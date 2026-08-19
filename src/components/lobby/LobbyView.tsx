@@ -186,7 +186,7 @@ export function LobbyView() {
             <NeonButton onClick={handleGpsSearch} variant="green">
               <span className="flex items-center justify-center gap-2">
                 <LocateFixed className="h-5 w-5" />
-                Utiliser ma position GPS
+                Check-in à ma salle
               </span>
             </NeonButton>
 
