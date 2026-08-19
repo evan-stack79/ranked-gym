@@ -36,16 +36,16 @@ function hashString(value: string): number {
   return Math.abs(hash)
 }
 
-export function generateLobbyMembers(gymId: string): GymMember[] {
+export function generateLobbyMembers(gymId: string, count = 4): GymMember[] {
   const seed = hashString(gymId)
-  const count = 3 + (seed % 2)
+  const memberCount = count > 0 ? count : 3 + (seed % 2)
   const shuffled = [...LOBBY_POOL].sort((a, b) => {
     const scoreA = hashString(gymId + a.username)
     const scoreB = hashString(gymId + b.username)
     return scoreA - scoreB
   })
 
-  return shuffled.slice(0, count).map((member, index) => ({
+  return shuffled.slice(0, memberCount).map((member, index) => ({
     ...member,
     id: `${gymId}-member-${index}`,
   }))

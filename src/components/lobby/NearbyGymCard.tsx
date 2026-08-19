@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Building2, MapPin, Navigation, Lock, CheckCircle2 } from 'lucide-react'
 import type { NearbyGym } from '../../types'
 import { formatDistance, CHECK_IN_RADIUS_METERS } from '../../utils/geo'
@@ -33,7 +34,14 @@ export function NearbyGymCard({
           </div>
 
           <div className="min-w-0 flex-1">
-            <h3 className="truncate font-semibold text-white">{gym.name}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="truncate font-semibold text-white">{gym.name}</h3>
+              {gym.isCustom && (
+                <span className="shrink-0 rounded-full bg-neon-purple/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neon-purple">
+                  Perso
+                </span>
+              )}
+            </div>
             {gym.address && (
               <p className="mt-0.5 flex items-start gap-1 text-xs text-slate-500">
                 <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
@@ -49,7 +57,7 @@ export function NearbyGymCard({
                 }`}
               >
                 <Navigation className="h-3 w-3" />
-                {formatDistance(gym.distanceMeters)}
+                {gym.isCustom ? 'Sur place' : formatDistance(gym.distanceMeters)}
               </span>
               {gym.canCheckIn ? (
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-neon-green">
@@ -92,6 +100,7 @@ interface NearbyGymListProps {
   onCheckIn: (gym: NearbyGym) => void
   isCheckingIn: boolean
   checkingInGymId: string | null
+  footer?: ReactNode
 }
 
 export function NearbyGymList({
@@ -99,6 +108,7 @@ export function NearbyGymList({
   onCheckIn,
   isCheckingIn,
   checkingInGymId,
+  footer,
 }: NearbyGymListProps) {
   return (
     <section>
@@ -119,6 +129,8 @@ export function NearbyGymList({
           </li>
         ))}
       </ul>
+
+      {footer && <div className="mt-4">{footer}</div>}
     </section>
   )
 }

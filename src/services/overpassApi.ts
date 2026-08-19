@@ -6,6 +6,19 @@ const OVERPASS_ENDPOINTS = [
   'https://overpass.kumi.systems/api/interpreter',
 ]
 
+const GYM_TAG_FILTERS: Array<[string, string]> = [
+  ['leisure', 'fitness_centre'],
+  ['leisure', 'sports_centre'],
+  ['leisure', 'gym'],
+  ['sport', 'fitness'],
+  ['sport', 'weightlifting'],
+  ['sport', 'bodybuilding'],
+  ['sport', 'gymnastics'],
+  ['club', 'sport'],
+  ['amenity', 'gym'],
+  ['building', 'gym'],
+]
+
 interface OverpassElement {
   type: 'node' | 'way' | 'relation'
   id: number
@@ -19,19 +32,33 @@ interface OverpassResponse {
   elements: OverpassElement[]
 }
 
+function buildTagQueries(radiusMeters: number, lat: number, lng: number): string {
+  return GYM_TAG_FILTERS.map(([key, value]) => `
+      node["${key}"="${value}"](around:${radiusMeters},${lat},${lng});
+      way["${key}"="${value}"](around:${radiusMeters},${lat},${lng});
+      relation["${key}"="${value}"](around:${radiusMeters},${lat},${lng});
+    `).join('\n')
+}
+
 function buildOverpassQuery(lat: number, lng: number, radiusMeters: number): string {
   return `
-    [out:json][timeout:25];
+    [out:json][timeout:30];
     (
-      node["leisure"="fitness_centre"](around:${radiusMeters},${lat},${lng});
-      way["leisure"="fitness_centre"](around:${radiusMeters},${lat},${lng});
-      relation["leisure"="fitness_centre"](around:${radiusMeters},${lat},${lng});
-      node["sport"="fitness"](around:${radiusMeters},${lat},${lng});
-      way["sport"="fitness"](around:${radiusMeters},${lat},${lng});
-      relation["sport"="fitness"](around:${radiusMeters},${lat},${lng});
+      ${buildTagQueries(radiusMeters, lat, lng)}
     );
     out center;
   `.trim()
+}
+
+function resolveGymName(tags: Record<string, string> | undefined): string | null {
+  if (!tags) return null
+
+  const fromAddress =
+    tags['addr:housenumber'] && tags['addr:street']
+      ? `${tags['addr:housenumber']} ${tags['addr:street']}`
+      : null
+
+  return tags.name?.trim() || tags.operator?.trim() || tags.brand?.trim() || fromAddress
 }
 
 function parseAddress(tags: Record<string, string> | undefined): string | undefined {
@@ -52,7 +79,7 @@ function elementToGym(
   const lng = element.lon ?? element.center?.lon
   if (lat == null || lng == null) return null
 
-  const name = element.tags?.name?.trim()
+  const name = resolveGymName(element.tags)
   if (!name) return null
 
   const distanceMeters = haversineDistanceMeters(userLat, userLng, lat, lng)
@@ -64,21 +91,25 @@ function elementToGym(
     lng,
     address: parseAddress(element.tags),
     distanceMeters,
+    isCustom: false,
   }
 }
 
 function dedupeGyms(gyms: Omit<NearbyGym, 'canCheckIn'>[]): Omit<NearbyGym, 'canCheckIn'>[] {
-  const seen = new Map<string, Omit<NearbyGym, 'canCheckIn'>>()
+  const result: Omit<NearbyGym, 'canCheckIn'>[] = []
 
-  for (const gym of gyms) {
-    const key = gym.name.toLowerCase()
-    const existing = seen.get(key)
-    if (!existing || gym.distanceMeters < existing.distanceMeters) {
-      seen.set(key, gym)
+  for (const gym of gyms.sort((a, b) => a.distanceMeters - b.distanceMeters)) {
+    const duplicate = result.find(
+      (existing) =>
+        existing.name.toLowerCase() === gym.name.toLowerCase() ||
+        haversineDistanceMeters(existing.lat, existing.lng, gym.lat, gym.lng) < 40,
+    )
+    if (!duplicate) {
+      result.push(gym)
     }
   }
 
-  return [...seen.values()].sort((a, b) => a.distanceMeters - b.distanceMeters)
+  return result
 }
 
 async function fetchFromEndpoint(
@@ -125,4 +156,33 @@ export async function fetchNearbyGyms(
   }
 
   throw lastError ?? new Error('Impossible de contacter l\'API Overpass.')
+}
+
+function hashString(value: string): number {
+  let hash = 0
+  for (let i = 0; i < value.length; i++) {
+    hash = value.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return Math.abs(hash)
+}
+
+export function createVirtualGym(
+  name: string,
+  lat: number,
+  lng: number,
+  addressLabel?: string,
+): NearbyGym {
+  const trimmed = name.trim()
+  const id = `custom-${hashString(`${trimmed}-${lat}-${lng}`)}`
+
+  return {
+    id,
+    name: trimmed,
+    lat,
+    lng,
+    address: addressLabel ?? 'Lobby créé par la communauté',
+    distanceMeters: 0,
+    canCheckIn: true,
+    isCustom: true,
+  }
 }

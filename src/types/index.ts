@@ -27,6 +27,7 @@ export interface NearbyGym {
   address?: string
   distanceMeters: number
   canCheckIn: boolean
+  isCustom?: boolean
 }
 
 export interface GeoCoordinates {

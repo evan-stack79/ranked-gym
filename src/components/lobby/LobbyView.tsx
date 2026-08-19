@@ -7,8 +7,9 @@ import { CitySearchFallback } from './CitySearchFallback'
 import { NeonButton } from '../ui/NeonButton'
 import { getCurrentPosition, GeolocationError } from '../../services/geolocation'
 import { geocodeCity, NominatimError } from '../../services/nominatimApi'
-import { fetchNearbyGyms } from '../../services/overpassApi'
+import { fetchNearbyGyms, createVirtualGym } from '../../services/overpassApi'
 import { generateLobbyMembers } from '../../data/mockData'
+import { CreateLobbyPanel } from './CreateLobbyPanel'
 import { formatDistance, SEARCH_RADIUS_METERS } from '../../utils/geo'
 import type { GymMember, LobbyPhase, LocationContext, NearbyGym } from '../../types'
 
@@ -97,6 +98,29 @@ export function LobbyView() {
       }
     },
     [searchGymsAt],
+  )
+
+  const handleCreateCustomLobby = useCallback(
+    async (gymName: string) => {
+      if (!location) return
+
+      const customGym = createVirtualGym(
+        gymName,
+        location.coords.lat,
+        location.coords.lng,
+        location.source === 'manual' ? location.label : undefined,
+      )
+
+      setNearbyGyms((prev) => [customGym, ...prev.filter((g) => g.id !== customGym.id)])
+      setCheckingInGymId(customGym.id)
+      await new Promise((resolve) => setTimeout(resolve, 600))
+
+      setCheckedInGym(customGym)
+      setLobbyMembers(generateLobbyMembers(customGym.id, 3))
+      setPhase('checked-in')
+      setCheckingInGymId(null)
+    },
+    [location],
   )
 
   const handleGymCheckIn = useCallback(async (gym: NearbyGym) => {
@@ -221,8 +245,8 @@ export function LobbyView() {
 
       {isLoading && <LobbyLoader phase={loaderPhase} />}
 
-      {phase === 'ready' && nearbyGyms.length === 0 && (
-        <div className="flex flex-col items-center gap-4 py-8 text-center">
+      {phase === 'ready' && nearbyGyms.length === 0 && location && (
+        <div className="flex flex-col items-center gap-4 py-4 text-center">
           <MapPin className="h-12 w-12 text-slate-600" />
           <div>
             <p className="font-medium text-white">Aucune salle trouvée</p>
@@ -230,6 +254,9 @@ export function LobbyView() {
               Aucun centre fitness OpenStreetMap dans un rayon de{' '}
               {formatDistance(SEARCH_RADIUS_METERS)}.
             </p>
+          </div>
+          <div className="w-full max-w-sm">
+            <CreateLobbyPanel onCreate={handleCreateCustomLobby} />
           </div>
           <NeonButton onClick={resetToIdle} variant="blue" className="max-w-xs">
             Nouvelle recherche
@@ -254,6 +281,7 @@ export function LobbyView() {
             onCheckIn={handleGymCheckIn}
             isCheckingIn={checkingInGymId != null}
             checkingInGymId={checkingInGymId}
+            footer={<CreateLobbyPanel onCreate={handleCreateCustomLobby} />}
           />
         </>
       )}
@@ -265,6 +293,11 @@ export function LobbyView() {
               <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-neon-green" />
               <div>
                 <p className="font-medium text-neon-green">Check-in confirmé</p>
+                {checkedInGym.isCustom && (
+                  <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-neon-purple/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neon-purple">
+                    Lobby perso créé
+                  </span>
+                )}
                 <p className="mt-0.5 font-semibold text-white">{checkedInGym.name}</p>
                 {checkedInGym.address && (
                   <p className="text-xs text-slate-500">{checkedInGym.address}</p>
