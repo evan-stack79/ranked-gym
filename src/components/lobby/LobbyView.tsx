@@ -1,5 +1,14 @@
-import { useState, useCallback } from 'react'
-import { MapPin, Users, Radio, RefreshCw, AlertCircle, LocateFixed, Navigation } from 'lucide-react'
+import { useState, useCallback, useEffect } from 'react'
+import {
+  MapPin,
+  Users,
+  Radio,
+  RefreshCw,
+  AlertCircle,
+  LocateFixed,
+  Navigation,
+  LogOut,
+} from 'lucide-react'
 import { GymMemberList } from './GymMemberCard'
 import { NearbyGymList } from './NearbyGymCard'
 import { LobbyLoader } from './LobbyLoader'
@@ -8,10 +17,30 @@ import { NeonButton } from '../ui/NeonButton'
 import { getCurrentPosition, GeolocationError } from '../../services/geolocation'
 import { geocodeCity, NominatimError } from '../../services/nominatimApi'
 import { fetchNearbyGyms, createVirtualGym } from '../../services/overpassApi'
+import {
+  mergeWithCustomGyms,
+  saveCustomGym,
+  saveCheckIn,
+  getActiveCheckIn,
+  clearCheckIn,
+  formatCheckInDuration,
+} from '../../services/lobbyStorage'
 import { generateLobbyMembers } from '../../data/mockData'
 import { CreateLobbyPanel } from './CreateLobbyPanel'
 import { formatDistance, SEARCH_RADIUS_METERS } from '../../utils/geo'
 import type { GymMember, LobbyPhase, LocationContext, NearbyGym } from '../../types'
+
+function gymToLocation(gym: NearbyGym): LocationContext {
+  return {
+    coords: { lat: gym.lat, lng: gym.lng },
+    source: 'manual',
+    label: gym.address ?? gym.name,
+  }
+}
+
+function memberCountForGym(gym: NearbyGym): number {
+  return gym.isCustom ? 3 : 4
+}
 
 export function LobbyView() {
   const [phase, setPhase] = useState<LobbyPhase>('idle')
@@ -21,8 +50,34 @@ export function LobbyView() {
   const [checkedInGym, setCheckedInGym] = useState<NearbyGym | null>(null)
   const [lobbyMembers, setLobbyMembers] = useState<GymMember[]>([])
   const [checkingInGymId, setCheckingInGymId] = useState<string | null>(null)
+  const [checkedInAt, setCheckedInAt] = useState<number | null>(null)
+  const [hydrated, setHydrated] = useState(false)
+
+  useEffect(() => {
+    const savedCheckIn = getActiveCheckIn()
+    if (savedCheckIn) {
+      setCheckedInGym(savedCheckIn.gym)
+      setCheckedInAt(savedCheckIn.checkedInAt)
+      setLocation(gymToLocation(savedCheckIn.gym))
+      setLobbyMembers(
+        generateLobbyMembers(savedCheckIn.gym.id, memberCountForGym(savedCheckIn.gym)),
+      )
+      setNearbyGyms(mergeWithCustomGyms([savedCheckIn.gym]))
+      setPhase('checked-in')
+    }
+    setHydrated(true)
+  }, [])
+
+  const enterLobby = useCallback((gym: NearbyGym) => {
+    saveCheckIn(gym)
+    setCheckedInGym(gym)
+    setCheckedInAt(Date.now())
+    setLobbyMembers(generateLobbyMembers(gym.id, memberCountForGym(gym)))
+    setPhase('checked-in')
+  }, [])
 
   const resetToIdle = useCallback(() => {
+    clearCheckIn()
     setPhase('idle')
     setError(null)
     setLocation(null)
@@ -30,20 +85,31 @@ export function LobbyView() {
     setCheckedInGym(null)
     setLobbyMembers([])
     setCheckingInGymId(null)
+    setCheckedInAt(null)
   }, [])
+
+  const handleLeaveGym = useCallback(() => {
+    clearCheckIn()
+    setCheckedInGym(null)
+    setLobbyMembers([])
+    setCheckedInAt(null)
+    setPhase(location ? 'ready' : 'idle')
+  }, [location])
 
   const searchGymsAt = useCallback(async (ctx: LocationContext) => {
     setError(null)
     setLocation(ctx)
+    clearCheckIn()
     setCheckedInGym(null)
     setLobbyMembers([])
+    setCheckedInAt(null)
     setPhase('fetching')
 
     try {
       const gyms = await fetchNearbyGyms(ctx.coords.lat, ctx.coords.lng, {
         allowAllCheckIn: ctx.source === 'manual',
       })
-      setNearbyGyms(gyms)
+      setNearbyGyms(mergeWithCustomGyms(gyms))
       setPhase('ready')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Impossible de charger les salles.')
@@ -111,29 +177,36 @@ export function LobbyView() {
         location.source === 'manual' ? location.label : undefined,
       )
 
-      setNearbyGyms((prev) => [customGym, ...prev.filter((g) => g.id !== customGym.id)])
+      saveCustomGym(customGym)
+      setNearbyGyms((prev) => mergeWithCustomGyms([customGym, ...prev.filter((g) => g.id !== customGym.id)]))
+
       setCheckingInGymId(customGym.id)
       await new Promise((resolve) => setTimeout(resolve, 600))
-
-      setCheckedInGym(customGym)
-      setLobbyMembers(generateLobbyMembers(customGym.id, 3))
-      setPhase('checked-in')
       setCheckingInGymId(null)
+      enterLobby(customGym)
     },
-    [location],
+    [location, enterLobby],
   )
 
-  const handleGymCheckIn = useCallback(async (gym: NearbyGym) => {
-    if (!gym.canCheckIn) return
+  const handleGymCheckIn = useCallback(
+    async (gym: NearbyGym) => {
+      if (!gym.canCheckIn) return
 
-    setCheckingInGymId(gym.id)
-    await new Promise((resolve) => setTimeout(resolve, 800))
+      setCheckingInGymId(gym.id)
+      await new Promise((resolve) => setTimeout(resolve, 800))
+      setCheckingInGymId(null)
+      enterLobby(gym)
+    },
+    [enterLobby],
+  )
 
-    setCheckedInGym(gym)
-    setLobbyMembers(generateLobbyMembers(gym.id))
-    setPhase('checked-in')
-    setCheckingInGymId(null)
-  }, [])
+  if (!hydrated) {
+    return (
+      <div className="flex flex-col gap-6">
+        <LobbyLoader phase="fetching" />
+      </div>
+    )
+  }
 
   const isLoading = phase === 'locating' || phase === 'geocoding' || phase === 'fetching'
   const checkInEligibleCount = nearbyGyms.filter((g) => g.canCheckIn).length
@@ -293,6 +366,11 @@ export function LobbyView() {
               <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-neon-green" />
               <div>
                 <p className="font-medium text-neon-green">Check-in confirmé</p>
+                {checkedInAt != null && (
+                  <p className="mt-0.5 text-xs text-neon-green/70">
+                    Session {formatCheckInDuration(checkedInAt)}
+                  </p>
+                )}
                 {checkedInGym.isCustom && (
                   <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-neon-purple/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neon-purple">
                     Lobby perso créé
@@ -303,7 +381,9 @@ export function LobbyView() {
                   <p className="text-xs text-slate-500">{checkedInGym.address}</p>
                 )}
                 <p className="mt-1 text-xs text-slate-500">
-                  {formatDistance(checkedInGym.distanceMeters)} du point de recherche
+                  {checkedInGym.isCustom
+                    ? 'Salle sauvegardée localement'
+                    : `${formatDistance(checkedInGym.distanceMeters)} du point de recherche`}
                 </p>
               </div>
             </div>
@@ -317,6 +397,15 @@ export function LobbyView() {
           </div>
 
           <GymMemberList members={lobbyMembers} gymName={checkedInGym.name} />
+
+          <button
+            type="button"
+            onClick={handleLeaveGym}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-500/30 bg-red-500/10 py-3 text-sm font-semibold text-red-300 transition-all hover:border-red-500/50 hover:bg-red-500/15 active:scale-[0.98]"
+          >
+            <LogOut className="h-4 w-4" />
+            Quitter la salle
+          </button>
 
           <NeonButton onClick={resetToIdle} variant="blue" className="py-3 text-base">
             <span className="flex items-center justify-center gap-2">
