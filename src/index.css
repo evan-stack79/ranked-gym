@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+@theme {
+  --color-anthracite: #121218;
+  --color-anthracite-light: #1a1a24;
+  --color-neon-green: #00ff88;
+  --color-neon-blue: #00d4ff;
+  --color-neon-purple: #a855f7;
+  --font-family-display: "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: #0a0a0f;
+  color: #e2e8f0;
+  font-family: var(--font-family-display);
+  overscroll-behavior: none;
+}
+
+.neon-glow-green {
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.3), 0 0 40px rgba(0, 255, 136, 0.1);
+}
+
+.neon-glow-blue {
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.3), 0 0 40px rgba(0, 212, 255, 0.1);
+}
+
+.neon-text-green {
+  text-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
+}
+
+.neon-text-blue {
+  text-shadow: 0 0 10px rgba(0, 212, 255, 0.6);
+}
+
+.gradient-border {
+  background: linear-gradient(135deg, rgba(0, 255, 136, 0.4), rgba(0, 212, 255, 0.4));
+  padding: 1px;
+  border-radius: 1rem;
+}
+
+@keyframes pulse-neon {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-pulse-neon {
+  animation: pulse-neon 2s ease-in-out infinite;
+}
