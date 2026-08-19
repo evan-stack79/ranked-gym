@@ -11,13 +11,13 @@ export const currentUser = {
 }
 
 export const rankColors: Record<RankTier, { text: string; bg: string; border: string }> = {
-  Bronze: { text: 'text-amber-600', bg: 'bg-amber-600/20', border: 'border-amber-600/40' },
-  Argent: { text: 'text-slate-300', bg: 'bg-slate-400/20', border: 'border-slate-400/40' },
-  Or: { text: 'text-yellow-400', bg: 'bg-yellow-400/20', border: 'border-yellow-400/40' },
-  Platine: { text: 'text-neon-blue', bg: 'bg-neon-blue/20', border: 'border-neon-blue/40' },
-  Diamant: { text: 'text-cyan-300', bg: 'bg-cyan-400/20', border: 'border-cyan-400/40' },
-  Master: { text: 'text-fuchsia-400', bg: 'bg-fuchsia-500/20', border: 'border-fuchsia-400/40' },
-  Légende: { text: 'text-neon-green', bg: 'bg-neon-green/20', border: 'border-neon-green/40' },
+  Bronze: { text: 'text-[#D4A574]', bg: 'bg-[#3D2E24]/60', border: 'border-transparent' },
+  Argent: { text: 'text-[#E5E5EA]', bg: 'bg-[#48484A]/60', border: 'border-transparent' },
+  Or: { text: 'text-[#F2D98B]', bg: 'bg-[#3D3520]/60', border: 'border-transparent' },
+  Platine: { text: 'text-[#B8D4E8]', bg: 'bg-[#1E2A38]/60', border: 'border-transparent' },
+  Diamant: { text: 'text-[#C8E6F5]', bg: 'bg-[#1A2838]/60', border: 'border-transparent' },
+  Master: { text: 'text-[#D4B8E8]', bg: 'bg-[#2A1A38]/60', border: 'border-transparent' },
+  Légende: { text: 'text-[#B8E8C8]', bg: 'bg-[#1A2E24]/60', border: 'border-transparent' },
 }
 
 const LOBBY_POOL: Omit<GymMember, 'id'>[] = [

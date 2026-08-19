@@ -1,5 +1,3 @@
-import { Zap, TrendingUp } from 'lucide-react'
-
 interface ProfileXPBarProps {
   level: number
   currentXp: number
@@ -11,49 +9,29 @@ export function ProfileXPBar({ level, currentXp, xpToNextLevel }: ProfileXPBarPr
   const remaining = xpToNextLevel - currentXp
 
   return (
-    <section className="rounded-2xl border border-white/5 bg-anthracite-light p-5">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-neon-green/15">
-            <TrendingUp className="h-5 w-5 text-neon-green" />
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Progression
-            </p>
-            <p className="text-lg font-black text-white">
-              Level <span className="text-neon-green">{level}</span>
-            </p>
-          </div>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-slate-500">XP</p>
-          <p className="font-bold text-neon-blue">
-            {currentXp.toLocaleString('fr-FR')}
-            <span className="text-slate-500"> / </span>
-            {xpToNextLevel.toLocaleString('fr-FR')}
+    <section className="rounded-2xl bg-[#1C1C1E] p-5">
+      <div className="mb-4 flex items-end justify-between">
+        <div>
+          <p className="ios-label">Expérience</p>
+          <p className="mt-1 text-[22px] font-semibold tracking-tight text-white">
+            Niveau {level}
           </p>
         </div>
+        <p className="text-[15px] font-medium text-[#8E8E93]">
+          {currentXp} / {xpToNextLevel} XP
+        </p>
       </div>
 
-      <div className="relative h-4 overflow-hidden rounded-full bg-black/40 ring-1 ring-white/10">
+      <div className="h-2 overflow-hidden rounded-full bg-[#2C2C2E]">
         <div
-          className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-neon-green via-emerald-400 to-neon-blue transition-all duration-700"
-          style={{
-            width: `${progress}%`,
-            boxShadow: '0 0 20px rgba(0,255,136,0.5)',
-          }}
+          className="h-full rounded-full bg-[#0A84FF] transition-all duration-500"
+          style={{ width: `${progress}%` }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent" />
       </div>
 
-      <div className="mt-2 flex items-center justify-between text-xs">
-        <span className="flex items-center gap-1 text-slate-500">
-          <Zap className="h-3 w-3 text-neon-green" />
-          {remaining.toLocaleString('fr-FR')} XP avant Level {level + 1}
-        </span>
-        <span className="font-semibold text-neon-green">{Math.round(progress)}%</span>
-      </div>
+      <p className="mt-3 text-[13px] text-[#8E8E93]">
+        {remaining} XP avant le niveau {level + 1}
+      </p>
     </section>
   )
 }

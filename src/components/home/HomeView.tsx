@@ -1,4 +1,4 @@
-import { TrendingUp, Zap, Trophy, ChevronRight } from 'lucide-react'
+import { Zap, Trophy, ChevronRight } from 'lucide-react'
 
 const feedItems = [
   {
@@ -26,63 +26,50 @@ const feedItems = [
 
 export function HomeView() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-10">
       <header>
-        <p className="text-xs font-semibold uppercase tracking-widest text-neon-green">
-          Bienvenue
-        </p>
-        <h1 className="text-2xl font-bold text-white">
-          Ranked <span className="neon-text-green text-neon-green">Gym</span>
-        </h1>
-        <p className="mt-1 text-sm text-slate-400">
-          Entraîne-toi. Monte en rank. Domine.
+        <h1 className="text-[34px] font-bold tracking-tight text-white">Accueil</h1>
+        <p className="mt-2 text-[17px] text-[#8E8E93]">
+          Entraîne-toi. Progresse. Partage ton rank.
         </p>
       </header>
 
-      <section className="gradient-border">
-        <div className="rounded-2xl bg-anthracite p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-400">Défi du jour</p>
-              <p className="mt-1 font-semibold text-white">100 pompes en 10 min</p>
-            </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-neon-green/10">
-              <Zap className="h-6 w-6 text-neon-green" />
-            </div>
+      <section className="rounded-2xl bg-[#1C1C1E] p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="ios-label">Défi du jour</p>
+            <p className="mt-2 text-[20px] font-semibold tracking-tight text-white">
+              100 pompes en 10 min
+            </p>
+            <p className="mt-3 flex items-center gap-2 text-[15px] text-[#8E8E93]">
+              <Trophy className="h-4 w-4" />
+              500 XP · Badge
+            </p>
           </div>
-          <div className="mt-4 flex items-center gap-2 text-sm text-neon-green">
-            <Trophy className="h-4 w-4" />
-            <span>Récompense : 500 XP + Badge</span>
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#2C2C2E]">
+            <Zap className="h-5 w-5 text-[#0A84FF]" strokeWidth={1.75} />
           </div>
         </div>
       </section>
 
       <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 font-semibold text-white">
-            <TrendingUp className="h-5 w-5 text-neon-blue" />
-            Fil d&apos;activité
-          </h2>
-        </div>
-
-        <ul className="space-y-3">
+        <h2 className="ios-label mb-4 px-1">Activité récente</h2>
+        <ul className="space-y-2">
           {feedItems.map((item) => (
             <li
               key={item.id}
-              className="flex items-center gap-3 rounded-xl border border-white/5 bg-anthracite-light p-4"
+              className="flex items-center gap-3 rounded-2xl bg-[#1C1C1E] p-4"
             >
               <div className="min-w-0 flex-1">
-                <p className="text-sm text-slate-300">
-                  <span className="font-semibold text-white">{item.user}</span>{' '}
-                  {item.action}
+                <p className="text-[15px] leading-snug text-white">
+                  <span className="font-semibold">{item.user}</span>{' '}
+                  <span className="text-[#EBEBF5]">{item.action}</span>
                 </p>
-                <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
-                  <span className="text-neon-green">{item.xp}</span>
-                  <span>·</span>
-                  <span>il y a {item.time}</span>
-                </div>
+                <p className="mt-1 text-[13px] text-[#8E8E93]">
+                  {item.xp} · il y a {item.time}
+                </p>
               </div>
-              <ChevronRight className="h-4 w-4 shrink-0 text-slate-600" />
+              <ChevronRight className="h-5 w-5 shrink-0 text-[#48484A]" />
             </li>
           ))}
         </ul>

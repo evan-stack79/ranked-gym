@@ -1,12 +1,11 @@
 @import "tailwindcss";
 
 @theme {
-  --color-anthracite: #121218;
-  --color-anthracite-light: #1a1a24;
-  --color-neon-green: #00ff88;
-  --color-neon-blue: #00d4ff;
-  --color-neon-purple: #a855f7;
-  --font-family-display: "Segoe UI", system-ui, sans-serif;
+  --color-ios-blue: #0a84ff;
+  --color-ios-gray: #8e8e93;
+  --color-ios-card: #1c1c1e;
+  --color-ios-card-secondary: #2c2c2e;
+  --font-family-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
 }
 
 * {
@@ -21,44 +20,27 @@ body,
 
 body {
   margin: 0;
-  background-color: #0a0a0f;
-  color: #e2e8f0;
-  font-family: var(--font-family-display);
+  background-color: #000;
+  color: #fff;
+  font-family: var(--font-family-sans);
+  -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
 }
 
-.neon-glow-green {
-  box-shadow: 0 0 20px rgba(0, 255, 136, 0.3), 0 0 40px rgba(0, 255, 136, 0.1);
-}
-
-.neon-glow-blue {
-  box-shadow: 0 0 20px rgba(0, 212, 255, 0.3), 0 0 40px rgba(0, 212, 255, 0.1);
-}
-
-.neon-text-green {
-  text-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
-}
-
-.neon-text-blue {
-  text-shadow: 0 0 10px rgba(0, 212, 255, 0.6);
-}
-
-.gradient-border {
-  background: linear-gradient(135deg, rgba(0, 255, 136, 0.4), rgba(0, 212, 255, 0.4));
-  padding: 1px;
+.ios-card {
+  background-color: #1c1c1e;
   border-radius: 1rem;
 }
 
-@keyframes pulse-neon {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
+.ios-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #8e8e93;
 }
 
-.animate-pulse-neon {
-  animation: pulse-neon 2s ease-in-out infinite;
+.glass-bar {
+  background-color: rgb(0 0 0 / 0.7);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }

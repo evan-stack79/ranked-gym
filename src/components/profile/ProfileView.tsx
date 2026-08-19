@@ -27,19 +27,15 @@ export function ProfileView() {
   const rank = getRankFromLevel(progress.level)
 
   return (
-    <div className="flex flex-col gap-5 pb-2">
+    <div className="flex flex-col gap-8 pb-4">
       <FighterHeader username={currentUser.username} title={rank.title} />
-
       <RankShowcase rank={rank} level={progress.level} />
-
       <ProfileXPBar
         level={progress.level}
         currentXp={progress.currentXp}
         xpToNextLevel={progress.xpToNextLevel}
       />
-
       <StatGrid />
-
       <BadgeShowcase />
     </div>
   )

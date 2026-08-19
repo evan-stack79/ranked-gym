@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect } from 'react'
 import {
   MapPin,
   Users,
-  Radio,
   RefreshCw,
   AlertCircle,
   LocateFixed,
@@ -214,50 +213,42 @@ export function LobbyView() {
     phase === 'locating' ? 'locating' : phase === 'geocoding' ? 'geocoding' : 'fetching'
 
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <div className="mb-1 flex items-center gap-2">
-          <Radio className="h-5 w-5 text-neon-blue animate-pulse-neon" />
-          <span className="text-xs font-semibold uppercase tracking-widest text-neon-blue">
-            Live Lobby
-          </span>
+    <div className="flex flex-col gap-8">
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[34px] font-bold tracking-tight text-white">Lobby</h1>
+          <p className="mt-2 text-[17px] text-[#8E8E93]">
+            Trouve et rejoins une salle à proximité.
+          </p>
         </div>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Lobby Salle</h1>
-            <p className="mt-1 text-sm text-slate-400">
-              Trouve les salles autour de toi via OpenStreetMap
-            </p>
-          </div>
-          {(phase === 'ready' || phase === 'checked-in') && !isLoading && (
-            <button
-              type="button"
-              onClick={resetToIdle}
-              className="rounded-xl border border-white/10 bg-anthracite-light p-2.5 text-slate-400 transition-colors hover:border-neon-blue/30 hover:text-neon-blue"
-              aria-label="Nouvelle recherche"
-            >
-              <RefreshCw className="h-5 w-5" />
-            </button>
-          )}
-        </div>
+        {(phase === 'ready' || phase === 'checked-in') && !isLoading && (
+          <button
+            type="button"
+            onClick={resetToIdle}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1C1C1E] text-[#8E8E93] active:bg-[#2C2C2E]"
+            aria-label="Nouvelle recherche"
+          >
+            <RefreshCw className="h-5 w-5" />
+          </button>
+        )}
       </header>
 
       {location && phase !== 'idle' && !isLoading && (
-        <div className="rounded-xl border border-neon-blue/20 bg-neon-blue/5 px-4 py-3">
-          <div className="flex items-center gap-2 text-sm">
+        <div className="rounded-2xl bg-[#1C1C1E] px-4 py-3">
+          <div className="flex items-center gap-2 text-[15px]">
             {location.source === 'gps' ? (
-              <LocateFixed className="h-4 w-4 shrink-0 text-neon-green" />
+              <LocateFixed className="h-4 w-4 shrink-0 text-[#0A84FF]" />
             ) : (
-              <MapPin className="h-4 w-4 shrink-0 text-neon-purple" />
+              <MapPin className="h-4 w-4 shrink-0 text-[#8E8E93]" />
             )}
-            <span className="text-slate-300">
+            <span className="text-[#EBEBF5]">
               {location.source === 'manual' ? (
-                <>Zone : <span className="text-white">{location.label}</span></>
+                <>Zone · <span className="text-white">{location.label}</span></>
               ) : (
                 <>
-                  GPS : {location.coords.lat.toFixed(5)}, {location.coords.lng.toFixed(5)}
+                  GPS · {location.coords.lat.toFixed(5)}, {location.coords.lng.toFixed(5)}
                   {location.coords.accuracy != null && (
-                    <span className="text-slate-500"> · ±{Math.round(location.coords.accuracy)} m</span>
+                    <span className="text-[#8E8E93]"> · ±{Math.round(location.coords.accuracy)} m</span>
                   )}
                 </>
               )}
@@ -267,49 +258,42 @@ export function LobbyView() {
       )}
 
       {phase === 'idle' && !isLoading && (
-        <div className="flex flex-col items-center gap-6 py-4">
-          <div className="relative">
-            <div className="absolute inset-0 rounded-full bg-neon-green/10 blur-3xl" />
-            <div className="relative flex h-28 w-28 items-center justify-center rounded-full border-2 border-neon-green/30 bg-anthracite-light">
-              <Navigation className="h-12 w-12 text-neon-green" />
+        <div className="flex flex-col gap-6 py-2">
+          <div className="flex flex-col items-center gap-4 py-6">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#1C1C1E]">
+              <Navigation className="h-9 w-9 text-[#8E8E93]" strokeWidth={1.75} />
             </div>
-          </div>
-
-          <div className="w-full max-w-sm space-y-4">
-            <p className="text-center text-sm text-slate-400">
-              Choisis comment localiser les salles à proximité
+            <p className="max-w-xs text-center text-[15px] text-[#8E8E93]">
+              Localise les salles autour de toi pour rejoindre un lobby.
             </p>
-
-            <NeonButton onClick={handleGpsSearch} variant="green">
-              <span className="flex items-center justify-center gap-2">
-                <LocateFixed className="h-5 w-5" />
-                Check-in à ma salle
-              </span>
-            </NeonButton>
-
-            <CitySearchFallback onSearch={handleCitySearch} />
           </div>
+
+          <NeonButton onClick={handleGpsSearch} variant="primary">
+            <span className="flex items-center justify-center gap-2">
+              <LocateFixed className="h-5 w-5" />
+              Check-in à ma salle
+            </span>
+          </NeonButton>
+
+          <CitySearchFallback onSearch={handleCitySearch} />
         </div>
       )}
 
       {error && phase === 'idle' && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4">
+        <div className="rounded-2xl bg-[#1C1C1E] p-4">
           <div className="flex items-start gap-3">
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#FF453A]" />
             <div className="flex-1">
-              <p className="font-medium text-red-300">{error}</p>
-              <p className="mt-1 text-xs text-slate-500">
-                Safari bloque parfois le GPS sur les liens de test — utilise la recherche par ville ci-dessus.
+              <p className="text-[15px] font-medium text-white">{error}</p>
+              <p className="mt-1 text-[13px] text-[#8E8E93]">
+                Utilise la recherche par ville si le GPS est bloqué.
               </p>
               <NeonButton
                 onClick={handleGpsSearch}
-                variant="green"
-                className="mt-3 py-3 text-sm"
+                variant="secondary"
+                className="mt-3 py-3 text-[15px]"
               >
-                <span className="flex items-center justify-center gap-2">
-                  <LocateFixed className="h-4 w-4" />
-                  Réessayer la géolocalisation
-                </span>
+                Réessayer la géolocalisation
               </NeonButton>
             </div>
           </div>
@@ -319,19 +303,18 @@ export function LobbyView() {
       {isLoading && <LobbyLoader phase={loaderPhase} />}
 
       {phase === 'ready' && nearbyGyms.length === 0 && location && (
-        <div className="flex flex-col items-center gap-4 py-4 text-center">
-          <MapPin className="h-12 w-12 text-slate-600" />
+        <div className="flex flex-col items-center gap-6 py-4 text-center">
+          <MapPin className="h-10 w-10 text-[#48484A]" />
           <div>
-            <p className="font-medium text-white">Aucune salle trouvée</p>
-            <p className="mt-1 text-sm text-slate-400">
-              Aucun centre fitness OpenStreetMap dans un rayon de{' '}
-              {formatDistance(SEARCH_RADIUS_METERS)}.
+            <p className="text-[17px] font-semibold text-white">Aucune salle trouvée</p>
+            <p className="mt-1 text-[15px] text-[#8E8E93]">
+              Aucun centre dans un rayon de {formatDistance(SEARCH_RADIUS_METERS)}.
             </p>
           </div>
-          <div className="w-full max-w-sm">
+          <div className="w-full">
             <CreateLobbyPanel onCreate={handleCreateCustomLobby} />
           </div>
-          <NeonButton onClick={resetToIdle} variant="blue" className="max-w-xs">
+          <NeonButton onClick={resetToIdle} variant="secondary" className="max-w-xs">
             Nouvelle recherche
           </NeonButton>
         </div>
@@ -340,13 +323,13 @@ export function LobbyView() {
       {phase === 'ready' && nearbyGyms.length > 0 && (
         <>
           {location?.source === 'gps' && checkInEligibleCount === 0 && (
-            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-amber-200/90">
+            <div className="rounded-2xl bg-[#1C1C1E] p-4 text-[15px] text-[#EBEBF5]">
               Approche-toi à moins de 200 m d&apos;une salle pour activer le check-in.
             </div>
           )}
           {location?.source === 'manual' && (
-            <div className="rounded-xl border border-neon-purple/20 bg-neon-purple/5 p-4 text-sm text-slate-300">
-              Mode ville : le check-in est disponible sur toutes les salles listées.
+            <div className="rounded-2xl bg-[#1C1C1E] p-4 text-[15px] text-[#8E8E93]">
+              Mode ville · check-in disponible sur toutes les salles listées.
             </div>
           )}
           <NearbyGymList
@@ -361,57 +344,42 @@ export function LobbyView() {
 
       {phase === 'checked-in' && checkedInGym && (
         <>
-          <div className="rounded-xl border border-neon-green/20 bg-neon-green/5 p-4">
-            <div className="flex items-start gap-3">
-              <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-neon-green" />
-              <div>
-                <p className="font-medium text-neon-green">Check-in confirmé</p>
-                {checkedInAt != null && (
-                  <p className="mt-0.5 text-xs text-neon-green/70">
-                    Session {formatCheckInDuration(checkedInAt)}
-                  </p>
-                )}
-                {checkedInGym.isCustom && (
-                  <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-neon-purple/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neon-purple">
-                    Lobby perso créé
-                  </span>
-                )}
-                <p className="mt-0.5 font-semibold text-white">{checkedInGym.name}</p>
-                {checkedInGym.address && (
-                  <p className="text-xs text-slate-500">{checkedInGym.address}</p>
-                )}
-                <p className="mt-1 text-xs text-slate-500">
-                  {checkedInGym.isCustom
-                    ? 'Salle sauvegardée localement'
-                    : `${formatDistance(checkedInGym.distanceMeters)} du point de recherche`}
-                </p>
-              </div>
-            </div>
+          <div className="rounded-2xl bg-[#1C1C1E] p-5">
+            <p className="text-[13px] font-medium text-[#30D158]">Check-in confirmé</p>
+            {checkedInAt != null && (
+              <p className="mt-1 text-[13px] text-[#8E8E93]">
+                Session {formatCheckInDuration(checkedInAt)}
+              </p>
+            )}
+            <p className="mt-2 text-[20px] font-semibold tracking-tight text-white">
+              {checkedInGym.name}
+            </p>
+            {checkedInGym.isCustom && (
+              <p className="mt-1 text-[13px] text-[#8E8E93]">Salle personnelle · sauvegardée</p>
+            )}
+            {checkedInGym.address && (
+              <p className="mt-1 text-[13px] text-[#8E8E93]">{checkedInGym.address}</p>
+            )}
           </div>
 
-          <div className="flex items-center gap-2 rounded-lg bg-anthracite-light px-4 py-3">
-            <Users className="h-5 w-5 text-neon-blue" />
-            <span className="text-sm text-slate-300">
-              Rivaux actifs dans ta salle — esprit compétition !
-            </span>
+          <div className="rounded-2xl bg-[#1C1C1E] px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-[#0A84FF]" strokeWidth={1.75} />
+              <span className="text-[15px] text-[#EBEBF5]">Membres actifs dans ta salle</span>
+            </div>
           </div>
 
           <GymMemberList members={lobbyMembers} gymName={checkedInGym.name} />
 
-          <button
-            type="button"
-            onClick={handleLeaveGym}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-500/30 bg-red-500/10 py-3 text-sm font-semibold text-red-300 transition-all hover:border-red-500/50 hover:bg-red-500/15 active:scale-[0.98]"
-          >
-            <LogOut className="h-4 w-4" />
-            Quitter la salle
-          </button>
-
-          <NeonButton onClick={resetToIdle} variant="blue" className="py-3 text-base">
+          <NeonButton onClick={handleLeaveGym} variant="destructive" className="py-3.5 text-[15px]">
             <span className="flex items-center justify-center gap-2">
-              <RefreshCw className="h-4 w-4" />
-              Changer de salle
+              <LogOut className="h-4 w-4" />
+              Quitter la salle
             </span>
+          </NeonButton>
+
+          <NeonButton onClick={resetToIdle} variant="secondary" className="py-3.5 text-[15px]">
+            Changer de salle
           </NeonButton>
         </>
       )}

@@ -7,7 +7,7 @@ interface NeonButtonProps {
   disabled?: boolean
   loading?: boolean
   loadingLabel?: string
-  variant?: 'green' | 'blue'
+  variant?: 'primary' | 'secondary' | 'destructive'
   className?: string
 }
 
@@ -17,23 +17,21 @@ export function NeonButton({
   disabled = false,
   loading = false,
   loadingLabel = 'Chargement...',
-  variant = 'green',
+  variant = 'primary',
   className = '',
 }: NeonButtonProps) {
-  const glowClass = variant === 'green' ? 'neon-glow-green' : 'neon-glow-blue'
-  const gradientClass =
-    variant === 'green'
-      ? 'from-neon-green/20 to-neon-green/5 hover:from-neon-green/30'
-      : 'from-neon-blue/20 to-neon-blue/5 hover:from-neon-blue/30'
-  const borderClass = variant === 'green' ? 'border-neon-green/50' : 'border-neon-blue/50'
-  const textClass = variant === 'green' ? 'text-neon-green' : 'text-neon-blue'
+  const variantClass = {
+    primary: 'bg-[#0A84FF] text-white active:opacity-80',
+    secondary: 'bg-[#1C1C1E] text-white active:bg-[#2C2C2E]',
+    destructive: 'bg-[#1C1C1E] text-[#FF453A] active:bg-[#2C2C2E]',
+  }[variant]
 
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled || loading}
-      className={`w-full rounded-2xl border bg-gradient-to-b px-6 py-5 text-lg font-bold transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${glowClass} ${gradientClass} ${borderClass} ${textClass} ${className}`}
+      className={`w-full rounded-2xl px-6 py-4 text-[17px] font-semibold tracking-tight transition-opacity disabled:cursor-not-allowed disabled:opacity-40 ${variantClass} ${className}`}
     >
       {loading ? (
         <span className="flex items-center justify-center gap-2">

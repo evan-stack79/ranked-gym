@@ -20,77 +20,60 @@ export function NearbyGymCard({
   const isThisCheckingIn = isCheckingIn && checkingInGymId === gym.id
 
   return (
-    <article className={`gradient-border ${gym.canCheckIn ? 'neon-glow-green' : ''}`}>
-      <div className="rounded-2xl bg-anthracite p-4">
-        <div className="flex items-start gap-3">
-          <div
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-              gym.canCheckIn ? 'bg-neon-green/15' : 'bg-anthracite-light'
-            }`}
-          >
-            <Building2
-              className={`h-5 w-5 ${gym.canCheckIn ? 'text-neon-green' : 'text-slate-400'}`}
-            />
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h3 className="truncate font-semibold text-white">{gym.name}</h3>
-              {gym.isCustom && (
-                <span className="shrink-0 rounded-full bg-neon-purple/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-neon-purple">
-                  Perso
-                </span>
-              )}
-            </div>
-            {gym.address && (
-              <p className="mt-0.5 flex items-start gap-1 text-xs text-slate-500">
-                <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
-                <span className="line-clamp-2">{gym.address}</span>
-              </p>
-            )}
-            <div className="mt-2 flex items-center gap-2">
-              <span
-                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                  gym.canCheckIn
-                    ? 'bg-neon-green/15 text-neon-green'
-                    : 'bg-anthracite-light text-slate-400'
-                }`}
-              >
-                <Navigation className="h-3 w-3" />
-                {gym.isCustom ? 'Sur place' : formatDistance(gym.distanceMeters)}
-              </span>
-              {gym.canCheckIn ? (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-neon-green">
-                  <CheckCircle2 className="h-3 w-3" />
-                  À portée
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-xs text-slate-500">
-                  <Lock className="h-3 w-3" />
-                  &gt; {CHECK_IN_RADIUS_METERS} m
-                </span>
-              )}
-            </div>
-          </div>
+    <article className="rounded-2xl bg-[#1C1C1E] p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#2C2C2E]">
+          <Building2 className="h-5 w-5 text-[#0A84FF]" strokeWidth={1.75} />
         </div>
 
-        {gym.canCheckIn && (
-          <div className="mt-4">
-            <NeonButton
-              onClick={() => onCheckIn(gym)}
-              loading={isThisCheckingIn}
-              loadingLabel="Check-in..."
-              variant="green"
-              className="py-3 text-base"
-            >
-              <span className="flex items-center justify-center gap-2">
-                <MapPin className="h-4 w-4" />
-                Check-in ici
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="truncate font-semibold tracking-tight text-white">{gym.name}</h3>
+            {gym.isCustom && (
+              <span className="shrink-0 rounded-md bg-[#2C2C2E] px-1.5 py-0.5 text-[10px] font-medium text-[#8E8E93]">
+                Perso
               </span>
-            </NeonButton>
+            )}
           </div>
-        )}
+          {gym.address && (
+            <p className="mt-1 flex items-start gap-1 text-[13px] text-[#8E8E93]">
+              <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
+              <span className="line-clamp-2">{gym.address}</span>
+            </p>
+          )}
+          <div className="mt-2 flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 text-[13px] text-[#8E8E93]">
+              <Navigation className="h-3 w-3" />
+              {gym.isCustom ? 'Sur place' : formatDistance(gym.distanceMeters)}
+            </span>
+            {gym.canCheckIn ? (
+              <span className="inline-flex items-center gap-1 text-[13px] font-medium text-[#0A84FF]">
+                <CheckCircle2 className="h-3 w-3" />
+                À portée
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[13px] text-[#48484A]">
+                <Lock className="h-3 w-3" />
+                &gt; {CHECK_IN_RADIUS_METERS} m
+              </span>
+            )}
+          </div>
+        </div>
       </div>
+
+      {gym.canCheckIn && (
+        <div className="mt-4">
+          <NeonButton
+            onClick={() => onCheckIn(gym)}
+            loading={isThisCheckingIn}
+            loadingLabel="Check-in…"
+            variant="primary"
+            className="py-3.5 text-[15px]"
+          >
+            Check-in ici
+          </NeonButton>
+        </div>
+      )}
     </article>
   )
 }
@@ -112,12 +95,12 @@ export function NearbyGymList({
 }: NearbyGymListProps) {
   return (
     <section>
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="font-semibold text-white">Salles à proximité</h2>
-        <span className="text-xs text-slate-500">{gyms.length} trouvée{gyms.length > 1 ? 's' : ''}</span>
+      <div className="mb-4 flex items-center justify-between px-1">
+        <h2 className="ios-label">Salles à proximité</h2>
+        <span className="text-[13px] text-[#8E8E93]">{gyms.length}</span>
       </div>
 
-      <ul className="space-y-3">
+      <ul className="space-y-2">
         {gyms.map((gym) => (
           <li key={gym.id}>
             <NearbyGymCard
@@ -130,7 +113,7 @@ export function NearbyGymList({
         ))}
       </ul>
 
-      {footer && <div className="mt-4">{footer}</div>}
+      {footer && <div className="mt-3">{footer}</div>}
     </section>
   )
 }
