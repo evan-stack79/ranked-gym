@@ -1,4 +1,5 @@
 import { Zap, Trophy, ChevronRight } from 'lucide-react'
+import { IconBadge } from '../ui/IconBadge'
 
 const feedItems = [
   {
@@ -34,7 +35,7 @@ export function HomeView() {
         </p>
       </header>
 
-      <section className="rounded-2xl bg-ios-surface p-5">
+      <section className="glass-card rounded-2xl p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="ios-label">Défi du jour</p>
@@ -42,13 +43,11 @@ export function HomeView() {
               100 pompes en 10 min
             </p>
             <p className="mt-3 flex items-center gap-2 text-[15px] text-[#8E8E93]">
-              <Trophy className="h-4 w-4" />
+              <Trophy className="h-4 w-4 text-[#FF9F0A]" strokeWidth={1.75} />
               500 XP · Badge
             </p>
           </div>
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-ios-inset">
-            <Zap className="h-5 w-5 text-[#0A84FF]" strokeWidth={1.75} />
-          </div>
+          <IconBadge icon={Zap} variant="blue" />
         </div>
       </section>
 
@@ -58,7 +57,7 @@ export function HomeView() {
           {feedItems.map((item) => (
             <li
               key={item.id}
-              className="flex items-center gap-3 rounded-2xl bg-ios-surface p-4"
+              className="glass-card flex items-center gap-3 rounded-2xl p-4"
             >
               <div className="min-w-0 flex-1">
                 <p className="text-[15px] leading-snug text-white">
@@ -66,7 +65,7 @@ export function HomeView() {
                   <span className="text-[#EBEBF5]">{item.action}</span>
                 </p>
                 <p className="mt-1 text-[13px] text-[#8E8E93]">
-                  {item.xp} · il y a {item.time}
+                  <span className="text-[#0A84FF]">{item.xp}</span> · il y a {item.time}
                 </p>
               </div>
               <ChevronRight className="h-5 w-5 shrink-0 text-[#48484A]" />

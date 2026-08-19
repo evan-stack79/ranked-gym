@@ -13,6 +13,7 @@ import { NearbyGymList } from './NearbyGymCard'
 import { LobbyLoader } from './LobbyLoader'
 import { CitySearchFallback } from './CitySearchFallback'
 import { NeonButton } from '../ui/NeonButton'
+import { IconBadge } from '../ui/IconBadge'
 import { getCurrentPosition, GeolocationError } from '../../services/geolocation'
 import { geocodeCity, NominatimError } from '../../services/nominatimApi'
 import { fetchNearbyGyms, createVirtualGym } from '../../services/overpassApi'
@@ -225,22 +226,22 @@ export function LobbyView() {
           <button
             type="button"
             onClick={resetToIdle}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-ios-surface text-[#8E8E93] active:bg-ios-inset"
+            className="flex h-10 w-10 items-center justify-center glass-card rounded-full active:bg-ios-inset"
             aria-label="Nouvelle recherche"
           >
-            <RefreshCw className="h-5 w-5" />
+            <RefreshCw className="h-5 w-5 text-[#0A84FF]" />
           </button>
         )}
       </header>
 
       {location && phase !== 'idle' && !isLoading && (
-        <div className="rounded-2xl bg-ios-surface px-4 py-3">
-          <div className="flex items-center gap-2 text-[15px]">
-            {location.source === 'gps' ? (
-              <LocateFixed className="h-4 w-4 shrink-0 text-[#0A84FF]" />
-            ) : (
-              <MapPin className="h-4 w-4 shrink-0 text-[#8E8E93]" />
-            )}
+        <div className="glass-card rounded-2xl px-4 py-3">
+          <div className="flex items-center gap-3 text-[15px]">
+            <IconBadge
+              icon={location.source === 'gps' ? LocateFixed : MapPin}
+              variant={location.source === 'gps' ? 'blue' : 'white'}
+              size="sm"
+            />
             <span className="text-[#EBEBF5]">
               {location.source === 'manual' ? (
                 <>Zone · <span className="text-white">{location.label}</span></>
@@ -260,9 +261,7 @@ export function LobbyView() {
       {phase === 'idle' && !isLoading && (
         <div className="flex flex-col gap-6 py-2">
           <div className="flex flex-col items-center gap-4 py-6">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-ios-surface">
-              <Navigation className="h-9 w-9 text-[#8E8E93]" strokeWidth={1.75} />
-            </div>
+            <IconBadge icon={Navigation} variant="blue" size="md" />
             <p className="max-w-xs text-center text-[15px] text-[#8E8E93]">
               Localise les salles autour de toi pour rejoindre un lobby.
             </p>
@@ -280,9 +279,9 @@ export function LobbyView() {
       )}
 
       {error && phase === 'idle' && (
-        <div className="rounded-2xl bg-ios-surface p-4">
+        <div className="glass-card rounded-2xl p-4">
           <div className="flex items-start gap-3">
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#FF453A]" />
+            <IconBadge icon={AlertCircle} variant="orange" size="sm" />
             <div className="flex-1">
               <p className="text-[15px] font-medium text-white">{error}</p>
               <p className="mt-1 text-[13px] text-[#8E8E93]">
@@ -304,7 +303,7 @@ export function LobbyView() {
 
       {phase === 'ready' && nearbyGyms.length === 0 && location && (
         <div className="flex flex-col items-center gap-6 py-4 text-center">
-          <MapPin className="h-10 w-10 text-[#48484A]" />
+          <IconBadge icon={MapPin} variant="white" />
           <div>
             <p className="text-[17px] font-semibold text-white">Aucune salle trouvée</p>
             <p className="mt-1 text-[15px] text-[#8E8E93]">
@@ -323,12 +322,12 @@ export function LobbyView() {
       {phase === 'ready' && nearbyGyms.length > 0 && (
         <>
           {location?.source === 'gps' && checkInEligibleCount === 0 && (
-            <div className="rounded-2xl bg-ios-surface p-4 text-[15px] text-[#EBEBF5]">
+            <div className="glass-card rounded-2xl p-4 text-[15px] text-[#EBEBF5]">
               Approche-toi à moins de 200 m d&apos;une salle pour activer le check-in.
             </div>
           )}
           {location?.source === 'manual' && (
-            <div className="rounded-2xl bg-ios-surface p-4 text-[15px] text-[#8E8E93]">
+            <div className="glass-card rounded-2xl p-4 text-[15px] text-[#8E8E93]">
               Mode ville · check-in disponible sur toutes les salles listées.
             </div>
           )}
@@ -344,7 +343,7 @@ export function LobbyView() {
 
       {phase === 'checked-in' && checkedInGym && (
         <>
-          <div className="rounded-2xl bg-ios-surface p-5">
+          <div className="glass-card rounded-2xl p-5">
             <p className="text-[13px] font-medium text-[#30D158]">Check-in confirmé</p>
             {checkedInAt != null && (
               <p className="mt-1 text-[13px] text-[#8E8E93]">
@@ -362,9 +361,9 @@ export function LobbyView() {
             )}
           </div>
 
-          <div className="rounded-2xl bg-ios-surface px-4 py-3">
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-[#0A84FF]" strokeWidth={1.75} />
+          <div className="glass-card rounded-2xl px-4 py-3">
+            <div className="flex items-center gap-3">
+              <IconBadge icon={Users} variant="blue" size="sm" />
               <span className="text-[15px] text-[#EBEBF5]">Membres actifs dans ta salle</span>
             </div>
           </div>

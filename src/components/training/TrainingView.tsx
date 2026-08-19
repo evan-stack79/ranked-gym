@@ -1,4 +1,5 @@
 import { Dumbbell, Clock, Plus, Play } from 'lucide-react'
+import { IconBadge } from '../ui/IconBadge'
 
 const quickExercises = [
   { name: 'Développé couché', muscle: 'Pectoraux', sets: '4 × 8' },
@@ -19,7 +20,8 @@ export function TrainingView() {
 
       <button
         type="button"
-        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#0A84FF] py-4 text-[17px] font-semibold tracking-tight text-white transition-opacity active:opacity-80"
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-[#0A84FF] py-4 text-[17px] font-semibold tracking-tight text-white transition-opacity active:opacity-80"
+        style={{ boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.15)' }}
       >
         <Play className="h-5 w-5 fill-current" />
         Démarrer une séance
@@ -38,17 +40,15 @@ export function TrainingView() {
           {quickExercises.map((exercise) => (
             <li
               key={exercise.name}
-              className="flex items-center gap-4 rounded-2xl bg-ios-surface p-4"
+              className="glass-card flex items-center gap-4 rounded-2xl p-4"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-ios-inset">
-                <Dumbbell className="h-5 w-5 text-[#0A84FF]" strokeWidth={1.75} />
-              </div>
+              <IconBadge icon={Dumbbell} variant="blue" />
               <div className="min-w-0 flex-1">
                 <p className="font-semibold tracking-tight text-white">{exercise.name}</p>
                 <p className="text-[13px] text-[#8E8E93]">{exercise.muscle}</p>
               </div>
-              <div className="flex items-center gap-1 text-[13px] text-[#8E8E93]">
-                <Clock className="h-3.5 w-3.5" />
+              <div className="flex items-center gap-2 text-[13px] text-[#8E8E93]">
+                <IconBadge icon={Clock} variant="white" size="sm" />
                 {exercise.sets}
               </div>
             </li>

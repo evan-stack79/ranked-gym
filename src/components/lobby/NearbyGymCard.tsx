@@ -3,6 +3,7 @@ import { Building2, MapPin, Navigation, Lock, CheckCircle2 } from 'lucide-react'
 import type { NearbyGym } from '../../types'
 import { formatDistance, CHECK_IN_RADIUS_METERS } from '../../utils/geo'
 import { NeonButton } from '../ui/NeonButton'
+import { IconBadge } from '../ui/IconBadge'
 
 interface NearbyGymCardProps {
   gym: NearbyGym
@@ -20,23 +21,21 @@ export function NearbyGymCard({
   const isThisCheckingIn = isCheckingIn && checkingInGymId === gym.id
 
   return (
-    <article className="rounded-2xl bg-ios-surface p-4">
+    <article className="glass-card rounded-2xl p-4">
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ios-inset">
-          <Building2 className="h-5 w-5 text-[#0A84FF]" strokeWidth={1.75} />
-        </div>
+        <IconBadge icon={Building2} variant={gym.canCheckIn ? 'green' : 'white'} />
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h3 className="truncate font-semibold tracking-tight text-white">{gym.name}</h3>
             {gym.isCustom && (
-              <span className="shrink-0 rounded-md bg-ios-inset px-1.5 py-0.5 text-[10px] font-medium text-[#8E8E93]">
+              <span className="shrink-0 rounded-md border border-white/5 bg-ios-inset px-1.5 py-0.5 text-[10px] font-medium text-[#8E8E93]">
                 Perso
               </span>
             )}
           </div>
           {gym.address && (
-            <p className="mt-1 flex items-start gap-1 text-[13px] text-[#8E8E93]">
+            <p className="mt-1 flex items-start gap-1.5 text-[13px] text-[#8E8E93]">
               <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
               <span className="line-clamp-2">{gym.address}</span>
             </p>
@@ -47,7 +46,7 @@ export function NearbyGymCard({
               {gym.isCustom ? 'Sur place' : formatDistance(gym.distanceMeters)}
             </span>
             {gym.canCheckIn ? (
-              <span className="inline-flex items-center gap-1 text-[13px] font-medium text-[#0A84FF]">
+              <span className="inline-flex items-center gap-1 text-[13px] font-medium text-[#30D158]">
                 <CheckCircle2 className="h-3 w-3" />
                 À portée
               </span>

@@ -1,4 +1,5 @@
 import { Loader2, Satellite, Radar, Search } from 'lucide-react'
+import { IconBadge } from '../ui/IconBadge'
 
 type LoaderPhase = 'locating' | 'geocoding' | 'fetching'
 
@@ -6,7 +7,10 @@ interface LobbyLoaderProps {
   phase: LoaderPhase
 }
 
-const LOADER_CONFIG: Record<LoaderPhase, { icon: typeof Satellite; title: string; subtitle: string }> = {
+const LOADER_CONFIG: Record<
+  LoaderPhase,
+  { icon: typeof Satellite; title: string; subtitle: string }
+> = {
   locating: {
     icon: Satellite,
     title: 'Localisation…',
@@ -30,9 +34,7 @@ export function LobbyLoader({ phase }: LobbyLoaderProps) {
 
   return (
     <div className="flex flex-col items-center gap-5 py-16">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-ios-surface">
-        <Icon className="h-7 w-7 text-[#8E8E93]" strokeWidth={1.75} />
-      </div>
+      <IconBadge icon={Icon} variant="blue" />
       <Loader2 className="h-5 w-5 animate-spin text-[#0A84FF]" />
       <div className="text-center">
         <p className="text-[17px] font-semibold tracking-tight text-white">{config.title}</p>
