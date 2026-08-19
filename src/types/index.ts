@@ -1,4 +1,4 @@
-export type RankTier = 'Bronze' | 'Argent' | 'Or' | 'Platine' | 'Diamant' | 'Légende'
+export type RankTier = 'Bronze' | 'Argent' | 'Or' | 'Platine' | 'Diamant' | 'Master' | 'Légende'
 
 export interface UserProfile {
   id: string

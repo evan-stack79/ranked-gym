@@ -6,8 +6,8 @@ export const currentUser = {
   avatarUrl: '',
   level: 42,
   rank: 'Platine' as RankTier,
-  currentXp: 7250,
-  xpToNextLevel: 10000,
+  currentXp: 850,
+  xpToNextLevel: 1000,
 }
 
 export const rankColors: Record<RankTier, { text: string; bg: string; border: string }> = {
@@ -16,6 +16,7 @@ export const rankColors: Record<RankTier, { text: string; bg: string; border: st
   Or: { text: 'text-yellow-400', bg: 'bg-yellow-400/20', border: 'border-yellow-400/40' },
   Platine: { text: 'text-neon-blue', bg: 'bg-neon-blue/20', border: 'border-neon-blue/40' },
   Diamant: { text: 'text-cyan-300', bg: 'bg-cyan-400/20', border: 'border-cyan-400/40' },
+  Master: { text: 'text-fuchsia-400', bg: 'bg-fuchsia-500/20', border: 'border-fuchsia-400/40' },
   Légende: { text: 'text-neon-green', bg: 'bg-neon-green/20', border: 'border-neon-green/40' },
 }
 
