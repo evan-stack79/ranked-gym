@@ -34,7 +34,7 @@ export function HomeView() {
         </p>
       </header>
 
-      <section className="rounded-2xl bg-[#1C1C1E] p-5">
+      <section className="rounded-2xl bg-ios-surface p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="ios-label">Défi du jour</p>
@@ -46,7 +46,7 @@ export function HomeView() {
               500 XP · Badge
             </p>
           </div>
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#2C2C2E]">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-ios-inset">
             <Zap className="h-5 w-5 text-[#0A84FF]" strokeWidth={1.75} />
           </div>
         </div>
@@ -58,7 +58,7 @@ export function HomeView() {
           {feedItems.map((item) => (
             <li
               key={item.id}
-              className="flex items-center gap-3 rounded-2xl bg-[#1C1C1E] p-4"
+              className="flex items-center gap-3 rounded-2xl bg-ios-surface p-4"
             >
               <div className="min-w-0 flex-1">
                 <p className="text-[15px] leading-snug text-white">

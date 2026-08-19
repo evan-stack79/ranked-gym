@@ -3,8 +3,9 @@
 @theme {
   --color-ios-blue: #0a84ff;
   --color-ios-gray: #8e8e93;
-  --color-ios-card: #1c1c1e;
-  --color-ios-card-secondary: #2c2c2e;
+  --color-ios-bg: #1c1c1e;
+  --color-ios-surface: #2c2c2e;
+  --color-ios-inset: #3a3a3c;
   --font-family-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
 }
 
@@ -20,7 +21,7 @@ body,
 
 body {
   margin: 0;
-  background-color: #000;
+  background-color: #1c1c1e;
   color: #fff;
   font-family: var(--font-family-sans);
   -webkit-font-smoothing: antialiased;
@@ -28,7 +29,7 @@ body {
 }
 
 .ios-card {
-  background-color: #1c1c1e;
+  background-color: #2c2c2e;
   border-radius: 1rem;
 }
 
@@ -40,7 +41,7 @@ body {
 }
 
 .glass-bar {
-  background-color: rgb(0 0 0 / 0.7);
+  background-color: rgb(28 28 30 / 0.72);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
 }

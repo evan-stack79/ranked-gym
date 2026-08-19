@@ -9,7 +9,7 @@ export function ProfileXPBar({ level, currentXp, xpToNextLevel }: ProfileXPBarPr
   const remaining = xpToNextLevel - currentXp
 
   return (
-    <section className="rounded-2xl bg-[#1C1C1E] p-5">
+    <section className="rounded-2xl bg-ios-surface p-5">
       <div className="mb-4 flex items-end justify-between">
         <div>
           <p className="ios-label">Expérience</p>
@@ -22,7 +22,7 @@ export function ProfileXPBar({ level, currentXp, xpToNextLevel }: ProfileXPBarPr
         </p>
       </div>
 
-      <div className="h-2 overflow-hidden rounded-full bg-[#2C2C2E]">
+      <div className="h-2 overflow-hidden rounded-full bg-ios-inset">
         <div
           className="h-full rounded-full bg-[#0A84FF] transition-all duration-500"
           style={{ width: `${progress}%` }}

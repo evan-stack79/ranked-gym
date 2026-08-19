@@ -38,9 +38,9 @@ export function TrainingView() {
           {quickExercises.map((exercise) => (
             <li
               key={exercise.name}
-              className="flex items-center gap-4 rounded-2xl bg-[#1C1C1E] p-4"
+              className="flex items-center gap-4 rounded-2xl bg-ios-surface p-4"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#2C2C2E]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-ios-inset">
                 <Dumbbell className="h-5 w-5 text-[#0A84FF]" strokeWidth={1.75} />
               </div>
               <div className="min-w-0 flex-1">

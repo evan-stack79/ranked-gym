@@ -1,9 +1,9 @@
 const AVATAR_COLORS = [
-  'bg-[#3A3A3C]',
+  'bg-ios-inset',
   'bg-[#48484A]',
   'bg-[#636366]',
-  'bg-[#2C2C2E]',
-  'bg-[#1C1C1E]',
+  'bg-ios-surface',
+  'bg-[#48484A]',
 ]
 
 function hashString(value: string): number {

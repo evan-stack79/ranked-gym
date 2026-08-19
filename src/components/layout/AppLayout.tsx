@@ -10,7 +10,7 @@ interface AppLayoutProps {
 
 export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) {
   return (
-    <div className="flex min-h-full flex-col bg-black font-sans">
+    <div className="flex min-h-full flex-col bg-ios-bg font-sans">
       <header className="glass-bar sticky top-0 z-40 border-b border-gray-800">
         <div
           className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"

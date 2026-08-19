@@ -9,7 +9,7 @@ interface GymMemberCardProps {
 
 export function GymMemberCard({ member }: GymMemberCardProps) {
   return (
-    <article className="rounded-2xl bg-[#1C1C1E] p-4">
+    <article className="rounded-2xl bg-ios-surface p-4">
       <div className="flex items-center gap-4">
         <Avatar username={member.username} size="md" />
 

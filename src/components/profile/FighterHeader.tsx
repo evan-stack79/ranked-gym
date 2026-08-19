@@ -19,7 +19,7 @@ export function FighterHeader({ username, title }: FighterHeaderProps) {
 
       <button
         type="button"
-        className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1C1C1E] text-[#8E8E93] transition-colors active:bg-[#2C2C2E]"
+        className="flex h-10 w-10 items-center justify-center rounded-full bg-ios-surface text-[#8E8E93] transition-colors active:bg-ios-inset"
         aria-label="Paramètres"
       >
         <Settings className="h-5 w-5" />

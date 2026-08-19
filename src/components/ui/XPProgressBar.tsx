@@ -22,7 +22,7 @@ export function XPProgressBar({ currentXp, xpToNextLevel, level }: XPProgressBar
         </span>
       </div>
 
-      <div className="relative h-2 overflow-hidden rounded-full bg-[#2C2C2E]">
+      <div className="relative h-2 overflow-hidden rounded-full bg-ios-inset">
         <div
           className="absolute inset-y-0 left-0 rounded-full bg-[#0A84FF] transition-all duration-700 ease-out"
           style={{ width: `${progress}%` }}

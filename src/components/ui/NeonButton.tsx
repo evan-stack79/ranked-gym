@@ -22,8 +22,8 @@ export function NeonButton({
 }: NeonButtonProps) {
   const variantClass = {
     primary: 'bg-[#0A84FF] text-white active:opacity-80',
-    secondary: 'bg-[#1C1C1E] text-white active:bg-[#2C2C2E]',
-    destructive: 'bg-[#1C1C1E] text-[#FF453A] active:bg-[#2C2C2E]',
+    secondary: 'bg-ios-surface text-white active:bg-ios-inset',
+    destructive: 'bg-ios-surface text-[#FF453A] active:bg-ios-inset',
   }[variant]
 
   return (

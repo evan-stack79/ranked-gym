@@ -20,9 +20,9 @@ export function NearbyGymCard({
   const isThisCheckingIn = isCheckingIn && checkingInGymId === gym.id
 
   return (
-    <article className="rounded-2xl bg-[#1C1C1E] p-4">
+    <article className="rounded-2xl bg-ios-surface p-4">
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#2C2C2E]">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ios-inset">
           <Building2 className="h-5 w-5 text-[#0A84FF]" strokeWidth={1.75} />
         </div>
 
@@ -30,7 +30,7 @@ export function NearbyGymCard({
           <div className="flex items-center gap-2">
             <h3 className="truncate font-semibold tracking-tight text-white">{gym.name}</h3>
             {gym.isCustom && (
-              <span className="shrink-0 rounded-md bg-[#2C2C2E] px-1.5 py-0.5 text-[10px] font-medium text-[#8E8E93]">
+              <span className="shrink-0 rounded-md bg-ios-inset px-1.5 py-0.5 text-[10px] font-medium text-[#8E8E93]">
                 Perso
               </span>
             )}

@@ -21,7 +21,7 @@ export function CitySearchFallback({ onSearch, disabled = false, loading = false
     <div className="w-full">
       <p className="mb-3 text-center text-[15px] text-[#8E8E93]">Ou entre ta ville manuellement</p>
 
-      <form onSubmit={handleSubmit} className="flex items-center gap-2 rounded-2xl bg-[#1C1C1E] p-2 pl-4">
+      <form onSubmit={handleSubmit} className="flex items-center gap-2 rounded-2xl bg-ios-surface p-2 pl-4">
         <Search className="h-5 w-5 shrink-0 text-[#8E8E93]" strokeWidth={1.75} />
         <input
           type="text"
