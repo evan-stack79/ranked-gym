@@ -101,8 +101,10 @@ async function fetchFromEndpoint(
 export async function fetchNearbyGyms(
   userLat: number,
   userLng: number,
-  radiusMeters = SEARCH_RADIUS_METERS,
+  options?: { radiusMeters?: number; allowAllCheckIn?: boolean },
 ): Promise<NearbyGym[]> {
+  const radiusMeters = options?.radiusMeters ?? SEARCH_RADIUS_METERS
+  const allowAllCheckIn = options?.allowAllCheckIn ?? false
   const query = buildOverpassQuery(userLat, userLng, radiusMeters)
   let lastError: Error | null = null
 
@@ -115,7 +117,7 @@ export async function fetchNearbyGyms(
 
       return dedupeGyms(parsed).map((gym) => ({
         ...gym,
-        canCheckIn: gym.distanceMeters <= CHECK_IN_RADIUS_METERS,
+        canCheckIn: allowAllCheckIn || gym.distanceMeters <= CHECK_IN_RADIUS_METERS,
       }))
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Unknown Overpass error')

@@ -42,4 +42,12 @@ export interface NavTab {
   label: string
 }
 
-export type LobbyPhase = 'idle' | 'locating' | 'fetching' | 'ready' | 'checked-in'
+export type LobbyPhase = 'idle' | 'locating' | 'geocoding' | 'fetching' | 'ready' | 'checked-in'
+
+export type LocationSource = 'gps' | 'manual'
+
+export interface LocationContext {
+  coords: GeoCoordinates
+  source: LocationSource
+  label: string
+}
