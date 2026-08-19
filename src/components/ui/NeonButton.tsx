@@ -6,6 +6,7 @@ interface NeonButtonProps {
   onClick?: () => void
   disabled?: boolean
   loading?: boolean
+  loadingLabel?: string
   variant?: 'green' | 'blue'
   className?: string
 }
@@ -15,6 +16,7 @@ export function NeonButton({
   onClick,
   disabled = false,
   loading = false,
+  loadingLabel = 'Chargement...',
   variant = 'green',
   className = '',
 }: NeonButtonProps) {
@@ -36,7 +38,7 @@ export function NeonButton({
       {loading ? (
         <span className="flex items-center justify-center gap-2">
           <Loader2 className="h-5 w-5 animate-spin" />
-          Localisation...
+          {loadingLabel}
         </span>
       ) : (
         children

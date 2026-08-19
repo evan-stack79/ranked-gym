@@ -1,49 +1,14 @@
-import type { GymMember, RankTier, UserProfile } from '../types'
+import type { GymMember, RankTier } from '../types'
 
-export const currentUser: UserProfile = {
+export const currentUser = {
   id: 'user-1',
   username: 'Evan_Lift',
   avatarUrl: '',
   level: 42,
-  rank: 'Platine',
+  rank: 'Platine' as RankTier,
   currentXp: 7250,
   xpToNextLevel: 10000,
 }
-
-export const gymMembersPresent: GymMember[] = [
-  {
-    id: 'member-1',
-    username: 'IronMike',
-    avatarUrl: '',
-    level: 38,
-    rank: 'Or',
-    currentExercise: 'Développé couché',
-  },
-  {
-    id: 'member-2',
-    username: 'FlexQueen',
-    avatarUrl: '',
-    level: 51,
-    rank: 'Diamant',
-    currentExercise: 'Curl à la barre EZ',
-  },
-  {
-    id: 'member-3',
-    username: 'BeastMode_99',
-    avatarUrl: '',
-    level: 29,
-    rank: 'Argent',
-    currentExercise: 'Squat barre',
-  },
-  {
-    id: 'member-4',
-    username: 'NovaShred',
-    avatarUrl: '',
-    level: 45,
-    rank: 'Platine',
-    currentExercise: 'Tractions lestées',
-  },
-]
 
 export const rankColors: Record<RankTier, { text: string; bg: string; border: string }> = {
   Bronze: { text: 'text-amber-600', bg: 'bg-amber-600/20', border: 'border-amber-600/40' },
@@ -54,9 +19,34 @@ export const rankColors: Record<RankTier, { text: string; bg: string; border: st
   Légende: { text: 'text-neon-green', bg: 'bg-neon-green/20', border: 'border-neon-green/40' },
 }
 
-export const simulatedGymLocation = {
-  name: 'Iron Arena Fitness',
-  address: '12 Rue de la Force, Paris',
-  lat: 48.8566,
-  lng: 2.3522,
+const LOBBY_POOL: Omit<GymMember, 'id'>[] = [
+  { username: 'TitanForge', avatarUrl: '', level: 67, rank: 'Légende', currentExercise: 'Développé couché 140 kg' },
+  { username: 'FlexQueen', avatarUrl: '', level: 58, rank: 'Diamant', currentExercise: 'Curl à la barre EZ' },
+  { username: 'IronVortex', avatarUrl: '', level: 54, rank: 'Platine', currentExercise: 'Squat barre 5×5' },
+  { username: 'NovaShred', avatarUrl: '', level: 61, rank: 'Diamant', currentExercise: 'Tractions lestées' },
+  { username: 'BeastMode_X', avatarUrl: '', level: 49, rank: 'Platine', currentExercise: 'Soulevé de terre' },
+  { username: 'AlphaGrind', avatarUrl: '', level: 72, rank: 'Légende', currentExercise: 'Presse à cuisses' },
+]
+
+function hashString(value: string): number {
+  let hash = 0
+  for (let i = 0; i < value.length; i++) {
+    hash = value.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return Math.abs(hash)
+}
+
+export function generateLobbyMembers(gymId: string): GymMember[] {
+  const seed = hashString(gymId)
+  const count = 3 + (seed % 2)
+  const shuffled = [...LOBBY_POOL].sort((a, b) => {
+    const scoreA = hashString(gymId + a.username)
+    const scoreB = hashString(gymId + b.username)
+    return scoreA - scoreB
+  })
+
+  return shuffled.slice(0, count).map((member, index) => ({
+    ...member,
+    id: `${gymId}-member-${index}`,
+  }))
 }

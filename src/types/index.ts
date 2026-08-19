@@ -19,9 +19,27 @@ export interface GymMember {
   currentExercise: string
 }
 
+export interface NearbyGym {
+  id: string
+  name: string
+  lat: number
+  lng: number
+  address?: string
+  distanceMeters: number
+  canCheckIn: boolean
+}
+
+export interface GeoCoordinates {
+  lat: number
+  lng: number
+  accuracy?: number
+}
+
 export type TabId = 'home' | 'lobby' | 'training' | 'profile'
 
 export interface NavTab {
   id: TabId
   label: string
 }
+
+export type LobbyPhase = 'idle' | 'locating' | 'fetching' | 'ready' | 'checked-in'
