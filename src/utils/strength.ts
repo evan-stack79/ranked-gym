@@ -138,3 +138,61 @@ export function volumeToKcal(volumeKg: number, durationMin: number): number {
   const intensity = volumeKg > 0 ? Math.min(0.12, 0.05 + volumeKg / 40000) : 0.085
   return strengthSessionKcal(70, durationMin, intensity)
 }
+
+/** Reverse Epley: working weight for a target rep count from 1RM. */
+export function weightForTargetReps(oneRmKg: number, targetReps: number): number {
+  if (!(oneRmKg > 0) || targetReps < 1) return 0
+  const raw = oneRmKg / (1 + targetReps / 30)
+  // Round to 0.5 kg — gym-friendly plates
+  return Math.round(raw * 2) / 2
+}
+
+export type OverloadAdvice = {
+  oneRmKg: number
+  nextWeightKg: number | null
+  headline: string
+  message: string
+  tone: 'up' | 'ok' | 'down'
+}
+
+/**
+ * Progressive overload advice from a working set (Epley 1RM).
+ * >12 reps → raise load to land in 8–12 hypertrophy range.
+ */
+export function buildOverloadAdvice(weightKg: number, reps: number): OverloadAdvice | null {
+  if (!(weightKg > 0) || !(reps > 0)) return null
+  const oneRmKg = estimate1RM(weightKg, reps)
+
+  if (reps > 12) {
+    const nextWeightKg = weightForTargetReps(oneRmKg, 10)
+    const bumped = Math.max(nextWeightKg, Math.round((weightKg + 2.5) * 2) / 2)
+    return {
+      oneRmKg,
+      nextWeightKg: bumped,
+      headline: 'Tu valides ton format !',
+      message: `Augmente le poids à ${bumped} kg pour redescendre sur une fourchette de 8-12 reps et déclencher l’hypertrophie.`,
+      tone: 'up',
+    }
+  }
+
+  if (reps >= 8) {
+    const nextWeightKg = Math.round((weightKg + 1.25) * 2) / 2
+    return {
+      oneRmKg,
+      nextWeightKg,
+      headline: 'Zone hypertrophie',
+      message: `Tu es déjà sur 8-12. Prochaine séance : vise ~${nextWeightKg} kg si la technique reste clean, ou garde ${weightKg} kg pour consolider.`,
+      tone: 'ok',
+    }
+  }
+
+  // < 8 reps — strength-biased
+  const hypoWeight = weightForTargetReps(oneRmKg, 10)
+  return {
+    oneRmKg,
+    nextWeightKg: hypoWeight,
+    headline: 'Charge lourde',
+    message: `Moins de 8 reps = force pure. Pour l’hypertrophie, descends vers ~${hypoWeight} kg et remonte à 8-12 reps.`,
+    tone: 'down',
+  }
+}

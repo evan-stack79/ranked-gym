@@ -29,6 +29,7 @@ import { SportPicker, SportChip } from './SportPicker'
 import { StepsCard } from './StepsCard'
 import { TrainingAgenda } from './TrainingAgenda'
 import { WorkoutNotebook } from './WorkoutNotebook'
+import { OverloadCalculator } from './OverloadCalculator'
 import { IconBadge } from '../ui/IconBadge'
 import { IosSheet } from '../ui/IosSheet'
 
@@ -175,6 +176,8 @@ export function TrainingView() {
           void handleConnectHealth()
         }}
       />
+
+      <OverloadCalculator />
 
       {isStrength ? (
         <WorkoutNotebook
