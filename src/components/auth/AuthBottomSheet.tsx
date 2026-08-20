@@ -201,8 +201,6 @@ export function AuthBottomSheet() {
 
           <p className="pt-1 text-center text-[11px] leading-relaxed text-[#636366]">
             En continuant, tu acceptes les conditions Ranked Gym.
-            <br />
-            Mode simulation — aucun compte réel n&apos;est créé.
           </p>
         </div>
       </div>

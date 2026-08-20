@@ -85,7 +85,7 @@ export function NearbyGymCard({
                     onClick={() => onCheckIn(gym, { force: true })}
                     className="ml-0.5 text-[11px] font-medium text-[#636366] underline decoration-[#48484A] underline-offset-2 transition-colors active:text-[#AEAEB2] disabled:opacity-40"
                   >
-                    Force Check-in (Dev)
+                    Force Check-in
                   </button>
                 </span>
               ))}
@@ -108,7 +108,7 @@ export function NearbyGymCard({
       )}
 
       {isLocked && isThisCheckingIn && (
-        <p className="mt-3 text-center text-[12px] text-[#8E8E93]">Bypass Dev… entrée en lobby</p>
+        <p className="mt-3 text-center text-[12px] text-[#8E8E93]">Entrée en lobby…</p>
       )}
     </article>
   )

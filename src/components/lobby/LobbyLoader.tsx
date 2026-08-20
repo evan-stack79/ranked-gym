@@ -1,6 +1,5 @@
 import { Loader2, Satellite, Radar, Search } from 'lucide-react'
 import { IconBadge } from '../ui/IconBadge'
-import { isMockPlacesMode } from '../../services/googlePlacesApi'
 
 type LoaderPhase = 'locating' | 'geocoding' | 'fetching'
 
@@ -9,8 +8,6 @@ interface LobbyLoaderProps {
 }
 
 export function LobbyLoader({ phase }: LobbyLoaderProps) {
-  const mock = isMockPlacesMode()
-
   const config = {
     locating: {
       icon: Satellite,
@@ -20,14 +17,12 @@ export function LobbyLoader({ phase }: LobbyLoaderProps) {
     geocoding: {
       icon: Search,
       title: 'Recherche de la ville…',
-      subtitle: mock ? 'Simulation géocodage' : 'Google Geocoding',
+      subtitle: 'Conversion en coordonnées',
     },
     fetching: {
       icon: Radar,
       title: 'Recherche des salles…',
-      subtitle: mock
-        ? 'Simulation Google Places (pas de clé API)'
-        : 'Google Places · gym & fitness_center',
+      subtitle: 'Salles & centres fitness à proximité',
     },
   }[phase]
 

@@ -19,7 +19,6 @@ import {
   createVirtualGym,
   geocodeCity,
   GooglePlacesError,
-  isMockPlacesMode,
 } from '../../services/googlePlacesApi'
 import {
   mergeWithCustomGyms,
@@ -31,7 +30,7 @@ import {
 } from '../../services/lobbyStorage'
 import { generateLobbyMembers } from '../../data/mockData'
 import { CreateLobbyPanel } from './CreateLobbyPanel'
-import { formatDistance, SEARCH_RADIUS_METERS, CHECK_IN_RADIUS_METERS } from '../../utils/geo'
+import { formatDistance, SEARCH_RADIUS_METERS } from '../../utils/geo'
 import { useAuth } from '../../context/AuthContext'
 import type { GymMember, LobbyPhase, LocationContext, NearbyGym } from '../../types'
 
@@ -232,11 +231,6 @@ export function LobbyView() {
           <h1 className="text-[34px] font-bold tracking-tight text-white">Lobby</h1>
           <p className="mt-2 text-[17px] text-[#8E8E93]">
             Trouve et rejoins une salle à proximité.
-            {isMockPlacesMode() && (
-              <span className="mt-1 block text-[13px] text-[#FF9F0A]">
-                Mode simulation · clé Google Maps absente
-              </span>
-            )}
           </p>
         </div>
         {(phase === 'ready' || phase === 'checked-in') && !isLoading && (
@@ -378,9 +372,6 @@ export function LobbyView() {
             {checkedInAt != null && (
               <p className="mt-1 text-[13px] text-[#8E8E93]">
                 Session {formatCheckInDuration(checkedInAt)}
-                {checkedInGym.distanceMeters > CHECK_IN_RADIUS_METERS && (
-                  <span className="ml-2 text-[11px] text-[#636366]">· Dev bypass</span>
-                )}
               </p>
             )}
             <p className="mt-3 text-[24px] font-black tracking-tight text-white">
