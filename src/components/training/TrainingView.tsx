@@ -8,6 +8,7 @@ import {
   removeWorkoutNote,
   saveTrainingState,
   saveWorkoutNote,
+  addCustomRoutine,
   setHealthLinked,
   setNotificationsEnabled,
   setPrimarySport,
@@ -171,13 +172,19 @@ export function TrainingView() {
       {isStrength ? (
         <WorkoutNotebook
           bodyWeightKg={profile.weightKg}
+          routines={state.routines}
           history={state.workoutNotes}
           onSave={(note) => {
             persist(saveWorkoutNote(note))
-            showToast(`Séance sauvée · ~${note.estimatedKcal} kcal → Nutri`)
+            showToast(`${note.title} sauvegardé · prochaines fois on le recharge`)
           }}
           onDeleteNote={(id) => {
             persist(removeWorkoutNote(id))
+          }}
+          onAddRoutine={(label) => {
+            const next = addCustomRoutine(label)
+            persist(next)
+            showToast(`Focus « ${label} » créé`)
           }}
         />
       ) : (

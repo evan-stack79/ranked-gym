@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BookOpen, Plus, Trash2, TrendingUp } from 'lucide-react'
 import type {
   ExerciseEntry,
   SetDifficulty,
   WorkoutNote,
+  WorkoutRoutine,
   WorkoutSet,
 } from '../../types/training'
 import {
@@ -18,13 +19,16 @@ import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
 
 interface WorkoutNotebookProps {
   bodyWeightKg: number
+  routines: WorkoutRoutine[]
   history: WorkoutNote[]
   onSave: (note: {
     title: string
     exercises: ExerciseEntry[]
     estimatedKcal: number
+    routineId: string
   }) => void
   onDeleteNote: (id: string) => void
+  onAddRoutine: (label: string) => void
 }
 
 const DIFF_OPTIONS: { id: SetDifficulty; label: string }[] = [
@@ -45,14 +49,51 @@ function emptyExercise(): ExerciseEntry {
   }
 }
 
+function cloneFromRoutine(routine: WorkoutRoutine): ExerciseEntry[] {
+  if (!routine.exercises.length) return [emptyExercise()]
+  return routine.exercises.map((e) => ({
+    ...e,
+    id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    sets: e.sets.map((s) => ({ ...s })),
+  }))
+}
+
 export function WorkoutNotebook({
   bodyWeightKg,
+  routines,
   history,
   onSave,
   onDeleteNote,
+  onAddRoutine,
 }: WorkoutNotebookProps) {
-  const [title, setTitle] = useState('Séance')
-  const [exercises, setExercises] = useState<ExerciseEntry[]>([emptyExercise()])
+  const [routineId, setRoutineId] = useState(routines[0]?.id ?? 'upper')
+  const [title, setTitle] = useState(routines[0]?.label ?? 'Séance')
+  const [exercises, setExercises] = useState<ExerciseEntry[]>(() =>
+    cloneFromRoutine(routines[0] ?? { id: 'upper', label: 'Upper', subtitle: '', accent: '#fff', exercises: [], updatedAt: 0 }),
+  )
+  const [customOpen, setCustomOpen] = useState(false)
+  const [customLabel, setCustomLabel] = useState('')
+
+  const activeRoutine = useMemo(
+    () => routines.find((r) => r.id === routineId) ?? routines[0],
+    [routines, routineId],
+  )
+
+  const selectRoutine = (id: string) => {
+    const routine = routines.find((r) => r.id === id)
+    if (!routine) return
+    setRoutineId(id)
+    setTitle(routine.label)
+    setExercises(cloneFromRoutine(routine))
+  }
+
+  // If routines list gains a new custom, keep selection valid
+  useEffect(() => {
+    if (!routines.some((r) => r.id === routineId) && routines[0]) {
+      selectRoutine(routines[0].id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routines])
 
   const stats = useMemo(() => {
     const allSets = exercises.flatMap((e) => e.sets)
@@ -87,13 +128,21 @@ export function WorkoutNotebook({
       .filter((e) => e.sets.length > 0)
     if (!cleaned.length) return
     onSave({
-      title: title.trim() || 'Séance',
+      title: title.trim() || activeRoutine?.label || 'Séance',
       exercises: cleaned,
       estimatedKcal: stats.kcal,
+      routineId,
     })
-    setTitle('Séance')
-    setExercises([emptyExercise()])
+    // Keep the same focus open with what was just saved (progress stays visible)
+    setExercises(cleaned.map((e) => ({
+      ...e,
+      id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      sets: e.sets.map((s) => ({ ...s })),
+    })))
   }
+
+  const focusHistory = history.filter((n) => n.routineId === routineId).slice(0, 4)
+  const hasSaved = (activeRoutine?.exercises.length ?? 0) > 0
 
   return (
     <section className="space-y-3">
@@ -101,30 +150,91 @@ export function WorkoutNotebook({
         <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
           Carnet
         </p>
-        <h2 className="text-[20px] font-bold text-white">Séries · poids · force</h2>
+        <h2 className="text-[20px] font-bold text-white">Focus · séries · progression</h2>
         <p className="mt-1 text-[12px] text-[#AEAEB2]">
-          Note ce que tu soulèves. On estime ta force vs ton poids et une progression safe.
+          Choisis Upper, Jambes, Pecs… — on rouvre ta dernière version pour évoluer.
         </p>
       </div>
+
+      <div className="flex gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {routines.map((r) => {
+          const active = r.id === routineId
+          return (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => selectRoutine(r.id)}
+              className={`ios-press shrink-0 rounded-full border px-3.5 py-2 text-[12px] font-semibold ${
+                active
+                  ? 'border-transparent text-white'
+                  : 'border-white/10 bg-black/25 text-[#8E8E93]'
+              }`}
+              style={
+                active
+                  ? { background: `${r.accent}33`, borderColor: `${r.accent}66`, color: '#fff' }
+                  : undefined
+              }
+            >
+              {r.label}
+              {r.exercises.length > 0 ? ' ·' : ''}
+            </button>
+          )
+        })}
+        <button
+          type="button"
+          onClick={() => setCustomOpen((v) => !v)}
+          className="ios-press shrink-0 rounded-full border border-dashed border-white/20 px-3 py-2 text-[12px] font-semibold text-[#8E8E93]"
+        >
+          + Focus
+        </button>
+      </div>
+
+      {customOpen && (
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={customLabel}
+            onChange={(e) => setCustomLabel(e.target.value)}
+            placeholder="Ex. Pecs & triceps"
+            className="flex-1 rounded-xl border border-white/10 bg-black/35 px-3 py-2.5 text-[14px] text-white outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              if (!customLabel.trim()) return
+              onAddRoutine(customLabel.trim())
+              setCustomLabel('')
+              setCustomOpen(false)
+            }}
+            className="btn-brand rounded-xl px-4 text-[13px] font-semibold text-white"
+          >
+            OK
+          </button>
+        </div>
+      )}
 
       <div
         className="rounded-3xl border border-white/10 p-4"
         style={{
-          background:
-            'radial-gradient(ellipse 80% 60% at 100% 0%, rgb(255 43 43 / 0.16) 0%, transparent 55%), rgb(22 22 24 / 0.96)',
+          background: `radial-gradient(ellipse 80% 60% at 100% 0%, ${activeRoutine?.accent ?? '#FF2B2B'}28 0%, transparent 55%), rgb(22 22 24 / 0.96)`,
           boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.06)',
         }}
       >
-        <div className="mb-3 flex items-center gap-2">
-          <BookOpen className="h-4 w-4 text-[#FF6961]" />
+        <div className="mb-1 flex items-center gap-2">
+          <BookOpen className="h-4 w-4" style={{ color: activeRoutine?.accent }} />
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Nom de la séance (ex. Upper)"
+            placeholder="Nom"
             className="w-full bg-transparent text-[17px] font-bold text-white placeholder:text-[#636366] outline-none"
           />
         </div>
+        <p className="mb-3 text-[11px] text-[#8E8E93]">
+          {hasSaved
+            ? 'Dernière sauvegarde chargée — modifie les kilos / reps pour progresser.'
+            : 'Nouveau focus — écris tes exercices, on les gardera pour la prochaine fois.'}
+        </p>
 
         <div className="space-y-4">
           {exercises.map((ex) => {
@@ -188,9 +298,7 @@ export function WorkoutNotebook({
                         <span className="mb-0.5 block text-[10px] text-[#636366]">Poids kg</span>
                         <ClearableNumberInput
                           value={set.weightKg}
-                          onChange={(v) =>
-                            updateSet(ex.id, idx, { weightKg: v ?? 0 })
-                          }
+                          onChange={(v) => updateSet(ex.id, idx, { weightKg: v ?? 0 })}
                           min={0}
                           max={500}
                           step={0.5}
@@ -248,6 +356,17 @@ export function WorkoutNotebook({
                       </button>
                     )
                   })}
+                  {tip && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateSet(ex.id, ex.sets.length - 1, { weightKg: tip.nextKg })
+                      }
+                      className="rounded-full border border-[#30D158]/35 bg-[#30D158]/10 px-2.5 py-1 text-[11px] font-semibold text-[#30D158]"
+                    >
+                      Appliquer ~{tip.nextKg} kg
+                    </button>
+                  )}
                 </div>
 
                 {oneRm > 0 && (
@@ -284,19 +403,21 @@ export function WorkoutNotebook({
             onClick={handleSave}
             className="btn-brand ios-press flex-[1.4] rounded-2xl py-3 text-[13px] font-semibold text-white"
           >
-            Sauver · ~{stats.kcal} kcal
+            Sauver {activeRoutine?.label} · ~{stats.kcal} kcal
           </button>
         </div>
 
         <p className="mt-2 text-center text-[11px] text-[#636366]">
-          Volume {stats.volume} kg · estimations pour progresser en sécurité
+          Volume {stats.volume} kg · ce focus est mémorisé pour la prochaine fois
         </p>
       </div>
 
-      {history.length > 0 && (
+      {focusHistory.length > 0 && (
         <div className="space-y-2">
-          <p className="px-1 text-[12px] font-semibold text-[#8E8E93]">Dernières séances</p>
-          {history.slice(0, 5).map((note) => (
+          <p className="px-1 text-[12px] font-semibold text-[#8E8E93]">
+            Historique {activeRoutine?.label}
+          </p>
+          {focusHistory.map((note) => (
             <article
               key={note.id}
               className="glass-card flex items-start gap-3 rounded-2xl p-3.5"

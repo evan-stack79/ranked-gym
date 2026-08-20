@@ -82,6 +82,18 @@ export interface WorkoutNote {
   exercises: ExerciseEntry[]
   createdAt: number
   estimatedKcal: number
+  /** Links to a saved focus routine (Upper, Legs, Pecs…) */
+  routineId?: string
+}
+
+/** Persistent “bloc” — opens last exercises for that focus. */
+export interface WorkoutRoutine {
+  id: string
+  label: string
+  subtitle: string
+  accent: string
+  exercises: ExerciseEntry[]
+  updatedAt: number
 }
 
 export interface TrainingState {
@@ -95,4 +107,5 @@ export interface TrainingState {
   schedule: ScheduledSession[]
   completed: CompletedSession[]
   workoutNotes: WorkoutNote[]
+  routines: WorkoutRoutine[]
 }

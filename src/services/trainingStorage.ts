@@ -4,6 +4,8 @@ import type {
   SessionTemplate,
   TrainingState,
   WorkoutNote,
+  WorkoutRoutine,
+  ExerciseEntry,
 } from '../types/training'
 import { todayKey } from '../utils/calories'
 
@@ -60,6 +62,41 @@ export const DEFAULT_TEMPLATES: SessionTemplate[] = [
   },
 ]
 
+export const DEFAULT_ROUTINES: WorkoutRoutine[] = [
+  { id: 'upper', label: 'Upper', subtitle: 'Haut du corps', accent: '#FF2B2B', exercises: [], updatedAt: 0 },
+  { id: 'lower', label: 'Lower', subtitle: 'Bas du corps', accent: '#00B4FF', exercises: [], updatedAt: 0 },
+  { id: 'push', label: 'Push', subtitle: 'Poussée', accent: '#FF9F0A', exercises: [], updatedAt: 0 },
+  { id: 'pull', label: 'Pull', subtitle: 'Tirage', accent: '#BF5AF2', exercises: [], updatedAt: 0 },
+  { id: 'legs', label: 'Jambes', subtitle: 'Lower focus', accent: '#30D158', exercises: [], updatedAt: 0 },
+  { id: 'pecs', label: 'Pecs', subtitle: 'Pectoraux', accent: '#FF453A', exercises: [], updatedAt: 0 },
+  { id: 'dos', label: 'Dos', subtitle: 'Tirage / row', accent: '#64D2FF', exercises: [], updatedAt: 0 },
+  { id: 'shoulders', label: 'Épaules', subtitle: 'Deltoïdes', accent: '#FF9F0A', exercises: [], updatedAt: 0 },
+  { id: 'arms', label: 'Bras', subtitle: 'Biceps / triceps', accent: '#BF5AF2', exercises: [], updatedAt: 0 },
+  { id: 'full', label: 'Full body', subtitle: 'Tout le corps', accent: '#30D158', exercises: [], updatedAt: 0 },
+]
+
+function mergeRoutines(stored?: WorkoutRoutine[]): WorkoutRoutine[] {
+  const byId = new Map((stored ?? []).map((r) => [r.id, r]))
+  const merged = DEFAULT_ROUTINES.map((def) => {
+    const existing = byId.get(def.id)
+    if (!existing) return { ...def }
+    byId.delete(def.id)
+    return {
+      ...def,
+      ...existing,
+      label: existing.label || def.label,
+      subtitle: existing.subtitle || def.subtitle,
+      accent: existing.accent || def.accent,
+      exercises: existing.exercises ?? [],
+    }
+  })
+  // keep user-created customs
+  for (const extra of byId.values()) {
+    merged.push(extra)
+  }
+  return merged
+}
+
 const DEFAULT_STATE: TrainingState = {
   primarySportId: null,
   favoriteSportIds: [],
@@ -71,12 +108,27 @@ const DEFAULT_STATE: TrainingState = {
   schedule: [],
   completed: [],
   workoutNotes: [],
+  routines: DEFAULT_ROUTINES.map((r) => ({ ...r })),
+}
+
+function cloneExercises(exercises: ExerciseEntry[]): ExerciseEntry[] {
+  return exercises.map((e) => ({
+    ...e,
+    id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    sets: e.sets.map((s) => ({ ...s })),
+  }))
 }
 
 function read(): TrainingState {
   try {
     const raw = localStorage.getItem(KEY)
-    if (!raw) return { ...DEFAULT_STATE, templates: [...DEFAULT_TEMPLATES] }
+    if (!raw) {
+      return {
+        ...DEFAULT_STATE,
+        templates: [...DEFAULT_TEMPLATES],
+        routines: DEFAULT_ROUTINES.map((r) => ({ ...r })),
+      }
+    }
     const parsed = JSON.parse(raw) as Partial<TrainingState>
     const merged: TrainingState = {
       ...DEFAULT_STATE,
@@ -89,6 +141,7 @@ function read(): TrainingState {
       completed: parsed.completed ?? [],
       favoriteSportIds: parsed.favoriteSportIds ?? [],
       workoutNotes: parsed.workoutNotes ?? [],
+      routines: mergeRoutines(parsed.routines),
       notificationsEnabled: Boolean(parsed.notificationsEnabled),
     }
     if (merged.stepsDateKey !== todayKey()) {
@@ -97,7 +150,11 @@ function read(): TrainingState {
     }
     return merged
   } catch {
-    return { ...DEFAULT_STATE, templates: [...DEFAULT_TEMPLATES] }
+    return {
+      ...DEFAULT_STATE,
+      templates: [...DEFAULT_TEMPLATES],
+      routines: DEFAULT_ROUTINES.map((r) => ({ ...r })),
+    }
   }
 }
 
@@ -232,6 +289,7 @@ export function saveWorkoutNote(
     title: note.title,
     exercises: note.exercises,
     estimatedKcal: note.estimatedKcal,
+    routineId: note.routineId,
     dateKey: todayKey(),
     createdAt: Date.now(),
   }
@@ -241,7 +299,7 @@ export function saveWorkoutNote(
   )
   const completedEntry: CompletedSession = {
     id: `done-note-${entry.id}`,
-    templateId: 'notebook',
+    templateId: entry.routineId ?? 'notebook',
     title: entry.title,
     dateKey: entry.dateKey,
     durationMin: Math.max(20, entry.exercises.length * 8),
@@ -252,9 +310,46 @@ export function saveWorkoutNote(
     completedEntry,
     ...state.completed.filter((c) => c.id !== completedEntry.id),
   ].slice(0, 60)
-  const next = { ...state, workoutNotes, completed }
+
+  let routines = state.routines
+  if (entry.routineId) {
+    routines = state.routines.map((r) =>
+      r.id === entry.routineId
+        ? {
+            ...r,
+            exercises: cloneExercises(entry.exercises),
+            updatedAt: Date.now(),
+          }
+        : r,
+    )
+  }
+
+  const next = { ...state, workoutNotes, completed, routines }
   write(next)
   return next
+}
+
+export function addCustomRoutine(label: string): TrainingState {
+  const state = read()
+  const id = `custom-${Date.now()}`
+  const routine: WorkoutRoutine = {
+    id,
+    label: label.trim() || 'Custom',
+    subtitle: 'Focus perso',
+    accent: '#FF6961',
+    exercises: [],
+    updatedAt: 0,
+  }
+  const next = { ...state, routines: [...state.routines, routine] }
+  write(next)
+  return next
+}
+
+export function getRoutineExercises(routineId: string): ExerciseEntry[] {
+  const state = read()
+  const routine = state.routines.find((r) => r.id === routineId)
+  if (!routine?.exercises?.length) return []
+  return cloneExercises(routine.exercises)
 }
 
 export function removeWorkoutNote(id: string): TrainingState {
