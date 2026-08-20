@@ -8,6 +8,7 @@ import {
   inferGoalFromWeights,
 } from '../../utils/calories'
 import { IconBadge } from '../ui/IconBadge'
+import { ClearableNumberInput } from './ClearableNumberInput'
 
 interface NutritionOnboardingProps {
   initial: CalorieProfile
@@ -89,14 +90,13 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
                 Poids objectif
               </span>
               <div className="flex items-end gap-2">
-                <input
-                  type="number"
-                  inputMode="decimal"
+                <ClearableNumberInput
+                  value={goalWeightKg}
+                  onChange={setGoalWeightKg}
                   min={35}
                   max={250}
                   step={0.5}
-                  value={goalWeightKg}
-                  onChange={(e) => setGoalWeightKg(Number(e.target.value) || goalWeightKg)}
+                  aria-label="Poids objectif"
                   className="w-full bg-transparent text-[40px] font-black tracking-tight text-white outline-none"
                 />
                 <span className="pb-2 text-[15px] font-medium text-[#8E8E93]">kg</span>
@@ -122,14 +122,13 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
                   Poids actuel
                 </span>
                 <div className="flex items-end gap-1">
-                  <input
-                    type="number"
-                    inputMode="decimal"
+                  <ClearableNumberInput
+                    value={weightKg}
+                    onChange={setWeightKg}
                     min={35}
                     max={250}
                     step={0.5}
-                    value={weightKg}
-                    onChange={(e) => setWeightKg(Number(e.target.value) || weightKg)}
+                    aria-label="Poids actuel"
                     className="w-full bg-transparent text-[28px] font-bold text-white outline-none"
                   />
                   <span className="pb-1 text-[13px] text-[#8E8E93]">kg</span>
@@ -141,13 +140,12 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
                   Taille
                 </span>
                 <div className="flex items-end gap-1">
-                  <input
-                    type="number"
-                    inputMode="decimal"
+                  <ClearableNumberInput
+                    value={heightCm}
+                    onChange={setHeightCm}
                     min={120}
                     max={230}
-                    value={heightCm}
-                    onChange={(e) => setHeightCm(Number(e.target.value) || heightCm)}
+                    aria-label="Taille"
                     className="w-full bg-transparent text-[28px] font-bold text-white outline-none"
                   />
                   <span className="pb-1 text-[13px] text-[#8E8E93]">cm</span>
@@ -160,13 +158,12 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
                 <UserRound className="h-3.5 w-3.5 text-[#FF9F0A]" />
                 Âge
               </span>
-              <input
-                type="number"
-                inputMode="numeric"
+              <ClearableNumberInput
+                value={age}
+                onChange={setAge}
                 min={14}
                 max={90}
-                value={age}
-                onChange={(e) => setAge(Number(e.target.value) || age)}
+                aria-label="Âge"
                 className="w-full bg-transparent text-[24px] font-bold text-white outline-none"
               />
             </label>

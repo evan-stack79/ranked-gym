@@ -10,6 +10,7 @@ import {
 import { IconBadge } from '../ui/IconBadge'
 import { MacroRing } from './MacroRing'
 import { IosSheet } from '../ui/IosSheet'
+import { ClearableNumberInput } from './ClearableNumberInput'
 
 interface NutritionPlanCardProps {
   profile: CalorieProfile
@@ -43,17 +44,13 @@ function Field({
         {label}
       </span>
       <div className="flex items-end gap-1">
-        <input
-          type="number"
-          inputMode="decimal"
+        <ClearableNumberInput
+          value={value}
+          onChange={onChange}
           min={min}
           max={max}
           step={step}
-          value={value}
-          onChange={(e) => {
-            const next = Number(e.target.value)
-            if (!Number.isNaN(next)) onChange(Math.min(max, Math.max(min, next)))
-          }}
+          aria-label={label}
           className="w-full bg-transparent text-[26px] font-bold tracking-tight text-white outline-none"
         />
         <span className="pb-1 text-[13px] font-medium text-[#8E8E93]">{suffix}</span>
