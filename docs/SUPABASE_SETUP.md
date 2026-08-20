@@ -47,26 +47,18 @@ Il active aussi :
 - un **trigger** `on_auth_user_created` → à chaque inscription, insert automatique dans `profiles` (Niveau 1, Rank Bronze)
 - les **RLS** (chaque user ne voit / n’écrit que ses données)
 
-## 4. Auth email (obligatoire pour démarrer)
+## 4. Auth email uniquement
 
-1. **Authentication** → **Providers** → **Email** : activé.
-2. Pour le développement, désactive temporairement la confirmation email :  
-   **Authentication** → **Providers** → **Email** → *Confirm email* = **OFF**  
+Apple / Google sont retirés de l’app. Auth = **email + mot de passe** seulement.
+
+1. **Authentication → Providers → Email** : activé.
+2. En dev : **Confirm email = OFF**  
    (sinon `signUp` crée le user sans session jusqu’à validation du mail).
-3. **Authentication** → **URL Configuration** :
+3. **Authentication → URL Configuration** :
    - Site URL : `http://localhost:5173` (dev) puis ton URL de prod
-   - Redirect URLs : ajoute `http://localhost:5173/**` et ton domaine Cloudflare/Vercel
+   - Redirect URLs : ajoute `http://localhost:5173/**` et ton domaine de prod
 
-## 5. (Optionnel) Apple & Google
-
-Dans **Authentication → Providers** :
-
-- **Google** : crée un OAuth client Google Cloud, colle Client ID / Secret.
-- **Apple** : configure Services ID Apple Developer.
-
-Sans ça, les boutons Apple/Google afficheront une erreur provider — l’email fonctionne quand même.
-
-## 6. Brancher le code (déjà prêt)
+## 5. Brancher le code (déjà prêt)
 
 Le front utilise :
 
@@ -84,7 +76,7 @@ npm run dev
 
 Test : **Profil** → Inscription email → un row apparaît dans **Table Editor → profiles**.
 
-## 7. Déploiement (prod)
+## 6. Déploiement (prod)
 
 1. Build : `npm run build`
 2. Héberge `dist/` sur **Vercel**, **Netlify** ou **Cloudflare Pages**

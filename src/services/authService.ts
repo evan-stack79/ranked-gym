@@ -2,7 +2,7 @@ import { getSupabase } from '../lib/supabase'
 import type { ProfileRow } from '../types/database'
 import { getRankFromLevel } from '../utils/rank'
 
-export type AuthMethod = 'email' | 'apple' | 'google'
+export type AuthMethod = 'email'
 
 export type AuthUser = {
   id: string
@@ -11,18 +11,10 @@ export type AuthUser = {
   provider: AuthMethod
 }
 
-function providerFromUser(appMetadata: Record<string, unknown> | undefined): AuthMethod {
-  const provider = String(appMetadata?.provider ?? 'email')
-  if (provider === 'apple') return 'apple'
-  if (provider === 'google') return 'google'
-  return 'email'
-}
-
 export function mapSessionUser(user: {
   id: string
   email?: string | null
   user_metadata?: Record<string, unknown>
-  app_metadata?: Record<string, unknown>
 }): AuthUser {
   const metaPseudo = user.user_metadata?.pseudo
   const email = user.email ?? ''
@@ -35,7 +27,7 @@ export function mapSessionUser(user: {
     id: user.id,
     email,
     displayName,
-    provider: providerFromUser(user.app_metadata),
+    provider: 'email',
   }
 }
 
@@ -61,34 +53,6 @@ export async function signInWithEmail(email: string, password: string) {
     password,
   })
   if (error) throw error
-  return data
-}
-
-export async function signInWithOAuth(provider: 'apple' | 'google') {
-  const supabase = getSupabase()
-  const redirectTo = `${window.location.origin}/`
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider,
-    options: {
-      redirectTo,
-      skipBrowserRedirect: false,
-    },
-  })
-  if (error) {
-    const msg = error.message || ''
-    if (
-      msg.toLowerCase().includes('provider is not enabled') ||
-      msg.toLowerCase().includes('unsupported provider') ||
-      error.code === 'validation_failed'
-    ) {
-      throw new Error(
-        provider === 'apple'
-          ? 'Apple n’est pas activé sur Supabase. Utilise l’email pour l’instant.'
-          : 'Google n’est pas activé sur Supabase. Utilise l’email pour l’instant.',
-      )
-    }
-    throw error
-  }
   return data
 }
 

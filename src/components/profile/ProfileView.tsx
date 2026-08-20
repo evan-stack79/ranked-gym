@@ -95,7 +95,7 @@ export function ProfileView() {
               <p className="mt-1 font-semibold text-white">{username}</p>
               <p className="mt-0.5 text-[13px] text-[#AEAEB2]">{user.email}</p>
               <p className="mt-2 text-[11px] uppercase tracking-wide text-[#636366]">
-                {profile?.rank ?? rank.tier} · Niv. {level} · via {user.provider}
+                {profile?.rank ?? rank.tier} · Niv. {level}
               </p>
             </div>
 

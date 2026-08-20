@@ -16,7 +16,6 @@ import {
   fetchProfile,
   mapSessionUser,
   signInWithEmail as apiSignInWithEmail,
-  signInWithOAuth,
   signOut as apiSignOut,
   signUpWithEmail,
   type AuthUser,
@@ -37,12 +36,29 @@ interface AuthContextValue {
   requireAuth: (onSuccess: AuthSuccessCallback) => void
   signInWithEmail: (email: string, password: string) => Promise<void>
   signUpWithEmail: (email: string, password: string, pseudo?: string) => Promise<void>
-  signInWithApple: () => Promise<void>
-  signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
+
+function friendlyAuthError(err: unknown, fallback: string): string {
+  const raw = err instanceof Error ? err.message : String(err)
+  const lower = raw.toLowerCase()
+
+  if (lower.includes('invalid login credentials')) {
+    return 'Email ou mot de passe incorrect.'
+  }
+  if (lower.includes('user already registered')) {
+    return 'Cet email est déjà utilisé. Passe sur Connexion.'
+  }
+  if (lower.includes('password') && lower.includes('6')) {
+    return 'Le mot de passe doit contenir au moins 6 caractères.'
+  }
+  if (lower.includes('email')) {
+    return raw
+  }
+  return raw || fallback
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
@@ -51,7 +67,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthOpen, setIsAuthOpen] = useState(false)
   const [authLoading, setAuthLoading] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
-  const [hydrated, setHydrated] = useState(false)
   const pendingRef = useRef<AuthSuccessCallback | null>(null)
 
   const loadProfile = useCallback(async (authUser: AuthUser) => {
@@ -72,10 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user])
 
   useEffect(() => {
-    if (!isSupabaseConfigured()) {
-      setHydrated(true)
-      return
-    }
+    if (!isSupabaseConfigured()) return
 
     const supabase = getSupabase()
 
@@ -87,7 +99,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(mapped)
         void loadProfile(mapped)
       }
-      setHydrated(true)
     })
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
@@ -152,7 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await apiSignInWithEmail(email, password)
         completePending()
       } catch (err) {
-        setAuthError(err instanceof Error ? err.message : 'Connexion impossible.')
+        setAuthError(friendlyAuthError(err, 'Connexion impossible.'))
         setAuthLoading(false)
       }
     },
@@ -171,59 +182,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const data = await signUpWithEmail(email, password, pseudo)
         if (!data.session) {
           setAuthError(
-            'Compte créé. Vérifie ton email si la confirmation est activée, puis reconnecte-toi.',
+            'Compte créé. Si la confirmation email est activée sur Supabase, valide ton mail puis reconnecte-toi.',
           )
           setAuthLoading(false)
           return
         }
         completePending()
       } catch (err) {
-        setAuthError(err instanceof Error ? err.message : 'Inscription impossible.')
+        setAuthError(friendlyAuthError(err, 'Inscription impossible.'))
         setAuthLoading(false)
       }
     },
     [completePending],
   )
-
-  const signInWithApple = useCallback(async () => {
-    if (!isSupabaseConfigured()) {
-      setAuthError(getSupabaseConfigError())
-      return
-    }
-    setAuthLoading(true)
-    setAuthError(null)
-    try {
-      await signInWithOAuth('apple')
-    } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err)
-      setAuthError(
-        raw.toLowerCase().includes('provider') || raw.toLowerCase().includes('not enabled')
-          ? 'Apple n’est pas activé sur Supabase. Utilise email, ou active Apple dans Authentication → Providers.'
-          : raw || 'Apple Sign-In indisponible.',
-      )
-      setAuthLoading(false)
-    }
-  }, [])
-
-  const signInWithGoogle = useCallback(async () => {
-    if (!isSupabaseConfigured()) {
-      setAuthError(getSupabaseConfigError())
-      return
-    }
-    setAuthLoading(true)
-    setAuthError(null)
-    try {
-      await signInWithOAuth('google')
-    } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err)
-      setAuthError(
-        raw.toLowerCase().includes('provider') || raw.toLowerCase().includes('not enabled')
-          ? 'Google n’est pas activé sur Supabase. Utilise email, ou active Google dans Authentication → Providers.'
-          : raw || 'Google Sign-In indisponible.',
-      )
-      setAuthLoading(false)
-    }
-  }, [])
 
   const signOut = useCallback(async () => {
     if (isSupabaseConfigured()) {
@@ -248,8 +219,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requireAuth,
       signInWithEmail,
       signUpWithEmail: signUpEmail,
-      signInWithApple,
-      signInWithGoogle,
       signOut,
     }),
     [
@@ -265,10 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requireAuth,
       signInWithEmail,
       signUpEmail,
-      signInWithApple,
-      signInWithGoogle,
       signOut,
-      hydrated,
     ],
   )
 
