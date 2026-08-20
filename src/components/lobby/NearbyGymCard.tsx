@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Building2, MapPin, Navigation, Lock, CheckCircle2, Star } from 'lucide-react'
 import type { NearbyGym } from '../../types'
-import { formatDistance, CHECK_IN_RADIUS_METERS } from '../../utils/geo'
+import { formatDistance, CHECK_IN_RADIUS_METERS, isValidDistanceMeters } from '../../utils/geo'
 import { NeonButton } from '../ui/NeonButton'
 import { IconBadge } from '../ui/IconBadge'
 
@@ -31,6 +31,7 @@ export function NearbyGymCard({
   checkingInGymId,
 }: NearbyGymCardProps) {
   const isThisCheckingIn = isCheckingIn && checkingInGymId === gym.id
+  const hasValidDistance = isValidDistanceMeters(gym.distanceMeters)
 
   return (
     <article className="glass-card rounded-2xl p-4">
@@ -47,7 +48,7 @@ export function NearbyGymCard({
             )}
           </div>
 
-          {gym.rating != null && (
+          {gym.rating != null && Number.isFinite(gym.rating) && (
             <RatingRow rating={gym.rating} total={gym.userRatingsTotal} />
           )}
 
@@ -61,19 +62,24 @@ export function NearbyGymCard({
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1 text-[13px] text-[#8E8E93]">
               <Navigation className="h-3 w-3" />
-              {gym.isCustom ? 'Sur place' : formatDistance(gym.distanceMeters)}
+              {gym.isCustom
+                ? 'Sur place'
+                : hasValidDistance
+                  ? formatDistance(gym.distanceMeters)
+                  : 'Calcul…'}
             </span>
-            {gym.canCheckIn ? (
-              <span className="inline-flex items-center gap-1 text-[13px] font-medium text-[#30D158]">
-                <CheckCircle2 className="h-3 w-3" />
-                À portée
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 text-[13px] text-[#48484A]">
-                <Lock className="h-3 w-3" />
-                &gt; {CHECK_IN_RADIUS_METERS} m
-              </span>
-            )}
+            {hasValidDistance &&
+              (gym.canCheckIn ? (
+                <span className="inline-flex items-center gap-1 text-[13px] font-medium text-[#30D158]">
+                  <CheckCircle2 className="h-3 w-3" />
+                  À portée
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[13px] text-[#48484A]">
+                  <Lock className="h-3 w-3" />
+                  &gt; {CHECK_IN_RADIUS_METERS} m
+                </span>
+              ))}
           </div>
         </div>
       </div>

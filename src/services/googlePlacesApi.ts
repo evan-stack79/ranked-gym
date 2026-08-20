@@ -1,5 +1,11 @@
 import type { GeoCoordinates, NearbyGym } from '../types'
-import { CHECK_IN_RADIUS_METERS, SEARCH_RADIUS_METERS, haversineDistanceMeters } from '../utils/geo'
+import {
+  CHECK_IN_RADIUS_METERS,
+  SEARCH_RADIUS_METERS,
+  haversineDistanceMeters,
+  isValidDistanceMeters,
+  toFiniteNumber,
+} from '../utils/geo'
 
 export class GooglePlacesError extends Error {
   constructor(message: string) {
@@ -23,7 +29,13 @@ interface GooglePlaceResult {
   name?: string
   vicinity?: string
   formatted_address?: string
-  geometry?: { location?: { lat?: number; lng?: number } }
+  /** LatLng objects expose lat/lng as methods; literals expose numbers. */
+  geometry?: {
+    location?: {
+      lat?: number | string | (() => number)
+      lng?: number | string | (() => number)
+    }
+  }
   rating?: number
   user_ratings_total?: number
   types?: string[]
@@ -31,7 +43,12 @@ interface GooglePlaceResult {
 
 interface GoogleGeocodeResult {
   formatted_address?: string
-  geometry?: { location?: { lat: number; lng: number } }
+  geometry?: {
+    location?: {
+      lat?: number | string | (() => number)
+      lng?: number | string | (() => number)
+    }
+  }
 }
 
 /** Declared so we can load the Maps JS SDK without @types/google.maps. */
@@ -119,17 +136,26 @@ function buildMockGyms(userLat: number, userLng: number): NearbyGym[] {
   const mockCheckInRadius = 700
 
   return templates.map((template) => {
-    const coords = offsetCoords(userLat, userLng, template.distanceMeters, template.bearing)
+    const coords = offsetCoords(
+      Number(userLat),
+      Number(userLng),
+      Number(template.distanceMeters),
+      Number(template.bearing),
+    )
+    const lat = Number(coords.lat)
+    const lng = Number(coords.lng)
+    const distanceMeters = Number(template.distanceMeters)
+
     return {
       id: template.id,
       name: template.name,
-      lat: coords.lat,
-      lng: coords.lng,
+      lat,
+      lng,
       address: template.address,
-      distanceMeters: template.distanceMeters,
-      rating: template.rating,
-      userRatingsTotal: template.userRatingsTotal,
-      canCheckIn: template.distanceMeters <= mockCheckInRadius,
+      distanceMeters,
+      rating: Number(template.rating),
+      userRatingsTotal: Number(template.userRatingsTotal),
+      canCheckIn: distanceMeters <= mockCheckInRadius,
       isCustom: false,
     }
   })
@@ -224,23 +250,36 @@ function nearbySearchOnce(
   })
 }
 
+function extractLatLng(location: unknown): { lat: number; lng: number } | null {
+  if (location == null || typeof location !== 'object') return null
+  const record = location as { lat?: unknown; lng?: unknown }
+  const lat = toFiniteNumber(record.lat)
+  const lng = toFiniteNumber(record.lng)
+  if (lat == null || lng == null) return null
+  return { lat, lng }
+}
+
 function placeResultToGym(
   place: GooglePlaceResult,
   userLat: number,
   userLng: number,
   allowAllCheckIn: boolean,
 ): NearbyGym | null {
-  const lat = place.geometry?.location?.lat
-  const lng = place.geometry?.location?.lng
-  if (lat == null || lng == null || !place.name) return null
+  const coords = extractLatLng(place.geometry?.location)
+  if (!coords || !place.name) return null
 
-  const distanceMeters = Math.round(haversineDistanceMeters(userLat, userLng, lat, lng))
+  const rawDistance = haversineDistanceMeters(userLat, userLng, coords.lat, coords.lng)
+  if (!isValidDistanceMeters(rawDistance)) return null
+
+  const distanceMeters = Math.round(rawDistance)
 
   return {
-    id: place.place_id ? `gplace-${place.place_id}` : `gplace-${place.name}-${lat}-${lng}`,
+    id: place.place_id
+      ? `gplace-${place.place_id}`
+      : `gplace-${place.name}-${coords.lat}-${coords.lng}`,
     name: place.name,
-    lat,
-    lng,
+    lat: coords.lat,
+    lng: coords.lng,
     address: place.vicinity ?? place.formatted_address,
     distanceMeters,
     rating: place.rating,
@@ -263,6 +302,12 @@ async function fetchNearbyGymsFromGoogle(
   userLng: number,
   options: PlacesSearchOptions,
 ): Promise<NearbyGym[]> {
+  const safeUserLat = toFiniteNumber(userLat)
+  const safeUserLng = toFiniteNumber(userLng)
+  if (safeUserLat == null || safeUserLng == null) {
+    throw new GooglePlacesError('Position utilisateur invalide pour Google Places.')
+  }
+
   const apiKey = getApiKey()
   await loadGoogleMapsScript(apiKey)
 
@@ -276,7 +321,7 @@ async function fetchNearbyGymsFromGoogle(
   const allowAllCheckIn = options.allowAllCheckIn ?? false
   const service = new google.maps.places.PlacesService(document.createElement('div'))
   const { OK, ZERO_RESULTS } = google.maps.places.PlacesServiceStatus
-  const location = { lat: userLat, lng: userLng }
+  const location = { lat: safeUserLat, lng: safeUserLng }
 
   const [gymResults, fitnessResults] = await Promise.all([
     nearbySearchOnce(service, { location, radius: radiusMeters, type: 'gym' }, OK, ZERO_RESULTS),
@@ -289,7 +334,7 @@ async function fetchNearbyGymsFromGoogle(
   ])
 
   const mapped = [...gymResults, ...fitnessResults]
-    .map((place) => placeResultToGym(place, userLat, userLng, allowAllCheckIn))
+    .map((place) => placeResultToGym(place, safeUserLat, safeUserLng, allowAllCheckIn))
     .filter((gym): gym is NearbyGym => gym != null)
 
   return dedupeGyms(mapped)
@@ -300,9 +345,15 @@ export async function fetchNearbyGyms(
   userLng: number,
   options: PlacesSearchOptions = {},
 ): Promise<NearbyGym[]> {
+  const safeUserLat = toFiniteNumber(userLat)
+  const safeUserLng = toFiniteNumber(userLng)
+  if (safeUserLat == null || safeUserLng == null) {
+    throw new GooglePlacesError('Coordonnées GPS invalides.')
+  }
+
   if (isMockPlacesMode()) {
     await delay(650)
-    const mocks = buildMockGyms(userLat, userLng)
+    const mocks = buildMockGyms(safeUserLat, safeUserLng)
     if (options.allowAllCheckIn) {
       return mocks.map((gym) => ({ ...gym, canCheckIn: true }))
     }
@@ -310,7 +361,7 @@ export async function fetchNearbyGyms(
   }
 
   try {
-    return await fetchNearbyGymsFromGoogle(userLat, userLng, options)
+    return await fetchNearbyGymsFromGoogle(safeUserLat, safeUserLng, options)
   } catch (error) {
     if (error instanceof GooglePlacesError) throw error
     throw new GooglePlacesError(
@@ -345,12 +396,17 @@ async function geocodeCityWithGoogle(cityQuery: string): Promise<GeocodedPlace> 
       }
 
       const first = results[0]
-      const location = first.geometry!.location!
+      const coords = extractLatLng(first.geometry?.location)
+      if (!coords) {
+        reject(new GooglePlacesError('Coordonnées de géocodage invalides.'))
+        return
+      }
+
       const label =
         first.formatted_address?.split(',').slice(0, 2).join(',').trim() ?? cityQuery
 
       resolve({
-        coords: { lat: location.lat, lng: location.lng },
+        coords: { lat: coords.lat, lng: coords.lng },
         label,
       })
     })

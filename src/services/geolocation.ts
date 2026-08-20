@@ -23,9 +23,10 @@ export function getCurrentPosition(options?: PositionOptions): Promise<GeoCoordi
     navigator.geolocation.getCurrentPosition(
       (position) => {
         resolve({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          accuracy: position.coords.accuracy,
+          lat: Number(position.coords.latitude),
+          lng: Number(position.coords.longitude),
+          accuracy:
+            position.coords.accuracy != null ? Number(position.coords.accuracy) : undefined,
         })
       },
       (error) => {
