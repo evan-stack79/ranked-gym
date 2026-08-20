@@ -246,7 +246,8 @@ export function AuthBottomSheet() {
           </form>
 
           <p className="pt-1 text-center text-[11px] leading-relaxed text-[#636366]">
-            Auth sécurisée via Supabase. Apple/Google nécessitent les providers activés.
+            Astuce : utilise l’onglet Inscription / Connexion avec email.
+            Apple & Google nécessitent d’être activés dans Supabase.
           </p>
         </div>
       </div>

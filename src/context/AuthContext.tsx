@@ -195,10 +195,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await signInWithOAuth('apple')
     } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err)
       setAuthError(
-        err instanceof Error
-          ? err.message
-          : 'Apple Sign-In non disponible. Active le provider dans Supabase.',
+        raw.toLowerCase().includes('provider') || raw.toLowerCase().includes('not enabled')
+          ? 'Apple n’est pas activé sur Supabase. Utilise email, ou active Apple dans Authentication → Providers.'
+          : raw || 'Apple Sign-In indisponible.',
       )
       setAuthLoading(false)
     }
@@ -214,10 +215,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await signInWithOAuth('google')
     } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err)
       setAuthError(
-        err instanceof Error
-          ? err.message
-          : 'Google Sign-In non disponible. Active le provider dans Supabase.',
+        raw.toLowerCase().includes('provider') || raw.toLowerCase().includes('not enabled')
+          ? 'Google n’est pas activé sur Supabase. Utilise email, ou active Google dans Authentication → Providers.'
+          : raw || 'Google Sign-In indisponible.',
       )
       setAuthLoading(false)
     }

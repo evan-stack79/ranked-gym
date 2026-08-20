@@ -69,9 +69,26 @@ export async function signInWithOAuth(provider: 'apple' | 'google') {
   const redirectTo = `${window.location.origin}/`
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
-    options: { redirectTo },
+    options: {
+      redirectTo,
+      skipBrowserRedirect: false,
+    },
   })
-  if (error) throw error
+  if (error) {
+    const msg = error.message || ''
+    if (
+      msg.toLowerCase().includes('provider is not enabled') ||
+      msg.toLowerCase().includes('unsupported provider') ||
+      error.code === 'validation_failed'
+    ) {
+      throw new Error(
+        provider === 'apple'
+          ? 'Apple n’est pas activé sur Supabase. Utilise l’email pour l’instant.'
+          : 'Google n’est pas activé sur Supabase. Utilise l’email pour l’instant.',
+      )
+    }
+    throw error
+  }
   return data
 }
 
