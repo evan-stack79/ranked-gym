@@ -113,6 +113,24 @@ export const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
   athlete: 'Athlète',
 }
 
+/** Short hint shown under the selected activity chip (sessions ≈ sport / musculation). */
+export const ACTIVITY_HINTS: Record<ActivityLevel, string> = {
+  sedentary: 'Peu ou pas de sport — quotidien surtout assis, marche légère.',
+  light: '1 à 2 séances par semaine — débutant ou reprise.',
+  moderate: 'Environ 3 séances par semaine — rythme régulier.',
+  active: 'Environ 4 séances par semaine — entraînement soutenu et constant.',
+  athlete:
+    '5 à 6+ séances par semaine (niveau très exigeant). Garde des jours de récup pour progresser et rester en bonne santé.',
+}
+
+export const ACTIVITY_ORDER: ActivityLevel[] = [
+  'sedentary',
+  'light',
+  'moderate',
+  'active',
+  'athlete',
+]
+
 export const GOAL_LABELS: Record<NutritionGoal, string> = {
   cut: 'Sèche',
   maintain: 'Maintien',

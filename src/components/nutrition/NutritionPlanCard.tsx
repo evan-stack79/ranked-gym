@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Flame, Ruler, Scale, Target, Pencil } from 'lucide-react'
-import type { ActivityLevel, CalorieProfile, Sex } from '../../types/nutrition'
+import type { CalorieProfile, Sex } from '../../types/nutrition'
 import {
-  ACTIVITY_LABELS,
   GOAL_LABELS,
   computeCaloriePlan,
   inferGoalFromWeights,
@@ -11,6 +10,7 @@ import { IconBadge } from '../ui/IconBadge'
 import { MacroRing } from './MacroRing'
 import { IosSheet } from '../ui/IosSheet'
 import { ClearableNumberInput } from './ClearableNumberInput'
+import { ActivityLevelPicker } from './ActivityLevelPicker'
 
 interface NutritionPlanCardProps {
   profile: CalorieProfile
@@ -258,25 +258,13 @@ export function NutritionPlanCard({ profile, onChange, onTargetChange }: Nutriti
             ))}
           </div>
 
-          <div className="flex flex-wrap gap-1.5">
-            {(Object.keys(ACTIVITY_LABELS) as ActivityLevel[]).map((level) => (
-              <button
-                key={level}
-                type="button"
-                onClick={() => setDraft((p) => ({ ...p, activity: level }))}
-                className={`ios-press rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
-                  draft.activity === level
-                    ? 'border-[#00B4FF]/50 bg-[#00B4FF]/20 text-[#64D2FF]'
-                    : 'border-white/10 bg-black/20 text-[#8E8E93]'
-                }`}
-              >
-                {ACTIVITY_LABELS[level]}
-              </button>
-            ))}
-          </div>
+          <ActivityLevelPicker
+            value={draft.activity}
+            onChange={(level) => setDraft((p) => ({ ...p, activity: level }))}
+          />
 
           <p className="text-[12px] text-[#8E8E93]">
-            Les calories se recalculent automatiquement selon ton objectif.
+            Les calories se recalculent automatiquement selon ton objectif et ton activité.
           </p>
 
           <button
