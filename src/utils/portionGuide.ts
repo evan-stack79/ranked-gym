@@ -1,33 +1,28 @@
-import type { MealType } from '../types/nutrition'
+import type { BodyMorphology, MealType } from '../types/nutrition'
+import { foodShareForMode, MEAL_SHARE_BY_MORPHOLOGY, type PortionMode } from './morphology'
 
-/** Share of daily calories reserved per meal — leaves room for a balanced plate. */
-export const MEAL_CALORIE_SHARE: Record<MealType, number> = {
-  breakfast: 0.25,
-  lunch: 0.35,
-  dinner: 0.3,
-  snack: 0.1,
-}
-
-export function mealCalorieBudget(dailyTarget: number, mealType: MealType): number {
-  return Math.round(dailyTarget * MEAL_CALORIE_SHARE[mealType])
+export function mealCalorieBudget(
+  dailyTarget: number,
+  mealType: MealType,
+  morphology: BodyMorphology = 'mesomorph',
+): number {
+  const share = MEAL_SHARE_BY_MORPHOLOGY[morphology][mealType]
+  return Math.round(dailyTarget * share)
 }
 
 export function remainingMealBudget(
   dailyTarget: number,
   mealType: MealType,
   meals: Array<{ mealType: MealType; calories: number }>,
+  morphology: BodyMorphology = 'mesomorph',
 ): number {
-  const budget = mealCalorieBudget(dailyTarget, mealType)
+  const budget = mealCalorieBudget(dailyTarget, mealType, morphology)
   const used = meals
     .filter((meal) => meal.mealType === mealType)
     .reduce((sum, meal) => sum + meal.calories, 0)
   return Math.max(0, budget - used)
 }
 
-/**
- * Suggest grams so this food uses part of the remaining meal budget
- * (not 100% — leave space for a balanced plate: protein, veggies, etc.).
- */
 export function suggestedGramsForProduct(
   kcalPer100g: number,
   remainingKcal: number,
@@ -40,6 +35,16 @@ export function suggestedGramsForProduct(
   return Math.round(grams * 100) / 100
 }
 
+export function suggestedGramsForScan(options: {
+  kcalPer100g: number
+  remainingKcal: number
+  mode: PortionMode
+  morphology: BodyMorphology
+}): number | null {
+  const share = foodShareForMode(options.mode, options.morphology)
+  return suggestedGramsForProduct(options.kcalPer100g, options.remainingKcal, share)
+}
+
 export function isCalorieDense(kcalPer100g: number): boolean {
   return kcalPer100g >= 350
 }
@@ -47,4 +52,17 @@ export function isCalorieDense(kcalPer100g: number): boolean {
 export function formatGrams(grams: number): string {
   if (!Number.isFinite(grams)) return '—'
   return String(Math.round(grams * 100) / 100)
+}
+
+export function scaleNutrition(
+  per100: { calories: number; proteines: number; glucides: number; lipides: number },
+  grams: number,
+) {
+  const factor = grams / 100
+  return {
+    calories: Math.max(0, Math.round(per100.calories * factor)),
+    proteines: Math.round(per100.proteines * factor * 100) / 100,
+    glucides: Math.round(per100.glucides * factor * 100) / 100,
+    lipides: Math.round(per100.lipides * factor * 100) / 100,
+  }
 }

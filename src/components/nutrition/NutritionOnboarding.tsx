@@ -1,21 +1,25 @@
 import { useMemo, useState } from 'react'
 import { ChevronRight, Ruler, Scale, Sparkles, Target, UserRound } from 'lucide-react'
-import type { ActivityLevel, CalorieProfile, Sex } from '../../types/nutrition'
+import type { ActivityLevel, BodyMorphology, CalorieProfile, Sex } from '../../types/nutrition'
 import {
   GOAL_LABELS,
   computeCaloriePlan,
   inferGoalFromWeights,
 } from '../../utils/calories'
+import { MORPHOLOGY_LABELS } from '../../utils/morphology'
 import { IconBadge } from '../ui/IconBadge'
 import { ClearableNumberInput } from './ClearableNumberInput'
 import { ActivityLevelPicker } from './ActivityLevelPicker'
+import { MorphologyPicker } from './MorphologyPicker'
 
 interface NutritionOnboardingProps {
   initial: CalorieProfile
   onComplete: (profile: CalorieProfile) => void
 }
 
-type Step = 'goal' | 'body' | 'result'
+type Step = 'goal' | 'body' | 'morphology' | 'result'
+
+const STEPS: Step[] = ['goal', 'body', 'morphology', 'result']
 
 export function NutritionOnboarding({ initial, onComplete }: NutritionOnboardingProps) {
   const [step, setStep] = useState<Step>('goal')
@@ -25,6 +29,9 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
   const [age, setAge] = useState(initial.age || 24)
   const [sex, setSex] = useState<Sex>(initial.sex || 'male')
   const [activity, setActivity] = useState<ActivityLevel>(initial.activity || 'moderate')
+  const [morphology, setMorphology] = useState<BodyMorphology>(
+    initial.morphology || 'mesomorph',
+  )
 
   const draft: CalorieProfile = useMemo(
     () => ({
@@ -34,13 +41,23 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
       age,
       sex,
       activity,
+      morphology,
       goal: inferGoalFromWeights(weightKg, goalWeightKg),
       onboardingComplete: true,
     }),
-    [weightKg, goalWeightKg, heightCm, age, sex, activity],
+    [weightKg, goalWeightKg, heightCm, age, sex, activity, morphology],
   )
 
   const plan = useMemo(() => computeCaloriePlan(draft), [draft])
+
+  const title =
+    step === 'goal'
+      ? 'Quel poids vises-tu ?'
+      : step === 'body'
+        ? 'Où en es-tu aujourd’hui ?'
+        : step === 'morphology'
+          ? 'Ta morphologie'
+          : 'Ton plan personnalisé'
 
   return (
     <section className="ios-fade-up space-y-5">
@@ -58,22 +75,16 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
             <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
               Setup nutrition
             </p>
-            <h2 className="text-[22px] font-bold tracking-tight text-white">
-              {step === 'goal' && 'Quel poids vises-tu ?'}
-              {step === 'body' && 'Où en es-tu aujourd’hui ?'}
-              {step === 'result' && 'Ton plan personnalisé'}
-            </h2>
+            <h2 className="text-[22px] font-bold tracking-tight text-white">{title}</h2>
           </div>
         </div>
 
         <div className="mb-5 flex gap-1.5">
-          {(['goal', 'body', 'result'] as Step[]).map((item, index) => (
+          {STEPS.map((item, index) => (
             <div
               key={item}
               className={`h-1 flex-1 rounded-full transition-colors ${
-                (['goal', 'body', 'result'] as Step[]).indexOf(step) >= index
-                  ? 'bg-[#30D158]'
-                  : 'bg-white/10'
+                STEPS.indexOf(step) >= index ? 'bg-[#30D158]' : 'bg-white/10'
               }`}
             />
           ))}
@@ -92,7 +103,9 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               <div className="flex items-end gap-2">
                 <ClearableNumberInput
                   value={goalWeightKg}
-                  onChange={setGoalWeightKg}
+                  onChange={(v) => {
+                    if (v != null) setGoalWeightKg(v)
+                  }}
                   min={35}
                   max={250}
                   step={0.5}
@@ -124,7 +137,9 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
                 <div className="flex items-end gap-1">
                   <ClearableNumberInput
                     value={weightKg}
-                    onChange={setWeightKg}
+                    onChange={(v) => {
+                      if (v != null) setWeightKg(v)
+                    }}
                     min={35}
                     max={250}
                     step={0.5}
@@ -142,7 +157,9 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
                 <div className="flex items-end gap-1">
                   <ClearableNumberInput
                     value={heightCm}
-                    onChange={setHeightCm}
+                    onChange={(v) => {
+                      if (v != null) setHeightCm(v)
+                    }}
                     min={120}
                     max={230}
                     aria-label="Taille"
@@ -160,7 +177,9 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               </span>
               <ClearableNumberInput
                 value={age}
-                onChange={setAge}
+                onChange={(v) => {
+                  if (v != null) setAge(v)
+                }}
                 min={14}
                 max={90}
                 aria-label="Âge"
@@ -180,9 +199,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
                   type="button"
                   onClick={() => setSex(option.value)}
                   className={`ios-press flex-1 rounded-lg py-2 text-[13px] font-semibold ${
-                    sex === option.value
-                      ? 'bg-[#30D158] text-white'
-                      : 'text-[#8E8E93]'
+                    sex === option.value ? 'bg-[#30D158] text-white' : 'text-[#8E8E93]'
                   }`}
                 >
                   {option.label}
@@ -196,6 +213,33 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               <button
                 type="button"
                 onClick={() => setStep('goal')}
+                className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#8E8E93]"
+              >
+                Retour
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep('morphology')}
+                className="btn-brand ios-press flex flex-[1.4] items-center justify-center gap-1 rounded-2xl py-3.5 text-[15px] font-semibold text-white"
+              >
+                Continuer
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 'morphology' && (
+          <div className="space-y-4">
+            <p className="text-[15px] text-[#AEAEB2]">
+              On adapte les portions à ta morphologie — surtout si tu as du mal avec les gros
+              repas.
+            </p>
+            <MorphologyPicker value={morphology} onChange={setMorphology} />
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setStep('body')}
                 className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#8E8E93]"
               >
                 Retour
@@ -216,7 +260,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
           <div className="space-y-4">
             <div className="rounded-2xl border border-[#30D158]/25 bg-[#30D158]/10 p-4 text-center">
               <p className="text-[12px] font-semibold uppercase tracking-wide text-[#8E8E93]">
-                Objectif {GOAL_LABELS[plan.goal]}
+                Objectif {GOAL_LABELS[plan.goal]} · {MORPHOLOGY_LABELS[morphology]}
               </p>
               <p className="mt-1 text-[42px] font-black tracking-tight text-white">
                 {plan.targetCalories}
@@ -224,9 +268,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               </p>
               <p className="mt-2 text-[13px] text-[#AEAEB2]">
                 {weightKg} kg → {goalWeightKg} kg
-                {plan.estimatedWeeks != null && (
-                  <> · ~{plan.estimatedWeeks} semaines</>
-                )}
+                {plan.estimatedWeeks != null && <> · ~{plan.estimatedWeeks} semaines</>}
               </p>
             </div>
 
@@ -236,7 +278,10 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
                 { label: 'Glucides', value: `${plan.carbsG} g` },
                 { label: 'Lipides', value: `${plan.fatG} g` },
               ].map((item) => (
-                <div key={item.label} className="rounded-2xl border border-white/10 bg-black/25 p-3 text-center">
+                <div
+                  key={item.label}
+                  className="rounded-2xl border border-white/10 bg-black/25 p-3 text-center"
+                >
                   <p className="text-[10px] text-[#8E8E93]">{item.label}</p>
                   <p className="mt-1 text-[15px] font-bold text-white">{item.value}</p>
                 </div>
@@ -246,7 +291,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setStep('body')}
+                onClick={() => setStep('morphology')}
                 className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#8E8E93]"
               >
                 Modifier

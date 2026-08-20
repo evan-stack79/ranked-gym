@@ -8,18 +8,9 @@ import {
   Trash2,
   UtensilsCrossed,
   ScanBarcode,
-  Scale,
-  Sparkles,
 } from 'lucide-react'
-import type { MealEntry, MealType } from '../../types/nutrition'
+import type { BodyMorphology, MealEntry, MealType } from '../../types/nutrition'
 import { MEAL_TYPE_LABELS } from '../../utils/calories'
-import {
-  formatGrams,
-  isCalorieDense,
-  mealCalorieBudget,
-  remainingMealBudget,
-  suggestedGramsForProduct,
-} from '../../utils/portionGuide'
 import {
   addMealToToday,
   getTodayJournal,
@@ -30,27 +21,11 @@ import { useAuth } from '../../context/AuthContext'
 import { IconBadge } from '../ui/IconBadge'
 import { MacroRing } from './MacroRing'
 import { BarcodeScanner } from './BarcodeScanner'
-import { ClearableNumberInput } from './ClearableNumberInput'
+import { ScannedProductSheet } from './ScannedProductSheet'
 
 interface MealJournalProps {
   targetCalories: number
-}
-
-interface Per100gNutrition {
-  calories: number
-  proteines: number
-  glucides: number
-  lipides: number
-}
-
-function scaleFromPer100(per100: Per100gNutrition, grams: number) {
-  const factor = grams / 100
-  return {
-    calories: Math.max(0, Math.round(per100.calories * factor)),
-    proteines: Math.round(per100.proteines * factor * 100) / 100,
-    glucides: Math.round(per100.glucides * factor * 100) / 100,
-    lipides: Math.round(per100.lipides * factor * 100) / 100,
-  }
+  morphology: BodyMorphology
 }
 
 const MEAL_META: Record<
@@ -87,79 +62,54 @@ function MealTypeChip({
   )
 }
 
-export function MealJournal({ targetCalories }: MealJournalProps) {
+export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   const { user, requireAuth } = useAuth()
   const [meals, setMeals] = useState<MealEntry[]>([])
   const [hydrated, setHydrated] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [scannerOpen, setScannerOpen] = useState(false)
+  const [scannedProduct, setScannedProduct] = useState<OpenFoodFactsProduct | null>(null)
   const [name, setName] = useState('')
   const [calories, setCalories] = useState(350)
   const [proteinG, setProteinG] = useState<number | ''>('')
   const [carbsG, setCarbsG] = useState<number | ''>('')
   const [fatG, setFatG] = useState<number | ''>('')
   const [mealType, setMealType] = useState<MealType>('lunch')
-  const [portionGrams, setPortionGrams] = useState(100)
-  const [per100, setPer100] = useState<Per100gNutrition | null>(null)
 
   useEffect(() => {
     setMeals(getTodayJournal().meals)
     setHydrated(true)
   }, [])
 
-  const applyPortion = useCallback((base: Per100gNutrition, grams: number) => {
-    const scaled = scaleFromPer100(base, grams)
-    setCalories(Math.max(1, scaled.calories))
-    setProteinG(scaled.proteines)
-    setCarbsG(scaled.glucides)
-    setFatG(scaled.lipides)
-  }, [])
-
-  const portionGuide = useMemo(() => {
-    if (!per100) return null
-    const budget = mealCalorieBudget(targetCalories, mealType)
-    const remaining = remainingMealBudget(targetCalories, mealType, meals)
-    const suggested = suggestedGramsForProduct(per100.calories, remaining)
-    return {
-      budget,
-      remaining,
-      suggested,
-      dense: isCalorieDense(per100.calories),
-    }
-  }, [per100, targetCalories, mealType, meals])
-
   const handleScannedProduct = useCallback(
     (product: OpenFoodFactsProduct) => {
-      const base: Per100gNutrition = {
-        calories: product.calories,
-        proteines: product.proteines,
-        glucides: product.glucides,
-        lipides: product.lipides,
-      }
-      const remaining = remainingMealBudget(targetCalories, mealType, getTodayJournal().meals)
-      const suggested = suggestedGramsForProduct(base.calories, remaining)
-      const grams = suggested ?? 100
-
-      setName(product.nom)
-      setPer100(base)
-      setPortionGrams(grams)
-      applyPortion(base, grams)
-      setShowForm(true)
       setScannerOpen(false)
-
+      setScannedProduct(product)
       if (user) {
         void saveAliment(product, user.id).catch(() => undefined)
       }
     },
-    [user, applyPortion, targetCalories, mealType],
+    [user],
   )
 
-  const handlePortionChange = (grams: number) => {
-    const precise = Math.round(grams * 100) / 100
-    setPortionGrams(precise)
-    if (per100 && precise > 0) {
-      applyPortion(per100, precise)
-    }
+  const handleScanSave = (entry: {
+    name: string
+    mealType: MealType
+    calories: number
+    proteinG: number
+    carbsG: number
+    fatG: number
+  }) => {
+    const journal = addMealToToday({
+      name: entry.name,
+      mealType: entry.mealType,
+      calories: entry.calories,
+      proteinG: entry.proteinG,
+      carbsG: entry.carbsG,
+      fatG: entry.fatG,
+    })
+    setMeals(journal.meals)
+    setScannedProduct(null)
   }
 
   const resetForm = () => {
@@ -168,19 +118,11 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
     setProteinG('')
     setCarbsG('')
     setFatG('')
-    setPortionGrams(100)
-    setPer100(null)
     setShowForm(false)
   }
 
   const openScanner = () => {
     requireAuth(() => setScannerOpen(true))
-  }
-
-  const openManualForm = () => {
-    setPer100(null)
-    setPortionGrams(100)
-    setShowForm((v) => !v)
   }
 
   const totals = useMemo(() => {
@@ -253,7 +195,7 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
             </button>
             <button
               type="button"
-              onClick={openManualForm}
+              onClick={() => setShowForm((v) => !v)}
               className="btn-brand inline-flex items-center gap-1.5 rounded-full border border-white/15 px-3.5 py-2 text-[13px] font-semibold text-white"
             >
               <Plus className="h-4 w-4" />
@@ -316,7 +258,7 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
           className="glass-card space-y-4 rounded-3xl p-4"
           style={{ boxShadow: '0 10px 30px rgb(0 0 0 / 0.25)' }}
         >
-          <p className="text-[15px] font-semibold text-white">Nouveau repas</p>
+          <p className="text-[15px] font-semibold text-white">Nouveau repas (manuel)</p>
 
           <div className="flex flex-wrap gap-1.5">
             {(Object.keys(MEAL_META) as MealType[]).map((type) => (
@@ -340,106 +282,6 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
               required
             />
           </label>
-
-          {per100 && (
-            <div className="space-y-3 rounded-2xl border border-[#30D158]/25 bg-[#30D158]/10 p-3.5">
-              <label className="block">
-                <span className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-[#8E8E93]">
-                  <Scale className="h-3.5 w-3.5 text-[#30D158]" />
-                  Poids sur la balance (g)
-                </span>
-                <div className="flex items-end gap-2">
-                  <ClearableNumberInput
-                    value={portionGrams}
-                    onChange={handlePortionChange}
-                    min={0.01}
-                    max={5000}
-                    step={0.01}
-                    aria-label="Poids en grammes"
-                    className="w-full bg-transparent text-[32px] font-bold tracking-tight text-white outline-none"
-                  />
-                  <span className="pb-1 text-[13px] font-medium text-[#8E8E93]">g</span>
-                </div>
-              </label>
-              <p className="text-[12px] leading-relaxed text-[#AEAEB2]">
-                Entre le poids exact de ta balance (ex. 61,05 g). Les valeurs Open Food Facts sont
-                pour 100 g ({per100.calories} kcal) — on recalcule ta portion précisément.
-              </p>
-
-              {portionGuide && (
-                <div className="rounded-xl border border-white/10 bg-black/25 p-3">
-                  <div className="mb-1.5 flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-[#64D2FF]" />
-                    <p className="text-[12px] font-semibold text-white">
-                      Guide {MEAL_TYPE_LABELS[mealType]}
-                    </p>
-                  </div>
-                  <p className="text-[12px] leading-relaxed text-[#AEAEB2]">
-                    Pour ton objectif : environ{' '}
-                    <span className="font-semibold text-white">{portionGuide.budget} kcal</span> sur
-                    ce repas
-                    {portionGuide.remaining < portionGuide.budget && (
-                      <>
-                        {' '}
-                        · il reste{' '}
-                        <span className="font-semibold text-[#30D158]">
-                          {portionGuide.remaining} kcal
-                        </span>
-                      </>
-                    )}
-                    .
-                  </p>
-                  {portionGuide.suggested != null ? (
-                    <>
-                      <p className="mt-1.5 text-[12px] leading-relaxed text-[#AEAEB2]">
-                        Suggestion pour ce produit :{' '}
-                        <span className="font-semibold text-[#64D2FF]">
-                          {formatGrams(portionGuide.suggested)} g
-                        </span>{' '}
-                        — ça laisse de la place pour un repas équilibré (protéines, veggies…).
-                        {portionGuide.dense && (
-                          <>
-                            {' '}
-                            Aliment plutôt dense en calories : une petite portion + un accompagnement
-                            est souvent le meilleur combo.
-                          </>
-                        )}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => handlePortionChange(portionGuide.suggested!)}
-                        className="ios-press mt-2.5 w-full rounded-xl border border-[#00B4FF]/35 bg-[#00B4FF]/15 py-2.5 text-[13px] font-semibold text-[#64D2FF]"
-                      >
-                        Utiliser {formatGrams(portionGuide.suggested)} g
-                      </button>
-                    </>
-                  ) : (
-                    <p className="mt-1.5 text-[12px] leading-relaxed text-[#FF9F0A]">
-                      Budget de ce repas déjà atteint — réduis la portion ou choisis un autre
-                      créneau.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              <div className="flex flex-wrap gap-1.5">
-                {[25, 50, 80, 100, 150, 200].map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => handlePortionChange(preset)}
-                    className={`ios-press rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                      portionGrams === preset
-                        ? 'border-[#30D158]/50 bg-[#30D158]/20 text-[#30D158]'
-                        : 'border-white/10 bg-black/20 text-[#8E8E93]'
-                    }`}
-                  >
-                    {preset} g
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
@@ -531,7 +373,7 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
           </div>
           <p className="text-[16px] font-semibold text-white">Aucun repas pour l&apos;instant</p>
           <p className="max-w-xs text-[13px] text-[#8E8E93]">
-            Ajoute ton premier repas pour suivre ta journée nutrition.
+            Scanne un produit ou ajoute un repas pour suivre ta journée.
           </p>
         </div>
       ) : (
@@ -560,9 +402,7 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
                     </div>
                     <p className="mt-0.5 text-[13px] text-[#8E8E93]">
                       <span className="font-semibold text-[#FF9F0A]">{meal.calories} kcal</span>
-                      {meal.proteinG != null && (
-                        <> · {meal.proteinG} g protéines</>
-                      )}
+                      {meal.proteinG != null && <> · {meal.proteinG} g protéines</>}
                     </p>
                   </div>
                   <button
@@ -584,6 +424,16 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
         open={scannerOpen}
         onClose={() => setScannerOpen(false)}
         onProduct={handleScannedProduct}
+      />
+
+      <ScannedProductSheet
+        open={scannedProduct != null}
+        product={scannedProduct}
+        targetCalories={targetCalories}
+        morphology={morphology}
+        meals={meals}
+        onClose={() => setScannedProduct(null)}
+        onSave={handleScanSave}
       />
     </section>
   )

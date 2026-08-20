@@ -11,6 +11,7 @@ export const DEFAULT_PROFILE: CalorieProfile = {
   age: 24,
   sex: 'male',
   activity: 'moderate',
+  morphology: 'mesomorph',
   goal: 'cut',
   onboardingComplete: false,
 }
@@ -35,6 +36,7 @@ export function getCalorieProfile(): CalorieProfile {
     ...DEFAULT_PROFILE,
     ...stored,
     goalWeightKg: stored.goalWeightKg ?? stored.weightKg ?? DEFAULT_PROFILE.goalWeightKg,
+    morphology: stored.morphology ?? DEFAULT_PROFILE.morphology,
     onboardingComplete: Boolean(stored.onboardingComplete),
   }
   merged.goal = inferGoalFromWeights(merged.weightKg, merged.goalWeightKg)

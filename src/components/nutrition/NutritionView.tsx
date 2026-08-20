@@ -65,7 +65,7 @@ export function NutritionView() {
             <h1 className="text-[34px] font-bold tracking-tight text-white">Nutrition</h1>
             <p className="mt-2 text-[17px] text-[#8E8E93]">
               {profile.onboardingComplete
-                ? 'Plan adapté à ton objectif de poids.'
+                ? 'Plan adapté à ton objectif et ta morphologie.'
                 : 'Dis-nous ton objectif, on calcule le reste.'}
             </p>
           </div>
@@ -97,7 +97,10 @@ export function NutritionView() {
             />
           </div>
           <div className="ios-fade-up ios-fade-up-delay-2">
-            <MealJournal targetCalories={targetCalories} />
+            <MealJournal
+              targetCalories={targetCalories}
+              morphology={profile.morphology}
+            />
           </div>
         </>
       )}

@@ -11,6 +11,8 @@ import { MacroRing } from './MacroRing'
 import { IosSheet } from '../ui/IosSheet'
 import { ClearableNumberInput } from './ClearableNumberInput'
 import { ActivityLevelPicker } from './ActivityLevelPicker'
+import { MorphologyPicker } from './MorphologyPicker'
+import { MORPHOLOGY_LABELS } from '../../utils/morphology'
 
 interface NutritionPlanCardProps {
   profile: CalorieProfile
@@ -46,7 +48,9 @@ function Field({
       <div className="flex items-end gap-1">
         <ClearableNumberInput
           value={value}
-          onChange={onChange}
+          onChange={(v) => {
+            if (v != null) onChange(v)
+          }}
           min={min}
           max={max}
           step={step}
@@ -108,7 +112,7 @@ export function NutritionPlanCard({ profile, onChange, onTargetChange }: Nutriti
             <IconBadge icon={Flame} variant="green" size="sm" />
             <div>
               <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-                Plan auto · {GOAL_LABELS[plan.goal]}
+                Plan auto · {GOAL_LABELS[plan.goal]} · {MORPHOLOGY_LABELS[profile.morphology]}
               </p>
               <h2 className="text-[20px] font-bold tracking-tight text-white">Calories du jour</h2>
             </div>
@@ -193,7 +197,7 @@ export function NutritionPlanCard({ profile, onChange, onTargetChange }: Nutriti
         open={scaleOpen}
         onClose={() => setScaleOpen(false)}
         title="Mettre à jour"
-        subtitle="Poids, taille & objectif"
+        subtitle="Poids, morphologie & objectif"
         leading={<Scale className="mt-0.5 h-5 w-5 text-[#30D158]" />}
       >
         <div className="space-y-3 pb-3">
@@ -263,8 +267,17 @@ export function NutritionPlanCard({ profile, onChange, onTargetChange }: Nutriti
             onChange={(level) => setDraft((p) => ({ ...p, activity: level }))}
           />
 
+          <div className="pt-1">
+            <p className="mb-2 text-[12px] font-semibold text-[#8E8E93]">Morphologie</p>
+            <MorphologyPicker
+              value={draft.morphology}
+              onChange={(morphology) => setDraft((p) => ({ ...p, morphology }))}
+              compact
+            />
+          </div>
+
           <p className="text-[12px] text-[#8E8E93]">
-            Les calories se recalculent automatiquement selon ton objectif et ton activité.
+            Les calories et portions s’adaptent à ton objectif, ton activité et ta morphologie.
           </p>
 
           <button

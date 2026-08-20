@@ -2,6 +2,8 @@ export type Sex = 'male' | 'female'
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'athlete'
 export type NutritionGoal = 'cut' | 'maintain' | 'bulk'
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
+/** Somatotype — used to adapt meal size & scan guidance (not a medical label). */
+export type BodyMorphology = 'ectomorph' | 'mesomorph' | 'endomorph'
 
 export interface CalorieProfile {
   weightKg: number
@@ -10,6 +12,7 @@ export interface CalorieProfile {
   age: number
   sex: Sex
   activity: ActivityLevel
+  morphology: BodyMorphology
   /** Derived from current vs goal weight, but overridable */
   goal: NutritionGoal
   onboardingComplete: boolean
