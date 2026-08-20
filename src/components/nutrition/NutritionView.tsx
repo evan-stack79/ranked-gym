@@ -9,26 +9,47 @@ import {
   getCalorieProfile,
   saveCalorieProfile,
 } from '../../services/nutritionStorage'
+import { getAdjustedNutritionTarget } from '../../services/nutritionActivity'
 import type { CalorieProfile } from '../../types/nutrition'
 
 export function NutritionView() {
   const [profile, setProfile] = useState<CalorieProfile>(() => getCalorieProfile())
   const [hydrated, setHydrated] = useState(false)
   const [targetCalories, setTargetCalories] = useState(
-    () => computeCaloriePlan(getCalorieProfile()).targetCalories,
+    () => getAdjustedNutritionTarget().targetCalories,
   )
+  const [activityBonus, setActivityBonus] = useState(
+    () => getAdjustedNutritionTarget().activityBonus,
+  )
+
+  const refreshTargets = useCallback(() => {
+    const adjusted = getAdjustedNutritionTarget()
+    setTargetCalories(adjusted.targetCalories)
+    setActivityBonus(adjusted.activityBonus)
+  }, [])
 
   useEffect(() => {
     const stored = getCalorieProfile()
     setProfile(stored)
-    setTargetCalories(computeCaloriePlan(stored).targetCalories)
+    refreshTargets()
     setHydrated(true)
-  }, [])
+  }, [refreshTargets])
 
   useEffect(() => {
     if (!hydrated) return
     saveCalorieProfile(profile)
-  }, [profile, hydrated])
+    refreshTargets()
+  }, [profile, hydrated, refreshTargets])
+
+  useEffect(() => {
+    const onFocus = () => refreshTargets()
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+    }
+  }, [refreshTargets])
 
   const handleTargetChange = useCallback((value: number) => {
     setTargetCalories(value)
@@ -36,7 +57,9 @@ export function NutritionView() {
 
   const handleProfileChange = useCallback((next: CalorieProfile) => {
     setProfile(next)
-    setTargetCalories(computeCaloriePlan(next).targetCalories)
+    const plan = computeCaloriePlan(next)
+    const adjusted = getAdjustedNutritionTarget()
+    setTargetCalories(Math.max(1200, plan.targetCalories + (adjusted.activityBonus || 0)))
   }, [])
 
   const resetOnboarding = () => {
@@ -65,7 +88,9 @@ export function NutritionView() {
             <h1 className="text-[34px] font-bold tracking-tight text-white">Nutrition</h1>
             <p className="mt-2 text-[17px] text-[#8E8E93]">
               {profile.onboardingComplete
-                ? 'Plan adapté à ton objectif et ta morphologie.'
+                ? activityBonus > 0
+                  ? `Plan +${activityBonus} kcal liés à ton activité Train.`
+                  : 'Plan adapté à ton objectif et ta morphologie.'
                 : 'Dis-nous ton objectif, on calcule le reste.'}
             </p>
           </div>
@@ -97,10 +122,7 @@ export function NutritionView() {
             />
           </div>
           <div className="ios-fade-up ios-fade-up-delay-2">
-            <MealJournal
-              targetCalories={targetCalories}
-              morphology={profile.morphology}
-            />
+            <MealJournal targetCalories={targetCalories} morphology={profile.morphology} />
           </div>
         </>
       )}

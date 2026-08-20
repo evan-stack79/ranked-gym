@@ -13,6 +13,7 @@ import { ClearableNumberInput } from './ClearableNumberInput'
 import { ActivityLevelPicker } from './ActivityLevelPicker'
 import { MorphologyPicker } from './MorphologyPicker'
 import { MORPHOLOGY_LABELS } from '../../utils/morphology'
+import { getAdjustedNutritionTarget } from '../../services/nutritionActivity'
 
 interface NutritionPlanCardProps {
   profile: CalorieProfile
@@ -72,10 +73,11 @@ export function NutritionPlanCard({ profile, onChange, onTargetChange }: Nutriti
   }, [profile])
 
   const plan = useMemo(() => computeCaloriePlan(profile), [profile])
+  const adjusted = useMemo(() => getAdjustedNutritionTarget(), [profile, plan.targetCalories])
 
   useEffect(() => {
-    onTargetChange?.(plan.targetCalories)
-  }, [plan.targetCalories, onTargetChange])
+    onTargetChange?.(adjusted.targetCalories)
+  }, [adjusted.targetCalories, onTargetChange])
 
   const progressToGoal = useMemo(() => {
     const start = profile.weightKg
@@ -130,7 +132,9 @@ export function NutritionPlanCard({ profile, onChange, onTargetChange }: Nutriti
         <div className="mb-5 flex items-center gap-5">
           <MacroRing progress={1} size={120} stroke={9} color="#34C759">
             <p className="text-[11px] font-semibold text-[#8E8E93]">Cible</p>
-            <p className="text-[24px] font-black tracking-tight text-white">{plan.targetCalories}</p>
+            <p className="text-[24px] font-black tracking-tight text-white">
+              {adjusted.targetCalories}
+            </p>
             <p className="text-[11px] font-medium text-[#30D158]">kcal</p>
           </MacroRing>
 
@@ -157,6 +161,9 @@ export function NutritionPlanCard({ profile, onChange, onTargetChange }: Nutriti
                   ? `${Math.abs(plan.deltaKg)} kg à perdre`
                   : `+${plan.deltaKg} kg à prendre`}
               {plan.estimatedWeeks != null && <> · ~{plan.estimatedWeeks} sem.</>}
+              {adjusted.activityBonus > 0 && (
+                <> · <span className="text-[#30D158]">+{adjusted.activityBonus} act.</span></>
+              )}
             </p>
           </div>
         </div>
