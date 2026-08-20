@@ -24,9 +24,10 @@ const LOBBY_POOL: Omit<GymMember, 'id'>[] = [
   { username: 'TitanForge', avatarUrl: '', level: 67, rank: 'Légende', currentExercise: 'Développé couché 140 kg' },
   { username: 'FlexQueen', avatarUrl: '', level: 58, rank: 'Diamant', currentExercise: 'Curl à la barre EZ' },
   { username: 'IronVortex', avatarUrl: '', level: 54, rank: 'Platine', currentExercise: 'Squat barre 5×5' },
-  { username: 'NovaShred', avatarUrl: '', level: 61, rank: 'Diamant', currentExercise: 'Tractions lestées' },
-  { username: 'BeastMode_X', avatarUrl: '', level: 49, rank: 'Platine', currentExercise: 'Soulevé de terre' },
-  { username: 'AlphaGrind', avatarUrl: '', level: 72, rank: 'Légende', currentExercise: 'Presse à cuisses' },
+  { username: 'NovaShred', avatarUrl: '', level: 61, rank: 'Diamant', currentExercise: 'Tractions lestées +20 kg' },
+  { username: 'BeastMode_X', avatarUrl: '', level: 49, rank: 'Platine', currentExercise: 'Soulevé de terre 180 kg' },
+  { username: 'GoldRush_22', avatarUrl: '', level: 28, rank: 'Or', currentExercise: 'Hip thrust 4×10' },
+  { username: 'AlphaGrind', avatarUrl: '', level: 72, rank: 'Légende', currentExercise: 'Presse à cuisses 300 kg' },
 ]
 
 function hashString(value: string): number {

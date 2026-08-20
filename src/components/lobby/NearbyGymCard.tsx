@@ -7,7 +7,7 @@ import { IconBadge } from '../ui/IconBadge'
 
 interface NearbyGymCardProps {
   gym: NearbyGym
-  onCheckIn: (gym: NearbyGym) => void
+  onCheckIn: (gym: NearbyGym, options?: { force?: boolean }) => void
   isCheckingIn: boolean
   checkingInGymId: string | null
 }
@@ -32,6 +32,7 @@ export function NearbyGymCard({
 }: NearbyGymCardProps) {
   const isThisCheckingIn = isCheckingIn && checkingInGymId === gym.id
   const hasValidDistance = isValidDistanceMeters(gym.distanceMeters)
+  const isLocked = hasValidDistance && !gym.canCheckIn
 
   return (
     <article className="glass-card rounded-2xl p-4">
@@ -75,9 +76,17 @@ export function NearbyGymCard({
                   À portée
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 text-[13px] text-[#48484A]">
+                <span className="inline-flex items-center gap-1.5 text-[13px] text-[#48484A]">
                   <Lock className="h-3 w-3" />
                   &gt; {CHECK_IN_RADIUS_METERS} m
+                  <button
+                    type="button"
+                    disabled={isCheckingIn}
+                    onClick={() => onCheckIn(gym, { force: true })}
+                    className="ml-0.5 text-[11px] font-medium text-[#636366] underline decoration-[#48484A] underline-offset-2 transition-colors active:text-[#AEAEB2] disabled:opacity-40"
+                  >
+                    Force Check-in (Dev)
+                  </button>
                 </span>
               ))}
           </div>
@@ -97,13 +106,17 @@ export function NearbyGymCard({
           </NeonButton>
         </div>
       )}
+
+      {isLocked && isThisCheckingIn && (
+        <p className="mt-3 text-center text-[12px] text-[#8E8E93]">Bypass Dev… entrée en lobby</p>
+      )}
     </article>
   )
 }
 
 interface NearbyGymListProps {
   gyms: NearbyGym[]
-  onCheckIn: (gym: NearbyGym) => void
+  onCheckIn: (gym: NearbyGym, options?: { force?: boolean }) => void
   isCheckingIn: boolean
   checkingInGymId: string | null
   footer?: ReactNode

@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import {
   MapPin,
-  Users,
   RefreshCw,
   AlertCircle,
   LocateFixed,
@@ -32,7 +31,7 @@ import {
 } from '../../services/lobbyStorage'
 import { generateLobbyMembers } from '../../data/mockData'
 import { CreateLobbyPanel } from './CreateLobbyPanel'
-import { formatDistance, SEARCH_RADIUS_METERS } from '../../utils/geo'
+import { formatDistance, SEARCH_RADIUS_METERS, CHECK_IN_RADIUS_METERS } from '../../utils/geo'
 import type { GymMember, LobbyPhase, LocationContext, NearbyGym } from '../../types'
 
 function gymToLocation(gym: NearbyGym): LocationContext {
@@ -194,11 +193,11 @@ export function LobbyView() {
   )
 
   const handleGymCheckIn = useCallback(
-    async (gym: NearbyGym) => {
-      if (!gym.canCheckIn) return
+    async (gym: NearbyGym, options?: { force?: boolean }) => {
+      if (!gym.canCheckIn && !options?.force) return
 
       setCheckingInGymId(gym.id)
-      await new Promise((resolve) => setTimeout(resolve, 800))
+      await new Promise((resolve) => setTimeout(resolve, options?.force ? 450 : 800))
       setCheckingInGymId(null)
       enterLobby(gym)
     },
@@ -353,43 +352,57 @@ export function LobbyView() {
 
       {phase === 'checked-in' && checkedInGym && (
         <>
-          <div className="glass-card rounded-2xl p-5">
-            <p className="text-[13px] font-medium text-[#FF2B2B]">Check-in confirmé</p>
+          <div
+            className="relative overflow-hidden rounded-3xl border border-[#FF2B2B]/30 p-5"
+            style={{
+              background:
+                'radial-gradient(ellipse 90% 80% at 10% 0%, rgb(255 43 43 / 0.28) 0%, transparent 55%), radial-gradient(ellipse 60% 50% at 100% 100%, rgb(255 159 10 / 0.12) 0%, transparent 50%), rgb(28 28 30 / 0.95)',
+              boxShadow:
+                'inset 0 1px 0 rgb(255 255 255 / 0.1), 0 0 40px rgb(255 43 43 / 0.15)',
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <span className="online-dot inline-block h-2 w-2 rounded-full bg-[#30D158]" />
+              <p className="text-[13px] font-bold uppercase tracking-wider text-[#30D158]">
+                Lobby actif
+              </p>
+            </div>
             {checkedInAt != null && (
               <p className="mt-1 text-[13px] text-[#8E8E93]">
                 Session {formatCheckInDuration(checkedInAt)}
+                {checkedInGym.distanceMeters > CHECK_IN_RADIUS_METERS && (
+                  <span className="ml-2 text-[11px] text-[#636366]">· Dev bypass</span>
+                )}
               </p>
             )}
-            <p className="mt-2 text-[20px] font-semibold tracking-tight text-white">
+            <p className="mt-3 text-[24px] font-black tracking-tight text-white">
               {checkedInGym.name}
             </p>
             {checkedInGym.isCustom && (
               <p className="mt-1 text-[13px] text-[#8E8E93]">Salle personnelle · sauvegardée</p>
             )}
             {checkedInGym.address && (
-              <p className="mt-1 text-[13px] text-[#8E8E93]">{checkedInGym.address}</p>
+              <p className="mt-1 text-[13px] text-[#AEAEB2]">{checkedInGym.address}</p>
             )}
-          </div>
-
-          <div className="glass-card rounded-2xl px-4 py-3">
-            <div className="flex items-center gap-3">
-              <IconBadge icon={Users} variant="crimson" size="sm" />
-              <span className="text-[15px] text-[#EBEBF5]">Membres actifs dans ta salle</span>
-            </div>
+            <p className="mt-4 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-[13px] text-[#EBEBF5]">
+              Affronte les athlètes présents. Monte en XP. Domine le rank.
+            </p>
           </div>
 
           <GymMemberList members={lobbyMembers} gymName={checkedInGym.name} />
 
-          <NeonButton onClick={handleLeaveGym} variant="destructive" className="py-3.5 text-[15px]">
-            <span className="flex items-center justify-center gap-2">
-              <LogOut className="h-4 w-4" />
-              Quitter la salle
-            </span>
-          </NeonButton>
+          <div className="sticky bottom-0 z-20 -mx-1 space-y-2 bg-gradient-to-t from-[#0C0C0E] via-[#0C0C0E]/95 to-transparent pt-4 pb-1">
+            <NeonButton onClick={handleLeaveGym} variant="destructive" className="py-4 text-[16px]">
+              <span className="flex items-center justify-center gap-2 font-bold">
+                <LogOut className="h-5 w-5" />
+                Quitter la salle
+              </span>
+            </NeonButton>
 
-          <NeonButton onClick={resetToIdle} variant="secondary" className="py-3.5 text-[15px]">
-            Changer de salle
-          </NeonButton>
+            <NeonButton onClick={resetToIdle} variant="secondary" className="py-3.5 text-[15px]">
+              Changer de salle
+            </NeonButton>
+          </div>
         </>
       )}
     </div>
