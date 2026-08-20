@@ -41,11 +41,14 @@ Ce script crée :
 | `profiles` | `id`, `pseudo`, `level`, `xp`, `rank`, `discipline` |
 | `checkins` | `id`, `user_id`, `salle_nom`, `salle_lat`, `salle_lng`, `created_at` |
 | `aliments` | `id`, `nom`, `calories`, `proteines`, `glucides`, `lipides`, `barcode` |
+| `user_backups` | `user_id`, `payload` (json Nutri/Train/Force), `updated_at` |
 
 Il active aussi :
 
 - un **trigger** `on_auth_user_created` → à chaque inscription, insert automatique dans `profiles` (Niveau 1, Rank Bronze)
 - les **RLS** (chaque user ne voit / n’écrit que ses données)
+
+> Si ton projet existait déjà **avant** `user_backups`, exécute aussi [`supabase/user_backups.sql`](../supabase/user_backups.sql) une fois dans le SQL Editor.
 
 ## 4. Auth email uniquement
 
@@ -65,6 +68,7 @@ Le front utilise :
 - `signUp` / `signInWithPassword` → `src/services/authService.ts`
 - Check-in DB → `src/services/checkinService.ts`
 - Aliments + Open Food Facts → `src/services/alimentsService.ts`
+- Sauvegarde cloud (Nutri / Train / Force) → `src/services/cloudBackup.ts` + table `user_backups`
 - Caméra code-barres → `html5-qrcode` dans `BarcodeScanner`
 
 Après `.env` + SQL + restart :

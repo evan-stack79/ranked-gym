@@ -4,6 +4,12 @@ import { inferGoalFromWeights, todayKey } from '../utils/calories'
 const PROFILE_KEY = 'ranked-gym:nutrition-profile'
 const JOURNAL_KEY = 'ranked-gym:nutrition-journal'
 
+export type StorageSaveOptions = { skipCloud?: boolean }
+
+function triggerCloudBackup() {
+  void import('./cloudBackup').then((m) => m.notifyLocalDataChanged())
+}
+
 export const DEFAULT_PROFILE: CalorieProfile = {
   weightKg: 70,
   goalWeightKg: 65,
@@ -43,12 +49,16 @@ export function getCalorieProfile(): CalorieProfile {
   return merged
 }
 
-export function saveCalorieProfile(profile: CalorieProfile): void {
+export function saveCalorieProfile(
+  profile: CalorieProfile,
+  opts?: StorageSaveOptions,
+): void {
   const next = {
     ...profile,
     goal: inferGoalFromWeights(profile.weightKg, profile.goalWeightKg),
   }
   writeJson(PROFILE_KEY, next)
+  if (!opts?.skipCloud) triggerCloudBackup()
 }
 
 export function isNutritionOnboarded(): boolean {
@@ -59,16 +69,29 @@ function getAllJournals(): Record<string, DayJournal> {
   return readJson<Record<string, DayJournal>>(JOURNAL_KEY, {})
 }
 
+export function getMealJournal(): Record<string, DayJournal> {
+  return getAllJournals()
+}
+
+export function saveMealJournal(
+  journal: Record<string, DayJournal>,
+  opts?: StorageSaveOptions,
+): void {
+  writeJson(JOURNAL_KEY, journal)
+  if (!opts?.skipCloud) triggerCloudBackup()
+}
+
 export function getTodayJournal(): DayJournal {
   const key = todayKey()
   const all = getAllJournals()
   return all[key] ?? { dateKey: key, meals: [] }
 }
 
-export function saveTodayJournal(journal: DayJournal): void {
+export function saveTodayJournal(journal: DayJournal, opts?: StorageSaveOptions): void {
   const all = getAllJournals()
   all[journal.dateKey] = journal
   writeJson(JOURNAL_KEY, all)
+  if (!opts?.skipCloud) triggerCloudBackup()
 }
 
 export function addMealToToday(meal: Omit<MealEntry, 'id' | 'createdAt'>): DayJournal {

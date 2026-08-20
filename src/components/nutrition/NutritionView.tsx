@@ -37,6 +37,15 @@ export function NutritionView() {
   }, [refreshTargets])
 
   useEffect(() => {
+    const onRestored = () => {
+      setProfile(getCalorieProfile())
+      refreshTargets()
+    }
+    window.addEventListener('ranked-gym:backup-restored', onRestored)
+    return () => window.removeEventListener('ranked-gym:backup-restored', onRestored)
+  }, [refreshTargets])
+
+  useEffect(() => {
     if (!hydrated) return
     saveCalorieProfile(profile)
     refreshTargets()

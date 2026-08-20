@@ -86,6 +86,12 @@ export function TrainingView() {
     return stop
   }, [])
 
+  useEffect(() => {
+    const onRestored = () => setState(getTrainingState())
+    window.addEventListener('ranked-gym:backup-restored', onRestored)
+    return () => window.removeEventListener('ranked-gym:backup-restored', onRestored)
+  }, [])
+
   const handleConnectHealth = async () => {
     const result = await connectHealthIntent()
     persist(setHealthLinked(true))

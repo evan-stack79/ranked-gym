@@ -13,6 +13,12 @@ import { getCalorieProfile } from './nutritionStorage'
 
 const KEY = 'ranked-gym:training'
 
+export type StorageSaveOptions = { skipCloud?: boolean }
+
+function triggerCloudBackup() {
+  void import('./cloudBackup').then((m) => m.notifyLocalDataChanged())
+}
+
 export const DEFAULT_TEMPLATES: SessionTemplate[] = [
   {
     id: 'tpl-upper',
@@ -160,16 +166,17 @@ function read(): TrainingState {
   }
 }
 
-function write(state: TrainingState): void {
+function write(state: TrainingState, opts?: StorageSaveOptions): void {
   localStorage.setItem(KEY, JSON.stringify(state))
+  if (!opts?.skipCloud) triggerCloudBackup()
 }
 
 export function getTrainingState(): TrainingState {
   return read()
 }
 
-export function saveTrainingState(state: TrainingState): void {
-  write(state)
+export function saveTrainingState(state: TrainingState, opts?: StorageSaveOptions): void {
+  write(state, opts)
 }
 
 export function setPrimarySport(sportId: string): TrainingState {

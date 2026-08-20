@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Gauge, Sparkles, Swords, Zap } from 'lucide-react'
 import {
   getTrainingState,
@@ -16,6 +16,12 @@ import { IconBadge } from '../ui/IconBadge'
 export function ForceView() {
   const [tick, setTick] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
+
+  useEffect(() => {
+    const onRestored = () => setTick((t) => t + 1)
+    window.addEventListener('ranked-gym:backup-restored', onRestored)
+    return () => window.removeEventListener('ranked-gym:backup-restored', onRestored)
+  }, [])
 
   const profile = useMemo(() => getCalorieProfile(), [tick])
   const training = useMemo(() => getTrainingState(), [tick])

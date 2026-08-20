@@ -5,6 +5,7 @@ import { RankShowcase } from './RankShowcase'
 import { ProfileXPBar } from './ProfileXPBar'
 import { StatGrid } from './StatGrid'
 import { BadgeShowcase } from './BadgeShowcase'
+import { CloudBackupCard } from './CloudBackupCard'
 import { IosSheet } from '../ui/IosSheet'
 import { useAuth } from '../../context/AuthContext'
 import { getRankFromLevel } from '../../utils/rank'
@@ -23,18 +24,22 @@ export function ProfileView() {
 
   if (!isAuthenticated || !user) {
     return (
-      <div className="flex flex-col items-center gap-4 py-20 text-center ios-fade-up">
-        <p className="text-[17px] font-semibold text-white">Profil verrouillé</p>
-        <p className="max-w-xs text-[15px] text-[#8E8E93]">
-          Connecte-toi pour voir ton rank, ton XP et tes stats.
-        </p>
-        <button
-          type="button"
-          onClick={() => requireAuth(() => undefined)}
-          className="btn-brand ios-press rounded-2xl border border-white/15 px-6 py-3.5 text-[15px] font-semibold text-white"
-        >
-          Créer mon profil
-        </button>
+      <div className="flex flex-col gap-6 py-12 ios-fade-up">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <p className="text-[17px] font-semibold text-white">Profil verrouillé</p>
+          <p className="max-w-xs text-[15px] text-[#8E8E93]">
+            Connecte-toi pour voir ton rank, ton XP et sauvegarder toute ta progression dans le
+            cloud.
+          </p>
+          <button
+            type="button"
+            onClick={() => requireAuth(() => undefined)}
+            className="btn-brand ios-press rounded-2xl border border-white/15 px-6 py-3.5 text-[15px] font-semibold text-white"
+          >
+            Créer mon profil
+          </button>
+        </div>
+        <CloudBackupCard />
       </div>
     )
   }
@@ -68,9 +73,12 @@ export function ProfileView() {
         />
       </div>
       <div className="ios-fade-up ios-fade-up-delay-3">
+        <CloudBackupCard />
+      </div>
+      <div className="ios-fade-up" style={{ animationDelay: '0.18s' }}>
         <StatGrid />
       </div>
-      <div className="ios-fade-up" style={{ animationDelay: '0.2s' }}>
+      <div className="ios-fade-up" style={{ animationDelay: '0.24s' }}>
         <BadgeShowcase />
       </div>
 

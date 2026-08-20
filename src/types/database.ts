@@ -92,12 +92,31 @@ type AlimentsTable = {
   Relationships: []
 }
 
+type UserBackupsTable = {
+  Row: {
+    user_id: string
+    payload: Json
+    updated_at: string
+  }
+  Insert: {
+    user_id: string
+    payload?: Json
+    updated_at?: string
+  }
+  Update: {
+    payload?: Json
+    updated_at?: string
+  }
+  Relationships: []
+}
+
 export interface Database {
   public: {
     Tables: {
       profiles: ProfilesTable
       checkins: CheckinsTable
       aliments: AlimentsTable
+      user_backups: UserBackupsTable
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -109,3 +128,4 @@ export interface Database {
 export type ProfileRow = ProfilesTable['Row']
 export type CheckinRow = CheckinsTable['Row']
 export type AlimentRow = AlimentsTable['Row']
+export type UserBackupRow = UserBackupsTable['Row']

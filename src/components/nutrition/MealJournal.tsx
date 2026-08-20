@@ -90,6 +90,12 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     setHydrated(true)
   }, [])
 
+  useEffect(() => {
+    const onRestored = () => setMeals(getTodayJournal().meals)
+    window.addEventListener('ranked-gym:backup-restored', onRestored)
+    return () => window.removeEventListener('ranked-gym:backup-restored', onRestored)
+  }, [])
+
   const pendingRemaining = useMemo(() => {
     if (!pendingMealType) return 0
     return remainingMealBudget(targetCalories, pendingMealType, meals, morphology)

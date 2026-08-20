@@ -20,6 +20,11 @@ import {
   signUpWithEmail,
   type AuthUser,
 } from '../services/authService'
+import {
+  hydrateCloudBackupForUser,
+  resetCloudBackupHydration,
+  setCloudBackupUserId,
+} from '../services/cloudBackup'
 
 type AuthSuccessCallback = () => void
 
@@ -70,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pendingRef = useRef<AuthSuccessCallback | null>(null)
 
   const loadProfile = useCallback(async (authUser: AuthUser) => {
+    setCloudBackupUserId(authUser.id)
     try {
       const row = await ensureProfile(authUser.id, authUser.displayName)
       setProfile(row)
@@ -78,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const row = await fetchProfile(authUser.id)
       setProfile(row)
     }
+    void hydrateCloudBackupForUser(authUser.id)
   }, [])
 
   const refreshProfile = useCallback(async () => {
@@ -110,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setUser(null)
         setProfile(null)
+        resetCloudBackupHydration()
       }
     })
 
@@ -200,6 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isSupabaseConfigured()) {
       await apiSignOut()
     }
+    resetCloudBackupHydration()
     setSession(null)
     setUser(null)
     setProfile(null)
