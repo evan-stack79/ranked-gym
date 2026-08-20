@@ -1,6 +1,7 @@
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 import type { CalorieProfile, DayJournal } from '../types/nutrition'
 import type { TrainingState } from '../types/training'
+import type { NearbyGym } from '../types'
 import {
   getCalorieProfile,
   getMealJournal,
@@ -8,8 +9,21 @@ import {
   saveMealJournal,
 } from './nutritionStorage'
 import { getTrainingState, saveTrainingState } from './trainingStorage'
+import {
+  getProfileProgress,
+  saveProfileProgress,
+  type StoredProfileProgress,
+} from './profileStorage'
+import {
+  getActiveCheckIn,
+  getCustomGyms,
+  saveCheckIn,
+  saveCustomGyms,
+  clearCheckIn,
+  type StoredCheckIn,
+} from './lobbyStorage'
 
-export const BACKUP_VERSION = 1 as const
+export const BACKUP_VERSION = 2 as const
 
 export type CloudBackupPayload = {
   version: typeof BACKUP_VERSION
@@ -19,9 +33,15 @@ export type CloudBackupPayload = {
     journal: Record<string, DayJournal>
   }
   training: TrainingState
+  profileProgress?: StoredProfileProgress | null
+  lobby?: {
+    customGyms: NearbyGym[]
+    checkIn: StoredCheckIn | null
+  }
 }
 
 const LOCAL_META_KEY = 'ranked-gym:cloud-backup-meta'
+const AUTO_DEBOUNCE_MS = 450
 
 export type CloudBackupMeta = {
   lastPushAt: string | null
@@ -37,10 +57,12 @@ let meta: CloudBackupMeta = loadMeta()
 const listeners = new Set<Listener>()
 let pushTimer: ReturnType<typeof setTimeout> | null = null
 let pushing = false
+let needsRepush = false
 let hydratedUserId: string | null = null
 /** Block auto-push until first pull finishes (avoids overwriting cloud with stale local). */
 let cloudSyncReady = false
 let deferredPush = false
+let lifecycleWired = false
 
 function loadMeta(): CloudBackupMeta {
   try {
@@ -95,14 +117,15 @@ export function setCloudBackupUserId(userId: string | null) {
     hydratedUserId = null
     cloudSyncReady = false
     deferredPush = false
+    needsRepush = false
     return
   }
-  // New session: wait for hydrate before auto-push
   if (hydratedUserId !== userId) {
     cloudSyncReady = false
   }
 }
 
+/** Called after every local write — auto cloud save, no user action. */
 export function notifyLocalDataChanged() {
   if (!activeUserId || !isSupabaseConfigured()) return
   if (!cloudSyncReady) {
@@ -122,6 +145,11 @@ export function collectLocalBackup(): CloudBackupPayload {
       journal: getMealJournal(),
     },
     training: getTrainingState(),
+    profileProgress: getProfileProgress(),
+    lobby: {
+      customGyms: getCustomGyms(),
+      checkIn: getActiveCheckIn(),
+    },
   }
 }
 
@@ -134,6 +162,17 @@ function applyBackup(payload: CloudBackupPayload) {
   }
   if (payload.training) {
     saveTrainingState(payload.training, { skipCloud: true })
+  }
+  if (payload.profileProgress) {
+    saveProfileProgress(payload.profileProgress, { skipCloud: true })
+  }
+  if (payload.lobby) {
+    saveCustomGyms(payload.lobby.customGyms ?? [], { skipCloud: true })
+    if (payload.lobby.checkIn?.gym) {
+      saveCheckIn(payload.lobby.checkIn.gym, { skipCloud: true })
+    } else {
+      clearCheckIn({ skipCloud: true })
+    }
   }
 }
 
@@ -152,9 +191,13 @@ export async function pushCloudBackup(
 ): Promise<{ ok: boolean; error?: string }> {
   const uid = userId ?? activeUserId
   if (!uid || !isSupabaseConfigured()) {
-    return { ok: false, error: 'Connexion requise pour sauvegarder.' }
+    return { ok: false, error: 'Connecte-toi pour activer la sauvegarde auto.' }
   }
-  if (pushing) return { ok: false, error: 'already_pushing' }
+  if (pushing) {
+    needsRepush = true
+    setMeta({ pending: true })
+    return { ok: false, error: 'already_pushing' }
+  }
 
   pushing = true
   setMeta({ pending: true, lastError: null })
@@ -173,7 +216,7 @@ export async function pushCloudBackup(
 
     if (error) {
       const msg = isMissingTableError(error.message)
-        ? 'Table manquante : exécute supabase/user_backups.sql dans le SQL Editor Supabase.'
+        ? 'Table manquante : exécute le SQL Ranked Gym dans Supabase (SQL Editor).'
         : error.message
       setMeta({ pending: false, lastError: msg })
       return { ok: false, error: msg }
@@ -191,6 +234,10 @@ export async function pushCloudBackup(
     return { ok: false, error: msg }
   } finally {
     pushing = false
+    if (needsRepush && activeUserId) {
+      needsRepush = false
+      scheduleCloudPush(activeUserId)
+    }
   }
 }
 
@@ -212,7 +259,7 @@ export async function pullCloudBackup(
 
     if (error) {
       const msg = isMissingTableError(error.message)
-        ? 'Table manquante : exécute supabase/user_backups.sql dans le SQL Editor Supabase.'
+        ? 'Table manquante : exécute le SQL Ranked Gym dans Supabase (SQL Editor).'
         : error.message
       setMeta({ lastError: msg })
       return { ok: false, applied: false, error: msg }
@@ -229,7 +276,6 @@ export async function pullCloudBackup(
     const remoteTs = Date.parse(remote.updatedAt || data.updated_at || '') || 0
     const localTs = Date.parse(local.updatedAt) || 0
 
-    // Prefer cloud when equal or newer (tolerance 2s for clock skew)
     if (remoteTs >= localTs - 2000) {
       applyBackup(remote)
       setMeta({ lastPullAt: new Date().toISOString(), lastError: null })
@@ -247,19 +293,42 @@ export async function pullCloudBackup(
   }
 }
 
-/** Debounced cloud push after any local save. */
+/** Debounced auto push after any local save. */
 export function scheduleCloudPush(userId: string | null | undefined) {
   if (!userId || !isSupabaseConfigured()) return
   setMeta({ pending: true })
   if (pushTimer) clearTimeout(pushTimer)
   pushTimer = setTimeout(() => {
+    pushTimer = null
     void pushCloudBackup(userId)
-  }, 1200)
+  }, AUTO_DEBOUNCE_MS)
+}
+
+/** Immediate flush (tab hidden / leave page) — still auto, no button. */
+export function flushCloudPush() {
+  if (!activeUserId || !cloudSyncReady || !isSupabaseConfigured()) return
+  if (pushTimer) {
+    clearTimeout(pushTimer)
+    pushTimer = null
+  }
+  void pushCloudBackup(activeUserId)
+}
+
+function wireLifecycleOnce() {
+  if (lifecycleWired || typeof window === 'undefined') return
+  lifecycleWired = true
+  const flush = () => flushCloudPush()
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flush()
+  })
+  window.addEventListener('pagehide', flush)
+  window.addEventListener('beforeunload', flush)
 }
 
 export async function hydrateCloudBackupForUser(userId: string) {
   if (!userId || !isSupabaseConfigured()) return
   setCloudBackupUserId(userId)
+  wireLifecycleOnce()
   if (hydratedUserId === userId) {
     cloudSyncReady = true
     return
@@ -277,5 +346,10 @@ export function resetCloudBackupHydration() {
   hydratedUserId = null
   cloudSyncReady = false
   deferredPush = false
+  needsRepush = false
+  if (pushTimer) {
+    clearTimeout(pushTimer)
+    pushTimer = null
+  }
   setCloudBackupUserId(null)
 }

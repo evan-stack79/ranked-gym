@@ -4,6 +4,12 @@ const CUSTOM_GYMS_KEY = 'ranked-gym:custom-gyms'
 const CHECK_IN_KEY = 'ranked-gym:check-in'
 export const CHECK_IN_TTL_MS = 3 * 60 * 60 * 1000
 
+export type StorageSaveOptions = { skipCloud?: boolean }
+
+function triggerCloudBackup() {
+  void import('./cloudBackup').then((m) => m.notifyLocalDataChanged())
+}
+
 export interface StoredCheckIn {
   gymId: string
   gymName: string
@@ -21,8 +27,9 @@ function readJson<T>(key: string, fallback: T): T {
   }
 }
 
-function writeJson<T>(key: string, value: T): void {
+function writeJson<T>(key: string, value: T, opts?: StorageSaveOptions): void {
   localStorage.setItem(key, JSON.stringify(value))
+  if (!opts?.skipCloud) triggerCloudBackup()
 }
 
 export function getCustomGyms(): NearbyGym[] {
@@ -33,10 +40,22 @@ export function getCustomGyms(): NearbyGym[] {
   }))
 }
 
-export function saveCustomGym(gym: NearbyGym): void {
+export function saveCustomGyms(gyms: NearbyGym[], opts?: StorageSaveOptions): void {
+  writeJson(
+    CUSTOM_GYMS_KEY,
+    gyms.map((g) => ({ ...g, isCustom: true, canCheckIn: true })),
+    opts,
+  )
+}
+
+export function saveCustomGym(gym: NearbyGym, opts?: StorageSaveOptions): void {
   const gyms = getCustomGyms()
   const withoutDuplicate = gyms.filter((g) => g.id !== gym.id)
-  writeJson(CUSTOM_GYMS_KEY, [{ ...gym, isCustom: true, canCheckIn: true }, ...withoutDuplicate])
+  writeJson(
+    CUSTOM_GYMS_KEY,
+    [{ ...gym, isCustom: true, canCheckIn: true }, ...withoutDuplicate],
+    opts,
+  )
 }
 
 export function mergeWithCustomGyms(apiGyms: NearbyGym[]): NearbyGym[] {
@@ -46,14 +65,14 @@ export function mergeWithCustomGyms(apiGyms: NearbyGym[]): NearbyGym[] {
   return [...uniqueCustom, ...apiGyms]
 }
 
-export function saveCheckIn(gym: NearbyGym): void {
+export function saveCheckIn(gym: NearbyGym, opts?: StorageSaveOptions): void {
   const payload: StoredCheckIn = {
     gymId: gym.id,
     gymName: gym.name,
     checkedInAt: Date.now(),
     gym,
   }
-  writeJson(CHECK_IN_KEY, payload)
+  writeJson(CHECK_IN_KEY, payload, opts)
 }
 
 export function getActiveCheckIn(): StoredCheckIn | null {
@@ -69,13 +88,14 @@ export function getActiveCheckIn(): StoredCheckIn | null {
   return stored
 }
 
-export function clearCheckIn(): void {
+export function clearCheckIn(opts?: StorageSaveOptions): void {
   localStorage.removeItem(CHECK_IN_KEY)
+  if (!opts?.skipCloud) triggerCloudBackup()
 }
 
 export function formatCheckInDuration(checkedInAt: number): string {
   const minutes = Math.floor((Date.now() - checkedInAt) / 60_000)
-  if (minutes < 1) return 'à l\'instant'
+  if (minutes < 1) return "à l'instant"
   if (minutes < 60) return `depuis ${minutes} min`
   const hours = Math.floor(minutes / 60)
   const remainingMinutes = minutes % 60
