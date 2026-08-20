@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { AuthProvider, useAuth } from './context/AuthContext'
+import { AuthBottomSheet } from './components/auth/AuthBottomSheet'
 import { AppLayout } from './components/layout/AppLayout'
 import { HomeView } from './components/home/HomeView'
 import { LobbyView } from './components/lobby/LobbyView'
@@ -22,12 +24,38 @@ function renderActiveView(tab: TabId) {
   }
 }
 
-export default function App() {
+function AppShell() {
   const [activeTab, setActiveTab] = useState<TabId>('home')
+  const { requireAuth, isAuthenticated } = useAuth()
+
+  useEffect(() => {
+    if (!isAuthenticated && activeTab === 'profile') {
+      setActiveTab('home')
+    }
+  }, [isAuthenticated, activeTab])
+
+  const handleTabChange = (tab: TabId) => {
+    if (tab === 'profile' && !isAuthenticated) {
+      requireAuth(() => setActiveTab('profile'))
+      return
+    }
+    setActiveTab(tab)
+  }
 
   return (
-    <AppLayout activeTab={activeTab} onTabChange={setActiveTab}>
-      {renderActiveView(activeTab)}
-    </AppLayout>
+    <>
+      <AppLayout activeTab={activeTab} onTabChange={handleTabChange}>
+        {renderActiveView(activeTab)}
+      </AppLayout>
+      <AuthBottomSheet />
+    </>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppShell />
+    </AuthProvider>
   )
 }

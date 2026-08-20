@@ -32,6 +32,7 @@ import {
 import { generateLobbyMembers } from '../../data/mockData'
 import { CreateLobbyPanel } from './CreateLobbyPanel'
 import { formatDistance, SEARCH_RADIUS_METERS, CHECK_IN_RADIUS_METERS } from '../../utils/geo'
+import { useAuth } from '../../context/AuthContext'
 import type { GymMember, LobbyPhase, LocationContext, NearbyGym } from '../../types'
 
 function gymToLocation(gym: NearbyGym): LocationContext {
@@ -47,6 +48,7 @@ function memberCountForGym(gym: NearbyGym): number {
 }
 
 export function LobbyView() {
+  const { requireAuth } = useAuth()
   const [phase, setPhase] = useState<LobbyPhase>('idle')
   const [error, setError] = useState<string | null>(null)
   const [location, setLocation] = useState<LocationContext | null>(null)
@@ -170,38 +172,44 @@ export function LobbyView() {
     [searchGymsAt],
   )
 
-  const handleCreateCustomLobby = useCallback(
-    async (gymName: string) => {
-      if (!location) return
-
-      const customGym = createVirtualGym(
-        gymName,
-        location.coords.lat,
-        location.coords.lng,
-        location.source === 'manual' ? location.label : undefined,
-      )
-
-      saveCustomGym(customGym)
-      setNearbyGyms((prev) => mergeWithCustomGyms([customGym, ...prev.filter((g) => g.id !== customGym.id)]))
-
-      setCheckingInGymId(customGym.id)
-      await new Promise((resolve) => setTimeout(resolve, 600))
-      setCheckingInGymId(null)
-      enterLobby(customGym)
-    },
-    [location, enterLobby],
-  )
-
   const handleGymCheckIn = useCallback(
     async (gym: NearbyGym, options?: { force?: boolean }) => {
       if (!gym.canCheckIn && !options?.force) return
 
-      setCheckingInGymId(gym.id)
-      await new Promise((resolve) => setTimeout(resolve, options?.force ? 450 : 800))
-      setCheckingInGymId(null)
-      enterLobby(gym)
+      requireAuth(async () => {
+        setCheckingInGymId(gym.id)
+        await new Promise((resolve) => setTimeout(resolve, options?.force ? 450 : 800))
+        setCheckingInGymId(null)
+        enterLobby(gym)
+      })
     },
-    [enterLobby],
+    [enterLobby, requireAuth],
+  )
+
+  const handleCreateCustomLobby = useCallback(
+    async (gymName: string) => {
+      if (!location) return
+
+      requireAuth(async () => {
+        const customGym = createVirtualGym(
+          gymName,
+          location.coords.lat,
+          location.coords.lng,
+          location.source === 'manual' ? location.label : undefined,
+        )
+
+        saveCustomGym(customGym)
+        setNearbyGyms((prev) =>
+          mergeWithCustomGyms([customGym, ...prev.filter((g) => g.id !== customGym.id)]),
+        )
+
+        setCheckingInGymId(customGym.id)
+        await new Promise((resolve) => setTimeout(resolve, 600))
+        setCheckingInGymId(null)
+        enterLobby(customGym)
+      })
+    },
+    [location, enterLobby, requireAuth],
   )
 
   if (!hydrated) {

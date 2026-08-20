@@ -1,15 +1,27 @@
 import { Settings } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
 import { StatusBadge, statusFromPower } from '../ui/StatusBadge'
+import type { AuthProvider } from '../../services/authStorage'
 
 interface FighterHeaderProps {
   username: string
   title: string
   level: number
   rank: string
+  email?: string
+  provider?: AuthProvider
+  onOpenSettings?: () => void
 }
 
-export function FighterHeader({ username, title, level, rank }: FighterHeaderProps) {
+export function FighterHeader({
+  username,
+  title,
+  level,
+  rank,
+  email,
+  provider,
+  onOpenSettings,
+}: FighterHeaderProps) {
   const status = statusFromPower(level, rank)
 
   return (
@@ -22,11 +34,18 @@ export function FighterHeader({ username, title, level, rank }: FighterHeaderPro
             {status && <StatusBadge variant={status} />}
           </div>
           <p className="mt-0.5 text-[15px] text-[#8E8E93]">{title}</p>
+          {email && (
+            <p className="mt-1 text-[12px] text-[#636366]">
+              {email}
+              {provider ? ` · ${provider}` : ''}
+            </p>
+          )}
         </div>
       </div>
 
       <button
         type="button"
+        onClick={onOpenSettings}
         className="glass-card flex h-10 w-10 items-center justify-center rounded-full text-[#8E8E93] transition-colors active:opacity-80"
         aria-label="Paramètres"
       >
