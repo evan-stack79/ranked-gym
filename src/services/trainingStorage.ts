@@ -8,8 +8,13 @@ import type {
   ExerciseEntry,
 } from '../types/training'
 import { todayKey } from '../utils/calories'
-import { progressRoutineExercises } from '../utils/forceArena'
 import { getCalorieProfile } from './nutritionStorage'
+import { progressRoutineExercises } from '../utils/forceArena'
+import {
+  computeStrengthSessionStats,
+  sessionIntensity,
+  strengthSessionKcal,
+} from '../utils/strength'
 
 const KEY = 'ranked-gym:training'
 
@@ -293,11 +298,38 @@ export function saveWorkoutNote(
   note: Omit<WorkoutNote, 'id' | 'createdAt' | 'dateKey'> & { id?: string },
 ): TrainingState {
   const state = read()
+  const bodyWeightKg = getCalorieProfile().weightKg
+  const isLift = note.exercises.some((e) => e.sets.some((s) => s.weightKg > 0))
+  const stats = computeStrengthSessionStats(note.exercises, bodyWeightKg)
+
+  let durationMin: number
+  let totalVolumeKg: number
+  let estimatedKcal: number
+
+  if (isLift) {
+    durationMin = stats.durationMin
+    totalVolumeKg = stats.volume
+    estimatedKcal = strengthSessionKcal(
+      bodyWeightKg,
+      durationMin,
+      sessionIntensity(note.exercises),
+    )
+  } else {
+    durationMin =
+      note.durationMin && note.durationMin > 0
+        ? note.durationMin
+        : Math.max(15, note.exercises[0]?.sets[0]?.reps ?? 30)
+    totalVolumeKg = 0
+    estimatedKcal = note.estimatedKcal > 0 ? note.estimatedKcal : stats.kcal
+  }
+
   const entry: WorkoutNote = {
     id: note.id ?? `note-${Date.now()}`,
     title: note.title,
     exercises: note.exercises,
-    estimatedKcal: note.estimatedKcal,
+    estimatedKcal,
+    durationMin,
+    totalVolumeKg,
     routineId: note.routineId,
     dateKey: todayKey(),
     createdAt: Date.now(),
@@ -311,21 +343,25 @@ export function saveWorkoutNote(
     templateId: entry.routineId ?? 'notebook',
     title: entry.title,
     dateKey: entry.dateKey,
-    durationMin: Math.max(20, entry.exercises.length * 8),
+    durationMin: entry.durationMin ?? durationMin,
     estimatedKcal: entry.estimatedKcal,
     createdAt: entry.createdAt,
   }
+  // Drop orphan completed rows that are not linked to a real workout note
+  const noteIds = new Set(workoutNotes.map((n) => n.id))
   const completed = [
     completedEntry,
-    ...state.completed.filter((c) => c.id !== completedEntry.id),
+    ...state.completed.filter(
+      (c) =>
+        c.id !== completedEntry.id &&
+        (!c.id.startsWith('done-note-') || noteIds.has(c.id.replace(/^done-note-/, ''))),
+    ),
   ].slice(0, 60)
 
   let routines = state.routines
   if (entry.routineId) {
-    const bodyWeightKg = getCalorieProfile().weightKg
     const base = state.routines.find((r) => r.id === entry.routineId)
     if (base) {
-      // History keeps actual lifts; routine stores NEXT session loads (auto Facile/OK/Dur)
       const withActual: WorkoutRoutine = {
         ...base,
         exercises: cloneExercises(entry.exercises),
@@ -375,8 +411,14 @@ export function removeWorkoutNote(id: string): TrainingState {
   return next
 }
 
+import { dedupeWorkoutNotes } from '../utils/workoutHistory'
+
 export function todayWorkoutKcal(state: TrainingState = read()): number {
   const key = todayKey()
+  const fromNotes = dedupeWorkoutNotes(state.workoutNotes)
+    .filter((n) => n.dateKey === key)
+    .reduce((sum, n) => sum + n.estimatedKcal, 0)
+  if (fromNotes > 0) return fromNotes
   return state.completed
     .filter((c) => c.dateKey === key)
     .reduce((sum, c) => sum + c.estimatedKcal, 0)

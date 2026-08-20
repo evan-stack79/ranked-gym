@@ -82,6 +82,10 @@ export interface WorkoutNote {
   exercises: ExerciseEntry[]
   createdAt: number
   estimatedKcal: number
+  /** Session length used for kcal (Poids × Durée × Intensité) */
+  durationMin?: number
+  /** Total kg lifted (reps × weight summed) */
+  totalVolumeKg?: number
   /** Links to a saved focus routine (Upper, Legs, Pecs…) */
   routineId?: string
 }

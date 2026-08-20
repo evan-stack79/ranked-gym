@@ -111,6 +111,7 @@ export function TrainingView() {
             sets: [{ reps: durationMin, weightKg: 0, difficulty: 'ok' }],
           },
         ],
+        durationMin,
         estimatedKcal: estimated,
       }),
     )

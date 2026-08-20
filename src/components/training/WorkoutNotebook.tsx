@@ -9,13 +9,13 @@ import type {
 } from '../../types/training'
 import {
   bestSet1RM,
+  computeStrengthSessionStats,
   relativeStrength,
   relativeStrengthLabel,
   suggestNextWeight,
-  totalVolume,
-  volumeToKcal,
 } from '../../utils/strength'
 import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
+import { WorkoutHistory } from './WorkoutHistory'
 
 interface WorkoutNotebookProps {
   bodyWeightKg: number
@@ -25,6 +25,8 @@ interface WorkoutNotebookProps {
     title: string
     exercises: ExerciseEntry[]
     estimatedKcal: number
+    durationMin: number
+    totalVolumeKg: number
     routineId: string
   }) => void
   onDeleteNote: (id: string) => void
@@ -95,14 +97,10 @@ export function WorkoutNotebook({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routines])
 
-  const stats = useMemo(() => {
-    const allSets = exercises.flatMap((e) => e.sets)
-    const volume = totalVolume(allSets)
-    const oneRm = bestSet1RM(allSets)
-    const ratio = relativeStrength(oneRm, bodyWeightKg)
-    const kcal = volumeToKcal(volume, Math.max(25, exercises.length * 10))
-    return { volume, oneRm, ratio, kcal }
-  }, [exercises, bodyWeightKg])
+  const stats = useMemo(
+    () => computeStrengthSessionStats(exercises, bodyWeightKg),
+    [exercises, bodyWeightKg],
+  )
 
   const updateExercise = (id: string, patch: Partial<ExerciseEntry>) => {
     setExercises((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)))
@@ -131,6 +129,8 @@ export function WorkoutNotebook({
       title: title.trim() || activeRoutine?.label || 'Séance',
       exercises: cleaned,
       estimatedKcal: stats.kcal,
+      durationMin: stats.durationMin,
+      totalVolumeKg: stats.volume,
       routineId,
     })
     // Keep the same focus open with what was just saved (progress stays visible)
@@ -141,7 +141,6 @@ export function WorkoutNotebook({
     })))
   }
 
-  const focusHistory = history.filter((n) => n.routineId === routineId).slice(0, 4)
   const hasSaved = (activeRoutine?.exercises.length ?? 0) > 0
 
   return (
@@ -408,40 +407,11 @@ export function WorkoutNotebook({
         </div>
 
         <p className="mt-2 text-center text-[11px] text-[#636366]">
-          Volume {stats.volume} kg · ce focus est mémorisé pour la prochaine fois
+          Volume {stats.volume} kg · {stats.durationMin} min · kcal = poids × durée × intensité
         </p>
       </div>
 
-      {focusHistory.length > 0 && (
-        <div className="space-y-2">
-          <p className="px-1 text-[12px] font-semibold text-[#8E8E93]">
-            Historique {activeRoutine?.label}
-          </p>
-          {focusHistory.map((note) => (
-            <article
-              key={note.id}
-              className="glass-card flex items-start gap-3 rounded-2xl p-3.5"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-white">{note.title}</p>
-                <p className="text-[12px] text-[#8E8E93]">
-                  {note.exercises.map((e) => e.name).join(' · ') || 'Exercices'}
-                  {' · '}
-                  {note.estimatedKcal} kcal
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => onDeleteNote(note.id)}
-                className="text-[#636366]"
-                aria-label="Supprimer"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </article>
-          ))}
-        </div>
-      )}
+      <WorkoutHistory notes={history} onDelete={onDeleteNote} />
     </section>
   )
 }
