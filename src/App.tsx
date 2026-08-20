@@ -5,6 +5,7 @@ import { AppLayout } from './components/layout/AppLayout'
 import { HomeView } from './components/home/HomeView'
 import { LobbyView } from './components/lobby/LobbyView'
 import { TrainingView } from './components/training/TrainingView'
+import { ForceView } from './components/force/ForceView'
 import { NutritionView } from './components/nutrition/NutritionView'
 import { ProfileView } from './components/profile/ProfileView'
 import type { TabId } from './types'
@@ -17,6 +18,8 @@ function renderActiveView(tab: TabId) {
       return <LobbyView />
     case 'training':
       return <TrainingView />
+    case 'force':
+      return <ForceView />
     case 'nutrition':
       return <NutritionView />
     case 'profile':

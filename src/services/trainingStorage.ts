@@ -8,6 +8,8 @@ import type {
   ExerciseEntry,
 } from '../types/training'
 import { todayKey } from '../utils/calories'
+import { progressRoutineExercises } from '../utils/forceArena'
+import { getCalorieProfile } from './nutritionStorage'
 
 const KEY = 'ranked-gym:training'
 
@@ -313,15 +315,18 @@ export function saveWorkoutNote(
 
   let routines = state.routines
   if (entry.routineId) {
-    routines = state.routines.map((r) =>
-      r.id === entry.routineId
-        ? {
-            ...r,
-            exercises: cloneExercises(entry.exercises),
-            updatedAt: Date.now(),
-          }
-        : r,
-    )
+    const bodyWeightKg = getCalorieProfile().weightKg
+    const base = state.routines.find((r) => r.id === entry.routineId)
+    if (base) {
+      // History keeps actual lifts; routine stores NEXT session loads (auto Facile/OK/Dur)
+      const withActual: WorkoutRoutine = {
+        ...base,
+        exercises: cloneExercises(entry.exercises),
+        updatedAt: Date.now(),
+      }
+      const progressed = progressRoutineExercises(withActual, bodyWeightKg)
+      routines = state.routines.map((r) => (r.id === entry.routineId ? progressed : r))
+    }
   }
 
   const next = { ...state, workoutNotes, completed, routines }
@@ -368,4 +373,15 @@ export function todayWorkoutKcal(state: TrainingState = read()): number {
   return state.completed
     .filter((c) => c.dateKey === key)
     .reduce((sum, c) => sum + c.estimatedKcal, 0)
+}
+
+/** Apply Facile/OK/Dur progression to every routine that has exercises. */
+export function applyForceProgression(bodyWeightKg: number): TrainingState {
+  const state = read()
+  const routines = state.routines.map((r) =>
+    r.exercises.length ? progressRoutineExercises(r, bodyWeightKg) : r,
+  )
+  const next = { ...state, routines }
+  write(next)
+  return next
 }

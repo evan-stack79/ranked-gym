@@ -3,6 +3,7 @@ import { Leaf, Droplets, RotateCcw } from 'lucide-react'
 import { NutritionOnboarding } from './NutritionOnboarding'
 import { NutritionPlanCard } from './NutritionPlanCard'
 import { MealJournal } from './MealJournal'
+import { WeightPaceCard } from './WeightPaceCard'
 import { IconBadge } from '../ui/IconBadge'
 import { computeCaloriePlan } from '../../utils/calories'
 import {
@@ -120,6 +121,9 @@ export function NutritionView() {
               onChange={handleProfileChange}
               onTargetChange={handleTargetChange}
             />
+          </div>
+          <div className="ios-fade-up ios-fade-up-delay-1">
+            <WeightPaceCard profile={profile} />
           </div>
           <div className="ios-fade-up ios-fade-up-delay-2">
             <MealJournal targetCalories={targetCalories} morphology={profile.morphology} />

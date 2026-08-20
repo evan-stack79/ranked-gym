@@ -1,10 +1,12 @@
 import type {
   ActivityLevel,
+  BodyMorphology,
   CalorieProfile,
   CalorieResult,
   NutritionGoal,
   Sex,
 } from '../types/nutrition'
+import { computeWeightPace } from './weightPace'
 
 const ACTIVITY_MULTIPLIER: Record<ActivityLevel, number> = {
   sedentary: 1.2,
@@ -28,40 +30,38 @@ export function inferGoalFromWeights(currentKg: number, goalKg: number): Nutriti
 }
 
 /**
- * Calorie adjustment based on how far the goal is.
- * ~7700 kcal ≈ 1 kg of body mass (rule of thumb).
- * We target ~0.5 kg/week loss or ~0.25 kg/week gain, capped safely.
+ * Calorie adjustment using health/aesthetic weekly pace.
  */
 export function calorieAdjustmentForGoal(
   currentKg: number,
   goalKg: number,
   tdee: number,
+  morphology: BodyMorphology = 'mesomorph',
 ): { goal: NutritionGoal; targetCalories: number; weeklyChangeKg: number } {
-  const delta = goalKg - currentKg
-  const goal = inferGoalFromWeights(currentKg, goalKg)
+  const pace = computeWeightPace({ currentKg, goalKg, morphology })
+  const goal = pace.goal
+  const weeklyChangeKg = pace.weeklyKg
 
   if (goal === 'maintain') {
     return { goal, targetCalories: tdee, weeklyChangeKg: 0 }
   }
 
   if (goal === 'cut') {
-    const weeklyLoss = Math.min(0.7, Math.max(0.35, Math.abs(delta) / 12))
-    const dailyDeficit = Math.round((weeklyLoss * 7700) / 7)
+    const dailyDeficit = Math.round((Math.abs(weeklyChangeKg) * 7700) / 7)
     const cappedDeficit = Math.min(dailyDeficit, Math.round(tdee * 0.25))
     return {
       goal,
       targetCalories: Math.max(1200, tdee - cappedDeficit),
-      weeklyChangeKg: -weeklyLoss,
+      weeklyChangeKg,
     }
   }
 
-  const weeklyGain = Math.min(0.4, Math.max(0.2, Math.abs(delta) / 16))
-  const dailySurplus = Math.round((weeklyGain * 7700) / 7)
+  const dailySurplus = Math.round((weeklyChangeKg * 7700) / 7)
   const cappedSurplus = Math.min(dailySurplus, Math.round(tdee * 0.15))
   return {
     goal,
     targetCalories: tdee + cappedSurplus,
-    weeklyChangeKg: weeklyGain,
+    weeklyChangeKg,
   }
 }
 
@@ -72,6 +72,7 @@ export function computeCaloriePlan(profile: CalorieProfile): CalorieResult {
     profile.weightKg,
     profile.goalWeightKg,
     tdee,
+    profile.morphology,
   )
 
   const proteinG = Math.round(profile.weightKg * (goal === 'cut' ? 2.2 : 2))
