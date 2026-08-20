@@ -23,12 +23,12 @@ export function ClearableNumberInput({
   className,
   'aria-label': ariaLabel,
 }: ClearableNumberInputProps) {
-  const [text, setText] = useState(() => formatValue(value))
+  const [text, setText] = useState(() => formatValue(value, step))
   const [focused, setFocused] = useState(false)
 
   useEffect(() => {
-    if (!focused) setText(formatValue(value))
-  }, [value, focused])
+    if (!focused) setText(formatValue(value, step))
+  }, [value, focused, step])
 
   return (
     <input
@@ -39,6 +39,7 @@ export function ClearableNumberInput({
       onFocus={() => setFocused(true)}
       onChange={(e) => {
         const raw = e.target.value.replace(',', '.')
+        // Allow scale-precise values like 61.05 while typing
         if (raw !== '' && !/^\d*\.?\d*$/.test(raw)) return
         setText(raw)
         if (raw === '' || raw === '.') return
@@ -49,20 +50,24 @@ export function ClearableNumberInput({
         setFocused(false)
         const parsed = Number(text)
         if (text === '' || text === '.' || Number.isNaN(parsed)) {
-          setText(formatValue(value))
+          setText(formatValue(value, step))
           return
         }
         const clamped = clamp(parsed, min, max, step)
         onChange(clamped)
-        setText(formatValue(clamped))
+        setText(formatValue(clamped, step))
       }}
       className={className}
     />
   )
 }
 
-function formatValue(value: number): string {
+function formatValue(value: number, step?: number): string {
   if (!Number.isFinite(value)) return ''
+  if (step != null && step > 0 && step < 1) {
+    const decimals = String(step).includes('.') ? String(step).split('.')[1].length : 2
+    return Number(value.toFixed(decimals)).toString()
+  }
   return String(value)
 }
 

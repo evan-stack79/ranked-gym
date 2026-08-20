@@ -8,9 +8,18 @@ import {
   Trash2,
   UtensilsCrossed,
   ScanBarcode,
+  Scale,
+  Sparkles,
 } from 'lucide-react'
 import type { MealEntry, MealType } from '../../types/nutrition'
 import { MEAL_TYPE_LABELS } from '../../utils/calories'
+import {
+  formatGrams,
+  isCalorieDense,
+  mealCalorieBudget,
+  remainingMealBudget,
+  suggestedGramsForProduct,
+} from '../../utils/portionGuide'
 import {
   addMealToToday,
   getTodayJournal,
@@ -37,10 +46,10 @@ interface Per100gNutrition {
 function scaleFromPer100(per100: Per100gNutrition, grams: number) {
   const factor = grams / 100
   return {
-    calories: Math.max(1, Math.round(per100.calories * factor)),
-    proteines: Math.round(per100.proteines * factor * 10) / 10,
-    glucides: Math.round(per100.glucides * factor * 10) / 10,
-    lipides: Math.round(per100.lipides * factor * 10) / 10,
+    calories: Math.max(0, Math.round(per100.calories * factor)),
+    proteines: Math.round(per100.proteines * factor * 100) / 100,
+    glucides: Math.round(per100.glucides * factor * 100) / 100,
+    lipides: Math.round(per100.lipides * factor * 100) / 100,
   }
 }
 
@@ -100,11 +109,24 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
 
   const applyPortion = useCallback((base: Per100gNutrition, grams: number) => {
     const scaled = scaleFromPer100(base, grams)
-    setCalories(scaled.calories)
+    setCalories(Math.max(1, scaled.calories))
     setProteinG(scaled.proteines)
     setCarbsG(scaled.glucides)
     setFatG(scaled.lipides)
   }, [])
+
+  const portionGuide = useMemo(() => {
+    if (!per100) return null
+    const budget = mealCalorieBudget(targetCalories, mealType)
+    const remaining = remainingMealBudget(targetCalories, mealType, meals)
+    const suggested = suggestedGramsForProduct(per100.calories, remaining)
+    return {
+      budget,
+      remaining,
+      suggested,
+      dense: isCalorieDense(per100.calories),
+    }
+  }, [per100, targetCalories, mealType, meals])
 
   const handleScannedProduct = useCallback(
     (product: OpenFoodFactsProduct) => {
@@ -114,7 +136,10 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
         glucides: product.glucides,
         lipides: product.lipides,
       }
-      const grams = 100
+      const remaining = remainingMealBudget(targetCalories, mealType, getTodayJournal().meals)
+      const suggested = suggestedGramsForProduct(base.calories, remaining)
+      const grams = suggested ?? 100
+
       setName(product.nom)
       setPer100(base)
       setPortionGrams(grams)
@@ -126,13 +151,14 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
         void saveAliment(product, user.id).catch(() => undefined)
       }
     },
-    [user, applyPortion],
+    [user, applyPortion, targetCalories, mealType],
   )
 
   const handlePortionChange = (grams: number) => {
-    setPortionGrams(grams)
-    if (per100 && grams > 0) {
-      applyPortion(per100, grams)
+    const precise = Math.round(grams * 100) / 100
+    setPortionGrams(precise)
+    if (per100 && precise > 0) {
+      applyPortion(per100, precise)
     }
   }
 
@@ -316,30 +342,88 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
           </label>
 
           {per100 && (
-            <div className="rounded-2xl border border-[#30D158]/25 bg-[#30D158]/10 p-3.5">
+            <div className="space-y-3 rounded-2xl border border-[#30D158]/25 bg-[#30D158]/10 p-3.5">
               <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
-                  Quantité dans ton assiette (g)
+                <span className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-[#8E8E93]">
+                  <Scale className="h-3.5 w-3.5 text-[#30D158]" />
+                  Poids sur la balance (g)
                 </span>
                 <div className="flex items-end gap-2">
                   <ClearableNumberInput
                     value={portionGrams}
                     onChange={handlePortionChange}
-                    min={1}
+                    min={0.01}
                     max={5000}
-                    step={1}
-                    aria-label="Quantité en grammes"
-                    className="w-full bg-transparent text-[28px] font-bold tracking-tight text-white outline-none"
+                    step={0.01}
+                    aria-label="Poids en grammes"
+                    className="w-full bg-transparent text-[32px] font-bold tracking-tight text-white outline-none"
                   />
                   <span className="pb-1 text-[13px] font-medium text-[#8E8E93]">g</span>
                 </div>
               </label>
-              <p className="mt-2 text-[12px] leading-relaxed text-[#AEAEB2]">
-                Données Open Food Facts pour 100 g ({per100.calories} kcal). Adapte les grammes à
-                ta portion — calories et macros se recalculent automatiquement.
+              <p className="text-[12px] leading-relaxed text-[#AEAEB2]">
+                Entre le poids exact de ta balance (ex. 61,05 g). Les valeurs Open Food Facts sont
+                pour 100 g ({per100.calories} kcal) — on recalcule ta portion précisément.
               </p>
-              <div className="mt-2.5 flex flex-wrap gap-1.5">
-                {[50, 100, 150, 200, 250].map((preset) => (
+
+              {portionGuide && (
+                <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+                  <div className="mb-1.5 flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-[#64D2FF]" />
+                    <p className="text-[12px] font-semibold text-white">
+                      Guide {MEAL_TYPE_LABELS[mealType]}
+                    </p>
+                  </div>
+                  <p className="text-[12px] leading-relaxed text-[#AEAEB2]">
+                    Pour ton objectif : environ{' '}
+                    <span className="font-semibold text-white">{portionGuide.budget} kcal</span> sur
+                    ce repas
+                    {portionGuide.remaining < portionGuide.budget && (
+                      <>
+                        {' '}
+                        · il reste{' '}
+                        <span className="font-semibold text-[#30D158]">
+                          {portionGuide.remaining} kcal
+                        </span>
+                      </>
+                    )}
+                    .
+                  </p>
+                  {portionGuide.suggested != null ? (
+                    <>
+                      <p className="mt-1.5 text-[12px] leading-relaxed text-[#AEAEB2]">
+                        Suggestion pour ce produit :{' '}
+                        <span className="font-semibold text-[#64D2FF]">
+                          {formatGrams(portionGuide.suggested)} g
+                        </span>{' '}
+                        — ça laisse de la place pour un repas équilibré (protéines, veggies…).
+                        {portionGuide.dense && (
+                          <>
+                            {' '}
+                            Aliment plutôt dense en calories : une petite portion + un accompagnement
+                            est souvent le meilleur combo.
+                          </>
+                        )}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handlePortionChange(portionGuide.suggested!)}
+                        className="ios-press mt-2.5 w-full rounded-xl border border-[#00B4FF]/35 bg-[#00B4FF]/15 py-2.5 text-[13px] font-semibold text-[#64D2FF]"
+                      >
+                        Utiliser {formatGrams(portionGuide.suggested)} g
+                      </button>
+                    </>
+                  ) : (
+                    <p className="mt-1.5 text-[12px] leading-relaxed text-[#FF9F0A]">
+                      Budget de ce repas déjà atteint — réduis la portion ou choisis un autre
+                      créneau.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-1.5">
+                {[25, 50, 80, 100, 150, 200].map((preset) => (
                   <button
                     key={preset}
                     type="button"
