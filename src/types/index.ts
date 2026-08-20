@@ -28,6 +28,9 @@ export interface NearbyGym {
   distanceMeters: number
   canCheckIn: boolean
   isCustom?: boolean
+  /** Google Places rating out of 5 */
+  rating?: number
+  userRatingsTotal?: number
 }
 
 export interface GeoCoordinates {

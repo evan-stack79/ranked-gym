@@ -1,5 +1,6 @@
 import { Loader2, Satellite, Radar, Search } from 'lucide-react'
 import { IconBadge } from '../ui/IconBadge'
+import { isMockPlacesMode } from '../../services/googlePlacesApi'
 
 type LoaderPhase = 'locating' | 'geocoding' | 'fetching'
 
@@ -7,29 +8,29 @@ interface LobbyLoaderProps {
   phase: LoaderPhase
 }
 
-const LOADER_CONFIG: Record<
-  LoaderPhase,
-  { icon: typeof Satellite; title: string; subtitle: string }
-> = {
-  locating: {
-    icon: Satellite,
-    title: 'Localisation…',
-    subtitle: 'Autorise l\'accès à ta position si demandé',
-  },
-  geocoding: {
-    icon: Search,
-    title: 'Recherche de la ville…',
-    subtitle: 'Conversion en coordonnées',
-  },
-  fetching: {
-    icon: Radar,
-    title: 'Recherche des salles…',
-    subtitle: 'Interrogation OpenStreetMap',
-  },
-}
-
 export function LobbyLoader({ phase }: LobbyLoaderProps) {
-  const config = LOADER_CONFIG[phase]
+  const mock = isMockPlacesMode()
+
+  const config = {
+    locating: {
+      icon: Satellite,
+      title: 'Localisation…',
+      subtitle: 'Autorise l\'accès à ta position si demandé',
+    },
+    geocoding: {
+      icon: Search,
+      title: 'Recherche de la ville…',
+      subtitle: mock ? 'Simulation géocodage' : 'Google Geocoding',
+    },
+    fetching: {
+      icon: Radar,
+      title: 'Recherche des salles…',
+      subtitle: mock
+        ? 'Simulation Google Places (pas de clé API)'
+        : 'Google Places · gym & fitness_center',
+    },
+  }[phase]
+
   const Icon = config.icon
 
   return (

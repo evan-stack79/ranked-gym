@@ -15,8 +15,13 @@ import { CitySearchFallback } from './CitySearchFallback'
 import { NeonButton } from '../ui/NeonButton'
 import { IconBadge } from '../ui/IconBadge'
 import { getCurrentPosition, GeolocationError } from '../../services/geolocation'
-import { geocodeCity, NominatimError } from '../../services/nominatimApi'
-import { fetchNearbyGyms, createVirtualGym } from '../../services/overpassApi'
+import {
+  fetchNearbyGyms,
+  createVirtualGym,
+  geocodeCity,
+  GooglePlacesError,
+  isMockPlacesMode,
+} from '../../services/googlePlacesApi'
 import {
   mergeWithCustomGyms,
   saveCustomGym,
@@ -153,7 +158,7 @@ export function LobbyView() {
           label: place.label,
         })
       } catch (err) {
-        if (err instanceof NominatimError) {
+        if (err instanceof GooglePlacesError) {
           setError(err.message)
         } else if (err instanceof Error) {
           setError(err.message)
@@ -220,6 +225,11 @@ export function LobbyView() {
           <h1 className="text-[34px] font-bold tracking-tight text-white">Lobby</h1>
           <p className="mt-2 text-[17px] text-[#8E8E93]">
             Trouve et rejoins une salle à proximité.
+            {isMockPlacesMode() && (
+              <span className="mt-1 block text-[13px] text-[#FF9F0A]">
+                Mode simulation · clé Google Maps absente
+              </span>
+            )}
           </p>
         </div>
         {(phase === 'ready' || phase === 'checked-in') && !isLoading && (
@@ -307,7 +317,7 @@ export function LobbyView() {
           <div>
             <p className="text-[17px] font-semibold text-white">Aucune salle trouvée</p>
             <p className="mt-1 text-[15px] text-[#8E8E93]">
-              Aucun centre dans un rayon de {formatDistance(SEARCH_RADIUS_METERS)}.
+              Aucun centre fitness dans un rayon de {formatDistance(SEARCH_RADIUS_METERS)}.
             </p>
           </div>
           <div className="w-full">

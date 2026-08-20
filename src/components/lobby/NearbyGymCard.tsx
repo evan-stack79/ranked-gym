@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Building2, MapPin, Navigation, Lock, CheckCircle2 } from 'lucide-react'
+import { Building2, MapPin, Navigation, Lock, CheckCircle2, Star } from 'lucide-react'
 import type { NearbyGym } from '../../types'
 import { formatDistance, CHECK_IN_RADIUS_METERS } from '../../utils/geo'
 import { NeonButton } from '../ui/NeonButton'
@@ -10,6 +10,18 @@ interface NearbyGymCardProps {
   onCheckIn: (gym: NearbyGym) => void
   isCheckingIn: boolean
   checkingInGymId: string | null
+}
+
+function RatingRow({ rating, total }: { rating: number; total?: number }) {
+  return (
+    <p className="mt-1.5 flex items-center gap-1.5 text-[13px]">
+      <span className="font-semibold text-[#FFD60A]">{rating.toFixed(1)}</span>
+      <Star className="h-3.5 w-3.5 fill-[#FFD60A] text-[#FFD60A]" />
+      {total != null && (
+        <span className="text-[#8E8E93]">({total.toLocaleString('fr-FR')})</span>
+      )}
+    </p>
+  )
 }
 
 export function NearbyGymCard({
@@ -23,7 +35,7 @@ export function NearbyGymCard({
   return (
     <article className="glass-card rounded-2xl p-4">
       <div className="flex items-start gap-3">
-          <IconBadge icon={Building2} variant={gym.canCheckIn ? 'crimson' : 'white'} />
+        <IconBadge icon={Building2} variant={gym.canCheckIn ? 'crimson' : 'white'} />
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -34,13 +46,19 @@ export function NearbyGymCard({
               </span>
             )}
           </div>
+
+          {gym.rating != null && (
+            <RatingRow rating={gym.rating} total={gym.userRatingsTotal} />
+          )}
+
           {gym.address && (
-            <p className="mt-1 flex items-start gap-1.5 text-[13px] text-[#8E8E93]">
-              <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
+            <p className="mt-1.5 flex items-start gap-1.5 text-[13px] leading-snug text-[#8E8E93]">
+              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#FF2B2B]/80" />
               <span className="line-clamp-2">{gym.address}</span>
             </p>
           )}
-          <div className="mt-2 flex items-center gap-2">
+
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1 text-[13px] text-[#8E8E93]">
               <Navigation className="h-3 w-3" />
               {gym.isCustom ? 'Sur place' : formatDistance(gym.distanceMeters)}

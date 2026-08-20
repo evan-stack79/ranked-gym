@@ -37,9 +37,20 @@ src/
 ## Fonctionnalités
 
 - Navigation bottom bar : Accueil, Lobby, Entraînement, Profil
-- **Lobby** : simulation géolocalisation + check-in + liste de membres actifs
-- **Profil** : avatar, rank (Platine Niv. 42), barre XP
-- Design dark mode futuriste (néon vert/bleu)
+- **Lobby** : Google Places Nearby Search (gym / fitness_center) + check-in + membres actifs
+  - Sans `VITE_GOOGLE_MAPS_API_KEY` → mode simulation (salles Tergnier mock)
+- **Profil** : avatar, rank, barre XP
+- Design dark « Hero & Arena » (crimson + glassmorphism)
+
+## Configuration Google Maps
+
+Copie `.env.example` vers `.env` et renseigne ta clé :
+
+```bash
+VITE_GOOGLE_MAPS_API_KEY=ta_cle_ici
+```
+
+Active **Places API** et **Geocoding API** sur Google Cloud. Tant que la clé est vide, l’app affiche 3 salles mock autour de ta position.
 
 ## Scripts
 
