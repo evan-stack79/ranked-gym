@@ -122,3 +122,94 @@ body {
 .arena-glow {
   animation: glow-breathe 10s ease-in-out infinite;
 }
+
+/* iOS sheet motion — springy ease like UIKit */
+.ios-sheet-panel {
+  transform: translate3d(0, 110%, 0);
+  transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: transform;
+}
+
+.ios-sheet-panel--open {
+  transform: translate3d(0, 0, 0);
+}
+
+.ios-sheet-panel--closed {
+  transform: translate3d(0, 110%, 0);
+}
+
+@media (min-width: 640px) {
+  .ios-sheet-panel {
+    transform: translate3d(0, 18px, 0) scale(0.96);
+    opacity: 0;
+    transition:
+      transform 0.36s cubic-bezier(0.32, 0.72, 0, 1),
+      opacity 0.28s ease;
+  }
+
+  .ios-sheet-panel--open {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 1;
+  }
+
+  .ios-sheet-panel--closed {
+    transform: translate3d(0, 18px, 0) scale(0.96);
+    opacity: 0;
+  }
+}
+
+.ios-press {
+  transition:
+    transform 0.18s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.ios-press:active {
+  transform: scale(0.96);
+  opacity: 0.88;
+}
+
+@keyframes ios-fade-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.ios-fade-up {
+  animation: ios-fade-up 0.45s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.ios-fade-up-delay-1 {
+  animation-delay: 0.05s;
+}
+
+.ios-fade-up-delay-2 {
+  animation-delay: 0.1s;
+}
+
+.ios-fade-up-delay-3 {
+  animation-delay: 0.15s;
+}
+
+@keyframes ios-tab-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(0.88);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.ios-tab-active-icon {
+  animation: ios-tab-pop 0.34s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
