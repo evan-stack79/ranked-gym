@@ -52,11 +52,10 @@ Il active aussi :
 Apple / Google sont retirés de l’app. Auth = **email + mot de passe** seulement.
 
 1. **Authentication → Providers → Email** : activé.
-2. En dev : **Confirm email = OFF**  
-   (sinon `signUp` crée le user sans session jusqu’à validation du mail).
-3. **Authentication → URL Configuration** :
-   - Site URL : `http://localhost:5173` (dev) puis ton URL de prod
-   - Redirect URLs : ajoute `http://localhost:5173/**` et ton domaine de prod
+2. En dev : **Confirm email = OFF** (recommandé)  
+   Sinon Supabase envoie un mail de validation.  
+   Site URL doit être `http://localhost:5173` (pas `:3000`) et Redirect URLs doit contenir ton origine.  
+   L’app envoie déjà `emailRedirectTo` = l’URL courante.
 
 ## 5. Brancher le code (déjà prêt)
 

@@ -182,7 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const data = await signUpWithEmail(email, password, pseudo)
         if (!data.session) {
           setAuthError(
-            'Compte créé. Si la confirmation email est activée sur Supabase, valide ton mail puis reconnecte-toi.',
+            'Compte créé, mais la confirmation email est encore activée sur Supabase. Désactive “Confirm email” (Authentication → Providers → Email), puis reconnecte-toi avec le même email/mot de passe.',
           )
           setAuthLoading(false)
           return

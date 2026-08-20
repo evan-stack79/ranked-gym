@@ -33,10 +33,13 @@ export function mapSessionUser(user: {
 
 export async function signUpWithEmail(email: string, password: string, pseudo?: string) {
   const supabase = getSupabase()
+  const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined
+
   const { data, error } = await supabase.auth.signUp({
     email: email.trim().toLowerCase(),
     password,
     options: {
+      emailRedirectTo: redirectTo,
       data: {
         pseudo: pseudo?.trim() || email.split('@')[0] || 'Athlete',
       },
