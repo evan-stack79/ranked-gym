@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   Coffee,
   Moon,
@@ -7,6 +7,7 @@ import {
   Cookie,
   Trash2,
   UtensilsCrossed,
+  ScanBarcode,
 } from 'lucide-react'
 import type { MealEntry, MealType } from '../../types/nutrition'
 import { MEAL_TYPE_LABELS } from '../../utils/calories'
@@ -15,8 +16,11 @@ import {
   getTodayJournal,
   removeMealFromToday,
 } from '../../services/nutritionStorage'
+import { saveAliment, type OpenFoodFactsProduct } from '../../services/alimentsService'
+import { useAuth } from '../../context/AuthContext'
 import { IconBadge } from '../ui/IconBadge'
 import { MacroRing } from './MacroRing'
+import { BarcodeScanner } from './BarcodeScanner'
 
 interface MealJournalProps {
   targetCalories: number
@@ -57,18 +61,43 @@ function MealTypeChip({
 }
 
 export function MealJournal({ targetCalories }: MealJournalProps) {
+  const { user, requireAuth } = useAuth()
   const [meals, setMeals] = useState<MealEntry[]>([])
   const [hydrated, setHydrated] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [scannerOpen, setScannerOpen] = useState(false)
   const [name, setName] = useState('')
   const [calories, setCalories] = useState(350)
   const [proteinG, setProteinG] = useState<number | ''>('')
+  const [carbsG, setCarbsG] = useState<number | ''>('')
+  const [fatG, setFatG] = useState<number | ''>('')
   const [mealType, setMealType] = useState<MealType>('lunch')
 
   useEffect(() => {
     setMeals(getTodayJournal().meals)
     setHydrated(true)
   }, [])
+
+  const handleScannedProduct = useCallback(
+    (product: OpenFoodFactsProduct) => {
+      setName(product.nom)
+      setCalories(product.calories || 1)
+      setProteinG(product.proteines)
+      setCarbsG(product.glucides)
+      setFatG(product.lipides)
+      setShowForm(true)
+      setScannerOpen(false)
+
+      if (user) {
+        void saveAliment(product, user.id).catch(() => undefined)
+      }
+    },
+    [user],
+  )
+
+  const openScanner = () => {
+    requireAuth(() => setScannerOpen(true))
+  }
 
   const totals = useMemo(() => {
     return meals.reduce(
@@ -95,11 +124,15 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
       mealType,
       calories: Math.round(calories),
       proteinG: proteinG === '' ? undefined : Number(proteinG),
+      carbsG: carbsG === '' ? undefined : Number(carbsG),
+      fatG: fatG === '' ? undefined : Number(fatG),
     })
     setMeals(journal.meals)
     setName('')
     setCalories(350)
     setProteinG('')
+    setCarbsG('')
+    setFatG('')
     setShowForm(false)
   }
 
@@ -130,14 +163,24 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
               <h2 className="text-[20px] font-bold tracking-tight text-white">Repas du jour</h2>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowForm((v) => !v)}
-            className="btn-brand inline-flex items-center gap-1.5 rounded-full border border-white/15 px-3.5 py-2 text-[13px] font-semibold text-white"
-          >
-            <Plus className="h-4 w-4" />
-            Ajouter
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={openScanner}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#30D158]/35 bg-[#30D158]/15 px-3.5 py-2 text-[13px] font-semibold text-[#30D158]"
+            >
+              <ScanBarcode className="h-4 w-4" />
+              Scanner
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowForm((v) => !v)}
+              className="btn-brand inline-flex items-center gap-1.5 rounded-full border border-white/15 px-3.5 py-2 text-[13px] font-semibold text-white"
+            >
+              <Plus className="h-4 w-4" />
+              Ajouter
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-5">
@@ -250,6 +293,36 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
                 className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/40"
               />
             </label>
+            <label className="block">
+              <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                Glucides (g)
+              </span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={400}
+                value={carbsG}
+                onChange={(e) => setCarbsG(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="Optionnel"
+                className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF9F0A]/40"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                Lipides (g)
+              </span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={400}
+                value={fatG}
+                onChange={(e) => setFatG(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="Optionnel"
+                className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#00B4FF]/40"
+              />
+            </label>
           </div>
 
           <div className="flex gap-2">
@@ -327,6 +400,12 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
           })}
         </ul>
       )}
+
+      <BarcodeScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onProduct={handleScannedProduct}
+      />
     </section>
   )
 }

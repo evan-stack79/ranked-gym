@@ -31,6 +31,8 @@ import {
 import { generateLobbyMembers } from '../../data/mockData'
 import { CreateLobbyPanel } from './CreateLobbyPanel'
 import { formatDistance, SEARCH_RADIUS_METERS } from '../../utils/geo'
+import { createCheckin } from '../../services/checkinService'
+import { isSupabaseConfigured } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import type { GymMember, LobbyPhase, LocationContext, NearbyGym } from '../../types'
 
@@ -47,7 +49,7 @@ function memberCountForGym(gym: NearbyGym): number {
 }
 
 export function LobbyView() {
-  const { requireAuth } = useAuth()
+  const { requireAuth, user } = useAuth()
   const [phase, setPhase] = useState<LobbyPhase>('idle')
   const [error, setError] = useState<string | null>(null)
   const [location, setLocation] = useState<LocationContext | null>(null)
@@ -73,13 +75,27 @@ export function LobbyView() {
     setHydrated(true)
   }, [])
 
-  const enterLobby = useCallback((gym: NearbyGym) => {
-    saveCheckIn(gym)
-    setCheckedInGym(gym)
-    setCheckedInAt(Date.now())
-    setLobbyMembers(generateLobbyMembers(gym.id, memberCountForGym(gym)))
-    setPhase('checked-in')
-  }, [])
+  const enterLobby = useCallback(
+    (gym: NearbyGym) => {
+      saveCheckIn(gym)
+      setCheckedInGym(gym)
+      setCheckedInAt(Date.now())
+      setLobbyMembers(generateLobbyMembers(gym.id, memberCountForGym(gym)))
+      setPhase('checked-in')
+
+      if (user && isSupabaseConfigured()) {
+        void createCheckin({
+          userId: user.id,
+          salleNom: gym.name,
+          salleLat: gym.lat,
+          salleLng: gym.lng,
+        }).catch(() => {
+          // Keep local lobby even if remote write fails (offline / RLS)
+        })
+      }
+    },
+    [user],
+  )
 
   const resetToIdle = useCallback(() => {
     clearCheckIn()

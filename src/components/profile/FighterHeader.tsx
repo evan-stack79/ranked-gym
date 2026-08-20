@@ -1,7 +1,7 @@
 import { Settings } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
 import { StatusBadge, statusFromPower } from '../ui/StatusBadge'
-import type { AuthProvider } from '../../services/authStorage'
+import type { AuthMethod } from '../../services/authService'
 
 interface FighterHeaderProps {
   username: string
@@ -9,7 +9,7 @@ interface FighterHeaderProps {
   level: number
   rank: string
   email?: string
-  provider?: AuthProvider
+  provider?: AuthMethod
   onOpenSettings?: () => void
 }
 

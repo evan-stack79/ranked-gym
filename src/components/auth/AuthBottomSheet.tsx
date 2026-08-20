@@ -40,13 +40,16 @@ export function AuthBottomSheet() {
     authLoading,
     authError,
     signInWithEmail,
+    signUpWithEmail,
     signInWithApple,
     signInWithGoogle,
   } = useAuth()
 
   const titleId = useId()
+  const [mode, setMode] = useState<'signup' | 'login'>('signup')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [pseudo, setPseudo] = useState('')
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
@@ -70,7 +73,11 @@ export function AuthBottomSheet() {
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault()
-    void signInWithEmail(email, password)
+    if (mode === 'signup') {
+      void signUpWithEmail(email, password, pseudo || undefined)
+    } else {
+      void signInWithEmail(email, password)
+    }
   }
 
   return (
@@ -91,7 +98,7 @@ export function AuthBottomSheet() {
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`relative z-10 w-full max-w-lg overflow-hidden rounded-t-[28px] border border-white/10 sm:rounded-[28px] sm:mx-4 transition-transform duration-300 ease-out ${
+        className={`relative z-10 max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-[28px] border border-white/10 sm:rounded-[28px] sm:mx-4 transition-transform duration-300 ease-out ${
           visible ? 'translate-y-0' : 'translate-y-8'
         }`}
         style={{
@@ -108,7 +115,9 @@ export function AuthBottomSheet() {
             <p id={titleId} className="text-[17px] font-semibold tracking-tight text-white">
               Ranked <span className="text-[#FF2B2B]">Gym</span>
             </p>
-            <p className="mt-0.5 text-[13px] text-[#8E8E93]">Crée ton profil pour checker et progresser</p>
+            <p className="mt-0.5 text-[13px] text-[#8E8E93]">
+              {mode === 'signup' ? 'Crée ton profil athlète' : 'Bon retour dans l’arène'}
+            </p>
           </div>
           <button
             type="button"
@@ -122,6 +131,27 @@ export function AuthBottomSheet() {
         </div>
 
         <div className="space-y-3 px-5 pb-5 pt-3">
+          <div className="flex gap-1 rounded-xl border border-white/10 bg-black/30 p-1">
+            <button
+              type="button"
+              onClick={() => setMode('signup')}
+              className={`flex-1 rounded-lg py-2 text-[13px] font-semibold ${
+                mode === 'signup' ? 'bg-[#FF2B2B] text-white' : 'text-[#8E8E93]'
+              }`}
+            >
+              Inscription
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('login')}
+              className={`flex-1 rounded-lg py-2 text-[13px] font-semibold ${
+                mode === 'login' ? 'bg-[#FF2B2B] text-white' : 'text-[#8E8E93]'
+              }`}
+            >
+              Connexion
+            </button>
+          </div>
+
           <button
             type="button"
             disabled={authLoading}
@@ -149,6 +179,20 @@ export function AuthBottomSheet() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-3">
+            {mode === 'signup' && (
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Pseudo</span>
+                <input
+                  type="text"
+                  value={pseudo}
+                  onChange={(e) => setPseudo(e.target.value)}
+                  placeholder="Evan_Lift"
+                  disabled={authLoading}
+                  maxLength={24}
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                />
+              </label>
+            )}
             <label className="block">
               <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Email</span>
               <input
@@ -166,9 +210,9 @@ export function AuthBottomSheet() {
               <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Mot de passe</span>
               <input
                 type="password"
-                autoComplete="new-password"
+                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                 required
-                minLength={4}
+                minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -191,16 +235,18 @@ export function AuthBottomSheet() {
               {authLoading ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  Connexion…
+                  {mode === 'signup' ? 'Création…' : 'Connexion…'}
                 </>
-              ) : (
+              ) : mode === 'signup' ? (
                 'Créer mon profil'
+              ) : (
+                'Se connecter'
               )}
             </button>
           </form>
 
           <p className="pt-1 text-center text-[11px] leading-relaxed text-[#636366]">
-            En continuant, tu acceptes les conditions Ranked Gym.
+            Auth sécurisée via Supabase. Apple/Google nécessitent les providers activés.
           </p>
         </div>
       </div>

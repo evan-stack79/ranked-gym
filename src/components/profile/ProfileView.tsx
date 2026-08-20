@@ -6,26 +6,19 @@ import { ProfileXPBar } from './ProfileXPBar'
 import { StatGrid } from './StatGrid'
 import { BadgeShowcase } from './BadgeShowcase'
 import { useAuth } from '../../context/AuthContext'
-import { getProfileProgress, saveProfileProgress } from '../../services/profileStorage'
 import { getRankFromLevel } from '../../utils/rank'
-import type { StoredProfileProgress } from '../../services/profileStorage'
+
+const XP_PER_LEVEL = 1000
 
 export function ProfileView() {
-  const { user, signOut, isAuthenticated, requireAuth } = useAuth()
-  const [progress, setProgress] = useState<StoredProfileProgress>(() => getProfileProgress())
-  const [hydrated, setHydrated] = useState(false)
+  const { user, profile, signOut, isAuthenticated, requireAuth, refreshProfile } = useAuth()
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   useEffect(() => {
-    setProgress(getProfileProgress())
-    setHydrated(true)
-  }, [])
-
-  useEffect(() => {
-    if (hydrated) {
-      saveProfileProgress(progress)
+    if (isAuthenticated) {
+      void refreshProfile()
     }
-  }, [progress, hydrated])
+  }, [isAuthenticated, refreshProfile])
 
   if (!isAuthenticated || !user) {
     return (
@@ -45,25 +38,27 @@ export function ProfileView() {
     )
   }
 
-  const rank = getRankFromLevel(progress.level)
-  const username = user.displayName
+  const level = profile?.level ?? 1
+  const currentXp = profile?.xp ?? 0
+  const rank = getRankFromLevel(level)
+  const username = profile?.pseudo || user.displayName
 
   return (
     <div className="flex flex-col gap-8 pb-4">
       <FighterHeader
         username={username}
-        title={rank.title}
-        level={progress.level}
-        rank={rank.tier}
+        title={profile?.discipline ? `${rank.title} · ${profile.discipline}` : rank.title}
+        level={level}
+        rank={profile?.rank ?? rank.tier}
         email={user.email}
         provider={user.provider}
         onOpenSettings={() => setSettingsOpen(true)}
       />
-      <RankShowcase rank={rank} level={progress.level} />
+      <RankShowcase rank={rank} level={level} />
       <ProfileXPBar
-        level={progress.level}
-        currentXp={progress.currentXp}
-        xpToNextLevel={progress.xpToNextLevel}
+        level={level}
+        currentXp={currentXp % XP_PER_LEVEL}
+        xpToNextLevel={XP_PER_LEVEL}
       />
       <StatGrid />
       <BadgeShowcase />
@@ -96,11 +91,11 @@ export function ProfileView() {
             </div>
 
             <div className="glass-card mb-4 rounded-2xl p-4">
-              <p className="text-[13px] text-[#8E8E93]">Compte connecté</p>
-              <p className="mt-1 font-semibold text-white">{user.displayName}</p>
+              <p className="text-[13px] text-[#8E8E93]">Compte Supabase</p>
+              <p className="mt-1 font-semibold text-white">{username}</p>
               <p className="mt-0.5 text-[13px] text-[#AEAEB2]">{user.email}</p>
               <p className="mt-2 text-[11px] uppercase tracking-wide text-[#636366]">
-                Via {user.provider}
+                {profile?.rank ?? rank.tier} · Niv. {level} · via {user.provider}
               </p>
             </div>
 
@@ -108,7 +103,7 @@ export function ProfileView() {
               type="button"
               onClick={() => {
                 setSettingsOpen(false)
-                signOut()
+                void signOut()
               }}
               className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[#FF453A]/30 bg-[#FF453A]/15 py-3.5 text-[16px] font-semibold text-[#FF453A] active:opacity-80"
             >
