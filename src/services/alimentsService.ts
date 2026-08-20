@@ -43,6 +43,7 @@ export async function fetchOpenFoodFacts(barcode: string): Promise<OpenFoodFacts
   }
 
   const n = data.product.nutriments ?? {}
+  // Open Food Facts: always use *_100g so portions stay honest and scalable in the UI.
   const calories = Number(n['energy-kcal_100g'] ?? n.energy_kcal_100g ?? 0)
   const proteines = Number(n.proteins_100g ?? 0)
   const glucides = Number(n.carbohydrates_100g ?? 0)

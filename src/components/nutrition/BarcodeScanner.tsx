@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Html5Qrcode, type Html5QrcodeResult } from 'html5-qrcode'
+import {
+  Html5Qrcode,
+  Html5QrcodeSupportedFormats,
+  type Html5QrcodeCameraScanConfig,
+  type Html5QrcodeResult,
+} from 'html5-qrcode'
 import { Camera, Loader2, X } from 'lucide-react'
 import { fetchOpenFoodFacts, type OpenFoodFactsProduct } from '../../services/alimentsService'
 
@@ -7,6 +12,25 @@ interface BarcodeScannerProps {
   open: boolean
   onClose: () => void
   onProduct: (product: OpenFoodFactsProduct) => void
+}
+
+/** Larger scan area + higher-res camera so barcodes can be read a bit farther away. */
+function buildScanConfig(): Html5QrcodeCameraScanConfig {
+  return {
+    fps: 12,
+    qrbox: (viewfinderWidth, viewfinderHeight) => {
+      const width = Math.floor(Math.min(viewfinderWidth * 0.92, viewfinderWidth - 16))
+      const height = Math.floor(Math.min(viewfinderHeight * 0.55, 240))
+      return { width: Math.max(180, width), height: Math.max(100, height) }
+    },
+    aspectRatio: 1.777778,
+    disableFlip: false,
+    videoConstraints: {
+      facingMode: 'environment',
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+    },
+  }
 }
 
 export function BarcodeScanner({ open, onClose, onProduct }: BarcodeScannerProps) {
@@ -23,8 +47,21 @@ export function BarcodeScanner({ open, onClose, onProduct }: BarcodeScannerProps
     setError(null)
     setLookingUp(false)
 
-    const scanner = new Html5Qrcode(containerId)
+    const scanner = new Html5Qrcode(containerId, {
+      verbose: false,
+      useBarCodeDetectorIfSupported: true,
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.QR_CODE,
+      ],
+    })
     scannerRef.current = scanner
+    const config = buildScanConfig()
 
     const onScan = async (decoded: string, _result: Html5QrcodeResult) => {
       if (handledRef.current) return
@@ -48,7 +85,7 @@ export function BarcodeScanner({ open, onClose, onProduct }: BarcodeScannerProps
         try {
           await scanner.start(
             { facingMode: 'environment' },
-            { fps: 8, qrbox: { width: 260, height: 140 } },
+            config,
             (text, result) => {
               void onScan(text, result)
             },
@@ -63,7 +100,7 @@ export function BarcodeScanner({ open, onClose, onProduct }: BarcodeScannerProps
     void scanner
       .start(
         { facingMode: 'environment' },
-        { fps: 8, qrbox: { width: 260, height: 140 } },
+        config,
         (text, result) => {
           void onScan(text, result)
         },
@@ -106,7 +143,9 @@ export function BarcodeScanner({ open, onClose, onProduct }: BarcodeScannerProps
             <Camera className="h-5 w-5 text-[#30D158]" />
             <div>
               <p className="text-[16px] font-semibold text-white">Scanner Open Food Facts</p>
-              <p className="text-[12px] text-[#8E8E93]">Cadre le code-barres du produit</p>
+              <p className="text-[12px] text-[#8E8E93]">
+                Tiens le code un peu plus loin — pas besoin de coller l’écran
+              </p>
             </div>
           </div>
           <button
@@ -122,7 +161,7 @@ export function BarcodeScanner({ open, onClose, onProduct }: BarcodeScannerProps
         <div className="px-4 pb-4">
           <div
             id={containerId}
-            className="overflow-hidden rounded-2xl border border-white/10 bg-black"
+            className="overflow-hidden rounded-2xl border border-white/10 bg-black [&_video]:min-h-[280px] [&_video]:w-full [&_video]:object-cover"
           />
           {lookingUp && (
             <p className="mt-3 flex items-center justify-center gap-2 text-[13px] text-[#8E8E93]">

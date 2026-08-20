@@ -113,14 +113,18 @@ export const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
   athlete: 'Athlète',
 }
 
-/** Short hint shown under the selected activity chip (sessions ≈ sport / musculation). */
+/** Short hint shown under the selected activity chip — motivational, health-first. */
 export const ACTIVITY_HINTS: Record<ActivityLevel, string> = {
-  sedentary: 'Peu ou pas de sport — quotidien surtout assis, marche légère.',
-  light: '1 à 2 séances par semaine — débutant ou reprise.',
-  moderate: 'Environ 3 séances par semaine — rythme régulier.',
-  active: 'Environ 4 séances par semaine — entraînement soutenu et constant.',
+  sedentary:
+    'Peu de sport pour l’instant — marche, quotidien, ou juste démarrer. Chaque pas compte pour ta santé.',
+  light:
+    '1 à 2 séances par semaine — parfait pour progresser à ton rythme et prendre de bonnes habitudes.',
+  moderate:
+    'Environ 3 séances par semaine — un bon équilibre sport / récup pour rester en forme.',
+  active:
+    'Environ 4 séances par semaine — rythme régulier et motivant, avec des jours pour récupérer.',
   athlete:
-    '5 à 6+ séances par semaine (niveau très exigeant). Garde des jours de récup pour progresser et rester en bonne santé.',
+    '5 à 6+ séances par semaine — rythme très engagé. La récupération fait aussi partie de la progression et de la santé.',
 }
 
 export const ACTIVITY_ORDER: ActivityLevel[] = [

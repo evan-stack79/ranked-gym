@@ -14,6 +14,10 @@ export function ActivityLevelPicker({ value, onChange }: ActivityLevelPickerProp
   return (
     <div className="space-y-2.5">
       <p className="text-[12px] font-semibold text-[#8E8E93]">Niveau d’activité</p>
+      <p className="text-[11px] leading-relaxed text-[#636366]">
+        Choisis ce qui te ressemble aujourd’hui — tu pourras le changer plus tard. L’important, c’est
+        d’avancer à ton rythme.
+      </p>
       <div className="flex flex-wrap gap-1.5">
         {ACTIVITY_ORDER.map((level) => (
           <button

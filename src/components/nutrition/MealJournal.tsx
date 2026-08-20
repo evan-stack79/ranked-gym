@@ -21,9 +21,27 @@ import { useAuth } from '../../context/AuthContext'
 import { IconBadge } from '../ui/IconBadge'
 import { MacroRing } from './MacroRing'
 import { BarcodeScanner } from './BarcodeScanner'
+import { ClearableNumberInput } from './ClearableNumberInput'
 
 interface MealJournalProps {
   targetCalories: number
+}
+
+interface Per100gNutrition {
+  calories: number
+  proteines: number
+  glucides: number
+  lipides: number
+}
+
+function scaleFromPer100(per100: Per100gNutrition, grams: number) {
+  const factor = grams / 100
+  return {
+    calories: Math.max(1, Math.round(per100.calories * factor)),
+    proteines: Math.round(per100.proteines * factor * 10) / 10,
+    glucides: Math.round(per100.glucides * factor * 10) / 10,
+    lipides: Math.round(per100.lipides * factor * 10) / 10,
+  }
 }
 
 const MEAL_META: Record<
@@ -72,19 +90,35 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
   const [carbsG, setCarbsG] = useState<number | ''>('')
   const [fatG, setFatG] = useState<number | ''>('')
   const [mealType, setMealType] = useState<MealType>('lunch')
+  const [portionGrams, setPortionGrams] = useState(100)
+  const [per100, setPer100] = useState<Per100gNutrition | null>(null)
 
   useEffect(() => {
     setMeals(getTodayJournal().meals)
     setHydrated(true)
   }, [])
 
+  const applyPortion = useCallback((base: Per100gNutrition, grams: number) => {
+    const scaled = scaleFromPer100(base, grams)
+    setCalories(scaled.calories)
+    setProteinG(scaled.proteines)
+    setCarbsG(scaled.glucides)
+    setFatG(scaled.lipides)
+  }, [])
+
   const handleScannedProduct = useCallback(
     (product: OpenFoodFactsProduct) => {
+      const base: Per100gNutrition = {
+        calories: product.calories,
+        proteines: product.proteines,
+        glucides: product.glucides,
+        lipides: product.lipides,
+      }
+      const grams = 100
       setName(product.nom)
-      setCalories(product.calories || 1)
-      setProteinG(product.proteines)
-      setCarbsG(product.glucides)
-      setFatG(product.lipides)
+      setPer100(base)
+      setPortionGrams(grams)
+      applyPortion(base, grams)
       setShowForm(true)
       setScannerOpen(false)
 
@@ -92,11 +126,35 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
         void saveAliment(product, user.id).catch(() => undefined)
       }
     },
-    [user],
+    [user, applyPortion],
   )
+
+  const handlePortionChange = (grams: number) => {
+    setPortionGrams(grams)
+    if (per100 && grams > 0) {
+      applyPortion(per100, grams)
+    }
+  }
+
+  const resetForm = () => {
+    setName('')
+    setCalories(350)
+    setProteinG('')
+    setCarbsG('')
+    setFatG('')
+    setPortionGrams(100)
+    setPer100(null)
+    setShowForm(false)
+  }
 
   const openScanner = () => {
     requireAuth(() => setScannerOpen(true))
+  }
+
+  const openManualForm = () => {
+    setPer100(null)
+    setPortionGrams(100)
+    setShowForm((v) => !v)
   }
 
   const totals = useMemo(() => {
@@ -128,12 +186,7 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
       fatG: fatG === '' ? undefined : Number(fatG),
     })
     setMeals(journal.meals)
-    setName('')
-    setCalories(350)
-    setProteinG('')
-    setCarbsG('')
-    setFatG('')
-    setShowForm(false)
+    resetForm()
   }
 
   const handleRemove = (id: string) => {
@@ -174,7 +227,7 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
             </button>
             <button
               type="button"
-              onClick={() => setShowForm((v) => !v)}
+              onClick={openManualForm}
               className="btn-brand inline-flex items-center gap-1.5 rounded-full border border-white/15 px-3.5 py-2 text-[13px] font-semibold text-white"
             >
               <Plus className="h-4 w-4" />
@@ -262,6 +315,48 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
             />
           </label>
 
+          {per100 && (
+            <div className="rounded-2xl border border-[#30D158]/25 bg-[#30D158]/10 p-3.5">
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                  Quantité dans ton assiette (g)
+                </span>
+                <div className="flex items-end gap-2">
+                  <ClearableNumberInput
+                    value={portionGrams}
+                    onChange={handlePortionChange}
+                    min={1}
+                    max={5000}
+                    step={1}
+                    aria-label="Quantité en grammes"
+                    className="w-full bg-transparent text-[28px] font-bold tracking-tight text-white outline-none"
+                  />
+                  <span className="pb-1 text-[13px] font-medium text-[#8E8E93]">g</span>
+                </div>
+              </label>
+              <p className="mt-2 text-[12px] leading-relaxed text-[#AEAEB2]">
+                Données Open Food Facts pour 100 g ({per100.calories} kcal). Adapte les grammes à
+                ta portion — calories et macros se recalculent automatiquement.
+              </p>
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
+                {[50, 100, 150, 200, 250].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => handlePortionChange(preset)}
+                    className={`ios-press rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                      portionGrams === preset
+                        ? 'border-[#30D158]/50 bg-[#30D158]/20 text-[#30D158]'
+                        : 'border-white/10 bg-black/20 text-[#8E8E93]'
+                    }`}
+                  >
+                    {preset} g
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Calories</span>
@@ -282,7 +377,7 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
               </span>
               <input
                 type="number"
-                inputMode="numeric"
+                inputMode="decimal"
                 min={0}
                 max={400}
                 value={proteinG}
@@ -299,7 +394,7 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
               </span>
               <input
                 type="number"
-                inputMode="numeric"
+                inputMode="decimal"
                 min={0}
                 max={400}
                 value={carbsG}
@@ -314,7 +409,7 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
               </span>
               <input
                 type="number"
-                inputMode="numeric"
+                inputMode="decimal"
                 min={0}
                 max={400}
                 value={fatG}
@@ -328,7 +423,7 @@ export function MealJournal({ targetCalories }: MealJournalProps) {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={resetForm}
               className="flex-1 rounded-xl border border-white/10 bg-ios-inset py-3 text-[15px] font-medium text-[#8E8E93]"
             >
               Annuler
