@@ -232,7 +232,7 @@ export function WorkoutNotebook({
         </div>
         <p className="mb-3 text-[11px] text-[#8E8E93]">
           {hasSaved
-            ? 'Dernière sauvegarde chargée — modifie les kilos / reps pour progresser.'
+            ? 'Dernière progression chargée — charges déjà ajustées selon Facile / OK / Dur.'
             : 'Nouveau focus — écris tes exercices, on les gardera pour la prochaine fois.'}
         </p>
 
