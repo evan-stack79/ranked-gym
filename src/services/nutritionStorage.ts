@@ -1,16 +1,18 @@
 import type { CalorieProfile, DayJournal, MealEntry } from '../types/nutrition'
-import { todayKey } from '../utils/calories'
+import { inferGoalFromWeights, todayKey } from '../utils/calories'
 
 const PROFILE_KEY = 'ranked-gym:nutrition-profile'
 const JOURNAL_KEY = 'ranked-gym:nutrition-journal'
 
 export const DEFAULT_PROFILE: CalorieProfile = {
-  weightKg: 78,
-  heightCm: 178,
+  weightKg: 70,
+  goalWeightKg: 65,
+  heightCm: 170,
   age: 24,
   sex: 'male',
   activity: 'moderate',
-  goal: 'maintain',
+  goal: 'cut',
+  onboardingComplete: false,
 }
 
 function readJson<T>(key: string, fallback: T): T {
@@ -28,11 +30,27 @@ function writeJson<T>(key: string, value: T): void {
 }
 
 export function getCalorieProfile(): CalorieProfile {
-  return { ...DEFAULT_PROFILE, ...readJson<Partial<CalorieProfile>>(PROFILE_KEY, {}) }
+  const stored = readJson<Partial<CalorieProfile>>(PROFILE_KEY, {})
+  const merged: CalorieProfile = {
+    ...DEFAULT_PROFILE,
+    ...stored,
+    goalWeightKg: stored.goalWeightKg ?? stored.weightKg ?? DEFAULT_PROFILE.goalWeightKg,
+    onboardingComplete: Boolean(stored.onboardingComplete),
+  }
+  merged.goal = inferGoalFromWeights(merged.weightKg, merged.goalWeightKg)
+  return merged
 }
 
 export function saveCalorieProfile(profile: CalorieProfile): void {
-  writeJson(PROFILE_KEY, profile)
+  const next = {
+    ...profile,
+    goal: inferGoalFromWeights(profile.weightKg, profile.goalWeightKg),
+  }
+  writeJson(PROFILE_KEY, next)
+}
+
+export function isNutritionOnboarded(): boolean {
+  return getCalorieProfile().onboardingComplete
 }
 
 function getAllJournals(): Record<string, DayJournal> {

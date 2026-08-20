@@ -14,29 +14,88 @@ const ACTIVITY_MULTIPLIER: Record<ActivityLevel, number> = {
   athlete: 1.9,
 }
 
-const GOAL_ADJUSTMENT: Record<NutritionGoal, number> = {
-  cut: -0.18,
-  maintain: 0,
-  bulk: 0.12,
-}
-
 /** Mifflin-St Jeor BMR */
 export function computeBmr(weightKg: number, heightCm: number, age: number, sex: Sex): number {
   const base = 10 * weightKg + 6.25 * heightCm - 5 * age
   return Math.round(sex === 'male' ? base + 5 : base - 161)
 }
 
+/** Infer cut / maintain / bulk from current vs goal weight. */
+export function inferGoalFromWeights(currentKg: number, goalKg: number): NutritionGoal {
+  const delta = goalKg - currentKg
+  if (Math.abs(delta) < 0.5) return 'maintain'
+  return delta < 0 ? 'cut' : 'bulk'
+}
+
+/**
+ * Calorie adjustment based on how far the goal is.
+ * ~7700 kcal ≈ 1 kg of body mass (rule of thumb).
+ * We target ~0.5 kg/week loss or ~0.25 kg/week gain, capped safely.
+ */
+export function calorieAdjustmentForGoal(
+  currentKg: number,
+  goalKg: number,
+  tdee: number,
+): { goal: NutritionGoal; targetCalories: number; weeklyChangeKg: number } {
+  const delta = goalKg - currentKg
+  const goal = inferGoalFromWeights(currentKg, goalKg)
+
+  if (goal === 'maintain') {
+    return { goal, targetCalories: tdee, weeklyChangeKg: 0 }
+  }
+
+  if (goal === 'cut') {
+    const weeklyLoss = Math.min(0.7, Math.max(0.35, Math.abs(delta) / 12))
+    const dailyDeficit = Math.round((weeklyLoss * 7700) / 7)
+    const cappedDeficit = Math.min(dailyDeficit, Math.round(tdee * 0.25))
+    return {
+      goal,
+      targetCalories: Math.max(1200, tdee - cappedDeficit),
+      weeklyChangeKg: -weeklyLoss,
+    }
+  }
+
+  const weeklyGain = Math.min(0.4, Math.max(0.2, Math.abs(delta) / 16))
+  const dailySurplus = Math.round((weeklyGain * 7700) / 7)
+  const cappedSurplus = Math.min(dailySurplus, Math.round(tdee * 0.15))
+  return {
+    goal,
+    targetCalories: tdee + cappedSurplus,
+    weeklyChangeKg: weeklyGain,
+  }
+}
+
 export function computeCaloriePlan(profile: CalorieProfile): CalorieResult {
   const bmr = computeBmr(profile.weightKg, profile.heightCm, profile.age, profile.sex)
   const tdee = Math.round(bmr * ACTIVITY_MULTIPLIER[profile.activity])
-  const targetCalories = Math.round(tdee * (1 + GOAL_ADJUSTMENT[profile.goal]))
+  const { goal, targetCalories, weeklyChangeKg } = calorieAdjustmentForGoal(
+    profile.weightKg,
+    profile.goalWeightKg,
+    tdee,
+  )
 
-  // Classic physique macros: ~2g/kg protein, 25% calories from fat, rest carbs
-  const proteinG = Math.round(profile.weightKg * 2)
+  const proteinG = Math.round(profile.weightKg * (goal === 'cut' ? 2.2 : 2))
   const fatG = Math.round((targetCalories * 0.25) / 9)
   const carbsG = Math.max(0, Math.round((targetCalories - proteinG * 4 - fatG * 9) / 4))
+  const deltaKg = Math.round((profile.goalWeightKg - profile.weightKg) * 10) / 10
 
-  return { bmr, tdee, targetCalories, proteinG, carbsG, fatG }
+  let estimatedWeeks: number | null = null
+  if (weeklyChangeKg !== 0) {
+    estimatedWeeks = Math.max(1, Math.ceil(Math.abs(deltaKg) / Math.abs(weeklyChangeKg)))
+  }
+
+  return {
+    bmr,
+    tdee,
+    targetCalories,
+    proteinG,
+    carbsG,
+    fatG,
+    goal,
+    deltaKg,
+    weeklyChangeKg,
+    estimatedWeeks,
+  }
 }
 
 export function todayKey(date = new Date()): string {

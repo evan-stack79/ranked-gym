@@ -1,23 +1,54 @@
-import { useCallback, useState } from 'react'
-import { Leaf, Droplets } from 'lucide-react'
-import { CalorieCalculator } from './CalorieCalculator'
+import { useCallback, useEffect, useState } from 'react'
+import { Leaf, Droplets, RotateCcw } from 'lucide-react'
+import { NutritionOnboarding } from './NutritionOnboarding'
+import { NutritionPlanCard } from './NutritionPlanCard'
 import { MealJournal } from './MealJournal'
 import { IconBadge } from '../ui/IconBadge'
 import { computeCaloriePlan } from '../../utils/calories'
-import { getCalorieProfile } from '../../services/nutritionStorage'
+import {
+  getCalorieProfile,
+  saveCalorieProfile,
+} from '../../services/nutritionStorage'
+import type { CalorieProfile } from '../../types/nutrition'
 
 export function NutritionView() {
+  const [profile, setProfile] = useState<CalorieProfile>(() => getCalorieProfile())
+  const [hydrated, setHydrated] = useState(false)
   const [targetCalories, setTargetCalories] = useState(
     () => computeCaloriePlan(getCalorieProfile()).targetCalories,
   )
+
+  useEffect(() => {
+    const stored = getCalorieProfile()
+    setProfile(stored)
+    setTargetCalories(computeCaloriePlan(stored).targetCalories)
+    setHydrated(true)
+  }, [])
+
+  useEffect(() => {
+    if (!hydrated) return
+    saveCalorieProfile(profile)
+  }, [profile, hydrated])
 
   const handleTargetChange = useCallback((value: number) => {
     setTargetCalories(value)
   }, [])
 
+  const handleProfileChange = useCallback((next: CalorieProfile) => {
+    setProfile(next)
+    setTargetCalories(computeCaloriePlan(next).targetCalories)
+  }, [])
+
+  const resetOnboarding = () => {
+    const next = { ...profile, onboardingComplete: false }
+    setProfile(next)
+  }
+
+  if (!hydrated) return null
+
   return (
     <div className="flex flex-col gap-8 pb-4">
-      <header className="relative">
+      <header className="relative ios-fade-up">
         <div
           className="pointer-events-none absolute -left-8 -top-6 h-28 w-40 rounded-full blur-3xl"
           style={{ background: 'radial-gradient(circle, #34C75944 0%, transparent 70%)' }}
@@ -33,15 +64,43 @@ export function NutritionView() {
             </div>
             <h1 className="text-[34px] font-bold tracking-tight text-white">Nutrition</h1>
             <p className="mt-2 text-[17px] text-[#8E8E93]">
-              Calcule ta cible et suis tes repas, style Apple Health.
+              {profile.onboardingComplete
+                ? 'Plan adapté à ton objectif de poids.'
+                : 'Dis-nous ton objectif, on calcule le reste.'}
             </p>
           </div>
-          <IconBadge icon={Droplets} variant="blue" />
+          <div className="flex flex-col items-end gap-2">
+            <IconBadge icon={Droplets} variant="blue" />
+            {profile.onboardingComplete && (
+              <button
+                type="button"
+                onClick={resetOnboarding}
+                className="ios-press inline-flex items-center gap-1 text-[11px] font-medium text-[#636366]"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Refaire le setup
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
-      <CalorieCalculator onTargetChange={handleTargetChange} />
-      <MealJournal targetCalories={targetCalories} />
+      {!profile.onboardingComplete ? (
+        <NutritionOnboarding initial={profile} onComplete={handleProfileChange} />
+      ) : (
+        <>
+          <div className="ios-fade-up ios-fade-up-delay-1">
+            <NutritionPlanCard
+              profile={profile}
+              onChange={handleProfileChange}
+              onTargetChange={handleTargetChange}
+            />
+          </div>
+          <div className="ios-fade-up ios-fade-up-delay-2">
+            <MealJournal targetCalories={targetCalories} />
+          </div>
+        </>
+      )}
     </div>
   )
 }
