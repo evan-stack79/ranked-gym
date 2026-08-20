@@ -89,3 +89,16 @@ export function removeMealFromToday(mealId: string): DayJournal {
   saveTodayJournal(next)
   return next
 }
+
+export function updateMealInToday(
+  mealId: string,
+  patch: Partial<Omit<MealEntry, 'id' | 'createdAt'>>,
+): DayJournal {
+  const journal = getTodayJournal()
+  const next = {
+    ...journal,
+    meals: journal.meals.map((meal) => (meal.id === mealId ? { ...meal, ...patch } : meal)),
+  }
+  saveTodayJournal(next)
+  return next
+}

@@ -10,6 +10,22 @@ export function mealCalorieBudget(
   return Math.round(dailyTarget * share)
 }
 
+/** Soft range around the meal target so people know “about how much” to eat. */
+export function mealCalorieRange(budget: number): { min: number; max: number; target: number } {
+  const min = Math.max(80, Math.round(budget * 0.85))
+  const max = Math.round(budget * 1.15)
+  return { min, max, target: budget }
+}
+
+export function usedMealCalories(
+  mealType: MealType,
+  meals: Array<{ mealType: MealType; calories: number }>,
+): number {
+  return meals
+    .filter((meal) => meal.mealType === mealType)
+    .reduce((sum, meal) => sum + meal.calories, 0)
+}
+
 export function remainingMealBudget(
   dailyTarget: number,
   mealType: MealType,
@@ -17,10 +33,22 @@ export function remainingMealBudget(
   morphology: BodyMorphology = 'mesomorph',
 ): number {
   const budget = mealCalorieBudget(dailyTarget, mealType, morphology)
-  const used = meals
-    .filter((meal) => meal.mealType === mealType)
-    .reduce((sum, meal) => sum + meal.calories, 0)
-  return Math.max(0, budget - used)
+  return Math.max(0, budget - usedMealCalories(mealType, meals))
+}
+
+export function allMealBudgets(
+  dailyTarget: number,
+  morphology: BodyMorphology,
+  meals: Array<{ mealType: MealType; calories: number }>,
+) {
+  const types: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
+  return types.map((mealType) => {
+    const budget = mealCalorieBudget(dailyTarget, mealType, morphology)
+    const range = mealCalorieRange(budget)
+    const used = usedMealCalories(mealType, meals)
+    const remaining = Math.max(0, budget - used)
+    return { mealType, budget, range, used, remaining }
+  })
 }
 
 export function suggestedGramsForProduct(

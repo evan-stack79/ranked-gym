@@ -8,13 +8,18 @@ import {
   Trash2,
   UtensilsCrossed,
   ScanBarcode,
+  Pencil,
+  ScanLine,
 } from 'lucide-react'
 import type { BodyMorphology, MealEntry, MealType } from '../../types/nutrition'
 import { MEAL_TYPE_LABELS } from '../../utils/calories'
+import { remainingMealBudget } from '../../utils/portionGuide'
+import type { PortionMode } from '../../utils/morphology'
 import {
   addMealToToday,
   getTodayJournal,
   removeMealFromToday,
+  updateMealInToday,
 } from '../../services/nutritionStorage'
 import { saveAliment, type OpenFoodFactsProduct } from '../../services/alimentsService'
 import { useAuth } from '../../context/AuthContext'
@@ -22,6 +27,8 @@ import { IconBadge } from '../ui/IconBadge'
 import { MacroRing } from './MacroRing'
 import { BarcodeScanner } from './BarcodeScanner'
 import { ScannedProductSheet } from './ScannedProductSheet'
+import { MealBudgetsCard } from './MealBudgetsCard'
+import { EditMealSheet } from './EditMealSheet'
 
 interface MealJournalProps {
   targetCalories: number
@@ -69,6 +76,8 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   const [showForm, setShowForm] = useState(false)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [scannedProduct, setScannedProduct] = useState<OpenFoodFactsProduct | null>(null)
+  const [editingMeal, setEditingMeal] = useState<MealEntry | null>(null)
+  const [pendingMealType, setPendingMealType] = useState<MealType | null>(null)
   const [name, setName] = useState('')
   const [calories, setCalories] = useState(350)
   const [proteinG, setProteinG] = useState<number | ''>('')
@@ -80,6 +89,11 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     setMeals(getTodayJournal().meals)
     setHydrated(true)
   }, [])
+
+  const pendingRemaining = useMemo(() => {
+    if (!pendingMealType) return 0
+    return remainingMealBudget(targetCalories, pendingMealType, meals, morphology)
+  }, [pendingMealType, targetCalories, meals, morphology])
 
   const handleScannedProduct = useCallback(
     (product: OpenFoodFactsProduct) => {
@@ -99,6 +113,8 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     proteinG: number
     carbsG: number
     fatG: number
+    grams: number
+    portionMode: PortionMode
   }) => {
     const journal = addMealToToday({
       name: entry.name,
@@ -107,9 +123,23 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
       proteinG: entry.proteinG,
       carbsG: entry.carbsG,
       fatG: entry.fatG,
+      grams: entry.grams,
+      portionMode: entry.portionMode,
     })
     setMeals(journal.meals)
     setScannedProduct(null)
+
+    const remain = remainingMealBudget(
+      targetCalories,
+      entry.mealType,
+      journal.meals,
+      morphology,
+    )
+    if (entry.portionMode === 'with_sides' && remain > 60) {
+      setPendingMealType(entry.mealType)
+    } else if (remain <= 60) {
+      setPendingMealType(null)
+    }
   }
 
   const resetForm = () => {
@@ -121,7 +151,8 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     setShowForm(false)
   }
 
-  const openScanner = () => {
+  const openScanner = (forMeal?: MealType) => {
+    if (forMeal) setPendingMealType(forMeal)
     requireAuth(() => setScannerOpen(true))
   }
 
@@ -160,6 +191,13 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   const handleRemove = (id: string) => {
     const journal = removeMealFromToday(id)
     setMeals(journal.meals)
+    setEditingMeal(null)
+  }
+
+  const handleEditSave = (mealId: string, patch: Partial<MealEntry>) => {
+    const journal = updateMealInToday(mealId, patch)
+    setMeals(journal.meals)
+    setEditingMeal(null)
   }
 
   if (!hydrated) return null
@@ -187,7 +225,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={openScanner}
+              onClick={() => openScanner()}
               className="inline-flex items-center gap-1.5 rounded-full border border-[#30D158]/35 bg-[#30D158]/15 px-3.5 py-2 text-[13px] font-semibold text-[#30D158]"
             >
               <ScanBarcode className="h-4 w-4" />
@@ -246,11 +284,47 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
                 <span className="font-semibold text-[#FF9F0A]">Objectif atteint</span>
               )}
               {' · '}
-              {meals.length} repas
+              {meals.length} aliments
             </p>
           </div>
         </div>
       </div>
+
+      <MealBudgetsCard
+        targetCalories={targetCalories}
+        morphology={morphology}
+        meals={meals}
+      />
+
+      {pendingMealType && pendingRemaining > 60 && (
+        <div className="rounded-2xl border border-[#00B4FF]/30 bg-[#00B4FF]/10 px-4 py-3.5">
+          <p className="text-[14px] font-semibold text-white">
+            {MEAL_TYPE_LABELS[pendingMealType]} en cours
+          </p>
+          <p className="mt-1 text-[12px] leading-relaxed text-[#AEAEB2]">
+            Il manque encore environ{' '}
+            <span className="font-semibold text-[#64D2FF]">{pendingRemaining} kcal</span> pour un
+            bon repas. Scanne l’accompagnement (ex. frites) — on calcule la portion pour toi.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => openScanner(pendingMealType)}
+              className="ios-press inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#00B4FF]/40 bg-[#00B4FF]/20 py-2.5 text-[13px] font-semibold text-[#64D2FF]"
+            >
+              <ScanLine className="h-4 w-4" />
+              Scanner l’accompagnement
+            </button>
+            <button
+              type="button"
+              onClick={() => setPendingMealType(null)}
+              className="ios-press rounded-xl border border-white/10 bg-black/25 px-3 py-2.5 text-[12px] font-medium text-[#8E8E93]"
+            >
+              Plus tard
+            </button>
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <form
@@ -402,9 +476,18 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
                     </div>
                     <p className="mt-0.5 text-[13px] text-[#8E8E93]">
                       <span className="font-semibold text-[#FF9F0A]">{meal.calories} kcal</span>
-                      {meal.proteinG != null && <> · {meal.proteinG} g protéines</>}
+                      {meal.grams != null && <> · {meal.grams} g</>}
+                      {meal.proteinG != null && <> · {meal.proteinG} g P</>}
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingMeal(meal)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/5 bg-white/5 text-[#8E8E93] active:text-white"
+                    aria-label="Modifier l’aliment"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
                   <button
                     type="button"
                     onClick={() => handleRemove(meal.id)}
@@ -432,8 +515,17 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
         targetCalories={targetCalories}
         morphology={morphology}
         meals={meals}
+        preferredMealType={pendingMealType}
         onClose={() => setScannedProduct(null)}
         onSave={handleScanSave}
+      />
+
+      <EditMealSheet
+        open={editingMeal != null}
+        meal={editingMeal}
+        onClose={() => setEditingMeal(null)}
+        onSave={handleEditSave}
+        onDelete={handleRemove}
       />
     </section>
   )

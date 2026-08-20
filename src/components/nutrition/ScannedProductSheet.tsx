@@ -13,12 +13,14 @@ import { MEAL_TYPE_LABELS } from '../../utils/calories'
 import {
   formatGrams,
   isCalorieDense,
+  mealCalorieBudget,
+  mealCalorieRange,
   remainingMealBudget,
   scaleNutrition,
   suggestedGramsForScan,
+  usedMealCalories,
 } from '../../utils/portionGuide'
 import type { PortionMode } from '../../utils/morphology'
-import { MORPHOLOGY_LABELS } from '../../utils/morphology'
 import type { OpenFoodFactsProduct } from '../../services/alimentsService'
 import { IosSheet } from '../ui/IosSheet'
 import { ClearableNumberInput } from './ClearableNumberInput'
@@ -28,7 +30,8 @@ interface ScannedProductSheetProps {
   product: OpenFoodFactsProduct | null
   targetCalories: number
   morphology: BodyMorphology
-  meals: Array<{ mealType: MealType; calories: number }>
+  meals: Array<{ mealType: MealType; calories: number; name?: string }>
+  preferredMealType?: MealType | null
   onClose: () => void
   onSave: (entry: {
     name: string
@@ -38,6 +41,7 @@ interface ScannedProductSheetProps {
     carbsG: number
     fatG: number
     grams: number
+    portionMode: PortionMode
   }) => void
 }
 
@@ -62,6 +66,7 @@ export function ScannedProductSheet({
   targetCalories,
   morphology,
   meals,
+  preferredMealType,
   onClose,
   onSave,
 }: ScannedProductSheetProps) {
@@ -69,13 +74,27 @@ export function ScannedProductSheet({
   const [mode, setMode] = useState<PortionMode>('with_sides')
   const [grams, setGrams] = useState<number | null>(null)
 
+  const foodsAlready = useMemo(
+    () => meals.filter((m) => m.mealType === mealType),
+    [meals, mealType],
+  )
+  const isFollowUp = foodsAlready.length > 0
+
   useEffect(() => {
     if (!open || !product) return
-    setMealType(guessMealType())
-    setMode('with_sides')
+    const nextMeal = preferredMealType ?? guessMealType()
+    setMealType(nextMeal)
+    const already = meals.filter((m) => m.mealType === nextMeal).length
+    setMode(already > 0 ? 'solo' : 'with_sides')
     setGrams(null)
-  }, [open, product])
+  }, [open, product, preferredMealType, meals])
 
+  const budget = useMemo(
+    () => mealCalorieBudget(targetCalories, mealType, morphology),
+    [targetCalories, mealType, morphology],
+  )
+  const range = useMemo(() => mealCalorieRange(budget), [budget])
+  const used = useMemo(() => usedMealCalories(mealType, meals), [mealType, meals])
   const remaining = useMemo(
     () => remainingMealBudget(targetCalories, mealType, meals, morphology),
     [targetCalories, mealType, meals, morphology],
@@ -104,6 +123,10 @@ export function ScannedProductSheet({
     )
   }, [product, grams])
 
+  const afterAddRemaining = nutrition
+    ? Math.max(0, remaining - nutrition.calories)
+    : remaining
+
   if (!product) return null
 
   const canSave = grams != null && grams > 0 && nutrition != null && nutrition.calories > 0
@@ -118,6 +141,7 @@ export function ScannedProductSheet({
       carbsG: nutrition.glucides,
       fatG: nutrition.lipides,
       grams,
+      portionMode: mode,
     })
   }
 
@@ -130,7 +154,24 @@ export function ScannedProductSheet({
       leading={<UtensilsCrossed className="mt-0.5 h-5 w-5 text-[#30D158]" />}
     >
       <div className="space-y-5 pb-2">
-        {/* 1. Meal */}
+        <div className="rounded-2xl border border-white/10 bg-black/25 px-3.5 py-3">
+          <p className="text-[12px] font-semibold text-white">
+            {MEAL_TYPE_LABELS[mealType]} · vise {range.min}–{range.max} kcal
+          </p>
+          <p className="mt-1 text-[12px] text-[#AEAEB2]">
+            Déjà noté : <span className="font-semibold text-white">{used} kcal</span>
+            {' · '}
+            Il reste{' '}
+            <span className="font-semibold text-[#30D158]">{remaining} kcal</span> pour un bon
+            repas.
+          </p>
+          {isFollowUp && (
+            <p className="mt-1 text-[11px] text-[#8E8E93]">
+              Avec : {foodsAlready.map((f) => f.name ?? 'aliment').join(', ')}
+            </p>
+          )}
+        </div>
+
         <div>
           <p className="mb-2 text-[13px] font-semibold text-white">1. Pour quel repas ?</p>
           <div className="grid grid-cols-2 gap-2">
@@ -155,7 +196,6 @@ export function ScannedProductSheet({
           </div>
         </div>
 
-        {/* 2. Solo vs sides */}
         <div>
           <p className="mb-2 text-[13px] font-semibold text-white">2. Tu manges comment ?</p>
           <div className="grid grid-cols-1 gap-2">
@@ -170,10 +210,12 @@ export function ScannedProductSheet({
             >
               <p className="flex items-center gap-2 text-[14px] font-semibold text-white">
                 <Cookie className="h-4 w-4 text-[#64D2FF]" />
-                Uniquement ça
+                {isFollowUp ? 'Compléter le repas' : 'Uniquement ça'}
               </p>
               <p className="mt-1 text-[12px] text-[#AEAEB2]">
-                Ce produit couvre presque tout le repas ({remaining} kcal restantes).
+                {isFollowUp
+                  ? `On calcule la portion pour utiliser les ~${remaining} kcal qu’il reste avec ce que tu as déjà.`
+                  : `Ce produit couvre presque tout le repas (${remaining} kcal restantes).`}
               </p>
             </button>
             <button
@@ -190,14 +232,12 @@ export function ScannedProductSheet({
                 Avec autre chose
               </p>
               <p className="mt-1 text-[12px] text-[#AEAEB2]">
-                On laisse de la place pour accompagner (protéines, veggies…) — plus simple à
-                digérer, surtout en {MORPHOLOGY_LABELS[morphology].toLowerCase()}.
+                On laisse de la place pour un 2ᵉ aliment (ex. steak puis frites).
               </p>
             </button>
           </div>
         </div>
 
-        {/* 3. Scale grams */}
         <div>
           <p className="mb-2 text-[13px] font-semibold text-white">3. Poids sur la balance</p>
           <div className="rounded-2xl border border-white/10 bg-[#1C1C1E] p-4">
@@ -233,8 +273,10 @@ export function ScannedProductSheet({
               </p>
               <p className="mt-0.5 text-[12px] text-[#AEAEB2]">
                 {mode === 'solo'
-                  ? `Pour atteindre ~${remaining} kcal avec uniquement ce produit.`
-                  : `Portion adaptée pour laisser de la place au reste du repas.`}
+                  ? isFollowUp
+                    ? `Pour finir le repas avec les ~${remaining} kcal restantes — ça fait un bon combo.`
+                    : `Pour atteindre ~${remaining} kcal avec uniquement ce produit.`
+                  : `Portion pour laisser ~${Math.round(remaining * (1 - 0.55))} kcal à l’accompagnement.`}
                 {isCalorieDense(product.calories) && mode === 'with_sides'
                   ? ' Aliment dense : une petite part + accompagnement, c’est top.'
                   : ''}
@@ -243,11 +285,20 @@ export function ScannedProductSheet({
           )}
 
           {nutrition && (
-            <p className="mt-2 text-center text-[13px] text-[#8E8E93]">
-              ≈ <span className="font-semibold text-white">{nutrition.calories} kcal</span>
-              {' · '}
-              P {nutrition.proteines}g · G {nutrition.glucides}g · L {nutrition.lipides}g
-            </p>
+            <div className="mt-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-center">
+              <p className="text-[13px] text-[#8E8E93]">
+                Cet aliment ≈{' '}
+                <span className="font-semibold text-white">{nutrition.calories} kcal</span>
+                {' · '}P {nutrition.proteines}g · G {nutrition.glucides}g · L {nutrition.lipides}g
+              </p>
+              <p className="mt-1 text-[12px] text-[#AEAEB2]">
+                {afterAddRemaining > 40
+                  ? `Après ça, il manquera encore ~${afterAddRemaining} kcal pour atteindre la zone du repas.`
+                  : afterAddRemaining > 0
+                    ? `Presque parfait — il restera ~${afterAddRemaining} kcal (optionnel).`
+                    : 'Repas bien rempli — tu es dans la bonne zone.'}
+              </p>
+            </div>
           )}
         </div>
 
