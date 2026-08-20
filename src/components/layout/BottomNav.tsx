@@ -29,7 +29,7 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
               type="button"
               onClick={() => onTabChange(id)}
               className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg px-2 py-2 transition-colors ${
-                isActive ? 'text-[#0A84FF]' : 'text-[#8E8E93]'
+                isActive ? 'text-[#FF2B2B]' : 'text-[#8E8E93]'
               }`}
               aria-current={isActive ? 'page' : undefined}
             >

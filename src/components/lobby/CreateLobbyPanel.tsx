@@ -28,7 +28,7 @@ export function CreateLobbyPanel({ onCreate, disabled = false }: CreateLobbyPane
         disabled={disabled}
         className="glass-card flex w-full items-center gap-3 rounded-2xl p-4 text-left transition-colors active:opacity-90 disabled:opacity-50"
       >
-        <IconBadge icon={Plus} variant="blue" />
+        <IconBadge icon={Plus} variant="crimson" />
         <span>
           <span className="block text-[15px] font-semibold text-white">
             Ma salle n&apos;y est pas ? Créer un Lobby
@@ -69,7 +69,7 @@ export function CreateLobbyPanel({ onCreate, disabled = false }: CreateLobbyPane
         <button
           type="submit"
           disabled={disabled || gymName.trim().length < 2}
-          className="flex flex-1 items-center justify-center gap-1 rounded-xl border border-white/10 bg-[#0A84FF] py-3 text-[15px] font-semibold text-white disabled:opacity-40"
+          className="flex flex-1 items-center justify-center gap-1 rounded-xl border border-white/15 btn-brand py-3 text-[15px] font-semibold text-white disabled:opacity-40"
         >
           Créer
           <ArrowRight className="h-4 w-4" />

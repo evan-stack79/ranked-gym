@@ -20,13 +20,13 @@ export function RankBadge({ rank, level, size = 'md' }: RankBadgeProps) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span
-        className={`inline-flex items-center rounded-full font-medium ${colors.text} ${colors.bg} ${sizeStyles[size]}`}
+        className={`inline-flex items-center rounded-full border font-semibold ${colors.text} ${colors.bg} ${colors.border} ${sizeStyles[size]}`}
       >
         <Trophy className="h-3 w-3" />
         {rank}
       </span>
       <span className="text-sm text-[#8E8E93]">
-        Niveau <span className="font-semibold text-white">{level}</span>
+        Niv. <span className="font-semibold text-white">{level}</span>
       </span>
     </div>
   )

@@ -229,7 +229,7 @@ export function LobbyView() {
             className="flex h-10 w-10 items-center justify-center glass-card rounded-full active:bg-ios-inset"
             aria-label="Nouvelle recherche"
           >
-            <RefreshCw className="h-5 w-5 text-[#0A84FF]" />
+            <RefreshCw className="h-5 w-5 text-[#FF2B2B]" />
           </button>
         )}
       </header>
@@ -239,7 +239,7 @@ export function LobbyView() {
           <div className="flex items-center gap-3 text-[15px]">
             <IconBadge
               icon={location.source === 'gps' ? LocateFixed : MapPin}
-              variant={location.source === 'gps' ? 'blue' : 'white'}
+              variant={location.source === 'gps' ? 'crimson' : 'white'}
               size="sm"
             />
             <span className="text-[#EBEBF5]">
@@ -261,7 +261,7 @@ export function LobbyView() {
       {phase === 'idle' && !isLoading && (
         <div className="flex flex-col gap-6 py-2">
           <div className="flex flex-col items-center gap-4 py-6">
-            <IconBadge icon={Navigation} variant="blue" size="md" />
+            <IconBadge icon={Navigation} variant="crimson" size="md" />
             <p className="max-w-xs text-center text-[15px] text-[#8E8E93]">
               Localise les salles autour de toi pour rejoindre un lobby.
             </p>
@@ -344,7 +344,7 @@ export function LobbyView() {
       {phase === 'checked-in' && checkedInGym && (
         <>
           <div className="glass-card rounded-2xl p-5">
-            <p className="text-[13px] font-medium text-[#30D158]">Check-in confirmé</p>
+            <p className="text-[13px] font-medium text-[#FF2B2B]">Check-in confirmé</p>
             {checkedInAt != null && (
               <p className="mt-1 text-[13px] text-[#8E8E93]">
                 Session {formatCheckInDuration(checkedInAt)}
@@ -363,7 +363,7 @@ export function LobbyView() {
 
           <div className="glass-card rounded-2xl px-4 py-3">
             <div className="flex items-center gap-3">
-              <IconBadge icon={Users} variant="blue" size="sm" />
+              <IconBadge icon={Users} variant="crimson" size="sm" />
               <span className="text-[15px] text-[#EBEBF5]">Membres actifs dans ta salle</span>
             </div>
           </div>

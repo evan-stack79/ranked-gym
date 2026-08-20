@@ -6,14 +6,14 @@ interface BadgeItem {
   icon: LucideIcon
   name: string
   description: string
-  variant: 'blue' | 'orange' | 'green' | 'white'
+  variant: 'blue' | 'orange' | 'green' | 'white' | 'crimson' | 'violet'
 }
 
 const BADGES: BadgeItem[] = [
   { icon: Sunrise, name: 'Lève-tôt', description: 'Séance avant 6h', variant: 'orange' },
-  { icon: CalendarCheck, name: 'Régularité', description: '7 jours d\'affilée', variant: 'blue' },
-  { icon: Crown, name: 'Centurion', description: '100 séances', variant: 'green' },
-  { icon: Medal, name: 'PR Hunter', description: '3 records battus', variant: 'white' },
+  { icon: CalendarCheck, name: 'Régularité', description: '7 jours d\'affilée', variant: 'crimson' },
+  { icon: Crown, name: 'Centurion', description: '100 séances', variant: 'violet' },
+  { icon: Medal, name: 'PR Hunter', description: '3 records battus', variant: 'blue' },
 ]
 
 export function BadgeShowcase() {

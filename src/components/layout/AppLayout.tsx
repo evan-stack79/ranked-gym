@@ -13,16 +13,26 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
     <div className="relative flex min-h-full flex-col mesh-bg font-sans">
       <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
         <div
-          className="absolute -left-[20%] -top-[15%] h-[55vh] w-[70vw] rounded-full opacity-70 blur-[100px]"
-          style={{ background: 'radial-gradient(circle, #0A1128 0%, transparent 70%)' }}
+          className="arena-glow absolute -left-[30%] -top-[20%] h-[70vh] w-[90vw] rounded-full blur-[90px]"
+          style={{ background: 'radial-gradient(circle, #5C1018 0%, #FF2B2B33 35%, transparent 70%)' }}
         />
         <div
-          className="absolute -right-[15%] top-[5%] h-[45vh] w-[55vw] rounded-full opacity-50 blur-[110px]"
-          style={{ background: 'radial-gradient(circle, #1a0a28 0%, transparent 68%)' }}
+          className="arena-glow absolute -right-[25%] top-[-5%] h-[60vh] w-[75vw] rounded-full blur-[100px]"
+          style={{
+            background: 'radial-gradient(circle, #0A1A40 0%, #00B4FF28 40%, transparent 72%)',
+            animationDelay: '3s',
+          }}
         />
         <div
-          className="absolute -right-[10%] bottom-[20%] h-[35vh] w-[45vw] rounded-full opacity-35 blur-[90px]"
-          style={{ background: 'radial-gradient(circle, #0A1128 0%, transparent 70%)' }}
+          className="arena-glow absolute -left-[10%] bottom-[10%] h-[45vh] w-[60vw] rounded-full blur-[110px]"
+          style={{
+            background: 'radial-gradient(circle, #3B0A20 0%, #FF2B2B22 45%, transparent 70%)',
+            animationDelay: '6s',
+          }}
+        />
+        <div
+          className="absolute right-[-5%] bottom-[25%] h-[40vh] w-[50vw] rounded-full opacity-40 blur-[100px]"
+          style={{ background: 'radial-gradient(circle, #1A0A38 0%, transparent 68%)' }}
         />
       </div>
 
@@ -31,7 +41,9 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
           className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"
           style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
         >
-          <span className="text-[17px] font-semibold tracking-tight text-white">Ranked Gym</span>
+          <span className="text-[17px] font-semibold tracking-tight text-white">
+            Ranked <span className="text-[#FF2B2B]">Gym</span>
+          </span>
         </div>
       </header>
 

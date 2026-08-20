@@ -3,7 +3,7 @@ interface ActivityRingsProps {
   size?: number
 }
 
-const RING_COLORS = ['#FF453A', '#30D158', '#0A84FF']
+const RING_COLORS = ['#FF2B2B', '#FF9F0A', '#00B4FF']
 
 export function ActivityRings({ values, size = 36 }: ActivityRingsProps) {
   const center = size / 2

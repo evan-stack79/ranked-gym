@@ -23,7 +23,7 @@ export function NearbyGymCard({
   return (
     <article className="glass-card rounded-2xl p-4">
       <div className="flex items-start gap-3">
-        <IconBadge icon={Building2} variant={gym.canCheckIn ? 'green' : 'white'} />
+          <IconBadge icon={Building2} variant={gym.canCheckIn ? 'crimson' : 'white'} />
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">

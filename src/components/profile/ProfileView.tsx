@@ -28,7 +28,12 @@ export function ProfileView() {
 
   return (
     <div className="flex flex-col gap-8 pb-4">
-      <FighterHeader username={currentUser.username} title={rank.title} />
+      <FighterHeader
+        username={currentUser.username}
+        title={rank.title}
+        level={progress.level}
+        rank={rank.tier}
+      />
       <RankShowcase rank={rank} level={progress.level} />
       <ProfileXPBar
         level={progress.level}

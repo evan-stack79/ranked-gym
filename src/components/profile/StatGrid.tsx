@@ -62,7 +62,7 @@ function StatVisual({ stat }: { stat: StatItem }) {
             cy="18"
             r="14"
             fill="none"
-            stroke="#FF9F0A"
+            stroke="#FF2B2B"
             strokeWidth="3"
             strokeLinecap="round"
             strokeDasharray={2 * Math.PI * 14}
@@ -86,7 +86,7 @@ export function StatGrid() {
             <div className="mb-3 flex items-start justify-between gap-1">
               <IconBadge
                 icon={stat.icon}
-                variant={stat.label === 'Série' ? 'orange' : stat.label === 'PR' ? 'green' : 'blue'}
+                variant={stat.label === 'Série' ? 'orange' : stat.label === 'PR' ? 'crimson' : 'blue'}
                 size="sm"
               />
               <StatVisual stat={stat} />

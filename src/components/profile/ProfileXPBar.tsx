@@ -17,15 +17,15 @@ export function ProfileXPBar({ level, currentXp, xpToNextLevel }: ProfileXPBarPr
             Niveau {level}
           </p>
         </div>
-        <p className="text-[15px] font-medium text-[#8E8E93]">
+        <p className="text-[15px] font-medium text-[#FF9F0A]">
           {currentXp} / {xpToNextLevel} XP
         </p>
       </div>
 
-      <div className="h-2 overflow-hidden rounded-full border border-white/5 bg-ios-inset">
+      <div className="h-2.5 overflow-hidden rounded-full border border-white/10 bg-black/40">
         <div
-          className="h-full rounded-full bg-[#0A84FF]"
-          style={{ width: `${progress}%`, boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.2)' }}
+          className="h-full rounded-full xp-fill transition-all duration-700 ease-out"
+          style={{ width: `${progress}%` }}
         />
       </div>
 
