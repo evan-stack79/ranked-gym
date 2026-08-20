@@ -39,8 +39,10 @@ export interface MealEntry {
   proteinG?: number
   carbsG?: number
   fatG?: number
-  /** Portion weight when logged from a scale / scan */
+  /** Portion weight when logged from a scale / scan / piece count */
   grams?: number
+  /** Number of pieces when logged without a scale (nuggets, boulettes…) */
+  pieces?: number
   /** How the user intended this food in the meal */
   portionMode?: 'solo' | 'with_sides'
   createdAt: number

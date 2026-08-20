@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Coffee,
   Cookie,
+  Hash,
   Moon,
   Scale,
   Sun,
@@ -21,9 +22,21 @@ import {
   usedMealCalories,
 } from '../../utils/portionGuide'
 import type { PortionMode } from '../../utils/morphology'
+import {
+  detectPieceKind,
+  gramsFromPack,
+  gramsFromTypical,
+  loadPackPreset,
+  PIECE_KIND_LABELS,
+  savePackPreset,
+  TYPICAL_GRAMS_PER_PIECE,
+  type PieceInputMode,
+} from '../../utils/piecePortion'
 import type { OpenFoodFactsProduct } from '../../services/alimentsService'
 import { IosSheet } from '../ui/IosSheet'
 import { ClearableNumberInput } from './ClearableNumberInput'
+
+type MeasureMode = 'scale' | 'pieces'
 
 interface ScannedProductSheetProps {
   open: boolean
@@ -41,6 +54,7 @@ interface ScannedProductSheetProps {
     carbsG: number
     fatG: number
     grams: number
+    pieces?: number
     portionMode: PortionMode
   }) => void
 }
@@ -72,7 +86,18 @@ export function ScannedProductSheet({
 }: ScannedProductSheetProps) {
   const [mealType, setMealType] = useState<MealType>(guessMealType)
   const [mode, setMode] = useState<PortionMode>('with_sides')
+  const [measure, setMeasure] = useState<MeasureMode>('scale')
   const [grams, setGrams] = useState<number | null>(null)
+
+  const [pieceMode, setPieceMode] = useState<PieceInputMode>('pack')
+  const [packGrams, setPackGrams] = useState<number | null>(null)
+  const [packPieces, setPackPieces] = useState<number | null>(null)
+  const [eatenPieces, setEatenPieces] = useState<number | null>(null)
+
+  const pieceKind = useMemo(
+    () => (product ? detectPieceKind(product.nom) : 'generic'),
+    [product],
+  )
 
   const foodsAlready = useMemo(
     () => meals.filter((m) => m.mealType === mealType),
@@ -87,7 +112,35 @@ export function ScannedProductSheet({
     const already = meals.filter((m) => m.mealType === nextMeal).length
     setMode(already > 0 ? 'solo' : 'with_sides')
     setGrams(null)
+    setEatenPieces(null)
+    const kind = detectPieceKind(product.nom)
+    const preset = loadPackPreset(product.barcode)
+    // Auto-open piece counter for nuggets / boulettes / etc.
+    setMeasure(kind !== 'generic' || preset ? 'pieces' : 'scale')
+    setPieceMode(preset ? 'pack' : kind !== 'generic' ? 'typical' : 'pack')
+    if (preset) {
+      setPackGrams(preset.packGrams)
+      setPackPieces(preset.packPieces)
+    } else {
+      setPackGrams(null)
+      setPackPieces(null)
+    }
   }, [open, product, preferredMealType, meals])
+
+  const computedPieceGrams = useMemo(() => {
+    if (eatenPieces == null || eatenPieces <= 0) return null
+    if (pieceMode === 'pack') {
+      if (packGrams == null || packPieces == null) return null
+      return gramsFromPack({
+        packGrams,
+        packPieces,
+        eatenPieces,
+      })
+    }
+    return gramsFromTypical(pieceKind, eatenPieces)
+  }, [pieceMode, packGrams, packPieces, eatenPieces, pieceKind])
+
+  const effectiveGrams = measure === 'scale' ? grams : computedPieceGrams
 
   const budget = useMemo(
     () => mealCalorieBudget(targetCalories, mealType, morphology),
@@ -111,7 +164,7 @@ export function ScannedProductSheet({
   }, [product, remaining, mode, morphology])
 
   const nutrition = useMemo(() => {
-    if (!product || grams == null || grams <= 0) return null
+    if (!product || effectiveGrams == null || effectiveGrams <= 0) return null
     return scaleNutrition(
       {
         calories: product.calories,
@@ -119,20 +172,37 @@ export function ScannedProductSheet({
         glucides: product.glucides,
         lipides: product.lipides,
       },
-      grams,
+      effectiveGrams,
     )
-  }, [product, grams])
+  }, [product, effectiveGrams])
 
   const afterAddRemaining = nutrition
     ? Math.max(0, remaining - nutrition.calories)
     : remaining
 
+  const gramsPerPiece =
+    pieceMode === 'pack' && packGrams != null && packPieces != null && packPieces > 0
+      ? Math.round((packGrams / packPieces) * 10) / 10
+      : TYPICAL_GRAMS_PER_PIECE[pieceKind]
+
   if (!product) return null
 
-  const canSave = grams != null && grams > 0 && nutrition != null && nutrition.calories > 0
+  const canSave =
+    effectiveGrams != null &&
+    effectiveGrams > 0 &&
+    nutrition != null &&
+    nutrition.calories > 0
 
   const handleSave = () => {
-    if (!canSave || grams == null || nutrition == null) return
+    if (!canSave || effectiveGrams == null || nutrition == null) return
+    if (
+      measure === 'pieces' &&
+      pieceMode === 'pack' &&
+      packGrams != null &&
+      packPieces != null
+    ) {
+      savePackPreset(product.barcode, { packGrams, packPieces })
+    }
     onSave({
       name: product.nom,
       mealType,
@@ -140,7 +210,11 @@ export function ScannedProductSheet({
       proteinG: nutrition.proteines,
       carbsG: nutrition.glucides,
       fatG: nutrition.lipides,
-      grams,
+      grams: effectiveGrams,
+      pieces:
+        measure === 'pieces' && eatenPieces != null && eatenPieces > 0
+          ? eatenPieces
+          : undefined,
       portionMode: mode,
     })
   }
@@ -239,30 +313,166 @@ export function ScannedProductSheet({
         </div>
 
         <div>
-          <p className="mb-2 text-[13px] font-semibold text-white">3. Poids sur la balance</p>
-          <div className="rounded-2xl border border-white/10 bg-[#1C1C1E] p-4">
-            <div className="mb-1 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
-              <Scale className="h-3.5 w-3.5" />
-              Grammes affichés
-            </div>
-            <div className="flex items-end gap-2">
-              <ClearableNumberInput
-                value={grams}
-                onChange={setGrams}
-                min={0.01}
-                max={5000}
-                step={0.01}
-                required={false}
-                placeholder="Ex. 61,05"
-                placeholderClassName="pointer-events-none absolute inset-0 flex items-center text-[36px] font-bold tracking-tight text-[#636366]"
-                aria-label="Poids en grammes"
-                className="relative z-[1] w-full bg-transparent text-[36px] font-bold tracking-tight text-white outline-none placeholder:text-[#636366]"
-              />
-              <span className="pb-1 text-[15px] font-medium text-[#8E8E93]">g</span>
-            </div>
+          <p className="mb-2 text-[13px] font-semibold text-white">3. Quelle quantité ?</p>
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setMeasure('scale')}
+              className={`ios-press flex items-center justify-center gap-1.5 rounded-2xl border px-3 py-2.5 text-[13px] font-semibold ${
+                measure === 'scale'
+                  ? 'border-[#FF9F0A]/45 bg-[#FF9F0A]/15 text-white'
+                  : 'border-white/10 bg-black/25 text-[#8E8E93]'
+              }`}
+            >
+              <Scale className="h-4 w-4" />
+              Balance
+            </button>
+            <button
+              type="button"
+              onClick={() => setMeasure('pieces')}
+              className={`ios-press flex items-center justify-center gap-1.5 rounded-2xl border px-3 py-2.5 text-[13px] font-semibold ${
+                measure === 'pieces'
+                  ? 'border-[#FF9F0A]/45 bg-[#FF9F0A]/15 text-white'
+                  : 'border-white/10 bg-black/25 text-[#8E8E93]'
+              }`}
+            >
+              <Hash className="h-4 w-4" />
+              Compter
+            </button>
           </div>
 
-          {suggested != null && (
+          {measure === 'scale' ? (
+            <div className="rounded-2xl border border-white/10 bg-[#1C1C1E] p-4">
+              <div className="mb-1 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
+                <Scale className="h-3.5 w-3.5" />
+                Grammes affichés
+              </div>
+              <div className="flex items-end gap-2">
+                <ClearableNumberInput
+                  value={grams}
+                  onChange={setGrams}
+                  min={0.01}
+                  max={5000}
+                  step={0.01}
+                  required={false}
+                  placeholder="Ex. 61,05"
+                  placeholderClassName="pointer-events-none absolute inset-0 flex items-center text-[36px] font-bold tracking-tight text-[#636366]"
+                  aria-label="Poids en grammes"
+                  className="relative z-[1] w-full bg-transparent text-[36px] font-bold tracking-tight text-white outline-none placeholder:text-[#636366]"
+                />
+                <span className="pb-1 text-[15px] font-medium text-[#8E8E93]">g</span>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3 rounded-2xl border border-white/10 bg-[#1C1C1E] p-4">
+              <p className="text-[12px] leading-snug text-[#AEAEB2]">
+                Nuggets, boulettes, croquettes… tu comptes les pièces. On convertit avec le poids
+                de la boîte (ou une estimation typique).
+              </p>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPieceMode('pack')}
+                  className={`ios-press rounded-xl border px-2.5 py-2 text-[12px] font-semibold ${
+                    pieceMode === 'pack'
+                      ? 'border-white/25 bg-white/12 text-white'
+                      : 'border-white/8 bg-transparent text-[#8E8E93]'
+                  }`}
+                >
+                  D’après la boîte
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPieceMode('typical')}
+                  className={`ios-press rounded-xl border px-2.5 py-2 text-[12px] font-semibold ${
+                    pieceMode === 'typical'
+                      ? 'border-white/25 bg-white/12 text-white'
+                      : 'border-white/8 bg-transparent text-[#8E8E93]'
+                  }`}
+                >
+                  Estimation typique
+                </button>
+              </div>
+
+              {pieceMode === 'pack' ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-[#636366]">
+                      Poids boîte
+                    </span>
+                    <div className="mt-1 flex items-end gap-1 border-b border-white/10 pb-1">
+                      <ClearableNumberInput
+                        value={packGrams}
+                        onChange={setPackGrams}
+                        min={1}
+                        max={10000}
+                        step={1}
+                        required={false}
+                        placeholder="400"
+                        aria-label="Poids de la boîte en grammes"
+                        className="w-full bg-transparent text-[22px] font-bold text-white outline-none"
+                      />
+                      <span className="pb-0.5 text-[12px] text-[#8E8E93]">g</span>
+                    </div>
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-[#636366]">
+                      Pièces / boîte
+                    </span>
+                    <div className="mt-1 border-b border-white/10 pb-1">
+                      <ClearableNumberInput
+                        value={packPieces}
+                        onChange={setPackPieces}
+                        min={1}
+                        max={500}
+                        step={1}
+                        required={false}
+                        placeholder="20"
+                        aria-label="Nombre de pièces dans la boîte"
+                        className="w-full bg-transparent text-[22px] font-bold text-white outline-none"
+                      />
+                    </div>
+                  </label>
+                </div>
+              ) : (
+                <p className="rounded-xl border border-white/8 bg-black/25 px-3 py-2 text-[12px] text-[#AEAEB2]">
+                  Détecté : <span className="font-semibold text-white">{PIECE_KIND_LABELS[pieceKind]}</span>
+                  {' · '}≈ {TYPICAL_GRAMS_PER_PIECE[pieceKind]} g / pièce (moyenne). Moins précis
+                  que la boîte, mais utile sans emballage.
+                </p>
+              )}
+
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-[#636366]">
+                  Combien tu manges ?
+                </span>
+                <div className="mt-1 flex items-end gap-2 border-b border-white/10 pb-1">
+                  <ClearableNumberInput
+                    value={eatenPieces}
+                    onChange={setEatenPieces}
+                    min={0.5}
+                    max={200}
+                    step={0.5}
+                    required={false}
+                    placeholder="Ex. 6"
+                    aria-label="Nombre de pièces mangées"
+                    className="w-full bg-transparent text-[36px] font-bold tracking-tight text-white outline-none"
+                  />
+                  <span className="pb-1 text-[14px] text-[#8E8E93]">pièces</span>
+                </div>
+              </label>
+
+              {computedPieceGrams != null && (
+                <p className="text-[13px] text-[#AEAEB2]">
+                  ≈ <span className="font-semibold text-white">{formatGrams(computedPieceGrams)} g</span>
+                  {' '}({gramsPerPiece} g × {eatenPieces})
+                </p>
+              )}
+            </div>
+          )}
+
+          {measure === 'scale' && suggested != null && (
             <button
               type="button"
               onClick={() => setGrams(suggested)}
@@ -276,7 +486,7 @@ export function ScannedProductSheet({
                   ? isFollowUp
                     ? `Pour finir le repas avec les ~${remaining} kcal restantes — ça fait un bon combo.`
                     : `Pour atteindre ~${remaining} kcal avec uniquement ce produit.`
-                  : `Portion pour laisser ~${Math.round(remaining * (1 - 0.55))} kcal à l’accompagnement.`}
+                  : `Portion pour laisser de la place à l’accompagnement.`}
                 {isCalorieDense(product.calories) && mode === 'with_sides'
                   ? ' Aliment dense : une petite part + accompagnement, c’est top.'
                   : ''}

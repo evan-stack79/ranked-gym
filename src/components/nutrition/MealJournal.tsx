@@ -120,6 +120,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     carbsG: number
     fatG: number
     grams: number
+    pieces?: number
     portionMode: PortionMode
   }) => {
     const journal = addMealToToday({
@@ -130,6 +131,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
       carbsG: entry.carbsG,
       fatG: entry.fatG,
       grams: entry.grams,
+      pieces: entry.pieces,
       portionMode: entry.portionMode,
     })
     setMeals(journal.meals)
@@ -482,6 +484,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
                     </div>
                     <p className="mt-0.5 text-[13px] text-[#8E8E93]">
                       <span className="font-semibold text-[#FF9F0A]">{meal.calories} kcal</span>
+                      {meal.pieces != null && <> · {meal.pieces} pc</>}
                       {meal.grams != null && <> · {meal.grams} g</>}
                       {meal.proteinG != null && <> · {meal.proteinG} g P</>}
                     </p>
