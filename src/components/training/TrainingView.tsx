@@ -1,20 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronRight, Dumbbell, Flame } from 'lucide-react'
-import type { SessionTemplate, TrainingState } from '../../types/training'
+import type { TrainingState } from '../../types/training'
 import { getSportById } from '../../data/sports'
 import {
-  addCustomTemplate,
   getTrainingState,
-  logCompletedSession,
   removeSchedule,
+  removeWorkoutNote,
   saveTrainingState,
+  saveWorkoutNote,
   setHealthLinked,
+  setNotificationsEnabled,
   setPrimarySport,
   setStepsToday,
   todayWorkoutKcal,
   upsertSchedule,
 } from '../../services/trainingStorage'
-import { connectHealthIntent, checkUpcomingReminders } from '../../services/healthSteps'
+import { connectHealthIntent } from '../../services/healthSteps'
+import { startReminderWatcher } from '../../services/reminderService'
 import { getCalorieProfile } from '../../services/nutritionStorage'
 import { computeCaloriePlan, GOAL_LABELS } from '../../utils/calories'
 import {
@@ -24,8 +26,8 @@ import {
 } from '../../utils/activityCalories'
 import { SportPicker, SportChip } from './SportPicker'
 import { StepsCard } from './StepsCard'
-import { SessionBoard } from './SessionBoard'
 import { TrainingAgenda } from './TrainingAgenda'
+import { WorkoutNotebook } from './WorkoutNotebook'
 import { IconBadge } from '../ui/IconBadge'
 import { IosSheet } from '../ui/IosSheet'
 
@@ -33,10 +35,14 @@ export function TrainingView() {
   const [state, setState] = useState<TrainingState>(() => getTrainingState())
   const [sportOpen, setSportOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
-  const [activeSession, setActiveSession] = useState<SessionTemplate | null>(null)
-  const [durationMin, setDurationMin] = useState(60)
+  const [dueBanner, setDueBanner] = useState<string | null>(null)
+  const [cardioOpen, setCardioOpen] = useState(false)
+  const [durationMin, setDurationMin] = useState(40)
 
-  const profile = useMemo(() => getCalorieProfile(), [state.stepsToday, state.completed])
+  const profile = useMemo(
+    () => getCalorieProfile(),
+    [state.stepsToday, state.completed, state.workoutNotes],
+  )
   const plan = useMemo(() => computeCaloriePlan(profile), [profile])
 
   const stepsKcal = stepsToKcal(state.stepsToday, profile.weightKg)
@@ -48,14 +54,15 @@ export function TrainingView() {
   )
 
   const sport = state.primarySportId ? getSportById(state.primarySportId) : null
-
-  useEffect(() => {
-    checkUpcomingReminders(state.schedule)
-  }, [state.schedule])
+  const isStrength =
+    !sport ||
+    sport.category === 'strength' ||
+    sport.id === 'crossfit' ||
+    sport.id === 'fitness'
 
   const showToast = useCallback((message: string) => {
     setToast(message)
-    window.setTimeout(() => setToast(null), 2600)
+    window.setTimeout(() => setToast(null), 2800)
   }, [])
 
   const persist = (next: TrainingState) => {
@@ -63,30 +70,45 @@ export function TrainingView() {
     setState(next)
   }
 
+  useEffect(() => {
+    const stop = startReminderWatcher(
+      () => getTrainingState().schedule,
+      (due) => {
+        setDueBanner(
+          due.minutesLeft === 0
+            ? `C’est l’heure : ${due.title} (${due.time})`
+            : `${due.title} dans ${due.minutesLeft} min (${due.time})`,
+        )
+        window.setTimeout(() => setDueBanner(null), 12000)
+      },
+    )
+    return stop
+  }, [])
+
   const handleConnectHealth = async () => {
     const result = await connectHealthIntent()
     persist(setHealthLinked(true))
     showToast(result.message)
   }
 
-  const handleStartSession = (tpl: SessionTemplate) => {
-    setActiveSession(tpl)
-    setDurationMin(sport?.id === 'course-a-pied' ? 40 : 60)
-  }
-
-  const confirmSession = () => {
-    if (!activeSession) return
-    const kcalPerHour = sport?.kcalPerHour ?? 400
+  const confirmCardio = () => {
+    const kcalPerHour = sport?.kcalPerHour ?? 500
     const estimated = estimateSessionKcal(durationMin, kcalPerHour, profile.weightKg)
-    const next = logCompletedSession({
-      templateId: activeSession.id,
-      title: activeSession.title,
-      durationMin,
-      estimatedKcal: estimated,
-    })
-    persist(next)
-    setActiveSession(null)
-    showToast(`${activeSession.title} notée · ~${estimated} kcal · Nutri mis à jour`)
+    persist(
+      saveWorkoutNote({
+        title: sport?.name ?? 'Cardio',
+        exercises: [
+          {
+            id: `cardio-${Date.now()}`,
+            name: sport?.name ?? 'Cardio',
+            sets: [{ reps: durationMin, weightKg: 0, difficulty: 'ok' }],
+          },
+        ],
+        estimatedKcal: estimated,
+      }),
+    )
+    setCardioOpen(false)
+    showToast(`${sport?.name ?? 'Séance'} · ~${estimated} kcal → Nutri`)
   }
 
   return (
@@ -106,10 +128,16 @@ export function TrainingView() {
           </div>
           <h1 className="text-[34px] font-bold tracking-tight text-white">Entraînement</h1>
           <p className="mt-2 text-[17px] text-[#8E8E93]">
-            Sport, séances, pas — et Nutri suit automatiquement.
+            Carnet, rappels, pas — Nutri suit tout seul.
           </p>
         </div>
       </header>
+
+      {dueBanner && (
+        <div className="rounded-2xl border border-[#FF2B2B]/40 bg-[#FF2B2B]/15 px-4 py-3 text-[14px] font-semibold text-white">
+          {dueBanner}
+        </div>
+      )}
 
       <button
         type="button"
@@ -140,48 +168,44 @@ export function TrainingView() {
         }}
       />
 
-      {!state.primarySportId || sport?.category === 'strength' || sport?.id === 'crossfit' ? (
-        <SessionBoard
-          templates={state.templates}
-          onStart={handleStartSession}
-          onAddCustom={(title, muscles) => {
-            persist(addCustomTemplate({ title, muscles }))
-            showToast('Séance ajoutée')
+      {isStrength ? (
+        <WorkoutNotebook
+          bodyWeightKg={profile.weightKg}
+          history={state.workoutNotes}
+          onSave={(note) => {
+            persist(saveWorkoutNote(note))
+            showToast(`Séance sauvée · ~${note.estimatedKcal} kcal → Nutri`)
+          }}
+          onDeleteNote={(id) => {
+            persist(removeWorkoutNote(id))
           }}
         />
       ) : (
         <section className="glass-card rounded-3xl p-4">
           <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-            Séance {sport?.name}
+            {sport?.name}
           </p>
-          <h2 className="mt-1 text-[18px] font-bold text-white">Noter l’effort du jour</h2>
+          <h2 className="mt-1 text-[18px] font-bold text-white">Noter la séance</h2>
           <p className="mt-1 text-[12px] text-[#AEAEB2]">
-            Entre tes pas ci-dessus, puis lance une séance type pour recalculer Nutri.
+            Entre tes pas, puis valide la durée pour recalculer Nutri.
           </p>
           <button
             type="button"
-            onClick={() =>
-              handleStartSession({
-                id: `sport-${sport?.id ?? 'run'}`,
-                kind: 'custom',
-                title: sport?.name ?? 'Séance',
-                subtitle: 'Session',
-                muscles: [sport?.name ?? 'Cardio'],
-                accent: '#00B4FF',
-              })
-            }
+            onClick={() => setCardioOpen(true)}
             className="btn-brand ios-press mt-3 w-full rounded-2xl py-3 text-[15px] font-semibold text-white"
           >
-            Noter une séance {sport?.name}
+            Noter {sport?.name}
           </button>
         </section>
       )}
 
       <TrainingAgenda
         schedule={state.schedule}
-        templates={state.templates}
+        notificationsEnabled={state.notificationsEnabled}
         onSave={(entry) => persist(upsertSchedule(entry))}
         onRemove={(id) => persist(removeSchedule(id))}
+        onNotificationsChange={(enabled) => persist(setNotificationsEnabled(enabled))}
+        onToast={showToast}
       />
 
       <SportPicker
@@ -195,53 +219,36 @@ export function TrainingView() {
       />
 
       <IosSheet
-        open={activeSession != null}
-        onClose={() => setActiveSession(null)}
-        title={activeSession?.title ?? 'Séance'}
-        subtitle="Durée ≈ calories → Nutri"
+        open={cardioOpen}
+        onClose={() => setCardioOpen(false)}
+        title={sport?.name ?? 'Séance'}
+        subtitle="Durée → calories Nutri"
       >
-        {activeSession && (
-          <div className="space-y-4 pb-2">
-            <p className="text-[13px] text-[#AEAEB2]">{activeSession.muscles.join(' · ')}</p>
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
-                Durée (min)
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {[30, 45, 60, 75, 90].map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setDurationMin(m)}
-                    className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
-                      durationMin === m
-                        ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-[#FF6961]'
-                        : 'border-white/10 text-[#8E8E93]'
-                    }`}
-                  >
-                    {m} min
-                  </button>
-                ))}
-              </div>
-            </label>
-            <p className="text-[12px] text-[#8E8E93]">
-              Estimation ~{' '}
-              {estimateSessionKcal(
-                durationMin,
-                sport?.kcalPerHour ?? 400,
-                profile.weightKg,
-              )}{' '}
-              kcal — rééquilibrage selon ton objectif ({GOAL_LABELS[plan.goal]}).
-            </p>
-            <button
-              type="button"
-              onClick={confirmSession}
-              className="btn-brand ios-press w-full rounded-2xl py-3.5 text-[15px] font-semibold text-white"
-            >
-              Valider la séance
-            </button>
+        <div className="space-y-4 pb-2">
+          <div className="flex flex-wrap gap-1.5">
+            {[20, 30, 40, 45, 60, 75, 90].map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setDurationMin(m)}
+                className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
+                  durationMin === m
+                    ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-[#FF6961]'
+                    : 'border-white/10 text-[#8E8E93]'
+                }`}
+              >
+                {m} min
+              </button>
+            ))}
           </div>
-        )}
+          <button
+            type="button"
+            onClick={confirmCardio}
+            className="btn-brand ios-press w-full rounded-2xl py-3.5 text-[15px] font-semibold text-white"
+          >
+            Valider
+          </button>
+        </div>
       </IosSheet>
 
       {toast && (

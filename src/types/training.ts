@@ -13,15 +13,12 @@ export interface Sport {
   id: string
   name: string
   category: SportCategory
-  /** Higher = shown first in search / defaults */
   popularity: number
-  /** Tracks steps / distance well */
   tracksSteps?: boolean
-  /** Typical kcal/hour estimate for a 70kg person (rough) */
   kcalPerHour: number
 }
 
-export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6 // Sun–Sat
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
 export type SessionTemplateKind =
   | 'upper'
@@ -38,7 +35,6 @@ export interface SessionTemplate {
   title: string
   subtitle: string
   muscles: string[]
-  /** Soft accent for cards */
   accent: string
 }
 
@@ -46,11 +42,11 @@ export interface ScheduledSession {
   id: string
   templateId: string
   title: string
-  /** Days of week (0=dim … 6=sam) */
   days: Weekday[]
-  /** "18:30" */
   time: string
   enabled: boolean
+  /** Notify X minutes before */
+  remindBeforeMin?: number
 }
 
 export interface CompletedSession {
@@ -63,13 +59,40 @@ export interface CompletedSession {
   createdAt: number
 }
 
+export type SetDifficulty = 'easy' | 'ok' | 'hard'
+
+export interface WorkoutSet {
+  reps: number
+  weightKg: number
+  /** How hard it felt — used for safe progression */
+  difficulty?: SetDifficulty
+}
+
+export interface ExerciseEntry {
+  id: string
+  name: string
+  sets: WorkoutSet[]
+  note?: string
+}
+
+export interface WorkoutNote {
+  id: string
+  title: string
+  dateKey: string
+  exercises: ExerciseEntry[]
+  createdAt: number
+  estimatedKcal: number
+}
+
 export interface TrainingState {
   primarySportId: string | null
   favoriteSportIds: string[]
   stepsToday: number
   stepsDateKey: string
   healthLinked: boolean
+  notificationsEnabled: boolean
   templates: SessionTemplate[]
   schedule: ScheduledSession[]
   completed: CompletedSession[]
+  workoutNotes: WorkoutNote[]
 }

@@ -3,6 +3,7 @@ import type {
   ScheduledSession,
   SessionTemplate,
   TrainingState,
+  WorkoutNote,
 } from '../types/training'
 import { todayKey } from '../utils/calories'
 
@@ -65,9 +66,11 @@ const DEFAULT_STATE: TrainingState = {
   stepsToday: 0,
   stepsDateKey: todayKey(),
   healthLinked: false,
+  notificationsEnabled: false,
   templates: DEFAULT_TEMPLATES,
   schedule: [],
   completed: [],
+  workoutNotes: [],
 }
 
 function read(): TrainingState {
@@ -85,8 +88,9 @@ function read(): TrainingState {
       schedule: parsed.schedule ?? [],
       completed: parsed.completed ?? [],
       favoriteSportIds: parsed.favoriteSportIds ?? [],
+      workoutNotes: parsed.workoutNotes ?? [],
+      notificationsEnabled: Boolean(parsed.notificationsEnabled),
     }
-    // Reset steps if day changed
     if (merged.stepsDateKey !== todayKey()) {
       merged.stepsToday = 0
       merged.stepsDateKey = todayKey()
@@ -137,6 +141,13 @@ export function setHealthLinked(linked: boolean): TrainingState {
   return next
 }
 
+export function setNotificationsEnabled(enabled: boolean): TrainingState {
+  const state = read()
+  const next = { ...state, notificationsEnabled: enabled }
+  write(next)
+  return next
+}
+
 export function addCustomTemplate(input: {
   title: string
   muscles: string[]
@@ -156,7 +167,9 @@ export function addCustomTemplate(input: {
   return next
 }
 
-export function upsertSchedule(entry: Omit<ScheduledSession, 'id'> & { id?: string }): TrainingState {
+export function upsertSchedule(
+  entry: Omit<ScheduledSession, 'id'> & { id?: string },
+): TrainingState {
   const state = read()
   if (entry.id) {
     const next = {
@@ -170,11 +183,12 @@ export function upsertSchedule(entry: Omit<ScheduledSession, 'id'> & { id?: stri
   }
   const created: ScheduledSession = {
     id: `sch-${Date.now()}`,
-    templateId: entry.templateId,
+    templateId: entry.templateId || 'notebook',
     title: entry.title,
     days: entry.days,
     time: entry.time,
     enabled: entry.enabled,
+    remindBeforeMin: entry.remindBeforeMin ?? 10,
   }
   const next = { ...state, schedule: [...state.schedule, created] }
   write(next)
@@ -205,6 +219,51 @@ export function logCompletedSession(input: {
     createdAt: Date.now(),
   }
   const next = { ...state, completed: [entry, ...state.completed].slice(0, 60) }
+  write(next)
+  return next
+}
+
+export function saveWorkoutNote(
+  note: Omit<WorkoutNote, 'id' | 'createdAt' | 'dateKey'> & { id?: string },
+): TrainingState {
+  const state = read()
+  const entry: WorkoutNote = {
+    id: note.id ?? `note-${Date.now()}`,
+    title: note.title,
+    exercises: note.exercises,
+    estimatedKcal: note.estimatedKcal,
+    dateKey: todayKey(),
+    createdAt: Date.now(),
+  }
+  const workoutNotes = [entry, ...state.workoutNotes.filter((n) => n.id !== entry.id)].slice(
+    0,
+    80,
+  )
+  const completedEntry: CompletedSession = {
+    id: `done-note-${entry.id}`,
+    templateId: 'notebook',
+    title: entry.title,
+    dateKey: entry.dateKey,
+    durationMin: Math.max(20, entry.exercises.length * 8),
+    estimatedKcal: entry.estimatedKcal,
+    createdAt: entry.createdAt,
+  }
+  const completed = [
+    completedEntry,
+    ...state.completed.filter((c) => c.id !== completedEntry.id),
+  ].slice(0, 60)
+  const next = { ...state, workoutNotes, completed }
+  write(next)
+  return next
+}
+
+export function removeWorkoutNote(id: string): TrainingState {
+  const state = read()
+  const next = {
+    ...state,
+    workoutNotes: state.workoutNotes.filter((n) => n.id !== id),
+    completed: state.completed.filter((c) => c.id !== `done-note-${id}`),
+  }
   write(next)
   return next
 }

@@ -1,7 +1,12 @@
 import { useMemo, useState } from 'react'
 import { Bell, CalendarDays, Plus, Trash2 } from 'lucide-react'
-import type { ScheduledSession, SessionTemplate, Weekday } from '../../types/training'
+import type { ScheduledSession, Weekday } from '../../types/training'
 import { IosSheet } from '../ui/IosSheet'
+import {
+  notificationPermission,
+  requestReminderPermission,
+  sendTestNotification,
+} from '../../services/reminderService'
 
 const DAY_LABELS: { day: Weekday; short: string }[] = [
   { day: 1, short: 'L' },
@@ -17,16 +22,26 @@ const DAY_NAMES = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
 
 interface TrainingAgendaProps {
   schedule: ScheduledSession[]
-  templates: SessionTemplate[]
+  notificationsEnabled: boolean
   onSave: (entry: Omit<ScheduledSession, 'id'> & { id?: string }) => void
   onRemove: (id: string) => void
+  onNotificationsChange: (enabled: boolean) => void
+  onToast: (message: string) => void
 }
 
-export function TrainingAgenda({ schedule, templates, onSave, onRemove }: TrainingAgendaProps) {
+export function TrainingAgenda({
+  schedule,
+  notificationsEnabled,
+  onSave,
+  onRemove,
+  onNotificationsChange,
+  onToast,
+}: TrainingAgendaProps) {
   const [open, setOpen] = useState(false)
-  const [templateId, setTemplateId] = useState(templates[0]?.id ?? '')
+  const [title, setTitle] = useState('Séance')
   const [days, setDays] = useState<Weekday[]>([1, 4])
   const [time, setTime] = useState('18:30')
+  const [remindBefore, setRemindBefore] = useState(10)
 
   const sorted = useMemo(
     () =>
@@ -34,21 +49,38 @@ export function TrainingAgenda({ schedule, templates, onSave, onRemove }: Traini
     [schedule],
   )
 
+  const perm = notificationPermission()
+
   const toggleDay = (d: Weekday) => {
     setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()))
   }
 
-  const handleAdd = () => {
-    const tpl = templates.find((t) => t.id === templateId) ?? templates[0]
-    if (!tpl || days.length === 0) return
+  const enableNotifs = async () => {
+    const ok = await requestReminderPermission()
+    onNotificationsChange(ok)
+    if (ok) {
+      await sendTestNotification()
+      onToast('Notifications activées — test envoyé')
+    } else {
+      onToast('Autorise les notifs dans Réglages Safari / Chrome')
+    }
+  }
+
+  const handleAdd = async () => {
+    if (days.length === 0 || !title.trim()) return
+    if (!notificationsEnabled || perm !== 'granted') {
+      await enableNotifs()
+    }
     onSave({
-      templateId: tpl.id,
-      title: tpl.title,
+      templateId: 'notebook',
+      title: title.trim(),
       days,
       time,
       enabled: true,
+      remindBeforeMin: remindBefore,
     })
     setOpen(false)
+    onToast(`Rappel « ${title.trim()} » · ${time} (−${remindBefore} min)`)
   }
 
   return (
@@ -58,7 +90,7 @@ export function TrainingAgenda({ schedule, templates, onSave, onRemove }: Traini
           <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
             Agenda
           </p>
-          <h2 className="text-[20px] font-bold text-white">Rappels simples</h2>
+          <h2 className="text-[20px] font-bold text-white">Rappels séance</h2>
         </div>
         <button
           type="button"
@@ -70,12 +102,40 @@ export function TrainingAgenda({ schedule, templates, onSave, onRemove }: Traini
         </button>
       </div>
 
+      <button
+        type="button"
+        onClick={() => {
+          void enableNotifs()
+        }}
+        className={`ios-press flex w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left ${
+          notificationsEnabled && perm === 'granted'
+            ? 'border-[#30D158]/35 bg-[#30D158]/10'
+            : 'border-white/10 bg-black/25'
+        }`}
+      >
+        <Bell
+          className={`h-4 w-4 ${
+            notificationsEnabled && perm === 'granted' ? 'text-[#30D158]' : 'text-[#8E8E93]'
+          }`}
+        />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-semibold text-white">
+            {perm === 'granted' ? 'Notifications ON' : 'Activer les notifications'}
+          </p>
+          <p className="text-[11px] text-[#8E8E93]">
+            {perm === 'denied'
+              ? 'Bloquées par le navigateur — active-les dans les réglages du site.'
+              : 'Obligatoire pour être prévenu avant ta séance (garde l’app / PWA ouverte ou en fond).'}
+          </p>
+        </div>
+      </button>
+
       {sorted.length === 0 ? (
         <div className="glass-card rounded-3xl px-5 py-8 text-center">
           <CalendarDays className="mx-auto h-7 w-7 text-[#8E8E93]" />
           <p className="mt-2 text-[14px] font-semibold text-white">Aucun créneau</p>
           <p className="mt-1 text-[12px] text-[#8E8E93]">
-            Ex. Upper Lun/Jeu 18:30 — 10 secondes à régler.
+            Ex. Muscu Lun/Jeu 18:30 — rappel 10 min avant.
           </p>
         </div>
       ) : (
@@ -90,11 +150,12 @@ export function TrainingAgenda({ schedule, templates, onSave, onRemove }: Traini
               </div>
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-white">
-                  {item.title}{' '}
-                  <span className="text-[#8E8E93]">· {item.time}</span>
+                  {item.title} <span className="text-[#8E8E93]">· {item.time}</span>
                 </p>
                 <p className="text-[12px] text-[#8E8E93]">
                   {item.days.map((d) => DAY_NAMES[d]).join(' · ')}
+                  {' · '}-
+                  {item.remindBeforeMin ?? 10} min
                 </p>
               </div>
               <button
@@ -112,25 +173,18 @@ export function TrainingAgenda({ schedule, templates, onSave, onRemove }: Traini
 
       <IosSheet open={open} onClose={() => setOpen(false)} title="Nouveau créneau" subtitle="Rapide">
         <div className="space-y-4 pb-2">
-          <div>
-            <p className="mb-2 text-[12px] font-semibold text-[#8E8E93]">Séance</p>
-            <div className="flex flex-wrap gap-1.5">
-              {templates.map((tpl) => (
-                <button
-                  key={tpl.id}
-                  type="button"
-                  onClick={() => setTemplateId(tpl.id)}
-                  className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
-                    templateId === tpl.id
-                      ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-[#FF6961]'
-                      : 'border-white/10 text-[#8E8E93]'
-                  }`}
-                >
-                  {tpl.title}
-                </button>
-              ))}
-            </div>
-          </div>
+          <label className="block">
+            <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+              Nom de la séance
+            </span>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Ex. Upper, Pecs, Course…"
+              className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none"
+            />
+          </label>
 
           <div>
             <p className="mb-2 text-[12px] font-semibold text-[#8E8E93]">Jours</p>
@@ -163,12 +217,34 @@ export function TrainingAgenda({ schedule, templates, onSave, onRemove }: Traini
             />
           </label>
 
+          <div>
+            <p className="mb-2 text-[12px] font-semibold text-[#8E8E93]">Me prévenir</p>
+            <div className="flex flex-wrap gap-1.5">
+              {[5, 10, 15, 30].map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setRemindBefore(m)}
+                  className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
+                    remindBefore === m
+                      ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-[#FF6961]'
+                      : 'border-white/10 text-[#8E8E93]'
+                  }`}
+                >
+                  {m} min avant
+                </button>
+              ))}
+            </div>
+          </div>
+
           <button
             type="button"
-            onClick={handleAdd}
+            onClick={() => {
+              void handleAdd()
+            }}
             className="btn-brand ios-press w-full rounded-2xl py-3.5 text-[15px] font-semibold text-white"
           >
-            Enregistrer le rappel
+            Enregistrer + activer rappel
           </button>
         </div>
       </IosSheet>
