@@ -39,7 +39,7 @@ export interface GeoCoordinates {
   accuracy?: number
 }
 
-export type TabId = 'home' | 'lobby' | 'training' | 'profile'
+export type TabId = 'home' | 'lobby' | 'training' | 'nutrition' | 'profile'
 
 export interface NavTab {
   id: TabId

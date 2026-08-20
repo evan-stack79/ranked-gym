@@ -1,4 +1,4 @@
-import { Home, Users, Dumbbell, User } from 'lucide-react'
+import { Home, Users, Dumbbell, Salad, User } from 'lucide-react'
 import type { TabId } from '../../types'
 
 interface BottomNavProps {
@@ -9,7 +9,8 @@ interface BottomNavProps {
 const tabs: { id: TabId; label: string; icon: typeof Home }[] = [
   { id: 'home', label: 'Accueil', icon: Home },
   { id: 'lobby', label: 'Lobby', icon: Users },
-  { id: 'training', label: 'Entraînement', icon: Dumbbell },
+  { id: 'training', label: 'Train', icon: Dumbbell },
+  { id: 'nutrition', label: 'Nutri', icon: Salad },
   { id: 'profile', label: 'Profil', icon: User },
 ]
 
@@ -20,7 +21,7 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       aria-label="Navigation principale"
     >
-      <div className="mx-auto flex max-w-lg items-stretch justify-around px-1 py-1.5">
+      <div className="mx-auto flex max-w-lg items-stretch justify-around px-0.5 py-1.5">
         {tabs.map(({ id, label, icon: Icon }) => {
           const isActive = activeTab === id
           return (
@@ -28,13 +29,13 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
               key={id}
               type="button"
               onClick={() => onTabChange(id)}
-              className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg px-2 py-2 transition-colors ${
+              className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-2 transition-colors ${
                 isActive ? 'text-[#FF2B2B]' : 'text-[#8E8E93]'
               }`}
               aria-current={isActive ? 'page' : undefined}
             >
-              <Icon className="h-6 w-6" strokeWidth={isActive ? 2.25 : 1.75} />
-              <span className="text-[10px] font-medium">{label}</span>
+              <Icon className="h-5.5 w-5.5 h-[22px] w-[22px]" strokeWidth={isActive ? 2.25 : 1.75} />
+              <span className="text-[9px] font-medium leading-tight">{label}</span>
             </button>
           )
         })}
