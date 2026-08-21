@@ -31,6 +31,22 @@ interface WorkoutNotebookProps {
   }) => void
   onDeleteNote: (id: string) => void
   onAddRoutine: (label: string) => void
+  /** Démarre le timer de repos après « Terminer la série ». */
+  onRestStart?: (info: {
+    exerciseId: string
+    setIndex: number
+    exerciseName: string
+    setLabel: string
+  }) => void
+  /** Applique restSec / done sur une série (callback parent). */
+  restLogRequest?: {
+    exerciseId: string
+    setIndex: number
+    restSec: number
+    /** Skip → prépare la série suivante. */
+    addNextSet: boolean
+    nonce: number
+  } | null
 }
 
 const DIFF_OPTIONS: { id: SetDifficulty; label: string }[] = [
@@ -67,6 +83,8 @@ export function WorkoutNotebook({
   onSave,
   onDeleteNote,
   onAddRoutine,
+  onRestStart,
+  restLogRequest,
 }: WorkoutNotebookProps) {
   const [routineId, setRoutineId] = useState(routines[0]?.id ?? 'upper')
   const [title, setTitle] = useState(routines[0]?.label ?? 'Séance')
@@ -114,6 +132,45 @@ export function WorkoutNotebook({
         return { ...e, sets }
       }),
     )
+  }
+
+  // Applique le repos loggé par le timer parent
+  useEffect(() => {
+    if (!restLogRequest) return
+    const { exerciseId, setIndex, restSec, addNextSet } = restLogRequest
+    setExercises((prev) =>
+      prev.map((e) => {
+        if (e.id !== exerciseId) return e
+        const sets = e.sets.map((s, i) =>
+          i === setIndex ? { ...s, done: true, restSec } : s,
+        )
+        if (addNextSet && setIndex === e.sets.length - 1) {
+          const last = sets[setIndex]
+          return {
+            ...e,
+            sets: [
+              ...sets,
+              {
+                reps: last?.reps ?? 8,
+                weightKg: last?.weightKg ?? 20,
+                difficulty: last?.difficulty ?? 'ok',
+              },
+            ],
+          }
+        }
+        return { ...e, sets }
+      }),
+    )
+  }, [restLogRequest])
+
+  const finishSet = (ex: ExerciseEntry, setIndex: number) => {
+    updateSet(ex.id, setIndex, { done: true })
+    onRestStart?.({
+      exerciseId: ex.id,
+      setIndex,
+      exerciseName: ex.name.trim() || 'Exercice',
+      setLabel: `S${setIndex + 1}`,
+    })
   }
 
   const handleSave = () => {
@@ -273,54 +330,75 @@ export function WorkoutNotebook({
 
                 <div className="space-y-2">
                   {ex.sets.map((set, idx) => (
-                    <div
-                      key={idx}
-                      className="grid grid-cols-[auto_1fr_1fr_auto] items-end gap-2"
-                    >
-                      <span className="pb-2 text-[11px] font-bold text-[#8E8E93]">
-                        S{idx + 1}
-                      </span>
-                      <label className="block">
-                        <span className="mb-0.5 block text-[10px] text-[#636366]">Reps</span>
-                        <ClearableNumberInput
-                          value={set.reps}
-                          onChange={(v) =>
-                            updateSet(ex.id, idx, { reps: v != null ? Math.round(v) : 0 })
-                          }
-                          min={1}
-                          max={50}
-                          aria-label="Reps"
-                          className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
-                        />
-                      </label>
-                      <label className="block">
-                        <span className="mb-0.5 block text-[10px] text-[#636366]">Poids kg</span>
-                        <ClearableNumberInput
-                          value={set.weightKg}
-                          onChange={(v) => updateSet(ex.id, idx, { weightKg: v ?? 0 })}
-                          min={0}
-                          max={500}
-                          step={0.5}
-                          aria-label="Poids"
-                          className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
-                        />
-                      </label>
-                      {ex.sets.length > 1 ? (
+                    <div key={idx} className="space-y-1.5">
+                      <div className="grid grid-cols-[auto_1fr_1fr_auto] items-end gap-2">
+                        <span
+                          className={`pb-2 text-[11px] font-bold ${
+                            set.done ? 'text-[#30D158]' : 'text-[#8E8E93]'
+                          }`}
+                        >
+                          S{idx + 1}
+                        </span>
+                        <label className="block">
+                          <span className="mb-0.5 block text-[10px] text-[#636366]">Reps</span>
+                          <ClearableNumberInput
+                            value={set.reps}
+                            onChange={(v) =>
+                              updateSet(ex.id, idx, { reps: v != null ? Math.round(v) : 0 })
+                            }
+                            min={1}
+                            max={50}
+                            aria-label="Reps"
+                            className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="mb-0.5 block text-[10px] text-[#636366]">Poids kg</span>
+                          <ClearableNumberInput
+                            value={set.weightKg}
+                            onChange={(v) => updateSet(ex.id, idx, { weightKg: v ?? 0 })}
+                            min={0}
+                            max={500}
+                            step={0.5}
+                            aria-label="Poids"
+                            className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
+                          />
+                        </label>
+                        {ex.sets.length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateExercise(ex.id, {
+                                sets: ex.sets.filter((_, i) => i !== idx),
+                              })
+                            }
+                            className="mb-2 text-[#636366]"
+                            aria-label="Supprimer série"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        ) : (
+                          <span className="w-4" />
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 pl-6">
                         <button
                           type="button"
-                          onClick={() =>
-                            updateExercise(ex.id, {
-                              sets: ex.sets.filter((_, i) => i !== idx),
-                            })
-                          }
-                          className="mb-2 text-[#636366]"
-                          aria-label="Supprimer série"
+                          onClick={() => finishSet(ex, idx)}
+                          className={`ios-press rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                            set.done
+                              ? 'border-[#30D158]/35 bg-[#30D158]/12 text-[#30D158]'
+                              : 'border-[#FF2B2B]/35 bg-[#FF2B2B]/12 text-[#FF6961]'
+                          }`}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          {set.done ? 'Repos · Terminer' : 'Terminer la série'}
                         </button>
-                      ) : (
-                        <span className="w-4" />
-                      )}
+                        {set.restSec != null && set.restSec > 0 ? (
+                          <span className="text-[10px] font-medium tabular-nums text-[#636366]">
+                            Repos {set.restSec}s
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   ))}
                 </div>

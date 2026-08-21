@@ -144,6 +144,24 @@ body {
   will-change: transform, opacity;
 }
 
+@keyframes rest-timer-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
+}
+
+.rest-timer-pulse {
+  animation: rest-timer-pulse 0.85s ease-in-out infinite;
+}
+
+.rest-timer-panel {
+  animation: ios-fade-up 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
 .badge-unlocked {
   box-shadow:
     0 0 0 1px rgb(255 255 255 / 0.06),

@@ -31,6 +31,7 @@ import { TrainingAgenda } from './TrainingAgenda'
 import { WorkoutNotebook } from './WorkoutNotebook'
 import { OverloadCalculator } from './OverloadCalculator'
 import { EnduranceSessionCard } from './EnduranceSessionCard'
+import { RestTimerOverlay } from './RestTimerOverlay'
 import { IconBadge } from '../ui/IconBadge'
 import { IosSheet } from '../ui/IosSheet'
 import {
@@ -42,6 +43,7 @@ import {
   storeDisciplineId,
 } from '../../data/disciplines'
 import { useAuth } from '../../context/AuthContext'
+import { useRestTimer, type RestPresetSec } from '../../hooks/useRestTimer'
 
 export function TrainingView() {
   const { isLoading: isBootLoading } = useAuth()
@@ -52,6 +54,25 @@ export function TrainingView() {
   const [dueBanner, setDueBanner] = useState<string | null>(null)
   const [cardioOpen, setCardioOpen] = useState(false)
   const [durationMin, setDurationMin] = useState(40)
+  const [restLogRequest, setRestLogRequest] = useState<{
+    exerciseId: string
+    setIndex: number
+    restSec: number
+    addNextSet: boolean
+    nonce: number
+  } | null>(null)
+
+  const restTimer = useRestTimer({
+    onRestLogged: ({ target, restSec, skipped }) => {
+      setRestLogRequest({
+        exerciseId: target.exerciseId,
+        setIndex: target.setIndex,
+        restSec,
+        addNextSet: skipped,
+        nonce: Date.now(),
+      })
+    },
+  })
 
   const [disciplineTick, setDisciplineTick] = useState(0)
 
@@ -256,6 +277,10 @@ export function TrainingView() {
           bodyWeightKg={profile.weightKg}
           routines={state.routines}
           history={state.workoutNotes}
+          restLogRequest={restLogRequest}
+          onRestStart={(info) => {
+            restTimer.start(90, info)
+          }}
           onSave={(note) => {
             persist(saveWorkoutNote(note))
             showToast(`${note.title} sauvegardé · prochaines fois on le recharge`)
@@ -348,6 +373,19 @@ export function TrainingView() {
           {toast}
         </div>
       )}
+
+      {showStrengthTools ? (
+        <RestTimerOverlay
+          state={restTimer.state}
+          onPreset={(sec: RestPresetSec) => {
+            const target = restTimer.state.target
+            if (!target) return
+            restTimer.start(sec, target)
+          }}
+          onSkip={restTimer.skip}
+          onDismiss={restTimer.dismiss}
+        />
+      ) : null}
     </div>
   )
 }

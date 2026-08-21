@@ -66,6 +66,10 @@ export interface WorkoutSet {
   weightKg: number
   /** How hard it felt — used for safe progression */
   difficulty?: SetDifficulty
+  /** Set marked done via « Terminer la série ». */
+  done?: boolean
+  /** Seconds of rest logged after this set (rest timer). */
+  restSec?: number
 }
 
 export interface ExerciseEntry {
