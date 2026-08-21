@@ -1,7 +1,7 @@
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 import { compressMealImage } from '../utils/compressMealImage'
 
-export const AI_MEAL_DAILY_LIMIT = 3
+export const AI_MEAL_DAILY_LIMIT = 5
 
 export type MealPhotoMacros = {
   calories: number

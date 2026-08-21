@@ -1,5 +1,5 @@
 -- Ranked Gym — quotas Gemini (analyse photo repas)
--- 3 scans / jour / utilisateur (date Europe/Paris)
+-- 5 scans / jour / utilisateur (date Europe/Paris)
 
 create table if not exists public.ai_usage_limits (
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -32,7 +32,7 @@ as $$
 declare
   v_today date := (timezone('Europe/Paris', now()))::date;
   v_count integer;
-  v_limit constant integer := 3;
+  v_limit constant integer := 5;
 begin
   if p_user_id is null then
     return query select false, 0, v_limit;

@@ -42,7 +42,7 @@ export function MealPhotoAnalyzer({ mealType, onAnalyzed, onToast }: MealPhotoAn
       return
     }
     if (remaining === 0) {
-      onToast?.('Limite atteinte : 3 analyses photo / jour.')
+      onToast?.('Limite atteinte : 5 analyses photo / jour.')
       return
     }
     inputRef.current?.click()
@@ -95,17 +95,16 @@ export function MealPhotoAnalyzer({ mealType, onAnalyzed, onToast }: MealPhotoAn
         <div className="min-w-0 flex-1">
           <p className="text-[15px] font-semibold text-white">Photo → macros (Gemini)</p>
           <p className="mt-0.5 text-[12px] leading-snug text-[#8E8E93]">
-            Compression locale puis analyse sécurisée. Max 3 / jour
-            {remaining != null ? (
-              <>
-                {' '}
-                · reste{' '}
-                <span className={remaining === 0 ? 'text-[#FF453A]' : 'text-[#30D158]'}>
-                  {remaining}
-                </span>
-              </>
-            ) : null}
-            .
+            Compression locale puis analyse sécurisée.
+          </p>
+          <p
+            className={`mt-1 text-[12px] font-semibold tabular-nums ${
+              remaining === 0 ? 'text-[#FF453A]' : 'text-[#30D158]'
+            }`}
+          >
+            {remaining == null
+              ? 'Scans IA : —/5 restants aujourd’hui'
+              : `Scans IA : ${remaining}/5 restants aujourd’hui`}
           </p>
           <button
             type="button"

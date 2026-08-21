@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
   const reserve = Array.isArray(reserveRows) ? reserveRows[0] : reserveRows
   const allowed = Boolean(reserve?.allowed)
   const scanCount = Number(reserve?.scan_count ?? 0)
-  const dailyLimit = Number(reserve?.daily_limit ?? 3)
+  const dailyLimit = Number(reserve?.daily_limit ?? 5)
 
   if (!allowed) {
     return jsonResponse(
