@@ -90,7 +90,18 @@ body {
 }
 
 .rank-shine {
-  animation: card-shine 8s ease-in-out infinite;
+  animation: card-shine 5.5s ease-in-out infinite;
+}
+
+.rank-trading-card {
+  touch-action: pan-y;
+}
+
+.badge-unlocked {
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.06),
+    0 8px 28px rgb(0 0 0 / 0.25),
+    0 0 24px rgb(255 43 43 / 0.12);
 }
 
 @keyframes online-pulse {

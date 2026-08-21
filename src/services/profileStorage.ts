@@ -17,6 +17,8 @@ export interface StoredProfileProgress {
   level: number
   currentXp: number
   xpToNextLevel: number
+  /** PR épinglé sur le profil (vitrine). */
+  pinnedPr?: { exerciseName: string; weightKg: number } | null
 }
 
 const DEFAULT_PROGRESS: StoredProfileProgress = {
@@ -46,6 +48,15 @@ export function getProfileProgress(): StoredProfileProgress {
     level: stored.level ?? DEFAULT_PROGRESS.level,
     currentXp: stored.currentXp ?? DEFAULT_PROGRESS.currentXp,
     xpToNextLevel: stored.xpToNextLevel ?? DEFAULT_PROGRESS.xpToNextLevel,
+    pinnedPr:
+      stored.pinnedPr &&
+      typeof stored.pinnedPr.exerciseName === 'string' &&
+      typeof stored.pinnedPr.weightKg === 'number'
+        ? {
+            exerciseName: stored.pinnedPr.exerciseName,
+            weightKg: stored.pinnedPr.weightKg,
+          }
+        : null,
   }
 }
 
@@ -54,6 +65,21 @@ export function saveProfileProgress(
   opts?: StorageSaveOptions,
 ): void {
   writeJson(scopedKey(), progress, opts)
+}
+
+export function getPinnedPr(): { exerciseName: string; weightKg: number } | null {
+  return getProfileProgress().pinnedPr ?? null
+}
+
+export function setPinnedPr(
+  pinned: { exerciseName: string; weightKg: number } | null,
+  opts?: StorageSaveOptions,
+): void {
+  const current = getProfileProgress()
+  saveProfileProgress({ ...current, pinnedPr: pinned }, opts)
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('ranked-gym:pinned-pr-changed'))
+  }
 }
 
 export function getDefaultProfileProgress(): StoredProfileProgress {

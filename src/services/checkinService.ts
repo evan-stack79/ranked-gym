@@ -38,3 +38,15 @@ export async function listRecentCheckins(userId: string, limit = 20): Promise<Ch
   if (error) throw error
   return data ?? []
 }
+
+/** Nombre total de check-ins (Lobby) pour l’utilisateur. */
+export async function countCheckins(userId: string): Promise<number> {
+  const supabase = getSupabase()
+  const { count, error } = await supabase
+    .from('checkins')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+
+  if (error) throw error
+  return count ?? 0
+}
