@@ -104,7 +104,6 @@ export function FighterHeader({
             ref={inputRef}
             type="file"
             accept="image/*"
-            capture="user"
             className="sr-only"
             onChange={onFileChange}
             tabIndex={-1}
