@@ -28,7 +28,9 @@ interface WorkoutNotebookProps {
     durationMin: number
     totalVolumeKg: number
     routineId: string
-  }) => void
+  }) => void | Promise<void>
+  /** Autosave séries / exercices vers Supabase (routine draft). */
+  onDraftSave?: (routineId: string, exercises: ExerciseEntry[]) => void
   onDeleteNote: (id: string) => void
   onAddRoutine: (label: string) => void
   /** Démarre le timer de repos (validation Facile / OK / Dur). */
@@ -80,6 +82,7 @@ export function WorkoutNotebook({
   routines,
   history,
   onSave,
+  onDraftSave,
   onDeleteNote,
   onAddRoutine,
   onRestStart,
@@ -92,6 +95,7 @@ export function WorkoutNotebook({
   )
   const [customOpen, setCustomOpen] = useState(false)
   const [customLabel, setCustomLabel] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const activeRoutine = useMemo(
     () => routines.find((r) => r.id === routineId) ?? routines[0],
@@ -137,8 +141,8 @@ export function WorkoutNotebook({
   useEffect(() => {
     if (!restLogRequest) return
     const { exerciseId, setIndex, restSec, addNextSet } = restLogRequest
-    setExercises((prev) =>
-      prev.map((e) => {
+    setExercises((prev) => {
+      const next = prev.map((e) => {
         if (e.id !== exerciseId) return e
         const sets = e.sets.map((s, i) =>
           i === setIndex ? { ...s, done: true, restSec } : s,
@@ -158,14 +162,34 @@ export function WorkoutNotebook({
           }
         }
         return { ...e, sets }
-      }),
-    )
-  }, [restLogRequest])
+      })
+      onDraftSave?.(routineId, next)
+      return next
+    })
+  }, [restLogRequest, onDraftSave, routineId])
+
+  // Autosave debounced à chaque modification du carnet
+  useEffect(() => {
+    if (!onDraftSave) return
+    const t = window.setTimeout(() => {
+      onDraftSave(routineId, exercises)
+    }, 700)
+    return () => window.clearTimeout(t)
+  }, [exercises, routineId, onDraftSave])
 
   const finishSet = (ex: ExerciseEntry, setIndex: number, difficulty?: SetDifficulty) => {
-    updateSet(ex.id, setIndex, {
-      done: true,
-      ...(difficulty ? { difficulty } : {}),
+    setExercises((prev) => {
+      const next = prev.map((e) => {
+        if (e.id !== ex.id) return e
+        const sets = e.sets.map((s, i) =>
+          i === setIndex
+            ? { ...s, done: true, ...(difficulty ? { difficulty } : {}) }
+            : s,
+        )
+        return { ...e, sets }
+      })
+      onDraftSave?.(routineId, next)
+      return next
     })
     onRestStart?.({
       exerciseId: ex.id,
@@ -175,7 +199,7 @@ export function WorkoutNotebook({
     })
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const cleaned = exercises
       .map((e) => ({
         ...e,
@@ -184,20 +208,27 @@ export function WorkoutNotebook({
       }))
       .filter((e) => e.sets.length > 0)
     if (!cleaned.length) return
-    onSave({
-      title: title.trim() || activeRoutine?.label || 'Séance',
-      exercises: cleaned,
-      estimatedKcal: stats.kcal,
-      durationMin: stats.durationMin,
-      totalVolumeKg: stats.volume,
-      routineId,
-    })
-    // Keep the same focus open with what was just saved (progress stays visible)
-    setExercises(cleaned.map((e) => ({
-      ...e,
-      id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      sets: e.sets.map((s) => ({ ...s })),
-    })))
+    setSaving(true)
+    try {
+      await onSave({
+        title: title.trim() || activeRoutine?.label || 'Séance',
+        exercises: cleaned,
+        estimatedKcal: stats.kcal,
+        durationMin: stats.durationMin,
+        totalVolumeKg: stats.volume,
+        routineId,
+      })
+      // Keep the same focus open with what was just saved (progress stays visible)
+      setExercises(
+        cleaned.map((e) => ({
+          ...e,
+          id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          sets: e.sets.map((s) => ({ ...s })),
+        })),
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   const hasSaved = (activeRoutine?.exercises.length ?? 0) > 0
@@ -475,10 +506,13 @@ export function WorkoutNotebook({
           </button>
           <button
             type="button"
-            onClick={handleSave}
-            className="btn-brand ios-press flex-[1.4] rounded-2xl py-3 text-[13px] font-semibold text-white"
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="btn-brand ios-press flex-[1.4] rounded-2xl py-3 text-[13px] font-semibold text-white disabled:opacity-60"
           >
-            Sauver {activeRoutine?.label} · ~{stats.kcal} kcal
+            {saving
+              ? 'Envoi Supabase…'
+              : `Sauver ${activeRoutine?.label} · ~${stats.kcal} kcal`}
           </button>
         </div>
 

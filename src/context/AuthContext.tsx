@@ -160,8 +160,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       await hydrateCloudBackupForUser(authUser.id)
-    } catch {
-      // Cloud hydrate failed — UI still unlocks; local cache may be empty.
+    } catch (e) {
+      console.error('[auth] hydrateCloudBackupForUser failed:', e)
     }
   }, [])
 

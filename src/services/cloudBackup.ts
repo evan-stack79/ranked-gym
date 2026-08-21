@@ -190,16 +190,37 @@ function applyBackup(payload: CloudBackupPayload) {
   }
 }
 
+/** True only for missing-relation errors — never RLS / permission / network. */
 function isMissingTableError(message: string | undefined): boolean {
   const m = (message ?? '').toLowerCase()
+  if (!m) return false
+  // Do NOT match bare table names — RLS messages often contain "workouts".
   return (
-    m.includes('schema cache') ||
-    m.includes('does not exist') ||
     m.includes('could not find the table') ||
-    m.includes('workouts') ||
-    m.includes('nutrition') ||
-    m.includes('user_backups')
+    m.includes('schema cache') ||
+    (m.includes('relation') && m.includes('does not exist')) ||
+    (m.includes('table') && m.includes('does not exist'))
   )
+}
+
+function isRlsOrAuthError(message: string | undefined): boolean {
+  const m = (message ?? '').toLowerCase()
+  return (
+    m.includes('row-level security') ||
+    m.includes('row level security') ||
+    m.includes('violates row-level') ||
+    m.includes('permission denied') ||
+    m.includes('jwt') ||
+    m.includes('not authenticated')
+  )
+}
+
+function emitBackupEvent(
+  name: 'ranked-gym:backup-saved' | 'ranked-gym:backup-error',
+  detail?: { error?: string; source?: string },
+) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(name, { detail }))
 }
 
 function asObject(value: unknown): Record<string, unknown> | null {
@@ -273,10 +294,11 @@ function hasMeaningfulCloudData(payload: CloudBackupPayload): boolean {
   const notes = (payload.training?.workoutNotes?.length ?? 0) > 0
   const completed = (payload.training?.completed?.length ?? 0) > 0
   const schedule = (payload.training?.schedule?.length ?? 0) > 0
+  const routines = (payload.training?.routines ?? []).some((r) => (r.exercises?.length ?? 0) > 0)
   const onboarded = Boolean(payload.nutrition.profile?.onboardingComplete)
   const spots = (payload.lobby?.customGyms?.length ?? 0) > 0
   const checkIn = Boolean(payload.lobby?.checkIn?.gym)
-  return meals || notes || completed || schedule || onboarded || spots || checkIn
+  return meals || notes || completed || schedule || routines || onboarded || spots || checkIn
 }
 
 async function fetchRemotePayload(userId: string): Promise<{
@@ -360,72 +382,106 @@ async function upsertTables(userId: string, payload: CloudBackupPayload): Promis
   const now = payload.updatedAt || new Date().toISOString()
   const json = (v: unknown) => v as Json
 
-  const [nutritionRes, workoutsRes, profileRes] = await Promise.all([
-    supabase.from('nutrition').upsert(
-      {
-        user_id: userId,
-        profile: json(payload.nutrition.profile ?? {}),
-        journal: json(payload.nutrition.journal ?? {}),
-        updated_at: now,
-      },
-      { onConflict: 'user_id' },
-    ),
-    supabase.from('workouts').upsert(
-      {
-        user_id: userId,
-        state: json(payload.training ?? {}),
-        progress: json(payload.profileProgress ?? {}),
-        updated_at: now,
-      },
-      { onConflict: 'user_id' },
-    ),
-    supabase
-      .from('profiles')
-      .update({
-        custom_spots: json(payload.lobby?.customGyms ?? []),
-        active_checkin: json(payload.lobby?.checkIn ?? null),
-        updated_at: now,
-      })
-      .eq('id', userId),
-  ])
-
-  const err =
-    nutritionRes.error?.message || workoutsRes.error?.message || profileRes.error?.message
-
-  if (err) {
-    if (isMissingTableError(err)) {
-      // Fallback: keep writing legacy blob so data is not lost before SQL migration
-      const { error } = await supabase.from('user_backups').upsert(
+  try {
+    const [nutritionRes, workoutsRes, profileRes] = await Promise.all([
+      supabase.from('nutrition').upsert(
         {
           user_id: userId,
-          payload: json(payload),
+          profile: json(payload.nutrition.profile ?? {}),
+          journal: json(payload.nutrition.journal ?? {}),
           updated_at: now,
         },
         { onConflict: 'user_id' },
-      )
-      if (error) {
+      ),
+      supabase.from('workouts').upsert(
+        {
+          user_id: userId,
+          state: json(payload.training ?? {}),
+          progress: json(payload.profileProgress ?? {}),
+          updated_at: now,
+        },
+        { onConflict: 'user_id' },
+      ),
+      supabase
+        .from('profiles')
+        .update({
+          custom_spots: json(payload.lobby?.customGyms ?? []),
+          active_checkin: json(payload.lobby?.checkIn ?? null),
+          updated_at: now,
+        })
+        .eq('id', userId),
+    ])
+
+    const parts: { table: string; message: string }[] = []
+    if (nutritionRes.error?.message) {
+      parts.push({ table: 'nutrition', message: nutritionRes.error.message })
+    }
+    if (workoutsRes.error?.message) {
+      parts.push({ table: 'workouts', message: workoutsRes.error.message })
+    }
+    if (profileRes.error?.message) {
+      parts.push({ table: 'profiles', message: profileRes.error.message })
+    }
+
+    if (parts.length > 0) {
+      for (const p of parts) {
+        console.error(`[cloudBackup] upsert ${p.table} failed:`, p.message)
+      }
+
+      const workoutsErr = workoutsRes.error?.message
+      // Train data lives in workouts — surface that first
+      const primary = workoutsErr || parts[0]?.message || 'Erreur Supabase'
+
+      if (workoutsErr && isRlsOrAuthError(workoutsErr)) {
         return {
-          error: isMissingTableError(error.message)
-            ? 'Tables manquantes : exécute supabase/schema.sql dans le SQL Editor Supabase.'
-            : error.message,
+          error:
+            'RLS bloque l’écriture workouts (INSERT/UPDATE). Exécute la migration workouts_rls_write_fix.sql.',
         }
       }
-      return {}
+
+      const allMissing = parts.every((p) => isMissingTableError(p.message))
+      if (allMissing) {
+        const { error } = await supabase.from('user_backups').upsert(
+          {
+            user_id: userId,
+            payload: json(payload),
+            updated_at: now,
+          },
+          { onConflict: 'user_id' },
+        )
+        if (error) {
+          console.error('[cloudBackup] fallback user_backups failed:', error.message)
+          return {
+            error: isMissingTableError(error.message)
+              ? 'Tables manquantes : exécute supabase/schema.sql dans le SQL Editor Supabase.'
+              : error.message,
+          }
+        }
+        console.warn('[cloudBackup] tables manquantes — écriture via user_backups uniquement')
+        return {}
+      }
+
+      return { error: primary }
     }
-    return { error: err }
+
+    const { error: mirrorError } = await supabase.from('user_backups').upsert(
+      {
+        user_id: userId,
+        payload: json(payload),
+        updated_at: now,
+      },
+      { onConflict: 'user_id' },
+    )
+    if (mirrorError) {
+      console.warn('[cloudBackup] mirror user_backups failed (non-bloquant):', mirrorError.message)
+    }
+
+    return {}
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Erreur upsert cloud'
+    console.error('[cloudBackup] upsertTables exception:', e)
+    return { error: msg }
   }
-
-  // Also mirror to legacy blob for safety during transition
-  void supabase.from('user_backups').upsert(
-    {
-      user_id: userId,
-      payload: json(payload),
-      updated_at: now,
-    },
-    { onConflict: 'user_id' },
-  )
-
-  return {}
 }
 
 export async function pushCloudBackup(
@@ -448,7 +504,9 @@ export async function pushCloudBackup(
     const payload = collectLocalBackup()
     const { error } = await upsertTables(uid, payload)
     if (error) {
+      console.error('[cloudBackup] pushCloudBackup failed:', error)
       setMeta({ pending: false, lastError: error })
+      emitBackupEvent('ranked-gym:backup-error', { error, source: 'push' })
       return { ok: false, error }
     }
     setMeta({
@@ -456,10 +514,13 @@ export async function pushCloudBackup(
       lastPushAt: new Date().toISOString(),
       lastError: null,
     })
+    emitBackupEvent('ranked-gym:backup-saved', { source: 'push' })
     return { ok: true }
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erreur de sauvegarde'
+    console.error('[cloudBackup] pushCloudBackup exception:', e)
     setMeta({ pending: false, lastError: msg })
+    emitBackupEvent('ranked-gym:backup-error', { error: msg, source: 'push' })
     return { ok: false, error: msg }
   } finally {
     pushing = false
@@ -489,7 +550,9 @@ export async function pullCloudBackup(
   try {
     const { payload: remote, error } = await fetchRemotePayload(uid)
     if (error) {
+      console.error('[cloudBackup] pullCloudBackup failed:', error)
       setMeta({ lastError: error })
+      emitBackupEvent('ranked-gym:backup-error', { error, source: 'pull' })
       return { ok: false, applied: false, error }
     }
 
@@ -511,7 +574,9 @@ export async function pullCloudBackup(
     return { ok: true, applied: false }
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erreur de restauration'
+    console.error('[cloudBackup] pullCloudBackup exception:', e)
     setMeta({ lastError: msg })
+    emitBackupEvent('ranked-gym:backup-error', { error: msg, source: 'pull' })
     return { ok: false, applied: false, error: msg }
   }
 }
@@ -527,12 +592,31 @@ export function scheduleCloudPush(userId: string | null | undefined) {
 }
 
 export function flushCloudPush() {
-  if (!activeUserId || !cloudSyncReady || !isSupabaseConfigured()) return
+  void flushCloudPushAsync()
+}
+
+/** Flush immédiat — retourne le résultat (pour toasts Train / Sauver). */
+export async function flushCloudPushAsync(): Promise<{ ok: boolean; error?: string }> {
+  if (!activeUserId) {
+    const error = 'Connecte-toi pour sauvegarder dans Supabase.'
+    console.error('[cloudBackup] flush:', error)
+    return { ok: false, error }
+  }
+  if (!isSupabaseConfigured()) {
+    const error = 'Supabase non configuré (VITE_SUPABASE_URL / ANON_KEY).'
+    console.error('[cloudBackup] flush:', error)
+    return { ok: false, error }
+  }
+  if (!cloudSyncReady) {
+    deferredPush = true
+    setMeta({ pending: true })
+    return { ok: false, error: 'Sync cloud pas encore prête — nouvel essai après hydratation.' }
+  }
   if (pushTimer) {
     clearTimeout(pushTimer)
     pushTimer = null
   }
-  void pushCloudBackup(activeUserId)
+  return pushCloudBackup(activeUserId)
 }
 
 function wireLifecycleOnce() {

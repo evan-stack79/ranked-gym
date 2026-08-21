@@ -387,6 +387,45 @@ export function saveWorkoutNote(
   return next
 }
 
+/**
+ * Autosave carnet en cours → routines (local + cloud).
+ * Les séries validées ne restent plus uniquement en mémoire React.
+ */
+export function saveRoutineDraft(
+  routineId: string,
+  exercises: ExerciseEntry[],
+): TrainingState {
+  const state = read()
+  const cleaned = exercises
+    .map((e) => ({
+      ...e,
+      name: e.name.trim() || 'Exercice',
+      sets: e.sets.filter((s) => s.reps > 0 && s.weightKg >= 0).map((s) => ({ ...s })),
+    }))
+    .filter((e) => e.sets.length > 0)
+
+  // Ignore placeholder vide (évite d’écraser une routine au montage)
+  const meaningful = cleaned.some(
+    (e) =>
+      (e.name && e.name !== 'Exercice') ||
+      e.sets.some((s) => s.done || s.restSec != null || s.weightKg !== 20 || s.reps !== 8),
+  )
+  if (!meaningful) return state
+
+  const routines = state.routines.map((r) =>
+    r.id === routineId
+      ? {
+          ...r,
+          exercises: cleaned,
+          updatedAt: Date.now(),
+        }
+      : r,
+  )
+  const next = { ...state, routines }
+  write(next)
+  return next
+}
+
 export function addCustomRoutine(label: string): TrainingState {
   const state = read()
   const id = `custom-${Date.now()}`

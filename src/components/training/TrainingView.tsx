@@ -8,6 +8,7 @@ import {
   removeWorkoutNote,
   saveTrainingState,
   saveWorkoutNote,
+  saveRoutineDraft,
   addCustomRoutine,
   setHealthLinked,
   setNotificationsEnabled,
@@ -16,6 +17,7 @@ import {
   todayWorkoutKcal,
   upsertSchedule,
 } from '../../services/trainingStorage'
+import { flushCloudPushAsync } from '../../services/cloudBackup'
 import { connectHealthIntent } from '../../services/healthSteps'
 import { startReminderWatcher } from '../../services/reminderService'
 import { getCalorieProfile } from '../../services/nutritionStorage'
@@ -46,7 +48,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useRestTimer, type RestPresetSec } from '../../hooks/useRestTimer'
 
 export function TrainingView() {
-  const { isLoading: isBootLoading } = useAuth()
+  const { isLoading: isBootLoading, isAuthenticated, requireAuth } = useAuth()
   const [state, setState] = useState<TrainingState>(() => getTrainingState())
   const [profileTick, setProfileTick] = useState(0)
   const [sportOpen, setSportOpen] = useState(false)
@@ -132,9 +134,49 @@ export function TrainingView() {
 
   useEffect(() => {
     const onRestored = () => setState(getTrainingState())
+    const onBackupError = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ error?: string }>).detail
+      const msg = detail?.error || 'Échec sauvegarde Supabase'
+      console.error('[Train] backup error:', msg)
+      showToast(`Cloud : ${msg}`)
+    }
     window.addEventListener('ranked-gym:backup-restored', onRestored)
-    return () => window.removeEventListener('ranked-gym:backup-restored', onRestored)
-  }, [])
+    window.addEventListener('ranked-gym:backup-error', onBackupError)
+    return () => {
+      window.removeEventListener('ranked-gym:backup-restored', onRestored)
+      window.removeEventListener('ranked-gym:backup-error', onBackupError)
+    }
+  }, [showToast])
+
+  const persistDraft = useCallback(
+    (routineId: string, exercises: TrainingState['routines'][number]['exercises']) => {
+      const next = saveRoutineDraft(routineId, exercises)
+      setState(next)
+    },
+    [],
+  )
+
+  const persistAndSyncNote = useCallback(
+    async (note: Parameters<typeof saveWorkoutNote>[0]) => {
+      const next = saveWorkoutNote(note)
+      setState(next)
+
+      if (!isAuthenticated) {
+        showToast(`${note.title} sauvé en local — connecte-toi pour Supabase`)
+        requireAuth(() => undefined)
+        return
+      }
+
+      const result = await flushCloudPushAsync()
+      if (result.ok) {
+        showToast(`${note.title} → Supabase OK`)
+      } else {
+        console.error('[Train] Sauver cloud failed:', result.error)
+        showToast(`Échec cloud : ${result.error ?? 'inconnu'}`)
+      }
+    },
+    [isAuthenticated, requireAuth, showToast],
+  )
 
   useEffect(() => {
     const syncProfile = () => setProfileTick((t) => t + 1)
@@ -287,10 +329,8 @@ export function TrainingView() {
           onRestStart={(info) => {
             restTimer.start(90, info)
           }}
-          onSave={(note) => {
-            persist(saveWorkoutNote(note))
-            showToast(`${note.title} sauvegardé · prochaines fois on le recharge`)
-          }}
+          onDraftSave={persistDraft}
+          onSave={(note) => persistAndSyncNote(note)}
           onDeleteNote={(id) => {
             persist(removeWorkoutNote(id))
           }}
