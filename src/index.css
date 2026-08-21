@@ -89,22 +89,22 @@ body {
   }
 }
 
-/* Shine diagonal trading-card — cycle ~3s (pause entre passages) */
+/* Shine diagonal trading-card — cycle ~7s, passage lent et discret */
 @keyframes rank-holo-shine {
   0% {
-    transform: translate(-130%, -10%) rotate(28deg);
+    transform: translate(-140%, -12%) rotate(28deg);
     opacity: 0;
   }
-  8% {
+  12% {
     opacity: 1;
   }
-  42% {
-    transform: translate(130%, 10%) rotate(28deg);
+  48% {
+    transform: translate(140%, 12%) rotate(28deg);
     opacity: 1;
   }
-  50%,
+  58%,
   100% {
-    transform: translate(130%, 10%) rotate(28deg);
+    transform: translate(140%, 12%) rotate(28deg);
     opacity: 0;
   }
 }
@@ -127,20 +127,20 @@ body {
   position: absolute;
   top: -20%;
   left: 0;
-  width: 48%;
+  width: 42%;
   height: 140%;
   pointer-events: none;
   background: linear-gradient(
     105deg,
     transparent 0%,
-    transparent 35%,
-    rgba(255, 255, 255, 0.04) 45%,
-    rgba(255, 255, 255, 0.14) 50%,
-    rgba(255, 255, 255, 0.04) 55%,
-    transparent 65%,
+    transparent 38%,
+    rgba(255, 255, 255, 0.02) 46%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.02) 54%,
+    transparent 62%,
     transparent 100%
   );
-  animation: rank-holo-shine 3s ease-in-out infinite;
+  animation: rank-holo-shine 7s cubic-bezier(0.4, 0.0, 0.2, 1) infinite;
   will-change: transform, opacity;
 }
 

@@ -50,9 +50,9 @@ export function RankShowcase({ rank, level }: RankShowcaseProps) {
     const rect = el.getBoundingClientRect()
     const px = (clientX - rect.left) / Math.max(rect.width, 1)
     const py = (clientY - rect.top) / Math.max(rect.height, 1)
-    // Inclinaison vers le doigt (profondeur trading card)
-    const ry = (px - 0.5) * 18
-    const rx = (0.5 - py) * 14
+    // Inclinaison douce vers le doigt (profondeur trading card)
+    const ry = (px - 0.5) * 12
+    const rx = (0.5 - py) * 10
     setTilt({
       rx,
       ry,
@@ -62,12 +62,12 @@ export function RankShowcase({ rank, level }: RankShowcaseProps) {
     })
   }, [])
 
-  const haloStrength = tilt.active ? 0.72 : 0.48
-  const haloSpread = tilt.active ? 56 : 40
+  const haloStrength = tilt.active ? 0.58 : 0.42
+  const haloSpread = tilt.active ? 48 : 40
   const dynamicGlow = [
     `0 0 ${haloSpread}px rgba(${visual.haloRgb}, ${haloStrength})`,
-    `0 0 ${haloSpread * 1.6}px rgba(${visual.haloRgb}, ${haloStrength * 0.35})`,
-    `0 18px 40px rgba(0, 0, 0, 0.45)`,
+    `0 0 ${haloSpread * 1.5}px rgba(${visual.haloRgb}, ${haloStrength * 0.28})`,
+    `0 18px 40px rgba(0, 0, 0, 0.4)`,
     `inset 0 1px 0 rgba(255, 255, 255, 0.28)`,
   ].join(', ')
 
@@ -81,11 +81,11 @@ export function RankShowcase({ rank, level }: RankShowcaseProps) {
           boxShadow: dynamicGlow,
           borderColor: 'transparent',
           transform: `perspective(1000px) rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg) scale(${
-            tilt.active ? 1.025 : 1
+            tilt.active ? 1.015 : 1
           })`,
           transition: tilt.active
-            ? 'transform 70ms linear, box-shadow 180ms ease-out'
-            : 'transform 480ms cubic-bezier(0.32, 0.72, 0, 1), box-shadow 420ms ease-out',
+            ? 'transform 140ms ease-out, box-shadow 280ms ease-out'
+            : 'transform 650ms cubic-bezier(0.32, 0.72, 0, 1), box-shadow 550ms ease-out',
           transformStyle: 'preserve-3d',
           willChange: 'transform, box-shadow',
         }}
@@ -111,23 +111,24 @@ export function RankShowcase({ rank, level }: RankShowcaseProps) {
 
         {/* Foil holographique subtil (réagit au tilt) */}
         <div
-          className="pointer-events-none absolute inset-0 rounded-3xl opacity-40 mix-blend-soft-light"
+          className="pointer-events-none absolute inset-0 rounded-3xl opacity-28 mix-blend-soft-light"
           style={{
             background: `
               linear-gradient(
-                ${115 + tilt.ry * 2}deg,
-                transparent 20%,
-                rgba(255,255,255,0.08) 40%,
-                rgba(255,200,150,0.12) 50%,
-                rgba(180,220,255,0.1) 60%,
-                transparent 80%
+                ${115 + tilt.ry * 1.5}deg,
+                transparent 22%,
+                rgba(255,255,255,0.05) 42%,
+                rgba(255,200,150,0.08) 50%,
+                rgba(180,220,255,0.06) 58%,
+                transparent 78%
               )
             `,
+            transition: 'background 200ms ease-out',
           }}
           aria-hidden
         />
 
-        {/* Shine diagonal toutes les ~3s */}
+        {/* Shine diagonal ~7s, lent et discret */}
         <div
           className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl"
           aria-hidden
@@ -137,13 +138,13 @@ export function RankShowcase({ rank, level }: RankShowcaseProps) {
 
         {/* Glare sous le doigt / curseur */}
         <div
-          className="pointer-events-none absolute inset-0 rounded-3xl transition-opacity duration-200"
+          className="pointer-events-none absolute inset-0 rounded-3xl transition-opacity duration-300 ease-out"
           style={{
-            opacity: tilt.active ? 0.7 : 0,
+            opacity: tilt.active ? 0.45 : 0,
             background: `radial-gradient(
               circle at ${tilt.glareX}% ${tilt.glareY}%,
-              rgba(255, 255, 255, 0.32) 0%,
-              rgba(255, 255, 255, 0.08) 28%,
+              rgba(255, 255, 255, 0.22) 0%,
+              rgba(255, 255, 255, 0.05) 30%,
               transparent 58%
             )`,
           }}
