@@ -13,8 +13,13 @@ export interface CalorieProfile {
   sex: Sex
   activity: ActivityLevel
   morphology: BodyMorphology
-  /** Derived from current vs goal weight, but overridable */
+  /** Explicit user choice: cut | maintain | bulk */
   goal: NutritionGoal
+  /**
+   * Absolute weekly pace in kg/week chosen by the user (e.g. 0.5).
+   * Sign is applied from `goal` (negative on cut, positive on bulk).
+   */
+  weeklyPaceKg: number
   onboardingComplete: boolean
 }
 

@@ -1,12 +1,10 @@
 import type {
   ActivityLevel,
-  BodyMorphology,
   CalorieProfile,
   CalorieResult,
   NutritionGoal,
   Sex,
 } from '../types/nutrition'
-import { computeWeightPace } from './weightPace'
 
 const ACTIVITY_MULTIPLIER: Record<ActivityLevel, number> = {
   sedentary: 1.2,
@@ -22,7 +20,7 @@ export function computeBmr(weightKg: number, heightCm: number, age: number, sex:
   return Math.round(sex === 'male' ? base + 5 : base - 161)
 }
 
-/** Infer cut / maintain / bulk from current vs goal weight. */
+/** Fallback only — prefer the explicit `goal` saved on the profile. */
 export function inferGoalFromWeights(currentKg: number, goalKg: number): NutritionGoal {
   const delta = goalKg - currentKg
   if (Math.abs(delta) < 0.5) return 'maintain'
@@ -30,24 +28,23 @@ export function inferGoalFromWeights(currentKg: number, goalKg: number): Nutriti
 }
 
 /**
- * Calorie adjustment using health/aesthetic weekly pace.
+ * Calorie adjustment from the user's explicit goal + weekly pace (kg/week).
  */
 export function calorieAdjustmentForGoal(
-  currentKg: number,
-  goalKg: number,
+  profile: CalorieProfile,
   tdee: number,
-  morphology: BodyMorphology = 'mesomorph',
 ): { goal: NutritionGoal; targetCalories: number; weeklyChangeKg: number } {
-  const pace = computeWeightPace({ currentKg, goalKg, morphology })
-  const goal = pace.goal
-  const weeklyChangeKg = pace.weeklyKg
+  const goal = profile.goal
+  const paceMag = Math.max(0, parseFloat(String(profile.weeklyPaceKg || 0)) || 0)
 
-  if (goal === 'maintain') {
-    return { goal, targetCalories: tdee, weeklyChangeKg: 0 }
+  if (goal === 'maintain' || paceMag === 0) {
+    return { goal: 'maintain', targetCalories: tdee, weeklyChangeKg: 0 }
   }
 
+  const weeklyChangeKg = goal === 'cut' ? -paceMag : paceMag
+
   if (goal === 'cut') {
-    const dailyDeficit = Math.round((Math.abs(weeklyChangeKg) * 7700) / 7)
+    const dailyDeficit = Math.round((paceMag * 7700) / 7)
     const cappedDeficit = Math.min(dailyDeficit, Math.round(tdee * 0.25))
     return {
       goal,
@@ -56,7 +53,7 @@ export function calorieAdjustmentForGoal(
     }
   }
 
-  const dailySurplus = Math.round((weeklyChangeKg * 7700) / 7)
+  const dailySurplus = Math.round((paceMag * 7700) / 7)
   const cappedSurplus = Math.min(dailySurplus, Math.round(tdee * 0.15))
   return {
     goal,
@@ -66,22 +63,22 @@ export function calorieAdjustmentForGoal(
 }
 
 export function computeCaloriePlan(profile: CalorieProfile): CalorieResult {
-  const bmr = computeBmr(profile.weightKg, profile.heightCm, profile.age, profile.sex)
-  const tdee = Math.round(bmr * ACTIVITY_MULTIPLIER[profile.activity])
-  const { goal, targetCalories, weeklyChangeKg } = calorieAdjustmentForGoal(
-    profile.weightKg,
-    profile.goalWeightKg,
-    tdee,
-    profile.morphology,
-  )
+  const weight = parseFloat(String(profile.weightKg)) || 0
+  const height = parseFloat(String(profile.heightCm)) || 0
+  const age = parseFloat(String(profile.age)) || 0
+  const goalWeight = parseFloat(String(profile.goalWeightKg)) || weight
 
-  const proteinG = Math.round(profile.weightKg * (goal === 'cut' ? 2.2 : 2))
+  const bmr = computeBmr(weight, height, age, profile.sex)
+  const tdee = Math.round(bmr * ACTIVITY_MULTIPLIER[profile.activity])
+  const { goal, targetCalories, weeklyChangeKg } = calorieAdjustmentForGoal(profile, tdee)
+
+  const proteinG = Math.round(weight * (goal === 'cut' ? 2.2 : 2))
   const fatG = Math.round((targetCalories * 0.25) / 9)
   const carbsG = Math.max(0, Math.round((targetCalories - proteinG * 4 - fatG * 9) / 4))
-  const deltaKg = Math.round((profile.goalWeightKg - profile.weightKg) * 10) / 10
+  const deltaKg = Math.round((goalWeight - weight) * 10) / 10
 
   let estimatedWeeks: number | null = null
-  if (weeklyChangeKg !== 0) {
+  if (weeklyChangeKg !== 0 && deltaKg !== 0) {
     estimatedWeeks = Math.max(1, Math.ceil(Math.abs(deltaKg) / Math.abs(weeklyChangeKg)))
   }
 
@@ -139,8 +136,10 @@ export const ACTIVITY_ORDER: ActivityLevel[] = [
 export const GOAL_LABELS: Record<NutritionGoal, string> = {
   cut: 'Sèche',
   maintain: 'Maintien',
-  bulk: 'Prise',
+  bulk: 'Prise de masse',
 }
+
+export const WEEKLY_PACE_OPTIONS_KG = [0.2, 0.3, 0.4, 0.5, 0.6, 0.75] as const
 
 export const MEAL_TYPE_LABELS: Record<string, string> = {
   breakfast: 'Petit-déj',

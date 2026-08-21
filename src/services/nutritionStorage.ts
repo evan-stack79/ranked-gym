@@ -1,5 +1,5 @@
-import type { CalorieProfile, DayJournal, MealEntry } from '../types/nutrition'
-import { inferGoalFromWeights, todayKey } from '../utils/calories'
+import type { CalorieProfile, DayJournal, MealEntry, NutritionGoal } from '../types/nutrition'
+import { todayKey } from '../utils/calories'
 import { getActiveCloudUserId } from './cloudSession'
 
 const PROFILE_BASE = 'ranked-gym:nutrition-profile'
@@ -16,17 +16,24 @@ function scopedKey(base: string): string {
   return uid ? `${base}:u:${uid}` : base
 }
 
-export const DEFAULT_PROFILE: CalorieProfile = {
-  weightKg: 70,
-  goalWeightKg: 65,
-  heightCm: 170,
-  age: 24,
+/** Empty shell for first-time onboarding — never auto-pushed as “real” data. */
+export const BLANK_PROFILE: CalorieProfile = {
+  weightKg: 0,
+  goalWeightKg: 0,
+  heightCm: 0,
+  age: 0,
   sex: 'male',
   activity: 'moderate',
   morphology: 'mesomorph',
-  goal: 'cut',
+  goal: 'maintain',
+  weeklyPaceKg: 0.5,
   onboardingComplete: false,
 }
+
+/** @deprecated Use BLANK_PROFILE — kept for imports that still reference the name. */
+export const DEFAULT_PROFILE = BLANK_PROFILE
+
+const VALID_GOALS: NutritionGoal[] = ['cut', 'maintain', 'bulk']
 
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -42,27 +49,79 @@ function writeJson<T>(key: string, value: T): void {
   localStorage.setItem(key, JSON.stringify(value))
 }
 
-export function getCalorieProfile(): CalorieProfile {
-  const stored = readJson<Partial<CalorieProfile>>(scopedKey(PROFILE_BASE), {})
-  const merged: CalorieProfile = {
-    ...DEFAULT_PROFILE,
-    ...stored,
-    goalWeightKg: stored.goalWeightKg ?? stored.weightKg ?? DEFAULT_PROFILE.goalWeightKg,
-    morphology: stored.morphology ?? DEFAULT_PROFILE.morphology,
-    onboardingComplete: Boolean(stored.onboardingComplete),
+function asFiniteNumber(value: unknown, fallback: number): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = parseFloat(value.replace(',', '.'))
+    if (Number.isFinite(n)) return n
   }
-  merged.goal = inferGoalFromWeights(merged.weightKg, merged.goalWeightKg)
-  return merged
+  return fallback
+}
+
+function normalizeGoal(value: unknown, fallback: NutritionGoal): NutritionGoal {
+  return typeof value === 'string' && VALID_GOALS.includes(value as NutritionGoal)
+    ? (value as NutritionGoal)
+    : fallback
+}
+
+/** Persist exactly what the user entered — no mock overwrite. */
+export function normalizeCalorieProfile(input: CalorieProfile): CalorieProfile {
+  const goal = normalizeGoal(input.goal, 'maintain')
+  const weeklyPaceKg =
+    goal === 'maintain'
+      ? 0
+      : Math.max(0.1, Math.min(1.5, asFiniteNumber(input.weeklyPaceKg, 0.5)))
+
+  return {
+    weightKg: asFiniteNumber(input.weightKg, 0),
+    goalWeightKg: asFiniteNumber(input.goalWeightKg, 0),
+    heightCm: asFiniteNumber(input.heightCm, 0),
+    age: Math.round(asFiniteNumber(input.age, 0)),
+    sex: input.sex === 'female' ? 'female' : 'male',
+    activity: input.activity || 'moderate',
+    morphology: input.morphology || 'mesomorph',
+    goal,
+    weeklyPaceKg,
+    onboardingComplete: Boolean(input.onboardingComplete),
+  }
+}
+
+export function getCalorieProfile(): CalorieProfile {
+  const stored = readJson<Partial<CalorieProfile> | null>(scopedKey(PROFILE_BASE), null)
+  if (!stored || typeof stored !== 'object') {
+    return { ...BLANK_PROFILE }
+  }
+
+  const hasAnyUserData =
+    Boolean(stored.onboardingComplete) ||
+    asFiniteNumber(stored.weightKg, 0) > 0 ||
+    asFiniteNumber(stored.goalWeightKg, 0) > 0 ||
+    asFiniteNumber(stored.heightCm, 0) > 0 ||
+    asFiniteNumber(stored.age, 0) > 0
+
+  if (!hasAnyUserData) {
+    return { ...BLANK_PROFILE }
+  }
+
+  return normalizeCalorieProfile({
+    weightKg: asFiniteNumber(stored.weightKg, 0),
+    goalWeightKg: asFiniteNumber(stored.goalWeightKg, asFiniteNumber(stored.weightKg, 0)),
+    heightCm: asFiniteNumber(stored.heightCm, 0),
+    age: asFiniteNumber(stored.age, 0),
+    sex: stored.sex === 'female' ? 'female' : 'male',
+    activity: stored.activity || 'moderate',
+    morphology: stored.morphology || 'mesomorph',
+    goal: normalizeGoal(stored.goal, 'maintain'),
+    weeklyPaceKg: asFiniteNumber(stored.weeklyPaceKg, 0.5),
+    onboardingComplete: Boolean(stored.onboardingComplete),
+  })
 }
 
 export function saveCalorieProfile(
   profile: CalorieProfile,
   opts?: StorageSaveOptions,
 ): void {
-  const next = {
-    ...profile,
-    goal: inferGoalFromWeights(profile.weightKg, profile.goalWeightKg),
-  }
+  const next = normalizeCalorieProfile(profile)
   writeJson(scopedKey(PROFILE_BASE), next)
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('ranked-gym:profile-changed'))

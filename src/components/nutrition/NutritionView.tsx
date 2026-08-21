@@ -39,17 +39,17 @@ export function NutritionView() {
     }
   }, [])
 
-  useEffect(() => {
-    if (!hydrated) return
-    saveCalorieProfile(profile)
-  }, [profile, hydrated])
-
+  // Only persist when the user (or cloud restore) actually changes the profile.
+  // Never auto-push blank mock defaults (70kg / age 24) on first mount.
   const handleProfileChange = useCallback((next: CalorieProfile) => {
     setProfile(next)
+    saveCalorieProfile(next)
   }, [])
 
   const resetOnboarding = () => {
-    setProfile({ ...profile, onboardingComplete: false })
+    const next = { ...profile, onboardingComplete: false }
+    setProfile(next)
+    saveCalorieProfile(next)
   }
 
   if (!hydrated) return null

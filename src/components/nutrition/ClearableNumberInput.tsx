@@ -67,12 +67,12 @@ export function ClearableNumberInput({
             if (!required) onChange(null)
             return
           }
-          const next = Number(raw)
+          const next = parseFloat(raw)
           if (!Number.isNaN(next)) onChange(next)
         }}
         onBlur={() => {
           setFocused(false)
-          const parsed = Number(text)
+          const parsed = parseFloat(text)
           if (text === '' || text === '.' || Number.isNaN(parsed)) {
             if (required) {
               setText(formatValue(value, step))

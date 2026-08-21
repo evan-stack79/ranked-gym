@@ -16,18 +16,24 @@ export interface WeightPacePlan {
 }
 
 /**
- * Sustainable weekly rate — health first, cleaner physique (less stretch-mark risk on bulk).
+ * Weekly rate — uses the user's explicit goal + pace when provided.
  */
 export function computeWeightPace(options: {
   currentKg: number
   goalKg: number
   morphology: BodyMorphology
+  goal?: NutritionGoal
+  weeklyPaceKg?: number
 }): WeightPacePlan {
   const { currentKg, goalKg, morphology } = options
   const delta = goalKg - currentKg
   const abs = Math.abs(delta)
 
-  if (abs < 0.4) {
+  const goal: NutritionGoal =
+    options.goal ??
+    (abs < 0.4 ? 'maintain' : delta < 0 ? 'cut' : 'bulk')
+
+  if (goal === 'maintain') {
     return {
       goal: 'maintain',
       weeklyKg: 0,
@@ -35,14 +41,40 @@ export function computeWeightPace(options: {
       weeklyMaxKg: 0,
       estimatedWeeks: null,
       weeklyPct: 0,
-      headline: 'Tu es sur ton poids cible',
+      headline: 'Maintien — calories au TDEE',
       healthTip: 'Maintiens calories + entraînement. Les petites variations jour à jour sont normales.',
       aestheticTip: 'Priorité qualité (protéines, sommeil) plutôt que le chiffre sur la balance.',
     }
   }
 
-  if (delta < 0) {
-    // Cut: ~0.5–0.8% BW / week — protect muscle
+  const customPace = options.weeklyPaceKg
+  if (customPace != null && customPace > 0) {
+    const weekly = Math.round(customPace * 100) / 100
+    const signed = goal === 'cut' ? -weekly : weekly
+    const weeks = abs > 0.05 ? Math.max(1, Math.ceil(abs / weekly)) : null
+    const pct = currentKg > 0 ? Math.round((weekly / currentKg) * 1000) / 10 : 0
+    return {
+      goal,
+      weeklyKg: signed,
+      weeklyMinKg: goal === 'cut' ? -0.75 : 0.15,
+      weeklyMaxKg: goal === 'cut' ? -0.2 : 0.75,
+      estimatedWeeks: weeks,
+      weeklyPct: pct,
+      headline:
+        goal === 'cut'
+          ? `Perte choisie : ${weekly.toFixed(1)} kg / semaine`
+          : `Prise choisie : ${weekly.toFixed(1)} kg / semaine`,
+      healthTip:
+        goal === 'cut'
+          ? 'Ce rythme alimente le déficit calorique de ton plan Nutri.'
+          : 'Ce rythme alimente le surplus calorique de ton plan Nutri.',
+      aestheticTip:
+        'Tu peux le changer à tout moment dans Balance — les calories se recalculent.',
+    }
+  }
+
+  // Legacy morphology-based suggestion (only if no custom pace)
+  if (goal === 'cut') {
     let pct = 0.0065
     if (morphology === 'ectomorph') pct = 0.0055
     if (morphology === 'endomorph') pct = 0.007
@@ -57,16 +89,15 @@ export function computeWeightPace(options: {
       weeklyPct: Math.round(pct * 1000) / 10,
       headline: `Perte recommandée ~${weekly.toFixed(2)} kg / semaine`,
       healthTip:
-        'Pas plus vite : tu gardes le muscle, l’énergie et les hormones. Si tu crashes trop vite, tu rebondis.',
+        'Pas plus vite : tu gardes le muscle, l’énergie et les hormones.',
       aestheticTip:
-        'Une sèche régulière = peau qui suit mieux + moins de fatigue. Vise la zone, pas le sprint.',
+        'Une sèche régulière = peau qui suit mieux + moins de fatigue.',
     }
   }
 
-  // Bulk: slower lean gain — fewer stretch marks, more muscle vs fat
-  let pct = 0.0035 // ~0.25–0.35% BW
-  if (morphology === 'ectomorph') pct = 0.0045 // hardgainers can push a bit
-  if (morphology === 'endomorph') pct = 0.0025 // stay leaner
+  let pct = 0.0035
+  if (morphology === 'ectomorph') pct = 0.0045
+  if (morphology === 'endomorph') pct = 0.0025
   const weekly = Math.min(0.4, Math.max(0.15, currentKg * pct))
   const weeks = Math.max(1, Math.ceil(abs / weekly))
   return {
@@ -77,9 +108,7 @@ export function computeWeightPace(options: {
     estimatedWeeks: weeks,
     weeklyPct: Math.round(pct * 1000) / 10,
     headline: `Prise recommandée ~${weekly.toFixed(2)} kg / semaine`,
-    healthTip:
-      'Prise lente = plus de muscle, moins de graisse. Ton corps a le temps d’adapter peau & articulations.',
-    aestheticTip:
-      'Évite le dirty bulk : moins de vergetures, silhouette plus propre. Simple, régulier, efficace.',
+    healthTip: 'Prise lente = plus de muscle, moins de graisse.',
+    aestheticTip: 'Évite le dirty bulk : silhouette plus propre.',
   }
 }

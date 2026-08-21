@@ -12,6 +12,8 @@ export function WeightPaceCard({ profile }: WeightPaceCardProps) {
     currentKg: profile.weightKg,
     goalKg: profile.goalWeightKg,
     morphology: profile.morphology,
+    goal: profile.goal,
+    weeklyPaceKg: profile.weeklyPaceKg,
   })
 
   return (
@@ -29,22 +31,15 @@ export function WeightPaceCard({ profile }: WeightPaceCardProps) {
           <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
             Rythme {GOAL_LABELS[pace.goal]}
           </p>
-          <h3 className="text-[17px] font-bold text-white">Objectif poids · santé d’abord</h3>
+          <h3 className="text-[17px] font-bold text-white">Objectif poids · ton choix</h3>
         </div>
       </div>
 
       <p className="text-[22px] font-black tracking-tight text-white">{pace.headline}</p>
       {pace.estimatedWeeks != null && (
         <p className="mt-1 text-[13px] text-[#AEAEB2]">
-          {profile.weightKg} → {profile.goalWeightKg} kg · ~{pace.estimatedWeeks} semaines si tu
-          restes dans la zone
-        </p>
-      )}
-
-      {pace.goal !== 'maintain' && (
-        <p className="mt-2 text-[12px] text-[#8E8E93]">
-          Zone saine : {Math.abs(pace.weeklyMinKg).toFixed(2)}–
-          {Math.abs(pace.weeklyMaxKg).toFixed(2)} kg / sem. ({pace.weeklyPct}% du poids)
+          {profile.weightKg} → {profile.goalWeightKg} kg · ~{pace.estimatedWeeks} semaines à{' '}
+          {Math.abs(pace.weeklyKg).toFixed(1)} kg/sem.
         </p>
       )}
 

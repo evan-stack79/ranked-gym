@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Flame, Ruler, Scale, Target, Pencil } from 'lucide-react'
 import type { CalorieProfile, Sex } from '../../types/nutrition'
-import {
-  GOAL_LABELS,
-  computeCaloriePlan,
-  inferGoalFromWeights,
-} from '../../utils/calories'
+import { GOAL_LABELS, computeCaloriePlan } from '../../utils/calories'
+import { normalizeCalorieProfile } from '../../services/nutritionStorage'
 import { IconBadge } from '../ui/IconBadge'
 import { MacroRing } from './MacroRing'
 import { IosSheet } from '../ui/IosSheet'
 import { ClearableNumberInput } from './ClearableNumberInput'
 import { ActivityLevelPicker } from './ActivityLevelPicker'
 import { MorphologyPicker } from './MorphologyPicker'
+import { GoalPicker, WeeklyPacePicker } from './GoalPacePickers'
 import { MORPHOLOGY_LABELS } from '../../utils/morphology'
 import { getAdjustedNutritionTarget } from '../../services/nutritionActivity'
 
@@ -84,11 +82,10 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
   }, [profile])
 
   const saveScale = () => {
-    const next: CalorieProfile = {
+    const next = normalizeCalorieProfile({
       ...draft,
-      goal: inferGoalFromWeights(draft.weightKg, draft.goalWeightKg),
       onboardingComplete: true,
-    }
+    })
     onChange(next)
     setScaleOpen(false)
   }
@@ -108,7 +105,10 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
             <IconBadge icon={Flame} variant="green" size="sm" />
             <div>
               <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-                Plan auto · {GOAL_LABELS[plan.goal]} · {MORPHOLOGY_LABELS[profile.morphology]}
+                Plan · {GOAL_LABELS[plan.goal]} · {MORPHOLOGY_LABELS[profile.morphology]}
+                {profile.goal !== 'maintain' && (
+                  <> · {profile.weeklyPaceKg.toFixed(1)} kg/sem.</>
+                )}
               </p>
               <h2 className="text-[20px] font-bold tracking-tight text-white">Calories du jour</h2>
             </div>
@@ -156,7 +156,10 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
                   : `+${plan.deltaKg} kg à prendre`}
               {plan.estimatedWeeks != null && <> · ~{plan.estimatedWeeks} sem.</>}
               {adjusted.activityBonus > 0 && (
-                <> · <span className="text-[#30D158]">+{adjusted.activityBonus} act.</span></>
+                <>
+                  {' '}
+                  · <span className="text-[#30D158]">+{adjusted.activityBonus} act.</span>
+                </>
               )}
             </p>
           </div>
@@ -198,7 +201,7 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
         open={scaleOpen}
         onClose={() => setScaleOpen(false)}
         title="Mettre à jour"
-        subtitle="Poids, morphologie & objectif"
+        subtitle="Poids, objectif, rythme & morphologie"
         leading={<Scale className="mt-0.5 h-5 w-5 text-[#30D158]" />}
       >
         <div className="space-y-3 pb-3">
@@ -209,17 +212,17 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
               onChange={(v) => setDraft((p) => ({ ...p, weightKg: v }))}
               min={35}
               max={250}
-              step={0.5}
+              step={0.1}
               suffix="kg"
               icon={<Scale className="h-3.5 w-3.5 text-[#FF9F0A]" />}
             />
             <Field
-              label="Objectif"
+              label="Poids cible"
               value={draft.goalWeightKg}
               onChange={(v) => setDraft((p) => ({ ...p, goalWeightKg: v }))}
               min={35}
               max={250}
-              step={0.5}
+              step={0.1}
               suffix="kg"
               icon={<Target className="h-3.5 w-3.5 text-[#30D158]" />}
             />
@@ -241,6 +244,23 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
             max={90}
             suffix="ans"
             icon={<span className="text-[11px] text-[#8E8E93]">ans</span>}
+          />
+
+          <GoalPicker
+            value={draft.goal}
+            onChange={(goal) =>
+              setDraft((p) => ({
+                ...p,
+                goal,
+                weeklyPaceKg: goal === 'maintain' ? 0 : p.weeklyPaceKg || 0.5,
+              }))
+            }
+          />
+
+          <WeeklyPacePicker
+            value={draft.weeklyPaceKg > 0 ? draft.weeklyPaceKg : 0.5}
+            onChange={(weeklyPaceKg) => setDraft((p) => ({ ...p, weeklyPaceKg }))}
+            goal={draft.goal}
           />
 
           <div className="flex gap-1 rounded-xl border border-white/10 bg-black/30 p-1">
@@ -276,10 +296,6 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
               compact
             />
           </div>
-
-          <p className="text-[12px] text-[#8E8E93]">
-            Les calories et portions s’adaptent à ton objectif, ton activité et ta morphologie.
-          </p>
 
           <button
             type="button"

@@ -1,16 +1,14 @@
 import { useMemo, useState } from 'react'
 import { ChevronRight, Ruler, Scale, Sparkles, Target, UserRound } from 'lucide-react'
-import type { ActivityLevel, BodyMorphology, CalorieProfile, Sex } from '../../types/nutrition'
-import {
-  GOAL_LABELS,
-  computeCaloriePlan,
-  inferGoalFromWeights,
-} from '../../utils/calories'
+import type { ActivityLevel, BodyMorphology, CalorieProfile, NutritionGoal, Sex } from '../../types/nutrition'
+import { GOAL_LABELS, computeCaloriePlan } from '../../utils/calories'
 import { MORPHOLOGY_LABELS } from '../../utils/morphology'
+import { normalizeCalorieProfile } from '../../services/nutritionStorage'
 import { IconBadge } from '../ui/IconBadge'
 import { ClearableNumberInput } from './ClearableNumberInput'
 import { ActivityLevelPicker } from './ActivityLevelPicker'
 import { MorphologyPicker } from './MorphologyPicker'
+import { GoalPicker, WeeklyPacePicker } from './GoalPacePickers'
 
 interface NutritionOnboardingProps {
   initial: CalorieProfile
@@ -21,20 +19,46 @@ type Step = 'goal' | 'body' | 'morphology' | 'result'
 
 const STEPS: Step[] = ['goal', 'body', 'morphology', 'result']
 
+function seedNumber(value: number): number | null {
+  return value > 0 ? value : null
+}
+
 export function NutritionOnboarding({ initial, onComplete }: NutritionOnboardingProps) {
   const [step, setStep] = useState<Step>('goal')
-  const [goalWeightKg, setGoalWeightKg] = useState(initial.goalWeightKg || 65)
-  const [weightKg, setWeightKg] = useState(initial.weightKg || 70)
-  const [heightCm, setHeightCm] = useState(initial.heightCm || 170)
-  const [age, setAge] = useState(initial.age || 24)
+  const [error, setError] = useState<string | null>(null)
+
+  const [goal, setGoal] = useState<NutritionGoal>(
+    initial.onboardingComplete ? initial.goal : 'cut',
+  )
+  const [weeklyPaceKg, setWeeklyPaceKg] = useState(
+    initial.weeklyPaceKg > 0 ? initial.weeklyPaceKg : 0.5,
+  )
+  const [goalWeightKg, setGoalWeightKg] = useState<number | null>(
+    seedNumber(initial.goalWeightKg),
+  )
+  const [weightKg, setWeightKg] = useState<number | null>(seedNumber(initial.weightKg))
+  const [heightCm, setHeightCm] = useState<number | null>(seedNumber(initial.heightCm))
+  const [age, setAge] = useState<number | null>(seedNumber(initial.age))
   const [sex, setSex] = useState<Sex>(initial.sex || 'male')
   const [activity, setActivity] = useState<ActivityLevel>(initial.activity || 'moderate')
   const [morphology, setMorphology] = useState<BodyMorphology>(
     initial.morphology || 'mesomorph',
   )
 
-  const draft: CalorieProfile = useMemo(
-    () => ({
+  const draft: CalorieProfile | null = useMemo(() => {
+    if (
+      weightKg == null ||
+      goalWeightKg == null ||
+      heightCm == null ||
+      age == null ||
+      weightKg <= 0 ||
+      goalWeightKg <= 0 ||
+      heightCm <= 0 ||
+      age <= 0
+    ) {
+      return null
+    }
+    return normalizeCalorieProfile({
       weightKg,
       goalWeightKg,
       heightCm,
@@ -42,22 +66,71 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
       sex,
       activity,
       morphology,
-      goal: inferGoalFromWeights(weightKg, goalWeightKg),
+      goal,
+      weeklyPaceKg: goal === 'maintain' ? 0 : weeklyPaceKg,
       onboardingComplete: true,
-    }),
-    [weightKg, goalWeightKg, heightCm, age, sex, activity, morphology],
-  )
+    })
+  }, [
+    weightKg,
+    goalWeightKg,
+    heightCm,
+    age,
+    sex,
+    activity,
+    morphology,
+    goal,
+    weeklyPaceKg,
+  ])
 
-  const plan = useMemo(() => computeCaloriePlan(draft), [draft])
+  const plan = useMemo(() => (draft ? computeCaloriePlan(draft) : null), [draft])
 
   const title =
     step === 'goal'
-      ? 'Quel poids vises-tu ?'
+      ? 'Ton objectif'
       : step === 'body'
         ? 'Où en es-tu aujourd’hui ?'
         : step === 'morphology'
           ? 'Ta morphologie'
           : 'Ton plan personnalisé'
+
+  const goBody = () => {
+    if (goalWeightKg == null || goalWeightKg < 35) {
+      setError('Indique ton poids objectif (ex. 61.7).')
+      return
+    }
+    if (goal !== 'maintain' && weeklyPaceKg < 0.1) {
+      setError('Choisis un rythme hebdomadaire.')
+      return
+    }
+    setError(null)
+    setStep('body')
+  }
+
+  const goMorphology = () => {
+    if (weightKg == null || heightCm == null || age == null) {
+      setError('Remplis poids actuel, taille et âge.')
+      return
+    }
+    setError(null)
+    setStep('morphology')
+  }
+
+  const goResult = () => {
+    if (!draft) {
+      setError('Complète tous les champs avant de calculer.')
+      return
+    }
+    setError(null)
+    setStep('result')
+  }
+
+  const submit = () => {
+    if (!draft) {
+      setError('Données incomplètes — impossible d’enregistrer.')
+      return
+    }
+    onComplete(draft)
+  }
 
   return (
     <section className="ios-fade-up space-y-5">
@@ -90,11 +163,28 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
           ))}
         </div>
 
+        {error && (
+          <p className="mb-3 rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF453A]">
+            {error}
+          </p>
+        )}
+
         {step === 'goal' && (
           <div className="space-y-4">
             <p className="text-[15px] text-[#AEAEB2]">
-              Indique ton objectif. On calcule ensuite tes calories automatiquement.
+              Choisis clairement sèche, maintien ou prise — puis ton rythme. Aucune valeur
+              fictive n’est envoyée.
             </p>
+
+            <GoalPicker
+              value={goal}
+              onChange={(next) => {
+                setGoal(next)
+                if (next === 'maintain') setWeeklyPaceKg(0)
+                else if (weeklyPaceKg <= 0) setWeeklyPaceKg(0.5)
+              }}
+            />
+
             <label className="glass-card block rounded-2xl p-4">
               <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
                 <Target className="h-3.5 w-3.5 text-[#30D158]" />
@@ -103,21 +193,28 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               <div className="flex items-end gap-2">
                 <ClearableNumberInput
                   value={goalWeightKg}
-                  onChange={(v) => {
-                    if (v != null) setGoalWeightKg(v)
-                  }}
+                  onChange={setGoalWeightKg}
                   min={35}
                   max={250}
-                  step={0.5}
+                  step={0.1}
+                  required={false}
+                  placeholder="61.7"
                   aria-label="Poids objectif"
                   className="w-full bg-transparent text-[40px] font-black tracking-tight text-white outline-none"
                 />
                 <span className="pb-2 text-[15px] font-medium text-[#8E8E93]">kg</span>
               </div>
             </label>
+
+            <WeeklyPacePicker
+              value={weeklyPaceKg > 0 ? weeklyPaceKg : 0.5}
+              onChange={setWeeklyPaceKg}
+              goal={goal}
+            />
+
             <button
               type="button"
-              onClick={() => setStep('body')}
+              onClick={goBody}
               className="btn-brand ios-press flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[16px] font-semibold text-white"
             >
               Continuer
@@ -137,12 +234,12 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
                 <div className="flex items-end gap-1">
                   <ClearableNumberInput
                     value={weightKg}
-                    onChange={(v) => {
-                      if (v != null) setWeightKg(v)
-                    }}
+                    onChange={setWeightKg}
                     min={35}
                     max={250}
-                    step={0.5}
+                    step={0.1}
+                    required={false}
+                    placeholder="70.5"
                     aria-label="Poids actuel"
                     className="w-full bg-transparent text-[28px] font-bold text-white outline-none"
                   />
@@ -157,11 +254,11 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
                 <div className="flex items-end gap-1">
                   <ClearableNumberInput
                     value={heightCm}
-                    onChange={(v) => {
-                      if (v != null) setHeightCm(v)
-                    }}
+                    onChange={setHeightCm}
                     min={120}
                     max={230}
+                    required={false}
+                    placeholder="175"
                     aria-label="Taille"
                     className="w-full bg-transparent text-[28px] font-bold text-white outline-none"
                   />
@@ -177,11 +274,11 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               </span>
               <ClearableNumberInput
                 value={age}
-                onChange={(v) => {
-                  if (v != null) setAge(v)
-                }}
+                onChange={setAge}
                 min={14}
                 max={90}
+                required={false}
+                placeholder="24"
                 aria-label="Âge"
                 className="w-full bg-transparent text-[24px] font-bold text-white outline-none"
               />
@@ -219,7 +316,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               </button>
               <button
                 type="button"
-                onClick={() => setStep('morphology')}
+                onClick={goMorphology}
                 className="btn-brand ios-press flex flex-[1.4] items-center justify-center gap-1 rounded-2xl py-3.5 text-[15px] font-semibold text-white"
               >
                 Continuer
@@ -246,7 +343,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               </button>
               <button
                 type="button"
-                onClick={() => setStep('result')}
+                onClick={goResult}
                 className="btn-brand ios-press flex flex-[1.4] items-center justify-center gap-1 rounded-2xl py-3.5 text-[15px] font-semibold text-white"
               >
                 Calculer
@@ -256,19 +353,22 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
           </div>
         )}
 
-        {step === 'result' && (
+        {step === 'result' && draft && plan && (
           <div className="space-y-4">
             <div className="rounded-2xl border border-[#30D158]/25 bg-[#30D158]/10 p-4 text-center">
               <p className="text-[12px] font-semibold uppercase tracking-wide text-[#8E8E93]">
-                Objectif {GOAL_LABELS[plan.goal]} · {MORPHOLOGY_LABELS[morphology]}
+                Objectif {GOAL_LABELS[draft.goal]} · {MORPHOLOGY_LABELS[morphology]}
               </p>
               <p className="mt-1 text-[42px] font-black tracking-tight text-white">
                 {plan.targetCalories}
                 <span className="ml-1 text-[16px] font-semibold text-[#30D158]">kcal/j</span>
               </p>
               <p className="mt-2 text-[13px] text-[#AEAEB2]">
-                {weightKg} kg → {goalWeightKg} kg
-                {plan.estimatedWeeks != null && <> · ~{plan.estimatedWeeks} semaines</>}
+                {draft.weightKg} kg → {draft.goalWeightKg} kg
+                {draft.goal !== 'maintain' && (
+                  <> · {draft.weeklyPaceKg.toFixed(1)} kg/sem.</>
+                )}
+                {plan.estimatedWeeks != null && <> · ~{plan.estimatedWeeks} sem.</>}
               </p>
             </div>
 
@@ -298,7 +398,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               </button>
               <button
                 type="button"
-                onClick={() => onComplete(draft)}
+                onClick={submit}
                 className="btn-brand ios-press flex-[1.5] rounded-2xl py-3.5 text-[15px] font-semibold text-white"
               >
                 Valider mon plan
