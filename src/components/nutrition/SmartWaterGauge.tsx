@@ -27,16 +27,19 @@ function hapticTick() {
 }
 
 /**
- * Bouteille iOS glassmorphism — glisse haut/bas pour régler le niveau.
- * Persistance Supabase (via nutrition.journal.waterMl) uniquement au relâchement.
+ * Bouteille iOS — le niveau d’eau restant est l’inverse de ce que tu as bu :
+ * bouteille pleine = 0 ml bus · bouteille vide = 1500 ml bus.
+ * Sauvegarde Supabase uniquement au relâchement.
  */
 export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
   const bottleRef = useRef<HTMLDivElement>(null)
   const pointerIdRef = useRef<number | null>(null)
   const hapticBucketRef = useRef(0)
-  const savedMlRef = useRef(getTodayWaterMl())
+  const savedDrunkRef = useRef(
+    clampLevel(Math.min(getTodayWaterMl(), WATER_BOTTLE_CAPACITY_ML)),
+  )
 
-  const [levelMl, setLevelMl] = useState(() =>
+  const [drunkMl, setDrunkMl] = useState(() =>
     clampLevel(Math.min(getTodayWaterMl(), WATER_BOTTLE_CAPACITY_ML)),
   )
   const [dragging, setDragging] = useState(false)
@@ -44,43 +47,50 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
   useEffect(() => {
     const sync = () => {
       const next = clampLevel(Math.min(getTodayWaterMl(), WATER_BOTTLE_CAPACITY_ML))
-      savedMlRef.current = next
-      setLevelMl(next)
+      savedDrunkRef.current = next
+      setDrunkMl(next)
     }
     window.addEventListener('ranked-gym:backup-restored', sync)
     return () => window.removeEventListener('ranked-gym:backup-restored', sync)
   }, [])
 
-  const fillPct = (levelMl / WATER_BOTTLE_CAPACITY_ML) * 100
+  const remainingMl = WATER_BOTTLE_CAPACITY_ML - drunkMl
+  const remainingPct = (remainingMl / WATER_BOTTLE_CAPACITY_ML) * 100
+  const drunkPct = (drunkMl / WATER_BOTTLE_CAPACITY_ML) * 100
 
-  const mlFromClientY = useCallback((clientY: number) => {
+  /** Y → eau encore dans la bouteille (haut = plein). */
+  const remainingFromClientY = useCallback((clientY: number) => {
     const el = bottleRef.current
-    if (!el) return levelMl
+    if (!el) return remainingMl
     const rect = el.getBoundingClientRect()
-    // Haut de la bouteille = plein, bas = vide (comme une vraie bouteille)
     const ratio = 1 - (clientY - rect.top) / Math.max(rect.height, 1)
     return clampLevel(ratio * WATER_BOTTLE_CAPACITY_ML)
-  }, [levelMl])
+  }, [remainingMl])
 
-  const previewLevel = useCallback((ml: number) => {
+  const drunkFromClientY = useCallback(
+    (clientY: number) => clampLevel(WATER_BOTTLE_CAPACITY_ML - remainingFromClientY(clientY)),
+    [remainingFromClientY],
+  )
+
+  const previewDrunk = useCallback((ml: number) => {
     const next = clampLevel(ml)
     const bucket = Math.floor(next / HAPTIC_EVERY_ML)
     if (bucket !== hapticBucketRef.current) {
       hapticBucketRef.current = bucket
       hapticTick()
     }
-    setLevelMl(next)
+    setDrunkMl(next)
   }, [])
 
-  const persistLevel = useCallback((ml: number) => {
+  const persistDrunk = useCallback((ml: number) => {
     const next = clampLevel(ml)
-    if (next === savedMlRef.current) {
-      setLevelMl(next)
+    if (next === savedDrunkRef.current) {
+      setDrunkMl(next)
       return
     }
-    savedMlRef.current = next
-    setLevelMl(next)
-    setTodayWaterMl(next) // → local + cloud backup (Supabase) debounced
+    savedDrunkRef.current = next
+    setDrunkMl(next)
+    setTodayWaterMl(next)
   }, [])
 
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -88,13 +98,13 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
     pointerIdRef.current = event.pointerId
     event.currentTarget.setPointerCapture(event.pointerId)
     setDragging(true)
-    hapticBucketRef.current = Math.floor(levelMl / HAPTIC_EVERY_ML)
-    previewLevel(mlFromClientY(event.clientY))
+    hapticBucketRef.current = Math.floor(drunkMl / HAPTIC_EVERY_ML)
+    previewDrunk(drunkFromClientY(event.clientY))
   }
 
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     if (pointerIdRef.current !== event.pointerId) return
-    previewLevel(mlFromClientY(event.clientY))
+    previewDrunk(drunkFromClientY(event.clientY))
   }
 
   const endDrag = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -106,18 +116,15 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
       // already released
     }
     setDragging(false)
-    const finalMl = mlFromClientY(event.clientY)
-    persistLevel(finalMl)
+    persistDrunk(drunkFromClientY(event.clientY))
   }
 
-  /** Accessible fallback — same absolute level model, save on change end. */
   const onRangeInput = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const next = clampLevel(Number(event.target.value))
-    setLevelMl(next)
+    setDrunkMl(clampLevel(Number(event.target.value)))
   }
 
   const onRangeCommit = () => {
-    persistLevel(levelMl)
+    persistDrunk(drunkMl)
   }
 
   return (
@@ -138,15 +145,13 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
           <h2 className="mt-1 text-[22px] font-semibold tracking-tight text-white">Eau</h2>
         </div>
         <p className="text-right text-[15px] font-medium tabular-nums text-[#AEAEB2]">
-          <span className="text-[22px] font-semibold tracking-tight text-white">{levelMl}</span>
-          <span className="text-[#8E8E93]"> / {WATER_BOTTLE_CAPACITY_ML} ml</span>
+          <span className="text-[22px] font-semibold tracking-tight text-white">{drunkMl}</span>
+          <span className="text-[#8E8E93]"> / {WATER_BOTTLE_CAPACITY_ML} ml bus</span>
         </p>
       </div>
 
       <div className="flex flex-col items-center gap-4">
-        {/* Bottle */}
         <div className="relative flex flex-col items-center">
-          {/* Cap / neck */}
           <div
             className="relative z-10 h-4 w-11 rounded-t-[10px] border border-white/20"
             style={{
@@ -163,7 +168,6 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
             aria-hidden
           />
 
-          {/* Body — glass bottle */}
           <div
             ref={bottleRef}
             className={`water-bottle relative mt-[-2px] h-[260px] w-[124px] touch-none select-none overflow-hidden ${
@@ -177,11 +181,10 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
             role="slider"
             aria-valuemin={0}
             aria-valuemax={WATER_BOTTLE_CAPACITY_ML}
-            aria-valuenow={levelMl}
-            aria-label="Niveau d’eau dans la bouteille"
+            aria-valuenow={drunkMl}
+            aria-label="Volume d’eau bu (bouteille vide = 1,5 L bus)"
             tabIndex={0}
           >
-            {/* Glass shell */}
             <div
               className="pointer-events-none absolute inset-0 rounded-[42px] border border-white/25"
               style={{
@@ -193,7 +196,6 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
               }}
             />
 
-            {/* Specular highlight */}
             <div
               className="pointer-events-none absolute left-3 top-8 bottom-10 w-3 rounded-full opacity-40"
               style={{
@@ -202,11 +204,11 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
               aria-hidden
             />
 
-            {/* Water fill */}
+            {/* Eau restante dans la bouteille (inverse de ce qui est bu) */}
             <div
               className="water-bottle-fill absolute inset-x-0 bottom-0 mx-[3px] mb-[3px] overflow-hidden rounded-b-[39px]"
               style={{
-                height: `calc(${fillPct}% - 0px)`,
+                height: `${remainingPct}%`,
                 maxHeight: 'calc(100% - 6px)',
                 transition: dragging
                   ? 'height 80ms linear'
@@ -217,26 +219,27 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
               <div className="water-bottle-meniscus absolute inset-x-0 top-0 h-4" />
             </div>
 
-            {/* Center readout */}
             <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center px-3 text-center">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-white/70">
+                Bu
+              </p>
               <p
                 className={`text-[34px] font-semibold tracking-tight tabular-nums text-white transition-transform duration-200 ${
                   dragging ? 'scale-105' : 'scale-100'
                 }`}
                 style={{ textShadow: '0 2px 12px rgb(0 0 0 / 0.45)' }}
               >
-                {levelMl}
+                {drunkMl}
               </p>
               <p className="text-[13px] font-medium text-white/80">ml</p>
             </div>
 
-            {/* Invisible vertical range for a11y / trackpads */}
             <input
               type="range"
               min={0}
               max={WATER_BOTTLE_CAPACITY_ML}
               step={STEP_ML}
-              value={levelMl}
+              value={drunkMl}
               onChange={onRangeInput}
               onMouseUp={onRangeCommit}
               onTouchEnd={onRangeCommit}
@@ -248,15 +251,16 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
           </div>
         </div>
 
-        <p className="max-w-[240px] text-center text-[13px] leading-relaxed text-[#8E8E93]">
-          Glisse sur la bouteille pour ajuster le niveau. La sauvegarde se fait au relâchement.
+        <p className="max-w-[260px] text-center text-[13px] leading-relaxed text-[#8E8E93]">
+          Baisse le niveau comme une vraie bouteille : vide = tu as bu 1,5&nbsp;L. Sauvegarde au
+          relâchement.
         </p>
 
         <div className="h-1.5 w-full max-w-[200px] overflow-hidden rounded-full bg-white/8">
           <div
             className="h-full rounded-full bg-gradient-to-r from-[#7DD3FC] to-[#38BDF8]"
             style={{
-              width: `${fillPct}%`,
+              width: `${drunkPct}%`,
               transition: dragging
                 ? 'width 80ms linear'
                 : 'width 520ms cubic-bezier(0.32, 0.72, 0, 1)',
