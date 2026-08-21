@@ -3,10 +3,8 @@ import { Check, SkipForward, Timer } from 'lucide-react'
 import type { RestPresetSec, RestTimerState } from '../../hooks/useRestTimer'
 import { REST_PRESETS_SEC } from '../../hooks/useRestTimer'
 
-/** Hauteur approx. BottomNav (hors safe-area) — îlot repos juste au-dessus. */
-export const REST_BAR_NAV_CLEARANCE_PX = 76
-/** Hauteur réservée au contenu Train pour ne pas masquer le bas de page. */
-export const REST_BAR_CONTENT_PAD = '7.75rem'
+/** Clearance scroll Train (CSS var --rest-content-clearance). */
+export const REST_BAR_CONTENT_PAD = 'var(--rest-content-clearance)'
 
 interface RestTimerOverlayProps {
   state: RestTimerState
@@ -32,7 +30,7 @@ function ringColor(remaining: number, total: number, idle: boolean): string {
 }
 
 /**
- * Îlot de repos fixed — collé juste au-dessus de la BottomNav (z-index 999).
+ * Îlot de repos fixed — docké juste au-dessus de la BottomNav (portal body).
  */
 export function RestTimerOverlay({
   state,
@@ -54,8 +52,8 @@ export function RestTimerOverlay({
   const progress = idle ? 0 : Math.min(1, Math.max(0, remaining / total))
   const color = ringColor(remaining, total, idle)
   const pulsing = running && remaining > 0 && remaining <= 10
-  const ringSize = 44
-  const stroke = 3.5
+  const ringSize = 40
+  const stroke = 3.25
   const radius = (ringSize - stroke) / 2
   const circumference = 2 * Math.PI * radius
   const dashOffset = circumference * (1 - progress)
@@ -63,23 +61,13 @@ export function RestTimerOverlay({
   return createPortal(
     <div
       id="ranked-rest-timer-bar"
-      className="pointer-events-none fixed inset-x-0 flex justify-center"
-      style={{
-        zIndex: 999,
-        bottom: `calc(${REST_BAR_NAV_CLEARANCE_PX}px + env(safe-area-inset-bottom, 0px))`,
-        paddingLeft: 12,
-        paddingRight: 12,
-      }}
+      className="rest-timer-dock"
       aria-live="polite"
       role="timer"
       aria-label={idle ? 'Repos prêt à lancer' : `Repos ${formatClock(remaining)}`}
     >
-      <div
-        className={`pointer-events-auto rest-timer-island w-full max-w-md ${
-          pulsing ? 'rest-timer-pulse' : ''
-        }`}
-      >
-        <div className="flex items-center gap-2.5 px-3 pt-2.5">
+      <div className={`rest-timer-island ${pulsing ? 'rest-timer-pulse' : ''}`}>
+        <div className="flex items-center gap-2.5 px-3 pt-2">
           <div className="relative shrink-0" style={{ width: ringSize, height: ringSize }}>
             <svg width={ringSize} height={ringSize} className="-rotate-90" aria-hidden>
               <circle
@@ -126,7 +114,7 @@ export function RestTimerOverlay({
             ) : idle ? (
               <p className="text-[15px] font-bold tracking-tight text-white">Prêt à lancer</p>
             ) : (
-              <p className="text-[22px] font-bold leading-none tracking-tight tabular-nums text-white">
+              <p className="text-[20px] font-bold leading-none tracking-tight tabular-nums text-white">
                 {formatClock(remaining)}
               </p>
             )}
@@ -143,7 +131,7 @@ export function RestTimerOverlay({
             <button
               type="button"
               onClick={onSkip}
-              className="ios-press flex shrink-0 items-center gap-1 rounded-full border border-white/12 bg-white/[0.07] px-3 py-2 text-[12px] font-semibold text-white"
+              className="ios-press flex shrink-0 items-center gap-1 rounded-full border border-white/12 bg-white/[0.07] px-3 py-1.5 text-[12px] font-semibold text-white"
             >
               <SkipForward className="h-3.5 w-3.5" strokeWidth={2.5} />
               Passer
@@ -154,14 +142,14 @@ export function RestTimerOverlay({
             <button
               type="button"
               onClick={onDismiss}
-              className="ios-press shrink-0 rounded-full border border-[#30D158]/40 bg-[#30D158]/18 px-3.5 py-2 text-[12px] font-semibold text-[#30D158]"
+              className="ios-press shrink-0 rounded-full border border-[#30D158]/40 bg-[#30D158]/18 px-3.5 py-1.5 text-[12px] font-semibold text-[#30D158]"
             >
               OK
             </button>
           ) : null}
         </div>
 
-        <div className="mt-2 flex gap-1.5 px-3 pb-2.5">
+        <div className="mt-1.5 flex gap-1.5 px-3 pb-2">
           {REST_PRESETS_SEC.map((sec) => {
             const active = running && state.totalSec === sec
             return (
@@ -169,7 +157,7 @@ export function RestTimerOverlay({
                 key={sec}
                 type="button"
                 onClick={() => onPreset(sec)}
-                className={`ios-press flex-1 rounded-full border py-2 text-[12px] font-semibold tabular-nums transition-colors ${
+                className={`ios-press flex-1 rounded-full border py-1.5 text-[12px] font-semibold tabular-nums transition-colors ${
                   active
                     ? 'border-[#30D158]/50 bg-[#30D158]/22 text-[#30D158]'
                     : 'border-white/10 bg-white/[0.04] text-[#D1D1D6] active:bg-[#30D158]/15 active:text-[#30D158]'

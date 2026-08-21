@@ -185,10 +185,8 @@ export function TrainingView() {
     <div
       className="flex flex-col gap-8"
       style={{
-        // Nav (AppLayout) + îlot repos sticky — dernier élément scrollable au-dessus
-        paddingBottom: showStrengthTools
-          ? `calc(${REST_BAR_CONTENT_PAD} + 0.5rem)`
-          : '1rem',
+        /* Nav déjà réservée par AppLayout — ici uniquement la hauteur de l’îlot repos */
+        paddingBottom: showStrengthTools ? REST_BAR_CONTENT_PAD : '0.5rem',
       }}
     >
       <header className="relative ios-fade-up">
@@ -377,7 +375,14 @@ export function TrainingView() {
       </IosSheet>
 
       {toast && (
-        <div className="fixed bottom-24 left-1/2 z-50 max-w-[90%] -translate-x-1/2 rounded-full border border-white/10 bg-[#2C2C2E] px-4 py-2 text-center text-[13px] font-medium text-white shadow-lg">
+        <div
+          className="pointer-events-none fixed left-1/2 z-[70] max-w-[90%] -translate-x-1/2 rounded-full border border-white/10 bg-[#2C2C2E] px-4 py-2 text-center text-[13px] font-medium text-white shadow-lg"
+          style={{
+            bottom: showStrengthTools
+              ? 'calc(var(--rest-bar-bottom) + var(--rest-island-h) + 12px)'
+              : 'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 12px)',
+          }}
+        >
           {toast}
         </div>
       )}

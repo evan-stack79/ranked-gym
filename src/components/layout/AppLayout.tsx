@@ -49,7 +49,10 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
 
       <main
         className="relative z-10 mx-auto w-full max-w-lg flex-1 overflow-y-auto px-5 py-8"
-        style={{ paddingBottom: 'calc(5.5rem + env(safe-area-inset-bottom))' }}
+        style={{
+          paddingBottom:
+            'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 0.75rem)',
+        }}
       >
         {children}
       </main>
