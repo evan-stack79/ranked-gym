@@ -7,7 +7,12 @@ import { isSupabaseConfigured } from '../lib/supabase'
 
 export type ExercisePr = {
   exerciseName: string
+  /** Max historique (kg) — recalculé depuis les logs workouts. */
   weightKg: number
+  /** Epoch ms du set/séance où ce max a été touché. */
+  achievedAt: number
+  /** dateKey YYYY-MM-DD de la séance record. */
+  dateKey?: string
 }
 
 export type ProfileAchievementId =
@@ -18,15 +23,11 @@ export type ProfileAchievementId =
 
 export type ProfileStatsSnapshot = {
   streakDays: number
-  /** Workouts (notes) + check-ins Lobby. */
   sessionCount: number
   workoutCount: number
   checkinCount: number
-  /** Activité relative des 10 dernières semaines (sparkline). */
   sparkPoints: number[]
-  /** Meilleurs poids par exercice (triés desc). */
   bestPrs: ExercisePr[]
-  /** PR affiché en vitrine. */
   pinnedPr: ExercisePr | null
   unlocked: Record<ProfileAchievementId, boolean>
 }
@@ -35,11 +36,62 @@ function normalizeExerciseName(name: string): string {
   return name.trim().replace(/\s+/g, ' ')
 }
 
-/** Meilleur poids touché pour chaque exercice (toutes séances). */
-export function collectBestPrs(notes: WorkoutNote[] = dedupeWorkoutNotes(getTrainingState().workoutNotes)): ExercisePr[] {
-  const map = new Map<string, number>()
+function noteTimestamp(note: WorkoutNote): number {
+  if (typeof note.createdAt === 'number' && Number.isFinite(note.createdAt)) {
+    return note.createdAt
+  }
+  if (note.dateKey) {
+    const [y, m, d] = note.dateKey.split('-').map(Number)
+    return new Date(y, (m ?? 1) - 1, d ?? 1).getTime()
+  }
+  return Date.now()
+}
+
+/**
+ * Meilleur poids historique par exercice, depuis les logs d’entraînement
+ * (hydratés depuis Supabase `workouts.state`).
+ */
+export function collectBestPrs(
+  notes: WorkoutNote[] = dedupeWorkoutNotes(getTrainingState().workoutNotes),
+): ExercisePr[] {
+  const map = new Map<string, ExercisePr>()
+
   for (const note of notes) {
+    const at = noteTimestamp(note)
     for (const exercise of note.exercises ?? []) {
+      const name = normalizeExerciseName(exercise.name || '')
+      if (!name) continue
+      let bestInSession = 0
+      for (const set of exercise.sets ?? []) {
+        if (typeof set.weightKg === 'number' && set.weightKg > bestInSession) {
+          bestInSession = set.weightKg
+        }
+      }
+      if (bestInSession <= 0) continue
+
+      const prev = map.get(name.toLowerCase())
+      if (!prev || bestInSession > prev.weightKg) {
+        map.set(name.toLowerCase(), {
+          exerciseName: name,
+          weightKg: bestInSession,
+          achievedAt: at,
+          dateKey: note.dateKey,
+        })
+      } else if (bestInSession === prev.weightKg && at > prev.achievedAt) {
+        // Même poids : garder la date la plus récente
+        map.set(name.toLowerCase(), {
+          ...prev,
+          exerciseName: name,
+          achievedAt: at,
+          dateKey: note.dateKey,
+        })
+      }
+    }
+  }
+
+  // Aussi les routines sauvegardées (dernier état connu)
+  for (const routine of getTrainingState().routines ?? []) {
+    for (const exercise of routine.exercises ?? []) {
       const name = normalizeExerciseName(exercise.name || '')
       if (!name) continue
       let best = 0
@@ -47,13 +99,38 @@ export function collectBestPrs(notes: WorkoutNote[] = dedupeWorkoutNotes(getTrai
         if (typeof set.weightKg === 'number' && set.weightKg > best) best = set.weightKg
       }
       if (best <= 0) continue
-      const prev = map.get(name) ?? 0
-      if (best > prev) map.set(name, best)
+      const key = name.toLowerCase()
+      const prev = map.get(key)
+      if (!prev || best > prev.weightKg) {
+        map.set(key, {
+          exerciseName: name,
+          weightKg: best,
+          achievedAt: routine.updatedAt || Date.now(),
+        })
+      }
     }
   }
-  return [...map.entries()]
-    .map(([exerciseName, weightKg]) => ({ exerciseName, weightKg }))
-    .sort((a, b) => b.weightKg - a.weightKg || a.exerciseName.localeCompare(b.exerciseName, 'fr'))
+
+  return [...map.values()].sort(
+    (a, b) => b.weightKg - a.weightKg || a.exerciseName.localeCompare(b.exerciseName, 'fr'),
+  )
+}
+
+/** Libellé relatif FR pour le badge « Battu il y a… ». */
+export function formatPrAgeLabel(achievedAt: number, now = Date.now()): string {
+  if (!Number.isFinite(achievedAt) || achievedAt <= 0) return 'Record enregistré'
+  const days = Math.max(0, Math.floor((now - achievedAt) / 86_400_000))
+  if (days <= 0) return 'Battu aujourd’hui'
+  if (days === 1) return 'Battu hier'
+  if (days < 7) return `Battu il y a ${days} jours`
+  const weeks = Math.floor(days / 7)
+  if (weeks === 1) return 'Battu il y a 1 semaine'
+  if (weeks < 5) return `Battu il y a ${weeks} semaines`
+  const months = Math.floor(days / 30)
+  if (months <= 1) return 'Battu il y a 1 mois'
+  if (months < 12) return `Battu il y a ${months} mois`
+  const years = Math.floor(days / 365)
+  return years <= 1 ? 'Battu il y a 1 an' : `Battu il y a ${years} ans`
 }
 
 function weekKey(dateKey: string): string {
@@ -86,27 +163,26 @@ function buildSparkPoints(notes: WorkoutNote[], weeks = 10): number[] {
 }
 
 function hasEarlyBirdSession(notes: WorkoutNote[]): boolean {
-  return notes.some((note) => {
-    const hour = new Date(note.createdAt).getHours()
-    return hour < 6
-  })
+  return notes.some((note) => new Date(note.createdAt).getHours() < 6)
 }
 
-function resolvePinnedPr(bestPrs: ExercisePr[]): ExercisePr | null {
+/**
+ * Résout le PR épinglé : favori choisi → max live depuis les logs.
+ * Sinon premier PR dispo. Jamais de valeur figée obsolète.
+ */
+export function resolvePinnedPr(bestPrs: ExercisePr[]): ExercisePr | null {
   const pinned = getPinnedPr()
   if (pinned?.exerciseName) {
     const match = bestPrs.find(
       (p) => p.exerciseName.toLowerCase() === pinned.exerciseName.toLowerCase(),
     )
     if (match) return match
-    if (pinned.weightKg > 0) return pinned
+    // Favori choisi mais plus de logs → aucun PR affichable
+    return null
   }
   return bestPrs[0] ?? null
 }
 
-/**
- * Agrège streak profil, séances (workouts + checkins) et PRs locaux (sync cloud).
- */
 export async function loadProfileStats(input: {
   userId?: string | null
   streakDays: number
