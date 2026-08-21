@@ -3,15 +3,16 @@ import { Check, SkipForward, Timer } from 'lucide-react'
 import type { RestPresetSec, RestTimerState } from '../../hooks/useRestTimer'
 import { REST_PRESETS_SEC } from '../../hooks/useRestTimer'
 
+/** Hauteur approx. BottomNav (hors safe-area) — îlot repos juste au-dessus. */
+export const REST_BAR_NAV_CLEARANCE_PX = 76
+/** Hauteur réservée au contenu Train pour ne pas masquer le bas de page. */
+export const REST_BAR_CONTENT_PAD = '7.75rem'
+
 interface RestTimerOverlayProps {
   state: RestTimerState
   onPreset: (sec: RestPresetSec) => void
   onSkip: () => void
   onDismiss: () => void
-  /**
-   * Pour tests / ergonomie Train : barre toujours montée
-   * (état « Prêt à lancer » si le chrono est à l’arrêt).
-   */
   alwaysVisible?: boolean
 }
 
@@ -23,7 +24,7 @@ function formatClock(totalSec: number): string {
 }
 
 function ringColor(remaining: number, total: number, idle: boolean): string {
-  if (idle) return '#8E8E93'
+  if (idle) return '#636366'
   const ratio = total > 0 ? remaining / total : 0
   if (remaining <= 10) return '#FF453A'
   if (ratio <= 0.35) return '#FF9F0A'
@@ -31,7 +32,7 @@ function ringColor(remaining: number, total: number, idle: boolean): string {
 }
 
 /**
- * Barre de repos sticky — portal body, z-index 999, au-dessus de la BottomNav.
+ * Îlot de repos fixed — collé juste au-dessus de la BottomNav (z-index 999).
  */
 export function RestTimerOverlay({
   state,
@@ -53,8 +54,8 @@ export function RestTimerOverlay({
   const progress = idle ? 0 : Math.min(1, Math.max(0, remaining / total))
   const color = ringColor(remaining, total, idle)
   const pulsing = running && remaining > 0 && remaining <= 10
-  const ringSize = 48
-  const stroke = 4
+  const ringSize = 44
+  const stroke = 3.5
   const radius = (ringSize - stroke) / 2
   const circumference = 2 * Math.PI * radius
   const dashOffset = circumference * (1 - progress)
@@ -62,29 +63,23 @@ export function RestTimerOverlay({
   return createPortal(
     <div
       id="ranked-rest-timer-bar"
-      className="pointer-events-none fixed inset-x-0 flex justify-center px-3"
+      className="pointer-events-none fixed inset-x-0 flex justify-center"
       style={{
         zIndex: 999,
-        bottom: 'calc(5.25rem + env(safe-area-inset-bottom, 0px))',
+        bottom: `calc(${REST_BAR_NAV_CLEARANCE_PX}px + env(safe-area-inset-bottom, 0px))`,
+        paddingLeft: 12,
+        paddingRight: 12,
       }}
       aria-live="polite"
       role="timer"
       aria-label={idle ? 'Repos prêt à lancer' : `Repos ${formatClock(remaining)}`}
     >
       <div
-        className={`pointer-events-auto rest-timer-panel w-full max-w-lg overflow-hidden rounded-2xl border-2 px-3 py-2.5 ${
+        className={`pointer-events-auto rest-timer-island w-full max-w-md ${
           pulsing ? 'rest-timer-pulse' : ''
         }`}
-        style={{
-          borderColor: idle ? 'rgb(48 209 88 / 0.35)' : 'rgb(255 255 255 / 0.16)',
-          background: 'rgb(22 22 24 / 0.98)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          boxShadow:
-            '0 14px 40px rgb(0 0 0 / 0.7), 0 0 24px rgb(48 209 88 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.12)',
-        }}
       >
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 px-3 pt-2.5">
           <div className="relative shrink-0" style={{ width: ringSize, height: ringSize }}>
             <svg width={ringSize} height={ringSize} className="-rotate-90" aria-hidden>
               <circle
@@ -92,7 +87,7 @@ export function RestTimerOverlay({
                 cy={ringSize / 2}
                 r={radius}
                 fill="none"
-                stroke="rgb(255 255 255 / 0.12)"
+                stroke="rgb(255 255 255 / 0.1)"
                 strokeWidth={stroke}
               />
               <circle
@@ -100,24 +95,25 @@ export function RestTimerOverlay({
                 cy={ringSize / 2}
                 r={radius}
                 fill="none"
-                stroke={color}
+                stroke={idle ? '#30D158' : color}
                 strokeWidth={stroke}
                 strokeLinecap="round"
                 strokeDasharray={circumference}
-                strokeDashoffset={idle ? circumference : dashOffset}
+                strokeDashoffset={idle ? circumference * 0.92 : dashOffset}
                 style={{
                   transition: 'stroke-dashoffset 0.95s linear, stroke 0.35s ease',
-                  filter: idle ? undefined : `drop-shadow(0 0 6px ${color}88)`,
+                  opacity: idle ? 0.55 : 1,
+                  filter: running ? `drop-shadow(0 0 5px ${color}77)` : undefined,
                 }}
               />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
               {finished ? (
-                <Check className="h-4 w-4 text-[#30D158]" strokeWidth={2.75} />
+                <Check className="h-3.5 w-3.5 text-[#30D158]" strokeWidth={2.75} />
               ) : idle ? (
-                <Timer className="h-4 w-4 text-[#30D158]" strokeWidth={2.25} />
+                <Timer className="h-3.5 w-3.5 text-[#30D158]" strokeWidth={2.25} />
               ) : (
-                <span className="text-[10px] font-bold tabular-nums text-white">
+                <span className="text-[9px] font-bold tabular-nums text-white">
                   {Math.ceil(progress * 100)}
                 </span>
               )}
@@ -126,17 +122,17 @@ export function RestTimerOverlay({
 
           <div className="min-w-0 flex-1">
             {finished ? (
-              <p className="text-[17px] font-bold tracking-tight text-[#30D158]">Repos OK</p>
+              <p className="text-[15px] font-bold tracking-tight text-[#30D158]">Repos OK</p>
             ) : idle ? (
-              <p className="text-[16px] font-bold tracking-tight text-white">Prêt à lancer</p>
+              <p className="text-[15px] font-bold tracking-tight text-white">Prêt à lancer</p>
             ) : (
-              <p className="text-[24px] font-bold leading-none tracking-tight tabular-nums text-white">
+              <p className="text-[22px] font-bold leading-none tracking-tight tabular-nums text-white">
                 {formatClock(remaining)}
               </p>
             )}
-            <p className="mt-0.5 truncate text-[11px] font-medium text-[#8E8E93]">
+            <p className="mt-0.5 truncate text-[10px] font-medium text-[#8E8E93]">
               {idle
-                ? 'Choisis 45s · 90s · 180s'
+                ? 'Repos · 45s · 90s · 180s'
                 : state.target
                   ? `${state.target.exerciseName || 'Exercice'} · ${state.target.setLabel}`
                   : 'Repos en cours'}
@@ -147,7 +143,7 @@ export function RestTimerOverlay({
             <button
               type="button"
               onClick={onSkip}
-              className="ios-press flex shrink-0 items-center gap-1 rounded-xl border border-white/14 bg-white/[0.08] px-3 py-2.5 text-[13px] font-semibold text-white"
+              className="ios-press flex shrink-0 items-center gap-1 rounded-full border border-white/12 bg-white/[0.07] px-3 py-2 text-[12px] font-semibold text-white"
             >
               <SkipForward className="h-3.5 w-3.5" strokeWidth={2.5} />
               Passer
@@ -158,14 +154,14 @@ export function RestTimerOverlay({
             <button
               type="button"
               onClick={onDismiss}
-              className="ios-press shrink-0 rounded-xl border border-[#30D158]/40 bg-[#30D158]/18 px-3 py-2.5 text-[13px] font-semibold text-[#30D158]"
+              className="ios-press shrink-0 rounded-full border border-[#30D158]/40 bg-[#30D158]/18 px-3.5 py-2 text-[12px] font-semibold text-[#30D158]"
             >
               OK
             </button>
           ) : null}
         </div>
 
-        <div className="mt-2 flex gap-1.5">
+        <div className="mt-2 flex gap-1.5 px-3 pb-2.5">
           {REST_PRESETS_SEC.map((sec) => {
             const active = running && state.totalSec === sec
             return (
@@ -173,12 +169,10 @@ export function RestTimerOverlay({
                 key={sec}
                 type="button"
                 onClick={() => onPreset(sec)}
-                className={`ios-press flex-1 rounded-xl border py-2.5 text-[13px] font-semibold tabular-nums ${
+                className={`ios-press flex-1 rounded-full border py-2 text-[12px] font-semibold tabular-nums transition-colors ${
                   active
-                    ? 'border-[#30D158]/50 bg-[#30D158]/20 text-[#30D158]'
-                    : idle
-                      ? 'border-[#30D158]/30 bg-[#30D158]/12 text-[#30D158]'
-                      : 'border-white/12 bg-white/[0.05] text-[#AEAEB2]'
+                    ? 'border-[#30D158]/50 bg-[#30D158]/22 text-[#30D158]'
+                    : 'border-white/10 bg-white/[0.04] text-[#D1D1D6] active:bg-[#30D158]/15 active:text-[#30D158]'
                 }`}
               >
                 {sec}s

@@ -154,11 +154,26 @@ body {
     transform: scale(1);
   }
   50% {
-    transform: scale(1.012);
+    transform: scale(1.01);
   }
 }
 
 .rest-timer-panel {
+  animation: ios-fade-up 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+/* Îlot repos — native, au-dessus de la nav */
+.rest-timer-island {
+  border-radius: 22px;
+  border: 1px solid rgb(48 209 88 / 0.28);
+  background: rgb(20 20 22 / 0.94);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  box-shadow:
+    0 10px 32px rgb(0 0 0 / 0.55),
+    0 0 0 0.5px rgb(255 255 255 / 0.06),
+    0 0 20px rgb(48 209 88 / 0.1),
+    inset 0 1px 0 rgb(255 255 255 / 0.1);
   animation: ios-fade-up 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 

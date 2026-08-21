@@ -31,7 +31,7 @@ import { TrainingAgenda } from './TrainingAgenda'
 import { WorkoutNotebook } from './WorkoutNotebook'
 import { OverloadCalculator } from './OverloadCalculator'
 import { EnduranceSessionCard } from './EnduranceSessionCard'
-import { RestTimerOverlay } from './RestTimerOverlay'
+import { RestTimerOverlay, REST_BAR_CONTENT_PAD } from './RestTimerOverlay'
 import { IconBadge } from '../ui/IconBadge'
 import { IosSheet } from '../ui/IosSheet'
 import {
@@ -182,7 +182,15 @@ export function TrainingView() {
   }
 
   return (
-    <div className="flex flex-col gap-8 pb-4">
+    <div
+      className="flex flex-col gap-8"
+      style={{
+        // Nav (AppLayout) + îlot repos sticky — dernier élément scrollable au-dessus
+        paddingBottom: showStrengthTools
+          ? `calc(${REST_BAR_CONTENT_PAD} + 0.5rem)`
+          : '1rem',
+      }}
+    >
       <header className="relative ios-fade-up">
         <div
           className="pointer-events-none absolute -right-6 -top-4 h-28 w-40 rounded-full blur-3xl"
