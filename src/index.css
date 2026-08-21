@@ -378,6 +378,10 @@ body {
   }
 }
 
+.water-journal-row {
+  animation: ios-fade-up 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
 /* iOS Cristaline-style slim bottle */
 .water-bottle-slim {
   border-radius: 28px;

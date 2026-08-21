@@ -3,6 +3,8 @@ import type {
   DayJournal,
   MealEntry,
   NutritionGoal,
+  WaterEntry,
+  WaterEntryType,
   WaterPresetsCount,
 } from '../types/nutrition'
 import { todayKey } from '../utils/calories'
@@ -208,55 +210,271 @@ export function suggestedWaterGoalMl(_weightKg?: number): number {
 /** Plafond journalier (plusieurs bouteilles / presets). */
 export const MAX_DAILY_WATER_ML = 15000
 
-export function getTodayWaterMl(): number {
-  return Math.max(0, Math.round(getTodayJournal().waterMl ?? 0))
+const PRESET_LABELS: Record<string, string> = {
+  glass: 'Verre',
+  shaker: 'Shaker',
+  bottle: 'Bouteille',
+  manual: 'Ajustement',
+  legacy: 'Eau',
 }
 
-export function setTodayWaterMl(waterMl: number, opts?: StorageSaveOptions): DayJournal {
+const PRESET_ML: Record<string, number> = {
+  glass: 250,
+  shaker: 500,
+  bottle: 1500,
+}
+
+function newWaterEntryId(): string {
+  return `w-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function sumEntries(entries: WaterEntry[]): number {
+  return entries.reduce((acc, e) => acc + Math.max(0, Math.round(e.amountMl)), 0)
+}
+
+function countsFromEntries(entries: WaterEntry[]): WaterPresetsCount {
+  const counts: WaterPresetsCount = {}
+  for (const entry of entries) {
+    if (entry.type === 'glass' || entry.type === 'shaker' || entry.type === 'bottle') {
+      counts[entry.type] = (counts[entry.type] ?? 0) + 1
+    }
+  }
+  return counts
+}
+
+function normalizeEntry(raw: unknown): WaterEntry | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  const amountMl = Math.round(Number(o.amountMl ?? o.amount ?? 0))
+  if (!Number.isFinite(amountMl) || amountMl <= 0) return null
+  const typeRaw = typeof o.type === 'string' ? o.type : 'manual'
+  const type = (
+    ['glass', 'shaker', 'bottle', 'manual', 'legacy'].includes(typeRaw)
+      ? typeRaw
+      : 'manual'
+  ) as WaterEntryType
+  const createdAt = Number(o.createdAt ?? o.time ?? Date.now())
+  const label =
+    typeof o.label === 'string' && o.label.trim()
+      ? o.label.trim()
+      : (PRESET_LABELS[type] ?? 'Eau')
+  return {
+    id: typeof o.id === 'string' && o.id ? o.id : newWaterEntryId(),
+    amountMl: Math.min(MAX_DAILY_WATER_ML, amountMl),
+    createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
+    type,
+    label,
+  }
+}
+
+/** Migre waterMl / waterPresetsCount → waterEntries si besoin. */
+export function resolveTodayWaterEntries(journal: DayJournal = getTodayJournal()): WaterEntry[] {
+  const existing = Array.isArray(journal.waterEntries)
+    ? journal.waterEntries.map(normalizeEntry).filter((e): e is WaterEntry => e !== null)
+    : []
+  if (existing.length > 0) return existing
+
+  const fromPresets: WaterEntry[] = []
+  const counts = journal.waterPresetsCount
+  if (counts && typeof counts === 'object') {
+    const now = Date.now()
+    let offset = 0
+    for (const [key, value] of Object.entries(counts)) {
+      const n = Math.floor(Number(value))
+      const ml = PRESET_ML[key]
+      if (!ml || !Number.isFinite(n) || n <= 0) continue
+      for (let i = 0; i < n; i += 1) {
+        fromPresets.push({
+          id: `migrate-${journal.dateKey}-${key}-${i}`,
+          amountMl: ml,
+          createdAt: now - offset * 60_000,
+          type: key as WaterEntryType,
+          label: PRESET_LABELS[key] ?? key,
+        })
+        offset += 1
+      }
+    }
+  }
+  if (fromPresets.length > 0) return fromPresets
+
+  const legacyMl = Math.round(journal.waterMl ?? 0)
+  if (legacyMl > 0) {
+    return [
+      {
+        id: `migrate-${journal.dateKey}-legacy`,
+        amountMl: Math.min(MAX_DAILY_WATER_ML, legacyMl),
+        createdAt: Date.now(),
+        type: 'legacy',
+        label: 'Eau',
+      },
+    ]
+  }
+  return []
+}
+
+function persistWaterJournal(
+  entries: WaterEntry[],
+  opts?: StorageSaveOptions,
+): DayJournal {
+  const normalized = entries
+    .map(normalizeEntry)
+    .filter((e): e is WaterEntry => e !== null)
+    .sort((a, b) => b.createdAt - a.createdAt)
+
+  const cleaned: WaterEntry[] = []
+  let waterMl = 0
+  for (const entry of normalized) {
+    if (waterMl + entry.amountMl > MAX_DAILY_WATER_ML) break
+    cleaned.push(entry)
+    waterMl += entry.amountMl
+  }
+
   const journal = getTodayJournal()
   const next: DayJournal = {
     ...journal,
-    waterMl: Math.max(0, Math.min(MAX_DAILY_WATER_ML, Math.round(waterMl))),
+    waterMl,
+    waterEntries: cleaned.length > 0 ? cleaned : undefined,
+    waterPresetsCount: countsFromEntries(cleaned),
   }
   saveTodayJournal(next, opts)
   return next
 }
 
-export function addTodayWaterMl(deltaMl: number, opts?: StorageSaveOptions): DayJournal {
-  return setTodayWaterMl(getTodayWaterMl() + deltaMl, opts)
+export function getTodayWaterMl(): number {
+  const journal = getTodayJournal()
+  const entries = resolveTodayWaterEntries(journal)
+  if (entries.length > 0) return sumEntries(entries)
+  return Math.max(0, Math.round(journal.waterMl ?? 0))
 }
 
-function normalizePresetsCount(raw: unknown): WaterPresetsCount {
-  if (!raw || typeof raw !== 'object') return {}
-  const out: WaterPresetsCount = {}
-  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-    const n = typeof value === 'number' ? value : Number(value)
-    if (Number.isFinite(n) && n > 0) out[key] = Math.floor(n)
+export function getTodayWaterEntries(): WaterEntry[] {
+  const journal = getTodayJournal()
+  const entries = resolveTodayWaterEntries(journal)
+  const hadStored = Array.isArray(journal.waterEntries) && journal.waterEntries.length > 0
+  if (!hadStored && entries.length > 0) {
+    return persistWaterJournal(entries).waterEntries ?? entries
   }
-  return out
+  return entries
 }
 
 export function getTodayWaterPresetsCount(): WaterPresetsCount {
-  return normalizePresetsCount(getTodayJournal().waterPresetsCount)
+  return countsFromEntries(getTodayWaterEntries())
 }
 
-export function setTodayWaterPresetsCount(
-  counts: WaterPresetsCount,
+/** Ajoute une prise d’eau au journal (raccourci ou ajustement manuel). */
+export function addWaterEntry(
+  input: {
+    amountMl: number
+    type: WaterEntryType
+    label?: string
+    createdAt?: number
+  },
   opts?: StorageSaveOptions,
-): DayJournal {
-  const journal = getTodayJournal()
-  const cleaned = normalizePresetsCount(counts)
-  const next: DayJournal = {
-    ...journal,
-    waterPresetsCount: Object.keys(cleaned).length > 0 ? cleaned : undefined,
+): { journal: DayJournal; entry: WaterEntry; waterMl: number } {
+  const amountMl = Math.max(0, Math.round(input.amountMl))
+  const entries = resolveTodayWaterEntries()
+  if (amountMl <= 0) {
+    const journal = persistWaterJournal(entries, opts)
+    return {
+      journal,
+      entry: {
+        id: '',
+        amountMl: 0,
+        createdAt: Date.now(),
+        type: input.type,
+        label: input.label ?? PRESET_LABELS[input.type] ?? 'Eau',
+      },
+      waterMl: journal.waterMl ?? 0,
+    }
   }
-  saveTodayJournal(next, opts)
-  return next
+
+  const entry: WaterEntry = {
+    id: newWaterEntryId(),
+    amountMl: Math.min(MAX_DAILY_WATER_ML, amountMl),
+    createdAt: input.createdAt ?? Date.now(),
+    type: input.type,
+    label: input.label ?? PRESET_LABELS[input.type] ?? 'Eau',
+  }
+  const journal = persistWaterJournal([entry, ...entries], opts)
+  return { journal, entry, waterMl: journal.waterMl ?? 0 }
+}
+
+/** Supprime une ligne du journal → recalcule le total + sync cloud. */
+export function removeWaterEntry(
+  entryId: string,
+  opts?: StorageSaveOptions,
+): { journal: DayJournal; waterMl: number; removed: WaterEntry | null } {
+  const entries = resolveTodayWaterEntries()
+  const removed = entries.find((e) => e.id === entryId) ?? null
+  const nextEntries = entries.filter((e) => e.id !== entryId)
+  const journal = persistWaterJournal(nextEntries, opts)
+  return { journal, waterMl: journal.waterMl ?? 0, removed }
 }
 
 /**
- * Ajoute ou retire un contenant preset (tap / long-press).
- * Met à jour le total d’eau + le badge multiplicateur, puis sync cloud.
+ * Valide un total cible depuis le drag-to-fill :
+ * - si ↑ : ajoute une entrée « Ajustement » du delta
+ * - si ↓ : retire du plus récent jusqu’à atteindre la cible
+ */
+export function setWaterTotalFromGauge(
+  targetMl: number,
+  opts?: StorageSaveOptions,
+): DayJournal {
+  const target = Math.max(0, Math.min(MAX_DAILY_WATER_ML, Math.round(targetMl)))
+  let entries = resolveTodayWaterEntries()
+  let sum = sumEntries(entries)
+
+  if (target > sum) {
+    const delta = target - sum
+    entries = [
+      {
+        id: newWaterEntryId(),
+        amountMl: delta,
+        createdAt: Date.now(),
+        type: 'manual',
+        label: 'Ajustement',
+      },
+      ...entries,
+    ]
+  } else if (target < sum) {
+    let need = sum - target
+    // entries are newest-first
+    const next: WaterEntry[] = []
+    for (const entry of entries) {
+      if (need <= 0) {
+        next.push(entry)
+        continue
+      }
+      if (entry.amountMl <= need) {
+        need -= entry.amountMl
+        continue
+      }
+      next.push({ ...entry, amountMl: entry.amountMl - need })
+      need = 0
+    }
+    entries = next
+  }
+
+  return persistWaterJournal(entries, opts)
+}
+
+/** @deprecated Prefer addWaterEntry / setWaterTotalFromGauge */
+export function setTodayWaterMl(waterMl: number, opts?: StorageSaveOptions): DayJournal {
+  return setWaterTotalFromGauge(waterMl, opts)
+}
+
+export function addTodayWaterMl(deltaMl: number, opts?: StorageSaveOptions): DayJournal {
+  if (deltaMl === 0) return getTodayJournal()
+  if (deltaMl > 0) {
+    return addWaterEntry({ amountMl: deltaMl, type: 'manual', label: 'Ajustement' }, opts)
+      .journal
+  }
+  return setWaterTotalFromGauge(getTodayWaterMl() + deltaMl, opts)
+}
+
+/**
+ * Ajoute un contenant preset (tap).
+ * Les suppressions passent par removeWaterEntry (journal UI).
  */
 export function applyWaterPresetDelta(
   presetId: string,
@@ -264,34 +482,39 @@ export function applyWaterPresetDelta(
   mlPerUnit: number,
   opts?: StorageSaveOptions,
 ): { journal: DayJournal; count: number; waterMl: number } {
-  const journal = getTodayJournal()
-  const counts = normalizePresetsCount(journal.waterPresetsCount)
-  const current = counts[presetId] ?? 0
-  const nextCount = Math.max(0, current + deltaCount)
-  if (deltaCount < 0 && current <= 0) {
+  if (deltaCount > 0) {
+    const result = addWaterEntry(
+      {
+        amountMl: mlPerUnit,
+        type: presetId as WaterEntryType,
+        label: PRESET_LABELS[presetId] ?? presetId,
+      },
+      opts,
+    )
+    const counts = countsFromEntries(resolveTodayWaterEntries(result.journal))
     return {
-      journal,
-      count: 0,
-      waterMl: Math.max(0, Math.round(journal.waterMl ?? 0)),
+      journal: result.journal,
+      count: counts[presetId] ?? 0,
+      waterMl: result.waterMl,
     }
   }
 
-  if (nextCount <= 0) delete counts[presetId]
-  else counts[presetId] = nextCount
-
-  const waterMl = Math.max(
-    0,
-    Math.min(
-      MAX_DAILY_WATER_ML,
-      Math.round((journal.waterMl ?? 0) + deltaCount * mlPerUnit),
-    ),
-  )
-
-  const next: DayJournal = {
-    ...journal,
-    waterMl,
-    waterPresetsCount: Object.keys(counts).length > 0 ? counts : undefined,
+  // Long-press legacy: retire la plus récente entrée de ce type
+  const entries = resolveTodayWaterEntries()
+  const idx = entries.findIndex((e) => e.type === presetId)
+  if (idx < 0) {
+    return {
+      journal: getTodayJournal(),
+      count: 0,
+      waterMl: getTodayWaterMl(),
+    }
   }
-  saveTodayJournal(next, opts)
-  return { journal: next, count: nextCount, waterMl }
+  const next = entries.filter((_, i) => i !== idx)
+  const journal = persistWaterJournal(next, opts)
+  const counts = countsFromEntries(next)
+  return {
+    journal,
+    count: counts[presetId] ?? 0,
+    waterMl: journal.waterMl ?? 0,
+  }
 }

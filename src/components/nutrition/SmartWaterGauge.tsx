@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CupSoda, Droplets, FlaskConical } from 'lucide-react'
-import type { WaterPresetsCount } from '../../types/nutrition'
+import { CupSoda, Droplets, FlaskConical, X } from 'lucide-react'
+import type { WaterEntry, WaterPresetsCount } from '../../types/nutrition'
 import {
-  applyWaterPresetDelta,
+  addWaterEntry,
+  getTodayWaterEntries,
   getTodayWaterMl,
   getTodayWaterPresetsCount,
   MAX_DAILY_WATER_ML,
-  setTodayWaterMl,
+  removeWaterEntry,
+  setWaterTotalFromGauge,
 } from '../../services/nutritionStorage'
 
 /** Capacité physique d’une bouteille (ml) — UI jauge. */
@@ -15,8 +17,6 @@ const STEP_ML = 10
 const HAPTIC_EVERY_ML = 50
 const RELEASE_DEADZONE_PX = 18
 const RELEASE_JITTER_MS = 70
-const LONG_PRESS_MS = 480
-const LONG_PRESS_MOVE_PX = 12
 
 const GRADUATIONS_ML = [1250, 1000, 750, 500, 250] as const
 
@@ -40,19 +40,16 @@ interface SmartWaterGaugeProps {
 
 type DragSample = { y: number; t: number; visual: number }
 
-/** Clamp du niveau dans une bouteille (0–1,5 L). */
 function clampBottle(ml: number): number {
   const stepped = Math.round(ml / STEP_ML) * STEP_ML
   return Math.min(WATER_BOTTLE_CAPACITY_ML, Math.max(0, stepped))
 }
 
-/** Clamp du total journalier (plusieurs contenants). */
 function clampDaily(ml: number): number {
   const stepped = Math.round(ml / STEP_ML) * STEP_ML
   return Math.min(MAX_DAILY_WATER_ML, Math.max(0, stepped))
 }
 
-/** Portion bue dans la bouteille « en cours » (mod 1,5 L). */
 function bottleVisualDrunk(totalMl: number): number {
   const t = Math.max(0, totalMl)
   if (t === 0) return 0
@@ -82,6 +79,20 @@ function formatGradLabel(ml: number): string {
   return `${ml}`
 }
 
+function formatEntryTime(createdAt: number): string {
+  try {
+    return new Intl.DateTimeFormat('fr-FR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(createdAt))
+  } catch {
+    const d = new Date(createdAt)
+    const h = String(d.getHours()).padStart(2, '0')
+    const m = String(d.getMinutes()).padStart(2, '0')
+    return `${h}:${m}`
+  }
+}
+
 function resolveReleaseVisual(samples: DragSample[]): number | null {
   if (samples.length === 0) return null
   let endIdx = samples.length - 1
@@ -101,8 +112,8 @@ function resolveReleaseVisual(samples: DragSample[]): number | null {
 }
 
 /**
- * Bouteille Cristaline + presets « mémoire des contenants » (badges ×N).
- * Tap = +1 contenant · long-press = −1. Sync via nutrition.journal (Supabase).
+ * Journal d’hydratation : jauge + raccourcis (badges ×N) + liste « Aujourd’hui »
+ * avec suppression explicite. Sync JSON via nutrition.journal (Supabase).
  */
 export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
   const bottleRef = useRef<HTMLDivElement>(null)
@@ -118,14 +129,21 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
   const [presetCounts, setPresetCounts] = useState<WaterPresetsCount>(() =>
     getTodayWaterPresetsCount(),
   )
+  const [entries, setEntries] = useState<WaterEntry[]>(() => getTodayWaterEntries())
 
-  const syncFromStorage = useCallback(() => {
-    const next = clampDaily(getTodayWaterMl())
-    savedDrunkRef.current = next
-    setDrunkMl(next)
+  const applyJournalState = useCallback((waterMl: number, nextEntries?: WaterEntry[]) => {
+    const total = clampDaily(waterMl)
+    savedDrunkRef.current = total
+    setDrunkMl(total)
     setAwaitingConfirm(false)
+    const resolved = nextEntries ?? getTodayWaterEntries()
+    setEntries(resolved)
     setPresetCounts(getTodayWaterPresetsCount())
   }, [])
+
+  const syncFromStorage = useCallback(() => {
+    applyJournalState(getTodayWaterMl(), getTodayWaterEntries())
+  }, [applyJournalState])
 
   useEffect(() => {
     window.addEventListener('ranked-gym:backup-restored', syncFromStorage)
@@ -140,14 +158,17 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
   const showConfirmBar = awaitingConfirm
   const fullBottlesToday = Math.floor(displayTotal / WATER_BOTTLE_CAPACITY_ML)
 
-  const visualFromClientY = useCallback((clientY: number) => {
-    const el = bottleRef.current
-    if (!el) return visualDrunk
-    const rect = el.getBoundingClientRect()
-    const ratio = 1 - (clientY - rect.top) / Math.max(rect.height, 1)
-    const remaining = clampBottle(ratio * WATER_BOTTLE_CAPACITY_ML)
-    return clampBottle(WATER_BOTTLE_CAPACITY_ML - remaining)
-  }, [visualDrunk])
+  const visualFromClientY = useCallback(
+    (clientY: number) => {
+      const el = bottleRef.current
+      if (!el) return visualDrunk
+      const rect = el.getBoundingClientRect()
+      const ratio = 1 - (clientY - rect.top) / Math.max(rect.height, 1)
+      const remaining = clampBottle(ratio * WATER_BOTTLE_CAPACITY_ML)
+      return clampBottle(WATER_BOTTLE_CAPACITY_ML - remaining)
+    },
+    [visualDrunk],
+  )
 
   const pushSample = useCallback((clientY: number, visual: number) => {
     const sample: DragSample = {
@@ -174,14 +195,14 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
     [pushSample],
   )
 
-  const persistDrunk = useCallback((ml: number) => {
-    const next = clampDaily(ml)
-    savedDrunkRef.current = next
-    setDrunkMl(next)
-    setAwaitingConfirm(false)
-    setTodayWaterMl(next)
-    hapticTick()
-  }, [])
+  const persistDrunk = useCallback(
+    (ml: number) => {
+      const journal = setWaterTotalFromGauge(ml)
+      applyJournalState(journal.waterMl ?? 0, journal.waterEntries)
+      hapticTick()
+    },
+    [applyJournalState],
+  )
 
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -243,13 +264,18 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
     setAwaitingConfirm(false)
   }
 
-  const applyPreset = (presetId: WaterPresetId, delta: 1 | -1, ml: number) => {
+  const addPreset = (presetId: WaterPresetId, ml: number, label: string) => {
     if (awaitingConfirm) cancelDraft()
-    const result = applyWaterPresetDelta(presetId, delta, ml)
-    savedDrunkRef.current = result.waterMl
-    setDrunkMl(result.waterMl)
-    setPresetCounts(result.journal.waterPresetsCount ?? {})
-    hapticTick(delta > 0 ? 10 : 16)
+    const result = addWaterEntry({ amountMl: ml, type: presetId, label })
+    applyJournalState(result.waterMl, result.journal.waterEntries)
+    hapticTick(10)
+  }
+
+  const deleteEntry = (entryId: string) => {
+    if (awaitingConfirm) cancelDraft()
+    const result = removeWaterEntry(entryId)
+    applyJournalState(result.waterMl, result.journal.waterEntries)
+    hapticTick(14)
   }
 
   return (
@@ -415,27 +441,103 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
           />
         </div>
 
-        {/* Smart presets — mémoire des contenants */}
         <div className="w-full max-w-[340px]">
           <p className="mb-2 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8E8E93]">
             Raccourcis
           </p>
           <div className="grid grid-cols-3 gap-2">
             {WATER_SMART_PRESETS.map((preset) => (
-              <WaterPresetButton
+              <button
                 key={preset.id}
-                label={preset.label}
-                detail={preset.detail}
-                count={presetCounts[preset.id] ?? 0}
-                Icon={preset.Icon}
-                onAdd={() => applyPreset(preset.id, 1, preset.ml)}
-                onRemove={() => applyPreset(preset.id, -1, preset.ml)}
-              />
+                type="button"
+                onClick={() => addPreset(preset.id, preset.ml, preset.label)}
+                className="water-preset-btn ios-press relative flex flex-col items-center gap-1 rounded-2xl border border-white/12 px-2 py-3 text-center"
+                style={{
+                  background: 'rgb(28 28 30 / 0.72)',
+                  backdropFilter: 'blur(16px)',
+                  WebkitBackdropFilter: 'blur(16px)',
+                  boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.08)',
+                }}
+                aria-label={`Ajouter ${preset.label} ${preset.detail}`}
+              >
+                {(presetCounts[preset.id] ?? 0) > 0 ? (
+                  <span
+                    key={presetCounts[preset.id]}
+                    className="water-preset-badge"
+                    aria-label={`${presetCounts[preset.id]} fois`}
+                  >
+                    {(presetCounts[preset.id] ?? 0) > 1
+                      ? `x${presetCounts[preset.id]}`
+                      : '1'}
+                  </span>
+                ) : null}
+                <preset.Icon className="h-5 w-5 text-[#7DD3FC]" strokeWidth={1.75} aria-hidden />
+                <span className="text-[12px] font-semibold tracking-tight text-white">
+                  {preset.label}
+                </span>
+                <span className="text-[10px] font-medium tabular-nums text-[#8E8E93]">
+                  {preset.detail}
+                </span>
+              </button>
             ))}
           </div>
-          <p className="mt-2 text-center text-[11px] leading-relaxed text-[#636366]">
-            Tap = +1 · appui long = −1
-          </p>
+        </div>
+
+        {/* Journal éphémère du jour */}
+        <div className="water-journal w-full max-w-[340px]">
+          <div className="mb-2 flex items-baseline justify-between gap-2 px-0.5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8E8E93]">
+              Aujourd’hui
+            </p>
+            {entries.length > 0 ? (
+              <p className="text-[11px] font-medium tabular-nums text-[#636366]">
+                {entries.length} prise{entries.length > 1 ? 's' : ''}
+              </p>
+            ) : null}
+          </div>
+
+          {entries.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-white/10 px-3 py-4 text-center text-[12px] leading-relaxed text-[#636366]">
+              Aucune prise pour l’instant — valide un volume ou un raccourci.
+            </p>
+          ) : (
+            <ul
+              className="max-h-[220px] space-y-1.5 overflow-y-auto overscroll-contain pr-0.5"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              {entries.map((entry) => (
+                <li
+                  key={entry.id}
+                  className="water-journal-row flex items-center gap-2 rounded-2xl border border-white/10 px-3 py-2.5"
+                  style={{
+                    background: 'rgb(28 28 30 / 0.78)',
+                    backdropFilter: 'blur(14px)',
+                    WebkitBackdropFilter: 'blur(14px)',
+                    boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.06)',
+                  }}
+                >
+                  <span className="shrink-0 text-[12px] font-semibold tabular-nums text-[#8E8E93]">
+                    {formatEntryTime(entry.createdAt)}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-white">
+                    {entry.label}
+                    <span className="text-[#8E8E93]">
+                      {' '}
+                      · <span className="tabular-nums">{entry.amountMl}</span> ml
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => deleteEntry(entry.id)}
+                    className="ios-press flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-[#AEAEB2] hover:border-[#FF453A]/40 hover:bg-[#FF453A]/15 hover:text-[#FF453A]"
+                    aria-label={`Supprimer ${entry.label} ${entry.amountMl} ml`}
+                  >
+                    <X className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {showConfirmBar ? (
@@ -490,103 +592,10 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
           </div>
         ) : (
           <p className="max-w-[280px] text-center text-[13px] leading-relaxed text-[#8E8E93]">
-            Glisse la bouteille pour l’approx., ou utilise les raccourcis.
+            Glisse la bouteille ou utilise un raccourci — corrige via la liste.
           </p>
         )}
       </div>
     </section>
-  )
-}
-
-interface WaterPresetButtonProps {
-  label: string
-  detail: string
-  count: number
-  Icon: typeof Droplets
-  onAdd: () => void
-  onRemove: () => void
-}
-
-function WaterPresetButton({
-  label,
-  detail,
-  count,
-  Icon,
-  onAdd,
-  onRemove,
-}: WaterPresetButtonProps) {
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const longPressFired = useRef(false)
-  const startPos = useRef({ x: 0, y: 0 })
-
-  const clearLongPress = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
-    }
-  }
-
-  const onPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
-    longPressFired.current = false
-    startPos.current = { x: event.clientX, y: event.clientY }
-    clearLongPress()
-    longPressTimer.current = setTimeout(() => {
-      longPressFired.current = true
-      if (count > 0) onRemove()
-      else hapticTick(4)
-    }, LONG_PRESS_MS)
-  }
-
-  const onPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
-    const dx = Math.abs(event.clientX - startPos.current.x)
-    const dy = Math.abs(event.clientY - startPos.current.y)
-    if (dx > LONG_PRESS_MOVE_PX || dy > LONG_PRESS_MOVE_PX) clearLongPress()
-  }
-
-  const onPointerUp = () => {
-    const wasLong = longPressFired.current
-    clearLongPress()
-    if (!wasLong) onAdd()
-  }
-
-  const onPointerCancel = () => {
-    clearLongPress()
-    longPressFired.current = true
-  }
-
-  return (
-    <button
-      type="button"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
-      onPointerLeave={clearLongPress}
-      onContextMenu={(e) => e.preventDefault()}
-      className="water-preset-btn ios-press relative flex flex-col items-center gap-1 rounded-2xl border border-white/12 px-2 py-3 text-center"
-      style={{
-        background: 'rgb(28 28 30 / 0.72)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.08)',
-        touchAction: 'manipulation',
-        WebkitTouchCallout: 'none',
-        userSelect: 'none',
-      }}
-      aria-label={`${label} ${detail}. Tap pour ajouter, appui long pour retirer.`}
-    >
-      {count > 0 ? (
-        <span
-          key={count}
-          className="water-preset-badge"
-          aria-label={`${count} fois`}
-        >
-          {count > 1 ? `x${count}` : '1'}
-        </span>
-      ) : null}
-      <Icon className="h-5 w-5 text-[#7DD3FC]" strokeWidth={1.75} aria-hidden />
-      <span className="text-[12px] font-semibold tracking-tight text-white">{label}</span>
-      <span className="text-[10px] font-medium tabular-nums text-[#8E8E93]">{detail}</span>
-    </button>
   )
 }

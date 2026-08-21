@@ -56,14 +56,36 @@ export interface MealEntry {
 /** Compteurs journaliers des raccourcis d’hydratation (verre, shaker…). */
 export type WaterPresetsCount = Record<string, number>
 
+/** Type de contenant / source d’une entrée d’hydratation. */
+export type WaterEntryType = 'glass' | 'shaker' | 'bottle' | 'manual' | 'legacy'
+
+/**
+ * Ligne du journal d’hydratation du jour.
+ * Persistée dans `nutrition.journal[date].waterEntries` (JSON Supabase).
+ */
+export interface WaterEntry {
+  id: string
+  /** Volume de cette prise (ml). */
+  amountMl: number
+  /** Epoch ms — affichage heure locale. */
+  createdAt: number
+  type: WaterEntryType
+  /** Libellé UI (ex. « Bouteille »). */
+  label: string
+}
+
 export interface DayJournal {
   dateKey: string
   meals: MealEntry[]
-  /** Eau bue aujourd’hui (ml) — sync cloud via nutrition.journal */
+  /** Eau bue aujourd’hui (ml) — somme des waterEntries, sync cloud. */
   waterMl?: number
   /**
-   * Mémoire des contenants — ex. `{ glass: 2, bottle: 1 }`.
-   * Persisté dans le JSON `nutrition.journal` (Supabase), clé du jour.
+   * Journal d’hydratation du jour (source de vérité).
+   * Option B : tableau JSON dans nutrition.journal.
+   */
+  waterEntries?: WaterEntry[]
+  /**
+   * @deprecated Dérivé de waterEntries — conservé pour migration / badges.
    */
   waterPresetsCount?: WaterPresetsCount
 }
