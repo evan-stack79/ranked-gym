@@ -101,7 +101,7 @@ export function useRestTimer(options: Options = {}) {
           return
         }
         setState((s) => ({ ...s, remainingSec: next, active: true, finished: false }))
-        if (next <= 10) vibrate(8)
+        if (next === 10 || next === 5 || next === 3 || next === 1) vibrate(10)
       }, 1000)
     },
     [clearTick, complete],
