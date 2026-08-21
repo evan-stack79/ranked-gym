@@ -217,6 +217,44 @@ body {
   animation: skeleton-shimmer 1.35s ease-in-out infinite;
 }
 
+@keyframes streak-flame-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.18);
+  }
+  70% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.streak-flame--pop {
+  animation: streak-flame-pop 0.7s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes streak-count-bump {
+  0% {
+    transform: translateY(6px) scale(0.92);
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.streak-count--bump {
+  animation: streak-count-bump 0.45s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.streak-card--lit {
+  animation: glow-breathe 3.2s ease-in-out infinite;
+}
+
 @keyframes ios-tab-pop {
   0% {
     transform: scale(1);
