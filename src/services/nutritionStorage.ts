@@ -58,6 +58,9 @@ export function saveCalorieProfile(
     goal: inferGoalFromWeights(profile.weightKg, profile.goalWeightKg),
   }
   writeJson(PROFILE_KEY, next)
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('ranked-gym:profile-changed'))
+  }
   if (!opts?.skipCloud) triggerCloudBackup()
 }
 

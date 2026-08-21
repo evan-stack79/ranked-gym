@@ -1,13 +1,47 @@
 import type { BodyMorphology, MealType } from '../types/nutrition'
 import { foodShareForMode, MEAL_SHARE_BY_MORPHOLOGY, type PortionMode } from './morphology'
 
+const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
+
+/**
+ * Allocate daily calories across meals so the sum is *exactly* dailyTarget
+ * (largest-remainder method — no drift from independent Math.round).
+ */
+export function allocateMealBudgets(
+  dailyTarget: number,
+  morphology: BodyMorphology = 'mesomorph',
+): Record<MealType, number> {
+  const target = Math.max(0, Math.round(dailyTarget))
+  const shares = MEAL_SHARE_BY_MORPHOLOGY[morphology]
+  const rows = MEAL_ORDER.map((mealType) => {
+    const exact = target * shares[mealType]
+    const floor = Math.floor(exact)
+    return { mealType, exact, floor, frac: exact - floor }
+  })
+  let used = rows.reduce((sum, r) => sum + r.floor, 0)
+  let left = target - used
+  const byFrac = [...rows].sort((a, b) => b.frac - a.frac || a.exact - b.exact)
+  const budgets: Record<MealType, number> = {
+    breakfast: 0,
+    lunch: 0,
+    dinner: 0,
+    snack: 0,
+  }
+  for (const row of rows) budgets[row.mealType] = row.floor
+  for (const row of byFrac) {
+    if (left <= 0) break
+    budgets[row.mealType] += 1
+    left -= 1
+  }
+  return budgets
+}
+
 export function mealCalorieBudget(
   dailyTarget: number,
   mealType: MealType,
   morphology: BodyMorphology = 'mesomorph',
 ): number {
-  const share = MEAL_SHARE_BY_MORPHOLOGY[morphology][mealType]
-  return Math.round(dailyTarget * share)
+  return allocateMealBudgets(dailyTarget, morphology)[mealType]
 }
 
 /** Soft range around the meal target so people know “about how much” to eat. */
@@ -41,14 +75,19 @@ export function allMealBudgets(
   morphology: BodyMorphology,
   meals: Array<{ mealType: MealType; calories: number }>,
 ) {
-  const types: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
-  return types.map((mealType) => {
-    const budget = mealCalorieBudget(dailyTarget, mealType, morphology)
-    const range = mealCalorieRange(budget)
-    const used = usedMealCalories(mealType, meals)
-    const remaining = Math.max(0, budget - used)
-    return { mealType, budget, range, used, remaining }
-  })
+  const budgets = allocateMealBudgets(dailyTarget, morphology)
+  const sumBudgets = MEAL_ORDER.reduce((s, t) => s + budgets[t], 0)
+  return {
+    rows: MEAL_ORDER.map((mealType) => {
+      const budget = budgets[mealType]
+      const range = mealCalorieRange(budget)
+      const used = usedMealCalories(mealType, meals)
+      const remaining = Math.max(0, budget - used)
+      return { mealType, budget, range, used, remaining }
+    }),
+    sumBudgets,
+    dailyTarget: Math.round(dailyTarget),
+  }
 }
 
 export function suggestedGramsForProduct(

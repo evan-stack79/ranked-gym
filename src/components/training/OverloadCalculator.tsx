@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { Calculator, Sparkles, TrendingUp } from 'lucide-react'
-import { buildOverloadAdvice, type OverloadAdvice } from '../../utils/strength'
+import {
+  buildOverloadAdvice,
+  relativeStrength,
+  type OverloadAdvice,
+} from '../../utils/strength'
 import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
 import { IconBadge } from '../ui/IconBadge'
 
@@ -28,7 +32,13 @@ const TONE_STYLES: Record<
   },
 }
 
-export function OverloadCalculator() {
+interface OverloadCalculatorProps {
+  /** Body weight from Nutri profile — same source of truth */
+  bodyWeightKg: number
+  goalLabel: string
+}
+
+export function OverloadCalculator({ bodyWeightKg, goalLabel }: OverloadCalculatorProps) {
   const [weightKg, setWeightKg] = useState<number | null>(null)
   const [reps, setReps] = useState<number | null>(null)
   const [result, setResult] = useState<OverloadAdvice | null>(null)
@@ -41,6 +51,8 @@ export function OverloadCalculator() {
   }
 
   const tone = result ? TONE_STYLES[result.tone] : null
+  const ratio =
+    result && bodyWeightKg > 0 ? relativeStrength(result.oneRmKg, bodyWeightKg) : null
 
   return (
     <section className="space-y-3">
@@ -50,7 +62,7 @@ export function OverloadCalculator() {
         </p>
         <h2 className="text-[20px] font-bold text-white">Calculateur de Surcharge</h2>
         <p className="mt-1 text-[12px] text-[#AEAEB2]">
-          1RM Epley + conseil pour la prochaine séance (8-12 reps).
+          Profil Nutri : {bodyWeightKg} kg · objectif {goalLabel}. Même données partout.
         </p>
       </div>
 
@@ -66,14 +78,14 @@ export function OverloadCalculator() {
           <IconBadge icon={Calculator} variant="crimson" size="md" />
           <div>
             <p className="text-[15px] font-semibold text-white">Force & surcharge</p>
-            <p className="text-[11px] text-[#8E8E93]">Poids × reps → 1RM estimé</p>
+            <p className="text-[11px] text-[#8E8E93]">Charge barre × reps → 1RM Epley</p>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#636366]">
-              Poids (kg)
+              Poids barre (kg)
             </span>
             <div className="rounded-2xl border border-white/10 bg-black/35 px-3 py-3">
               <ClearableNumberInput
@@ -83,7 +95,7 @@ export function OverloadCalculator() {
                 max={500}
                 step={0.5}
                 required={false}
-                placeholder="Ex. 60"
+                placeholder="60"
                 aria-label="Poids utilisé en kg"
                 className="w-full bg-transparent text-[28px] font-bold tracking-tight text-white outline-none placeholder:text-[#636366]"
               />
@@ -101,7 +113,7 @@ export function OverloadCalculator() {
                 max={50}
                 step={1}
                 required={false}
-                placeholder="Ex. 20"
+                placeholder="20"
                 aria-label="Nombre de répétitions"
                 className="w-full bg-transparent text-[28px] font-bold tracking-tight text-white outline-none placeholder:text-[#636366]"
               />
@@ -135,6 +147,11 @@ export function OverloadCalculator() {
                   {result.oneRmKg}
                   <span className="ml-1 text-[16px] font-semibold text-[#AEAEB2]">kg</span>
                 </p>
+                {ratio != null && ratio > 0 && (
+                  <p className="mt-0.5 text-[11px] text-[#8E8E93]">
+                    {ratio}× ton poids de corps ({bodyWeightKg} kg)
+                  </p>
+                )}
               </div>
               {result.nextWeightKg != null && (
                 <div className="text-right">

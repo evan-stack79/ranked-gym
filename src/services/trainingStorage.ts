@@ -111,8 +111,8 @@ function mergeRoutines(stored?: WorkoutRoutine[]): WorkoutRoutine[] {
 }
 
 const DEFAULT_STATE: TrainingState = {
-  primarySportId: null,
-  favoriteSportIds: [],
+  primarySportId: 'musculation',
+  favoriteSportIds: ['musculation'],
   stepsToday: 0,
   stepsDateKey: todayKey(),
   healthLinked: false,
@@ -146,13 +146,17 @@ function read(): TrainingState {
     const merged: TrainingState = {
       ...DEFAULT_STATE,
       ...parsed,
+      primarySportId: parsed.primarySportId || 'musculation',
       templates:
         parsed.templates && parsed.templates.length > 0
           ? parsed.templates
           : [...DEFAULT_TEMPLATES],
       schedule: parsed.schedule ?? [],
       completed: parsed.completed ?? [],
-      favoriteSportIds: parsed.favoriteSportIds ?? [],
+      favoriteSportIds:
+        parsed.favoriteSportIds && parsed.favoriteSportIds.length > 0
+          ? parsed.favoriteSportIds
+          : ['musculation'],
       workoutNotes: parsed.workoutNotes ?? [],
       routines: mergeRoutines(parsed.routines),
       notificationsEnabled: Boolean(parsed.notificationsEnabled),

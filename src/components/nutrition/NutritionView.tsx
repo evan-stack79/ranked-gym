@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Leaf, Droplets, RotateCcw } from 'lucide-react'
 import { NutritionOnboarding } from './NutritionOnboarding'
 import { NutritionPlanCard } from './NutritionPlanCard'
 import { MealJournal } from './MealJournal'
 import { WeightPaceCard } from './WeightPaceCard'
 import { IconBadge } from '../ui/IconBadge'
-import { computeCaloriePlan } from '../../utils/calories'
 import {
   getCalorieProfile,
   saveCalorieProfile,
@@ -16,65 +15,41 @@ import type { CalorieProfile } from '../../types/nutrition'
 export function NutritionView() {
   const [profile, setProfile] = useState<CalorieProfile>(() => getCalorieProfile())
   const [hydrated, setHydrated] = useState(false)
-  const [targetCalories, setTargetCalories] = useState(
-    () => getAdjustedNutritionTarget().targetCalories,
-  )
-  const [activityBonus, setActivityBonus] = useState(
-    () => getAdjustedNutritionTarget().activityBonus,
-  )
 
-  const refreshTargets = useCallback(() => {
-    const adjusted = getAdjustedNutritionTarget()
-    setTargetCalories(adjusted.targetCalories)
-    setActivityBonus(adjusted.activityBonus)
+  const adjusted = useMemo(() => getAdjustedNutritionTarget(profile), [profile])
+  const targetCalories = adjusted.targetCalories
+  const activityBonus = adjusted.activityBonus
+
+  useEffect(() => {
+    setProfile(getCalorieProfile())
+    setHydrated(true)
   }, [])
 
   useEffect(() => {
-    const stored = getCalorieProfile()
-    setProfile(stored)
-    refreshTargets()
-    setHydrated(true)
-  }, [refreshTargets])
-
-  useEffect(() => {
-    const onRestored = () => {
-      setProfile(getCalorieProfile())
-      refreshTargets()
+    const sync = () => setProfile(getCalorieProfile())
+    window.addEventListener('ranked-gym:backup-restored', sync)
+    window.addEventListener('ranked-gym:profile-changed', sync)
+    window.addEventListener('focus', sync)
+    document.addEventListener('visibilitychange', sync)
+    return () => {
+      window.removeEventListener('ranked-gym:backup-restored', sync)
+      window.removeEventListener('ranked-gym:profile-changed', sync)
+      window.removeEventListener('focus', sync)
+      document.removeEventListener('visibilitychange', sync)
     }
-    window.addEventListener('ranked-gym:backup-restored', onRestored)
-    return () => window.removeEventListener('ranked-gym:backup-restored', onRestored)
-  }, [refreshTargets])
+  }, [])
 
   useEffect(() => {
     if (!hydrated) return
     saveCalorieProfile(profile)
-    refreshTargets()
-  }, [profile, hydrated, refreshTargets])
-
-  useEffect(() => {
-    const onFocus = () => refreshTargets()
-    window.addEventListener('focus', onFocus)
-    document.addEventListener('visibilitychange', onFocus)
-    return () => {
-      window.removeEventListener('focus', onFocus)
-      document.removeEventListener('visibilitychange', onFocus)
-    }
-  }, [refreshTargets])
-
-  const handleTargetChange = useCallback((value: number) => {
-    setTargetCalories(value)
-  }, [])
+  }, [profile, hydrated])
 
   const handleProfileChange = useCallback((next: CalorieProfile) => {
     setProfile(next)
-    const plan = computeCaloriePlan(next)
-    const adjusted = getAdjustedNutritionTarget()
-    setTargetCalories(Math.max(1200, plan.targetCalories + (adjusted.activityBonus || 0)))
   }, [])
 
   const resetOnboarding = () => {
-    const next = { ...profile, onboardingComplete: false }
-    setProfile(next)
+    setProfile({ ...profile, onboardingComplete: false })
   }
 
   if (!hydrated) return null
@@ -125,11 +100,7 @@ export function NutritionView() {
       ) : (
         <>
           <div className="ios-fade-up ios-fade-up-delay-1">
-            <NutritionPlanCard
-              profile={profile}
-              onChange={handleProfileChange}
-              onTargetChange={handleTargetChange}
-            />
+            <NutritionPlanCard profile={profile} onChange={handleProfileChange} />
           </div>
           <div className="ios-fade-up ios-fade-up-delay-1">
             <WeightPaceCard profile={profile} />

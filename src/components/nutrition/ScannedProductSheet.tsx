@@ -230,14 +230,16 @@ export function ScannedProductSheet({
       <div className="space-y-5 pb-2">
         <div className="rounded-2xl border border-white/10 bg-black/25 px-3.5 py-3">
           <p className="text-[12px] font-semibold text-white">
-            {MEAL_TYPE_LABELS[mealType]} · vise {range.min}–{range.max} kcal
+            {MEAL_TYPE_LABELS[mealType]} · budget {budget} kcal (zone {range.min}–{range.max})
           </p>
           <p className="mt-1 text-[12px] text-[#AEAEB2]">
-            Déjà noté : <span className="font-semibold text-white">{used} kcal</span>
+            Déjà noté sur ce repas :{' '}
+            <span className="font-semibold text-white">{used} kcal</span>
             {' · '}
-            Il reste{' '}
-            <span className="font-semibold text-[#30D158]">{remaining} kcal</span> pour un bon
-            repas.
+            Budget repas restant{' '}
+            <span className="font-semibold text-[#30D158]">{remaining} kcal</span>
+            {' / '}
+            cible jour {targetCalories} kcal
           </p>
           {isFollowUp && (
             <p className="mt-1 text-[11px] text-[#8E8E93]">

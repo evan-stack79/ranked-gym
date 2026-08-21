@@ -1,14 +1,15 @@
+import type { CalorieProfile } from '../types/nutrition'
 import { getCalorieProfile } from './nutritionStorage'
 import { getTrainingState, todayWorkoutKcal } from './trainingStorage'
 import { computeCaloriePlan, GOAL_LABELS } from '../utils/calories'
-import {
-  applyActivityToTarget,
-  stepsToKcal,
-} from '../utils/activityCalories'
+import { applyActivityToTarget, stepsToKcal } from '../utils/activityCalories'
 
-/** Daily calorie target including steps + logged workouts, goal-aware. */
-export function getAdjustedNutritionTarget() {
-  const profile = getCalorieProfile()
+/**
+ * Single source of truth for the daily calorie target.
+ * Always pass the live profile when available so UI never drifts from storage timing.
+ */
+export function getAdjustedNutritionTarget(profileOverride?: CalorieProfile) {
+  const profile = profileOverride ?? getCalorieProfile()
   const training = getTrainingState()
   const plan = computeCaloriePlan(profile)
   const stepsKcal = stepsToKcal(training.stepsToday, profile.weightKg)

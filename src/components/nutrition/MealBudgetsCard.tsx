@@ -17,7 +17,7 @@ interface MealBudgetsCardProps {
 }
 
 export function MealBudgetsCard({ targetCalories, morphology, meals }: MealBudgetsCardProps) {
-  const rows = allMealBudgets(targetCalories, morphology, meals)
+  const { rows, sumBudgets, dailyTarget } = allMealBudgets(targetCalories, morphology, meals)
 
   return (
     <section className="glass-card space-y-3 rounded-3xl p-4">
@@ -27,7 +27,7 @@ export function MealBudgetsCard({ targetCalories, morphology, meals }: MealBudge
         </p>
         <h3 className="text-[17px] font-bold text-white">Combien manger à chaque repas</h3>
         <p className="mt-1 text-[12px] leading-relaxed text-[#AEAEB2]">
-          Fourchettes simples selon ton plan — reste dans la zone, c’est déjà très bien.
+          La somme des 4 repas = exactement ta cible du jour ({dailyTarget} kcal).
         </p>
       </div>
 
@@ -47,8 +47,8 @@ export function MealBudgetsCard({ targetCalories, morphology, meals }: MealBudge
                     {MEAL_TYPE_LABELS[row.mealType]}
                   </p>
                 </div>
-                <p className="text-[12px] font-semibold text-[#AEAEB2]">
-                  {row.range.min}–{row.range.max}{' '}
+                <p className="text-[13px] font-bold text-white">
+                  {row.budget}{' '}
                   <span className="font-medium text-[#636366]">kcal</span>
                 </p>
               </div>
@@ -65,21 +65,32 @@ export function MealBudgetsCard({ targetCalories, morphology, meals }: MealBudge
                 />
               </div>
               <p className="mt-1.5 text-[11px] text-[#8E8E93]">
-                Cible ~{row.budget} · mangé {row.used}
+                Zone {row.range.min}–{row.range.max} · mangé {row.used}
                 {row.remaining > 0 ? (
                   <>
                     {' '}
-                    · reste{' '}
+                    · reste repas{' '}
                     <span className="font-semibold text-[#30D158]">{row.remaining} kcal</span>
                   </>
                 ) : (
-                  <> · <span className="font-semibold text-[#FF9F0A]">budget OK</span></>
+                  <>
+                    {' '}
+                    · <span className="font-semibold text-[#FF9F0A]">budget OK</span>
+                  </>
                 )}
               </p>
             </li>
           )
         })}
       </ul>
+
+      <p className="text-center text-[12px] text-[#AEAEB2]">
+        Total repas{' '}
+        <span className="font-semibold text-white">{sumBudgets} kcal</span>
+        {' = '}
+        cible jour{' '}
+        <span className="font-semibold text-[#30D158]">{dailyTarget} kcal</span>
+      </p>
     </section>
   )
 }

@@ -70,7 +70,7 @@ export function SportPicker({ open, selectedId, onClose, onSelect }: SportPicker
 }
 
 export function SportChip({ sportId }: { sportId: string | null }) {
-  const sport = sportId ? getSportById(sportId) : null
-  if (!sport) return <span className="text-[#8E8E93]">Choisir un sport</span>
+  const sport = sportId ? getSportById(sportId) : getSportById('musculation')
+  if (!sport) return <span>Musculation / Hypertrophie</span>
   return <span>{sport.name}</span>
 }

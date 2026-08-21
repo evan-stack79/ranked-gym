@@ -35,16 +35,19 @@ import { IosSheet } from '../ui/IosSheet'
 
 export function TrainingView() {
   const [state, setState] = useState<TrainingState>(() => getTrainingState())
+  const [profileTick, setProfileTick] = useState(0)
   const [sportOpen, setSportOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [dueBanner, setDueBanner] = useState<string | null>(null)
   const [cardioOpen, setCardioOpen] = useState(false)
   const [durationMin, setDurationMin] = useState(40)
 
-  const profile = useMemo(
-    () => getCalorieProfile(),
-    [state.stepsToday, state.completed, state.workoutNotes],
-  )
+  const profile = useMemo(() => getCalorieProfile(), [
+    profileTick,
+    state.stepsToday,
+    state.completed,
+    state.workoutNotes,
+  ])
   const plan = useMemo(() => computeCaloriePlan(profile), [profile])
 
   const stepsKcal = stepsToKcal(state.stepsToday, profile.weightKg)
@@ -91,6 +94,18 @@ export function TrainingView() {
     const onRestored = () => setState(getTrainingState())
     window.addEventListener('ranked-gym:backup-restored', onRestored)
     return () => window.removeEventListener('ranked-gym:backup-restored', onRestored)
+  }, [])
+
+  useEffect(() => {
+    const syncProfile = () => setProfileTick((t) => t + 1)
+    window.addEventListener('ranked-gym:profile-changed', syncProfile)
+    window.addEventListener('ranked-gym:backup-restored', syncProfile)
+    window.addEventListener('focus', syncProfile)
+    return () => {
+      window.removeEventListener('ranked-gym:profile-changed', syncProfile)
+      window.removeEventListener('ranked-gym:backup-restored', syncProfile)
+      window.removeEventListener('focus', syncProfile)
+    }
   }, [])
 
   const handleConnectHealth = async () => {
@@ -177,7 +192,7 @@ export function TrainingView() {
         }}
       />
 
-      <OverloadCalculator />
+      <OverloadCalculator bodyWeightKg={profile.weightKg} goalLabel={GOAL_LABELS[plan.goal]} />
 
       {isStrength ? (
         <WorkoutNotebook

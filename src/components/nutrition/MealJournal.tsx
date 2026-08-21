@@ -286,10 +286,12 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
             <p className="text-[13px] text-[#8E8E93]">
               {remaining > 0 ? (
                 <>
-                  Il reste <span className="font-semibold text-[#30D158]">{remaining} kcal</span>
+                  Il reste{' '}
+                  <span className="font-semibold text-[#30D158]">{remaining} kcal</span> sur ta
+                  cible du jour ({targetCalories} kcal)
                 </>
               ) : (
-                <span className="font-semibold text-[#FF9F0A]">Objectif atteint</span>
+                <span className="font-semibold text-[#FF9F0A]">Objectif du jour atteint</span>
               )}
               {' · '}
               {meals.length} aliments

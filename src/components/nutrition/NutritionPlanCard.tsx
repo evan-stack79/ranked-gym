@@ -18,7 +18,6 @@ import { getAdjustedNutritionTarget } from '../../services/nutritionActivity'
 interface NutritionPlanCardProps {
   profile: CalorieProfile
   onChange: (profile: CalorieProfile) => void
-  onTargetChange?: (targetCalories: number) => void
 }
 
 function Field({
@@ -64,7 +63,7 @@ function Field({
   )
 }
 
-export function NutritionPlanCard({ profile, onChange, onTargetChange }: NutritionPlanCardProps) {
+export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps) {
   const [scaleOpen, setScaleOpen] = useState(false)
   const [draft, setDraft] = useState(profile)
 
@@ -73,17 +72,12 @@ export function NutritionPlanCard({ profile, onChange, onTargetChange }: Nutriti
   }, [profile])
 
   const plan = useMemo(() => computeCaloriePlan(profile), [profile])
-  const adjusted = useMemo(() => getAdjustedNutritionTarget(), [profile, plan.targetCalories])
-
-  useEffect(() => {
-    onTargetChange?.(adjusted.targetCalories)
-  }, [adjusted.targetCalories, onTargetChange])
+  const adjusted = useMemo(() => getAdjustedNutritionTarget(profile), [profile])
 
   const progressToGoal = useMemo(() => {
     const start = profile.weightKg
     const goal = profile.goalWeightKg
     if (Math.abs(start - goal) < 0.05) return 1
-    // Visual only: how close we are — when equal, 100%
     const total = Math.abs(start - goal)
     const remaining = Math.abs(profile.weightKg - goal)
     return Math.max(0, Math.min(1, 1 - remaining / Math.max(total, 0.1)))

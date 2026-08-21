@@ -15,7 +15,7 @@ export const SPORT_CATEGORY_LABELS: Record<SportCategory, string> = {
 /** Popular first (high popularity), then a wide catalog for France / world. */
 export const SPORTS: Sport[] = [
   // —— Les plus connus ——
-  { id: 'musculation', name: 'Musculation', category: 'strength', popularity: 100, kcalPerHour: 400 },
+  { id: 'musculation', name: 'Musculation / Hypertrophie', category: 'strength', popularity: 100, kcalPerHour: 400 },
   { id: 'course-a-pied', name: 'Course à pied', category: 'cardio', popularity: 99, tracksSteps: true, kcalPerHour: 650 },
   { id: 'marche', name: 'Marche / randonnée', category: 'cardio', popularity: 98, tracksSteps: true, kcalPerHour: 280 },
   { id: 'velo', name: 'Vélo', category: 'cardio', popularity: 97, kcalPerHour: 500 },

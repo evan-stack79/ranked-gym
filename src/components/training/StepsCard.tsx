@@ -53,20 +53,19 @@ export function StepsCard({
         </div>
         <div className="flex items-end gap-2">
           <ClearableNumberInput
-            value={steps || null}
+            value={steps}
             onChange={(v) => onStepsChange(v ?? 0)}
             min={0}
             max={100000}
             step={1}
             required={false}
-            placeholder="Ex. 10 000"
-            placeholderClassName="pointer-events-none absolute inset-0 flex items-center text-[34px] font-bold tracking-tight text-[#636366]"
             aria-label="Pas du jour"
             className="relative z-[1] w-full bg-transparent text-[34px] font-bold tracking-tight text-white outline-none"
           />
+          <span className="pb-1.5 text-[15px] font-semibold text-[#8E8E93]">pas</span>
         </div>
         <div className="mt-2.5 flex flex-wrap gap-1.5">
-          {[5000, 8000, 10000, 12000].map((preset) => (
+          {[5000, 7500, 10000, 12000].map((preset) => (
             <button
               key={preset}
               type="button"
