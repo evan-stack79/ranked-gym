@@ -7,6 +7,8 @@ export interface RankVisual {
   sublabel: string
   border: string
   glow: string
+  /** RGB channels for dynamic halo (ex. "196, 90, 26") */
+  haloRgb: string
 }
 
 export const rankVisuals: Record<RankTier, RankVisual> = {
@@ -17,6 +19,7 @@ export const rankVisuals: Record<RankTier, RankVisual> = {
     sublabel: 'text-[#FFD4A8]',
     border: 'border-[#FF9F5A]/40',
     glow: '0 0 40px rgb(196 90 26 / 0.45)',
+    haloRgb: '196, 90, 26',
   },
   Argent: {
     background:
@@ -25,6 +28,7 @@ export const rankVisuals: Record<RankTier, RankVisual> = {
     sublabel: 'text-[#D8E8F4]',
     border: 'border-white/35',
     glow: '0 0 36px rgb(168 196 216 / 0.4)',
+    haloRgb: '168, 196, 216',
   },
   Or: {
     background:
@@ -33,6 +37,7 @@ export const rankVisuals: Record<RankTier, RankVisual> = {
     sublabel: 'text-[#5C3D00]',
     border: 'border-[#FFE566]/50',
     glow: '0 0 44px rgb(255 193 7 / 0.5)',
+    haloRgb: '255, 193, 7',
   },
   Platine: {
     background:
@@ -41,6 +46,7 @@ export const rankVisuals: Record<RankTier, RankVisual> = {
     sublabel: 'text-[#C8FFF4]',
     border: 'border-[#5CFFE8]/40',
     glow: '0 0 44px rgb(0 212 170 / 0.45)',
+    haloRgb: '0, 212, 170',
   },
   Diamant: {
     background:
@@ -49,6 +55,7 @@ export const rankVisuals: Record<RankTier, RankVisual> = {
     sublabel: 'text-[#F5C8FF]',
     border: 'border-[#FF4DCF]/45',
     glow: '0 0 48px rgb(192 38 255 / 0.5)',
+    haloRgb: '192, 38, 255',
   },
   Master: {
     background:
@@ -57,6 +64,7 @@ export const rankVisuals: Record<RankTier, RankVisual> = {
     sublabel: 'text-[#DDD6FE]',
     border: 'border-[#A78BFA]/40',
     glow: '0 0 44px rgb(124 58 237 / 0.45)',
+    haloRgb: '124, 58, 237',
   },
   Légende: {
     background:
@@ -65,5 +73,6 @@ export const rankVisuals: Record<RankTier, RankVisual> = {
     sublabel: 'text-[#FFE8A0]',
     border: 'border-[#FFD700]/70',
     glow: '0 0 52px rgb(255 43 43 / 0.55), 0 0 24px rgb(255 215 0 / 0.35)',
+    haloRgb: '255, 107, 0',
   },
 }

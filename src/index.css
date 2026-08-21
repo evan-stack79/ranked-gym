@@ -89,12 +89,59 @@ body {
   }
 }
 
+/* Shine diagonal trading-card — cycle ~3s (pause entre passages) */
+@keyframes rank-holo-shine {
+  0% {
+    transform: translate(-130%, -10%) rotate(28deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  42% {
+    transform: translate(130%, 10%) rotate(28deg);
+    opacity: 1;
+  }
+  50%,
+  100% {
+    transform: translate(130%, 10%) rotate(28deg);
+    opacity: 0;
+  }
+}
+
 .rank-shine {
   animation: card-shine 5.5s ease-in-out infinite;
 }
 
+.rank-trading-stage {
+  /* Contient le tilt 3D sans affecter le reste de la page */
+  transform-style: preserve-3d;
+}
+
 .rank-trading-card {
   touch-action: pan-y;
+  isolation: isolate;
+}
+
+.rank-holo-shine {
+  position: absolute;
+  top: -20%;
+  left: 0;
+  width: 48%;
+  height: 140%;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 35%,
+    rgba(255, 255, 255, 0.04) 45%,
+    rgba(255, 255, 255, 0.14) 50%,
+    rgba(255, 255, 255, 0.04) 55%,
+    transparent 65%,
+    transparent 100%
+  );
+  animation: rank-holo-shine 3s ease-in-out infinite;
+  will-change: transform, opacity;
 }
 
 .badge-unlocked {
