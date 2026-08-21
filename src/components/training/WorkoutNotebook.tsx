@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BookOpen, Plus, Trash2, TrendingUp } from 'lucide-react'
+import { BookOpen, Plus, Timer, Trash2, TrendingUp } from 'lucide-react'
 import type {
   ExerciseEntry,
   SetDifficulty,
@@ -38,6 +38,8 @@ interface WorkoutNotebookProps {
     exerciseName: string
     setLabel: string
   }) => void
+  /** Lancer un repos rapide sans série (presets du carnet). */
+  onQuickRest?: (seconds: number) => void
   /** Applique restSec / done sur une série (callback parent). */
   restLogRequest?: {
     exerciseId: string
@@ -84,6 +86,7 @@ export function WorkoutNotebook({
   onDeleteNote,
   onAddRoutine,
   onRestStart,
+  onQuickRest,
   restLogRequest,
 }: WorkoutNotebookProps) {
   const [routineId, setRoutineId] = useState(routines[0]?.id ?? 'upper')
@@ -208,9 +211,53 @@ export function WorkoutNotebook({
         </p>
         <h2 className="text-[20px] font-bold text-white">Focus · séries · progression</h2>
         <p className="mt-1 text-[12px] text-[#AEAEB2]">
-          Choisis Upper, Jambes, Pecs… — on rouvre ta dernière version pour évoluer.
+          Choisis Upper, Jambes, Pecs… — termine une série pour lancer le chrono de repos.
         </p>
       </div>
+
+      {(onRestStart || onQuickRest) && (
+        <div
+          className="rounded-2xl border border-[#30D158]/25 px-3.5 py-3"
+          style={{
+            background: 'rgb(48 209 88 / 0.08)',
+            boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.06)',
+          }}
+        >
+          <div className="mb-2 flex items-center gap-2">
+            <Timer className="h-4 w-4 text-[#30D158]" strokeWidth={2.25} />
+            <p className="text-[13px] font-semibold text-white">Chrono repos</p>
+          </div>
+          <p className="mb-2.5 text-[11px] leading-relaxed text-[#8E8E93]">
+            Tape <span className="font-semibold text-[#AEAEB2]">Terminer la série</span> sous
+            une série, ou lance un preset :
+          </p>
+          <div className="flex gap-2">
+            {([45, 90, 180] as const).map((sec) => (
+              <button
+                key={sec}
+                type="button"
+                onClick={() => {
+                  if (onQuickRest) {
+                    onQuickRest(sec)
+                    return
+                  }
+                  const lastEx = exercises[exercises.length - 1]
+                  const setIndex = Math.max(0, (lastEx?.sets.length ?? 1) - 1)
+                  onRestStart?.({
+                    exerciseId: lastEx?.id ?? 'quick',
+                    setIndex,
+                    exerciseName: lastEx?.name?.trim() || 'Repos',
+                    setLabel: `${sec}s`,
+                  })
+                }}
+                className="ios-press flex-1 rounded-xl border border-[#30D158]/30 bg-[#30D158]/12 py-2.5 text-[13px] font-semibold tabular-nums text-[#30D158]"
+              >
+                {sec}s
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {routines.map((r) => {
@@ -381,21 +428,22 @@ export function WorkoutNotebook({
                           <span className="w-4" />
                         )}
                       </div>
-                      <div className="flex flex-wrap items-center gap-1.5 pl-6">
+                      <div className="flex flex-col gap-1.5 pl-0 sm:pl-0">
                         <button
                           type="button"
                           onClick={() => finishSet(ex, idx)}
-                          className={`ios-press rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                          className={`ios-press flex w-full items-center justify-center gap-1.5 rounded-xl border py-2.5 text-[13px] font-semibold ${
                             set.done
-                              ? 'border-[#30D158]/35 bg-[#30D158]/12 text-[#30D158]'
-                              : 'border-[#FF2B2B]/35 bg-[#FF2B2B]/12 text-[#FF6961]'
+                              ? 'border-[#30D158]/40 bg-[#30D158]/15 text-[#30D158]'
+                              : 'border-[#FF2B2B]/40 bg-[#FF2B2B]/18 text-white'
                           }`}
                         >
-                          {set.done ? 'Repos · Terminer' : 'Terminer la série'}
+                          <Timer className="h-3.5 w-3.5" strokeWidth={2.25} />
+                          {set.done ? 'Relancer le repos' : 'Terminer la série · repos'}
                         </button>
                         {set.restSec != null && set.restSec > 0 ? (
-                          <span className="text-[10px] font-medium tabular-nums text-[#636366]">
-                            Repos {set.restSec}s
+                          <span className="text-center text-[10px] font-medium tabular-nums text-[#636366]">
+                            Dernier repos loggé : {set.restSec}s
                           </span>
                         ) : null}
                       </div>

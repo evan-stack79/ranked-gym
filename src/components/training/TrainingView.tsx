@@ -281,6 +281,14 @@ export function TrainingView() {
           onRestStart={(info) => {
             restTimer.start(90, info)
           }}
+          onQuickRest={(seconds) => {
+            restTimer.start(seconds, {
+              exerciseId: 'quick-rest',
+              setIndex: 0,
+              exerciseName: 'Repos libre',
+              setLabel: `${seconds}s`,
+            })
+          }}
           onSave={(note) => {
             persist(saveWorkoutNote(note))
             showToast(`${note.title} sauvegardé · prochaines fois on le recharge`)
@@ -374,18 +382,20 @@ export function TrainingView() {
         </div>
       )}
 
-      {showStrengthTools ? (
-        <RestTimerOverlay
-          state={restTimer.state}
-          onPreset={(sec: RestPresetSec) => {
-            const target = restTimer.state.target
-            if (!target) return
-            restTimer.start(sec, target)
-          }}
-          onSkip={restTimer.skip}
-          onDismiss={restTimer.dismiss}
-        />
-      ) : null}
+      <RestTimerOverlay
+        state={restTimer.state}
+        onPreset={(sec: RestPresetSec) => {
+          const target = restTimer.state.target ?? {
+            exerciseId: 'quick-rest',
+            setIndex: 0,
+            exerciseName: 'Repos libre',
+            setLabel: `${sec}s`,
+          }
+          restTimer.start(sec, target)
+        }}
+        onSkip={restTimer.skip}
+        onDismiss={restTimer.dismiss}
+      />
     </div>
   )
 }
