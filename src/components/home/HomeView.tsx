@@ -1,6 +1,7 @@
 import { Zap, Trophy, ChevronRight } from 'lucide-react'
 import { IconBadge } from '../ui/IconBadge'
 import { StatusBadge } from '../ui/StatusBadge'
+import { DailyStreak } from './DailyStreak'
 
 const feedItems = [
   {
@@ -38,6 +39,8 @@ export function HomeView() {
           Toutes disciplines. Entraîne-toi. Progresse. Domine l&apos;arène.
         </p>
       </header>
+
+      <DailyStreak />
 
       <section className="glass-card relative overflow-hidden rounded-2xl p-5">
         <div
@@ -78,7 +81,8 @@ export function HomeView() {
                   <span className="text-[#EBEBF5]">{item.action}</span>
                 </p>
                 <p className="mt-1 text-[13px] text-[#8E8E93]">
-                  <span className="font-semibold text-[#FF2B2B]">{item.xp}</span> · il y a {item.time}
+                  <span className="font-semibold text-[#FF2B2B]">{item.xp}</span> · il y a{' '}
+                  {item.time}
                 </p>
               </div>
               <ChevronRight className="h-5 w-5 shrink-0 text-[#48484A]" />
