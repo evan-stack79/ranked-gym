@@ -63,7 +63,7 @@ export function StatGrid() {
   const bestPrs = stats?.bestPrs ?? []
   const sparkPoints = stats?.sparkPoints ?? [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   const barProgress = pinned
-    ? Math.min(1, pinned.weightKg / Math.max(pinned.weightKg, bestPrs[0]?.weightKg ?? pinned.weightKg, 1))
+    ? Math.min(0.96, 0.28 + Math.min(pinned.weightKg, 200) / 220)
     : 0
 
   const pickPr = (pr: ExercisePr) => {
