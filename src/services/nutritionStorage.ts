@@ -194,10 +194,9 @@ export function updateMealInToday(
   return next
 }
 
-/** Suggested daily water goal from body weight (~35 ml/kg), clamped. */
-export function suggestedWaterGoalMl(weightKg: number): number {
-  const raw = Math.round((Math.max(40, weightKg || 70) * 35) / 50) * 50
-  return Math.min(4000, Math.max(1500, raw))
+/** Default bottle capacity used by SmartWaterGauge (ml). */
+export function suggestedWaterGoalMl(_weightKg?: number): number {
+  return 1500
 }
 
 export function getTodayWaterMl(): number {

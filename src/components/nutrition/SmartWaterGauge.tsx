@@ -1,73 +1,87 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Droplets } from 'lucide-react'
-import {
-  addTodayWaterMl,
-  getTodayWaterMl,
-  suggestedWaterGoalMl,
-} from '../../services/nutritionStorage'
+import { getTodayWaterMl, setTodayWaterMl } from '../../services/nutritionStorage'
 
-const SIP_STEP_ML = 10
+/** Capacité physique de la bouteille (ml). */
+export const WATER_BOTTLE_CAPACITY_ML = 1500
+const STEP_ML = 10
 const HAPTIC_EVERY_ML = 50
-const MAX_SIP_ML = 1000
-const MIN_SIP_ML = 0
 
 interface SmartWaterGaugeProps {
-  weightKg: number
+  /** Conservé pour compat — l’objectif UI est fixé à 1500 ml (bouteille). */
+  weightKg?: number
 }
 
-function clampSip(ml: number): number {
-  const stepped = Math.round(ml / SIP_STEP_ML) * SIP_STEP_ML
-  return Math.min(MAX_SIP_ML, Math.max(MIN_SIP_ML, stepped))
+function clampLevel(ml: number): number {
+  const stepped = Math.round(ml / STEP_ML) * STEP_ML
+  return Math.min(WATER_BOTTLE_CAPACITY_ML, Math.max(0, stepped))
 }
 
 function hapticTick() {
   try {
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-      navigator.vibrate(10)
+      navigator.vibrate(8)
     }
   } catch {
-    // unsupported / blocked
+    // unsupported
   }
 }
 
-export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
-  const goalMl = suggestedWaterGoalMl(weightKg)
-  const trackRef = useRef<HTMLDivElement>(null)
-  const hapticBucketRef = useRef(0)
+/**
+ * Bouteille iOS glassmorphism — glisse haut/bas pour régler le niveau.
+ * Persistance Supabase (via nutrition.journal.waterMl) uniquement au relâchement.
+ */
+export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
+  const bottleRef = useRef<HTMLDivElement>(null)
   const pointerIdRef = useRef<number | null>(null)
+  const hapticBucketRef = useRef(0)
+  const savedMlRef = useRef(getTodayWaterMl())
 
-  const [totalMl, setTotalMl] = useState(() => getTodayWaterMl())
-  const [pendingMl, setPendingMl] = useState(0)
+  const [levelMl, setLevelMl] = useState(() =>
+    clampLevel(Math.min(getTodayWaterMl(), WATER_BOTTLE_CAPACITY_ML)),
+  )
   const [dragging, setDragging] = useState(false)
-  const [awaitingConfirm, setAwaitingConfirm] = useState(false)
-  const [wavePulse, setWavePulse] = useState(false)
 
   useEffect(() => {
-    const sync = () => setTotalMl(getTodayWaterMl())
+    const sync = () => {
+      const next = clampLevel(Math.min(getTodayWaterMl(), WATER_BOTTLE_CAPACITY_ML))
+      savedMlRef.current = next
+      setLevelMl(next)
+    }
     window.addEventListener('ranked-gym:backup-restored', sync)
     return () => window.removeEventListener('ranked-gym:backup-restored', sync)
   }, [])
 
-  const fillPct = Math.min(100, (totalMl / goalMl) * 100)
-  const pendingPct = (pendingMl / MAX_SIP_ML) * 100
+  const fillPct = (levelMl / WATER_BOTTLE_CAPACITY_ML) * 100
 
   const mlFromClientY = useCallback((clientY: number) => {
-    const el = trackRef.current
-    if (!el) return 0
+    const el = bottleRef.current
+    if (!el) return levelMl
     const rect = el.getBoundingClientRect()
+    // Haut de la bouteille = plein, bas = vide (comme une vraie bouteille)
     const ratio = 1 - (clientY - rect.top) / Math.max(rect.height, 1)
-    return clampSip(ratio * MAX_SIP_ML)
-  }, [])
+    return clampLevel(ratio * WATER_BOTTLE_CAPACITY_ML)
+  }, [levelMl])
 
-  const applyPending = useCallback((ml: number) => {
-    const next = clampSip(ml)
+  const previewLevel = useCallback((ml: number) => {
+    const next = clampLevel(ml)
     const bucket = Math.floor(next / HAPTIC_EVERY_ML)
-    if (bucket !== hapticBucketRef.current && next > 0) {
+    if (bucket !== hapticBucketRef.current) {
       hapticBucketRef.current = bucket
       hapticTick()
     }
-    if (next === 0) hapticBucketRef.current = 0
-    setPendingMl(next)
+    setLevelMl(next)
+  }, [])
+
+  const persistLevel = useCallback((ml: number) => {
+    const next = clampLevel(ml)
+    if (next === savedMlRef.current) {
+      setLevelMl(next)
+      return
+    }
+    savedMlRef.current = next
+    setLevelMl(next)
+    setTodayWaterMl(next) // → local + cloud backup (Supabase) debounced
   }, [])
 
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -75,14 +89,13 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
     pointerIdRef.current = event.pointerId
     event.currentTarget.setPointerCapture(event.pointerId)
     setDragging(true)
-    setAwaitingConfirm(false)
-    hapticBucketRef.current = 0
-    applyPending(mlFromClientY(event.clientY))
+    hapticBucketRef.current = Math.floor(levelMl / HAPTIC_EVERY_ML)
+    previewLevel(mlFromClientY(event.clientY))
   }
 
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     if (pointerIdRef.current !== event.pointerId) return
-    applyPending(mlFromClientY(event.clientY))
+    previewLevel(mlFromClientY(event.clientY))
   }
 
   const endDrag = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -94,170 +107,162 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
       // already released
     }
     setDragging(false)
-    setPendingMl((current) => {
-      if (current > 0) setAwaitingConfirm(true)
-      else setAwaitingConfirm(false)
-      return current
-    })
+    const finalMl = mlFromClientY(event.clientY)
+    persistLevel(finalMl)
   }
 
-  const cancelPending = () => {
-    setPendingMl(0)
-    setAwaitingConfirm(false)
-    hapticBucketRef.current = 0
+  /** Accessible fallback — same absolute level model, save on change end. */
+  const onRangeInput = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const next = clampLevel(Number(event.target.value))
+    setLevelMl(next)
   }
 
-  const confirmSip = () => {
-    if (pendingMl <= 0) return
-    const nextJournal = addTodayWaterMl(pendingMl)
-    setTotalMl(nextJournal.waterMl ?? 0)
-    setPendingMl(0)
-    setAwaitingConfirm(false)
-    hapticBucketRef.current = 0
-    setWavePulse(true)
-    window.setTimeout(() => setWavePulse(false), 900)
-    hapticTick()
+  const onRangeCommit = () => {
+    persistLevel(levelMl)
   }
-
-  const litersLabel = (ml: number) =>
-    ml >= 1000 ? `${(ml / 1000).toFixed(ml % 1000 === 0 ? 0 : 1)} L` : `${ml} ml`
 
   return (
     <section
-      className="relative overflow-hidden rounded-3xl border border-white/10 p-5"
+      className="relative overflow-hidden rounded-[28px] border border-white/12 px-5 py-5"
       style={{
-        background:
-          'radial-gradient(ellipse 90% 80% at 10% 0%, rgb(0 180 255 / 0.22) 0%, transparent 55%), rgb(28 28 30 / 0.92)',
-        boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.08)',
+        background: 'rgb(255 255 255 / 0.04)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.1)',
       }}
     >
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Droplets className="h-5 w-5 text-[#64D2FF]" />
-          <div>
-            <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-              Hydratation
-            </p>
-            <h2 className="text-[18px] font-bold tracking-tight text-white">Drag-to-Fill</h2>
-          </div>
+      <div className="mb-5 flex items-end justify-between gap-3">
+        <div>
+          <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#8E8E93]">
+            Hydratation
+          </p>
+          <h2 className="mt-1 text-[22px] font-semibold tracking-tight text-white">Eau</h2>
         </div>
-        <p className="text-[13px] font-semibold text-[#64D2FF]">
-          {litersLabel(totalMl)}
-          <span className="text-[#8E8E93]"> / {litersLabel(goalMl)}</span>
+        <p className="text-right text-[15px] font-medium tabular-nums text-[#AEAEB2]">
+          <span className="text-[22px] font-semibold tracking-tight text-white">{levelMl}</span>
+          <span className="text-[#8E8E93]"> / {WATER_BOTTLE_CAPACITY_ML} ml</span>
         </p>
       </div>
 
-      <p className="mb-3 text-[13px] text-[#8E8E93]">
-        Glisse verticalement sur la jauge — pas de clavier. Pas de 10&nbsp;ml.
-      </p>
-
-      <div className="flex items-stretch gap-4">
-        <div
-          ref={trackRef}
-          className="water-gauge relative h-[240px] w-[112px] shrink-0 touch-none select-none overflow-hidden rounded-[28px] border border-[#00B4FF]/35 bg-black/40"
-          style={{ touchAction: 'none' }}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
-          role="slider"
-          aria-valuemin={0}
-          aria-valuemax={MAX_SIP_ML}
-          aria-valuenow={pendingMl}
-          aria-label="Volume d’eau à ajouter"
-          tabIndex={0}
-        >
-          {/* Daily fill with wave */}
+      <div className="flex flex-col items-center gap-4">
+        {/* Bottle */}
+        <div className="relative flex flex-col items-center">
+          {/* Cap / neck */}
           <div
-            className={`water-wave absolute inset-x-0 bottom-0 transition-[height] duration-700 ease-out ${
-              wavePulse ? 'water-wave--pulse' : ''
-            }`}
-            style={{ height: `${fillPct}%` }}
+            className="relative z-10 h-4 w-11 rounded-t-[10px] border border-white/20"
+            style={{
+              background: 'linear-gradient(180deg, rgb(255 255 255 / 0.22), rgb(255 255 255 / 0.06))',
+              boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.35)',
+            }}
+            aria-hidden
+          />
+          <div
+            className="relative z-10 -mt-px h-5 w-[52px] rounded-[8px] border border-white/15"
+            style={{
+              background: 'linear-gradient(180deg, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0.04))',
+            }}
+            aria-hidden
           />
 
-          {/* Pending sip preview */}
-          {(dragging || awaitingConfirm) && pendingMl > 0 && (
+          {/* Body — glass bottle */}
+          <div
+            ref={bottleRef}
+            className={`water-bottle relative mt-[-2px] h-[260px] w-[124px] touch-none select-none overflow-hidden ${
+              dragging ? 'water-bottle--active' : ''
+            }`}
+            style={{ touchAction: 'none' }}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            role="slider"
+            aria-valuemin={0}
+            aria-valuemax={WATER_BOTTLE_CAPACITY_ML}
+            aria-valuenow={levelMl}
+            aria-label="Niveau d’eau dans la bouteille"
+            tabIndex={0}
+          >
+            {/* Glass shell */}
             <div
-              className="absolute inset-x-0 bottom-0 bg-[#64D2FF]/35 transition-[height] duration-75"
-              style={{ height: `${Math.max(pendingPct, (10 / MAX_SIP_ML) * 100)}%` }}
+              className="pointer-events-none absolute inset-0 rounded-[42px] border border-white/25"
+              style={{
+                background:
+                  'linear-gradient(145deg, rgb(255 255 255 / 0.16) 0%, rgb(255 255 255 / 0.04) 40%, rgb(255 255 255 / 0.02) 100%)',
+                boxShadow:
+                  'inset 0 1px 0 rgb(255 255 255 / 0.35), inset 0 -8px 24px rgb(0 0 0 / 0.2), 0 12px 40px rgb(0 0 0 / 0.25)',
+                backdropFilter: 'blur(18px)',
+              }}
             />
-          )}
 
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-2 text-center">
-            {dragging || (awaitingConfirm && pendingMl > 0) ? (
-              <>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-[#8EBEFF]">
-                  À ajouter
-                </p>
-                <p className="mt-1 text-[28px] font-black tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.65)]">
-                  +{pendingMl}
-                </p>
-                <p className="text-[13px] font-semibold text-[#64D2FF]">ml</p>
-              </>
-            ) : (
-              <>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-[#8E8E93]">
-                  Aujourd’hui
-                </p>
-                <p className="mt-1 text-[26px] font-black tracking-tight text-white">
-                  {Math.round(fillPct)}%
-                </p>
-                <p className="text-[12px] text-[#8E8E93]">glisse ↑↓</p>
-              </>
-            )}
-          </div>
+            {/* Specular highlight */}
+            <div
+              className="pointer-events-none absolute left-3 top-8 bottom-10 w-3 rounded-full opacity-40"
+              style={{
+                background: 'linear-gradient(180deg, rgb(255 255 255 / 0.55), transparent)',
+              }}
+              aria-hidden
+            />
 
-          {/* Tick marks every 250ml */}
-          <div className="pointer-events-none absolute inset-y-3 right-2 flex flex-col justify-between">
-            {[1000, 750, 500, 250, 0].map((mark) => (
-              <span key={mark} className="text-[9px] font-medium text-white/35">
-                {mark}
-              </span>
-            ))}
+            {/* Water fill */}
+            <div
+              className="water-bottle-fill absolute inset-x-0 bottom-0 mx-[3px] mb-[3px] overflow-hidden rounded-b-[39px]"
+              style={{
+                height: `calc(${fillPct}% - 0px)`,
+                maxHeight: 'calc(100% - 6px)',
+                transition: dragging
+                  ? 'height 80ms linear'
+                  : 'height 520ms cubic-bezier(0.32, 0.72, 0, 1)',
+              }}
+            >
+              <div className="water-bottle-liquid absolute inset-0" />
+              <div className="water-bottle-meniscus absolute inset-x-0 top-0 h-4" />
+            </div>
+
+            {/* Center readout */}
+            <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center px-3 text-center">
+              <p
+                className={`text-[34px] font-semibold tracking-tight tabular-nums text-white transition-transform duration-200 ${
+                  dragging ? 'scale-105' : 'scale-100'
+                }`}
+                style={{ textShadow: '0 2px 12px rgb(0 0 0 / 0.45)' }}
+              >
+                {levelMl}
+              </p>
+              <p className="text-[13px] font-medium text-white/80">ml</p>
+            </div>
+
+            {/* Invisible vertical range for a11y / trackpads */}
+            <input
+              type="range"
+              min={0}
+              max={WATER_BOTTLE_CAPACITY_ML}
+              step={STEP_ML}
+              value={levelMl}
+              onChange={onRangeInput}
+              onMouseUp={onRangeCommit}
+              onTouchEnd={onRangeCommit}
+              onKeyUp={onRangeCommit}
+              className="water-bottle-range absolute inset-0 z-20 h-full w-full cursor-ns-resize opacity-0"
+              aria-hidden
+              tabIndex={-1}
+            />
           </div>
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col justify-between py-1">
-          <div className="space-y-2">
-            <p className="text-[14px] leading-snug text-[#AEAEB2]">
-              Objectif du jour basé sur ton poids (~35&nbsp;ml/kg) :{' '}
-              <span className="font-semibold text-white">{goalMl} ml</span>
-            </p>
-            <div className="h-2 overflow-hidden rounded-full bg-black/40">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-[#00B4FF] to-[#64D2FF] transition-all duration-700"
-                style={{ width: `${fillPct}%` }}
-              />
-            </div>
-            <p className="text-[12px] text-[#8E8E93]">
-              Vibration à chaque +50&nbsp;ml pendant le glissement.
-            </p>
-          </div>
+        <p className="max-w-[240px] text-center text-[13px] leading-relaxed text-[#8E8E93]">
+          Glisse sur la bouteille pour ajuster le niveau. La sauvegarde se fait au relâchement.
+        </p>
 
-          <div className="space-y-2">
-            {awaitingConfirm && pendingMl > 0 ? (
-              <>
-                <button
-                  type="button"
-                  onClick={confirmSip}
-                  className="water-validate-btn ios-press btn-brand w-full rounded-2xl py-3.5 text-[15px] font-semibold text-white"
-                >
-                  Valider +{pendingMl} ml
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelPending}
-                  className="ios-press w-full rounded-2xl border border-white/10 bg-black/25 py-2.5 text-[13px] font-medium text-[#8E8E93]"
-                >
-                  Annuler
-                </button>
-              </>
-            ) : (
-              <p className="rounded-2xl border border-white/10 bg-black/25 px-3 py-3 text-[12px] leading-relaxed text-[#8E8E93]">
-                Touche la jauge et glisse vers le haut pour plus d’eau. Relâche, puis valide.
-              </p>
-            )}
-          </div>
+        <div className="h-1.5 w-full max-w-[200px] overflow-hidden rounded-full bg-white/8">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-[#7DD3FC] to-[#38BDF8]"
+            style={{
+              width: `${fillPct}%`,
+              transition: dragging
+                ? 'width 80ms linear'
+                : 'width 520ms cubic-bezier(0.32, 0.72, 0, 1)',
+            }}
+          />
         </div>
       </div>
     </section>
