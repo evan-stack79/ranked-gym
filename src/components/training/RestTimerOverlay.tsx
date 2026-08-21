@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom'
-import { Check, SkipForward, X } from 'lucide-react'
+import { Check, SkipForward, Timer } from 'lucide-react'
 import type { RestPresetSec, RestTimerState } from '../../hooks/useRestTimer'
 import { REST_PRESETS_SEC } from '../../hooks/useRestTimer'
 
@@ -8,6 +8,11 @@ interface RestTimerOverlayProps {
   onPreset: (sec: RestPresetSec) => void
   onSkip: () => void
   onDismiss: () => void
+  /**
+   * Pour tests / ergonomie Train : barre toujours montée
+   * (état « Prêt à lancer » si le chrono est à l’arrêt).
+   */
+  alwaysVisible?: boolean
 }
 
 function formatClock(totalSec: number): string {
@@ -17,7 +22,8 @@ function formatClock(totalSec: number): string {
   return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`
 }
 
-function ringColor(remaining: number, total: number): string {
+function ringColor(remaining: number, total: number, idle: boolean): string {
+  if (idle) return '#8E8E93'
   const ratio = total > 0 ? remaining / total : 0
   if (remaining <= 10) return '#FF453A'
   if (ratio <= 0.35) return '#FF9F0A'
@@ -25,24 +31,29 @@ function ringColor(remaining: number, total: number): string {
 }
 
 /**
- * Barre de repos flottante — sticky juste au-dessus de la BottomNav.
- * Visible uniquement quand un repos est actif / terminé.
+ * Barre de repos sticky — portal body, z-index 999, au-dessus de la BottomNav.
  */
 export function RestTimerOverlay({
   state,
   onPreset,
   onSkip,
   onDismiss,
+  alwaysVisible = false,
 }: RestTimerOverlayProps) {
   if (typeof document === 'undefined') return null
-  if (!state.active && !state.finished && !state.target) return null
 
-  const total = Math.max(1, state.totalSec)
-  const remaining = state.finished ? 0 : state.remainingSec
-  const progress = Math.min(1, Math.max(0, remaining / total))
-  const color = ringColor(remaining, total)
-  const pulsing = remaining > 0 && remaining <= 10
-  const ringSize = 52
+  const running = state.active
+  const finished = state.finished
+  const idle = !running && !finished
+
+  if (!alwaysVisible && idle && !state.target) return null
+
+  const total = Math.max(1, state.totalSec || 90)
+  const remaining = finished ? 0 : running ? state.remainingSec : 0
+  const progress = idle ? 0 : Math.min(1, Math.max(0, remaining / total))
+  const color = ringColor(remaining, total, idle)
+  const pulsing = running && remaining > 0 && remaining <= 10
+  const ringSize = 48
   const stroke = 4
   const radius = (ringSize - stroke) / 2
   const circumference = 2 * Math.PI * radius
@@ -50,28 +61,30 @@ export function RestTimerOverlay({
 
   return createPortal(
     <div
-      className="pointer-events-none fixed inset-x-0 z-[200] flex justify-center px-3"
+      id="ranked-rest-timer-bar"
+      className="pointer-events-none fixed inset-x-0 flex justify-center px-3"
       style={{
-        bottom: 'calc(4.85rem + env(safe-area-inset-bottom, 0px))',
+        zIndex: 999,
+        bottom: 'calc(5.25rem + env(safe-area-inset-bottom, 0px))',
       }}
       aria-live="polite"
       role="timer"
-      aria-label={`Repos ${formatClock(remaining)}`}
+      aria-label={idle ? 'Repos prêt à lancer' : `Repos ${formatClock(remaining)}`}
     >
       <div
-        className={`pointer-events-auto rest-timer-panel w-full max-w-lg overflow-hidden rounded-2xl border border-white/14 px-3 py-2.5 ${
+        className={`pointer-events-auto rest-timer-panel w-full max-w-lg overflow-hidden rounded-2xl border-2 px-3 py-2.5 ${
           pulsing ? 'rest-timer-pulse' : ''
         }`}
         style={{
-          background: 'rgb(18 18 20 / 0.97)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
+          borderColor: idle ? 'rgb(48 209 88 / 0.35)' : 'rgb(255 255 255 / 0.16)',
+          background: 'rgb(22 22 24 / 0.98)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
           boxShadow:
-            '0 12px 36px rgb(0 0 0 / 0.55), 0 0 0 1px rgb(255 255 255 / 0.05), inset 0 1px 0 rgb(255 255 255 / 0.1)',
+            '0 14px 40px rgb(0 0 0 / 0.7), 0 0 24px rgb(48 209 88 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.12)',
         }}
       >
-        {/* Ligne principale : ring + temps + passer */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <div className="relative shrink-0" style={{ width: ringSize, height: ringSize }}>
             <svg width={ringSize} height={ringSize} className="-rotate-90" aria-hidden>
               <circle
@@ -79,7 +92,7 @@ export function RestTimerOverlay({
                 cy={ringSize / 2}
                 r={radius}
                 fill="none"
-                stroke="rgb(255 255 255 / 0.1)"
+                stroke="rgb(255 255 255 / 0.12)"
                 strokeWidth={stroke}
               />
               <circle
@@ -91,81 +104,81 @@ export function RestTimerOverlay({
                 strokeWidth={stroke}
                 strokeLinecap="round"
                 strokeDasharray={circumference}
-                strokeDashoffset={dashOffset}
+                strokeDashoffset={idle ? circumference : dashOffset}
                 style={{
                   transition: 'stroke-dashoffset 0.95s linear, stroke 0.35s ease',
-                  filter: `drop-shadow(0 0 6px ${color}88)`,
+                  filter: idle ? undefined : `drop-shadow(0 0 6px ${color}88)`,
                 }}
               />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
-              {state.finished ? (
+              {finished ? (
                 <Check className="h-4 w-4 text-[#30D158]" strokeWidth={2.75} />
+              ) : idle ? (
+                <Timer className="h-4 w-4 text-[#30D158]" strokeWidth={2.25} />
               ) : (
-                <span className="text-[11px] font-bold tabular-nums text-white">
-                  {Math.ceil((remaining / total) * 100)}
+                <span className="text-[10px] font-bold tabular-nums text-white">
+                  {Math.ceil(progress * 100)}
                 </span>
               )}
             </div>
           </div>
 
           <div className="min-w-0 flex-1">
-            {state.finished ? (
-              <p className="text-[18px] font-bold tracking-tight text-[#30D158]">Repos OK</p>
+            {finished ? (
+              <p className="text-[17px] font-bold tracking-tight text-[#30D158]">Repos OK</p>
+            ) : idle ? (
+              <p className="text-[16px] font-bold tracking-tight text-white">Prêt à lancer</p>
             ) : (
-              <p className="text-[26px] font-bold leading-none tracking-tight tabular-nums text-white">
+              <p className="text-[24px] font-bold leading-none tracking-tight tabular-nums text-white">
                 {formatClock(remaining)}
               </p>
             )}
             <p className="mt-0.5 truncate text-[11px] font-medium text-[#8E8E93]">
-              {state.target
-                ? `${state.target.exerciseName || 'Exercice'} · ${state.target.setLabel}`
-                : 'Repos'}
+              {idle
+                ? 'Choisis 45s · 90s · 180s'
+                : state.target
+                  ? `${state.target.exerciseName || 'Exercice'} · ${state.target.setLabel}`
+                  : 'Repos en cours'}
             </p>
           </div>
 
-          {!state.finished ? (
+          {running ? (
             <button
               type="button"
               onClick={onSkip}
-              className="ios-press flex shrink-0 items-center gap-1 rounded-xl border border-white/12 bg-white/[0.07] px-3 py-2.5 text-[13px] font-semibold text-white"
+              className="ios-press flex shrink-0 items-center gap-1 rounded-xl border border-white/14 bg-white/[0.08] px-3 py-2.5 text-[13px] font-semibold text-white"
             >
               <SkipForward className="h-3.5 w-3.5" strokeWidth={2.5} />
               Passer
             </button>
-          ) : (
+          ) : null}
+
+          {finished ? (
             <button
               type="button"
               onClick={onDismiss}
-              className="ios-press shrink-0 rounded-xl border border-[#30D158]/35 bg-[#30D158]/15 px-3 py-2.5 text-[13px] font-semibold text-[#30D158]"
+              className="ios-press shrink-0 rounded-xl border border-[#30D158]/40 bg-[#30D158]/18 px-3 py-2.5 text-[13px] font-semibold text-[#30D158]"
             >
               OK
             </button>
-          )}
-
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="ios-press flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-[#8E8E93]"
-            aria-label="Fermer"
-          >
-            <X className="h-3.5 w-3.5" strokeWidth={2.5} />
-          </button>
+          ) : null}
         </div>
 
-        {/* Presets rapides */}
         <div className="mt-2 flex gap-1.5">
           {REST_PRESETS_SEC.map((sec) => {
-            const active = state.totalSec === sec && state.active
+            const active = running && state.totalSec === sec
             return (
               <button
                 key={sec}
                 type="button"
                 onClick={() => onPreset(sec)}
-                className={`ios-press flex-1 rounded-xl border py-2 text-[12px] font-semibold tabular-nums ${
+                className={`ios-press flex-1 rounded-xl border py-2.5 text-[13px] font-semibold tabular-nums ${
                   active
-                    ? 'border-[#30D158]/45 bg-[#30D158]/18 text-[#30D158]'
-                    : 'border-white/10 bg-white/[0.04] text-[#AEAEB2]'
+                    ? 'border-[#30D158]/50 bg-[#30D158]/20 text-[#30D158]'
+                    : idle
+                      ? 'border-[#30D158]/30 bg-[#30D158]/12 text-[#30D158]'
+                      : 'border-white/12 bg-white/[0.05] text-[#AEAEB2]'
                 }`}
               >
                 {sec}s

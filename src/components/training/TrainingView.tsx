@@ -375,6 +375,7 @@ export function TrainingView() {
       )}
 
       <RestTimerOverlay
+        alwaysVisible={showStrengthTools}
         state={restTimer.state}
         onPreset={(sec: RestPresetSec) => {
           const target = restTimer.state.target ?? {
@@ -383,7 +384,10 @@ export function TrainingView() {
             exerciseName: 'Repos libre',
             setLabel: `${sec}s`,
           }
-          restTimer.start(sec, target)
+          restTimer.start(sec, {
+            ...target,
+            setLabel: target.exerciseId === 'quick-rest' ? `${sec}s` : target.setLabel,
+          })
         }}
         onSkip={restTimer.skip}
         onDismiss={restTimer.dismiss}
