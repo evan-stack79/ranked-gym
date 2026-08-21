@@ -10,6 +10,8 @@ type ProfilesTable = {
     discipline: string
     custom_spots: Json
     active_checkin: Json | null
+    current_streak: number
+    last_login_date: string | null
     created_at: string
     updated_at: string
   }
@@ -22,6 +24,8 @@ type ProfilesTable = {
     discipline?: string
     custom_spots?: Json
     active_checkin?: Json | null
+    current_streak?: number
+    last_login_date?: string | null
     created_at?: string
     updated_at?: string
   }
@@ -34,6 +38,8 @@ type ProfilesTable = {
     discipline?: string
     custom_spots?: Json
     active_checkin?: Json | null
+    current_streak?: number
+    last_login_date?: string | null
     updated_at?: string
   }
   Relationships: []

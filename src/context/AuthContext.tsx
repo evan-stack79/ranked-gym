@@ -26,6 +26,7 @@ import {
   resetCloudBackupHydration,
   setCloudBackupUserId,
 } from '../services/cloudBackup'
+import { applyDailyLoginStreak } from '../services/streakService'
 import {
   disciplineFromLabel,
   getDiscipline,
@@ -41,6 +42,11 @@ function syncLocalDiscipline(label: string) {
 
 type AuthSuccessCallback = () => void
 
+export type StreakWeekBonus = {
+  streak: number
+  bonusXp: number
+}
+
 interface AuthContextValue {
   user: AuthUser | null
   profile: ProfileRow | null
@@ -54,6 +60,9 @@ interface AuthContextValue {
   isAuthOpen: boolean
   authLoading: boolean
   authError: string | null
+  /** Fired when daily streak hits a multiple of 7 (show Accueil celebration). */
+  streakWeekBonus: StreakWeekBonus | null
+  clearStreakWeekBonus: () => void
   refreshProfile: () => Promise<void>
   openAuth: (onSuccess?: AuthSuccessCallback) => void
   closeAuth: () => void
@@ -99,13 +108,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthOpen, setIsAuthOpen] = useState(false)
   const [authLoading, setAuthLoading] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
+  const [streakWeekBonus, setStreakWeekBonus] = useState<StreakWeekBonus | null>(null)
   const pendingRef = useRef<AuthSuccessCallback | null>(null)
   const hydrateGenRef = useRef(0)
 
+  const clearStreakWeekBonus = useCallback(() => setStreakWeekBonus(null), [])
+
   const loadProfile = useCallback(async (authUser: AuthUser, metaDiscipline?: string) => {
     setCloudBackupUserId(authUser.id)
+    let row: ProfileRow | null = null
     try {
-      const row = await ensureProfile(
+      row = await ensureProfile(
         authUser.id,
         authUser.displayName,
         metaDiscipline || 'Musculation',
@@ -115,13 +128,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       syncLocalDiscipline(row.discipline)
     } catch {
       try {
-        const row = await fetchProfile(authUser.id)
+        row = await fetchProfile(authUser.id)
         setProfile(row)
         if (row?.discipline) syncLocalDiscipline(row.discipline)
       } catch {
         setProfile(null)
+        row = null
       }
     }
+
+    if (row) {
+      try {
+        const streakResult = await applyDailyLoginStreak(row)
+        setProfile(streakResult.profile)
+        setUser({
+          ...authUser,
+          displayName: streakResult.profile.pseudo || authUser.displayName,
+        })
+        if (streakResult.weekBonus && streakResult.bonusXp > 0) {
+          setStreakWeekBonus({
+            streak: streakResult.profile.current_streak,
+            bonusXp: streakResult.bonusXp,
+          })
+        }
+      } catch {
+        // Columns may be missing until SQL migration — keep base profile.
+      }
+    }
+
     try {
       await hydrateCloudBackupForUser(authUser.id)
     } catch {
@@ -305,6 +339,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null)
     setUser(null)
     setProfile(null)
+    setStreakWeekBonus(null)
     setIsLoading(false)
   }, [])
 
@@ -317,6 +352,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthOpen,
       authLoading,
       authError,
+      streakWeekBonus,
+      clearStreakWeekBonus,
       refreshProfile,
       openAuth,
       closeAuth,
@@ -334,6 +371,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthOpen,
       authLoading,
       authError,
+      streakWeekBonus,
+      clearStreakWeekBonus,
       refreshProfile,
       openAuth,
       closeAuth,

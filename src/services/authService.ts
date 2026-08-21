@@ -122,6 +122,8 @@ export async function updateProfileProgress(
     rank?: string
     pseudo?: string
     discipline?: string
+    current_streak?: number
+    last_login_date?: string | null
   },
 ): Promise<ProfileRow> {
   const supabase = getSupabase()

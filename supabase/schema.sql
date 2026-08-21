@@ -20,6 +20,8 @@ create table if not exists public.profiles (
   discipline text not null default 'Musculation',
   custom_spots jsonb not null default '[]'::jsonb,
   active_checkin jsonb,
+  current_streak integer not null default 0 check (current_streak >= 0),
+  last_login_date date,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -29,6 +31,10 @@ alter table public.profiles
   add column if not exists custom_spots jsonb not null default '[]'::jsonb;
 alter table public.profiles
   add column if not exists active_checkin jsonb;
+alter table public.profiles
+  add column if not exists current_streak integer not null default 0;
+alter table public.profiles
+  add column if not exists last_login_date date;
 
 -- ---------------------------------------------------------------------------
 -- 2. Workouts (Train + progression locale)

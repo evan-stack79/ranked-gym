@@ -255,6 +255,47 @@ body {
   animation: glow-breathe 3.2s ease-in-out infinite;
 }
 
+.streak-card--jackpot {
+  animation: streak-jackpot-pulse 1.1s ease-in-out 3;
+}
+
+@keyframes streak-jackpot-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.18);
+  }
+}
+
+.streak-bonus-toast {
+  animation: ios-fade-up 0.45s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.streak-confetti {
+  background-image:
+    radial-gradient(circle at 12% 30%, #ff2b2b 0 2px, transparent 3px),
+    radial-gradient(circle at 28% 70%, #ffd60a 0 2px, transparent 3px),
+    radial-gradient(circle at 55% 25%, #ff9f0a 0 2.5px, transparent 3px),
+    radial-gradient(circle at 78% 60%, #30d158 0 2px, transparent 3px),
+    radial-gradient(circle at 90% 35%, #ff2b2b 0 1.5px, transparent 2.5px);
+  opacity: 0.55;
+  animation: streak-confetti-drift 2.8s ease-in-out infinite;
+}
+
+@keyframes streak-confetti-drift {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translateY(4px);
+    opacity: 0.75;
+  }
+}
+
 @keyframes ios-tab-pop {
   0% {
     transform: scale(1);
