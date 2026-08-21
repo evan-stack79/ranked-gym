@@ -37,6 +37,8 @@ export function BarcodeScanner({ open, onClose, onProduct }: BarcodeScannerProps
   const [error, setError] = useState<string | null>(null)
   const [lookingUp, setLookingUp] = useState(false)
   const scannerRef = useRef<Html5Qrcode | null>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const cameraRef = useRef<HTMLDivElement>(null)
   const handledRef = useRef(false)
   const containerId = 'ranked-gym-barcode-reader'
 
@@ -124,57 +126,65 @@ export function BarcodeScanner({ open, onClose, onProduct }: BarcodeScannerProps
     }
   }, [open, onClose, onProduct])
 
+  // Bring the camera into the viewport as soon as the panel mounts.
+  useEffect(() => {
+    if (!open) return
+    const scroll = () => {
+      cameraRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    const t1 = window.setTimeout(scroll, 40)
+    const t2 = window.setTimeout(scroll, 180)
+    return () => {
+      window.clearTimeout(t1)
+      window.clearTimeout(t2)
+    }
+  }, [open])
+
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[85] flex items-end justify-center sm:items-center">
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/75 backdrop-blur-md"
-        aria-label="Fermer le scanner"
-        onClick={onClose}
-      />
-      <div
-        className="relative z-10 w-full max-w-lg overflow-hidden rounded-t-[28px] border border-white/10 bg-[#161618] sm:mx-4 sm:rounded-[28px]"
-        style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
-      >
-        <div className="flex items-center justify-between px-5 pt-4 pb-3">
-          <div className="flex items-center gap-2">
-            <Camera className="h-5 w-5 text-[#30D158]" />
-            <div>
-              <p className="text-[16px] font-semibold text-white">Scanner Open Food Facts</p>
-              <p className="text-[12px] text-[#8E8E93]">
-                Tiens le code un peu plus loin — pas besoin de coller l’écran
-              </p>
-            </div>
+    <div
+      ref={panelRef}
+      className="relative z-20 overflow-hidden rounded-3xl border border-[#30D158]/35 bg-[#161618] shadow-[0_0_40px_rgb(48_209_88_/_0.15)]"
+      style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+    >
+      <div className="flex items-center justify-between px-5 pt-4 pb-3">
+        <div className="flex items-center gap-2">
+          <Camera className="h-5 w-5 text-[#30D158]" />
+          <div>
+            <p className="text-[16px] font-semibold text-white">Scanner Open Food Facts</p>
+            <p className="text-[12px] text-[#8E8E93]">
+              Tiens le code un peu plus loin — pas besoin de coller l’écran
+            </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-[#8E8E93]"
-            aria-label="Fermer"
-          >
-            <X className="h-4 w-4" />
-          </button>
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-[#8E8E93]"
+          aria-label="Fermer"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
 
-        <div className="px-4 pb-4">
-          <div
-            id={containerId}
-            className="overflow-hidden rounded-2xl border border-white/10 bg-black [&_video]:min-h-[280px] [&_video]:w-full [&_video]:object-cover"
-          />
-          {lookingUp && (
-            <p className="mt-3 flex items-center justify-center gap-2 text-[13px] text-[#8E8E93]">
-              <Loader2 className="h-4 w-4 animate-spin text-[#30D158]" />
-              Recherche Open Food Facts…
-            </p>
-          )}
-          {error && (
-            <p className="mt-3 rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]">
-              {error}
-            </p>
-          )}
-        </div>
+      <div ref={cameraRef} className="px-4 pb-4">
+        <div
+          id={containerId}
+          className="overflow-hidden rounded-2xl border border-white/10 bg-black [&_video]:min-h-[280px] [&_video]:w-full [&_video]:object-cover"
+        />
+        {lookingUp && (
+          <p className="mt-3 flex items-center justify-center gap-2 text-[13px] text-[#8E8E93]">
+            <Loader2 className="h-4 w-4 animate-spin text-[#30D158]" />
+            Recherche Open Food Facts…
+          </p>
+        )}
+        {error && (
+          <p className="mt-3 rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]">
+            {error}
+          </p>
+        )}
       </div>
     </div>
   )

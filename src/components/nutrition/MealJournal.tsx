@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   Coffee,
   Moon,
@@ -84,6 +84,11 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   const [carbsG, setCarbsG] = useState<number | ''>('')
   const [fatG, setFatG] = useState<number | ''>('')
   const [mealType, setMealType] = useState<MealType>('lunch')
+  const scanZoneRef = useRef<HTMLDivElement>(null)
+
+  const scrollToScanZone = useCallback(() => {
+    scanZoneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
 
   useEffect(() => {
     setMeals(getTodayJournal().meals)
@@ -161,7 +166,15 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
 
   const openScanner = (forMeal?: MealType) => {
     if (forMeal) setPendingMealType(forMeal)
-    requireAuth(() => setScannerOpen(true))
+    requireAuth(() => {
+      setScannerOpen(true)
+      // Wait for the scanner panel to mount, then smooth-scroll it into view.
+      requestAnimationFrame(() => {
+        scrollToScanZone()
+        window.setTimeout(scrollToScanZone, 80)
+        window.setTimeout(scrollToScanZone, 220)
+      })
+    })
   }
 
   const totals = useMemo(() => {
@@ -298,6 +311,18 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
             </p>
           </div>
         </div>
+      </div>
+
+      <div
+        ref={scanZoneRef}
+        className="scroll-mt-24"
+        id="nutrition-scan-zone"
+      >
+        <BarcodeScanner
+          open={scannerOpen}
+          onClose={() => setScannerOpen(false)}
+          onProduct={handleScannedProduct}
+        />
       </div>
 
       <MealBudgetsCard
@@ -513,12 +538,6 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
           })}
         </ul>
       )}
-
-      <BarcodeScanner
-        open={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        onProduct={handleScannedProduct}
-      />
 
       <ScannedProductSheet
         open={scannedProduct != null}
