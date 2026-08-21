@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BookOpen, Plus, Timer, Trash2, TrendingUp } from 'lucide-react'
+import { BookOpen, Plus, Trash2, TrendingUp } from 'lucide-react'
 import type {
   ExerciseEntry,
   SetDifficulty,
@@ -31,21 +31,18 @@ interface WorkoutNotebookProps {
   }) => void
   onDeleteNote: (id: string) => void
   onAddRoutine: (label: string) => void
-  /** Démarre le timer de repos après « Terminer la série ». */
+  /** Démarre le timer de repos (validation Facile / OK / Dur). */
   onRestStart?: (info: {
     exerciseId: string
     setIndex: number
     exerciseName: string
     setLabel: string
   }) => void
-  /** Lancer un repos rapide sans série (presets du carnet). */
-  onQuickRest?: (seconds: number) => void
   /** Applique restSec / done sur une série (callback parent). */
   restLogRequest?: {
     exerciseId: string
     setIndex: number
     restSec: number
-    /** Skip → prépare la série suivante. */
     addNextSet: boolean
     nonce: number
   } | null
@@ -86,7 +83,6 @@ export function WorkoutNotebook({
   onDeleteNote,
   onAddRoutine,
   onRestStart,
-  onQuickRest,
   restLogRequest,
 }: WorkoutNotebookProps) {
   const [routineId, setRoutineId] = useState(routines[0]?.id ?? 'upper')
@@ -166,8 +162,11 @@ export function WorkoutNotebook({
     )
   }, [restLogRequest])
 
-  const finishSet = (ex: ExerciseEntry, setIndex: number) => {
-    updateSet(ex.id, setIndex, { done: true })
+  const finishSet = (ex: ExerciseEntry, setIndex: number, difficulty?: SetDifficulty) => {
+    updateSet(ex.id, setIndex, {
+      done: true,
+      ...(difficulty ? { difficulty } : {}),
+    })
     onRestStart?.({
       exerciseId: ex.id,
       setIndex,
@@ -211,53 +210,9 @@ export function WorkoutNotebook({
         </p>
         <h2 className="text-[20px] font-bold text-white">Focus · séries · progression</h2>
         <p className="mt-1 text-[12px] text-[#AEAEB2]">
-          Choisis Upper, Jambes, Pecs… — termine une série pour lancer le chrono de repos.
+          Valide Facile / OK / Dur pour lancer le repos en bas de l’écran.
         </p>
       </div>
-
-      {(onRestStart || onQuickRest) && (
-        <div
-          className="rounded-2xl border border-[#30D158]/25 px-3.5 py-3"
-          style={{
-            background: 'rgb(48 209 88 / 0.08)',
-            boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.06)',
-          }}
-        >
-          <div className="mb-2 flex items-center gap-2">
-            <Timer className="h-4 w-4 text-[#30D158]" strokeWidth={2.25} />
-            <p className="text-[13px] font-semibold text-white">Chrono repos</p>
-          </div>
-          <p className="mb-2.5 text-[11px] leading-relaxed text-[#8E8E93]">
-            Tape <span className="font-semibold text-[#AEAEB2]">Terminer la série</span> sous
-            une série, ou lance un preset :
-          </p>
-          <div className="flex gap-2">
-            {([45, 90, 180] as const).map((sec) => (
-              <button
-                key={sec}
-                type="button"
-                onClick={() => {
-                  if (onQuickRest) {
-                    onQuickRest(sec)
-                    return
-                  }
-                  const lastEx = exercises[exercises.length - 1]
-                  const setIndex = Math.max(0, (lastEx?.sets.length ?? 1) - 1)
-                  onRestStart?.({
-                    exerciseId: lastEx?.id ?? 'quick',
-                    setIndex,
-                    exerciseName: lastEx?.name?.trim() || 'Repos',
-                    setLabel: `${sec}s`,
-                  })
-                }}
-                className="ios-press flex-1 rounded-xl border border-[#30D158]/30 bg-[#30D158]/12 py-2.5 text-[13px] font-semibold tabular-nums text-[#30D158]"
-              >
-                {sec}s
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="flex gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {routines.map((r) => {
@@ -377,76 +332,58 @@ export function WorkoutNotebook({
 
                 <div className="space-y-2">
                   {ex.sets.map((set, idx) => (
-                    <div key={idx} className="space-y-1.5">
-                      <div className="grid grid-cols-[auto_1fr_1fr_auto] items-end gap-2">
-                        <span
-                          className={`pb-2 text-[11px] font-bold ${
-                            set.done ? 'text-[#30D158]' : 'text-[#8E8E93]'
-                          }`}
-                        >
-                          S{idx + 1}
-                        </span>
-                        <label className="block">
-                          <span className="mb-0.5 block text-[10px] text-[#636366]">Reps</span>
-                          <ClearableNumberInput
-                            value={set.reps}
-                            onChange={(v) =>
-                              updateSet(ex.id, idx, { reps: v != null ? Math.round(v) : 0 })
-                            }
-                            min={1}
-                            max={50}
-                            aria-label="Reps"
-                            className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
-                          />
-                        </label>
-                        <label className="block">
-                          <span className="mb-0.5 block text-[10px] text-[#636366]">Poids kg</span>
-                          <ClearableNumberInput
-                            value={set.weightKg}
-                            onChange={(v) => updateSet(ex.id, idx, { weightKg: v ?? 0 })}
-                            min={0}
-                            max={500}
-                            step={0.5}
-                            aria-label="Poids"
-                            className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
-                          />
-                        </label>
-                        {ex.sets.length > 1 ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              updateExercise(ex.id, {
-                                sets: ex.sets.filter((_, i) => i !== idx),
-                              })
-                            }
-                            className="mb-2 text-[#636366]"
-                            aria-label="Supprimer série"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        ) : (
-                          <span className="w-4" />
-                        )}
-                      </div>
-                      <div className="flex flex-col gap-1.5 pl-0 sm:pl-0">
+                    <div
+                      key={idx}
+                      className="grid grid-cols-[auto_1fr_1fr_auto] items-end gap-2"
+                    >
+                      <span
+                        className={`pb-2 text-[11px] font-bold ${
+                          set.done ? 'text-[#30D158]' : 'text-[#8E8E93]'
+                        }`}
+                      >
+                        S{idx + 1}
+                      </span>
+                      <label className="block">
+                        <span className="mb-0.5 block text-[10px] text-[#636366]">Reps</span>
+                        <ClearableNumberInput
+                          value={set.reps}
+                          onChange={(v) =>
+                            updateSet(ex.id, idx, { reps: v != null ? Math.round(v) : 0 })
+                          }
+                          min={1}
+                          max={50}
+                          aria-label="Reps"
+                          className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="mb-0.5 block text-[10px] text-[#636366]">Poids kg</span>
+                        <ClearableNumberInput
+                          value={set.weightKg}
+                          onChange={(v) => updateSet(ex.id, idx, { weightKg: v ?? 0 })}
+                          min={0}
+                          max={500}
+                          step={0.5}
+                          aria-label="Poids"
+                          className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
+                        />
+                      </label>
+                      {ex.sets.length > 1 ? (
                         <button
                           type="button"
-                          onClick={() => finishSet(ex, idx)}
-                          className={`ios-press flex w-full items-center justify-center gap-1.5 rounded-xl border py-2.5 text-[13px] font-semibold ${
-                            set.done
-                              ? 'border-[#30D158]/40 bg-[#30D158]/15 text-[#30D158]'
-                              : 'border-[#FF2B2B]/40 bg-[#FF2B2B]/18 text-white'
-                          }`}
+                          onClick={() =>
+                            updateExercise(ex.id, {
+                              sets: ex.sets.filter((_, i) => i !== idx),
+                            })
+                          }
+                          className="mb-2 text-[#636366]"
+                          aria-label="Supprimer série"
                         >
-                          <Timer className="h-3.5 w-3.5" strokeWidth={2.25} />
-                          {set.done ? 'Relancer le repos' : 'Terminer la série · repos'}
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
-                        {set.restSec != null && set.restSec > 0 ? (
-                          <span className="text-center text-[10px] font-medium tabular-nums text-[#636366]">
-                            Dernier repos loggé : {set.restSec}s
-                          </span>
-                        ) : null}
-                      </div>
+                      ) : (
+                        <span className="w-4" />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -463,18 +400,19 @@ export function WorkoutNotebook({
                   </button>
                   {DIFF_OPTIONS.map((d) => {
                     const last = ex.sets[ex.sets.length - 1]
-                    const on = last?.difficulty === d.id
+                    const lastIdx = Math.max(0, ex.sets.length - 1)
+                    const on = last?.difficulty === d.id && last?.done
                     return (
                       <button
                         key={d.id}
                         type="button"
-                        onClick={() =>
-                          updateSet(ex.id, ex.sets.length - 1, { difficulty: d.id })
-                        }
-                        className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                        onClick={() => finishSet(ex, lastIdx, d.id)}
+                        className={`ios-press rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
                           on
-                            ? 'border-[#FF2B2B]/40 bg-[#FF2B2B]/20 text-[#FF6961]'
-                            : 'border-white/10 text-[#8E8E93]'
+                            ? 'border-[#30D158]/40 bg-[#30D158]/18 text-[#30D158]'
+                            : d.id === 'ok'
+                              ? 'border-[#FF2B2B]/40 bg-[#FF2B2B]/18 text-white'
+                              : 'border-white/12 text-[#AEAEB2]'
                         }`}
                       >
                         {d.label}
@@ -493,6 +431,18 @@ export function WorkoutNotebook({
                     </button>
                   )}
                 </div>
+
+                {ex.sets.some((s) => s.restSec != null && s.restSec > 0) ? (
+                  <p className="mt-1.5 text-[10px] tabular-nums text-[#636366]">
+                    Repos loggés :{' '}
+                    {ex.sets
+                      .map((s, i) =>
+                        s.restSec != null && s.restSec > 0 ? `S${i + 1} ${s.restSec}s` : null,
+                      )
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                ) : null}
 
                 {oneRm > 0 && (
                   <div className="mt-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2">

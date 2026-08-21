@@ -25,8 +25,8 @@ function ringColor(remaining: number, total: number): string {
 }
 
 /**
- * Timer de repos — porté sur document.body pour échapper au
- * overflow du <main> (sinon le fixed est invisible / clipé).
+ * Barre de repos flottante — sticky juste au-dessus de la BottomNav.
+ * Visible uniquement quand un repos est actif / terminé.
  */
 export function RestTimerOverlay({
   state,
@@ -42,70 +42,49 @@ export function RestTimerOverlay({
   const progress = Math.min(1, Math.max(0, remaining / total))
   const color = ringColor(remaining, total)
   const pulsing = remaining > 0 && remaining <= 10
-  const size = 156
-  const stroke = 9
-  const radius = (size - stroke) / 2
+  const ringSize = 52
+  const stroke = 4
+  const radius = (ringSize - stroke) / 2
   const circumference = 2 * Math.PI * radius
   const dashOffset = circumference * (1 - progress)
 
   return createPortal(
     <div
-      className="pointer-events-none fixed inset-x-0 z-[200] flex justify-center px-4"
+      className="pointer-events-none fixed inset-x-0 z-[200] flex justify-center px-3"
       style={{
-        bottom: 'calc(5.75rem + env(safe-area-inset-bottom, 0px))',
+        bottom: 'calc(4.85rem + env(safe-area-inset-bottom, 0px))',
       }}
       aria-live="polite"
       role="timer"
       aria-label={`Repos ${formatClock(remaining)}`}
     >
       <div
-        className="pointer-events-auto rest-timer-panel w-full max-w-[360px] overflow-hidden rounded-[28px] border border-white/16 p-4"
+        className={`pointer-events-auto rest-timer-panel w-full max-w-lg overflow-hidden rounded-2xl border border-white/14 px-3 py-2.5 ${
+          pulsing ? 'rest-timer-pulse' : ''
+        }`}
         style={{
-          background: 'rgb(18 18 20 / 0.96)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
+          background: 'rgb(18 18 20 / 0.97)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
           boxShadow:
-            '0 20px 56px rgb(0 0 0 / 0.65), 0 0 0 1px rgb(255 255 255 / 0.06), inset 0 1px 0 rgb(255 255 255 / 0.12)',
+            '0 12px 36px rgb(0 0 0 / 0.55), 0 0 0 1px rgb(255 255 255 / 0.05), inset 0 1px 0 rgb(255 255 255 / 0.1)',
         }}
       >
-        <div className="mb-3 flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8E8E93]">
-              Chrono repos
-            </p>
-            <p className="mt-0.5 truncate text-[13px] font-medium text-[#AEAEB2]">
-              {state.target
-                ? `${state.target.exerciseName || 'Exercice'} · ${state.target.setLabel}`
-                : 'Timer'}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="ios-press flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-[#AEAEB2]"
-            aria-label="Fermer le timer"
-          >
-            <X className="h-3.5 w-3.5" strokeWidth={2.5} />
-          </button>
-        </div>
-
-        <div className="flex flex-col items-center">
-          <div
-            className={`relative ${pulsing ? 'rest-timer-pulse' : ''}`}
-            style={{ width: size, height: size }}
-          >
-            <svg width={size} height={size} className="-rotate-90" aria-hidden>
+        {/* Ligne principale : ring + temps + passer */}
+        <div className="flex items-center gap-3">
+          <div className="relative shrink-0" style={{ width: ringSize, height: ringSize }}>
+            <svg width={ringSize} height={ringSize} className="-rotate-90" aria-hidden>
               <circle
-                cx={size / 2}
-                cy={size / 2}
+                cx={ringSize / 2}
+                cy={ringSize / 2}
                 r={radius}
                 fill="none"
-                stroke="rgb(255 255 255 / 0.08)"
+                stroke="rgb(255 255 255 / 0.1)"
                 strokeWidth={stroke}
               />
               <circle
-                cx={size / 2}
-                cy={size / 2}
+                cx={ringSize / 2}
+                cy={ringSize / 2}
                 r={radius}
                 fill="none"
                 stroke={color}
@@ -114,66 +93,85 @@ export function RestTimerOverlay({
                 strokeDasharray={circumference}
                 strokeDashoffset={dashOffset}
                 style={{
-                  transition: 'stroke-dashoffset 0.95s linear, stroke 0.4s ease',
-                  filter: `drop-shadow(0 0 12px ${color}99)`,
+                  transition: 'stroke-dashoffset 0.95s linear, stroke 0.35s ease',
+                  filter: `drop-shadow(0 0 6px ${color}88)`,
                 }}
               />
             </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center">
               {state.finished ? (
-                <>
-                  <Check className="mb-1 h-7 w-7 text-[#30D158]" strokeWidth={2.5} />
-                  <p className="text-[13px] font-semibold text-[#30D158]">Repos terminé</p>
-                </>
+                <Check className="h-4 w-4 text-[#30D158]" strokeWidth={2.75} />
               ) : (
-                <p
-                  className="text-[36px] font-bold tracking-tight tabular-nums text-white"
-                  style={{ textShadow: '0 2px 16px rgb(0 0 0 / 0.5)' }}
-                >
-                  {formatClock(remaining)}
-                </p>
+                <span className="text-[11px] font-bold tabular-nums text-white">
+                  {Math.ceil((remaining / total) * 100)}
+                </span>
               )}
             </div>
           </div>
 
-          <div className="mt-4 flex w-full gap-2">
-            {REST_PRESETS_SEC.map((sec) => {
-              const active = state.totalSec === sec && state.active
-              return (
-                <button
-                  key={sec}
-                  type="button"
-                  onClick={() => onPreset(sec)}
-                  className={`ios-press flex-1 rounded-2xl border py-2.5 text-[14px] font-semibold tabular-nums ${
-                    active
-                      ? 'border-[#30D158]/45 bg-[#30D158]/18 text-[#30D158]'
-                      : 'border-white/12 bg-white/[0.05] text-white'
-                  }`}
-                >
-                  {sec}s
-                </button>
-              )
-            })}
+          <div className="min-w-0 flex-1">
+            {state.finished ? (
+              <p className="text-[18px] font-bold tracking-tight text-[#30D158]">Repos OK</p>
+            ) : (
+              <p className="text-[26px] font-bold leading-none tracking-tight tabular-nums text-white">
+                {formatClock(remaining)}
+              </p>
+            )}
+            <p className="mt-0.5 truncate text-[11px] font-medium text-[#8E8E93]">
+              {state.target
+                ? `${state.target.exerciseName || 'Exercice'} · ${state.target.setLabel}`
+                : 'Repos'}
+            </p>
           </div>
 
           {!state.finished ? (
             <button
               type="button"
               onClick={onSkip}
-              className="ios-press mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/12 bg-white/[0.06] py-3 text-[14px] font-semibold text-white"
+              className="ios-press flex shrink-0 items-center gap-1 rounded-xl border border-white/12 bg-white/[0.07] px-3 py-2.5 text-[13px] font-semibold text-white"
             >
-              <SkipForward className="h-4 w-4" strokeWidth={2.25} />
-              Skip · série suivante
+              <SkipForward className="h-3.5 w-3.5" strokeWidth={2.5} />
+              Passer
             </button>
           ) : (
             <button
               type="button"
               onClick={onDismiss}
-              className="ios-press mt-3 w-full rounded-2xl border border-[#30D158]/35 bg-[#30D158]/15 py-3 text-[14px] font-semibold text-[#30D158]"
+              className="ios-press shrink-0 rounded-xl border border-[#30D158]/35 bg-[#30D158]/15 px-3 py-2.5 text-[13px] font-semibold text-[#30D158]"
             >
-              Continuer
+              OK
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="ios-press flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-[#8E8E93]"
+            aria-label="Fermer"
+          >
+            <X className="h-3.5 w-3.5" strokeWidth={2.5} />
+          </button>
+        </div>
+
+        {/* Presets rapides */}
+        <div className="mt-2 flex gap-1.5">
+          {REST_PRESETS_SEC.map((sec) => {
+            const active = state.totalSec === sec && state.active
+            return (
+              <button
+                key={sec}
+                type="button"
+                onClick={() => onPreset(sec)}
+                className={`ios-press flex-1 rounded-xl border py-2 text-[12px] font-semibold tabular-nums ${
+                  active
+                    ? 'border-[#30D158]/45 bg-[#30D158]/18 text-[#30D158]'
+                    : 'border-white/10 bg-white/[0.04] text-[#AEAEB2]'
+                }`}
+              >
+                {sec}s
+              </button>
+            )
+          })}
         </div>
       </div>
     </div>,

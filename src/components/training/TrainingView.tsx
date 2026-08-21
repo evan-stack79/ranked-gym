@@ -281,14 +281,6 @@ export function TrainingView() {
           onRestStart={(info) => {
             restTimer.start(90, info)
           }}
-          onQuickRest={(seconds) => {
-            restTimer.start(seconds, {
-              exerciseId: 'quick-rest',
-              setIndex: 0,
-              exerciseName: 'Repos libre',
-              setLabel: `${seconds}s`,
-            })
-          }}
           onSave={(note) => {
             persist(saveWorkoutNote(note))
             showToast(`${note.title} sauvegardé · prochaines fois on le recharge`)

@@ -144,22 +144,22 @@ body {
   will-change: transform, opacity;
 }
 
+.rest-timer-pulse {
+  animation: rest-timer-pulse 0.9s ease-in-out infinite;
+}
+
 @keyframes rest-timer-pulse {
   0%,
   100% {
     transform: scale(1);
   }
   50% {
-    transform: scale(1.035);
+    transform: scale(1.012);
   }
 }
 
-.rest-timer-pulse {
-  animation: rest-timer-pulse 0.85s ease-in-out infinite;
-}
-
 .rest-timer-panel {
-  animation: ios-fade-up 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: ios-fade-up 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 .badge-unlocked {
