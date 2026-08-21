@@ -53,9 +53,17 @@ export interface MealEntry {
   createdAt: number
 }
 
+/** Compteurs journaliers des raccourcis d’hydratation (verre, shaker…). */
+export type WaterPresetsCount = Record<string, number>
+
 export interface DayJournal {
   dateKey: string
   meals: MealEntry[]
   /** Eau bue aujourd’hui (ml) — sync cloud via nutrition.journal */
   waterMl?: number
+  /**
+   * Mémoire des contenants — ex. `{ glass: 2, bottle: 1 }`.
+   * Persisté dans le JSON `nutrition.journal` (Supabase), clé du jour.
+   */
+  waterPresetsCount?: WaterPresetsCount
 }

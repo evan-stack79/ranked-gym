@@ -1,4 +1,10 @@
-import type { CalorieProfile, DayJournal, MealEntry, NutritionGoal } from '../types/nutrition'
+import type {
+  CalorieProfile,
+  DayJournal,
+  MealEntry,
+  NutritionGoal,
+  WaterPresetsCount,
+} from '../types/nutrition'
 import { todayKey } from '../utils/calories'
 import { getActiveCloudUserId } from './cloudSession'
 
@@ -199,6 +205,9 @@ export function suggestedWaterGoalMl(_weightKg?: number): number {
   return 1500
 }
 
+/** Plafond journalier (plusieurs bouteilles / presets). */
+export const MAX_DAILY_WATER_ML = 15000
+
 export function getTodayWaterMl(): number {
   return Math.max(0, Math.round(getTodayJournal().waterMl ?? 0))
 }
@@ -207,7 +216,7 @@ export function setTodayWaterMl(waterMl: number, opts?: StorageSaveOptions): Day
   const journal = getTodayJournal()
   const next: DayJournal = {
     ...journal,
-    waterMl: Math.max(0, Math.round(waterMl)),
+    waterMl: Math.max(0, Math.min(MAX_DAILY_WATER_ML, Math.round(waterMl))),
   }
   saveTodayJournal(next, opts)
   return next
@@ -215,4 +224,74 @@ export function setTodayWaterMl(waterMl: number, opts?: StorageSaveOptions): Day
 
 export function addTodayWaterMl(deltaMl: number, opts?: StorageSaveOptions): DayJournal {
   return setTodayWaterMl(getTodayWaterMl() + deltaMl, opts)
+}
+
+function normalizePresetsCount(raw: unknown): WaterPresetsCount {
+  if (!raw || typeof raw !== 'object') return {}
+  const out: WaterPresetsCount = {}
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    const n = typeof value === 'number' ? value : Number(value)
+    if (Number.isFinite(n) && n > 0) out[key] = Math.floor(n)
+  }
+  return out
+}
+
+export function getTodayWaterPresetsCount(): WaterPresetsCount {
+  return normalizePresetsCount(getTodayJournal().waterPresetsCount)
+}
+
+export function setTodayWaterPresetsCount(
+  counts: WaterPresetsCount,
+  opts?: StorageSaveOptions,
+): DayJournal {
+  const journal = getTodayJournal()
+  const cleaned = normalizePresetsCount(counts)
+  const next: DayJournal = {
+    ...journal,
+    waterPresetsCount: Object.keys(cleaned).length > 0 ? cleaned : undefined,
+  }
+  saveTodayJournal(next, opts)
+  return next
+}
+
+/**
+ * Ajoute ou retire un contenant preset (tap / long-press).
+ * Met à jour le total d’eau + le badge multiplicateur, puis sync cloud.
+ */
+export function applyWaterPresetDelta(
+  presetId: string,
+  deltaCount: 1 | -1,
+  mlPerUnit: number,
+  opts?: StorageSaveOptions,
+): { journal: DayJournal; count: number; waterMl: number } {
+  const journal = getTodayJournal()
+  const counts = normalizePresetsCount(journal.waterPresetsCount)
+  const current = counts[presetId] ?? 0
+  const nextCount = Math.max(0, current + deltaCount)
+  if (deltaCount < 0 && current <= 0) {
+    return {
+      journal,
+      count: 0,
+      waterMl: Math.max(0, Math.round(journal.waterMl ?? 0)),
+    }
+  }
+
+  if (nextCount <= 0) delete counts[presetId]
+  else counts[presetId] = nextCount
+
+  const waterMl = Math.max(
+    0,
+    Math.min(
+      MAX_DAILY_WATER_ML,
+      Math.round((journal.waterMl ?? 0) + deltaCount * mlPerUnit),
+    ),
+  )
+
+  const next: DayJournal = {
+    ...journal,
+    waterMl,
+    waterPresetsCount: Object.keys(counts).length > 0 ? counts : undefined,
+  }
+  saveTodayJournal(next, opts)
+  return { journal: next, count: nextCount, waterMl }
 }

@@ -337,6 +337,47 @@ body {
   animation: ios-fade-up 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
+.water-preset-btn {
+  transition: transform 0.18s cubic-bezier(0.32, 0.72, 0, 1), border-color 0.2s ease;
+}
+
+.water-preset-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  z-index: 2;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #ff3b30;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgb(255 59 48 / 0.45), inset 0 1px 0 rgb(255 255 255 / 0.25);
+  animation: water-badge-pop 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+@keyframes water-badge-pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 /* iOS Cristaline-style slim bottle */
 .water-bottle-slim {
   border-radius: 28px;
