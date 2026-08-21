@@ -27,6 +27,7 @@ export function ProfileView() {
     isAuthenticated,
     requireAuth,
     refreshProfile,
+    patchProfile,
     updateDiscipline,
   } = useAuth()
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -85,6 +86,12 @@ export function ProfileView() {
           provider={user.provider}
           disciplineLabel={discipline.label}
           disciplineAccent={discipline.accent}
+          avatarUrl={profile?.avatar_url}
+          userId={user.id}
+          onAvatarUpdated={(url) => {
+            patchProfile({ avatar_url: url })
+            void refreshProfile()
+          }}
           onOpenSettings={() => setSettingsOpen(true)}
         />
       </div>

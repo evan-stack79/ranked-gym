@@ -120,6 +120,16 @@ body {
   animation: online-pulse 2s ease-in-out infinite;
 }
 
+.avatar-spinner {
+  animation: avatar-spin 0.7s linear infinite;
+}
+
+@keyframes avatar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @keyframes glow-breathe {
   0%,
   100% {

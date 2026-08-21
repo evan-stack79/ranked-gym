@@ -12,6 +12,7 @@ type ProfilesTable = {
     active_checkin: Json | null
     current_streak: number
     last_login_date: string | null
+    avatar_url: string | null
     created_at: string
     updated_at: string
   }
@@ -26,6 +27,7 @@ type ProfilesTable = {
     active_checkin?: Json | null
     current_streak?: number
     last_login_date?: string | null
+    avatar_url?: string | null
     created_at?: string
     updated_at?: string
   }
@@ -40,6 +42,7 @@ type ProfilesTable = {
     active_checkin?: Json | null
     current_streak?: number
     last_login_date?: string | null
+    avatar_url?: string | null
     updated_at?: string
   }
   Relationships: []

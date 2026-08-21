@@ -77,6 +77,14 @@ Un **trigger** crée automatiquement `profiles` + lignes vides `workouts` / `nut
 - **À la connexion** : l’app **tire d’abord le cloud** (source de vérité), puis écrit le cache local.
 - Le `localStorage` n’est plus qu’un **cache rapide** (scopé par user). Si l’URL change et vide le navigateur, le cloud restaure tout au login.
 
+## 7. Avatars (photos de profil)
+
+1. Le bucket Storage **`avatars`** est créé par la migration `20260821140000_profile_avatar_storage.sql` (public en lecture).
+2. Colonne `profiles.avatar_url` = URL publique de la photo.
+3. Dans l’app : Profil → tape l’avatar → choisis une image (redimensionnée côté client puis upload).
+
+Si le bucket manque encore : Dashboard → **SQL Editor** → exécute le fichier de migration, ou `npx supabase db push`.
+
 ## Checklist
 
 - [ ] Projet Supabase créé

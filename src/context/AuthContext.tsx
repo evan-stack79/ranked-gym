@@ -64,6 +64,8 @@ interface AuthContextValue {
   streakWeekBonus: StreakWeekBonus | null
   clearStreakWeekBonus: () => void
   refreshProfile: () => Promise<void>
+  /** Met à jour localement le profil (ex. avatar) sans refetch. */
+  patchProfile: (patch: Partial<ProfileRow>) => void
   openAuth: (onSuccess?: AuthSuccessCallback) => void
   closeAuth: () => void
   requireAuth: (onSuccess: AuthSuccessCallback) => void
@@ -183,6 +185,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const row = await fetchProfile(user.id)
     setProfile(row)
   }, [user])
+
+  const patchProfile = useCallback((patch: Partial<ProfileRow>) => {
+    setProfile((prev) => (prev ? { ...prev, ...patch } : prev))
+  }, [])
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -355,6 +361,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       streakWeekBonus,
       clearStreakWeekBonus,
       refreshProfile,
+      patchProfile,
       openAuth,
       closeAuth,
       requireAuth,
@@ -374,6 +381,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       streakWeekBonus,
       clearStreakWeekBonus,
       refreshProfile,
+      patchProfile,
       openAuth,
       closeAuth,
       requireAuth,

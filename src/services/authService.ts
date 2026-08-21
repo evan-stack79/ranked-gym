@@ -124,6 +124,7 @@ export async function updateProfileProgress(
     discipline?: string
     current_streak?: number
     last_login_date?: string | null
+    avatar_url?: string | null
   },
 ): Promise<ProfileRow> {
   const supabase = getSupabase()
