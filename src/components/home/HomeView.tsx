@@ -6,7 +6,7 @@ const feedItems = [
   {
     id: 1,
     user: 'IronMike',
-    action: 'a battu son record au développé couché',
+    action: 'a battu son PR développé couché',
     xp: '+250 XP',
     time: '2 min',
     hot: true,
@@ -21,8 +21,8 @@ const feedItems = [
   },
   {
     id: 3,
-    user: 'BeastMode_99',
-    action: 'a terminé un défi squat 5x5',
+    user: 'PaceRunner',
+    action: 'a fini un 10 km sous 45 min',
     xp: '+180 XP',
     time: '32 min',
     hot: true,
@@ -35,7 +35,7 @@ export function HomeView() {
       <header>
         <h1 className="text-[34px] font-bold tracking-tight text-white">Accueil</h1>
         <p className="mt-2 text-[17px] text-[#8E8E93]">
-          Entraîne-toi. Progresse. Domine l&apos;arène.
+          Toutes disciplines. Entraîne-toi. Progresse. Domine l&apos;arène.
         </p>
       </header>
 

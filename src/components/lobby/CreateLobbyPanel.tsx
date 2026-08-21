@@ -31,7 +31,7 @@ export function CreateLobbyPanel({ onCreate, disabled = false }: CreateLobbyPane
         <IconBadge icon={Plus} variant="crimson" />
         <span>
           <span className="block text-[15px] font-semibold text-white">
-            Ma salle n&apos;y est pas ? Créer un Lobby
+            Mon spot n&apos;y est pas ? Créer un Lobby
           </span>
           <span className="mt-0.5 block text-[13px] text-[#8E8E93]">
             Lance un lobby perso avec des rivaux simulés
@@ -43,13 +43,13 @@ export function CreateLobbyPanel({ onCreate, disabled = false }: CreateLobbyPane
 
   return (
     <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-4">
-      <p className="mb-3 text-[15px] font-semibold text-white">Nomme ta salle</p>
+      <p className="mb-3 text-[15px] font-semibold text-white">Nomme ton spot</p>
 
       <input
         type="text"
         value={gymName}
         onChange={(e) => setGymName(e.target.value)}
-        placeholder="Iron Box, CrossFit Local…"
+        placeholder="Piste municipale, Terrain synthétique…"
         disabled={disabled}
         autoFocus
         className="w-full rounded-xl border border-white/5 bg-ios-inset px-4 py-3 text-[17px] text-white placeholder:text-[#48484A] focus:outline-none disabled:opacity-50"

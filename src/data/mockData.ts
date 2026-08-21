@@ -1,4 +1,5 @@
 import type { GymMember, RankTier } from '../types'
+import { APP_DISCIPLINES, getStoredDisciplineId } from './disciplines'
 
 export const currentUser = {
   id: 'user-1',
@@ -20,14 +21,17 @@ export const rankColors: Record<RankTier, { text: string; bg: string; border: st
   Légende: { text: 'text-[#FFD700]', bg: 'bg-[#FF2B2B]/25', border: 'border-[#FFD700]/40' },
 }
 
-const LOBBY_POOL: Omit<GymMember, 'id'>[] = [
-  { username: 'TitanForge', avatarUrl: '', level: 67, rank: 'Légende', currentExercise: 'Développé couché 140 kg' },
-  { username: 'FlexQueen', avatarUrl: '', level: 58, rank: 'Diamant', currentExercise: 'Curl à la barre EZ' },
-  { username: 'IronVortex', avatarUrl: '', level: 54, rank: 'Platine', currentExercise: 'Squat barre 5×5' },
-  { username: 'NovaShred', avatarUrl: '', level: 61, rank: 'Diamant', currentExercise: 'Tractions lestées +20 kg' },
-  { username: 'BeastMode_X', avatarUrl: '', level: 49, rank: 'Platine', currentExercise: 'Soulevé de terre 180 kg' },
-  { username: 'GoldRush_22', avatarUrl: '', level: 28, rank: 'Or', currentExercise: 'Hip thrust 4×10' },
-  { username: 'AlphaGrind', avatarUrl: '', level: 72, rank: 'Légende', currentExercise: 'Presse à cuisses 300 kg' },
+const NAME_POOL = [
+  'TitanForge',
+  'FlexQueen',
+  'IronVortex',
+  'NovaShred',
+  'BeastMode_X',
+  'GoldRush_22',
+  'AlphaGrind',
+  'PaceQueen',
+  'MidfieldAce',
+  'RoundHouse',
 ]
 
 function hashString(value: string): number {
@@ -41,14 +45,40 @@ function hashString(value: string): number {
 export function generateLobbyMembers(gymId: string, count = 4): GymMember[] {
   const seed = hashString(gymId)
   const memberCount = count > 0 ? count : 3 + (seed % 2)
-  const shuffled = [...LOBBY_POOL].sort((a, b) => {
-    const scoreA = hashString(gymId + a.username)
-    const scoreB = hashString(gymId + b.username)
-    return scoreA - scoreB
-  })
+  const ranks: RankTier[] = ['Or', 'Platine', 'Diamant', 'Légende', 'Argent']
 
-  return shuffled.slice(0, memberCount).map((member, index) => ({
-    ...member,
-    id: `${gymId}-member-${index}`,
-  }))
+  return Array.from({ length: memberCount }, (_, index) => {
+    const disc = APP_DISCIPLINES[(seed + index) % APP_DISCIPLINES.length]
+    const activity =
+      disc.lobbyActivities[(seed + index * 3) % disc.lobbyActivities.length]
+    return {
+      id: `${gymId}-member-${index}`,
+      username: NAME_POOL[(seed + index) % NAME_POOL.length],
+      avatarUrl: '',
+      level: 25 + ((seed + index * 7) % 50),
+      rank: ranks[(seed + index) % ranks.length],
+      currentExercise: activity,
+      disciplineLabel: disc.label,
+    }
+  })
+}
+
+/** Prefer current user's discipline first in lobby flavor text. */
+export function generateLobbyMembersForDiscipline(
+  gymId: string,
+  count = 4,
+  disciplineId = getStoredDisciplineId(),
+): GymMember[] {
+  const base = generateLobbyMembers(gymId, count)
+  if (!base.length) return base
+  const disc = APP_DISCIPLINES.find((d) => d.id === disciplineId) ?? APP_DISCIPLINES[0]
+  return base.map((m, i) =>
+    i === 0
+      ? {
+          ...m,
+          disciplineLabel: disc.label,
+          currentExercise: disc.lobbyActivities[hashString(gymId) % disc.lobbyActivities.length],
+        }
+      : m,
+  )
 }

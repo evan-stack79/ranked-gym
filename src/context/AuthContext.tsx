@@ -18,6 +18,7 @@ import {
   signInWithEmail as apiSignInWithEmail,
   signOut as apiSignOut,
   signUpWithEmail,
+  updateProfileProgress,
   type AuthUser,
 } from '../services/authService'
 import {
@@ -25,6 +26,18 @@ import {
   resetCloudBackupHydration,
   setCloudBackupUserId,
 } from '../services/cloudBackup'
+import {
+  disciplineFromLabel,
+  getDiscipline,
+  storeDisciplineId,
+} from '../data/disciplines'
+import { setPrimarySport } from '../services/trainingStorage'
+
+function syncLocalDiscipline(label: string) {
+  const id = disciplineFromLabel(label)
+  storeDisciplineId(id)
+  setPrimarySport(getDiscipline(id).primarySportId)
+}
 
 type AuthSuccessCallback = () => void
 
@@ -40,7 +53,8 @@ interface AuthContextValue {
   closeAuth: () => void
   requireAuth: (onSuccess: AuthSuccessCallback) => void
   signInWithEmail: (email: string, password: string) => Promise<void>
-  signUpWithEmail: (email: string, password: string, pseudo?: string) => Promise<void>
+  signUpWithEmail: (email: string, password: string, pseudo?: string, discipline?: string) => Promise<void>
+  updateDiscipline: (disciplineLabel: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -74,15 +88,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authError, setAuthError] = useState<string | null>(null)
   const pendingRef = useRef<AuthSuccessCallback | null>(null)
 
-  const loadProfile = useCallback(async (authUser: AuthUser) => {
+  const loadProfile = useCallback(async (authUser: AuthUser, metaDiscipline?: string) => {
     setCloudBackupUserId(authUser.id)
     try {
-      const row = await ensureProfile(authUser.id, authUser.displayName)
+      const row = await ensureProfile(
+        authUser.id,
+        authUser.displayName,
+        metaDiscipline || 'Musculation',
+      )
       setProfile(row)
       setUser({ ...authUser, displayName: row.pseudo || authUser.displayName })
+      syncLocalDiscipline(row.discipline)
     } catch {
       const row = await fetchProfile(authUser.id)
       setProfile(row)
+      if (row?.discipline) syncLocalDiscipline(row.discipline)
     }
     void hydrateCloudBackupForUser(authUser.id)
   }, [])
@@ -104,7 +124,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (next?.user) {
         const mapped = mapSessionUser(next.user)
         setUser(mapped)
-        void loadProfile(mapped)
+        const metaDisc =
+          typeof next.user.user_metadata?.discipline === 'string'
+            ? next.user.user_metadata.discipline
+            : undefined
+        void loadProfile(mapped, metaDisc)
       }
     })
 
@@ -113,7 +137,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (nextSession?.user) {
         const mapped = mapSessionUser(nextSession.user)
         setUser(mapped)
-        void loadProfile(mapped)
+        const metaDisc =
+          typeof nextSession.user.user_metadata?.discipline === 'string'
+            ? nextSession.user.user_metadata.discipline
+            : undefined
+        void loadProfile(mapped, metaDisc)
       } else {
         setUser(null)
         setProfile(null)
@@ -179,7 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const signUpEmail = useCallback(
-    async (email: string, password: string, pseudo?: string) => {
+    async (email: string, password: string, pseudo?: string, discipline?: string) => {
       if (!isSupabaseConfigured()) {
         setAuthError(getSupabaseConfigError())
         return
@@ -187,7 +215,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthLoading(true)
       setAuthError(null)
       try {
-        const data = await signUpWithEmail(email, password, pseudo)
+        const data = await signUpWithEmail(email, password, pseudo, discipline)
+        if (discipline) syncLocalDiscipline(discipline)
         if (!data.session) {
           setAuthError(
             'Compte créé, mais la confirmation email est encore activée sur Supabase. Désactive “Confirm email” (Authentication → Providers → Email), puis reconnecte-toi avec le même email/mot de passe.',
@@ -202,6 +231,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     [completePending],
+  )
+
+  const updateDiscipline = useCallback(
+    async (disciplineLabel: string) => {
+      syncLocalDiscipline(disciplineLabel)
+      if (!user || !isSupabaseConfigured()) return
+      try {
+        const row = await updateProfileProgress(user.id, { discipline: disciplineLabel })
+        setProfile(row)
+      } catch {
+        // local sync already done
+      }
+    },
+    [user],
   )
 
   const signOut = useCallback(async () => {
@@ -228,6 +271,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requireAuth,
       signInWithEmail,
       signUpWithEmail: signUpEmail,
+      updateDiscipline,
       signOut,
     }),
     [
@@ -243,6 +287,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requireAuth,
       signInWithEmail,
       signUpEmail,
+      updateDiscipline,
       signOut,
     ],
   )

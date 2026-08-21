@@ -30,8 +30,17 @@ import { StepsCard } from './StepsCard'
 import { TrainingAgenda } from './TrainingAgenda'
 import { WorkoutNotebook } from './WorkoutNotebook'
 import { OverloadCalculator } from './OverloadCalculator'
+import { EnduranceSessionCard } from './EnduranceSessionCard'
 import { IconBadge } from '../ui/IconBadge'
 import { IosSheet } from '../ui/IosSheet'
+import {
+  disciplineFromSportCategory,
+  getDiscipline,
+  getStoredDisciplineId,
+  isEnduranceFamily,
+  isStrengthFamily,
+  storeDisciplineId,
+} from '../../data/disciplines'
 
 export function TrainingView() {
   const [state, setState] = useState<TrainingState>(() => getTrainingState())
@@ -41,6 +50,8 @@ export function TrainingView() {
   const [dueBanner, setDueBanner] = useState<string | null>(null)
   const [cardioOpen, setCardioOpen] = useState(false)
   const [durationMin, setDurationMin] = useState(40)
+
+  const [disciplineTick, setDisciplineTick] = useState(0)
 
   const profile = useMemo(() => getCalorieProfile(), [
     profileTick,
@@ -58,12 +69,11 @@ export function TrainingView() {
     stepsKcal + workoutKcal,
   )
 
-  const sport = state.primarySportId ? getSportById(state.primarySportId) : null
-  const isStrength =
-    !sport ||
-    sport.category === 'strength' ||
-    sport.id === 'crossfit' ||
-    sport.id === 'fitness'
+  const disciplineId = useMemo(() => getStoredDisciplineId(), [disciplineTick, state.primarySportId])
+  const discipline = getDiscipline(disciplineId)
+  const sport = state.primarySportId ? getSportById(state.primarySportId) : getSportById(discipline.primarySportId)
+  const showStrengthTools = isStrengthFamily(disciplineId)
+  const showEnduranceTools = isEnduranceFamily(disciplineId)
 
   const showToast = useCallback((message: string) => {
     setToast(message)
@@ -98,12 +108,18 @@ export function TrainingView() {
 
   useEffect(() => {
     const syncProfile = () => setProfileTick((t) => t + 1)
+    const syncDiscipline = () => {
+      setDisciplineTick((t) => t + 1)
+      setState(getTrainingState())
+    }
     window.addEventListener('ranked-gym:profile-changed', syncProfile)
     window.addEventListener('ranked-gym:backup-restored', syncProfile)
+    window.addEventListener('ranked-gym:discipline-changed', syncDiscipline)
     window.addEventListener('focus', syncProfile)
     return () => {
       window.removeEventListener('ranked-gym:profile-changed', syncProfile)
       window.removeEventListener('ranked-gym:backup-restored', syncProfile)
+      window.removeEventListener('ranked-gym:discipline-changed', syncDiscipline)
       window.removeEventListener('focus', syncProfile)
     }
   }, [])
@@ -152,7 +168,7 @@ export function TrainingView() {
           </div>
           <h1 className="text-[34px] font-bold tracking-tight text-white">Entraînement</h1>
           <p className="mt-2 text-[17px] text-[#8E8E93]">
-            Carnet, rappels, pas — Nutri suit tout seul.
+            Mode {discipline.shortLabel} — carnet, rappels, énergie.
           </p>
         </div>
       </header>
@@ -192,9 +208,41 @@ export function TrainingView() {
         }}
       />
 
-      <OverloadCalculator bodyWeightKg={profile.weightKg} goalLabel={GOAL_LABELS[plan.goal]} />
+      {showStrengthTools && (
+        <OverloadCalculator bodyWeightKg={profile.weightKg} goalLabel={GOAL_LABELS[plan.goal]} />
+      )}
 
-      {isStrength ? (
+      {showEnduranceTools && (
+        <EnduranceSessionCard
+          disciplineId={disciplineId}
+          bodyWeightKg={profile.weightKg}
+          onLog={(entry) => {
+            persist(
+              saveWorkoutNote({
+                title: entry.title,
+                exercises: [
+                  {
+                    id: `endurance-${Date.now()}`,
+                    name: `${entry.distanceKm} km`,
+                    sets: [
+                      {
+                        reps: entry.durationMin,
+                        weightKg: 0,
+                        difficulty: 'ok',
+                      },
+                    ],
+                  },
+                ],
+                durationMin: entry.durationMin,
+                estimatedKcal: entry.estimatedKcal,
+              }),
+            )
+            showToast(`${entry.title} · ~${entry.estimatedKcal} kcal → Nutri`)
+          }}
+        />
+      )}
+
+      {showStrengthTools ? (
         <WorkoutNotebook
           bodyWeightKg={profile.weightKg}
           routines={state.routines}
@@ -212,24 +260,24 @@ export function TrainingView() {
             showToast(`Focus « ${label} » créé`)
           }}
         />
-      ) : (
+      ) : !showEnduranceTools ? (
         <section className="glass-card rounded-3xl p-4">
           <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-            {sport?.name}
+            {sport?.name ?? discipline.label}
           </p>
           <h2 className="mt-1 text-[18px] font-bold text-white">Noter la séance</h2>
           <p className="mt-1 text-[12px] text-[#AEAEB2]">
-            Entre tes pas, puis valide la durée pour recalculer Nutri.
+            Valide la durée pour recalculer Nutri selon ton sport.
           </p>
           <button
             type="button"
             onClick={() => setCardioOpen(true)}
             className="btn-brand ios-press mt-3 w-full rounded-2xl py-3 text-[15px] font-semibold text-white"
           >
-            Noter {sport?.name}
+            Noter {sport?.name ?? discipline.shortLabel}
           </button>
         </section>
-      )}
+      ) : null}
 
       <TrainingAgenda
         schedule={state.schedule}
@@ -245,8 +293,11 @@ export function TrainingView() {
         selectedId={state.primarySportId}
         onClose={() => setSportOpen(false)}
         onSelect={(s) => {
+          const nextDisc = disciplineFromSportCategory(s.category, s.id)
+          storeDisciplineId(nextDisc)
           persist(setPrimarySport(s.id))
-          showToast(`${s.name} sélectionné`)
+          setDisciplineTick((t) => t + 1)
+          showToast(`${s.name} · mode ${getDiscipline(nextDisc).shortLabel}`)
         }}
       />
 

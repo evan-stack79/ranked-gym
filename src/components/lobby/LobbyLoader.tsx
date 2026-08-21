@@ -21,8 +21,8 @@ export function LobbyLoader({ phase }: LobbyLoaderProps) {
     },
     fetching: {
       icon: Radar,
-      title: 'Recherche des salles…',
-      subtitle: 'Salles & centres fitness à proximité',
+      title: 'Recherche des spots…',
+      subtitle: 'Salles, pistes, terrains & gymnases',
     },
   }[phase]
 

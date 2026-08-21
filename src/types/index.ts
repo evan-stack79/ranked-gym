@@ -17,6 +17,8 @@ export interface GymMember {
   level: number
   rank: RankTier
   currentExercise: string
+  /** Athlete's sport for the day */
+  disciplineLabel?: string
 }
 
 export interface NearbyGym {
@@ -31,6 +33,8 @@ export interface NearbyGym {
   /** Google Places rating out of 5 */
   rating?: number
   userRatingsTotal?: number
+  /** Spot category for multi-sport lobby */
+  spotKind?: string
 }
 
 export interface GeoCoordinates {

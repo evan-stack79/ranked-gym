@@ -28,13 +28,14 @@ import {
   clearCheckIn,
   formatCheckInDuration,
 } from '../../services/lobbyStorage'
-import { generateLobbyMembers } from '../../data/mockData'
+import { generateLobbyMembersForDiscipline } from '../../data/mockData'
 import { CreateLobbyPanel } from './CreateLobbyPanel'
 import { formatDistance, SEARCH_RADIUS_METERS } from '../../utils/geo'
 import { createCheckin } from '../../services/checkinService'
 import { isSupabaseConfigured } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import type { GymMember, LobbyPhase, LocationContext, NearbyGym } from '../../types'
+import { getStoredDisciplineId, getDiscipline } from '../../data/disciplines'
 
 function gymToLocation(gym: NearbyGym): LocationContext {
   return {
@@ -67,7 +68,10 @@ export function LobbyView() {
       setCheckedInAt(savedCheckIn.checkedInAt)
       setLocation(gymToLocation(savedCheckIn.gym))
       setLobbyMembers(
-        generateLobbyMembers(savedCheckIn.gym.id, memberCountForGym(savedCheckIn.gym)),
+        generateLobbyMembersForDiscipline(
+          savedCheckIn.gym.id,
+          memberCountForGym(savedCheckIn.gym),
+        ),
       )
       setNearbyGyms(mergeWithCustomGyms([savedCheckIn.gym]))
       setPhase('checked-in')
@@ -80,7 +84,9 @@ export function LobbyView() {
       saveCheckIn(gym)
       setCheckedInGym(gym)
       setCheckedInAt(Date.now())
-      setLobbyMembers(generateLobbyMembers(gym.id, memberCountForGym(gym)))
+      setLobbyMembers(
+        generateLobbyMembersForDiscipline(gym.id, memberCountForGym(gym)),
+      )
       setPhase('checked-in')
 
       if (user && isSupabaseConfigured()) {
@@ -129,11 +135,12 @@ export function LobbyView() {
     try {
       const gyms = await fetchNearbyGyms(ctx.coords.lat, ctx.coords.lng, {
         allowAllCheckIn: ctx.source === 'manual',
+        disciplineId: getStoredDisciplineId(),
       })
       setNearbyGyms(mergeWithCustomGyms(gyms))
       setPhase('ready')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Impossible de charger les salles.')
+      setError(err instanceof Error ? err.message : 'Impossible de charger les spots.')
       setPhase('idle')
     }
   }, [])
@@ -246,7 +253,7 @@ export function LobbyView() {
         <div>
           <h1 className="text-[34px] font-bold tracking-tight text-white">Lobby</h1>
           <p className="mt-2 text-[17px] text-[#8E8E93]">
-            Trouve et rejoins une salle à proximité.
+            Spots de sport près de toi — {getDiscipline(getStoredDisciplineId()).spotLabel.toLowerCase()}.
           </p>
         </div>
         {(phase === 'ready' || phase === 'checked-in') && !isLoading && (
@@ -290,14 +297,14 @@ export function LobbyView() {
           <div className="flex flex-col items-center gap-4 py-6">
             <IconBadge icon={Navigation} variant="crimson" size="md" />
             <p className="max-w-xs text-center text-[15px] text-[#8E8E93]">
-              Localise les salles autour de toi pour rejoindre un lobby.
+              Localise les spots de sport autour de toi pour rejoindre un lobby.
             </p>
           </div>
 
           <NeonButton onClick={handleGpsSearch} variant="primary">
             <span className="flex items-center justify-center gap-2">
               <LocateFixed className="h-5 w-5" />
-              Check-in à ma salle
+              Check-in à mon spot
             </span>
           </NeonButton>
 
@@ -332,9 +339,9 @@ export function LobbyView() {
         <div className="flex flex-col items-center gap-6 py-4 text-center">
           <IconBadge icon={MapPin} variant="white" />
           <div>
-            <p className="text-[17px] font-semibold text-white">Aucune salle trouvée</p>
+            <p className="text-[17px] font-semibold text-white">Aucun spot trouvé</p>
             <p className="mt-1 text-[15px] text-[#8E8E93]">
-              Aucun centre fitness dans un rayon de {formatDistance(SEARCH_RADIUS_METERS)}.
+              Aucun lieu sportif dans un rayon de {formatDistance(SEARCH_RADIUS_METERS)}.
             </p>
           </div>
           <div className="w-full">
@@ -350,12 +357,12 @@ export function LobbyView() {
         <>
           {location?.source === 'gps' && checkInEligibleCount === 0 && (
             <div className="glass-card rounded-2xl p-4 text-[15px] text-[#EBEBF5]">
-              Approche-toi à moins de 200 m d&apos;une salle pour activer le check-in.
+              Approche-toi à moins de 200 m d&apos;un spot pour activer le check-in.
             </div>
           )}
           {location?.source === 'manual' && (
             <div className="glass-card rounded-2xl p-4 text-[15px] text-[#8E8E93]">
-              Mode ville · check-in disponible sur toutes les salles listées.
+              Mode ville · check-in disponible sur tous les spots listés.
             </div>
           )}
           <NearbyGymList
@@ -394,13 +401,13 @@ export function LobbyView() {
               {checkedInGym.name}
             </p>
             {checkedInGym.isCustom && (
-              <p className="mt-1 text-[13px] text-[#8E8E93]">Salle personnelle · sauvegardée</p>
+              <p className="mt-1 text-[13px] text-[#8E8E93]">Spot perso · sauvegardé</p>
             )}
             {checkedInGym.address && (
               <p className="mt-1 text-[13px] text-[#AEAEB2]">{checkedInGym.address}</p>
             )}
             <p className="mt-4 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-[13px] text-[#EBEBF5]">
-              Affronte les athlètes présents. Monte en XP. Domine le rank.
+              Affronte les athlètes présents — toutes disciplines. Monte en XP. Domine le rank.
             </p>
           </div>
 
@@ -410,12 +417,12 @@ export function LobbyView() {
             <NeonButton onClick={handleLeaveGym} variant="destructive" className="py-4 text-[16px]">
               <span className="flex items-center justify-center gap-2 font-bold">
                 <LogOut className="h-5 w-5" />
-                Quitter la salle
+                Quitter le spot
               </span>
             </NeonButton>
 
             <NeonButton onClick={resetToIdle} variant="secondary" className="py-3.5 text-[15px]">
-              Changer de salle
+              Changer de spot
             </NeonButton>
           </div>
         </>

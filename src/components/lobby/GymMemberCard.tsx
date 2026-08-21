@@ -55,10 +55,15 @@ export function GymMemberCard({ member, index }: GymMemberCardProps) {
             <RankBadge rank={member.rank} level={member.level} size="sm" />
           </div>
 
-          <p className="mt-2.5 flex items-center gap-2 text-[13px] text-[#EBEBF5]">
+          <p className="mt-2.5 flex flex-wrap items-center gap-2 text-[13px] text-[#EBEBF5]">
             <IconBadge icon={Dumbbell} variant="crimson" size="sm" />
             <span className="min-w-0 truncate font-medium">{member.currentExercise}</span>
           </p>
+          {member.disciplineLabel && (
+            <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#8E8E93]">
+              {member.disciplineLabel}
+            </p>
+          )}
         </div>
 
         <OnlineIndicator />

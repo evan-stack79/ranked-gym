@@ -132,7 +132,7 @@ export function NearbyGymList({
   return (
     <section>
       <div className="mb-4 flex items-center justify-between px-1">
-        <h2 className="ios-label">Salles à proximité</h2>
+        <h2 className="ios-label">Spots de sport à proximité</h2>
         <span className="text-[13px] text-[#8E8E93]">{gyms.length}</span>
       </div>
 

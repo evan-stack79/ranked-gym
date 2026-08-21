@@ -6,6 +6,11 @@ import {
   isValidDistanceMeters,
   toFiniteNumber,
 } from '../utils/geo'
+import {
+  getDiscipline,
+  getStoredDisciplineId,
+  type AppDisciplineId,
+} from '../data/disciplines'
 
 export class GooglePlacesError extends Error {
   constructor(message: string) {
@@ -22,6 +27,8 @@ export interface GeocodedPlace {
 interface PlacesSearchOptions {
   radiusMeters?: number
   allowAllCheckIn?: boolean
+  /** App discipline id — widens Places search beyond gyms */
+  disciplineId?: string
 }
 
 interface GooglePlaceResult {
@@ -101,38 +108,59 @@ function offsetCoords(
   return { lat: lat + dLat, lng: lng + dLng }
 }
 
-function buildMockGyms(userLat: number, userLng: number): NearbyGym[] {
+function buildMockGyms(userLat: number, userLng: number, disciplineId?: AppDisciplineId): NearbyGym[] {
+  const disc = getDiscipline(disciplineId ?? getStoredDisciplineId())
   const templates = [
     {
-      id: 'mock-espace-forme-tergnier',
-      name: 'Espace Forme Tergnier',
-      address: '12 Avenue Jean Jaurès, 02700 Tergnier',
+      id: `mock-spot-1-${disc.id}`,
+      name:
+        disc.id === 'course'
+          ? 'Piste d’athlétisme municipale'
+          : disc.id === 'football'
+            ? 'Terrain synthétique municipal'
+            : disc.id === 'combat'
+              ? 'Club Boxe & MMA'
+              : disc.id === 'cyclisme'
+                ? 'Boucle cyclable / parc'
+                : disc.id === 'crossfit'
+                  ? 'Box CrossFit Locale'
+                  : 'Espace Forme',
+      address: '12 Avenue Jean Jaurès',
       distanceMeters: 600,
       bearing: 35,
       rating: 4.8,
       userRatingsTotal: 214,
+      spotKind: disc.spotLabel,
     },
     {
-      id: 'mock-basic-fit-tergnier',
-      name: 'Basic-Fit Tergnier',
-      address: 'Zone Commerciale Les Portes de la Ville, 02700 Tergnier',
+      id: `mock-spot-2-${disc.id}`,
+      name:
+        disc.id === 'course'
+          ? 'Parc & parcours running'
+          : disc.id === 'football'
+            ? 'Gymnase multisports'
+            : disc.id === 'combat'
+              ? 'Dojo municipal'
+              : 'Basic-Fit / Club sport',
+      address: 'Zone Commerciale',
       distanceMeters: 1200,
       bearing: 140,
       rating: 4.5,
       userRatingsTotal: 487,
+      spotKind: disc.spotLabel,
     },
     {
-      id: 'mock-leo-lagrange-tergnier',
-      name: 'Léo Lagrange Tergnier',
-      address: 'Rue Léo Lagrange, 02700 Tergnier',
+      id: `mock-spot-3-${disc.id}`,
+      name: 'Complexe sportif Léo Lagrange',
+      address: 'Rue Léo Lagrange',
       distanceMeters: 2000,
       bearing: 250,
       rating: 4.2,
       userRatingsTotal: 96,
+      spotKind: 'Spot sport',
     },
   ]
 
-  // Mock: allow check-in up to ~700 m so the closest gym (600 m) is testable.
   const mockCheckInRadius = 700
 
   return templates.map((template) => {
@@ -157,6 +185,7 @@ function buildMockGyms(userLat: number, userLng: number): NearbyGym[] {
       userRatingsTotal: Number(template.userRatingsTotal),
       canCheckIn: distanceMeters <= mockCheckInRadius,
       isCustom: false,
+      spotKind: template.spotKind,
     }
   })
 }
@@ -323,19 +352,29 @@ async function fetchNearbyGymsFromGoogle(
   const { OK, ZERO_RESULTS } = google.maps.places.PlacesServiceStatus
   const location = { lat: safeUserLat, lng: safeUserLng }
 
-  const [gymResults, fitnessResults] = await Promise.all([
-    nearbySearchOnce(service, { location, radius: radiusMeters, type: 'gym' }, OK, ZERO_RESULTS),
-    nearbySearchOnce(
-      service,
-      { location, radius: radiusMeters, keyword: 'fitness_center' },
-      OK,
-      ZERO_RESULTS,
+  const discId = (options.disciplineId as AppDisciplineId | undefined) ?? getStoredDisciplineId()
+  const queries = getDiscipline(discId).placeQueries
+  const batches = await Promise.all(
+    queries.map((q) =>
+      nearbySearchOnce(
+        service,
+        {
+          location,
+          radius: radiusMeters,
+          ...(q.type ? { type: q.type } : {}),
+          ...(q.keyword ? { keyword: q.keyword } : {}),
+        },
+        OK,
+        ZERO_RESULTS,
+      ),
     ),
-  ])
+  )
 
-  const mapped = [...gymResults, ...fitnessResults]
+  const mapped = batches
+    .flat()
     .map((place) => placeResultToGym(place, safeUserLat, safeUserLng, allowAllCheckIn))
     .filter((gym): gym is NearbyGym => gym != null)
+    .map((gym) => ({ ...gym, spotKind: getDiscipline(discId).spotLabel }))
 
   return dedupeGyms(mapped)
 }
@@ -353,7 +392,9 @@ export async function fetchNearbyGyms(
 
   if (isMockPlacesMode()) {
     await delay(650)
-    const mocks = buildMockGyms(safeUserLat, safeUserLng)
+    const discId =
+      (options.disciplineId as AppDisciplineId | undefined) ?? getStoredDisciplineId()
+    const mocks = buildMockGyms(safeUserLat, safeUserLng, discId)
     if (options.allowAllCheckIn) {
       return mocks.map((gym) => ({ ...gym, canCheckIn: true }))
     }

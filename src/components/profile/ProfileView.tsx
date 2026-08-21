@@ -6,15 +6,33 @@ import { ProfileXPBar } from './ProfileXPBar'
 import { StatGrid } from './StatGrid'
 import { BadgeShowcase } from './BadgeShowcase'
 import { CloudBackupCard } from './CloudBackupCard'
+import { DisciplinePicker } from '../discipline/DisciplinePicker'
 import { IosSheet } from '../ui/IosSheet'
 import { useAuth } from '../../context/AuthContext'
 import { getRankFromLevel } from '../../utils/rank'
+import {
+  disciplineFromLabel,
+  getDiscipline,
+  getStoredDisciplineId,
+  type AppDisciplineId,
+} from '../../data/disciplines'
 
 const XP_PER_LEVEL = 1000
 
 export function ProfileView() {
-  const { user, profile, signOut, isAuthenticated, requireAuth, refreshProfile } = useAuth()
+  const {
+    user,
+    profile,
+    signOut,
+    isAuthenticated,
+    requireAuth,
+    refreshProfile,
+    updateDiscipline,
+  } = useAuth()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [disciplineId, setDisciplineId] = useState<AppDisciplineId>(() =>
+    disciplineFromLabel(profile?.discipline) || getStoredDisciplineId(),
+  )
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -22,14 +40,19 @@ export function ProfileView() {
     }
   }, [isAuthenticated, refreshProfile])
 
+  useEffect(() => {
+    if (profile?.discipline) {
+      setDisciplineId(disciplineFromLabel(profile.discipline))
+    }
+  }, [profile?.discipline])
+
   if (!isAuthenticated || !user) {
     return (
       <div className="flex flex-col gap-6 py-12 ios-fade-up">
         <div className="flex flex-col items-center gap-4 text-center">
           <p className="text-[17px] font-semibold text-white">Profil verrouillé</p>
           <p className="max-w-xs text-[15px] text-[#8E8E93]">
-            Connecte-toi pour voir ton rank, ton XP et sauvegarder toute ta progression dans le
-            cloud.
+            Connecte-toi pour voir ton rank, ton sport et sauvegarder ta progression.
           </p>
           <button
             type="button"
@@ -48,17 +71,20 @@ export function ProfileView() {
   const currentXp = profile?.xp ?? 0
   const rank = getRankFromLevel(level)
   const username = profile?.pseudo || user.displayName
+  const discipline = getDiscipline(disciplineId)
 
   return (
     <div className="flex flex-col gap-8 pb-4">
       <div className="ios-fade-up">
         <FighterHeader
           username={username}
-          title={profile?.discipline ? `${rank.title} · ${profile.discipline}` : rank.title}
+          title={rank.title}
           level={level}
           rank={profile?.rank ?? rank.tier}
           email={user.email}
           provider={user.provider}
+          disciplineLabel={discipline.label}
+          disciplineAccent={discipline.accent}
           onOpenSettings={() => setSettingsOpen(true)}
         />
       </div>
@@ -86,7 +112,7 @@ export function ProfileView() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         title="Paramètres"
-        subtitle="Compte & session"
+        subtitle="Compte, sport & session"
         leading={<Settings className="mt-0.5 h-5 w-5 text-[#8E8E93]" />}
       >
         <div className="space-y-4 pb-3">
@@ -97,6 +123,21 @@ export function ProfileView() {
             <p className="mt-2 text-[11px] uppercase tracking-wide text-[#636366]">
               {profile?.rank ?? rank.tier} · Niv. {level}
             </p>
+          </div>
+
+          <div>
+            <p className="mb-2 text-[13px] font-semibold text-white">Sport principal</p>
+            <p className="mb-2 text-[12px] text-[#8E8E93]">
+              Adapte Train, Lobby et ton badge profil.
+            </p>
+            <DisciplinePicker
+              value={disciplineId}
+              onChange={(id) => {
+                setDisciplineId(id)
+                void updateDiscipline(getDiscipline(id).label)
+              }}
+              compact
+            />
           </div>
 
           <button

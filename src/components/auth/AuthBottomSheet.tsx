@@ -2,6 +2,12 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Loader2, Mail } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { IosSheet } from '../ui/IosSheet'
+import { DisciplinePicker } from '../discipline/DisciplinePicker'
+import {
+  getDiscipline,
+  getStoredDisciplineId,
+  type AppDisciplineId,
+} from '../../data/disciplines'
 
 export function AuthBottomSheet() {
   const {
@@ -17,12 +23,14 @@ export function AuthBottomSheet() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [pseudo, setPseudo] = useState('')
+  const [disciplineId, setDisciplineId] = useState<AppDisciplineId>(() => getStoredDisciplineId())
 
   useEffect(() => {
     if (!isAuthOpen) {
       setEmail('')
       setPassword('')
       setPseudo('')
+      setDisciplineId(getStoredDisciplineId())
       setMode('signup')
     }
   }, [isAuthOpen])
@@ -30,7 +38,12 @@ export function AuthBottomSheet() {
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault()
     if (mode === 'signup') {
-      void signUpWithEmail(email, password, pseudo || undefined)
+      void signUpWithEmail(
+        email,
+        password,
+        pseudo || undefined,
+        getDiscipline(disciplineId).label,
+      )
     } else {
       void signInWithEmail(email, password)
     }
@@ -69,23 +82,34 @@ export function AuthBottomSheet() {
 
         <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3.5 py-3">
           <Mail className="h-4 w-4 shrink-0 text-[#FF2B2B]" />
-          <p className="text-[13px] text-[#AEAEB2]">Connexion sécurisée par email (Supabase).</p>
+          <p className="text-[13px] text-[#AEAEB2]">
+            Tous les sports — muscu, course, combat, vélo…
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           {mode === 'signup' && (
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Pseudo</span>
-              <input
-                type="text"
-                value={pseudo}
-                onChange={(e) => setPseudo(e.target.value)}
-                placeholder="Evan_Lift"
-                disabled={authLoading}
-                maxLength={24}
-                className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
-              />
-            </label>
+            <>
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Pseudo</span>
+                <input
+                  type="text"
+                  value={pseudo}
+                  onChange={(e) => setPseudo(e.target.value)}
+                  placeholder="Evan_Lift"
+                  disabled={authLoading}
+                  maxLength={24}
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                />
+              </label>
+
+              <div>
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                  Sport principal
+                </span>
+                <DisciplinePicker value={disciplineId} onChange={setDisciplineId} compact />
+              </div>
+            </>
           )}
 
           <label className="block">

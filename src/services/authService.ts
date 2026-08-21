@@ -31,7 +31,12 @@ export function mapSessionUser(user: {
   }
 }
 
-export async function signUpWithEmail(email: string, password: string, pseudo?: string) {
+export async function signUpWithEmail(
+  email: string,
+  password: string,
+  pseudo?: string,
+  disciplineLabel?: string,
+) {
   const supabase = getSupabase()
   const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined
 
@@ -42,6 +47,7 @@ export async function signUpWithEmail(email: string, password: string, pseudo?: 
       emailRedirectTo: redirectTo,
       data: {
         pseudo: pseudo?.trim() || email.split('@')[0] || 'Athlete',
+        discipline: disciplineLabel?.trim() || 'Musculation',
       },
     },
   })
@@ -81,6 +87,7 @@ export async function fetchProfile(userId: string): Promise<ProfileRow | null> {
 export async function ensureProfile(
   userId: string,
   pseudo: string,
+  disciplineLabel = 'Musculation',
 ): Promise<ProfileRow> {
   const existing = await fetchProfile(userId)
   if (existing) return existing
@@ -96,7 +103,7 @@ export async function ensureProfile(
         level: 1,
         xp: 0,
         rank: rank.tier,
-        discipline: 'Musculation',
+        discipline: disciplineLabel.slice(0, 40) || 'Musculation',
       },
       { onConflict: 'id' },
     )
@@ -109,7 +116,13 @@ export async function ensureProfile(
 
 export async function updateProfileProgress(
   userId: string,
-  patch: { level?: number; xp?: number; rank?: string; pseudo?: string },
+  patch: {
+    level?: number
+    xp?: number
+    rank?: string
+    pseudo?: string
+    discipline?: string
+  },
 ): Promise<ProfileRow> {
   const supabase = getSupabase()
   const { data, error } = await supabase

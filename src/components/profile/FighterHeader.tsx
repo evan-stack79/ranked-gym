@@ -10,6 +10,8 @@ interface FighterHeaderProps {
   rank: string
   email?: string
   provider?: AuthMethod
+  disciplineLabel?: string
+  disciplineAccent?: string
   onOpenSettings?: () => void
 }
 
@@ -20,6 +22,8 @@ export function FighterHeader({
   rank,
   email,
   provider,
+  disciplineLabel,
+  disciplineAccent = '#FF2B2B',
   onOpenSettings,
 }: FighterHeaderProps) {
   const status = statusFromPower(level, rank)
@@ -34,6 +38,18 @@ export function FighterHeader({
             {status && <StatusBadge variant={status} />}
           </div>
           <p className="mt-0.5 text-[15px] text-[#8E8E93]">{title}</p>
+          {disciplineLabel && (
+            <span
+              className="mt-2 inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white"
+              style={{
+                background: `${disciplineAccent}22`,
+                borderColor: `${disciplineAccent}55`,
+                color: disciplineAccent,
+              }}
+            >
+              {disciplineLabel}
+            </span>
+          )}
           {email && (
             <p className="mt-1 text-[12px] text-[#636366]">
               {email}
