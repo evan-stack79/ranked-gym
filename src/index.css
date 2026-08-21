@@ -333,6 +333,10 @@ body {
   box-shadow: 0 0 24px rgb(0 180 255 / 0.35);
 }
 
+.water-validate-bar {
+  animation: ios-fade-up 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
 /* iOS Cristaline-style slim bottle */
 .water-bottle-slim {
   border-radius: 28px;
