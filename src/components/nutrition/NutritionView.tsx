@@ -10,20 +10,22 @@ import {
   saveCalorieProfile,
 } from '../../services/nutritionStorage'
 import { getAdjustedNutritionTarget } from '../../services/nutritionActivity'
+import { useAuth } from '../../context/AuthContext'
 import type { CalorieProfile } from '../../types/nutrition'
 
 export function NutritionView() {
+  const { isLoading: isBootLoading } = useAuth()
   const [profile, setProfile] = useState<CalorieProfile>(() => getCalorieProfile())
-  const [hydrated, setHydrated] = useState(false)
 
   const adjusted = useMemo(() => getAdjustedNutritionTarget(profile), [profile])
   const targetCalories = adjusted.targetCalories
   const activityBonus = adjusted.activityBonus
 
+  // Re-read after global boot (cloud hydrate) so we never paint blank defaults first.
   useEffect(() => {
+    if (isBootLoading) return
     setProfile(getCalorieProfile())
-    setHydrated(true)
-  }, [])
+  }, [isBootLoading])
 
   useEffect(() => {
     const sync = () => setProfile(getCalorieProfile())
@@ -39,8 +41,6 @@ export function NutritionView() {
     }
   }, [])
 
-  // Only persist when the user (or cloud restore) actually changes the profile.
-  // Never auto-push blank mock defaults (70kg / age 24) on first mount.
   const handleProfileChange = useCallback((next: CalorieProfile) => {
     setProfile(next)
     saveCalorieProfile(next)
@@ -52,7 +52,7 @@ export function NutritionView() {
     saveCalorieProfile(next)
   }
 
-  if (!hydrated) return null
+  if (isBootLoading) return null
 
   return (
     <div className="flex flex-col gap-8 pb-4">

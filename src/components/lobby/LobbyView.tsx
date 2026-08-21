@@ -50,7 +50,7 @@ function memberCountForGym(gym: NearbyGym): number {
 }
 
 export function LobbyView() {
-  const { requireAuth, user } = useAuth()
+  const { requireAuth, user, isLoading: isBootLoading } = useAuth()
   const [phase, setPhase] = useState<LobbyPhase>('idle')
   const [error, setError] = useState<string | null>(null)
   const [location, setLocation] = useState<LocationContext | null>(null)
@@ -62,6 +62,7 @@ export function LobbyView() {
   const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
+    if (isBootLoading) return
     const savedCheckIn = getActiveCheckIn()
     if (savedCheckIn) {
       setCheckedInGym(savedCheckIn.gym)
@@ -77,7 +78,7 @@ export function LobbyView() {
       setPhase('checked-in')
     }
     setHydrated(true)
-  }, [])
+  }, [isBootLoading])
 
   const enterLobby = useCallback(
     (gym: NearbyGym) => {

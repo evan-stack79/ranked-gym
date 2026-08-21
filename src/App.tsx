@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AuthBottomSheet } from './components/auth/AuthBottomSheet'
 import { AppLayout } from './components/layout/AppLayout'
+import { AppBootScreen } from './components/ui/AppBootScreen'
 import { HomeView } from './components/home/HomeView'
 import { LobbyView } from './components/lobby/LobbyView'
 import { TrainingView } from './components/training/TrainingView'
@@ -26,7 +27,7 @@ function renderActiveView(tab: TabId) {
 
 function AppShell() {
   const [activeTab, setActiveTab] = useState<TabId>('home')
-  const { requireAuth, isAuthenticated } = useAuth()
+  const { requireAuth, isAuthenticated, isLoading } = useAuth()
 
   useEffect(() => {
     if (!isAuthenticated && activeTab === 'profile') {
@@ -45,7 +46,7 @@ function AppShell() {
   return (
     <>
       <AppLayout activeTab={activeTab} onTabChange={handleTabChange}>
-        {renderActiveView(activeTab)}
+        {isLoading ? <AppBootScreen /> : renderActiveView(activeTab)}
       </AppLayout>
       <AuthBottomSheet />
     </>

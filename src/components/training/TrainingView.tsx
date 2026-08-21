@@ -41,8 +41,10 @@ import {
   isStrengthFamily,
   storeDisciplineId,
 } from '../../data/disciplines'
+import { useAuth } from '../../context/AuthContext'
 
 export function TrainingView() {
+  const { isLoading: isBootLoading } = useAuth()
   const [state, setState] = useState<TrainingState>(() => getTrainingState())
   const [profileTick, setProfileTick] = useState(0)
   const [sportOpen, setSportOpen] = useState(false)
@@ -52,6 +54,13 @@ export function TrainingView() {
   const [durationMin, setDurationMin] = useState(40)
 
   const [disciplineTick, setDisciplineTick] = useState(0)
+
+  useEffect(() => {
+    if (isBootLoading) return
+    setState(getTrainingState())
+    setProfileTick((n) => n + 1)
+    setDisciplineTick((n) => n + 1)
+  }, [isBootLoading])
 
   const profile = useMemo(() => getCalorieProfile(), [
     profileTick,

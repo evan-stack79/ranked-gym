@@ -45,6 +45,12 @@ interface AuthContextValue {
   user: AuthUser | null
   profile: ProfileRow | null
   isAuthenticated: boolean
+  /**
+   * True until the initial session check finishes, and — if logged in —
+   * until profile + cloud backup hydrate complete (success or error).
+   * Prevents Flash of Stale Data on refresh.
+   */
+  isLoading: boolean
   isAuthOpen: boolean
   authLoading: boolean
   authError: string | null
@@ -79,14 +85,22 @@ function friendlyAuthError(err: unknown, fallback: string): string {
   return raw || fallback
 }
 
+function metaDisciplineOf(user: { user_metadata?: Record<string, unknown> }): string | undefined {
+  return typeof user.user_metadata?.discipline === 'string'
+    ? user.user_metadata.discipline
+    : undefined
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<AuthUser | null>(null)
   const [profile, setProfile] = useState<ProfileRow | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [isAuthOpen, setIsAuthOpen] = useState(false)
   const [authLoading, setAuthLoading] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
   const pendingRef = useRef<AuthSuccessCallback | null>(null)
+  const hydrateGenRef = useRef(0)
 
   const loadProfile = useCallback(async (authUser: AuthUser, metaDiscipline?: string) => {
     setCloudBackupUserId(authUser.id)
@@ -100,12 +114,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser({ ...authUser, displayName: row.pseudo || authUser.displayName })
       syncLocalDiscipline(row.discipline)
     } catch {
-      const row = await fetchProfile(authUser.id)
-      setProfile(row)
-      if (row?.discipline) syncLocalDiscipline(row.discipline)
+      try {
+        const row = await fetchProfile(authUser.id)
+        setProfile(row)
+        if (row?.discipline) syncLocalDiscipline(row.discipline)
+      } catch {
+        setProfile(null)
+      }
     }
-    await hydrateCloudBackupForUser(authUser.id)
+    try {
+      await hydrateCloudBackupForUser(authUser.id)
+    } catch {
+      // Cloud hydrate failed — UI still unlocks; local cache may be empty.
+    }
   }, [])
+
+  const hydrateUser = useCallback(
+    async (authUser: AuthUser, metaDiscipline?: string) => {
+      const gen = ++hydrateGenRef.current
+      setIsLoading(true)
+      try {
+        await loadProfile(authUser, metaDiscipline)
+      } finally {
+        if (hydrateGenRef.current === gen) {
+          setIsLoading(false)
+        }
+      }
+    },
+    [loadProfile],
+  )
 
   const refreshProfile = useCallback(async () => {
     if (!user) return
@@ -114,45 +151,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user])
 
   useEffect(() => {
-    if (!isSupabaseConfigured()) return
+    if (!isSupabaseConfigured()) {
+      setIsLoading(false)
+      return
+    }
 
     const supabase = getSupabase()
+    let cancelled = false
 
     void supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return
       const next = data.session
       setSession(next)
       if (next?.user) {
         const mapped = mapSessionUser(next.user)
         setUser(mapped)
-        const metaDisc =
-          typeof next.user.user_metadata?.discipline === 'string'
-            ? next.user.user_metadata.discipline
-            : undefined
-        void loadProfile(mapped, metaDisc)
+        void hydrateUser(mapped, metaDisciplineOf(next.user))
+      } else {
+        setIsLoading(false)
       }
     })
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (cancelled) return
+      // Boot path is handled by getSession to avoid double hydrate / early unlock.
+      if (event === 'INITIAL_SESSION') return
+      if (event === 'TOKEN_REFRESHED') {
+        setSession(nextSession)
+        return
+      }
+
       setSession(nextSession)
       if (nextSession?.user) {
         const mapped = mapSessionUser(nextSession.user)
         setUser(mapped)
-        const metaDisc =
-          typeof nextSession.user.user_metadata?.discipline === 'string'
-            ? nextSession.user.user_metadata.discipline
-            : undefined
-        void loadProfile(mapped, metaDisc)
+        if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'PASSWORD_RECOVERY') {
+          void hydrateUser(mapped, metaDisciplineOf(nextSession.user))
+        }
       } else {
+        hydrateGenRef.current += 1
         setUser(null)
         setProfile(null)
         resetCloudBackupHydration()
+        setIsLoading(false)
       }
     })
 
     return () => {
+      cancelled = true
       sub.subscription.unsubscribe()
     }
-  }, [loadProfile])
+  }, [hydrateUser])
 
   const completePending = useCallback(() => {
     const cb = pendingRef.current
@@ -251,10 +300,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isSupabaseConfigured()) {
       await apiSignOut()
     }
+    hydrateGenRef.current += 1
     resetCloudBackupHydration()
     setSession(null)
     setUser(null)
     setProfile(null)
+    setIsLoading(false)
   }, [])
 
   const value = useMemo<AuthContextValue>(
@@ -262,6 +313,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       profile,
       isAuthenticated: Boolean(session?.user),
+      isLoading,
       isAuthOpen,
       authLoading,
       authError,
@@ -278,6 +330,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       profile,
       session,
+      isLoading,
       isAuthOpen,
       authLoading,
       authError,
