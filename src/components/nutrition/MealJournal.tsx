@@ -29,6 +29,7 @@ import { BarcodeScanner } from './BarcodeScanner'
 import { ScannedProductSheet } from './ScannedProductSheet'
 import { MealBudgetsCard } from './MealBudgetsCard'
 import { EditMealSheet } from './EditMealSheet'
+import { MealPhotoAnalyzer } from './MealPhotoAnalyzer'
 
 interface MealJournalProps {
   targetCalories: number
@@ -84,7 +85,13 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   const [carbsG, setCarbsG] = useState<number | ''>('')
   const [fatG, setFatG] = useState<number | ''>('')
   const [mealType, setMealType] = useState<MealType>('lunch')
+  const [toast, setToast] = useState<string | null>(null)
   const scanZoneRef = useRef<HTMLDivElement>(null)
+
+  const showToast = useCallback((message: string) => {
+    setToast(message)
+    window.setTimeout(() => setToast(null), 3200)
+  }, [])
 
   const scrollToScanZone = useCallback(() => {
     scanZoneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -315,9 +322,24 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
 
       <div
         ref={scanZoneRef}
-        className="scroll-mt-24"
+        className="scroll-mt-24 space-y-3"
         id="nutrition-scan-zone"
       >
+        <MealPhotoAnalyzer
+          mealType={mealType}
+          onToast={showToast}
+          onAnalyzed={(result) => {
+            const journal = addMealToToday({
+              name: result.name,
+              mealType: result.mealType,
+              calories: result.calories,
+              proteinG: result.proteines,
+              carbsG: result.glucides,
+              fatG: result.lipides,
+            })
+            setMeals(journal.meals)
+          }}
+        />
         <BarcodeScanner
           open={scannerOpen}
           onClose={() => setScannerOpen(false)}
@@ -557,6 +579,12 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
         onSave={handleEditSave}
         onDelete={handleRemove}
       />
+
+      {toast ? (
+        <div className="fixed bottom-24 left-1/2 z-[80] max-w-[90%] -translate-x-1/2 rounded-full border border-white/10 bg-[#2C2C2E] px-4 py-2 text-center text-[13px] font-medium text-white shadow-lg">
+          {toast}
+        </div>
+      ) : null}
     </section>
   )
 }

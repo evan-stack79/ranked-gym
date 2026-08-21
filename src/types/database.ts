@@ -170,6 +170,26 @@ type UserBackupsTable = {
   Relationships: []
 }
 
+type AiUsageLimitsTable = {
+  Row: {
+    user_id: string
+    date_of_scan: string
+    scan_count: number
+    updated_at: string
+  }
+  Insert: {
+    user_id: string
+    date_of_scan: string
+    scan_count?: number
+    updated_at?: string
+  }
+  Update: {
+    scan_count?: number
+    updated_at?: string
+  }
+  Relationships: []
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -179,9 +199,19 @@ export interface Database {
       checkins: CheckinsTable
       aliments: AlimentsTable
       user_backups: UserBackupsTable
+      ai_usage_limits: AiUsageLimitsTable
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      reserve_ai_meal_scan: {
+        Args: { p_user_id: string }
+        Returns: { allowed: boolean; scan_count: number; daily_limit: number }[]
+      }
+      release_ai_meal_scan: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+    }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
   }
@@ -193,3 +223,4 @@ export type NutritionRow = NutritionTable['Row']
 export type CheckinRow = CheckinsTable['Row']
 export type AlimentRow = AlimentsTable['Row']
 export type UserBackupRow = UserBackupsTable['Row']
+export type AiUsageLimitRow = AiUsageLimitsTable['Row']
