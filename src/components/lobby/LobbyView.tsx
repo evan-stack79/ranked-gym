@@ -95,6 +95,7 @@ export function LobbyView() {
           salleNom: gym.name,
           salleLat: gym.lat,
           salleLng: gym.lng,
+          gym,
         }).catch(() => {
           // Keep local lobby even if remote write fails (offline / RLS)
         })

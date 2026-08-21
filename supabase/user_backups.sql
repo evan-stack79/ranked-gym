@@ -1,29 +1,24 @@
--- Ranked Gym — cloud backup (ajoute à schema.sql / SQL Editor)
+-- Ranked Gym — migration minimale si schema.sql a déjà été partiellement exécuté
+-- Préférable : re-exécuter entièrement supabase/schema.sql (idempotent).
 
-create table if not exists public.user_backups (
+create table if not exists public.workouts (
   user_id uuid primary key references auth.users (id) on delete cascade,
-  payload jsonb not null default '{}'::jsonb,
+  state jsonb not null default '{}'::jsonb,
+  progress jsonb not null default '{}'::jsonb,
   updated_at timestamptz not null default now()
 );
 
-alter table public.user_backups enable row level security;
+create table if not exists public.nutrition (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  profile jsonb not null default '{}'::jsonb,
+  journal jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
 
-drop policy if exists "Backups select own" on public.user_backups;
-create policy "Backups select own"
-  on public.user_backups for select
-  using (auth.uid() = user_id);
+alter table public.profiles
+  add column if not exists custom_spots jsonb not null default '[]'::jsonb;
+alter table public.profiles
+  add column if not exists active_checkin jsonb;
 
-drop policy if exists "Backups insert own" on public.user_backups;
-create policy "Backups insert own"
-  on public.user_backups for insert
-  with check (auth.uid() = user_id);
-
-drop policy if exists "Backups update own" on public.user_backups;
-create policy "Backups update own"
-  on public.user_backups for update
-  using (auth.uid() = user_id);
-
-drop policy if exists "Backups delete own" on public.user_backups;
-create policy "Backups delete own"
-  on public.user_backups for delete
-  using (auth.uid() = user_id);
+alter table public.checkins
+  add column if not exists gym_payload jsonb;

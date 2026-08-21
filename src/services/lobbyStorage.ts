@@ -1,13 +1,22 @@
 import type { NearbyGym } from '../types'
+import { getActiveCloudUserId } from './cloudSession'
 
-const CUSTOM_GYMS_KEY = 'ranked-gym:custom-gyms'
-const CHECK_IN_KEY = 'ranked-gym:check-in'
+const CUSTOM_GYMS_BASE = 'ranked-gym:custom-gyms'
+const CHECK_IN_BASE = 'ranked-gym:check-in'
 export const CHECK_IN_TTL_MS = 3 * 60 * 60 * 1000
 
-export type StorageSaveOptions = { skipCloud?: boolean }
+export type StorageSaveOptions = {
+  skipCloud?: boolean
+  checkedInAt?: number
+}
 
 function triggerCloudBackup() {
   void import('./cloudBackup').then((m) => m.notifyLocalDataChanged())
+}
+
+function scopedKey(base: string): string {
+  const uid = getActiveCloudUserId()
+  return uid ? `${base}:u:${uid}` : base
 }
 
 export interface StoredCheckIn {
@@ -33,7 +42,7 @@ function writeJson<T>(key: string, value: T, opts?: StorageSaveOptions): void {
 }
 
 export function getCustomGyms(): NearbyGym[] {
-  return readJson<NearbyGym[]>(CUSTOM_GYMS_KEY, []).map((gym) => ({
+  return readJson<NearbyGym[]>(scopedKey(CUSTOM_GYMS_BASE), []).map((gym) => ({
     ...gym,
     isCustom: true,
     canCheckIn: true,
@@ -42,7 +51,7 @@ export function getCustomGyms(): NearbyGym[] {
 
 export function saveCustomGyms(gyms: NearbyGym[], opts?: StorageSaveOptions): void {
   writeJson(
-    CUSTOM_GYMS_KEY,
+    scopedKey(CUSTOM_GYMS_BASE),
     gyms.map((g) => ({ ...g, isCustom: true, canCheckIn: true })),
     opts,
   )
@@ -52,7 +61,7 @@ export function saveCustomGym(gym: NearbyGym, opts?: StorageSaveOptions): void {
   const gyms = getCustomGyms()
   const withoutDuplicate = gyms.filter((g) => g.id !== gym.id)
   writeJson(
-    CUSTOM_GYMS_KEY,
+    scopedKey(CUSTOM_GYMS_BASE),
     [{ ...gym, isCustom: true, canCheckIn: true }, ...withoutDuplicate],
     opts,
   )
@@ -69,14 +78,14 @@ export function saveCheckIn(gym: NearbyGym, opts?: StorageSaveOptions): void {
   const payload: StoredCheckIn = {
     gymId: gym.id,
     gymName: gym.name,
-    checkedInAt: Date.now(),
+    checkedInAt: opts?.checkedInAt ?? Date.now(),
     gym,
   }
-  writeJson(CHECK_IN_KEY, payload, opts)
+  writeJson(scopedKey(CHECK_IN_BASE), payload, opts)
 }
 
 export function getActiveCheckIn(): StoredCheckIn | null {
-  const stored = readJson<StoredCheckIn | null>(CHECK_IN_KEY, null)
+  const stored = readJson<StoredCheckIn | null>(scopedKey(CHECK_IN_BASE), null)
   if (!stored) return null
 
   const elapsed = Date.now() - stored.checkedInAt
@@ -89,7 +98,7 @@ export function getActiveCheckIn(): StoredCheckIn | null {
 }
 
 export function clearCheckIn(opts?: StorageSaveOptions): void {
-  localStorage.removeItem(CHECK_IN_KEY)
+  localStorage.removeItem(scopedKey(CHECK_IN_BASE))
   if (!opts?.skipCloud) triggerCloudBackup()
 }
 

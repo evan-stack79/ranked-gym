@@ -1,9 +1,16 @@
-const PROFILE_KEY = 'ranked-gym:profile'
+import { getActiveCloudUserId } from './cloudSession'
+
+const PROFILE_BASE = 'ranked-gym:profile'
 
 export type StorageSaveOptions = { skipCloud?: boolean }
 
 function triggerCloudBackup() {
   void import('./cloudBackup').then((m) => m.notifyLocalDataChanged())
+}
+
+function scopedKey(): string {
+  const uid = getActiveCloudUserId()
+  return uid ? `${PROFILE_BASE}:u:${uid}` : PROFILE_BASE
 }
 
 export interface StoredProfileProgress {
@@ -34,7 +41,7 @@ function writeJson<T>(key: string, value: T, opts?: StorageSaveOptions): void {
 }
 
 export function getProfileProgress(): StoredProfileProgress {
-  const stored = readJson<Partial<StoredProfileProgress>>(PROFILE_KEY, {})
+  const stored = readJson<Partial<StoredProfileProgress>>(scopedKey(), {})
   return {
     level: stored.level ?? DEFAULT_PROGRESS.level,
     currentXp: stored.currentXp ?? DEFAULT_PROGRESS.currentXp,
@@ -46,7 +53,7 @@ export function saveProfileProgress(
   progress: StoredProfileProgress,
   opts?: StorageSaveOptions,
 ): void {
-  writeJson(PROFILE_KEY, progress, opts)
+  writeJson(scopedKey(), progress, opts)
 }
 
 export function getDefaultProfileProgress(): StoredProfileProgress {

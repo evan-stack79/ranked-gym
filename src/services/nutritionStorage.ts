@@ -1,13 +1,19 @@
 import type { CalorieProfile, DayJournal, MealEntry } from '../types/nutrition'
 import { inferGoalFromWeights, todayKey } from '../utils/calories'
+import { getActiveCloudUserId } from './cloudSession'
 
-const PROFILE_KEY = 'ranked-gym:nutrition-profile'
-const JOURNAL_KEY = 'ranked-gym:nutrition-journal'
+const PROFILE_BASE = 'ranked-gym:nutrition-profile'
+const JOURNAL_BASE = 'ranked-gym:nutrition-journal'
 
 export type StorageSaveOptions = { skipCloud?: boolean }
 
 function triggerCloudBackup() {
   void import('./cloudBackup').then((m) => m.notifyLocalDataChanged())
+}
+
+function scopedKey(base: string): string {
+  const uid = getActiveCloudUserId()
+  return uid ? `${base}:u:${uid}` : base
 }
 
 export const DEFAULT_PROFILE: CalorieProfile = {
@@ -37,7 +43,7 @@ function writeJson<T>(key: string, value: T): void {
 }
 
 export function getCalorieProfile(): CalorieProfile {
-  const stored = readJson<Partial<CalorieProfile>>(PROFILE_KEY, {})
+  const stored = readJson<Partial<CalorieProfile>>(scopedKey(PROFILE_BASE), {})
   const merged: CalorieProfile = {
     ...DEFAULT_PROFILE,
     ...stored,
@@ -57,7 +63,7 @@ export function saveCalorieProfile(
     ...profile,
     goal: inferGoalFromWeights(profile.weightKg, profile.goalWeightKg),
   }
-  writeJson(PROFILE_KEY, next)
+  writeJson(scopedKey(PROFILE_BASE), next)
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('ranked-gym:profile-changed'))
   }
@@ -69,7 +75,7 @@ export function isNutritionOnboarded(): boolean {
 }
 
 function getAllJournals(): Record<string, DayJournal> {
-  return readJson<Record<string, DayJournal>>(JOURNAL_KEY, {})
+  return readJson<Record<string, DayJournal>>(scopedKey(JOURNAL_BASE), {})
 }
 
 export function getMealJournal(): Record<string, DayJournal> {
@@ -80,7 +86,7 @@ export function saveMealJournal(
   journal: Record<string, DayJournal>,
   opts?: StorageSaveOptions,
 ): void {
-  writeJson(JOURNAL_KEY, journal)
+  writeJson(scopedKey(JOURNAL_BASE), journal)
   if (!opts?.skipCloud) triggerCloudBackup()
 }
 
@@ -93,7 +99,7 @@ export function getTodayJournal(): DayJournal {
 export function saveTodayJournal(journal: DayJournal, opts?: StorageSaveOptions): void {
   const all = getAllJournals()
   all[journal.dateKey] = journal
-  writeJson(JOURNAL_KEY, all)
+  writeJson(scopedKey(JOURNAL_BASE), all)
   if (!opts?.skipCloud) triggerCloudBackup()
 }
 

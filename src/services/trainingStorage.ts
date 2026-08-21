@@ -15,13 +15,19 @@ import {
   sessionIntensity,
   strengthSessionKcal,
 } from '../utils/strength'
+import { getActiveCloudUserId } from './cloudSession'
 
-const KEY = 'ranked-gym:training'
+const KEY_BASE = 'ranked-gym:training'
 
 export type StorageSaveOptions = { skipCloud?: boolean }
 
 function triggerCloudBackup() {
   void import('./cloudBackup').then((m) => m.notifyLocalDataChanged())
+}
+
+function storageKey(): string {
+  const uid = getActiveCloudUserId()
+  return uid ? `${KEY_BASE}:u:${uid}` : KEY_BASE
 }
 
 export const DEFAULT_TEMPLATES: SessionTemplate[] = [
@@ -134,7 +140,7 @@ function cloneExercises(exercises: ExerciseEntry[]): ExerciseEntry[] {
 
 function read(): TrainingState {
   try {
-    const raw = localStorage.getItem(KEY)
+    const raw = localStorage.getItem(storageKey())
     if (!raw) {
       return {
         ...DEFAULT_STATE,
@@ -176,7 +182,7 @@ function read(): TrainingState {
 }
 
 function write(state: TrainingState, opts?: StorageSaveOptions): void {
-  localStorage.setItem(KEY, JSON.stringify(state))
+  localStorage.setItem(storageKey(), JSON.stringify(state))
   if (!opts?.skipCloud) triggerCloudBackup()
 }
 

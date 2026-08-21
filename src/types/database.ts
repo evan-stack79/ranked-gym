@@ -8,6 +8,8 @@ type ProfilesTable = {
     xp: number
     rank: string
     discipline: string
+    custom_spots: Json
+    active_checkin: Json | null
     created_at: string
     updated_at: string
   }
@@ -18,6 +20,8 @@ type ProfilesTable = {
     xp?: number
     rank?: string
     discipline?: string
+    custom_spots?: Json
+    active_checkin?: Json | null
     created_at?: string
     updated_at?: string
   }
@@ -28,6 +32,50 @@ type ProfilesTable = {
     xp?: number
     rank?: string
     discipline?: string
+    custom_spots?: Json
+    active_checkin?: Json | null
+    updated_at?: string
+  }
+  Relationships: []
+}
+
+type WorkoutsTable = {
+  Row: {
+    user_id: string
+    state: Json
+    progress: Json
+    updated_at: string
+  }
+  Insert: {
+    user_id: string
+    state?: Json
+    progress?: Json
+    updated_at?: string
+  }
+  Update: {
+    state?: Json
+    progress?: Json
+    updated_at?: string
+  }
+  Relationships: []
+}
+
+type NutritionTable = {
+  Row: {
+    user_id: string
+    profile: Json
+    journal: Json
+    updated_at: string
+  }
+  Insert: {
+    user_id: string
+    profile?: Json
+    journal?: Json
+    updated_at?: string
+  }
+  Update: {
+    profile?: Json
+    journal?: Json
     updated_at?: string
   }
   Relationships: []
@@ -40,6 +88,7 @@ type CheckinsTable = {
     salle_nom: string
     salle_lat: number | null
     salle_lng: number | null
+    gym_payload: Json | null
     created_at: string
   }
   Insert: {
@@ -48,12 +97,14 @@ type CheckinsTable = {
     salle_nom: string
     salle_lat?: number | null
     salle_lng?: number | null
+    gym_payload?: Json | null
     created_at?: string
   }
   Update: {
     salle_nom?: string
     salle_lat?: number | null
     salle_lng?: number | null
+    gym_payload?: Json | null
   }
   Relationships: []
 }
@@ -114,6 +165,8 @@ export interface Database {
   public: {
     Tables: {
       profiles: ProfilesTable
+      workouts: WorkoutsTable
+      nutrition: NutritionTable
       checkins: CheckinsTable
       aliments: AlimentsTable
       user_backups: UserBackupsTable
@@ -126,6 +179,8 @@ export interface Database {
 }
 
 export type ProfileRow = ProfilesTable['Row']
+export type WorkoutRow = WorkoutsTable['Row']
+export type NutritionRow = NutritionTable['Row']
 export type CheckinRow = CheckinsTable['Row']
 export type AlimentRow = AlimentsTable['Row']
 export type UserBackupRow = UserBackupsTable['Row']

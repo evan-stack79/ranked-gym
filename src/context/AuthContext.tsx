@@ -104,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(row)
       if (row?.discipline) syncLocalDiscipline(row.discipline)
     }
-    void hydrateCloudBackupForUser(authUser.id)
+    await hydrateCloudBackupForUser(authUser.id)
   }, [])
 
   const refreshProfile = useCallback(async () => {

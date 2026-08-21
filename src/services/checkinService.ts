@@ -1,11 +1,13 @@
 import { getSupabase } from '../lib/supabase'
-import type { CheckinRow } from '../types/database'
+import type { CheckinRow, Json } from '../types/database'
+import type { NearbyGym } from '../types'
 
 export async function createCheckin(input: {
   userId: string
   salleNom: string
   salleLat?: number
   salleLng?: number
+  gym?: NearbyGym
 }): Promise<CheckinRow> {
   const supabase = getSupabase()
   const { data, error } = await supabase
@@ -15,6 +17,7 @@ export async function createCheckin(input: {
       salle_nom: input.salleNom,
       salle_lat: input.salleLat ?? null,
       salle_lng: input.salleLng ?? null,
+      gym_payload: (input.gym ?? null) as Json | null,
     })
     .select('*')
     .single()
