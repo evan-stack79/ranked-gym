@@ -56,4 +56,6 @@ export interface MealEntry {
 export interface DayJournal {
   dateKey: string
   meals: MealEntry[]
+  /** Eau bue aujourd’hui (ml) — sync cloud via nutrition.journal */
+  waterMl?: number
 }

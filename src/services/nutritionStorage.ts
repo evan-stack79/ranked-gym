@@ -193,3 +193,27 @@ export function updateMealInToday(
   saveTodayJournal(next)
   return next
 }
+
+/** Suggested daily water goal from body weight (~35 ml/kg), clamped. */
+export function suggestedWaterGoalMl(weightKg: number): number {
+  const raw = Math.round((Math.max(40, weightKg || 70) * 35) / 50) * 50
+  return Math.min(4000, Math.max(1500, raw))
+}
+
+export function getTodayWaterMl(): number {
+  return Math.max(0, Math.round(getTodayJournal().waterMl ?? 0))
+}
+
+export function setTodayWaterMl(waterMl: number, opts?: StorageSaveOptions): DayJournal {
+  const journal = getTodayJournal()
+  const next: DayJournal = {
+    ...journal,
+    waterMl: Math.max(0, Math.round(waterMl)),
+  }
+  saveTodayJournal(next, opts)
+  return next
+}
+
+export function addTodayWaterMl(deltaMl: number, opts?: StorageSaveOptions): DayJournal {
+  return setTodayWaterMl(getTodayWaterMl() + deltaMl, opts)
+}
