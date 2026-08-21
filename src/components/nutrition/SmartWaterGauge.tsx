@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Droplets } from 'lucide-react'
 import { getTodayWaterMl, setTodayWaterMl } from '../../services/nutritionStorage'
 
 /** Capacité physique de la bouteille (ml). */
