@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { RestTimerProvider } from './context/RestTimerContext'
 import { AuthBottomSheet } from './components/auth/AuthBottomSheet'
@@ -15,6 +15,15 @@ import { hasCompletedNutritionOnboarding } from './services/nutritionStorage'
 import type { TabId } from './types'
 
 type AppPhase = 'loading' | 'onboarding' | 'main'
+
+function resolveLaunchPhase(): AppPhase {
+  try {
+    return hasCompletedNutritionOnboarding() ? 'main' : 'onboarding'
+  } catch (error) {
+    console.warn('[app] resolveLaunchPhase failed, defaulting to onboarding:', error)
+    return 'onboarding'
+  }
+}
 
 function renderActiveView(
   tab: TabId,
@@ -45,7 +54,6 @@ function AppShell() {
   const [phase, setPhase] = useState<AppPhase>('loading')
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [launchRoutineId, setLaunchRoutineId] = useState<string | null>(null)
-  const launchGateApplied = useRef(false)
   const { requireAuth, isAuthenticated, isLoading } = useAuth()
 
   useEffect(() => {
@@ -54,16 +62,18 @@ function AppShell() {
       return
     }
 
-    if (!launchGateApplied.current) {
-      launchGateApplied.current = true
-      setPhase(hasCompletedNutritionOnboarding() ? 'main' : 'onboarding')
-    }
+    setPhase(resolveLaunchPhase())
   }, [isLoading])
 
   useEffect(() => {
     const syncOnboardingPhase = () => {
-      if (hasCompletedNutritionOnboarding()) {
-        setPhase((current) => (current === 'onboarding' ? 'main' : current))
+      try {
+        if (hasCompletedNutritionOnboarding()) {
+          setPhase((current) => (current === 'onboarding' ? 'main' : current))
+        }
+      } catch (error) {
+        console.warn('[app] syncOnboardingPhase failed:', error)
+        setPhase('onboarding')
       }
     }
 

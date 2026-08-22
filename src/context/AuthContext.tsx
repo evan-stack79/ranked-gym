@@ -96,6 +96,25 @@ function friendlyAuthError(err: unknown, fallback: string): string {
   return raw || fallback
 }
 
+const HYDRATE_TIMEOUT_MS = 20_000
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error(`${label} timeout after ${ms}ms`))
+    }, ms)
+    promise
+      .then((value) => {
+        window.clearTimeout(timer)
+        resolve(value)
+      })
+      .catch((error) => {
+        window.clearTimeout(timer)
+        reject(error)
+      })
+  })
+}
+
 function metaDisciplineOf(user: { user_metadata?: Record<string, unknown> }): string | undefined {
   return typeof user.user_metadata?.discipline === 'string'
     ? user.user_metadata.discipline
@@ -159,7 +178,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await hydrateCloudBackupForUser(authUser.id)
+      await withTimeout(
+        hydrateCloudBackupForUser(authUser.id),
+        HYDRATE_TIMEOUT_MS,
+        'hydrateCloudBackupForUser',
+      )
     } catch (e) {
       console.error('[auth] hydrateCloudBackupForUser failed:', e)
     }
@@ -170,7 +193,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const gen = ++hydrateGenRef.current
       setIsLoading(true)
       try {
-        await loadProfile(authUser, metaDiscipline)
+        await withTimeout(
+          loadProfile(authUser, metaDiscipline),
+          HYDRATE_TIMEOUT_MS,
+          'loadProfile',
+        )
+      } catch (error) {
+        console.error('[auth] hydrateUser failed:', error)
       } finally {
         if (hydrateGenRef.current === gen) {
           setIsLoading(false)
@@ -199,18 +228,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const supabase = getSupabase()
     let cancelled = false
 
-    void supabase.auth.getSession().then(({ data }) => {
-      if (cancelled) return
-      const next = data.session
-      setSession(next)
-      if (next?.user) {
-        const mapped = mapSessionUser(next.user)
-        setUser(mapped)
-        void hydrateUser(mapped, metaDisciplineOf(next.user))
-      } else {
-        setIsLoading(false)
-      }
-    })
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (cancelled) return
+        const next = data.session
+        setSession(next)
+        if (next?.user) {
+          const mapped = mapSessionUser(next.user)
+          setUser(mapped)
+          void hydrateUser(mapped, metaDisciplineOf(next.user))
+        } else {
+          setIsLoading(false)
+        }
+      })
+      .catch((error) => {
+        console.error('[auth] getSession failed:', error)
+        if (!cancelled) setIsLoading(false)
+      })
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (cancelled) return

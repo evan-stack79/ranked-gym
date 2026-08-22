@@ -143,9 +143,14 @@ export function isNutritionOnboarded(): boolean {
 
 /** Guard de routing au lancement — objectif renseigné + onboarding terminé. */
 export function hasCompletedNutritionOnboarding(): boolean {
-  const profile = getCalorieProfile()
-  if (!profile.onboardingComplete) return false
-  return VALID_GOALS.includes(profile.goal)
+  try {
+    const profile = getCalorieProfile()
+    if (!profile?.onboardingComplete) return false
+    return VALID_GOALS.includes(profile.goal)
+  } catch (error) {
+    console.warn('[nutrition] hasCompletedNutritionOnboarding failed:', error)
+    return false
+  }
 }
 
 function getAllJournals(): Record<string, DayJournal> {
