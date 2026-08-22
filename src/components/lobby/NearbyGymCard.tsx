@@ -1,7 +1,13 @@
 import type { ReactNode } from 'react'
+import { useMemo, useState } from 'react'
 import { Building2, MapPin, Navigation, Lock, CheckCircle2, Star } from 'lucide-react'
 import type { NearbyGym } from '../../types'
 import { formatDistance, CHECK_IN_RADIUS_METERS, isValidDistanceMeters } from '../../utils/geo'
+import {
+  LOBBY_GYM_SORT_OPTIONS,
+  sortLobbyGyms,
+  type LobbyGymSortMode,
+} from '../../utils/lobbyGymSort'
 import { NeonButton } from '../ui/NeonButton'
 import { IconBadge } from '../ui/IconBadge'
 
@@ -129,15 +135,42 @@ export function NearbyGymList({
   checkingInGymId,
   footer,
 }: NearbyGymListProps) {
+  const [sortMode, setSortMode] = useState<LobbyGymSortMode>('recommended')
+
+  const sortedGyms = useMemo(() => sortLobbyGyms(gyms, sortMode), [gyms, sortMode])
+
   return (
     <section>
-      <div className="mb-4 flex items-center justify-between px-1">
+      <div className="mb-3 flex items-center justify-between px-1">
         <h2 className="ios-label">Spots de sport à proximité</h2>
         <span className="text-[13px] text-[#8E8E93]">{gyms.length}</span>
       </div>
 
+      <div className="-mx-1 mb-4 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex w-max min-w-full gap-2 pb-0.5">
+          {LOBBY_GYM_SORT_OPTIONS.map(({ id, label, emoji }) => {
+            const active = sortMode === id
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setSortMode(id)}
+                className={`shrink-0 rounded-full border px-3.5 py-2 text-[13px] font-semibold transition-all ${
+                  active
+                    ? 'border-[#FF2B2B]/50 bg-[#FF2B2B]/20 text-[#FF5C5C] shadow-[0_0_12px_rgb(255_43_43_/_0.2)]'
+                    : 'border-white/10 bg-black/20 text-[#8E8E93] active:bg-white/5'
+                }`}
+                aria-pressed={active}
+              >
+                {emoji} {label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       <ul className="space-y-2">
-        {gyms.map((gym) => (
+        {sortedGyms.map((gym) => (
           <li key={gym.id}>
             <NearbyGymCard
               gym={gym}
