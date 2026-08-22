@@ -249,7 +249,11 @@ Deno.serve(async (req) => {
   } catch (e) {
     console.error('[analyze-meal-photo] Gemini error:', e)
     await admin.rpc('release_ai_meal_scan', { p_user_id: user.id })
-    const message = e instanceof Error ? e.message : 'Erreur Gemini'
+    let message = e instanceof Error ? e.message : 'Erreur Gemini'
+    if (isGeminiModelNotFoundError(e)) {
+      message =
+        'Modèle Gemini indisponible — mets GEMINI_MODEL=gemini-2.5-flash dans les secrets Supabase puis redéploie la fonction.'
+    }
     return jsonResponse({ error: message }, 502)
   }
 })
