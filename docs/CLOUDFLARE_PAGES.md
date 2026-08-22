@@ -20,10 +20,16 @@ Dans **Workers & Pages → ranked-gym → Settings → Builds** :
 
 Ne mets **pas** `wrangler deploy` nulle part.
 
-Variables d’environnement (Production) :
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
-- `VITE_GOOGLE_MAPS_API_KEY`
+Variables d’environnement (Production) — **obligatoires au moment du build** :
+
+| Variable | Exemple |
+|----------|---------|
+| `VITE_SUPABASE_URL` | `https://jivqfrkwvnzzefnerpii.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | `sb_publishable_…` ou clé anon JWT |
+| `VITE_GOOGLE_MAPS_API_KEY` | `AIzaSy…` (optionnel, mock sinon) |
+
+⚠️ Sans `https://` dans l’URL Supabase → écran noir / crash.  
+⚠️ Les variables `VITE_*` sont **figées au build** : après modification, clique **Retry deployment**.
 
 ---
 

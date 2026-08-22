@@ -4,6 +4,7 @@ import { RestTimerProvider } from './context/RestTimerContext'
 import { AuthBottomSheet } from './components/auth/AuthBottomSheet'
 import { AppLayout } from './components/layout/AppLayout'
 import { AppBootScreen } from './components/ui/AppBootScreen'
+import { SupabaseConfigBanner } from './components/ui/SupabaseConfigBanner'
 import { HomeView } from './components/home/HomeView'
 import { LobbyView } from './components/lobby/LobbyView'
 import { TrainingView } from './components/training/TrainingView'
@@ -46,6 +47,7 @@ function AppShell() {
 
   return (
     <>
+      <SupabaseConfigBanner />
       <AppLayout activeTab={activeTab} onTabChange={handleTabChange}>
         {isLoading ? <AppBootScreen /> : renderActiveView(activeTab)}
       </AppLayout>
