@@ -24,7 +24,15 @@ export function GlobalOnboardingScreen({ onComplete }: GlobalOnboardingScreenPro
   )
 
   return (
-    <div className="relative flex min-h-[100dvh] flex-col mesh-bg font-sans">
+    <div
+      className="relative flex min-h-[100dvh] flex-col mesh-bg font-sans"
+      style={{
+        paddingTop: 'max(3rem, env(safe-area-inset-top, 0px))',
+        paddingLeft: 'env(safe-area-inset-left, 0px)',
+        paddingRight: 'env(safe-area-inset-right, 0px)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
+    >
       <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
         <div
           className="arena-glow absolute -left-[30%] -top-[20%] h-[70vh] w-[90vw] rounded-full blur-[90px]"
@@ -39,10 +47,7 @@ export function GlobalOnboardingScreen({ onComplete }: GlobalOnboardingScreenPro
         />
       </div>
 
-      <header
-        className="glass-bar relative z-10 border-b border-white/5"
-        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
-      >
+      <header className="glass-bar relative z-10 border-b border-white/5">
         <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-3">
           <span className="text-[17px] font-semibold tracking-tight text-white">
             Ranked <span className="text-[#FF2B2B]">Gym</span>
@@ -51,8 +56,7 @@ export function GlobalOnboardingScreen({ onComplete }: GlobalOnboardingScreenPro
       </header>
 
       <main
-        className="relative z-10 mx-auto w-full max-w-lg flex-1 overflow-y-auto px-5 py-8"
-        style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}
+        className="relative z-10 mx-auto w-full max-w-lg flex-1 overflow-y-auto px-5 pb-8 pt-6"
       >
         <header className="mb-8 ios-fade-up">
           <h1 className="text-[28px] font-bold leading-tight tracking-tight text-white">

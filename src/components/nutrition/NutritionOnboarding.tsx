@@ -15,7 +15,7 @@ interface NutritionOnboardingProps {
   onComplete: (profile: CalorieProfile) => void
 }
 
-type Step = 'goal' | 'goalWeight' | 'pace' | 'body' | 'morphology' | 'result'
+type Step = 'goal' | 'goalWeight' | 'pace' | 'measurements' | 'activity' | 'morphology' | 'result'
 
 function seedNumber(value: number): number | null {
   return value > 0 ? value : null
@@ -29,8 +29,10 @@ function stepTitle(step: Step): string {
       return 'Ton poids objectif'
     case 'pace':
       return 'Ton rythme'
-    case 'body':
-      return 'Où en es-tu aujourd’hui ?'
+    case 'measurements':
+      return 'Tes mensurations'
+    case 'activity':
+      return 'Ton niveau d’activité'
     case 'morphology':
       return 'Ta morphologie'
     case 'result':
@@ -63,7 +65,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
   const steps = useMemo<Step[]>(() => {
     const flow: Step[] = ['goal', 'goalWeight']
     if (goal !== 'maintain') flow.push('pace')
-    flow.push('body', 'morphology', 'result')
+    flow.push('measurements', 'activity', 'morphology', 'result')
     return flow
   }, [goal])
 
@@ -131,23 +133,28 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
       return
     }
     setError(null)
-    setStep(goal === 'maintain' ? 'body' : 'pace')
+    setStep(goal === 'maintain' ? 'measurements' : 'pace')
   }
 
-  const goBody = () => {
+  const goMeasurements = () => {
     if (goal !== 'maintain' && weeklyPaceKg < 0.1) {
       setError('Choisis un rythme hebdomadaire.')
       return
     }
     setError(null)
-    setStep('body')
+    setStep('measurements')
   }
 
-  const goMorphology = () => {
+  const goActivity = () => {
     if (weightKg == null || heightCm == null || age == null) {
       setError('Remplis poids actuel, taille et âge.')
       return
     }
+    setError(null)
+    setStep('activity')
+  }
+
+  const goMorphology = () => {
     setError(null)
     setStep('morphology')
   }
@@ -303,7 +310,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               </button>
               <button
                 type="button"
-                onClick={goBody}
+                onClick={goMeasurements}
                 className="btn-brand ios-press flex flex-[1.4] items-center justify-center gap-1 rounded-2xl py-3.5 text-[15px] font-semibold text-white"
               >
                 Continuer
@@ -313,8 +320,12 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
           </div>
         )}
 
-        {step === 'body' && (
+        {step === 'measurements' && (
           <div className="space-y-3">
+            <p className="text-[15px] text-[#AEAEB2]">
+              Poids, taille, âge et sexe — base de ton métabolisme.
+            </p>
+
             <div className="grid grid-cols-2 gap-3">
               <label className="glass-card block rounded-2xl p-3.5">
                 <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
@@ -393,6 +404,32 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
                 </button>
               ))}
             </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={goBack}
+                className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#8E8E93]"
+              >
+                Retour
+              </button>
+              <button
+                type="button"
+                onClick={goActivity}
+                className="btn-brand ios-press flex flex-[1.4] items-center justify-center gap-1 rounded-2xl py-3.5 text-[15px] font-semibold text-white"
+              >
+                Continuer
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 'activity' && (
+          <div className="space-y-4">
+            <p className="text-[15px] text-[#AEAEB2]">
+              Ton niveau d’activité hors séance influence ton métabolisme de base.
+            </p>
 
             <ActivityLevelPicker value={activity} onChange={setActivity} />
 
