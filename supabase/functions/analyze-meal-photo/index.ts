@@ -1,8 +1,9 @@
 /**
- * Edge Function — analyse photo repas via Gemini 1.5 Flash
+ * Edge Function — analyse photo repas via Gemini Flash (vision + JSON)
  *
  * Secrets (Dashboard → Edge Functions → Secrets) :
  *   GEMINI_API_KEY
+ *   GEMINI_MODEL (optionnel, ex. gemini-2.5-flash)
  *   SUPABASE_URL
  *   SUPABASE_ANON_KEY
  *   SUPABASE_SERVICE_ROLE_KEY
@@ -11,10 +12,17 @@
  *   supabase functions deploy analyze-meal-photo
  */
 import { createClient } from '@supabase/supabase-js'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenerativeAI, type GenerativeModel } from '@google/generative-ai'
 
 const SYSTEM_PROMPT =
   'Tu es un nutritionniste. Analyse cette photo. Renvoie un objet JSON avec les clés : calories, proteines, glucides, lipides (valeurs en nombres entiers).'
+
+/** Modèles vision testés par ordre si le précédent renvoie 404. */
+const GEMINI_MODEL_FALLBACKS = [
+  'gemini-2.5-flash',
+  'gemini-2.0-flash-001',
+  'gemini-1.5-flash-002',
+] as const
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -48,6 +56,70 @@ function parseMacros(raw: unknown): {
     glucides: toInt(obj.glucides ?? obj.carbs ?? obj.carbsG),
     lipides: toInt(obj.lipides ?? obj.fat ?? obj.fatG),
   }
+}
+
+function geminiModelCandidates(): string[] {
+  const fromEnv = Deno.env.get('GEMINI_MODEL')?.trim()
+  const ordered = fromEnv
+    ? [fromEnv, ...GEMINI_MODEL_FALLBACKS.filter((m) => m !== fromEnv)]
+    : [...GEMINI_MODEL_FALLBACKS]
+  return [...new Set(ordered)]
+}
+
+function isGeminiModelNotFoundError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return /404|not found|NOT_FOUND|models\//i.test(message)
+}
+
+function buildGeminiModel(genAI: GoogleGenerativeAI, modelName: string): GenerativeModel {
+  return genAI.getGenerativeModel({
+    model: modelName,
+    systemInstruction: SYSTEM_PROMPT,
+    generationConfig: {
+      responseMimeType: 'application/json',
+      temperature: 0.2,
+    },
+  })
+}
+
+async function analyzeImageWithGemini(
+  genAI: GoogleGenerativeAI,
+  imageBase64: string,
+  mimeType: string,
+): Promise<{ text: string; modelUsed: string }> {
+  const candidates = geminiModelCandidates()
+  let lastError: unknown = null
+
+  for (const modelName of candidates) {
+    try {
+      const model = buildGeminiModel(genAI, modelName)
+      const result = await model.generateContent([
+        {
+          inlineData: {
+            mimeType,
+            data: imageBase64,
+          },
+        },
+        {
+          text: 'Analyse le repas visible sur la photo et estime les macros pour une portion typique.',
+        },
+      ])
+      return { text: result.response.text(), modelUsed: modelName }
+    } catch (error) {
+      lastError = error
+      if (isGeminiModelNotFoundError(error)) {
+        console.warn('[analyze-meal-photo] model unavailable, trying next:', modelName, error)
+        continue
+      }
+      throw error
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(
+        `Aucun modèle Gemini disponible (${candidates.join(', ')}). Définis GEMINI_MODEL dans les secrets Supabase.`,
+      )
 }
 
 Deno.serve(async (req) => {
@@ -140,28 +212,9 @@ Deno.serve(async (req) => {
 
   try {
     const genAI = new GoogleGenerativeAI(geminiKey)
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
-      systemInstruction: SYSTEM_PROMPT,
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.2,
-      },
-    })
+    const { text, modelUsed } = await analyzeImageWithGemini(genAI, imageBase64, mimeType)
+    console.log('[analyze-meal-photo] Gemini model used:', modelUsed)
 
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          mimeType,
-          data: imageBase64,
-        },
-      },
-      {
-        text: 'Analyse le repas visible sur la photo et estime les macros pour une portion typique.',
-      },
-    ])
-
-    const text = result.response.text()
     let parsed: unknown
     try {
       parsed = JSON.parse(text)
