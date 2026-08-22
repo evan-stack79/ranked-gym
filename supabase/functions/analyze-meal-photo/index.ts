@@ -19,9 +19,10 @@ const SYSTEM_PROMPT =
 
 /** Modèles vision testés par ordre si le précédent renvoie 404. */
 const GEMINI_MODEL_FALLBACKS = [
+  'gemini-3.6-flash',
+  'gemini-flash-latest',
+  'gemini-3-flash-preview',
   'gemini-2.5-flash',
-  'gemini-2.0-flash-001',
-  'gemini-1.5-flash-002',
 ] as const
 
 const CORS = {
@@ -81,7 +82,7 @@ function friendlyGeminiError(error: unknown): string {
     return 'Clé Gemini invalide — crée une clé sur aistudio.google.com/apikey et mets-la dans Supabase → Secrets → GEMINI_API_KEY (format AIzaSy…).'
   }
   if (isGeminiModelNotFoundError(error)) {
-    return 'Modèle Gemini indisponible — ajoute GEMINI_MODEL=gemini-2.5-flash dans les secrets Supabase.'
+    return 'Modèle Gemini indisponible — ajoute GEMINI_MODEL=gemini-3.6-flash dans les secrets Supabase.'
   }
   return error instanceof Error ? error.message : 'Erreur Gemini'
 }
