@@ -15,7 +15,10 @@ export function GhostModeToggle({ enabled, onChange, disabled = false }: GhostMo
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[15px] font-semibold text-white">Mode Furtif</p>
+              <p className="text-[15px] font-semibold text-white">
+                Mode Furtif
+                <span className="ml-1.5 text-[13px] font-medium text-[#BF5AF2]">Stealth</span>
+              </p>
               <p className="mt-1 text-[13px] leading-snug text-[#8E8E93]">
                 Masque ta localisation dans le feed social — aucune ville ni zone affichée.
               </p>

@@ -8,7 +8,7 @@ import { BadgeShowcase } from './BadgeShowcase'
 import { CloudBackupCard } from './CloudBackupCard'
 import { GhostModeToggle } from './GhostModeToggle'
 import { DisciplinePicker } from '../discipline/DisciplinePicker'
-import { resolveGhostModeEnabled } from '../../services/ghostModeStorage'
+import { resolveGhostModeEnabled, getLocalGhostModeEnabled, setLocalGhostModeEnabled } from '../../services/ghostModeStorage'
 import { IosSheet } from '../ui/IosSheet'
 import { useAuth } from '../../context/AuthContext'
 import { getRankFromLevel } from '../../utils/rank'
@@ -52,8 +52,19 @@ export function ProfileView() {
   }, [profile?.discipline])
 
   if (!isAuthenticated || !user) {
+    const localGhost = getLocalGhostModeEnabled()
+
+    const handleLocalGhostChange = (enabled: boolean) => {
+      setLocalGhostModeEnabled(enabled)
+      window.dispatchEvent(new Event('ranked-gym:ghost-mode-changed'))
+    }
+
     return (
       <div className="flex flex-col gap-6 py-12 ios-fade-up">
+        <GhostModeToggle
+          enabled={localGhost}
+          onChange={handleLocalGhostChange}
+        />
         <div className="flex flex-col items-center gap-4 text-center">
           <p className="text-[17px] font-semibold text-white">Profil verrouillé</p>
           <p className="max-w-xs text-[15px] text-[#8E8E93]">

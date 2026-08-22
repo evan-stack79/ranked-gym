@@ -12,6 +12,7 @@ import { getTodayWorkout } from '../../utils/todayWorkout'
 import { DailyStreak } from './DailyStreak'
 import { TodayWorkoutCard } from './TodayWorkoutCard'
 import { NutritionSnapshot } from './NutritionSnapshot'
+import { GhostModeToggle } from '../profile/GhostModeToggle'
 import { LocalActivityFeed } from './LocalActivityFeed'
 
 interface HomeViewProps {
@@ -94,6 +95,12 @@ export function HomeView({ onStartTraining }: HomeViewProps) {
         </h1>
       </header>
 
+      <GhostModeToggle
+        enabled={ghostModeEnabled}
+        onChange={handleGhostModeChange}
+        disabled={ghostSaving}
+      />
+
       <DailyStreak />
 
       <TodayWorkoutCard
@@ -107,9 +114,6 @@ export function HomeView({ onStartTraining }: HomeViewProps) {
         areaName={areaName}
         loading={areaLoading}
         viewer={feedViewer}
-        ghostModeEnabled={ghostModeEnabled}
-        onGhostModeChange={handleGhostModeChange}
-        ghostModeSaving={ghostSaving}
       />
     </div>
   )

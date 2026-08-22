@@ -6,25 +6,18 @@ import {
   type LocalFeedViewer,
 } from '../../data/localActivityFeed'
 import { formatActivityAction } from '../../utils/activityFeedPrivacy'
-import { GhostModeToggle } from '../profile/GhostModeToggle'
 import { IconBadge } from '../ui/IconBadge'
 
 interface LocalActivityFeedProps {
   areaName: string | null
   loading?: boolean
   viewer?: LocalFeedViewer | null
-  ghostModeEnabled?: boolean
-  onGhostModeChange?: (enabled: boolean) => void
-  ghostModeSaving?: boolean
 }
 
 export function LocalActivityFeed({
   areaName,
   loading = false,
   viewer = null,
-  ghostModeEnabled = false,
-  onGhostModeChange,
-  ghostModeSaving = false,
 }: LocalActivityFeedProps) {
   const feedArea = areaName ?? 'ta zone'
   const [feedTick, setFeedTick] = useState(0)
@@ -57,14 +50,6 @@ export function LocalActivityFeed({
 
   return (
     <section className="space-y-4">
-      {onGhostModeChange && (
-        <GhostModeToggle
-          enabled={ghostModeEnabled}
-          onChange={onGhostModeChange}
-          disabled={ghostModeSaving}
-        />
-      )}
-
       <div>
         <h2 className="ios-label mb-4 px-1">{title}</h2>
         <ul className="space-y-2">
