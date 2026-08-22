@@ -3,7 +3,14 @@ import { getActiveCloudUserId } from './cloudSession'
 
 const CUSTOM_GYMS_BASE = 'ranked-gym:custom-gyms'
 const CHECK_IN_BASE = 'ranked-gym:check-in'
+const LAST_LOCATION_BASE = 'ranked-gym:last-location'
 export const CHECK_IN_TTL_MS = 3 * 60 * 60 * 1000
+
+export interface StoredLocationLabel {
+  label: string
+  source: 'gps' | 'manual'
+  updatedAt: number
+}
 
 export type StorageSaveOptions = {
   skipCloud?: boolean
@@ -100,6 +107,23 @@ export function getActiveCheckIn(): StoredCheckIn | null {
 export function clearCheckIn(opts?: StorageSaveOptions): void {
   localStorage.removeItem(scopedKey(CHECK_IN_BASE))
   if (!opts?.skipCloud) triggerCloudBackup()
+}
+
+export function saveLastLocationLabel(
+  label: string,
+  source: 'gps' | 'manual',
+  opts?: StorageSaveOptions,
+): void {
+  const payload: StoredLocationLabel = {
+    label: label.trim(),
+    source,
+    updatedAt: Date.now(),
+  }
+  writeJson(scopedKey(LAST_LOCATION_BASE), payload, opts)
+}
+
+export function getLastLocationLabel(): StoredLocationLabel | null {
+  return readJson<StoredLocationLabel | null>(scopedKey(LAST_LOCATION_BASE), null)
 }
 
 export function formatCheckInDuration(checkedInAt: number): string {

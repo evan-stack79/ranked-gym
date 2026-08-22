@@ -49,7 +49,13 @@ import {
   useRestTimerContext,
 } from '../../context/RestTimerContext'
 
-export function TrainingView() {
+export function TrainingView({
+  launchRoutineId = null,
+  onLaunchConsumed,
+}: {
+  launchRoutineId?: string | null
+  onLaunchConsumed?: () => void
+}) {
   const { isLoading: isBootLoading, isAuthenticated, requireAuth } = useAuth()
   const [state, setState] = useState<TrainingState>(() => getTrainingState())
   const [profileTick, setProfileTick] = useState(0)
@@ -103,6 +109,14 @@ export function TrainingView() {
     setReadyBarEnabled(showStrengthTools)
     return () => setReadyBarEnabled(false)
   }, [showStrengthTools, setReadyBarEnabled])
+
+  useEffect(() => {
+    if (!launchRoutineId || !showStrengthTools) return
+    window.requestAnimationFrame(() => {
+      document.getElementById('workout-notebook')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    onLaunchConsumed?.()
+  }, [launchRoutineId, showStrengthTools, onLaunchConsumed])
 
   useEffect(() => {
     return subscribeRestLogged(({ target, restSec, skipped }) => {
@@ -325,9 +339,11 @@ export function TrainingView() {
 
       {showStrengthTools ? (
         <WorkoutNotebook
+          id="workout-notebook"
           bodyWeightKg={profile.weightKg}
           routines={state.routines}
           history={state.workoutNotes}
+          initialRoutineId={launchRoutineId}
           restLogRequest={restLogRequest}
           onRestStart={(info) => {
             startRestTimer(90, info)

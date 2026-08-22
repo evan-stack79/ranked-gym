@@ -27,6 +27,7 @@ import {
   getActiveCheckIn,
   clearCheckIn,
   formatCheckInDuration,
+  saveLastLocationLabel,
 } from '../../services/lobbyStorage'
 import { generateLobbyMembersForDiscipline } from '../../data/mockData'
 import { CreateLobbyPanel } from './CreateLobbyPanel'
@@ -128,6 +129,10 @@ export function LobbyView() {
   const searchGymsAt = useCallback(async (ctx: LocationContext) => {
     setError(null)
     setLocation(ctx)
+    saveLastLocationLabel(
+      ctx.source === 'manual' ? ctx.label : 'Position GPS',
+      ctx.source,
+    )
     clearCheckIn()
     setCheckedInGym(null)
     setLobbyMembers([])

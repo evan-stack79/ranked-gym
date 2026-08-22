@@ -18,9 +18,11 @@ import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
 import { WorkoutHistory } from './WorkoutHistory'
 
 interface WorkoutNotebookProps {
+  id?: string
   bodyWeightKg: number
   routines: WorkoutRoutine[]
   history: WorkoutNote[]
+  initialRoutineId?: string | null
   onSave: (note: {
     title: string
     exercises: ExerciseEntry[]
@@ -78,9 +80,11 @@ function cloneFromRoutine(routine: WorkoutRoutine): ExerciseEntry[] {
 }
 
 export function WorkoutNotebook({
+  id,
   bodyWeightKg,
   routines,
   history,
+  initialRoutineId,
   onSave,
   onDraftSave,
   onDeleteNote,
@@ -117,6 +121,13 @@ export function WorkoutNotebook({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routines])
+
+  useEffect(() => {
+    if (!initialRoutineId) return
+    if (!routines.some((r) => r.id === initialRoutineId)) return
+    selectRoutine(initialRoutineId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialRoutineId])
 
   const stats = useMemo(
     () => computeStrengthSessionStats(exercises, bodyWeightKg),
@@ -234,7 +245,7 @@ export function WorkoutNotebook({
   const hasSaved = (activeRoutine?.exercises.length ?? 0) > 0
 
   return (
-    <section className="space-y-3">
+    <section id={id} className="space-y-3">
       <div className="px-1">
         <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
           Carnet

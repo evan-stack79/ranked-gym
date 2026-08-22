@@ -12,14 +12,24 @@ import { NutritionView } from './components/nutrition/NutritionView'
 import { ProfileView } from './components/profile/ProfileView'
 import type { TabId } from './types'
 
-function renderActiveView(tab: TabId) {
+function renderActiveView(
+  tab: TabId,
+  onStartTraining: (routineId: string) => void,
+  launchRoutineId: string | null,
+  onLaunchConsumed: () => void,
+) {
   switch (tab) {
     case 'home':
-      return <HomeView />
+      return <HomeView onStartTraining={onStartTraining} />
     case 'lobby':
       return <LobbyView />
     case 'training':
-      return <TrainingView />
+      return (
+        <TrainingView
+          launchRoutineId={launchRoutineId}
+          onLaunchConsumed={onLaunchConsumed}
+        />
+      )
     case 'nutrition':
       return <NutritionView />
     case 'profile':
@@ -29,6 +39,7 @@ function renderActiveView(tab: TabId) {
 
 function AppShell() {
   const [activeTab, setActiveTab] = useState<TabId>('home')
+  const [launchRoutineId, setLaunchRoutineId] = useState<string | null>(null)
   const { requireAuth, isAuthenticated, isLoading } = useAuth()
 
   useEffect(() => {
@@ -45,11 +56,24 @@ function AppShell() {
     setActiveTab(tab)
   }
 
+  const handleStartTraining = (routineId: string) => {
+    setLaunchRoutineId(routineId)
+    setActiveTab('training')
+  }
+
+  const handleLaunchConsumed = () => {
+    setLaunchRoutineId(null)
+  }
+
   return (
     <>
       <SupabaseConfigBanner />
       <AppLayout activeTab={activeTab} onTabChange={handleTabChange}>
-        {isLoading ? <AppBootScreen /> : renderActiveView(activeTab)}
+        {isLoading ? (
+          <AppBootScreen />
+        ) : (
+          renderActiveView(activeTab, handleStartTraining, launchRoutineId, handleLaunchConsumed)
+        )}
       </AppLayout>
       <AuthBottomSheet />
     </>
