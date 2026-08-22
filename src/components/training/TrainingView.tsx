@@ -33,7 +33,6 @@ import { TrainingAgenda } from './TrainingAgenda'
 import { WorkoutNotebook } from './WorkoutNotebook'
 import { OverloadCalculator } from './OverloadCalculator'
 import { EnduranceSessionCard } from './EnduranceSessionCard'
-import { RestTimerOverlay, REST_BAR_CONTENT_PAD } from './RestTimerOverlay'
 import { IconBadge } from '../ui/IconBadge'
 import { IosSheet } from '../ui/IosSheet'
 import {
@@ -45,7 +44,10 @@ import {
   storeDisciplineId,
 } from '../../data/disciplines'
 import { useAuth } from '../../context/AuthContext'
-import { useRestTimer, type RestPresetSec } from '../../hooks/useRestTimer'
+import {
+  subscribeRestLogged,
+  useRestTimerContext,
+} from '../../context/RestTimerContext'
 
 export function TrainingView() {
   const { isLoading: isBootLoading, isAuthenticated, requireAuth } = useAuth()
@@ -64,17 +66,7 @@ export function TrainingView() {
     nonce: number
   } | null>(null)
 
-  const restTimer = useRestTimer({
-    onRestLogged: ({ target, restSec, skipped }) => {
-      setRestLogRequest({
-        exerciseId: target.exerciseId,
-        setIndex: target.setIndex,
-        restSec,
-        addNextSet: skipped,
-        nonce: Date.now(),
-      })
-    },
-  })
+  const { start: startRestTimer, setReadyBarEnabled, isBarVisible } = useRestTimerContext()
 
   const [disciplineTick, setDisciplineTick] = useState(0)
 
@@ -106,6 +98,23 @@ export function TrainingView() {
   const sport = state.primarySportId ? getSportById(state.primarySportId) : getSportById(discipline.primarySportId)
   const showStrengthTools = isStrengthFamily(disciplineId)
   const showEnduranceTools = isEnduranceFamily(disciplineId)
+
+  useEffect(() => {
+    setReadyBarEnabled(showStrengthTools)
+    return () => setReadyBarEnabled(false)
+  }, [showStrengthTools, setReadyBarEnabled])
+
+  useEffect(() => {
+    return subscribeRestLogged(({ target, restSec, skipped }) => {
+      setRestLogRequest({
+        exerciseId: target.exerciseId,
+        setIndex: target.setIndex,
+        restSec,
+        addNextSet: skipped,
+        nonce: Date.now(),
+      })
+    })
+  }, [])
 
   const showToast = useCallback((message: string) => {
     setToast(message)
@@ -224,13 +233,7 @@ export function TrainingView() {
   }
 
   return (
-    <div
-      className="flex flex-col gap-8"
-      style={{
-        /* Nav déjà réservée par AppLayout — ici uniquement la hauteur de l’îlot repos */
-        paddingBottom: showStrengthTools ? REST_BAR_CONTENT_PAD : '0.5rem',
-      }}
-    >
+    <div className="flex flex-col gap-8" style={{ paddingBottom: '0.5rem' }}>
       <header className="relative ios-fade-up">
         <div
           className="pointer-events-none absolute -right-6 -top-4 h-28 w-40 rounded-full blur-3xl"
@@ -327,7 +330,7 @@ export function TrainingView() {
           history={state.workoutNotes}
           restLogRequest={restLogRequest}
           onRestStart={(info) => {
-            restTimer.start(90, info)
+            startRestTimer(90, info)
           }}
           onDraftSave={persistDraft}
           onSave={(note) => persistAndSyncNote(note)}
@@ -418,7 +421,7 @@ export function TrainingView() {
         <div
           className="pointer-events-none fixed left-1/2 z-[70] max-w-[90%] -translate-x-1/2 rounded-full border border-white/10 bg-[#2C2C2E] px-4 py-2 text-center text-[13px] font-medium text-white shadow-lg"
           style={{
-            bottom: showStrengthTools
+            bottom: isBarVisible
               ? 'calc(var(--rest-bar-bottom) + var(--rest-island-h) + 12px)'
               : 'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 12px)',
           }}
@@ -426,25 +429,6 @@ export function TrainingView() {
           {toast}
         </div>
       )}
-
-      <RestTimerOverlay
-        alwaysVisible={showStrengthTools}
-        state={restTimer.state}
-        onPreset={(sec: RestPresetSec) => {
-          const target = restTimer.state.target ?? {
-            exerciseId: 'quick-rest',
-            setIndex: 0,
-            exerciseName: 'Repos libre',
-            setLabel: `${sec}s`,
-          }
-          restTimer.start(sec, {
-            ...target,
-            setLabel: target.exerciseId === 'quick-rest' ? `${sec}s` : target.setLabel,
-          })
-        }}
-        onSkip={restTimer.skip}
-        onDismiss={restTimer.dismiss}
-      />
     </div>
   )
 }

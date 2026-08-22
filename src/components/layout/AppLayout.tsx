@@ -1,5 +1,10 @@
 import type { ReactNode } from 'react'
 import { BottomNav } from './BottomNav'
+import { RestTimerOverlay, REST_BAR_CONTENT_PAD } from '../training/RestTimerOverlay'
+import {
+  useRestTimerContext,
+  type RestPresetSec,
+} from '../../context/RestTimerContext'
 import type { TabId } from '../../types'
 
 interface AppLayoutProps {
@@ -9,6 +14,10 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) {
+  const { state, isBarVisible, readyBarEnabled, start, skip, dismiss } = useRestTimerContext()
+
+  const showReadyBar = activeTab === 'training' && readyBarEnabled
+
   return (
     <div className="relative flex min-h-full flex-col mesh-bg font-sans">
       <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
@@ -50,12 +59,32 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
       <main
         className="relative z-10 mx-auto w-full max-w-lg flex-1 overflow-y-auto px-5 py-8"
         style={{
-          paddingBottom:
-            'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 0.75rem)',
+          paddingBottom: isBarVisible
+            ? `calc(var(--app-bottom-nav) + ${REST_BAR_CONTENT_PAD} + env(safe-area-inset-bottom, 0px) + 0.75rem)`
+            : 'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 0.75rem)',
         }}
       >
         {children}
       </main>
+
+      <RestTimerOverlay
+        showReadyBar={showReadyBar}
+        state={state}
+        onPreset={(sec: RestPresetSec) => {
+          const target = state.target ?? {
+            exerciseId: 'quick-rest',
+            setIndex: 0,
+            exerciseName: 'Repos libre',
+            setLabel: `${sec}s`,
+          }
+          start(sec, {
+            ...target,
+            setLabel: target.exerciseId === 'quick-rest' ? `${sec}s` : target.setLabel,
+          })
+        }}
+        onSkip={skip}
+        onDismiss={dismiss}
+      />
 
       <BottomNav activeTab={activeTab} onTabChange={onTabChange} />
     </div>

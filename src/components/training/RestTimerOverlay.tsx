@@ -1,9 +1,8 @@
-import { createPortal } from 'react-dom'
 import { Check, SkipForward, Timer } from 'lucide-react'
-import type { RestPresetSec, RestTimerState } from '../../hooks/useRestTimer'
-import { REST_PRESETS_SEC } from '../../hooks/useRestTimer'
+import type { RestPresetSec, RestTimerState } from '../../context/RestTimerContext'
+import { REST_PRESETS_SEC } from '../../context/RestTimerContext'
 
-/** Clearance scroll Train (CSS var --rest-content-clearance). */
+/** Clearance scroll quand l’îlot repos est visible (CSS var). */
 export const REST_BAR_CONTENT_PAD = 'var(--rest-content-clearance)'
 
 interface RestTimerOverlayProps {
@@ -11,7 +10,8 @@ interface RestTimerOverlayProps {
   onPreset: (sec: RestPresetSec) => void
   onSkip: () => void
   onDismiss: () => void
-  alwaysVisible?: boolean
+  /** Affiche l’îlot « Prêt à lancer » (Train muscu uniquement). */
+  showReadyBar?: boolean
 }
 
 function formatClock(totalSec: number): string {
@@ -30,22 +30,22 @@ function ringColor(remaining: number, total: number, idle: boolean): string {
 }
 
 /**
- * Îlot de repos fixed — docké juste au-dessus de la BottomNav (portal body).
+ * Îlot repos fixed — ancré au-dessus de la BottomNav (layout racine).
  */
 export function RestTimerOverlay({
   state,
   onPreset,
   onSkip,
   onDismiss,
-  alwaysVisible = false,
+  showReadyBar = false,
 }: RestTimerOverlayProps) {
-  if (typeof document === 'undefined') return null
-
   const running = state.active
   const finished = state.finished
   const idle = !running && !finished
+  const sessionVisible = running || finished
 
-  if (!alwaysVisible && idle && !state.target) return null
+  // Tous onglets : décompte ou « Repos OK ». Train : aussi barre prête.
+  if (!sessionVisible && !(showReadyBar && idle)) return null
 
   const total = Math.max(1, state.totalSec || 90)
   const remaining = finished ? 0 : running ? state.remainingSec : 0
@@ -58,7 +58,7 @@ export function RestTimerOverlay({
   const circumference = 2 * Math.PI * radius
   const dashOffset = circumference * (1 - progress)
 
-  return createPortal(
+  return (
     <div
       id="ranked-rest-timer-bar"
       className="rest-timer-dock"
@@ -169,7 +169,6 @@ export function RestTimerOverlay({
           })}
         </div>
       </div>
-    </div>,
-    document.body,
+    </div>
   )
 }

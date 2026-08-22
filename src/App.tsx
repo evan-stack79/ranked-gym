@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { RestTimerProvider } from './context/RestTimerContext'
 import { AuthBottomSheet } from './components/auth/AuthBottomSheet'
 import { AppLayout } from './components/layout/AppLayout'
 import { AppBootScreen } from './components/ui/AppBootScreen'
@@ -56,7 +57,9 @@ function AppShell() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppShell />
+      <RestTimerProvider>
+        <AppShell />
+      </RestTimerProvider>
     </AuthProvider>
   )
 }
