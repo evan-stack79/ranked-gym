@@ -1,4 +1,7 @@
 -- Masquage identité Mode Furtif dans le feed (pseudo + flag explicite)
+-- DROP obligatoire : le type de retour a changé (ajout is_ghost_mode_enabled)
+
+drop function if exists public.get_social_activity_feed(double precision, double precision, double precision, integer);
 
 create or replace function public.get_social_activity_feed(
   p_viewer_lat double precision default null,
