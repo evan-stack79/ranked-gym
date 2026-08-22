@@ -13,6 +13,7 @@ type ProfilesTable = {
     current_streak: number
     last_login_date: string | null
     avatar_url: string | null
+    is_ghost_mode_enabled?: boolean | null
     created_at: string
     updated_at: string
   }
@@ -28,6 +29,7 @@ type ProfilesTable = {
     current_streak?: number
     last_login_date?: string | null
     avatar_url?: string | null
+    is_ghost_mode_enabled?: boolean
     created_at?: string
     updated_at?: string
   }
@@ -43,6 +45,7 @@ type ProfilesTable = {
     current_streak?: number
     last_login_date?: string | null
     avatar_url?: string | null
+    is_ghost_mode_enabled?: boolean
     updated_at?: string
   }
   Relationships: []

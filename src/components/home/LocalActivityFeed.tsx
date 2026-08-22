@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Flame, HandMetal, Trophy } from 'lucide-react'
-import type { LocalActivityItem } from '../../data/localActivityFeed'
-import { buildLocalActivityFeed } from '../../data/localActivityFeed'
+import { buildLocalActivityFeed, type LocalActivityItem } from '../../data/localActivityFeed'
+import { formatActivityAction } from '../../utils/activityFeedPrivacy'
 import { IconBadge } from '../ui/IconBadge'
 
 interface LocalActivityFeedProps {
@@ -32,6 +32,7 @@ export function LocalActivityFeed({ areaName, loading = false }: LocalActivityFe
           <ActivityRow
             key={item.id}
             item={item}
+            areaName={feedArea}
             cheered={Boolean(cheered[item.id])}
             onCheer={() => toggleCheer(item.id)}
           />
@@ -43,14 +44,17 @@ export function LocalActivityFeed({ areaName, loading = false }: LocalActivityFe
 
 function ActivityRow({
   item,
+  areaName,
   cheered,
   onCheer,
 }: {
   item: LocalActivityItem
+  areaName: string
   cheered: boolean
   onCheer: () => void
 }) {
   const CheerIcon = item.isPr ? HandMetal : Flame
+  const actionText = formatActivityAction(item, areaName)
 
   return (
     <li className="glass-card flex items-center gap-3 rounded-2xl p-4">
@@ -58,7 +62,7 @@ function ActivityRow({
       <div className="min-w-0 flex-1">
         <p className="text-[15px] leading-snug text-white">
           <span className="font-semibold">{item.user}</span>{' '}
-          <span className="text-[#EBEBF5]">{item.action}</span>
+          <span className="text-[#EBEBF5]">{actionText}</span>
         </p>
         <p className="mt-1 text-[13px] text-[#8E8E93]">
           <span className="font-semibold text-[#FF2B2B]">{item.xp}</span> · il y a {item.time}

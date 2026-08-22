@@ -33,6 +33,9 @@ import {
   storeDisciplineId,
 } from '../data/disciplines'
 import { setPrimarySport } from '../services/trainingStorage'
+import {
+  setLocalGhostModeEnabled,
+} from '../services/ghostModeStorage'
 
 function syncLocalDiscipline(label: string) {
   const id = disciplineFromLabel(label)
@@ -72,6 +75,7 @@ interface AuthContextValue {
   signInWithEmail: (email: string, password: string) => Promise<void>
   signUpWithEmail: (email: string, password: string, pseudo?: string, discipline?: string) => Promise<void>
   updateDiscipline: (disciplineLabel: string) => Promise<void>
+  updateGhostMode: (enabled: boolean) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -371,6 +375,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user],
   )
 
+  const updateGhostMode = useCallback(
+    async (enabled: boolean) => {
+      setLocalGhostModeEnabled(enabled)
+      patchProfile({ is_ghost_mode_enabled: enabled })
+      if (!user || !isSupabaseConfigured()) return
+      try {
+        const row = await updateProfileProgress(user.id, { is_ghost_mode_enabled: enabled })
+        setProfile(row)
+        setLocalGhostModeEnabled(row.is_ghost_mode_enabled ?? enabled)
+      } catch (error) {
+        console.warn('[auth] updateGhostMode remote failed, kept local:', error)
+      }
+    },
+    [user, patchProfile],
+  )
+
   const signOut = useCallback(async () => {
     if (isSupabaseConfigured()) {
       await apiSignOut()
@@ -403,6 +423,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithEmail,
       signUpWithEmail: signUpEmail,
       updateDiscipline,
+      updateGhostMode,
       signOut,
     }),
     [
@@ -423,6 +444,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithEmail,
       signUpEmail,
       updateDiscipline,
+      updateGhostMode,
       signOut,
     ],
   )

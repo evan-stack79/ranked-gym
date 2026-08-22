@@ -6,7 +6,9 @@ import { ProfileXPBar } from './ProfileXPBar'
 import { StatGrid } from './StatGrid'
 import { BadgeShowcase } from './BadgeShowcase'
 import { CloudBackupCard } from './CloudBackupCard'
+import { GhostModeToggle } from './GhostModeToggle'
 import { DisciplinePicker } from '../discipline/DisciplinePicker'
+import { resolveGhostModeEnabled } from '../../services/ghostModeStorage'
 import { IosSheet } from '../ui/IosSheet'
 import { useAuth } from '../../context/AuthContext'
 import { getRankFromLevel } from '../../utils/rank'
@@ -29,8 +31,10 @@ export function ProfileView() {
     refreshProfile,
     patchProfile,
     updateDiscipline,
+    updateGhostMode,
   } = useAuth()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [ghostSaving, setGhostSaving] = useState(false)
   const [disciplineId, setDisciplineId] = useState<AppDisciplineId>(() =>
     disciplineFromLabel(profile?.discipline) || getStoredDisciplineId(),
   )
@@ -73,6 +77,16 @@ export function ProfileView() {
   const rank = getRankFromLevel(level)
   const username = profile?.pseudo || user.displayName
   const discipline = getDiscipline(disciplineId)
+  const ghostModeEnabled = resolveGhostModeEnabled(profile)
+
+  const handleGhostModeChange = async (enabled: boolean) => {
+    setGhostSaving(true)
+    try {
+      await updateGhostMode(enabled)
+    } finally {
+      setGhostSaving(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-8 pb-4">
@@ -107,6 +121,15 @@ export function ProfileView() {
       </div>
       <div className="ios-fade-up ios-fade-up-delay-3">
         <CloudBackupCard />
+      </div>
+      <div className="ios-fade-up" style={{ animationDelay: '0.15s' }}>
+        <GhostModeToggle
+          enabled={ghostModeEnabled}
+          onChange={(enabled) => {
+            void handleGhostModeChange(enabled)
+          }}
+          disabled={ghostSaving}
+        />
       </div>
       <div className="ios-fade-up" style={{ animationDelay: '0.18s' }}>
         <StatGrid />

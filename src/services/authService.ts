@@ -133,6 +133,7 @@ export async function updateProfileProgress(
     current_streak?: number
     last_login_date?: string | null
     avatar_url?: string | null
+    is_ghost_mode_enabled?: boolean
   },
 ): Promise<ProfileRow> {
   const supabase = getSupabase()
