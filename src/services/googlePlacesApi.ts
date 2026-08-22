@@ -714,6 +714,46 @@ interface NominatimResult {
   display_name?: string
 }
 
+interface PhotonFeature {
+  geometry?: { coordinates?: [number, number] }
+  properties?: {
+    name?: string
+    city?: string
+    state?: string
+    country?: string
+  }
+}
+
+/** Géocodeur gratuit compatible navigateur (CORS *). Prioritaire pour la recherche ville. */
+async function geocodeCityWithPhoton(cityQuery: string): Promise<GeocodedPlace> {
+  const url = new URL('https://photon.komoot.io/api/')
+  url.searchParams.set('q', `${cityQuery}, France`)
+  url.searchParams.set('limit', '1')
+  url.searchParams.set('lang', 'fr')
+
+  const response = await fetch(url.toString(), { headers: { Accept: 'application/json' } })
+  if (!response.ok) {
+    throw new GooglePlacesError(`Géocodage Photon indisponible (${response.status}).`)
+  }
+
+  const payload = (await response.json()) as { features?: PhotonFeature[] }
+  const feature = payload.features?.[0]
+  const coords = feature?.geometry?.coordinates
+  const lat = coords?.[1]
+  const lng = coords?.[0]
+
+  if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new GooglePlacesError(`Aucun résultat pour « ${cityQuery} ».`)
+  }
+
+  const props = feature?.properties ?? {}
+  const label =
+    [props.name, props.state ?? props.city, props.country].filter(Boolean).join(', ') ||
+    `${cityQuery}, France`
+
+  return { coords: { lat, lng }, label }
+}
+
 /** Fallback gratuit si Geocoding Google indisponible (API non activée, quota, etc.). */
 async function geocodeCityWithNominatim(cityQuery: string): Promise<GeocodedPlace> {
   const url = new URL('https://nominatim.openstreetmap.org/search')
@@ -765,35 +805,39 @@ export async function geocodeCity(cityQuery: string): Promise<GeocodedPlace> {
     throw new GooglePlacesError('Entre au moins 2 caractères pour rechercher une ville.')
   }
 
+  const attempts: Array<{ name: string; run: () => Promise<GeocodedPlace> }> = [
+    { name: 'Photon', run: () => geocodeCityWithPhoton(query) },
+  ]
+
   if (!isMockPlacesMode()) {
+    attempts.push({ name: 'Google', run: () => geocodeCityWithGoogle(query) })
+  }
+
+  attempts.push({ name: 'Nominatim', run: () => geocodeCityWithNominatim(query) })
+
+  let lastError: unknown = null
+  for (const attempt of attempts) {
     try {
-      return await geocodeCityWithGoogle(query)
-    } catch (googleError) {
-      console.warn('[geocodeCity] Google échoué, fallback Nominatim:', googleError)
+      return await attempt.run()
+    } catch (error) {
+      lastError = error
+      console.warn(`[geocodeCity] ${attempt.name} échoué:`, error)
     }
   }
 
-  try {
-    return await geocodeCityWithNominatim(query)
-  } catch (nominatimError) {
-    if (isMockPlacesMode()) {
-      await delay(450)
-      const normalized = query.toLowerCase()
-      const known = Object.entries(MOCK_CITY_COORDS).find(([key]) => normalized.includes(key))
-      if (known) return known[1]
-
-      throw nominatimError instanceof GooglePlacesError
-        ? nominatimError
-        : new GooglePlacesError(`Impossible de localiser « ${query} ».`)
-    }
-
-    if (nominatimError instanceof GooglePlacesError) throw nominatimError
-    throw new GooglePlacesError(
-      nominatimError instanceof Error
-        ? nominatimError.message
-        : `Impossible de localiser « ${query} ».`,
-    )
+  if (isMockPlacesMode()) {
+    await delay(450)
+    const normalized = query.toLowerCase()
+    const known = Object.entries(MOCK_CITY_COORDS).find(([key]) => normalized.includes(key))
+    if (known) return known[1]
   }
+
+  if (lastError instanceof GooglePlacesError) throw lastError
+  throw new GooglePlacesError(
+    lastError instanceof Error
+      ? lastError.message
+      : `Impossible de localiser « ${query} ». Vérifie l’orthographe.`,
+  )
 }
 
 function hashString(value: string): number {
