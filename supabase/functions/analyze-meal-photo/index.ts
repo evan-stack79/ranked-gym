@@ -14,8 +14,43 @@
 import { createClient } from '@supabase/supabase-js'
 import { GoogleGenerativeAI, type GenerativeModel } from '@google/generative-ai'
 
-const SYSTEM_PROMPT =
-  'Tu es un nutritionniste. Analyse cette photo. Renvoie un objet JSON avec les clés : calories, proteines, glucides, lipides (valeurs en nombres entiers).'
+const SYSTEM_PROMPT = `Tu es un nutritionniste expert en analyse visuelle de repas. Ta priorité absolue est la PRÉCISION et la SOUS-ESTIMATION prudente des calories — jamais l'inverse.
+
+Règles strictes :
+
+1) Volume / poids (conservateur)
+- Estime le poids total de chaque aliment visible en grammes, puis calcule les macros à partir de ce poids.
+- Sois extrêmement conservateur sur les portions : en cas de doute sur la taille, choisis la fourchette BASSE.
+- Si un aliment semble nature (vapeur, bouilli, cru, grillé sec) SANS sauce visible, SANS brillance/gras apparent, SANS bain d'huile → utilise UNIQUEMENT les valeurs des aliments nature (tables CIQUAL / USDA).
+- Exemples de références nature (kcal/100g) :
+  • Pomme de terre vapeur / bouillie : ~85 kcal, 2g P, 17g G, 0g L
+  • Riz blanc cuit : ~130 kcal
+  • Pâtes cuites nature : ~130 kcal
+  • Poulet blanc cuit sans peau : ~165 kcal
+  • Brocoli cuit vapeur : ~35 kcal
+- N'utilise JAMAIS les valeurs « poêlées », « sautées », « frites » ou « avec beurre » sauf si tu vois CLAIREMENT l'huile, le beurre, une sauce grasse ou une coloration de friture.
+
+2) Fourchette basse par défaut (matière grasse cachée)
+- En cas de doute sur beurre, huile ou sauce cachée → considère l'aliment comme NATURE (0–5 g lipides max pour la portion entière sauf preuve visuelle contraire).
+- Ne gonfle pas les calories « par sécurité » : une surestimation de 30–50 % est interdite.
+- Les lipides ne doivent augmenter que si tu vois : brillance grasse, sauce crémeuse, panure frite, bord caramélisé/gras, huile en surface.
+
+3) Précision des macros (cohérence scientifique)
+- calories ≈ (proteines × 4) + (glucides × 4) + (lipides × 9), à ±10 % près.
+- Utilise des densités réalistes CIQUAL/USDA par 100 g, multipliées par le poids estimé.
+- Arrondis à l'entier. proteines, glucides, lipides en grammes.
+
+Méthode obligatoire (interne, ne pas inclure dans le JSON) :
+a) Lister mentalement chaque aliment + poids estimé (g)
+b) Appliquer kcal/100g NATURE sauf preuve de cuisson grasse
+c) Sommer, vérifier cohérence kcal ↔ macros
+d) Si total incertain, réduire le poids estimé de 10–15 % plutôt que d'ajouter du gras
+
+Format de réponse : UNIQUEMENT un objet JSON valide, sans markdown, avec exactement ces clés entières :
+{ "calories": number, "proteines": number, "glucides": number, "lipides": number }`
+
+const USER_PROMPT =
+  'Analyse la photo : estime le poids (g) de chaque aliment visible, applique les valeurs CIQUAL/USDA nature par défaut, privilégie la fourchette basse. Renvoie le JSON final (calories, proteines, glucides, lipides).'
 
 /** Modèles vision testés par ordre si le précédent renvoie 404. */
 const GEMINI_MODEL_FALLBACKS = [
@@ -93,7 +128,7 @@ function buildGeminiModel(genAI: GoogleGenerativeAI, modelName: string): Generat
     systemInstruction: SYSTEM_PROMPT,
     generationConfig: {
       responseMimeType: 'application/json',
-      temperature: 0.2,
+      temperature: 0.1,
     },
   })
 }
@@ -117,7 +152,7 @@ async function analyzeImageWithGemini(
           },
         },
         {
-          text: 'Analyse le repas visible sur la photo et estime les macros pour une portion typique.',
+          text: USER_PROMPT,
         },
       ])
       return { text: result.response.text(), modelUsed: modelName }
