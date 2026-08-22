@@ -1,4 +1,5 @@
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
+import { safeError, safeWarn } from '../utils/safeLog'
 import type { Json } from '../types/database'
 import type { CalorieProfile, DayJournal } from '../types/nutrition'
 import type { TrainingState } from '../types/training'
@@ -425,7 +426,7 @@ async function upsertTables(userId: string, payload: CloudBackupPayload): Promis
 
     if (parts.length > 0) {
       for (const p of parts) {
-        console.error(`[cloudBackup] upsert ${p.table} failed:`, p.message)
+        safeError(`[cloudBackup] upsert ${p.table} failed`, p.message)
       }
 
       const workoutsErr = workoutsRes.error?.message
@@ -450,14 +451,14 @@ async function upsertTables(userId: string, payload: CloudBackupPayload): Promis
           { onConflict: 'user_id' },
         )
         if (error) {
-          console.error('[cloudBackup] fallback user_backups failed:', error.message)
+          safeError('[cloudBackup] fallback user_backups failed', error.message)
           return {
             error: isMissingTableError(error.message)
               ? 'Tables manquantes : exécute supabase/schema.sql dans le SQL Editor Supabase.'
               : error.message,
           }
         }
-        console.warn('[cloudBackup] tables manquantes — écriture via user_backups uniquement')
+        safeWarn('[cloudBackup] tables manquantes — écriture via user_backups uniquement')
         return {}
       }
 
@@ -473,13 +474,13 @@ async function upsertTables(userId: string, payload: CloudBackupPayload): Promis
       { onConflict: 'user_id' },
     )
     if (mirrorError) {
-      console.warn('[cloudBackup] mirror user_backups failed (non-bloquant):', mirrorError.message)
+      safeWarn('[cloudBackup] mirror user_backups failed (non-bloquant)', mirrorError.message)
     }
 
     return {}
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erreur upsert cloud'
-    console.error('[cloudBackup] upsertTables exception:', e)
+    safeError('[cloudBackup] upsertTables exception', e)
     return { error: msg }
   }
 }
@@ -504,7 +505,7 @@ export async function pushCloudBackup(
     const payload = collectLocalBackup()
     const { error } = await upsertTables(uid, payload)
     if (error) {
-      console.error('[cloudBackup] pushCloudBackup failed:', error)
+      safeError('[cloudBackup] pushCloudBackup failed', error)
       setMeta({ pending: false, lastError: error })
       emitBackupEvent('ranked-gym:backup-error', { error, source: 'push' })
       return { ok: false, error }
@@ -518,7 +519,7 @@ export async function pushCloudBackup(
     return { ok: true }
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erreur de sauvegarde'
-    console.error('[cloudBackup] pushCloudBackup exception:', e)
+    safeError('[cloudBackup] pushCloudBackup exception', e)
     setMeta({ pending: false, lastError: msg })
     emitBackupEvent('ranked-gym:backup-error', { error: msg, source: 'push' })
     return { ok: false, error: msg }
@@ -550,7 +551,7 @@ export async function pullCloudBackup(
   try {
     const { payload: remote, error } = await fetchRemotePayload(uid)
     if (error) {
-      console.error('[cloudBackup] pullCloudBackup failed:', error)
+      safeError('[cloudBackup] pullCloudBackup failed', error)
       setMeta({ lastError: error })
       emitBackupEvent('ranked-gym:backup-error', { error, source: 'pull' })
       return { ok: false, applied: false, error }
@@ -574,7 +575,7 @@ export async function pullCloudBackup(
     return { ok: true, applied: false }
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Erreur de restauration'
-    console.error('[cloudBackup] pullCloudBackup exception:', e)
+    safeError('[cloudBackup] pullCloudBackup exception', e)
     setMeta({ lastError: msg })
     emitBackupEvent('ranked-gym:backup-error', { error: msg, source: 'pull' })
     return { ok: false, applied: false, error: msg }
@@ -599,12 +600,12 @@ export function flushCloudPush() {
 export async function flushCloudPushAsync(): Promise<{ ok: boolean; error?: string }> {
   if (!activeUserId) {
     const error = 'Connecte-toi pour sauvegarder dans Supabase.'
-    console.error('[cloudBackup] flush:', error)
+    safeError('[cloudBackup] flush', error)
     return { ok: false, error }
   }
   if (!isSupabaseConfigured()) {
     const error = 'Supabase non configuré (VITE_SUPABASE_URL / ANON_KEY).'
-    console.error('[cloudBackup] flush:', error)
+    safeError('[cloudBackup] flush', error)
     return { ok: false, error }
   }
   if (!cloudSyncReady) {

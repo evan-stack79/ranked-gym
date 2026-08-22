@@ -1,6 +1,7 @@
 import { getSupabase } from '../lib/supabase'
 import type { CheckinRow, Json } from '../types/database'
 import type { NearbyGym } from '../types'
+import { recordActivityEvent } from './activityFeedService'
 
 export async function createCheckin(input: {
   userId: string
@@ -23,6 +24,15 @@ export async function createCheckin(input: {
     .single()
 
   if (error) throw error
+
+  void recordActivityEvent({
+    activityType: 'checkin',
+    actionText: `a check-in à ${input.salleNom}`,
+    xpEarned: 90,
+    originLat: input.salleLat ?? null,
+    originLng: input.salleLng ?? null,
+  })
+
   return data
 }
 

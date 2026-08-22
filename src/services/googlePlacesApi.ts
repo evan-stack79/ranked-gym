@@ -1,4 +1,5 @@
 import type { GeoCoordinates, NearbyGym } from '../types'
+import { safeWarn } from '../utils/safeLog'
 import {
   CHECK_IN_RADIUS_METERS,
   SEARCH_RADIUS_METERS,
@@ -821,7 +822,7 @@ export async function geocodeCity(cityQuery: string): Promise<GeocodedPlace> {
       return await attempt.run()
     } catch (error) {
       lastError = error
-      console.warn(`[geocodeCity] ${attempt.name} échoué:`, error)
+      safeWarn(`[geocodeCity] ${attempt.name} échoué`, error)
     }
   }
 

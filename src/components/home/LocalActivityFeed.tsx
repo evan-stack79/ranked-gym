@@ -1,10 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Flame, HandMetal, Trophy } from 'lucide-react'
-import {
-  buildLocalActivityFeed,
-  type LocalActivityItem,
-  type LocalFeedViewer,
-} from '../../data/localActivityFeed'
+import type { LocalActivityItem, LocalFeedViewer } from '../../data/localActivityFeed'
+import { fetchSocialActivityFeed } from '../../services/activityFeedService'
+import { resolveHomeAreaCoords } from '../../utils/homeLocation'
 import { formatActivityAction } from '../../utils/activityFeedPrivacy'
 import { IconBadge } from '../ui/IconBadge'
 
@@ -20,7 +18,10 @@ export function LocalActivityFeed({
   viewer = null,
 }: LocalActivityFeedProps) {
   const feedArea = areaName ?? 'ta zone'
+  const [items, setItems] = useState<LocalActivityItem[]>([])
+  const [feedLoading, setFeedLoading] = useState(true)
   const [feedTick, setFeedTick] = useState(0)
+  const [cheered, setCheered] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     const sync = () => setFeedTick((n) => n + 1)
@@ -32,13 +33,29 @@ export function LocalActivityFeed({
     }
   }, [])
 
-  const items = useMemo(
-    () => buildLocalActivityFeed(feedArea, viewer),
-    [feedArea, viewer, feedTick],
-  )
-  const [cheered, setCheered] = useState<Record<string, boolean>>({})
+  useEffect(() => {
+    let cancelled = false
+    setFeedLoading(true)
+    const coords = resolveHomeAreaCoords()
 
-  const title = loading
+    void fetchSocialActivityFeed({
+      viewerLat: coords?.lat,
+      viewerLng: coords?.lng,
+      areaName: feedArea,
+      viewer,
+    }).then((next) => {
+      if (!cancelled) {
+        setItems(next)
+        setFeedLoading(false)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [feedArea, viewer, feedTick])
+
+  const title = loading || feedLoading
     ? 'Activité récente…'
     : areaName
       ? `Activité récente autour de ${areaName}`

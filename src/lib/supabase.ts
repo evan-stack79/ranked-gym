@@ -1,5 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../types/database'
+import { AUTH_STORAGE_KEY, getSecureAuthStorage } from '../services/secureAuthStorage'
+import { safeError } from '../utils/safeLog'
 
 const PLACEHOLDER_MARKERS = ['YOUR_PROJECT', 'YOUR_SUPABASE', 'example.supabase.co', 'undefined', 'null']
 
@@ -66,11 +68,13 @@ export function getSupabase(): SupabaseClient<Database> {
           persistSession: true,
           autoRefreshToken: true,
           detectSessionInUrl: true,
+          storage: getSecureAuthStorage(),
+          storageKey: AUTH_STORAGE_KEY,
         },
       })
     } catch (e) {
       clientInitFailed = true
-      console.error('[supabase] createClient failed:', e)
+      safeError('[supabase] createClient failed', e)
       throw new Error(
         'URL Supabase invalide. Format attendu : https://TON_REF.supabase.co',
       )

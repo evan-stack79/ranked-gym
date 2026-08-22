@@ -13,6 +13,7 @@ import { NutritionView } from './components/nutrition/NutritionView'
 import { ProfileView } from './components/profile/ProfileView'
 import { hasCompletedNutritionOnboarding } from './services/nutritionStorage'
 import type { TabId } from './types'
+import { safeWarn } from './utils/safeLog'
 
 type AppPhase = 'loading' | 'onboarding' | 'main'
 
@@ -20,7 +21,7 @@ function resolveLaunchPhase(): AppPhase {
   try {
     return hasCompletedNutritionOnboarding() ? 'main' : 'onboarding'
   } catch (error) {
-    console.warn('[app] resolveLaunchPhase failed, defaulting to onboarding:', error)
+    safeWarn('[app] resolveLaunchPhase failed, defaulting to onboarding', error)
     return 'onboarding'
   }
 }
@@ -72,7 +73,7 @@ function AppShell() {
           setPhase((current) => (current === 'onboarding' ? 'main' : current))
         }
       } catch (error) {
-        console.warn('[app] syncOnboardingPhase failed:', error)
+        safeWarn('[app] syncOnboardingPhase failed', error)
         setPhase('onboarding')
       }
     }

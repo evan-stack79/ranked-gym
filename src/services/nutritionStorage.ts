@@ -9,6 +9,7 @@ import type {
 } from '../types/nutrition'
 import { todayKey } from '../utils/calories'
 import { getActiveCloudUserId } from './cloudSession'
+import { safeWarn } from '../utils/safeLog'
 
 const PROFILE_BASE = 'ranked-gym:nutrition-profile'
 const JOURNAL_BASE = 'ranked-gym:nutrition-journal'
@@ -148,7 +149,7 @@ export function hasCompletedNutritionOnboarding(): boolean {
     if (!profile?.onboardingComplete) return false
     return VALID_GOALS.includes(profile.goal)
   } catch (error) {
-    console.warn('[nutrition] hasCompletedNutritionOnboarding failed:', error)
+    safeWarn('[nutrition] hasCompletedNutritionOnboarding failed', error)
     return false
   }
 }
