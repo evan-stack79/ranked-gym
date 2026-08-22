@@ -25,3 +25,11 @@ dist-ssr
 
 .env
 .env.local
+.env.*.local
+
+# Supabase CLI cache (local)
+supabase/.temp/
+
+# Build
+dist
+dist-ssr
