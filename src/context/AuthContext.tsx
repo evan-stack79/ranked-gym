@@ -36,6 +36,7 @@ import { setPrimarySport } from '../services/trainingStorage'
 import {
   setLocalGhostModeEnabled,
 } from '../services/ghostModeStorage'
+import { safeError, safeWarn } from '../utils/safeLog'
 
 function syncLocalDiscipline(label: string) {
   const id = disciplineFromLabel(label)
@@ -188,7 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         'hydrateCloudBackupForUser',
       )
     } catch (e) {
-      console.error('[auth] hydrateCloudBackupForUser failed:', e)
+      safeError('[auth] hydrateCloudBackupForUser failed', e)
     }
   }, [])
 
@@ -203,7 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           'loadProfile',
         )
       } catch (error) {
-        console.error('[auth] hydrateUser failed:', error)
+        safeError('[auth] hydrateUser failed', error)
       } finally {
         if (hydrateGenRef.current === gen) {
           setIsLoading(false)
@@ -247,7 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       })
       .catch((error) => {
-        console.error('[auth] getSession failed:', error)
+        safeError('[auth] getSession failed', error)
         if (!cancelled) setIsLoading(false)
       })
 
@@ -385,7 +386,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(row)
         setLocalGhostModeEnabled(row.is_ghost_mode_enabled ?? enabled)
       } catch (error) {
-        console.warn('[auth] updateGhostMode remote failed, kept local:', error)
+        safeWarn('[auth] updateGhostMode remote failed, kept local', error)
       } finally {
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new Event('ranked-gym:ghost-mode-changed'))

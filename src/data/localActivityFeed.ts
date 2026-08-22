@@ -7,6 +7,8 @@ export interface LocalActivityItem {
   hasLocation: boolean
   /** Style de suffixe lieu quand hasLocation && !ghost */
   locationStyle?: 'near' | 'zone'
+  /** Label lissé renvoyé par le RPC serveur (jamais de coords brutes). */
+  distanceLabel?: string | null
   isGhostModeEnabled: boolean
   xp: string
   time: string

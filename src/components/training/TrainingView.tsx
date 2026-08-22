@@ -18,6 +18,7 @@ import {
   upsertSchedule,
 } from '../../services/trainingStorage'
 import { flushCloudPushAsync } from '../../services/cloudBackup'
+import { safeError } from '../../utils/safeLog'
 import { connectHealthIntent } from '../../services/healthSteps'
 import { startReminderWatcher } from '../../services/reminderService'
 import { getCalorieProfile } from '../../services/nutritionStorage'
@@ -160,7 +161,7 @@ export function TrainingView({
     const onBackupError = (ev: Event) => {
       const detail = (ev as CustomEvent<{ error?: string }>).detail
       const msg = detail?.error || 'Échec sauvegarde Supabase'
-      console.error('[Train] backup error:', msg)
+      safeError('[Train] backup error', msg)
       showToast(`Cloud : ${msg}`)
     }
     window.addEventListener('ranked-gym:backup-restored', onRestored)
@@ -194,7 +195,7 @@ export function TrainingView({
       if (result.ok) {
         showToast(`${note.title} → Supabase OK`)
       } else {
-        console.error('[Train] Sauver cloud failed:', result.error)
+        safeError('[Train] Sauver cloud failed', result.error)
         showToast(`Échec cloud : ${result.error ?? 'inconnu'}`)
       }
     },

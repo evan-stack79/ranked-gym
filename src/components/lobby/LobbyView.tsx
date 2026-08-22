@@ -289,7 +289,7 @@ export function LobbyView() {
                 <>Zone · <span className="text-white">{location.label}</span></>
               ) : (
                 <>
-                  GPS · {location.coords.lat.toFixed(5)}, {location.coords.lng.toFixed(5)}
+                  GPS actif
                   {location.coords.accuracy != null && (
                     <span className="text-[#8E8E93]"> · ±{Math.round(location.coords.accuracy)} m</span>
                   )}

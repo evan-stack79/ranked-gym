@@ -9,6 +9,7 @@ import {
 } from '../../services/mealPhotoAi'
 import { MEAL_TYPE_LABELS } from '../../utils/calories'
 import type { MealType } from '../../types/nutrition'
+import { safeError } from '../../utils/safeLog'
 
 interface MealPhotoAnalyzerProps {
   onAnalyzed: (macros: MealPhotoMacros & { name: string; mealType: MealType }) => void
@@ -101,7 +102,7 @@ export function MealPhotoAnalyzer({ onAnalyzed, onToast }: MealPhotoAnalyzerProp
         'success',
       )
     } catch (e) {
-      console.error('[MealPhotoAnalyzer]', e)
+      safeError('[MealPhotoAnalyzer]', e)
       const msg =
         e instanceof MealPhotoAiError
           ? e.message

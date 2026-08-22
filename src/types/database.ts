@@ -193,6 +193,50 @@ type AiUsageLimitsTable = {
   Relationships: []
 }
 
+type ActivitiesTable = {
+  Row: {
+    id: string
+    user_id: string
+    activity_type: string
+    action_text: string
+    xp_earned: number
+    origin_lat: number | null
+    origin_lng: number | null
+    created_at: string
+  }
+  Insert: {
+    id?: string
+    user_id: string
+    activity_type: string
+    action_text: string
+    xp_earned?: number
+    origin_lat?: number | null
+    origin_lng?: number | null
+    created_at?: string
+  }
+  Update: {
+    activity_type?: string
+    action_text?: string
+    xp_earned?: number
+    origin_lat?: number | null
+    origin_lng?: number | null
+  }
+  Relationships: []
+}
+
+type ProfilesPublicView = {
+  Row: {
+    id: string
+    pseudo: string
+    level: number
+    xp: number
+    rank: string
+    discipline: string
+    avatar_url: string | null
+  }
+  Relationships: []
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -203,8 +247,11 @@ export interface Database {
       aliments: AlimentsTable
       user_backups: UserBackupsTable
       ai_usage_limits: AiUsageLimitsTable
+      activities: ActivitiesTable
     }
-    Views: Record<string, never>
+    Views: {
+      profiles_public: ProfilesPublicView
+    }
     Functions: {
       reserve_ai_meal_scan: {
         Args: { p_user_id: string }
@@ -213,6 +260,35 @@ export interface Database {
       release_ai_meal_scan: {
         Args: { p_user_id: string }
         Returns: undefined
+      }
+      get_social_activity_feed: {
+        Args: {
+          p_viewer_lat?: number | null
+          p_viewer_lng?: number | null
+          p_radius_km?: number | null
+          p_limit?: number | null
+        }
+        Returns: {
+          id: string
+          user_id: string
+          pseudo: string
+          activity_type: string
+          action_text: string
+          xp_earned: number
+          distance_label: string | null
+          created_at: string
+          is_self: boolean
+        }[]
+      }
+      record_activity: {
+        Args: {
+          p_activity_type: string
+          p_action_text: string
+          p_xp_earned?: number | null
+          p_origin_lat?: number | null
+          p_origin_lng?: number | null
+        }
+        Returns: string
       }
     }
     Enums: Record<string, never>
@@ -227,3 +303,5 @@ export type CheckinRow = CheckinsTable['Row']
 export type AlimentRow = AlimentsTable['Row']
 export type UserBackupRow = UserBackupsTable['Row']
 export type AiUsageLimitRow = AiUsageLimitsTable['Row']
+export type ActivityRow = ActivitiesTable['Row']
+export type ProfilePublicRow = ProfilesPublicView['Row']

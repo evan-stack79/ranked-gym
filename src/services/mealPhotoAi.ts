@@ -1,6 +1,7 @@
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 import { compressMealImage } from '../utils/compressMealImage'
+import { safeError } from '../utils/safeLog'
 
 export const AI_MEAL_DAILY_LIMIT = 5
 
@@ -118,7 +119,7 @@ export async function getAiMealUsageToday(userId: string): Promise<AiUsageToday>
     .maybeSingle()
 
   if (error) {
-    console.error('[mealPhotoAi] getAiMealUsageToday:', error.message)
+    safeError('[mealPhotoAi] getAiMealUsageToday', error.message)
     return { scanCount: 0, dailyLimit: AI_MEAL_DAILY_LIMIT, scansRemaining: AI_MEAL_DAILY_LIMIT }
   }
 
@@ -161,7 +162,7 @@ export async function analyzeMealPhoto(file: File | Blob): Promise<MealPhotoMacr
   if (error) {
     const errorBody = await readFunctionErrorBody(error)
     if (errorBody) payload = { ...payload, ...errorBody }
-    console.error('[mealPhotoAi] invoke failed:', error, payload)
+    safeError('[mealPhotoAi] invoke failed', { error, payload })
 
     throw new MealPhotoAiError(friendlyInvokeMessage(error, payload), {
       code: payload?.code,

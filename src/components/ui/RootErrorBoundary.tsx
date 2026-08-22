@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { safeError } from '../../utils/safeLog'
 
 interface Props {
   children: ReactNode
@@ -16,7 +17,7 @@ export class RootErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('[Ranked Gym] render crash:', error, info.componentStack)
+    safeError('[Ranked Gym] render crash', { error, componentStack: info.componentStack })
   }
 
   render() {
