@@ -68,7 +68,22 @@ function geminiModelCandidates(): string[] {
 
 function isGeminiModelNotFoundError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error)
-  return /404|not found|NOT_FOUND|models\//i.test(message)
+  return /404|not found|NOT_FOUND/i.test(message) && /models\//i.test(message)
+}
+
+function isGeminiApiKeyError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return /API_KEY_INVALID|API key not valid|invalid api key|PERMISSION_DENIED/i.test(message)
+}
+
+function friendlyGeminiError(error: unknown): string {
+  if (isGeminiApiKeyError(error)) {
+    return 'Clé Gemini invalide — crée une clé sur aistudio.google.com/apikey et mets-la dans Supabase → Secrets → GEMINI_API_KEY (format AIzaSy…).'
+  }
+  if (isGeminiModelNotFoundError(error)) {
+    return 'Modèle Gemini indisponible — ajoute GEMINI_MODEL=gemini-2.5-flash dans les secrets Supabase.'
+  }
+  return error instanceof Error ? error.message : 'Erreur Gemini'
 }
 
 function buildGeminiModel(genAI: GoogleGenerativeAI, modelName: string): GenerativeModel {
@@ -249,11 +264,6 @@ Deno.serve(async (req) => {
   } catch (e) {
     console.error('[analyze-meal-photo] Gemini error:', e)
     await admin.rpc('release_ai_meal_scan', { p_user_id: user.id })
-    let message = e instanceof Error ? e.message : 'Erreur Gemini'
-    if (isGeminiModelNotFoundError(e)) {
-      message =
-        'Modèle Gemini indisponible — mets GEMINI_MODEL=gemini-2.5-flash dans les secrets Supabase puis redéploie la fonction.'
-    }
-    return jsonResponse({ error: message }, 502)
+    return jsonResponse({ error: friendlyGeminiError(e) }, 502)
   }
 })
