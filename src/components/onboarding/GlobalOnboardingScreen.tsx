@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react'
-import { Sparkles, Target } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import { NutritionOnboarding } from '../nutrition/NutritionOnboarding'
-import { IconBadge } from '../ui/IconBadge'
 import {
   getCalorieProfile,
   saveCalorieProfile,
@@ -56,12 +55,6 @@ export function GlobalOnboardingScreen({ onComplete }: GlobalOnboardingScreenPro
         style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}
       >
         <header className="mb-8 ios-fade-up">
-          <div className="mb-3 flex items-center gap-2">
-            <IconBadge icon={Target} variant="green" size="sm" />
-            <span className="rounded-full border border-[#34C759]/30 bg-[#34C759]/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#30D158]">
-              Setup
-            </span>
-          </div>
           <h1 className="text-[28px] font-bold leading-tight tracking-tight text-white">
             Ton plan sur mesure
           </h1>

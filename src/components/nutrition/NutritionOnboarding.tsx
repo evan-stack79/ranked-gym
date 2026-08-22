@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight, Ruler, Scale, Sparkles, Target, UserRound } from 'lucide-react'
 import type { ActivityLevel, BodyMorphology, CalorieProfile, NutritionGoal, Sex } from '../../types/nutrition'
 import { GOAL_LABELS, computeCaloriePlan } from '../../utils/calories'
@@ -15,12 +15,27 @@ interface NutritionOnboardingProps {
   onComplete: (profile: CalorieProfile) => void
 }
 
-type Step = 'goal' | 'body' | 'morphology' | 'result'
-
-const STEPS: Step[] = ['goal', 'body', 'morphology', 'result']
+type Step = 'goal' | 'goalWeight' | 'pace' | 'body' | 'morphology' | 'result'
 
 function seedNumber(value: number): number | null {
   return value > 0 ? value : null
+}
+
+function stepTitle(step: Step): string {
+  switch (step) {
+    case 'goal':
+      return 'Ton objectif'
+    case 'goalWeight':
+      return 'Ton poids objectif'
+    case 'pace':
+      return 'Ton rythme'
+    case 'body':
+      return 'Où en es-tu aujourd’hui ?'
+    case 'morphology':
+      return 'Ta morphologie'
+    case 'result':
+      return 'Ton plan personnalisé'
+  }
 }
 
 export function NutritionOnboarding({ initial, onComplete }: NutritionOnboardingProps) {
@@ -44,6 +59,21 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
   const [morphology, setMorphology] = useState<BodyMorphology>(
     initial.morphology || 'mesomorph',
   )
+
+  const steps = useMemo<Step[]>(() => {
+    const flow: Step[] = ['goal', 'goalWeight']
+    if (goal !== 'maintain') flow.push('pace')
+    flow.push('body', 'morphology', 'result')
+    return flow
+  }, [goal])
+
+  const stepIndex = Math.max(0, steps.indexOf(step))
+
+  useEffect(() => {
+    if (!steps.includes(step)) {
+      setStep(steps[Math.max(0, stepIndex - 1)] ?? 'goal')
+    }
+  }, [steps, step, stepIndex])
 
   const draft: CalorieProfile | null = useMemo(() => {
     if (
@@ -84,20 +114,27 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
 
   const plan = useMemo(() => (draft ? computeCaloriePlan(draft) : null), [draft])
 
-  const title =
-    step === 'goal'
-      ? 'Ton objectif'
-      : step === 'body'
-        ? 'Où en es-tu aujourd’hui ?'
-        : step === 'morphology'
-          ? 'Ta morphologie'
-          : 'Ton plan personnalisé'
+  const goBack = () => {
+    setError(null)
+    const prev = steps[stepIndex - 1]
+    if (prev) setStep(prev)
+  }
 
-  const goBody = () => {
+  const goGoalWeight = () => {
+    setError(null)
+    setStep('goalWeight')
+  }
+
+  const goAfterGoalWeight = () => {
     if (goalWeightKg == null || goalWeightKg < 35) {
       setError('Indique ton poids objectif (ex. 61.7).')
       return
     }
+    setError(null)
+    setStep(goal === 'maintain' ? 'body' : 'pace')
+  }
+
+  const goBody = () => {
     if (goal !== 'maintain' && weeklyPaceKg < 0.1) {
       setError('Choisis un rythme hebdomadaire.')
       return
@@ -148,16 +185,16 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
             <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
               Setup nutrition
             </p>
-            <h2 className="text-[22px] font-bold tracking-tight text-white">{title}</h2>
+            <h2 className="text-[22px] font-bold tracking-tight text-white">{stepTitle(step)}</h2>
           </div>
         </div>
 
         <div className="mb-5 flex gap-1.5">
-          {STEPS.map((item, index) => (
+          {steps.map((item, index) => (
             <div
               key={item}
               className={`h-1 flex-1 rounded-full transition-colors ${
-                STEPS.indexOf(step) >= index ? 'bg-[#30D158]' : 'bg-white/10'
+                stepIndex >= index ? 'bg-[#30D158]' : 'bg-white/10'
               }`}
             />
           ))}
@@ -172,8 +209,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
         {step === 'goal' && (
           <div className="space-y-4">
             <p className="text-[15px] text-[#AEAEB2]">
-              Choisis clairement sèche, maintien ou prise — puis ton rythme. Aucune valeur
-              fictive n’est envoyée.
+              On adapte les calculs à ton métabolisme pour des résultats optimaux.
             </p>
 
             <GoalPicker
@@ -184,6 +220,25 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
                 else if (weeklyPaceKg <= 0) setWeeklyPaceKg(0.5)
               }}
             />
+
+            <button
+              type="button"
+              onClick={goGoalWeight}
+              className="btn-brand ios-press flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[16px] font-semibold text-white"
+            >
+              Continuer
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+        )}
+
+        {step === 'goalWeight' && (
+          <div className="space-y-4">
+            <p className="text-[15px] text-[#AEAEB2]">
+              Quel poids vises-tu avec ton objectif{' '}
+              <span className="font-semibold text-white">{GOAL_LABELS[goal].toLowerCase()}</span>{' '}
+              ?
+            </p>
 
             <label className="glass-card block rounded-2xl p-4">
               <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
@@ -206,20 +261,55 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               </div>
             </label>
 
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={goBack}
+                className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#8E8E93]"
+              >
+                Retour
+              </button>
+              <button
+                type="button"
+                onClick={goAfterGoalWeight}
+                className="btn-brand ios-press flex flex-[1.4] items-center justify-center gap-1 rounded-2xl py-3.5 text-[15px] font-semibold text-white"
+              >
+                Continuer
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 'pace' && goal !== 'maintain' && (
+          <div className="space-y-4">
+            <p className="text-[15px] text-[#AEAEB2]">
+              À quelle vitesse veux-tu progresser chaque semaine ?
+            </p>
+
             <WeeklyPacePicker
               value={weeklyPaceKg > 0 ? weeklyPaceKg : 0.5}
               onChange={setWeeklyPaceKg}
               goal={goal}
             />
 
-            <button
-              type="button"
-              onClick={goBody}
-              className="btn-brand ios-press flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[16px] font-semibold text-white"
-            >
-              Continuer
-              <ChevronRight className="h-5 w-5" />
-            </button>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={goBack}
+                className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#8E8E93]"
+              >
+                Retour
+              </button>
+              <button
+                type="button"
+                onClick={goBody}
+                className="btn-brand ios-press flex flex-[1.4] items-center justify-center gap-1 rounded-2xl py-3.5 text-[15px] font-semibold text-white"
+              >
+                Continuer
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         )}
 
@@ -309,7 +399,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
             <div className="flex gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => setStep('goal')}
+                onClick={goBack}
                 className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#8E8E93]"
               >
                 Retour
@@ -336,7 +426,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
             <div className="flex gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => setStep('body')}
+                onClick={goBack}
                 className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#8E8E93]"
               >
                 Retour
