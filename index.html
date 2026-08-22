@@ -10,9 +10,50 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="apple-touch-icon" href="/pwa-192x192.png" />
     <title>Ranked Gym</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background-color: #0c0c0e;
+        color: #ffffff;
+      }
+      #root {
+        min-height: 100vh;
+      }
+      .boot-fallback {
+        display: flex;
+        min-height: 100vh;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        text-align: center;
+        padding: 1.5rem;
+      }
+      .boot-fallback p {
+        margin: 0;
+        color: #8e8e93;
+        font-size: 0.9375rem;
+      }
+      .boot-fallback strong {
+        color: #ffffff;
+        font-size: 1.0625rem;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot-fallback" aria-live="polite" aria-busy="true">
+        <strong>Ranked Gym</strong>
+        <p>Chargement…</p>
+      </div>
+    </div>
+    <noscript>
+      <p style="padding: 2rem; font-family: system-ui, sans-serif; color: #fff; background: #0c0c0e">
+        Ranked Gym nécessite JavaScript. Active-le pour utiliser l’application.
+      </p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

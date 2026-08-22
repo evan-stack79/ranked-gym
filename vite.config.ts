@@ -50,6 +50,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/assets\//, /^\/workbox-/, /^\/sw\.js$/, /^\/registerSW\.js$/],
       },
     }),
   ],
