@@ -17,12 +17,12 @@ import type { CalorieProfile } from '../../types/nutrition'
 export function NutritionView() {
   const { isLoading: isBootLoading } = useAuth()
   const [profile, setProfile] = useState<CalorieProfile>(() => getCalorieProfile())
+  const [showSetupEditor, setShowSetupEditor] = useState(false)
 
   const adjusted = useMemo(() => getAdjustedNutritionTarget(profile), [profile])
   const targetCalories = adjusted.targetCalories
   const activityBonus = adjusted.activityBonus
 
-  // Re-read after global boot (cloud hydrate) so we never paint blank defaults first.
   useEffect(() => {
     if (isBootLoading) return
     setProfile(getCalorieProfile())
@@ -47,10 +47,16 @@ export function NutritionView() {
     saveCalorieProfile(next)
   }, [])
 
-  const resetOnboarding = () => {
-    const next = { ...profile, onboardingComplete: false }
-    setProfile(next)
-    saveCalorieProfile(next)
+  const handleSetupComplete = useCallback(
+    (next: CalorieProfile) => {
+      handleProfileChange(next)
+      setShowSetupEditor(false)
+    },
+    [handleProfileChange],
+  )
+
+  const openSetupEditor = () => {
+    setShowSetupEditor(true)
   }
 
   if (isBootLoading) return null
@@ -73,19 +79,19 @@ export function NutritionView() {
             </div>
             <h1 className="text-[34px] font-bold tracking-tight text-white">Nutrition</h1>
             <p className="mt-2 text-[17px] text-[#8E8E93]">
-              {profile.onboardingComplete
-                ? activityBonus > 0
+              {showSetupEditor
+                ? 'Ajuste ton objectif et ton plan calorique.'
+                : activityBonus > 0
                   ? `Plan +${activityBonus} kcal liés à ton activité Train.`
-                  : 'Plan adapté à ton objectif et ta morphologie.'
-                : 'Dis-nous ton objectif, on calcule le reste.'}
+                  : 'Plan adapté à ton objectif et ta morphologie.'}
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">
             <IconBadge icon={Droplets} variant="blue" />
-            {profile.onboardingComplete && (
+            {!showSetupEditor && (
               <button
                 type="button"
-                onClick={resetOnboarding}
+                onClick={openSetupEditor}
                 className="ios-press inline-flex items-center gap-1 text-[11px] font-medium text-[#636366]"
               >
                 <RotateCcw className="h-3 w-3" />
@@ -96,8 +102,8 @@ export function NutritionView() {
         </div>
       </header>
 
-      {!profile.onboardingComplete ? (
-        <NutritionOnboarding initial={profile} onComplete={handleProfileChange} />
+      {showSetupEditor ? (
+        <NutritionOnboarding initial={profile} onComplete={handleSetupComplete} />
       ) : (
         <>
           <div className="ios-fade-up ios-fade-up-delay-1">

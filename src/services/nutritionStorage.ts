@@ -138,7 +138,14 @@ export function saveCalorieProfile(
 }
 
 export function isNutritionOnboarded(): boolean {
-  return getCalorieProfile().onboardingComplete
+  return hasCompletedNutritionOnboarding()
+}
+
+/** Guard de routing au lancement — objectif renseigné + onboarding terminé. */
+export function hasCompletedNutritionOnboarding(): boolean {
+  const profile = getCalorieProfile()
+  if (!profile.onboardingComplete) return false
+  return VALID_GOALS.includes(profile.goal)
 }
 
 function getAllJournals(): Record<string, DayJournal> {
