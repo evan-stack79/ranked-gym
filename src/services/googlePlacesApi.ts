@@ -12,6 +12,167 @@ import {
   type AppDisciplineId,
 } from '../data/disciplines'
 
+/** Types Google Places acceptés pour muscu / fitness (Lobby force). */
+const GYM_ALLOWED_TYPES = new Set(['gym', 'fitness_center'])
+
+/** Types à exclure systématiquement (grande distribution, commerces). */
+const RETAIL_DENIED_TYPES = new Set([
+  'supermarket',
+  'grocery_or_supermarket',
+  'convenience_store',
+  'department_store',
+  'shopping_mall',
+  'store',
+  'hardware_store',
+  'home_goods_store',
+  'clothing_store',
+  'shoe_store',
+  'electronics_store',
+  'furniture_store',
+  'pharmacy',
+  'bakery',
+  'meal_takeaway',
+  'restaurant',
+  'food',
+  'gas_station',
+  'car_dealer',
+  'car_repair',
+  'bank',
+  'atm',
+  'lodging',
+  'school',
+  'church',
+  'hospital',
+  'doctor',
+  'dentist',
+  'veterinary_care',
+  'pet_store',
+  'beauty_salon',
+  'hair_care',
+  'spa',
+  'lawyer',
+  'real_estate_agency',
+  'insurance_agency',
+  'travel_agency',
+  'post_office',
+  'local_government_office',
+])
+
+/** Arts martiaux — exclus pour muscu / fitness pur. */
+const MARTIAL_ARTS_DENIED_TYPES = new Set(['martial_arts_school'])
+
+const RETAIL_DENIED_NAME =
+  /\b(e\.?\s?leclerc|leclerc|carrefour|auchan|intermarche|lidl|aldi|casino|super\s?u|monoprix|franprix|picard|hyper\s?u|supermarche|supermarché|hypermarché|market|drive)\b/i
+
+const MARTIAL_ARTS_DENIED_NAME =
+  /\b(dojo|karat[ée]|judo|aikido|taekwondo|kung\s?fu|arts?\s?martiaux|jujitsu|jjb|bjj|krav\s?maga|capoeira|escrime)\b/i
+
+const GYM_NAME_PATTERN =
+  /\b(fitness|musculation|muscu|gym|basic[- ]?fit|l'?orange\s?bleue|keep\s?cool|neoness|giga|curves|salles?\s+de\s+sport|salle\s+de\s+musculation|world\s+gym|fit\s?ness\s?park|crossfit|iron\s+gym|power\s+lift)\b/i
+
+const COMBAT_ALLOWED_TYPES = new Set(['gym', 'fitness_center', 'martial_arts_school', 'stadium'])
+
+const COMBAT_NAME_PATTERN =
+  /\b(boxe|boxing|mma|kick\s?boxing|muay\s?thai|dojo|karat[ée]|judo|arts?\s?martiaux|grappling|bjj|jujitsu|club\s+de\s+combat)\b/i
+
+const OUTDOOR_ALLOWED_TYPES = new Set([
+  'stadium',
+  'park',
+  'gym',
+  'fitness_center',
+  'sports_complex',
+  'athletic_field',
+  'playground',
+])
+
+const OUTDOOR_NAME_PATTERN =
+  /\b(stade|piste|terrain|gymnase|parc|velodrome|cyclable|running|football|athl[ée]tisme)\b/i
+
+function placeTypes(place: GooglePlaceResult): string[] {
+  return place.types ?? []
+}
+
+function placeName(place: GooglePlaceResult): string {
+  return place.name ?? ''
+}
+
+function isDeniedRetailPlace(place: GooglePlaceResult): boolean {
+  const types = placeTypes(place)
+  const name = placeName(place)
+  if (types.some((t) => RETAIL_DENIED_TYPES.has(t))) return true
+  if (RETAIL_DENIED_NAME.test(name)) return true
+  return false
+}
+
+function isAllowedFitnessGymPlace(place: GooglePlaceResult): boolean {
+  if (isDeniedRetailPlace(place)) return false
+
+  const types = placeTypes(place)
+  const name = placeName(place)
+
+  if (types.some((t) => MARTIAL_ARTS_DENIED_TYPES.has(t))) return false
+  if (MARTIAL_ARTS_DENIED_NAME.test(name)) return false
+
+  if (types.some((t) => GYM_ALLOWED_TYPES.has(t))) return true
+  if (GYM_NAME_PATTERN.test(name)) return true
+
+  return false
+}
+
+function isAllowedCombatPlace(place: GooglePlaceResult): boolean {
+  if (isDeniedRetailPlace(place)) return false
+
+  const types = placeTypes(place)
+  const name = placeName(place)
+
+  if (types.some((t) => COMBAT_ALLOWED_TYPES.has(t))) return true
+  if (COMBAT_NAME_PATTERN.test(name)) return true
+
+  return false
+}
+
+function isAllowedOutdoorSportPlace(place: GooglePlaceResult): boolean {
+  if (isDeniedRetailPlace(place)) return false
+
+  const types = placeTypes(place)
+  const name = placeName(place)
+
+  if (types.some((t) => OUTDOOR_ALLOWED_TYPES.has(t))) return true
+  if (OUTDOOR_NAME_PATTERN.test(name)) return true
+
+  return false
+}
+
+function isAllowedCrossfitPlace(place: GooglePlaceResult): boolean {
+  if (isDeniedRetailPlace(place)) return false
+
+  const name = placeName(place)
+  if (/\b(crossfit|cross\s?fit)\b/i.test(name)) return true
+
+  return isAllowedFitnessGymPlace(place)
+}
+
+function isPlaceAllowedForDiscipline(
+  place: GooglePlaceResult,
+  disciplineId: AppDisciplineId,
+): boolean {
+  switch (disciplineId) {
+    case 'musculation':
+    case 'fitness':
+      return isAllowedFitnessGymPlace(place)
+    case 'crossfit':
+      return isAllowedCrossfitPlace(place)
+    case 'combat':
+      return isAllowedCombatPlace(place)
+    case 'course':
+    case 'football':
+    case 'cyclisme':
+      return isAllowedOutdoorSportPlace(place)
+    default:
+      return isAllowedFitnessGymPlace(place)
+  }
+}
+
 export class GooglePlacesError extends Error {
   constructor(message: string) {
     super(message)
@@ -372,6 +533,7 @@ async function fetchNearbyGymsFromGoogle(
 
   const mapped = batches
     .flat()
+    .filter((place) => isPlaceAllowedForDiscipline(place, discId))
     .map((place) => placeResultToGym(place, safeUserLat, safeUserLng, allowAllCheckIn))
     .filter((gym): gym is NearbyGym => gym != null)
     .map((gym) => ({ ...gym, spotKind: getDiscipline(discId).spotLabel }))

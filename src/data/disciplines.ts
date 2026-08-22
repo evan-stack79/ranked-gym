@@ -37,8 +37,7 @@ export const APP_DISCIPLINES: AppDiscipline[] = [
     accent: '#FF2B2B',
     placeQueries: [
       { type: 'gym' },
-      { keyword: 'salle de musculation' },
-      { keyword: 'fitness' },
+      { type: 'fitness_center' },
     ],
     lobbyActivities: [
       'Développé couché 4×8',
@@ -98,11 +97,10 @@ export const APP_DISCIPLINES: AppDiscipline[] = [
     primarySportId: 'boxe',
     accent: '#BF5AF2',
     placeQueries: [
+      { type: 'gym' },
       { keyword: 'boxe' },
       { keyword: 'mma' },
       { keyword: 'dojo' },
-      { keyword: 'arts martiaux' },
-      { type: 'gym' },
     ],
     lobbyActivities: [
       'Sparring technique',
@@ -141,9 +139,8 @@ export const APP_DISCIPLINES: AppDiscipline[] = [
     primarySportId: 'crossfit',
     accent: '#FF453A',
     placeQueries: [
-      { keyword: 'crossfit' },
       { type: 'gym' },
-      { keyword: 'box crossfit' },
+      { keyword: 'crossfit' },
     ],
     lobbyActivities: [
       'WOD Metcon 12 min',
@@ -162,8 +159,7 @@ export const APP_DISCIPLINES: AppDiscipline[] = [
     accent: '#64D2FF',
     placeQueries: [
       { type: 'gym' },
-      { keyword: 'fitness' },
-      { keyword: 'salle de sport' },
+      { type: 'fitness_center' },
     ],
     lobbyActivities: [
       'Circuit full body',
