@@ -1,10 +1,25 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../types/database'
 
-const url = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim() ?? ''
-const anonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim() ?? ''
-
 const PLACEHOLDER_MARKERS = ['YOUR_PROJECT', 'YOUR_SUPABASE', 'example.supabase.co', 'undefined', 'null']
+
+/** Nettoie les collages depuis le chat (Markdown, guillemets, caractères invisibles). */
+function sanitizeEnvValue(raw: string | undefined): string {
+  if (!raw) return ''
+  let s = raw.trim()
+  // Zero-width / format chars (ex. U+2060 collé depuis Cursor/Slack)
+  s = s.replace(/[\u200B-\u200D\uFEFF\u2060\u00AD]/g, '')
+  // Lien Markdown [texte](https://…)
+  const md = s.match(/\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/i)
+  if (md) s = md[1]
+  // URL entre parenthèses seules
+  const wrapped = s.match(/^\((https?:\/\/[^)\s]+)\)$/i)
+  if (wrapped) s = wrapped[1]
+  return s.replace(/^["'`]+|["'`]+$/g, '').trim()
+}
+
+const url = sanitizeEnvValue(import.meta.env.VITE_SUPABASE_URL as string | undefined)
+const anonKey = sanitizeEnvValue(import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)
 
 function isValidHttpUrl(raw: string): boolean {
   if (!raw) return false
@@ -71,6 +86,11 @@ export function getSupabaseConfigError(): string | null {
     return 'Variables Supabase absentes au build. Ajoute VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY dans Cloudflare (Production) puis redéploie.'
   }
   if (!isValidHttpUrl(url)) {
+    const raw = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim() ?? ''
+    const pastedMarkdown = raw.includes('](') || /[\u2060\u200B]/.test(raw)
+    if (pastedMarkdown) {
+      return 'VITE_SUPABASE_URL collée en Markdown (lien cliquable). Cloudflare → colle uniquement : https://jivqfrkwvnzzefnerpii.supabase.co puis redéploie.'
+    }
     return `VITE_SUPABASE_URL invalide : « ${url || '(vide)'} ». Utilise https://jivqfrkwvnzzefnerpii.supabase.co`
   }
   if (!anonKey || anonKey.length < 20) {

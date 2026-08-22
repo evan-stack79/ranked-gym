@@ -31,6 +31,14 @@ Variables d’environnement (Production) — **obligatoires au moment du build**
 ⚠️ Sans `https://` dans l’URL Supabase → écran noir / crash.  
 ⚠️ Les variables `VITE_*` sont **figées au build** : après modification, clique **Retry deployment**.
 
+**Colle l’URL en texte brut** — pas depuis un message Markdown :
+
+| ❌ Mauvais (lien cliquable / chat) | ✅ Bon |
+|-------------------------------------|--------|
+| `[https://xxx.supabase.co](https://xxx.supabase.co)` | `https://xxx.supabase.co` |
+
+Copie l’URL depuis **Supabase → Project Settings → API → Project URL** (bouton Copy), pas depuis Cursor/Slack.
+
 ---
 
 ## Déploiement CLI (optionnel)
