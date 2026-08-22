@@ -58,4 +58,5 @@ export function formatDistance(meters: number): string {
 }
 
 export const CHECK_IN_RADIUS_METERS = 200
-export const SEARCH_RADIUS_METERS = 2000
+/** Rayon Places API — 8 km pour couvrir Basic-Fit et grandes chaînes. */
+export const SEARCH_RADIUS_METERS = 8000

@@ -310,7 +310,7 @@ export function LobbyView() {
             </span>
           </NeonButton>
 
-          <CitySearchFallback onSearch={handleCitySearch} />
+          <CitySearchFallback onSearch={handleCitySearch} disabled={isLoading} />
         </div>
       )}
 
@@ -348,6 +348,9 @@ export function LobbyView() {
           </div>
           <div className="w-full">
             <CreateLobbyPanel onCreate={handleCreateCustomLobby} />
+          </div>
+          <div className="w-full max-w-md">
+            <CitySearchFallback onSearch={handleCitySearch} />
           </div>
           <NeonButton onClick={resetToIdle} variant="secondary" className="max-w-xs">
             Nouvelle recherche

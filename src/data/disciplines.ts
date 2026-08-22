@@ -38,6 +38,11 @@ export const APP_DISCIPLINES: AppDiscipline[] = [
     placeQueries: [
       { type: 'gym' },
       { type: 'fitness_center' },
+      { type: 'gym', keyword: 'Basic-Fit' },
+      { type: 'gym', keyword: 'Fitness Park' },
+      { type: 'gym', keyword: "L'Orange Bleue" },
+      { type: 'gym', keyword: 'Keep Cool' },
+      { type: 'gym', keyword: 'Neoness' },
     ],
     lobbyActivities: [
       'Développé couché 4×8',
@@ -160,6 +165,9 @@ export const APP_DISCIPLINES: AppDiscipline[] = [
     placeQueries: [
       { type: 'gym' },
       { type: 'fitness_center' },
+      { type: 'gym', keyword: 'Basic-Fit' },
+      { type: 'gym', keyword: 'Fitness Park' },
+      { type: 'gym', keyword: 'Keep Cool' },
     ],
     lobbyActivities: [
       'Circuit full body',

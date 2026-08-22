@@ -36,10 +36,14 @@ export function CitySearchFallback({ onSearch, disabled = false, loading = false
           type="submit"
           disabled={disabled || loading || city.trim().length < 2}
           className="btn-brand flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/15 text-white transition-opacity disabled:opacity-40"
+          aria-label={loading ? 'Géocodage en cours' : 'Rechercher cette ville'}
         >
-          <ArrowRight className="h-5 w-5" />
+          <ArrowRight className={`h-5 w-5 ${loading ? 'animate-pulse' : ''}`} />
         </button>
       </form>
+      {loading ? (
+        <p className="mt-2 text-center text-[12px] text-[#8E8E93]">Conversion ville → GPS…</p>
+      ) : null}
     </div>
   )
 }

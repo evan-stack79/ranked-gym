@@ -67,6 +67,19 @@ const RETAIL_DENIED_NAME =
 const MARTIAL_ARTS_DENIED_NAME =
   /\b(dojo|karat[ée]|judo|aikido|taekwondo|kung\s?fu|arts?\s?martiaux|jujitsu|jjb|bjj|krav\s?maga|capoeira|escrime)\b/i
 
+const GYM_CHAIN_PRIORITY =
+  /\b(basic[- ]?fit|fitness\s+park|orange\s+bleue|keep\s+cool|neoness|giga\s?fit|curves|world\s+gym)\b/i
+
+/** Requêtes textSearch pour compléter nearbySearch (chaînes majeures). */
+const FITNESS_TEXT_SEARCH_QUERIES = [
+  'Basic-Fit',
+  'Fitness Park',
+  "L'Orange Bleue",
+  'Keep Cool',
+  'Neoness',
+  'salle de sport fitness',
+] as const
+
 const GYM_NAME_PATTERN =
   /\b(fitness|musculation|muscu|gym|basic[- ]?fit|l'?orange\s?bleue|keep\s?cool|neoness|giga|curves|salles?\s+de\s+sport|salle\s+de\s+musculation|world\s+gym|fit\s?ness\s?park|crossfit|iron\s+gym|power\s+lift)\b/i
 
@@ -235,11 +248,23 @@ interface GoogleMapsWindow {
             },
             callback: (results: GooglePlaceResult[] | null, status: string) => void,
           ) => void
+          textSearch: (
+            request: {
+              query: string
+              location?: { lat: number; lng: number }
+              radius?: number
+            },
+            callback: (results: GooglePlaceResult[] | null, status: string) => void,
+          ) => void
         }
       }
       Geocoder: new () => {
         geocode: (
-          request: { address: string },
+          request: {
+            address: string
+            componentRestrictions?: { country: string }
+            region?: string
+          },
           callback: (results: GoogleGeocodeResult[] | null, status: string) => void,
         ) => void
       }
@@ -412,6 +437,14 @@ type PlacesServiceInstance = {
     },
     callback: (results: GooglePlaceResult[] | null, status: string) => void,
   ) => void
+  textSearch: (
+    request: {
+      query: string
+      location?: { lat: number; lng: number }
+      radius?: number
+    },
+    callback: (results: GooglePlaceResult[] | null, status: string) => void,
+  ) => void
 }
 
 function nearbySearchOnce(
@@ -438,6 +471,35 @@ function nearbySearchOnce(
       reject(new GooglePlacesError(`Places Nearby Search a échoué (${status}).`))
     })
   })
+}
+
+function textSearchOnce(
+  service: PlacesServiceInstance,
+  request: {
+    query: string
+    location?: { lat: number; lng: number }
+    radius?: number
+  },
+  okStatus: string,
+  zeroStatus: string,
+): Promise<GooglePlaceResult[]> {
+  return new Promise((resolve, reject) => {
+    service.textSearch(request, (results, status) => {
+      if (status === okStatus) {
+        resolve(results ?? [])
+        return
+      }
+      if (status === zeroStatus) {
+        resolve([])
+        return
+      }
+      reject(new GooglePlacesError(`Places Text Search a échoué (${status}).`))
+    })
+  })
+}
+
+function isFitnessDiscipline(discId: AppDisciplineId): boolean {
+  return discId === 'musculation' || discId === 'fitness' || discId === 'crossfit'
 }
 
 function extractLatLng(location: unknown): { lat: number; lng: number } | null {
@@ -480,11 +542,16 @@ function placeResultToGym(
 }
 
 function dedupeGyms(gyms: NearbyGym[]): NearbyGym[] {
+  const sortScore = (gym: NearbyGym) => {
+    const chainBoost = GYM_CHAIN_PRIORITY.test(gym.name) ? 0 : 1_000_000
+    return chainBoost + gym.distanceMeters
+  }
+
   const byId = new Map<string, NearbyGym>()
-  for (const gym of gyms.sort((a, b) => a.distanceMeters - b.distanceMeters)) {
+  for (const gym of gyms.sort((a, b) => sortScore(a) - sortScore(b))) {
     if (!byId.has(gym.id)) byId.set(gym.id, gym)
   }
-  return [...byId.values()]
+  return [...byId.values()].sort((a, b) => sortScore(a) - sortScore(b))
 }
 
 async function fetchNearbyGymsFromGoogle(
@@ -515,7 +582,8 @@ async function fetchNearbyGymsFromGoogle(
 
   const discId = (options.disciplineId as AppDisciplineId | undefined) ?? getStoredDisciplineId()
   const queries = getDiscipline(discId).placeQueries
-  const batches = await Promise.all(
+
+  const nearbyBatches = await Promise.all(
     queries.map((q) =>
       nearbySearchOnce(
         service,
@@ -531,11 +599,28 @@ async function fetchNearbyGymsFromGoogle(
     ),
   )
 
+  let textBatches: GooglePlaceResult[][] = []
+  if (isFitnessDiscipline(discId)) {
+    textBatches = await Promise.all(
+      FITNESS_TEXT_SEARCH_QUERIES.map((query) =>
+        textSearchOnce(
+          service,
+          { query, location, radius: radiusMeters },
+          OK,
+          ZERO_RESULTS,
+        ).catch(() => [] as GooglePlaceResult[]),
+      ),
+    )
+  }
+
+  const batches = [...nearbyBatches, ...textBatches]
+
   const mapped = batches
     .flat()
     .filter((place) => isPlaceAllowedForDiscipline(place, discId))
     .map((place) => placeResultToGym(place, safeUserLat, safeUserLng, allowAllCheckIn))
     .filter((gym): gym is NearbyGym => gym != null)
+    .filter((gym) => gym.distanceMeters <= radiusMeters)
     .map((gym) => ({ ...gym, spotKind: getDiscipline(discId).spotLabel }))
 
   return dedupeGyms(mapped)
@@ -586,34 +671,84 @@ async function geocodeCityWithGoogle(cityQuery: string): Promise<GeocodedPlace> 
   const geocoder = new google.maps.Geocoder()
 
   return new Promise((resolve, reject) => {
-    geocoder.geocode({ address: `${cityQuery}, France` }, (results, status) => {
-      if (status !== 'OK' || !results?.[0]?.geometry?.location) {
-        reject(
-          new GooglePlacesError(
-            status === 'ZERO_RESULTS'
-              ? `Aucun résultat pour « ${cityQuery} ».`
-              : `Géocodage impossible (${status}).`,
-          ),
-        )
-        return
-      }
+    geocoder.geocode(
+      {
+        address: cityQuery,
+        componentRestrictions: { country: 'fr' },
+        region: 'fr',
+      },
+      (results, status) => {
+        if (status !== 'OK' || !results?.[0]?.geometry?.location) {
+          reject(
+            new GooglePlacesError(
+              status === 'ZERO_RESULTS'
+                ? `Aucun résultat pour « ${cityQuery} ».`
+                : `Géocodage Google impossible (${status}).`,
+            ),
+          )
+          return
+        }
 
-      const first = results[0]
-      const coords = extractLatLng(first.geometry?.location)
-      if (!coords) {
-        reject(new GooglePlacesError('Coordonnées de géocodage invalides.'))
-        return
-      }
+        const first = results[0]
+        const coords = extractLatLng(first.geometry?.location)
+        if (!coords) {
+          reject(new GooglePlacesError('Coordonnées de géocodage invalides.'))
+          return
+        }
 
-      const label =
-        first.formatted_address?.split(',').slice(0, 2).join(',').trim() ?? cityQuery
+        const label =
+          first.formatted_address?.split(',').slice(0, 2).join(',').trim() ?? `${cityQuery}, France`
 
-      resolve({
-        coords: { lat: coords.lat, lng: coords.lng },
-        label,
-      })
-    })
+        resolve({
+          coords: { lat: coords.lat, lng: coords.lng },
+          label,
+        })
+      },
+    )
   })
+}
+
+interface NominatimResult {
+  lat?: string
+  lon?: string
+  display_name?: string
+}
+
+/** Fallback gratuit si Geocoding Google indisponible (API non activée, quota, etc.). */
+async function geocodeCityWithNominatim(cityQuery: string): Promise<GeocodedPlace> {
+  const url = new URL('https://nominatim.openstreetmap.org/search')
+  url.searchParams.set('q', `${cityQuery}, France`)
+  url.searchParams.set('format', 'json')
+  url.searchParams.set('limit', '1')
+  url.searchParams.set('countrycodes', 'fr')
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      Accept: 'application/json',
+      'User-Agent': 'RankedGym/1.0 (https://ranked-gym.lembrezevan.workers.dev)',
+    },
+  })
+
+  if (!response.ok) {
+    throw new GooglePlacesError(`Géocodage Nominatim indisponible (${response.status}).`)
+  }
+
+  const results = (await response.json()) as NominatimResult[]
+  const hit = results[0]
+  const lat = hit?.lat != null ? Number.parseFloat(hit.lat) : Number.NaN
+  const lng = hit?.lon != null ? Number.parseFloat(hit.lon) : Number.NaN
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new GooglePlacesError(`Aucun résultat pour « ${cityQuery} » (Nominatim).`)
+  }
+
+  const label =
+    hit.display_name?.split(',').slice(0, 2).join(',').trim() ?? `${cityQuery}, France`
+
+  return {
+    coords: { lat, lng },
+    label,
+  }
 }
 
 /** Mock city center for Tergnier when no API key is configured. */
@@ -630,19 +765,35 @@ export async function geocodeCity(cityQuery: string): Promise<GeocodedPlace> {
     throw new GooglePlacesError('Entre au moins 2 caractères pour rechercher une ville.')
   }
 
-  if (isMockPlacesMode()) {
-    await delay(450)
-    const normalized = query.toLowerCase()
-    const known = Object.entries(MOCK_CITY_COORDS).find(([key]) => normalized.includes(key))
-    if (known) return known[1]
-
-    return {
-      coords: { lat: 49.6556, lng: 3.3011 },
-      label: `${query}, France`,
+  if (!isMockPlacesMode()) {
+    try {
+      return await geocodeCityWithGoogle(query)
+    } catch (googleError) {
+      console.warn('[geocodeCity] Google échoué, fallback Nominatim:', googleError)
     }
   }
 
-  return geocodeCityWithGoogle(query)
+  try {
+    return await geocodeCityWithNominatim(query)
+  } catch (nominatimError) {
+    if (isMockPlacesMode()) {
+      await delay(450)
+      const normalized = query.toLowerCase()
+      const known = Object.entries(MOCK_CITY_COORDS).find(([key]) => normalized.includes(key))
+      if (known) return known[1]
+
+      throw nominatimError instanceof GooglePlacesError
+        ? nominatimError
+        : new GooglePlacesError(`Impossible de localiser « ${query} ».`)
+    }
+
+    if (nominatimError instanceof GooglePlacesError) throw nominatimError
+    throw new GooglePlacesError(
+      nominatimError instanceof Error
+        ? nominatimError.message
+        : `Impossible de localiser « ${query} ».`,
+    )
+  }
 }
 
 function hashString(value: string): number {
