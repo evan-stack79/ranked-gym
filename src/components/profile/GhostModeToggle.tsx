@@ -17,8 +17,7 @@ export function GhostModeToggle({ enabled, onChange, disabled = false }: GhostMo
             <div>
               <p className="text-[15px] font-semibold text-white">Mode Furtif</p>
               <p className="mt-1 text-[13px] leading-snug text-[#8E8E93]">
-                Masque ta localisation dans le feed social — tes actions apparaissent « Dans
-                l&apos;arène ».
+                Masque ta localisation dans le feed social — aucune ville ni zone affichée.
               </p>
             </div>
             <button
