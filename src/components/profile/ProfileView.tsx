@@ -112,6 +112,15 @@ export function ProfileView() {
       <div className="ios-fade-up ios-fade-up-delay-1">
         <RankShowcase rank={rank} level={level} />
       </div>
+      <div className="ios-fade-up ios-fade-up-delay-1">
+        <GhostModeToggle
+          enabled={ghostModeEnabled}
+          onChange={(enabled) => {
+            void handleGhostModeChange(enabled)
+          }}
+          disabled={ghostSaving}
+        />
+      </div>
       <div className="ios-fade-up ios-fade-up-delay-2">
         <ProfileXPBar
           level={level}
@@ -121,15 +130,6 @@ export function ProfileView() {
       </div>
       <div className="ios-fade-up ios-fade-up-delay-3">
         <CloudBackupCard />
-      </div>
-      <div className="ios-fade-up" style={{ animationDelay: '0.15s' }}>
-        <GhostModeToggle
-          enabled={ghostModeEnabled}
-          onChange={(enabled) => {
-            void handleGhostModeChange(enabled)
-          }}
-          disabled={ghostSaving}
-        />
       </div>
       <div className="ios-fade-up" style={{ animationDelay: '0.18s' }}>
         <StatGrid />
@@ -153,6 +153,17 @@ export function ProfileView() {
             <p className="mt-2 text-[11px] uppercase tracking-wide text-[#636366]">
               {profile?.rank ?? rank.tier} · Niv. {level}
             </p>
+          </div>
+
+          <div>
+            <p className="mb-2 text-[13px] font-semibold text-white">Mode Furtif</p>
+            <GhostModeToggle
+              enabled={ghostModeEnabled}
+              onChange={(enabled) => {
+                void handleGhostModeChange(enabled)
+              }}
+              disabled={ghostSaving}
+            />
           </div>
 
           <div>

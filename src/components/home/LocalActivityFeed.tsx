@@ -1,17 +1,48 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Flame, HandMetal, Trophy } from 'lucide-react'
-import { buildLocalActivityFeed, type LocalActivityItem } from '../../data/localActivityFeed'
+import {
+  buildLocalActivityFeed,
+  type LocalActivityItem,
+  type LocalFeedViewer,
+} from '../../data/localActivityFeed'
 import { formatActivityAction } from '../../utils/activityFeedPrivacy'
+import { GhostModeToggle } from '../profile/GhostModeToggle'
 import { IconBadge } from '../ui/IconBadge'
 
 interface LocalActivityFeedProps {
   areaName: string | null
   loading?: boolean
+  viewer?: LocalFeedViewer | null
+  ghostModeEnabled?: boolean
+  onGhostModeChange?: (enabled: boolean) => void
+  ghostModeSaving?: boolean
 }
 
-export function LocalActivityFeed({ areaName, loading = false }: LocalActivityFeedProps) {
+export function LocalActivityFeed({
+  areaName,
+  loading = false,
+  viewer = null,
+  ghostModeEnabled = false,
+  onGhostModeChange,
+  ghostModeSaving = false,
+}: LocalActivityFeedProps) {
   const feedArea = areaName ?? 'ta zone'
-  const items = useMemo(() => buildLocalActivityFeed(feedArea), [feedArea])
+  const [feedTick, setFeedTick] = useState(0)
+
+  useEffect(() => {
+    const sync = () => setFeedTick((n) => n + 1)
+    window.addEventListener('ranked-gym:ghost-mode-changed', sync)
+    window.addEventListener('ranked-gym:profile-changed', sync)
+    return () => {
+      window.removeEventListener('ranked-gym:ghost-mode-changed', sync)
+      window.removeEventListener('ranked-gym:profile-changed', sync)
+    }
+  }, [])
+
+  const items = useMemo(
+    () => buildLocalActivityFeed(feedArea, viewer),
+    [feedArea, viewer, feedTick],
+  )
   const [cheered, setCheered] = useState<Record<string, boolean>>({})
 
   const title = loading
@@ -25,19 +56,29 @@ export function LocalActivityFeed({ areaName, loading = false }: LocalActivityFe
   }
 
   return (
-    <section>
-      <h2 className="ios-label mb-4 px-1">{title}</h2>
-      <ul className="space-y-2">
-        {items.map((item) => (
-          <ActivityRow
-            key={item.id}
-            item={item}
-            areaName={feedArea}
-            cheered={Boolean(cheered[item.id])}
-            onCheer={() => toggleCheer(item.id)}
-          />
-        ))}
-      </ul>
+    <section className="space-y-4">
+      {onGhostModeChange && (
+        <GhostModeToggle
+          enabled={ghostModeEnabled}
+          onChange={onGhostModeChange}
+          disabled={ghostModeSaving}
+        />
+      )}
+
+      <div>
+        <h2 className="ios-label mb-4 px-1">{title}</h2>
+        <ul className="space-y-2">
+          {items.map((item) => (
+            <ActivityRow
+              key={item.id}
+              item={item}
+              areaName={feedArea}
+              cheered={Boolean(cheered[item.id])}
+              onCheer={() => toggleCheer(item.id)}
+            />
+          ))}
+        </ul>
+      </div>
     </section>
   )
 }
@@ -57,15 +98,27 @@ function ActivityRow({
   const actionText = formatActivityAction(item, areaName)
 
   return (
-    <li className="glass-card flex items-center gap-3 rounded-2xl p-4">
-      <IconBadge icon={Trophy} variant={item.hot ? 'crimson' : 'orange'} size="sm" />
+    <li
+      className={`glass-card flex items-center gap-3 rounded-2xl p-4 ${
+        item.isSelf ? 'border border-[#BF5AF2]/30' : ''
+      }`}
+    >
+      <IconBadge icon={Trophy} variant={item.hot ? 'crimson' : item.isSelf ? 'violet' : 'orange'} size="sm" />
       <div className="min-w-0 flex-1">
         <p className="text-[15px] leading-snug text-white">
-          <span className="font-semibold">{item.user}</span>{' '}
+          <span className="font-semibold">{item.user}</span>
+          {item.isSelf && (
+            <span className="ml-1.5 text-[11px] font-bold uppercase tracking-wide text-[#BF5AF2]">
+              Toi
+            </span>
+          )}{' '}
           <span className="text-[#EBEBF5]">{actionText}</span>
         </p>
         <p className="mt-1 text-[13px] text-[#8E8E93]">
           <span className="font-semibold text-[#FF2B2B]">{item.xp}</span> · il y a {item.time}
+          {item.isSelf && item.isGhostModeEnabled && (
+            <span className="ml-1.5 text-[#BF5AF2]">· Mode furtif</span>
+          )}
         </p>
       </div>
       <button

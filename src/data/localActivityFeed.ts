@@ -12,11 +12,19 @@ export interface LocalActivityItem {
   time: string
   isPr: boolean
   hot: boolean
+  isSelf?: boolean
 }
 
-export function buildLocalActivityFeed(areaName: string): LocalActivityItem[] {
-  void areaName
-  return [
+export interface LocalFeedViewer {
+  username: string
+  isGhostModeEnabled: boolean
+}
+
+export function buildLocalActivityFeed(
+  _areaName: string,
+  viewer?: LocalFeedViewer | null,
+): LocalActivityItem[] {
+  const items: LocalActivityItem[] = [
     {
       id: '1',
       user: 'IronMike',
@@ -64,4 +72,22 @@ export function buildLocalActivityFeed(areaName: string): LocalActivityItem[] {
       hot: true,
     },
   ]
+
+  if (viewer?.username) {
+    items.unshift({
+      id: 'self',
+      user: viewer.username,
+      action: 'a check-in à sa salle',
+      hasLocation: true,
+      locationStyle: 'near',
+      isGhostModeEnabled: viewer.isGhostModeEnabled,
+      xp: '+90 XP',
+      time: '5 min',
+      isPr: false,
+      hot: false,
+      isSelf: true,
+    })
+  }
+
+  return items
 }

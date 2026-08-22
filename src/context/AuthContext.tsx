@@ -386,6 +386,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLocalGhostModeEnabled(row.is_ghost_mode_enabled ?? enabled)
       } catch (error) {
         console.warn('[auth] updateGhostMode remote failed, kept local:', error)
+      } finally {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('ranked-gym:ghost-mode-changed'))
+        }
       }
     },
     [user, patchProfile],
