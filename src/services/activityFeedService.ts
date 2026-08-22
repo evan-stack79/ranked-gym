@@ -13,6 +13,7 @@ export type SocialActivityRow = {
   distance_label: string | null
   created_at: string
   is_self: boolean
+  is_ghost_mode_enabled: boolean
 }
 
 function formatRelativeTime(iso: string): string {
@@ -24,7 +25,7 @@ function formatRelativeTime(iso: string): string {
   return `${Math.floor(hours / 24)} j`
 }
 
-function mapRow(row: SocialActivityRow, viewer?: { isGhostModeEnabled: boolean } | null): LocalActivityItem {
+function mapRow(row: SocialActivityRow): LocalActivityItem {
   const isPr = row.activity_type === 'pr' || row.activity_type === 'rank_up'
   return {
     id: row.id,
@@ -33,7 +34,7 @@ function mapRow(row: SocialActivityRow, viewer?: { isGhostModeEnabled: boolean }
     hasLocation: Boolean(row.distance_label),
     locationStyle: row.distance_label === 'Près de toi' ? 'near' : 'zone',
     distanceLabel: row.distance_label,
-    isGhostModeEnabled: row.is_self ? Boolean(viewer?.isGhostModeEnabled) : false,
+    isGhostModeEnabled: Boolean(row.is_ghost_mode_enabled),
     xp: `+${row.xp_earned} XP`,
     time: formatRelativeTime(row.created_at),
     isPr,
@@ -68,7 +69,7 @@ export async function fetchSocialActivityFeed(input: {
     if (rows.length === 0) {
       return buildLocalActivityFeed(input.areaName, input.viewer ?? null)
     }
-    return rows.map((row) => mapRow(row, input.viewer ?? null))
+    return rows.map(mapRow)
   } catch (error) {
     safeWarn('[activityFeed]', error)
     return buildLocalActivityFeed(input.areaName, input.viewer ?? null)

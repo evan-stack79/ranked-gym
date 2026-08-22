@@ -278,6 +278,7 @@ export interface Database {
           distance_label: string | null
           created_at: string
           is_self: boolean
+          is_ghost_mode_enabled: boolean
         }[]
       }
       record_activity: {

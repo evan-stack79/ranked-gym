@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Flame, HandMetal, Trophy } from 'lucide-react'
+import { EyeOff, Flame, Ghost, HandMetal, Trophy } from 'lucide-react'
 import type { LocalActivityItem, LocalFeedViewer } from '../../data/localActivityFeed'
 import { fetchSocialActivityFeed } from '../../services/activityFeedService'
 import { resolveHomeAreaCoords } from '../../utils/homeLocation'
 import { formatActivityAction } from '../../utils/activityFeedPrivacy'
+import {
+  getFeedDisplayName,
+  isAnonymousToViewer,
+  isSelfGhostPreview,
+} from '../../utils/feedAnonymity'
 import { IconBadge } from '../ui/IconBadge'
 
 interface LocalActivityFeedProps {
@@ -85,6 +90,22 @@ export function LocalActivityFeed({
   )
 }
 
+function FeedAvatar({ item }: { item: LocalActivityItem }) {
+  if (isAnonymousToViewer(item)) {
+    return <IconBadge icon={Ghost} variant="muted" size="sm" />
+  }
+  if (isSelfGhostPreview(item)) {
+    return <IconBadge icon={EyeOff} variant="violet" size="sm" />
+  }
+  return (
+    <IconBadge
+      icon={Trophy}
+      variant={item.hot ? 'crimson' : item.isSelf ? 'violet' : 'orange'}
+      size="sm"
+    />
+  )
+}
+
 function ActivityRow({
   item,
   areaName,
@@ -98,17 +119,29 @@ function ActivityRow({
 }) {
   const CheerIcon = item.isPr ? HandMetal : Flame
   const actionText = formatActivityAction(item, areaName)
+  const displayName = getFeedDisplayName(item)
+  const anonymous = isAnonymousToViewer(item)
+  const selfGhost = isSelfGhostPreview(item)
 
   return (
     <li
       className={`glass-card flex items-center gap-3 rounded-2xl p-4 ${
         item.isSelf ? 'border border-[#BF5AF2]/30' : ''
-      }`}
+      } ${anonymous ? 'opacity-95' : ''}`}
     >
-      <IconBadge icon={Trophy} variant={item.hot ? 'crimson' : item.isSelf ? 'violet' : 'orange'} size="sm" />
+      <FeedAvatar item={item} />
       <div className="min-w-0 flex-1">
         <p className="text-[15px] leading-snug text-white">
-          <span className="font-semibold">{item.user}</span>
+          <span className={`font-semibold ${anonymous ? 'text-[#AEAEB2]' : ''}`}>
+            {displayName}
+          </span>
+          {selfGhost && (
+            <EyeOff
+              className="ml-1.5 inline-block h-3.5 w-3.5 align-[-2px] text-[#BF5AF2]"
+              strokeWidth={2.25}
+              aria-hidden
+            />
+          )}
           {item.isSelf && (
             <span className="ml-1.5 text-[11px] font-bold uppercase tracking-wide text-[#BF5AF2]">
               Toi
@@ -118,8 +151,11 @@ function ActivityRow({
         </p>
         <p className="mt-1 text-[13px] text-[#8E8E93]">
           <span className="font-semibold text-[#FF2B2B]">{item.xp}</span> · il y a {item.time}
-          {item.isSelf && item.isGhostModeEnabled && (
-            <span className="ml-1.5 text-[#BF5AF2]">· Mode furtif</span>
+          {selfGhost && (
+            <span className="ml-1.5 text-[#BF5AF2]">· Masqué pour les autres</span>
+          )}
+          {anonymous && (
+            <span className="ml-1.5 text-[#8E8E93]">· Mode furtif</span>
           )}
         </p>
       </div>
