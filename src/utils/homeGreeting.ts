@@ -15,15 +15,26 @@ function looksLikeCleanName(value: string): boolean {
   return !/\d/.test(trimmed) && /^[\p{L}\s'-]+$/u.test(trimmed)
 }
 
-/** Retire les chiffres de fin et ne garde que les lettres (ex. Evanl141 → Evanl). */
+/**
+ * Nettoie un pseudo gaming : Evanl141 → Evan, Paul141 → Paul, Evan141 → Evan.
+ */
 function cleanUsernameToken(raw: string): string {
   const firstWord = raw.trim().split(/\s+/)[0] ?? ''
+  if (!firstWord) return ''
+
+  // Lettre parasite avant chiffres finaux (ex. Evanl141)
+  const bridged = firstWord.match(/^([\p{Lu}][\p{Ll}]{3,})[\p{Ll}]\d+$/u)
+  if (bridged?.[1]) return bridged[1]
+
+  // Chiffres directement après le nom (ex. Paul141, Evan141)
+  const direct = firstWord.match(/^([\p{Lu}][\p{Ll}]+)\d+$/u)
+  if (direct?.[1]) return direct[1]
+
   const withoutTrailingDigits = firstWord.replace(/\d+$/, '')
-  const lettersOnly = withoutTrailingDigits.replace(/[^\p{L}]/gu, '')
-  return lettersOnly
+  return withoutTrailingDigits.replace(/[^\p{L}]/gu, '')
 }
 
-/** Prénom affiché sur l'accueil (metadata > displayName propre > pseudo nettoyé). */
+/** Prénom affiché sur l'accueil (first_name metadata > displayName propre > pseudo nettoyé). */
 export function resolveDisplayFirstName(input: ResolveDisplayFirstNameInput): string {
   const metaFirst = input.firstName?.trim()
   if (metaFirst && looksLikeCleanName(metaFirst)) {

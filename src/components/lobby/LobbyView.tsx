@@ -132,6 +132,7 @@ export function LobbyView() {
     saveLastLocationLabel(
       ctx.source === 'manual' ? ctx.label : 'Position GPS',
       ctx.source,
+      ctx.coords,
     )
     clearCheckIn()
     setCheckedInGym(null)

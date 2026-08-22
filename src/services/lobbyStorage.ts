@@ -10,6 +10,8 @@ export interface StoredLocationLabel {
   label: string
   source: 'gps' | 'manual'
   updatedAt: number
+  lat?: number
+  lng?: number
 }
 
 export type StorageSaveOptions = {
@@ -112,12 +114,15 @@ export function clearCheckIn(opts?: StorageSaveOptions): void {
 export function saveLastLocationLabel(
   label: string,
   source: 'gps' | 'manual',
+  coords?: { lat: number; lng: number },
   opts?: StorageSaveOptions,
 ): void {
   const payload: StoredLocationLabel = {
     label: label.trim(),
     source,
     updatedAt: Date.now(),
+    lat: coords?.lat,
+    lng: coords?.lng,
   }
   writeJson(scopedKey(LAST_LOCATION_BASE), payload, opts)
 }

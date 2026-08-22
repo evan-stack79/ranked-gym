@@ -5,12 +5,20 @@ import { buildLocalActivityFeed } from '../../data/localActivityFeed'
 import { IconBadge } from '../ui/IconBadge'
 
 interface LocalActivityFeedProps {
-  areaName: string
+  areaName: string | null
+  loading?: boolean
 }
 
-export function LocalActivityFeed({ areaName }: LocalActivityFeedProps) {
-  const items = useMemo(() => buildLocalActivityFeed(areaName), [areaName])
+export function LocalActivityFeed({ areaName, loading = false }: LocalActivityFeedProps) {
+  const feedArea = areaName ?? 'ta zone'
+  const items = useMemo(() => buildLocalActivityFeed(feedArea), [feedArea])
   const [cheered, setCheered] = useState<Record<string, boolean>>({})
+
+  const title = loading
+    ? 'Activité récente…'
+    : areaName
+      ? `Activité récente autour de ${areaName}`
+      : 'Activité récente autour de vous'
 
   const toggleCheer = (id: string) => {
     setCheered((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -18,9 +26,7 @@ export function LocalActivityFeed({ areaName }: LocalActivityFeedProps) {
 
   return (
     <section>
-      <h2 className="ios-label mb-4 px-1">
-        Activité récente autour de {areaName}
-      </h2>
+      <h2 className="ios-label mb-4 px-1">{title}</h2>
       <ul className="space-y-2">
         {items.map((item) => (
           <ActivityRow

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { useHomeAreaName } from '../../hooks/useHomeAreaName'
 import { getTrainingState } from '../../services/trainingStorage'
 import { getHomeGreeting, resolveDisplayFirstName } from '../../utils/homeGreeting'
-import { resolveHomeAreaName } from '../../utils/homeLocation'
 import { getTodayWorkout } from '../../utils/todayWorkout'
 import { DailyStreak } from './DailyStreak'
 import { TodayWorkoutCard } from './TodayWorkoutCard'
@@ -16,22 +16,19 @@ interface HomeViewProps {
 export function HomeView({ onStartTraining }: HomeViewProps) {
   const { user, profile } = useAuth()
   const [trainingTick, setTrainingTick] = useState(0)
-  const [areaName, setAreaName] = useState(() => resolveHomeAreaName())
+  const { areaName, loading: areaLoading } = useHomeAreaName()
 
   useEffect(() => {
     const syncTraining = () => setTrainingTick((n) => n + 1)
-    const syncArea = () => setAreaName(resolveHomeAreaName())
 
     window.addEventListener('ranked-gym:backup-restored', syncTraining)
     window.addEventListener('ranked-gym:discipline-changed', syncTraining)
-    window.addEventListener('focus', () => {
-      syncTraining()
-      syncArea()
-    })
+    window.addEventListener('focus', syncTraining)
 
     return () => {
       window.removeEventListener('ranked-gym:backup-restored', syncTraining)
       window.removeEventListener('ranked-gym:discipline-changed', syncTraining)
+      window.removeEventListener('focus', syncTraining)
     }
   }, [])
 
@@ -50,7 +47,7 @@ export function HomeView({ onStartTraining }: HomeViewProps) {
   return (
     <div className="flex flex-col gap-8">
       <header>
-        <h1 className="line-clamp-2 text-2xl font-semibold leading-snug tracking-tight text-white">
+        <h1 className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white">
           {greeting}
         </h1>
       </header>
@@ -64,7 +61,7 @@ export function HomeView({ onStartTraining }: HomeViewProps) {
 
       <NutritionSnapshot />
 
-      <LocalActivityFeed areaName={areaName} />
+      <LocalActivityFeed areaName={areaName} loading={areaLoading} />
     </div>
   )
 }
