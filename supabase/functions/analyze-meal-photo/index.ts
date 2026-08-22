@@ -172,6 +172,19 @@ Deno.serve(async (req) => {
     }
 
     const macros = parseMacros(parsed)
+    if (macros.calories <= 0) {
+      console.error('[analyze-meal-photo] zero macros from model:', text.slice(0, 400))
+      await admin.rpc('release_ai_meal_scan', { p_user_id: user.id })
+      return jsonResponse(
+        {
+          error: 'Impossible d’estimer le repas — reprends la photo (repas visible, bon éclairage).',
+          code: 'EMPTY_MACROS',
+          scansRemaining: Math.max(0, dailyLimit - Math.max(0, scanCount - 1)),
+        },
+        422,
+      )
+    }
+
     const scansRemaining = Math.max(0, dailyLimit - scanCount)
 
     return jsonResponse({
