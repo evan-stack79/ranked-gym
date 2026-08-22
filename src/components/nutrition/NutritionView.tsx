@@ -56,7 +56,7 @@ export function NutritionView() {
   if (isBootLoading) return null
 
   return (
-    <div className="flex flex-col gap-8 pb-4">
+    <div className="flex flex-col gap-8 pb-2">
       <header className="relative ios-fade-up">
         <div
           className="pointer-events-none absolute -left-8 -top-6 h-28 w-40 rounded-full blur-3xl"

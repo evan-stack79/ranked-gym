@@ -85,12 +85,14 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   const [carbsG, setCarbsG] = useState<number | ''>('')
   const [fatG, setFatG] = useState<number | ''>('')
   const [mealType, setMealType] = useState<MealType>('lunch')
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' } | null>(
+    null,
+  )
   const scanZoneRef = useRef<HTMLDivElement>(null)
 
-  const showToast = useCallback((message: string) => {
-    setToast(message)
-    window.setTimeout(() => setToast(null), 3200)
+  const showToast = useCallback((message: string, variant: 'success' | 'error' = 'success') => {
+    setToast({ message, variant })
+    window.setTimeout(() => setToast(null), variant === 'error' ? 5200 : 3400)
   }, [])
 
   const scrollToScanZone = useCallback(() => {
@@ -231,7 +233,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   if (!hydrated) return null
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-4 pb-6">
       <div
         className="relative overflow-hidden rounded-3xl border border-white/10 p-5"
         style={{
@@ -240,17 +242,19 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
           boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.08), 0 12px 40px rgb(0 0 0 / 0.3)',
         }}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 items-center gap-2.5">
             <IconBadge icon={UtensilsCrossed} variant="orange" size="sm" />
-            <div>
-              <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8E8E93]">
                 Journal
               </p>
-              <h2 className="text-[20px] font-bold tracking-tight text-white">Repas du jour</h2>
+              <h2 className="whitespace-nowrap text-[20px] font-bold leading-tight tracking-tight text-white">
+                Repas du jour
+              </h2>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 self-start sm:self-auto">
             <button
               type="button"
               onClick={() => openScanner()}
@@ -326,7 +330,6 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
         id="nutrition-scan-zone"
       >
         <MealPhotoAnalyzer
-          mealType={mealType}
           onToast={showToast}
           onAnalyzed={(result) => {
             const journal = addMealToToday({
@@ -581,8 +584,15 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
       />
 
       {toast ? (
-        <div className="fixed bottom-24 left-1/2 z-[80] max-w-[90%] -translate-x-1/2 rounded-full border border-white/10 bg-[#2C2C2E] px-4 py-2 text-center text-[13px] font-medium text-white shadow-lg">
-          {toast}
+        <div
+          className={`fixed left-1/2 z-[80] max-w-[92%] -translate-x-1/2 rounded-2xl border px-4 py-3 text-center text-[13px] font-medium shadow-lg ${
+            toast.variant === 'error'
+              ? 'bottom-[calc(var(--app-bottom-nav)+env(safe-area-inset-bottom,0px)+1rem)] border-[#FF453A]/40 bg-[#2C1014]/95 text-[#FF6961]'
+              : 'bottom-[calc(var(--app-bottom-nav)+env(safe-area-inset-bottom,0px)+1rem)] border-[#30D158]/35 bg-[#102C18]/95 text-white'
+          }`}
+          role={toast.variant === 'error' ? 'alert' : 'status'}
+        >
+          {toast.message}
         </div>
       ) : null}
     </section>

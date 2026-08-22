@@ -60,8 +60,8 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
         className="relative z-10 mx-auto w-full max-w-lg flex-1 overflow-y-auto px-5 py-8"
         style={{
           paddingBottom: isBarVisible
-            ? `calc(var(--app-bottom-nav) + ${REST_BAR_CONTENT_PAD} + env(safe-area-inset-bottom, 0px) + 0.75rem)`
-            : 'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 0.75rem)',
+            ? `calc(var(--app-bottom-nav) + ${REST_BAR_CONTENT_PAD} + env(safe-area-inset-bottom, 0px) + 1.5rem)`
+            : 'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 1.5rem)',
         }}
       >
         {children}
