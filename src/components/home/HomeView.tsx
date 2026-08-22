@@ -35,7 +35,11 @@ export function HomeView({ onStartTraining }: HomeViewProps) {
     }
   }, [])
 
-  const firstName = resolveDisplayFirstName(profile?.pseudo, user?.displayName)
+  const firstName = resolveDisplayFirstName({
+    firstName: user?.firstName,
+    displayName: user?.displayName,
+    pseudo: profile?.pseudo,
+  })
   const greeting = getHomeGreeting(firstName)
 
   const todayWorkout = useMemo(
@@ -46,7 +50,7 @@ export function HomeView({ onStartTraining }: HomeViewProps) {
   return (
     <div className="flex flex-col gap-8">
       <header>
-        <h1 className="text-[34px] font-bold leading-tight tracking-tight text-white">
+        <h1 className="line-clamp-2 text-2xl font-semibold leading-snug tracking-tight text-white">
           {greeting}
         </h1>
       </header>

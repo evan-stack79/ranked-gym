@@ -8,6 +8,8 @@ export type AuthUser = {
   id: string
   email: string
   displayName: string
+  /** Prénom propre depuis user_metadata (first_name / display_name). */
+  firstName?: string
   provider: AuthMethod
 }
 
@@ -16,7 +18,12 @@ export function mapSessionUser(user: {
   email?: string | null
   user_metadata?: Record<string, unknown>
 }): AuthUser {
-  const metaPseudo = user.user_metadata?.pseudo
+  const meta = user.user_metadata ?? {}
+  const metaPseudo = meta.pseudo
+  const metaFirstName =
+    (typeof meta.first_name === 'string' && meta.first_name.trim()) ||
+    (typeof meta.display_name === 'string' && meta.display_name.trim()) ||
+    undefined
   const email = user.email ?? ''
   const displayName =
     (typeof metaPseudo === 'string' && metaPseudo.trim()) ||
@@ -27,6 +34,7 @@ export function mapSessionUser(user: {
     id: user.id,
     email,
     displayName,
+    firstName: metaFirstName,
     provider: 'email',
   }
 }
