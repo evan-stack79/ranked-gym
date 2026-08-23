@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Leaf } from 'lucide-react'
 import { getAdjustedNutritionTarget } from '../../services/nutritionActivity'
-import { getTodayJournal } from '../../services/nutritionStorage'
+import { getCalorieProfile, getTodayJournal, getTodayWaterMl } from '../../services/nutritionStorage'
+import { getDailyWaterGoalMl, isTrainingDayToday } from '../../utils/waterGoal'
+import { HydrationProgressBar } from '../nutrition/HydrationProgressBar'
 import { IconBadge } from '../ui/IconBadge'
 
 function MacroPill({
@@ -43,17 +45,25 @@ export function NutritionSnapshot() {
     const sync = () => setTick((n) => n + 1)
     window.addEventListener('ranked-gym:profile-changed', sync)
     window.addEventListener('ranked-gym:backup-restored', sync)
+    window.addEventListener('ranked-gym:water-changed', sync)
+    window.addEventListener('ranked-gym:training-changed', sync)
     window.addEventListener('focus', sync)
     return () => {
       window.removeEventListener('ranked-gym:profile-changed', sync)
       window.removeEventListener('ranked-gym:backup-restored', sync)
+      window.removeEventListener('ranked-gym:water-changed', sync)
+      window.removeEventListener('ranked-gym:training-changed', sync)
       window.removeEventListener('focus', sync)
     }
   }, [])
 
   const snapshot = useMemo(() => {
     const adjusted = getAdjustedNutritionTarget()
+    const profile = getCalorieProfile()
     const meals = getTodayJournal().meals
+    const waterMl = getTodayWaterMl()
+    const isTrainingDay = isTrainingDayToday()
+    const waterGoalMl = getDailyWaterGoalMl(profile.weightKg, isTrainingDay)
     const totals = meals.reduce(
       (acc, meal) => ({
         calories: acc.calories + meal.calories,
@@ -77,6 +87,9 @@ export function NutritionSnapshot() {
       carbsTarget: adjusted.plan.carbsG,
       fatTarget: adjusted.plan.fatG,
       totals,
+      waterMl,
+      waterGoalMl,
+      isTrainingDay,
     }
   }, [tick])
 
@@ -121,6 +134,14 @@ export function NutritionSnapshot() {
           style={{ width: `${snapshot.progress * 100}%` }}
         />
       </div>
+
+      <HydrationProgressBar
+        className="mb-3"
+        compact
+        consumedMl={snapshot.waterMl}
+        goalMl={snapshot.waterGoalMl}
+        isTrainingDay={snapshot.isTrainingDay}
+      />
 
       <div className="flex gap-3">
         <MacroPill
