@@ -3,6 +3,7 @@ import { Sunrise, CalendarCheck, Crown, Medal, Lock } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { IconBadge } from '../ui/IconBadge'
 import { useAuth } from '../../context/AuthContext'
+import { RADAR_REGULARITY_LABEL } from '../../constants/radarLabels'
 import {
   loadProfileStats,
   type ProfileAchievementId,
@@ -27,7 +28,7 @@ const BADGES: BadgeDef[] = [
   {
     id: 'consistency',
     icon: CalendarCheck,
-    name: 'Régularité',
+    name: RADAR_REGULARITY_LABEL,
     description: '7 jours d’affilée',
     variant: 'crimson',
   },

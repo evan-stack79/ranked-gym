@@ -2,6 +2,7 @@ import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 import { safeError } from '../utils/safeLog'
 import type { ArenaRadarAxis } from '../components/profile/charts/ArenaRadarChart'
 import type { PowerCurvePoint } from '../components/profile/charts/PowerCurveChart'
+import { RADAR_AXIS_LABELS } from '../constants/radarLabels'
 
 export type UserStatsRadar = {
   upper: number
@@ -32,7 +33,7 @@ function emptyStats(): UserStatsPayload {
       { label: 'Lower', value: 0 },
       { label: 'Force', value: 0 },
       { label: 'Volume', value: 0 },
-      { label: 'Régularité', value: 0 },
+      { label: RADAR_AXIS_LABELS.regularity, value: 0 },
     ],
     benchCurve: EMPTY_WEEK_LABELS.map((label) => ({ label, valueKg: 0 })),
     weeklySessions: { completed: 0, target: 4 },
@@ -52,7 +53,7 @@ function parseRpcPayload(raw: unknown): UserStatsPayload {
     { label: 'Lower', value: clampScore(radarRaw?.lower) },
     { label: 'Force', value: clampScore(radarRaw?.force) },
     { label: 'Volume', value: clampScore(radarRaw?.volume) },
-    { label: 'Régularité', value: clampScore(radarRaw?.regularite) },
+    { label: RADAR_AXIS_LABELS.regularity, value: clampScore(radarRaw?.regularite) },
   ]
 
   const benchCurve: PowerCurvePoint[] =

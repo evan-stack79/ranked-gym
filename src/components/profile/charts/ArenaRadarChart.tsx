@@ -1,13 +1,16 @@
 /** Radar / spider chart — axes combat (Upper, Lower, Force, Volume, Régularité). */
 
-export const RADAR_AXIS_LABELS = {
-  regularity: 'Régularité',
-} as const
+import {
+  RADAR_AXIS_LABELS,
+  normalizeRadarRegularityLabel,
+} from '../../../constants/radarLabels'
 
 export type ArenaRadarAxis = {
   label: string
   value: number
 }
+
+export { RADAR_AXIS_LABELS }
 
 interface ArenaRadarChartProps {
   axes?: ArenaRadarAxis[]
@@ -58,11 +61,10 @@ export function ArenaRadarChart({
     )
   }
 
-  const displayAxes = axes.map((axis) =>
-    axis.label.toLowerCase().includes('gularit')
-      ? { ...axis, label: RADAR_AXIS_LABELS.regularity }
-      : axis,
-  )
+  const displayAxes = axes.map((axis) => ({
+    ...axis,
+    label: normalizeRadarRegularityLabel(axis.label),
+  }))
   const count = displayAxes.length
   const gridPolygons = LEVELS.map((level) => polygonPath(Array(count).fill(100), count, level))
   const dataPath = polygonPath(

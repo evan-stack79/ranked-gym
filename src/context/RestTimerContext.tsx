@@ -10,6 +10,11 @@ import {
 } from 'react'
 import { playRestCompleteChime } from '../utils/restTimerSound'
 import { vibrate } from '../utils/haptics'
+import {
+  endRestLiveActivity,
+  startRestLiveActivity,
+  updateRestLiveActivity,
+} from '../services/restTimerLiveActivity'
 
 export const REST_PRESETS_SEC = [45, 90, 180] as const
 export type RestPresetSec = (typeof REST_PRESETS_SEC)[number]
@@ -105,6 +110,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     remainingRef.current = 0
     setState((s) => ({ ...s, remainingSec: 0, active: false, finished: true }))
     logRest(false)
+    void endRestLiveActivity(true)
     vibrate([40, 60, 40, 60, 80])
     playRestCompleteChime()
   }, [clearTick, logRest])
@@ -124,6 +130,11 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
         target,
         finished: false,
       })
+      void startRestLiveActivity({
+        remainingSec: total,
+        totalSec: total,
+        subtitle: `${target.exerciseName} · ${target.setLabel}`,
+      })
       vibrate(10)
 
       tickRef.current = window.setInterval(() => {
@@ -134,6 +145,10 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
           return
         }
         setState((s) => ({ ...s, remainingSec: next, active: true, finished: false }))
+        void updateRestLiveActivity({
+          remainingSec: next,
+          subtitle: `${target.exerciseName} · ${target.setLabel}`,
+        })
         if (next === 10 || next === 5 || next === 3 || next === 1) vibrate(10)
       }, 1000)
     },
@@ -144,6 +159,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     if (!targetRef.current) {
       clearTick()
       setState(IDLE)
+      void endRestLiveActivity(true)
       return
     }
     clearTick()
@@ -151,6 +167,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     finishedRef.current = false
     targetRef.current = null
     setState(IDLE)
+    void endRestLiveActivity(true)
     vibrate(16)
   }, [clearTick, logRest])
 
@@ -159,6 +176,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     finishedRef.current = false
     targetRef.current = null
     setState(IDLE)
+    void endRestLiveActivity(true)
   }, [clearTick])
 
   useEffect(() => () => clearTick(), [clearTick])
