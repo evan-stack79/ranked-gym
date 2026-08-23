@@ -31,6 +31,7 @@ function renderActiveView(
   onStartTraining: (routineId: string) => void,
   launchRoutineId: string | null,
   onLaunchConsumed: () => void,
+  onGoToLobby: () => void,
 ) {
   switch (tab) {
     case 'home':
@@ -42,6 +43,7 @@ function renderActiveView(
         <TrainingView
           launchRoutineId={launchRoutineId}
           onLaunchConsumed={onLaunchConsumed}
+          onGoToLobby={onGoToLobby}
         />
       )
     case 'nutrition':
@@ -152,7 +154,13 @@ function AppShell() {
     <>
       <SupabaseConfigBanner />
       <AppLayout activeTab={activeTab} onTabChange={handleTabChange}>
-        {renderActiveView(activeTab, handleStartTraining, launchRoutineId, handleLaunchConsumed)}
+        {renderActiveView(
+          activeTab,
+          handleStartTraining,
+          launchRoutineId,
+          handleLaunchConsumed,
+          () => setActiveTab('lobby'),
+        )}
       </AppLayout>
       <AuthBottomSheet />
     </>

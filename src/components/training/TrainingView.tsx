@@ -49,13 +49,19 @@ import {
   subscribeRestLogged,
   useRestTimerContext,
 } from '../../context/RestTimerContext'
+import { VictoryCamera } from './VictoryCamera'
+import type { VictorySessionStats } from '../../types/victory'
+import { countSessionPersonalRecords } from '../../utils/sessionPrs'
+import { computeStrengthSessionStats } from '../../utils/strength'
 
 export function TrainingView({
   launchRoutineId = null,
   onLaunchConsumed,
+  onGoToLobby,
 }: {
   launchRoutineId?: string | null
   onLaunchConsumed?: () => void
+  onGoToLobby?: () => void
 }) {
   const { isLoading: isBootLoading, isAuthenticated, requireAuth } = useAuth()
   const [state, setState] = useState<TrainingState>(() => getTrainingState())
@@ -76,6 +82,7 @@ export function TrainingView({
   const { start: startRestTimer, setReadyBarEnabled, isBarVisible } = useRestTimerContext()
 
   const [disciplineTick, setDisciplineTick] = useState(0)
+  const [pumpCheckSession, setPumpCheckSession] = useState<VictorySessionStats | null>(null)
 
   useEffect(() => {
     if (isBootLoading) return
@@ -180,9 +187,26 @@ export function TrainingView({
     [],
   )
 
+  const openPumpCheck = useCallback((note: Parameters<typeof saveWorkoutNote>[0]) => {
+    const priorNotes = getTrainingState().workoutNotes
+    const prCount = countSessionPersonalRecords(note.exercises, priorNotes, note.id)
+    const bodyWeightKg = getCalorieProfile().weightKg
+    const liftStats = computeStrengthSessionStats(note.exercises, bodyWeightKg)
+    setPumpCheckSession({
+      title: note.title?.trim() || 'Séance',
+      volumeKg: note.totalVolumeKg ?? liftStats.volume,
+      durationMin: note.durationMin ?? liftStats.durationMin,
+      prCount,
+    })
+  }, [])
+
   const persistAndSyncNote = useCallback(
     async (note: Parameters<typeof saveWorkoutNote>[0]) => {
+      const isNewSession = !note.id
+      const pumpCheckStats = isNewSession ? { note } : null
+
       if (!isAuthenticated) {
+        if (pumpCheckStats) openPumpCheck(pumpCheckStats.note)
         const local = saveWorkoutNote(note)
         setState(local)
         showToast(`${note.title} sauvé en local — connecte-toi pour Supabase`)
@@ -191,20 +215,23 @@ export function TrainingView({
       }
 
       try {
+        if (pumpCheckStats) openPumpCheck(pumpCheckStats.note)
         const result = await saveAndSyncWorkoutSession(note)
         setState(result.state)
         if (result.ok) {
-          showToast(note.id ? 'Séance mise à jour ✓' : 'Séance enregistrée ✓')
+          if (!isNewSession) showToast('Séance mise à jour ✓')
         } else {
+          if (isNewSession) setPumpCheckSession(null)
           safeError('[Train] session sync failed', result.error)
           showToast(result.error ?? 'Erreur de synchro')
         }
       } catch (error) {
+        if (isNewSession) setPumpCheckSession(null)
         safeError('[Train] session save exception', error)
         showToast('Erreur de synchro')
       }
     },
-    [isAuthenticated, requireAuth, showToast],
+    [isAuthenticated, openPumpCheck, requireAuth, showToast],
   )
 
   useEffect(() => {
@@ -468,6 +495,16 @@ export function TrainingView({
           {toast}
         </div>
       )}
+
+      {pumpCheckSession ? (
+        <VictoryCamera
+          stats={pumpCheckSession}
+          onComplete={() => {
+            setPumpCheckSession(null)
+            onGoToLobby?.()
+          }}
+        />
+      ) : null}
     </div>
   )
 }

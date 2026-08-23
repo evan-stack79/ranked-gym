@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Ranked Gym",
+    "slug": "ranked-gym",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Ranked Gym utilise la caméra pour ton Pump Check post-séance."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Ranked Gym enregistre ta carte Pump Check dans ta galerie.",
+          "savePhotosPermission": "Ranked Gym enregistre ta carte Pump Check dans ta galerie."
+        }
+      ]
+    ],
+    "ios": {
+      "infoPlist": {
+        "NSCameraUsageDescription": "Ranked Gym utilise la caméra pour ton Pump Check post-séance.",
+        "NSPhotoLibraryAddUsageDescription": "Ranked Gym enregistre ta carte Pump Check dans ta galerie.",
+        "NSPhotoLibraryUsageDescription": "Ranked Gym enregistre ta carte Pump Check dans ta galerie."
+      }
+    },
+    "android": {
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
+    }
+  },
+  "_comment": "Ranked Gym est une PWA Vite + Capacitor. Pump Check utilise getUserMedia (web) ; ce fichier documente les permissions natives équivalentes à expo-camera / expo-media-library."
+}
