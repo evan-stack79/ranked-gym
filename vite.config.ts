@@ -22,7 +22,7 @@ export default defineConfig({
       includeAssets: ['favicon.svg'],
       manifest: {
         name: 'Ranked Gym',
-        short_name: 'RankedGym',
+        short_name: 'Ranked Gym',
         description: 'Réseau social de musculation gamifié',
         theme_color: '#0C0C0E',
         background_color: '#0C0C0E',
