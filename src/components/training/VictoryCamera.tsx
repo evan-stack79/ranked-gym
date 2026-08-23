@@ -196,8 +196,10 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
         className="relative z-10 px-5 text-left"
         style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top))' }}
       >
-        <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#C7C7CC]">
-          Ranked Gym // Upper
+        <p className="text-[10px] font-semibold uppercase tracking-[0.28em]">
+          <span className="text-[#FF2B2B]">Ranked</span>{' '}
+          <span className="text-white">Gym</span>
+          <span className="text-[#C7C7CC]"> // UPPER</span>
         </p>
         <p className="mt-2 max-w-[85%] text-[22px] font-black uppercase leading-[1.05] tracking-tight text-white">
           Séance
@@ -277,15 +279,27 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
             />
 
             <div
-              className="pointer-events-none absolute inset-x-0 top-0 px-5 text-left"
+              className="absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 px-5 text-left"
               style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top))' }}
             >
-              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#C7C7CC]">
-                Ranked Gym // Upper
-              </p>
-              <p className="mt-2 text-[20px] font-black uppercase tracking-tight text-white">
-                Pump Check
-              </p>
+              <div className="pointer-events-none min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.28em]">
+                  <span className="text-[#FF2B2B]">Ranked</span>{' '}
+                  <span className="text-white">Gym</span>
+                  <span className="text-[#C7C7CC]"> // UPPER</span>
+                </p>
+                <p className="mt-2 text-[20px] font-black uppercase tracking-tight text-white">
+                  Pump Check
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onComplete}
+                className="ios-press -mr-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/20 bg-black/45 text-white/90 backdrop-blur-md"
+                aria-label="Passer et retour Lobby"
+              >
+                <X className="h-[18px] w-[18px]" strokeWidth={2.5} aria-hidden />
+              </button>
             </div>
           </div>
 
@@ -305,9 +319,9 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
             <button
               type="button"
               onClick={onComplete}
-              className="ios-press text-[12px] font-semibold uppercase tracking-[0.18em] text-[#8E8E93]"
+              className="ios-press rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-[13px] font-semibold uppercase tracking-[0.16em] text-[#AEAEB2]"
             >
-              Skip
+              Passer
             </button>
           </div>
         </>

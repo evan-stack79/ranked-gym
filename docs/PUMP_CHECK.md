@@ -21,7 +21,11 @@ Les permissions sont documentées dans `app.json` (référence native) et `index
 2. `VictoryCamera` plein écran (caméra frontale)
 3. Capture → aperçu avec filtre Arène + stats (volume, durée, PR)
 4. **Partager / Sauvegarder** → JPEG composite
-5. **Retour au Lobby** → onglet Lobby
+5. **Passer** / ✕ (optionnel) ou **Retour au Lobby** → onglet Lobby
+
+La séance est sauvegardée (local + Supabase) **avant** l’écran photo — le Pump Check n’est jamais bloquant.
+
+Partage iOS : JPEG `image/jpeg` via Web Share (files-only) pour l’aperçu natif ; fallback Capacitor Filesystem cache + Share si disponible.
 
 ## Fichiers
 

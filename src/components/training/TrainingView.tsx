@@ -205,30 +205,31 @@ export function TrainingView({
   const persistAndSyncNote = useCallback(
     async (note: Parameters<typeof saveWorkoutNote>[0]) => {
       const isNewSession = !note.id
-      const pumpCheckStats = isNewSession ? { note } : null
 
+      // Pump Check optionnel : la séance est toujours persistée
+      // (local + Supabase) AVANT / indépendamment de la photo.
       if (!isAuthenticated) {
-        if (pumpCheckStats) openPumpCheck(pumpCheckStats.note)
         const local = saveWorkoutNote(note)
         setState(local)
         showToast(`${note.title} sauvé en local — connecte-toi pour Supabase`)
+        if (isNewSession) openPumpCheck(note)
         requireAuth(() => undefined)
         return
       }
 
       try {
-        if (pumpCheckStats) openPumpCheck(pumpCheckStats.note)
         const result = await saveAndSyncWorkoutSession(note)
         setState(result.state)
         if (result.ok) {
           if (!isNewSession) showToast('Séance mise à jour ✓')
+          if (isNewSession) openPumpCheck(note)
         } else {
-          if (isNewSession) setPumpCheckSession(null)
           safeError('[Train] session sync failed', result.error)
           showToast(result.error ?? 'Erreur de synchro')
+          // Local déjà sauvé dans saveAndSyncWorkoutSession — Pump Check quand même OK
+          if (isNewSession) openPumpCheck(note)
         }
       } catch (error) {
-        if (isNewSession) setPumpCheckSession(null)
         safeError('[Train] session save exception', error)
         showToast('Erreur de synchro')
       }

@@ -49,9 +49,15 @@ function drawStats(ctx: CanvasRenderingContext2D, stats: VictorySessionStats) {
   const left = 64
   ctx.textAlign = 'left'
 
-  ctx.fillStyle = '#C7C7CC'
   ctx.font = '600 28px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
-  ctx.fillText('RANKED GYM // UPPER', left, 140)
+  ctx.fillStyle = '#FF2B2B'
+  ctx.fillText('RANKED', left, 140)
+  const rankedW = ctx.measureText('RANKED').width
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillText(' GYM', left + rankedW, 140)
+  const gymW = ctx.measureText(' GYM').width
+  ctx.fillStyle = '#C7C7CC'
+  ctx.fillText(' // UPPER', left + rankedW + gymW, 140)
 
   ctx.fillStyle = '#FFFFFF'
   ctx.font = '900 92px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
@@ -140,8 +146,11 @@ export async function exportVictoryCard(
 }
 
 function toVictoryFile(blob: Blob): File {
-  return new File([blob], `ranked-gym-pump-check-${Date.now()}.jpg`, {
+  const jpeg =
+    blob.type === 'image/jpeg' ? blob : new Blob([blob], { type: 'image/jpeg' })
+  return new File([jpeg], `ranked-gym-pump-check-${Date.now()}.jpg`, {
     type: 'image/jpeg',
+    lastModified: Date.now(),
   })
 }
 
@@ -159,20 +168,83 @@ export async function saveVictoryCardToGallery(blob: Blob): Promise<void> {
   downloadBlob(blob, file.name)
 }
 
+/**
+ * Partage iOS-friendly : File JPEG typé (image/jpeg) + partage fichiers seuls.
+ * Sur iOS Safari, title/text avec files masque souvent l’aperçu image
+ * (icône fichier générique). On force donc files-only + MIME/UTI JPEG.
+ */
 export async function shareVictoryCard(
   blob: Blob,
-  title: string,
+  _title: string,
 ): Promise<'shared' | 'saved'> {
-  const file = toVictoryFile(blob)
+  // Force MIME image/jpeg même si le blob source est ambigu
+  const jpegBlob =
+    blob.type === 'image/jpeg'
+      ? blob
+      : new Blob([blob], { type: 'image/jpeg' })
 
-  if (typeof navigator !== 'undefined' && navigator.share) {
+  const fileName = `ranked-gym-pump-check-${Date.now()}.jpg`
+  const file = new File([jpegBlob], fileName, {
+    type: 'image/jpeg',
+    lastModified: Date.now(),
+  })
+
+  // Capacitor Share natif (UTI public.jpeg) si dispo dans le WebView iOS
+  try {
+    const cap = (
+      window as Window & {
+        Capacitor?: {
+          isNativePlatform?: () => boolean
+          Plugins?: {
+            Share?: {
+              share: (opts: {
+                title?: string
+                text?: string
+                url?: string
+                dialogTitle?: string
+              }) => Promise<void>
+            }
+            Filesystem?: {
+              writeFile: (opts: {
+                path: string
+                data: string
+                directory: string
+                recursive?: boolean
+              }) => Promise<{ uri: string }>
+              Directory?: { Cache: string }
+            }
+          }
+        }
+      }
+    ).Capacitor
+
+    if (cap?.isNativePlatform?.() && cap.Plugins?.Filesystem && cap.Plugins?.Share) {
+      const base64 = await blobToBase64(jpegBlob)
+      const cacheDir = cap.Plugins.Filesystem.Directory?.Cache ?? 'CACHE'
+      const written = await cap.Plugins.Filesystem.writeFile({
+        path: fileName,
+        data: base64,
+        directory: cacheDir,
+        recursive: true,
+      })
+      await cap.Plugins.Share.share({
+        title: 'Partager ton Pump Check',
+        url: written.uri,
+        dialogTitle: 'Partager ton Pump Check',
+      })
+      return 'shared'
+    }
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    // fallback Web Share ci-dessous
+  }
+
+  if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
     try {
-      if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title,
-          text: 'Pump Check — Ranked Gym',
-        })
+      const payload: ShareData = { files: [file] }
+      if (!navigator.canShare || navigator.canShare(payload)) {
+        // Intentionnellement sans title/text : aperçu JPEG iOS
+        await navigator.share(payload)
         return 'shared'
       }
     } catch (error) {
@@ -182,8 +254,21 @@ export async function shareVictoryCard(
     }
   }
 
-  downloadBlob(blob, file.name)
+  downloadBlob(jpegBlob, fileName)
   return 'saved'
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result ?? '')
+      const comma = result.indexOf(',')
+      resolve(comma >= 0 ? result.slice(comma + 1) : result)
+    }
+    reader.onerror = () => reject(reader.error ?? new Error('base64 failed'))
+    reader.readAsDataURL(blob)
+  })
 }
 
 /** @deprecated */
