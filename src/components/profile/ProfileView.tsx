@@ -45,9 +45,14 @@ function ProfileViewContent() {
     }
   }, [profile?.discipline])
 
+  useEffect(() => {
+    if (route === 'fullProfile' && (!isAuthenticated || !user)) {
+      goBack()
+    }
+  }, [route, isAuthenticated, user, goBack])
+
   if (route === 'fullProfile') {
     if (!isAuthenticated || !user) {
-      goBack()
       return null
     }
     return <FullProfileScreen onBack={goBack} />
