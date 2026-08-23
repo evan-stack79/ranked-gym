@@ -179,7 +179,12 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     void endRestLiveActivity(true)
   }, [clearTick])
 
-  useEffect(() => () => clearTick(), [clearTick])
+  useEffect(() => {
+    return () => {
+      clearTick()
+      void endRestLiveActivity(true)
+    }
+  }, [clearTick])
 
   const isSessionVisible = state.active || state.finished
   const idle = !state.active && !state.finished
