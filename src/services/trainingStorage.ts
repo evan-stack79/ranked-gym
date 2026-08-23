@@ -184,6 +184,9 @@ function read(): TrainingState {
 function write(state: TrainingState, opts?: StorageSaveOptions): void {
   localStorage.setItem(storageKey(), JSON.stringify(state))
   if (!opts?.skipCloud) triggerCloudBackup()
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('ranked-gym:training-changed'))
+  }
 }
 
 export function getTrainingState(): TrainingState {

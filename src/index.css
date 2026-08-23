@@ -611,6 +611,28 @@ body {
   }
 }
 
+.hydration-progress-fill {
+  background: linear-gradient(
+    90deg,
+    #0891b2 0%,
+    #06b6d4 28%,
+    #22d3ee 55%,
+    #38bdf8 78%,
+    #7dd3fc 100%
+  );
+  box-shadow:
+    0 0 10px rgb(34 211 238 / 0.55),
+    0 0 22px rgb(6 182 212 / 0.28),
+    inset 0 1px 0 rgb(224 242 254 / 0.45);
+}
+
+.hydration-progress-fill--over {
+  background: linear-gradient(90deg, #06b6d4 0%, #22d3ee 40%, #a5f3fc 100%);
+  box-shadow:
+    0 0 14px rgb(103 232 249 / 0.65),
+    0 0 28px rgb(34 211 238 / 0.35);
+}
+
 .water-bottle-range {
   writing-mode: vertical-lr;
   direction: rtl;

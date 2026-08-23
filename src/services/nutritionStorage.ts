@@ -8,6 +8,7 @@ import type {
   WaterPresetsCount,
 } from '../types/nutrition'
 import { todayKey } from '../utils/calories'
+import { getDailyWaterGoalMl, isTrainingDayToday } from '../utils/waterGoal'
 import { getActiveCloudUserId } from './cloudSession'
 import { safeWarn } from '../utils/safeLog'
 
@@ -406,11 +407,19 @@ function persistWaterJournal(
     waterPresetsCount: countsFromEntries(cleaned),
   }
   saveTodayJournal(next, opts)
+  emitWaterChanged()
   return next
 }
 
-export function suggestedWaterGoalMl(_weightKg?: number): number {
-  return WATER_BOTTLE_CAPACITY_ML
+function emitWaterChanged(): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('ranked-gym:water-changed'))
+  }
+}
+
+export function suggestedWaterGoalMl(weightKg?: number): number {
+  const weight = weightKg ?? getCalorieProfile().weightKg ?? 70
+  return getDailyWaterGoalMl(weight, isTrainingDayToday())
 }
 
 export function getTodayWaterMl(): number {

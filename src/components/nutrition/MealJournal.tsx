@@ -17,10 +17,14 @@ import { remainingMealBudget } from '../../utils/portionGuide'
 import type { PortionMode } from '../../utils/morphology'
 import {
   addMealToToday,
+  getCalorieProfile,
   getTodayJournal,
+  getTodayWaterMl,
   removeMealFromToday,
   updateMealInToday,
 } from '../../services/nutritionStorage'
+import { getDailyWaterGoalMl, isTrainingDayToday } from '../../utils/waterGoal'
+import { HydrationProgressBar } from './HydrationProgressBar'
 import { saveAliment, type OpenFoodFactsProduct } from '../../services/alimentsService'
 import { useAuth } from '../../context/AuthContext'
 import { IconBadge } from '../ui/IconBadge'
@@ -74,6 +78,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   const { user, requireAuth } = useAuth()
   const [meals, setMeals] = useState<MealEntry[]>([])
   const [hydrated, setHydrated] = useState(false)
+  const [waterTick, setWaterTick] = useState(0)
   const [showForm, setShowForm] = useState(false)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [scannedProduct, setScannedProduct] = useState<OpenFoodFactsProduct | null>(null)
@@ -106,8 +111,17 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
 
   useEffect(() => {
     const onRestored = () => setMeals(getTodayJournal().meals)
+    const onWater = () => setWaterTick((n) => n + 1)
     window.addEventListener('ranked-gym:backup-restored', onRestored)
-    return () => window.removeEventListener('ranked-gym:backup-restored', onRestored)
+    window.addEventListener('ranked-gym:water-changed', onWater)
+    window.addEventListener('ranked-gym:profile-changed', onWater)
+    window.addEventListener('ranked-gym:training-changed', onWater)
+    return () => {
+      window.removeEventListener('ranked-gym:backup-restored', onRestored)
+      window.removeEventListener('ranked-gym:water-changed', onWater)
+      window.removeEventListener('ranked-gym:profile-changed', onWater)
+      window.removeEventListener('ranked-gym:training-changed', onWater)
+    }
   }, [])
 
   const pendingRemaining = useMemo(() => {
@@ -200,6 +214,17 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
 
   const progress = targetCalories > 0 ? totals.calories / targetCalories : 0
   const remaining = Math.max(0, targetCalories - totals.calories)
+
+  const hydration = useMemo(() => {
+    void waterTick
+    const profile = getCalorieProfile()
+    const isTrainingDay = isTrainingDayToday()
+    return {
+      consumedMl: getTodayWaterMl(),
+      goalMl: getDailyWaterGoalMl(profile.weightKg, isTrainingDay),
+      isTrainingDay,
+    }
+  }, [waterTick])
 
   const handleAdd = (event: FormEvent) => {
     event.preventDefault()
@@ -322,6 +347,13 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
             </p>
           </div>
         </div>
+
+        <HydrationProgressBar
+          className="mt-4 border-t border-white/8 pt-4"
+          consumedMl={hydration.consumedMl}
+          goalMl={hydration.goalMl}
+          isTrainingDay={hydration.isTrainingDay}
+        />
       </div>
 
       <div

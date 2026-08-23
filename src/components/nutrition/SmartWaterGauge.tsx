@@ -14,6 +14,12 @@ import {
   setWaterTotalFromGauge,
   WATER_BOTTLE_CAPACITY_ML,
 } from '../../services/nutritionStorage'
+import {
+  formatWaterMl,
+  getDailyWaterGoalMl,
+  isTrainingDayToday,
+} from '../../utils/waterGoal'
+import { HydrationProgressBar } from './HydrationProgressBar'
 
 /** Capacité physique d’une bouteille (ml) — UI jauge. */
 export { WATER_BOTTLE_CAPACITY_ML }
@@ -128,7 +134,7 @@ function bottleLevelFromTotalDelta(
  * Journal d’hydratation : jauge + raccourcis (badges ×N) + liste « Aujourd’hui »
  * avec suppression explicite. Sync JSON via nutrition.journal (Supabase).
  */
-export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
+export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
   const bottleRef = useRef<HTMLDivElement>(null)
   const pointerIdRef = useRef<number | null>(null)
   const hapticBucketRef = useRef(0)
@@ -168,8 +174,19 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
 
   useEffect(() => {
     window.addEventListener('ranked-gym:backup-restored', syncFromStorage)
-    return () => window.removeEventListener('ranked-gym:backup-restored', syncFromStorage)
+    window.addEventListener('ranked-gym:water-changed', syncFromStorage)
+    window.addEventListener('ranked-gym:profile-changed', syncFromStorage)
+    window.addEventListener('ranked-gym:training-changed', syncFromStorage)
+    return () => {
+      window.removeEventListener('ranked-gym:backup-restored', syncFromStorage)
+      window.removeEventListener('ranked-gym:water-changed', syncFromStorage)
+      window.removeEventListener('ranked-gym:profile-changed', syncFromStorage)
+      window.removeEventListener('ranked-gym:training-changed', syncFromStorage)
+    }
   }, [syncFromStorage])
+
+  const isTrainingDay = isTrainingDayToday()
+  const dailyGoalMl = getDailyWaterGoalMl(weightKg ?? 70, isTrainingDay)
 
   const displayTotal =
     isCalibrating || !(awaitingConfirm || dragging)
@@ -181,7 +198,6 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
 
   const remainingMl = WATER_BOTTLE_CAPACITY_ML - displayBottleLevel
   const remainingPct = (remainingMl / WATER_BOTTLE_CAPACITY_ML) * 100
-  const progressPct = Math.min(100, (displayTotal / WATER_BOTTLE_CAPACITY_ML) * 100)
   const showConfirmBar = awaitingConfirm
   const fullBottlesToday = Math.floor(displayTotal / WATER_BOTTLE_CAPACITY_ML)
 
@@ -398,7 +414,7 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
             <span className="text-[22px] font-semibold tracking-tight text-white">
               {displayTotal}
             </span>
-            <span className="text-[#8E8E93]"> ml bus</span>
+            <span className="text-[#8E8E93]"> / {formatWaterMl(dailyGoalMl)}</span>
             {fullBottlesToday > 0 ? (
               <span className="mt-0.5 block text-[11px] font-medium text-[#8E8E93]">
                 ≈ {fullBottlesToday}× 1,5 L
@@ -579,19 +595,11 @@ export function SmartWaterGauge(_props: SmartWaterGaugeProps) {
           />
         </div>
 
-        <div className="h-1.5 w-full max-w-[180px] overflow-hidden rounded-full bg-white/8">
-          <div
-            className={`h-full rounded-full ${
-              isCalibrating
-                ? 'bg-gradient-to-r from-[#FCD34D] to-[#F59E0B]'
-                : 'bg-gradient-to-r from-[#7DD3FC] to-[#38BDF8]'
-            }`}
-            style={{
-              width: `${progressPct}%`,
-              transition: dragging
-                ? 'width 70ms linear'
-                : 'width 420ms cubic-bezier(0.32, 0.72, 0, 1)',
-            }}
+        <div className="w-full max-w-[340px]">
+          <HydrationProgressBar
+            consumedMl={displayTotal}
+            goalMl={dailyGoalMl}
+            isTrainingDay={isTrainingDay}
           />
         </div>
 
