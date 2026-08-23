@@ -16,6 +16,10 @@ import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
 import { ArenaRadarChart } from './charts/ArenaRadarChart'
 import { PowerCurveChart } from './charts/PowerCurveChart'
 import { WeeklyAssiduityGauge } from './charts/WeeklyAssiduityGauge'
+import { RankShowcase } from './RankShowcase'
+import { ProfileXPBar } from './ProfileXPBar'
+import { StatGrid } from './StatGrid'
+import { BadgeShowcase } from './BadgeShowcase'
 import { useAuth } from '../../context/AuthContext'
 import { uploadUserAvatar } from '../../services/avatarService'
 import {
@@ -24,6 +28,8 @@ import {
   saveCalorieProfile,
 } from '../../services/nutritionStorage'
 import { getRankFromLevel } from '../../utils/rank'
+
+const XP_PER_LEVEL = 1000
 
 interface FullProfileScreenProps {
   onBack: () => void
@@ -80,6 +86,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
 
   const username = profile?.pseudo || user?.displayName || 'Athlète'
   const level = profile?.level ?? 1
+  const currentXp = profile?.xp ?? 0
   const rank = getRankFromLevel(level)
   const displayAvatarUrl = avatarPreview || profile?.avatar_url || null
 
@@ -157,7 +164,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
   }
 
   return (
-    <div className="flex flex-col gap-6 pb-8 ios-fade-up">
+    <div className="flex flex-col gap-6 ios-fade-up">
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -168,7 +175,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
           <ChevronLeft className="h-5 w-5" strokeWidth={2.25} />
         </button>
         <div className="min-w-0 flex-1">
-          <h1 className="text-[20px] font-bold tracking-tight text-white">Fiche combattant</h1>
+          <h1 className="text-[20px] font-bold tracking-tight text-white">Mon profil</h1>
           <p className="text-[13px] text-[#8E8E93]">Stats d&apos;arène & données corporelles</p>
         </div>
         <Shield className="h-5 w-5 shrink-0 text-[#636366]" strokeWidth={2} aria-hidden />
@@ -269,9 +276,9 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
         <WeeklyAssiduityGauge completed={3} target={4} />
       </section>
 
-      {/* Informations personnelles */}
+      {/* Corps & métabolisme */}
       <section className="space-y-3">
-        <SectionTitle icon={UserRound} title="Informations personnelles" subtitle="Corps & objectifs" />
+        <SectionTitle icon={UserRound} title="Corps & métabolisme" />
 
         <div className="grid grid-cols-2 gap-3">
           <label className="glass-card block rounded-2xl p-4">
@@ -355,7 +362,27 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
             />
           </label>
         </div>
+      </section>
 
+      {/* Carte de rang & stats — sans bouton Sauvegarder ici */}
+      <div className="flex flex-col gap-8">
+        <RankShowcase rank={rank} level={level} />
+        <ProfileXPBar
+          level={level}
+          currentXp={currentXp % XP_PER_LEVEL}
+          xpToNextLevel={XP_PER_LEVEL}
+        />
+        <StatGrid />
+        <BadgeShowcase />
+      </div>
+
+      {/* Sauvegarder — tout en bas du scroll */}
+      <footer
+        className="mt-2 space-y-3"
+        style={{
+          paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 0px))',
+        }}
+      >
         {saveError ? (
           <p className="px-1 text-[13px] text-[#FF453A]">{saveError}</p>
         ) : null}
@@ -371,7 +398,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
         >
           {saving ? 'Enregistrement…' : 'Sauvegarder'}
         </button>
-      </section>
+      </footer>
     </div>
   )
 }
