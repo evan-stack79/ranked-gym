@@ -6,6 +6,12 @@
 
 const FIRED_KEY = 'ranked-gym:reminder-fired'
 
+/** Titre sans nom d'app — iOS/macOS affiche déjà le short_name du manifest. */
+export const REMINDER_TITLE = "L'arène t'attend 🥊"
+export const REMINDER_TITLE_DUE = 'Prêt pour le combat ?'
+export const REMINDER_TEST_BODY =
+  'Rappel activé. Prépare-toi à tout donner pour ta prochaine séance.'
+
 type ScheduleItem = {
   id: string
   title: string
@@ -13,6 +19,14 @@ type ScheduleItem = {
   time: string
   enabled: boolean
   remindBeforeMin?: number
+}
+
+/** Payload minimal — title + body uniquement (pas de subtitle). */
+type ReminderNotificationPayload = {
+  body: string
+  icon: string
+  badge: string
+  tag: string
 }
 
 function readFired(): Record<string, number> {
@@ -25,6 +39,22 @@ function readFired(): Record<string, number> {
 
 function writeFired(map: Record<string, number>) {
   localStorage.setItem(FIRED_KEY, JSON.stringify(map))
+}
+
+function buildNotificationPayload(body: string, tagKey: string): ReminderNotificationPayload {
+  return {
+    body,
+    icon: '/pwa-192x192.png',
+    badge: '/pwa-192x192.png',
+    tag: `ranked-gym-${tagKey}`.slice(0, 64),
+  }
+}
+
+function buildSessionReminderBody(item: ScheduleItem, minutesLeft: number): string {
+  if (minutesLeft === 0) {
+    return `${item.title} · c'est l'heure (${item.time}). Entre dans l'arène.`
+  }
+  return `${item.title} dans ${minutesLeft} min · ${item.time}. Prépare-toi à tout donner.`
 }
 
 export async function requestReminderPermission(): Promise<boolean> {
@@ -44,15 +74,12 @@ export async function sendReminderNotification(title: string, body: string): Pro
   if (typeof Notification === 'undefined') return false
   if (Notification.permission !== 'granted') return false
 
+  const payload = buildNotificationPayload(body, `${title}-${body}`)
+
   try {
     const reg = await navigator.serviceWorker?.getRegistration()
     if (reg?.showNotification) {
-      await reg.showNotification(title, {
-        body,
-        icon: '/pwa-192x192.png',
-        badge: '/pwa-192x192.png',
-        tag: `ranked-gym-${title}-${body}`.slice(0, 64),
-      })
+      await reg.showNotification(title, payload)
       return true
     }
   } catch {
@@ -60,7 +87,7 @@ export async function sendReminderNotification(title: string, body: string): Pro
   }
 
   try {
-    new Notification(title, { body, icon: '/pwa-192x192.png' })
+    new Notification(title, { body: payload.body, icon: payload.icon, tag: payload.tag })
     return true
   } catch {
     return false
@@ -70,10 +97,7 @@ export async function sendReminderNotification(title: string, body: string): Pro
 export async function sendTestNotification(): Promise<boolean> {
   const ok = await requestReminderPermission()
   if (!ok) return false
-  return sendReminderNotification(
-    'Ranked Gym',
-    'Rappels activés ✓ Tu seras prévenu avant ta séance.',
-  )
+  return sendReminderNotification(REMINDER_TITLE, REMINDER_TEST_BODY)
 }
 
 /**
@@ -107,12 +131,10 @@ export async function checkUpcomingReminders(
     writeFired(fired)
 
     const minutesLeft = Math.max(0, delta)
-    const body =
-      minutesLeft === 0
-        ? `${item.title} · c’est l’heure (${item.time})`
-        : `${item.title} dans ${minutesLeft} min · ${item.time}`
+    const notifTitle = minutesLeft === 0 ? REMINDER_TITLE_DUE : REMINDER_TITLE
+    const body = buildSessionReminderBody(item, minutesLeft)
 
-    await sendReminderNotification('Séance Ranked Gym', body)
+    await sendReminderNotification(notifTitle, body)
     due = { id: item.id, title: item.title, time: item.time, minutesLeft }
   }
 
