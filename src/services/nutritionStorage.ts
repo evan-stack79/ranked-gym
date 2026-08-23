@@ -216,12 +216,68 @@ export function updateMealInToday(
 }
 
 /** Default bottle capacity used by SmartWaterGauge (ml). */
-export function suggestedWaterGoalMl(_weightKg?: number): number {
-  return 1500
-}
+export const WATER_BOTTLE_CAPACITY_ML = 1500
 
 /** Plafond journalier (plusieurs bouteilles / presets). */
 export const MAX_DAILY_WATER_ML = 15000
+
+const BOTTLE_STEP_ML = 10
+
+function clampBottleLevelMl(ml: number): number {
+  const stepped = Math.round(ml / BOTTLE_STEP_ML) * BOTTLE_STEP_ML
+  return Math.min(WATER_BOTTLE_CAPACITY_ML, Math.max(0, stepped))
+}
+
+function bottleVisualFromTotal(totalMl: number): number {
+  const t = Math.max(0, totalMl)
+  if (t === 0) return 0
+  const mod = t % WATER_BOTTLE_CAPACITY_ML
+  return mod === 0 ? WATER_BOTTLE_CAPACITY_ML : mod
+}
+
+/** Delta consommé entre deux niveaux visuels (gère le passage bouteille pleine → vide). */
+export function bottleLevelDelta(fromMl: number, toMl: number): number {
+  let delta = toMl - fromMl
+  if (delta < 0 && fromMl - toMl > WATER_BOTTLE_CAPACITY_ML / 2) {
+    delta = toMl + WATER_BOTTLE_CAPACITY_ML - fromMl
+  }
+  return delta
+}
+
+function bumpBottleLevelMl(currentMl: number, deltaMl: number): number {
+  if (deltaMl === 0) return clampBottleLevelMl(currentMl)
+  let next = currentMl + deltaMl
+  while (next > WATER_BOTTLE_CAPACITY_ML) next -= WATER_BOTTLE_CAPACITY_ML
+  if (next < 0) next = 0
+  return clampBottleLevelMl(next)
+}
+
+function readBottleLevelFromJournal(journal: DayJournal): number {
+  const stored = journal.waterBottleLevelMl
+  if (typeof stored === 'number' && Number.isFinite(stored)) {
+    return clampBottleLevelMl(stored)
+  }
+  return bottleVisualFromTotal(Math.max(0, Math.round(journal.waterMl ?? 0)))
+}
+
+/** Niveau visuel courant de la bouteille (ml déjà bus sur celle-ci). */
+export function getTodayWaterBottleLevel(): number {
+  return readBottleLevelFromJournal(getTodayJournal())
+}
+
+/** Enregistre le point de départ visuel (calibration ou fin de drag). */
+export function setTodayWaterBottleLevel(
+  levelMl: number,
+  opts?: StorageSaveOptions,
+): DayJournal {
+  const journal = getTodayJournal()
+  const next: DayJournal = {
+    ...journal,
+    waterBottleLevelMl: clampBottleLevelMl(levelMl),
+  }
+  saveTodayJournal(next, opts)
+  return next
+}
 
 const PRESET_LABELS: Record<string, string> = {
   glass: 'Verre',
@@ -353,6 +409,10 @@ function persistWaterJournal(
   return next
 }
 
+export function suggestedWaterGoalMl(_weightKg?: number): number {
+  return WATER_BOTTLE_CAPACITY_ML
+}
+
 export function getTodayWaterMl(): number {
   const journal = getTodayJournal()
   const entries = resolveTodayWaterEntries(journal)
@@ -408,8 +468,14 @@ export function addWaterEntry(
     type: input.type,
     label: input.label ?? PRESET_LABELS[input.type] ?? 'Eau',
   }
+  const prevLevel = readBottleLevelFromJournal(getTodayJournal())
   const journal = persistWaterJournal([entry, ...entries], opts)
-  return { journal, entry, waterMl: journal.waterMl ?? 0 }
+  const nextLevel = bumpBottleLevelMl(prevLevel, entry.amountMl)
+  const nextJournal = { ...journal, waterBottleLevelMl: nextLevel }
+  if (nextLevel !== prevLevel) {
+    saveTodayJournal(nextJournal, { ...opts, skipCloud: true })
+  }
+  return { journal: nextJournal, entry, waterMl: journal.waterMl ?? 0 }
 }
 
 /** Supprime une ligne du journal → recalcule le total + sync cloud. */
@@ -421,7 +487,14 @@ export function removeWaterEntry(
   const removed = entries.find((e) => e.id === entryId) ?? null
   const nextEntries = entries.filter((e) => e.id !== entryId)
   const journal = persistWaterJournal(nextEntries, opts)
-  return { journal, waterMl: journal.waterMl ?? 0, removed }
+  let nextJournal = journal
+  if (removed) {
+    const prevLevel = readBottleLevelFromJournal(journal)
+    const nextLevel = bumpBottleLevelMl(prevLevel, -removed.amountMl)
+    nextJournal = { ...journal, waterBottleLevelMl: nextLevel }
+    saveTodayJournal(nextJournal, { ...opts, skipCloud: true })
+  }
+  return { journal: nextJournal, waterMl: nextJournal.waterMl ?? 0, removed }
 }
 
 /**
@@ -436,6 +509,7 @@ export function setWaterTotalFromGauge(
   const target = Math.max(0, Math.min(MAX_DAILY_WATER_ML, Math.round(targetMl)))
   let entries = resolveTodayWaterEntries()
   let sum = sumEntries(entries)
+  const deltaBefore = target - sum
 
   if (target > sum) {
     const delta = target - sum
@@ -468,7 +542,15 @@ export function setWaterTotalFromGauge(
     entries = next
   }
 
-  return persistWaterJournal(entries, opts)
+  const journal = persistWaterJournal(entries, opts)
+  if (deltaBefore !== 0) {
+    const prevLevel = readBottleLevelFromJournal(journal)
+    const nextLevel = bumpBottleLevelMl(prevLevel, deltaBefore)
+    const nextJournal = { ...journal, waterBottleLevelMl: nextLevel }
+    saveTodayJournal(nextJournal, opts)
+    return nextJournal
+  }
+  return journal
 }
 
 /** @deprecated Prefer addWaterEntry / setWaterTotalFromGauge */

@@ -88,4 +88,9 @@ export interface DayJournal {
    * @deprecated Dérivé de waterEntries — conservé pour migration / badges.
    */
   waterPresetsCount?: WaterPresetsCount
+  /**
+   * Niveau visuel de la bouteille courante (ml déjà bus sur cette bouteille, 0–1500).
+   * Permet de calibrer une bouteille déjà entamée sans créditer l’eau au total.
+   */
+  waterBottleLevelMl?: number
 }
