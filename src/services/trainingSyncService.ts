@@ -3,7 +3,11 @@ import { saveWorkoutNote, getTrainingState } from './trainingStorage'
 import type { TrainingState, WorkoutNote } from '../types/training'
 import { safeError } from '../utils/safeLog'
 
-export type WorkoutSaveInput = Omit<WorkoutNote, 'id' | 'createdAt' | 'dateKey'> & { id?: string }
+export type WorkoutSaveInput = Omit<WorkoutNote, 'id' | 'createdAt' | 'dateKey'> & {
+  id?: string
+  createdAt?: number
+  dateKey?: string
+}
 
 export type WorkoutSaveResult = {
   ok: boolean
@@ -13,7 +17,8 @@ export type WorkoutSaveResult = {
 
 /**
  * Sauvegarde locale + upsert Supabase (`workouts.state` JSONB).
- * Attend la fin du push cloud (RLS owner-only sur `workouts`).
+ * Si `note.id` est fourni, remplace la séance existante (UPDATE logique)
+ * au lieu d'en créer une nouvelle ; volume et kcal sont recalculés dans saveWorkoutNote.
  */
 export async function saveAndSyncWorkoutSession(
   note: WorkoutSaveInput,

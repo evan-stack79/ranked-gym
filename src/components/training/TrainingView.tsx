@@ -194,7 +194,7 @@ export function TrainingView({
         const result = await saveAndSyncWorkoutSession(note)
         setState(result.state)
         if (result.ok) {
-          showToast('Séance enregistrée ✓')
+          showToast(note.id ? 'Séance mise à jour ✓' : 'Séance enregistrée ✓')
         } else {
           safeError('[Train] session sync failed', result.error)
           showToast(result.error ?? 'Erreur de synchro')
@@ -262,7 +262,14 @@ export function TrainingView({
   }
 
   return (
-    <div className="flex flex-col gap-8" style={{ paddingBottom: '0.5rem' }}>
+    <div
+      className="flex flex-col gap-8"
+      style={{
+        paddingBottom: showStrengthTools
+          ? 'max(120px, calc(var(--rest-content-clearance, 7rem) + 3.5rem))'
+          : '0.5rem',
+      }}
+    >
       <header className="relative ios-fade-up">
         <div
           className="pointer-events-none absolute -right-6 -top-4 h-28 w-40 rounded-full blur-3xl"

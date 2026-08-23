@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BookOpen, Info, Plus, Trash2, TrendingUp } from 'lucide-react'
+import { BookOpen, Info, Pencil, Plus, Trash2, TrendingUp, X } from 'lucide-react'
 import type {
   ExerciseEntry,
   ScheduledSession,
@@ -27,12 +27,15 @@ interface WorkoutNotebookProps {
   history: WorkoutNote[]
   initialRoutineId?: string | null
   onSave: (note: {
+    id?: string
     title: string
     exercises: ExerciseEntry[]
     estimatedKcal: number
     durationMin: number
     totalVolumeKg: number
     routineId: string
+    createdAt?: number
+    dateKey?: string
   }) => void | Promise<void>
   /** Autosave séries / exercices vers Supabase (routine draft). */
   onDraftSave?: (routineId: string, exercises: ExerciseEntry[]) => void
@@ -104,6 +107,7 @@ export function WorkoutNotebook({
   const [customOpen, setCustomOpen] = useState(false)
   const [customLabel, setCustomLabel] = useState('')
   const [saving, setSaving] = useState(false)
+  const [editingNote, setEditingNote] = useState<WorkoutNote | null>(null)
 
   const visibleRoutines = useMemo(() => {
     const split = detectProgramSplit(schedule, routines)
@@ -121,6 +125,34 @@ export function WorkoutNotebook({
     setRoutineId(id)
     setTitle(routine.label)
     setExercises(cloneFromRoutine(routine))
+    setEditingNote(null)
+  }
+
+  const loadNoteForEdit = (note: WorkoutNote) => {
+    setEditingNote(note)
+    setTitle(note.title)
+    if (note.routineId && routines.some((r) => r.id === note.routineId)) {
+      setRoutineId(note.routineId)
+    }
+    setExercises(
+      note.exercises.map((e) => ({
+        ...e,
+        id: e.id || `ex-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name: sanitizeExerciseName(e.name),
+        sets: e.sets.map((s) => ({ ...s })),
+      })),
+    )
+    window.requestAnimationFrame(() => {
+      document.getElementById(id ?? 'workout-notebook')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
+
+  const cancelEdit = () => {
+    setEditingNote(null)
+    if (activeRoutine) {
+      setTitle(activeRoutine.label)
+      setExercises(cloneFromRoutine(activeRoutine))
+    }
   }
 
   // Keep selection valid when program filter changes
@@ -238,6 +270,9 @@ export function WorkoutNotebook({
     setSaving(true)
     try {
       await onSave({
+        id: editingNote?.id,
+        createdAt: editingNote?.createdAt,
+        dateKey: editingNote?.dateKey,
         title: title.trim() || activeRoutine?.label || 'Séance',
         exercises: cleaned,
         estimatedKcal: stats.kcal,
@@ -245,14 +280,18 @@ export function WorkoutNotebook({
         totalVolumeKg: stats.volume,
         routineId,
       })
-      // Keep the same focus open with what was just saved (progress stays visible)
-      setExercises(
-        cleaned.map((e) => ({
-          ...e,
-          id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          sets: e.sets.map((s) => ({ ...s })),
-        })),
-      )
+      if (editingNote) {
+        setEditingNote(null)
+      } else {
+        // Keep the same focus open with what was just saved (progress stays visible)
+        setExercises(
+          cleaned.map((e) => ({
+            ...e,
+            id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            sets: e.sets.map((s) => ({ ...s })),
+          })),
+        )
+      }
     } finally {
       setSaving(false)
     }
@@ -332,10 +371,32 @@ export function WorkoutNotebook({
       <div
         className="rounded-3xl border border-white/10 px-5 py-4"
         style={{
-          background: `radial-gradient(ellipse 80% 60% at 100% 0%, ${activeRoutine?.accent ?? '#FF2B2B'}28 0%, transparent 55%), rgb(22 22 24 / 0.96)`,
+          background: editingNote
+            ? `radial-gradient(ellipse 80% 60% at 100% 0%, #FF2B2B33 0%, transparent 55%), rgb(22 22 24 / 0.96)`
+            : `radial-gradient(ellipse 80% 60% at 100% 0%, ${activeRoutine?.accent ?? '#FF2B2B'}28 0%, transparent 55%), rgb(22 22 24 / 0.96)`,
           boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.06)',
         }}
       >
+        {editingNote ? (
+          <div className="mb-3 flex items-center justify-between gap-2 rounded-2xl border border-[#FF2B2B]/35 bg-[#FF2B2B]/12 px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <Pencil className="h-4 w-4 shrink-0 text-[#FF6961]" strokeWidth={2.25} />
+              <div>
+                <p className="text-[13px] font-bold text-white">Mode Édition</p>
+                <p className="text-[11px] text-[#AEAEB2]">Séance du {editingNote.dateKey}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className="ios-press flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-[#8E8E93]"
+              aria-label="Annuler l’édition"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ) : null}
+
         <div className="mb-1 flex items-center gap-2">
           <BookOpen className="h-4 w-4" style={{ color: activeRoutine?.accent }} />
           <input
@@ -547,7 +608,7 @@ export function WorkoutNotebook({
             disabled={saving}
             className="btn-brand ios-press flex flex-[1.4] flex-col items-center justify-center rounded-2xl py-2.5 text-[13px] font-semibold leading-tight text-white disabled:opacity-60"
           >
-            <span>{saving ? 'Synchro…' : 'Terminer la séance'}</span>
+            <span>{saving ? 'Synchro…' : editingNote ? 'Sauvegarder' : 'Terminer la séance'}</span>
             {!saving && (
               <span className="mt-0.5 text-[11px] font-normal text-white/65">~{stats.kcal} kcal</span>
             )}
@@ -559,7 +620,11 @@ export function WorkoutNotebook({
         </p>
       </div>
 
-      <WorkoutHistory notes={history} onDelete={onDeleteNote} />
+      <WorkoutHistory
+        notes={history}
+        onDelete={onDeleteNote}
+        onEdit={loadNoteForEdit}
+      />
     </section>
   )
 }

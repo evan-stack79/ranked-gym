@@ -68,8 +68,21 @@ export function PowerCurveChart({
 
   const values = points.map((p) => p.valueKg)
   const hasData = values.some((v) => v > 0)
-  const minY = hasData ? Math.floor(Math.min(...values.filter((v) => v > 0)) - 5) : 0
-  const maxY = hasData ? Math.ceil(Math.max(...values) + 3) : 100
+
+  if (!hasData) {
+    return (
+      <div
+        className={`flex min-h-[148px] flex-col items-center justify-center rounded-xl border border-dashed border-white/10 px-4 py-8 text-center ${className}`}
+      >
+        <p className="max-w-[260px] text-[13px] leading-relaxed text-[#636366]">
+          Aucune donnée. Valide une séance avec cet exercice pour tracer ta courbe.
+        </p>
+      </div>
+    )
+  }
+
+  const minY = Math.floor(Math.min(...values.filter((v) => v > 0)) - 5)
+  const maxY = Math.ceil(Math.max(...values) + 3)
   const range = maxY - minY || 1
   const gridSteps = 3
 
@@ -159,7 +172,7 @@ export function PowerCurveChart({
       <div className="mt-1 flex items-center justify-between px-1">
         <p className="text-[12px] text-[#8E8E93]">{exerciseLabel} · 1RM estimé</p>
         <p className="text-[13px] font-bold tabular-nums text-[#FF6961]">
-          {hasData ? `${points[points.length - 1]?.valueKg} kg` : '—'}
+          {points[points.length - 1]?.valueKg} kg
         </p>
       </div>
     </div>

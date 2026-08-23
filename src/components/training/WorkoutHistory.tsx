@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronRight, Clock, Dumbbell, Flame, Trash2 } from 'lucide-react'
+import { ChevronRight, Clock, Dumbbell, Flame, Pencil, Trash2 } from 'lucide-react'
 import type { WorkoutNote } from '../../types/training'
 import {
   DIFF_LABELS,
@@ -13,9 +13,10 @@ import { IosSheet } from '../ui/IosSheet'
 interface WorkoutHistoryProps {
   notes: WorkoutNote[]
   onDelete: (id: string) => void
+  onEdit?: (note: WorkoutNote) => void
 }
 
-export function WorkoutHistory({ notes, onDelete }: WorkoutHistoryProps) {
+export function WorkoutHistory({ notes, onDelete, onEdit }: WorkoutHistoryProps) {
   const [selected, setSelected] = useState<WorkoutNote | null>(null)
   const groups = useMemo(() => groupNotesByDate(notes), [notes])
 
@@ -71,6 +72,19 @@ export function WorkoutHistory({ notes, onDelete }: WorkoutHistoryProps) {
                         <span className="shrink-0 text-[11px] text-[#636366]">
                           {formatClock(note.createdAt)}
                         </span>
+                        {onEdit ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onEdit(note)
+                            }}
+                            className="ios-press ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-[#AEAEB2]"
+                            aria-label={`Modifier ${note.title}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" strokeWidth={2.25} />
+                          </button>
+                        ) : null}
                       </div>
                       <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-[#8E8E93]">
                         <span className="inline-flex items-center gap-1">
@@ -138,6 +152,21 @@ export function WorkoutHistory({ notes, onDelete }: WorkoutHistoryProps) {
                 </ul>
               </div>
             ))}
+
+            {onEdit ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const note = selected
+                  setSelected(null)
+                  onEdit(note)
+                }}
+                className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-[#FF2B2B]/35 bg-[#FF2B2B]/12 py-3.5 text-[14px] font-semibold text-[#FF6961]"
+              >
+                <Pencil className="h-4 w-4" />
+                Modifier cette séance
+              </button>
+            ) : null}
 
             <button
               type="button"

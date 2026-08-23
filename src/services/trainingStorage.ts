@@ -305,9 +305,14 @@ export function logCompletedSession(input: {
 }
 
 export function saveWorkoutNote(
-  note: Omit<WorkoutNote, 'id' | 'createdAt' | 'dateKey'> & { id?: string },
+  note: Omit<WorkoutNote, 'id' | 'createdAt' | 'dateKey'> & {
+    id?: string
+    createdAt?: number
+    dateKey?: string
+  },
 ): TrainingState {
   const state = read()
+  const existing = note.id ? state.workoutNotes.find((n) => n.id === note.id) : undefined
   const bodyWeightKg = getCalorieProfile().weightKg
   const isLift = note.exercises.some((e) => e.sets.some((s) => s.weightKg > 0))
   const stats = computeStrengthSessionStats(note.exercises, bodyWeightKg)
@@ -340,9 +345,9 @@ export function saveWorkoutNote(
     estimatedKcal,
     durationMin,
     totalVolumeKg,
-    routineId: note.routineId,
-    dateKey: todayKey(),
-    createdAt: Date.now(),
+    routineId: note.routineId ?? existing?.routineId,
+    dateKey: note.dateKey ?? existing?.dateKey ?? todayKey(),
+    createdAt: note.createdAt ?? existing?.createdAt ?? Date.now(),
   }
   const workoutNotes = [entry, ...state.workoutNotes.filter((n) => n.id !== entry.id)].slice(
     0,
