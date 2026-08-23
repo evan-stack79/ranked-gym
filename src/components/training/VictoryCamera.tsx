@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, Download, Loader2, Share2 } from 'lucide-react'
+import { Download, Loader2, Share2, Trash2, X } from 'lucide-react'
 import type { VictorySessionStats } from '../../types/victory'
 import {
   exportVictoryCard,
@@ -16,14 +16,27 @@ interface VictoryCameraProps {
 }
 
 type Phase = 'camera' | 'preview'
+type FacingMode = 'user' | 'environment'
 
 function formatVolume(kg: number): string {
-  return `${kg.toLocaleString('fr-FR')} kg`
+  return Math.round(kg).toLocaleString('fr-FR')
+}
+
+function formatDuration(min: number): string {
+  if (min < 60) return `${min} MIN`
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return m > 0 ? `${h}H ${m}M` : `${h}H`
+}
+
+function prLabel(count: number): string {
+  return count === 1 ? '1 PR BATTU' : `${count} PR BATTUS`
 }
 
 /**
- * Pump Check plein écran — portail hors du stacking context AppLayout
- * pour passer au-dessus Tab Bar / timer repos.
+ * Pump Check — UI streetwear / brutaliste.
+ * Zone « ViewShot » = photo + overlay stats uniquement.
+ * Barre d'actions (pilule) hors capture.
  */
 export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -33,8 +46,11 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
   const [phase, setPhase] = useState<Phase>('camera')
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [cameraError, setCameraError] = useState<string | null>(null)
+  const [facingMode] = useState<FacingMode>('user')
   const [busy, setBusy] = useState<'save' | 'share' | null>(null)
   const [actionHint, setActionHint] = useState<string | null>(null)
+
+  const isFrontCamera = facingMode === 'user'
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop())
@@ -54,7 +70,7 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: { ideal: 'user' },
+          facingMode: { ideal: facingMode },
           width: { ideal: 1920 },
           height: { ideal: 1080 },
         },
@@ -66,11 +82,10 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
         await videoRef.current.play()
       }
     } catch {
-      setCameraError('Autorise l’accès à la caméra pour le Pump Check.')
+      setCameraError('Autorise l\'accès à la caméra pour le Pump Check.')
     }
-  }, [stopCamera])
+  }, [facingMode, stopCamera])
 
-  // Masque Tab Bar + tue le timer zombie pendant tout le Pump Check
   useEffect(() => {
     setChromeHidden(true)
     const previousOverflow = document.body.style.overflow
@@ -104,13 +119,18 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
+    // Miroir selfie : capture = prévisualisation scaleX(-1)
+    if (isFrontCamera) {
+      ctx.translate(canvas.width, 0)
+      ctx.scale(-1, 1)
+    }
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
     canvas.toBlob(
       (blob) => {
         if (!blob) return
         if (photoUrl) URL.revokeObjectURL(photoUrl)
-        const url = URL.createObjectURL(blob)
-        setPhotoUrl(url)
+        setPhotoUrl(URL.createObjectURL(blob))
         setPhase('preview')
         stopCamera()
         vibrate(14)
@@ -134,10 +154,10 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
     try {
       const blob = await exportVictoryCard(photoUrl, stats)
       await saveVictoryCardToGallery(blob)
-      setActionHint('Carte sauvegardée dans tes téléchargements ✓')
+      setActionHint('Carte sauvegardée ✓')
       vibrate(12)
     } catch {
-      setActionHint('Impossible de sauvegarder — réessaie.')
+      setActionHint('Sauvegarde impossible')
     } finally {
       setBusy(null)
     }
@@ -150,19 +170,70 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
     try {
       const blob = await exportVictoryCard(photoUrl, stats)
       const result = await shareVictoryCard(blob, stats.title)
-      setActionHint(
-        result === 'shared'
-          ? 'Carte partagée ✓'
-          : 'Partage indisponible — carte téléchargée ✓',
-      )
+      setActionHint(result === 'shared' ? 'Partagée ✓' : 'Téléchargée ✓')
       vibrate(12)
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
-      setActionHint('Impossible de partager — réessaie.')
+      setActionHint('Partage impossible')
     } finally {
       setBusy(null)
     }
   }
+
+  /** Zone exportable = photo + overlay stats (ViewShot sans boutons). */
+  const shotOverlay = (
+    <div className="pointer-events-none absolute inset-0 flex flex-col" data-victory-shot>
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            'linear-gradient(180deg, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.08) 28%, rgba(0,0,0,0) 42%, rgba(0,0,0,0.05) 58%, rgba(0,0,0,0.78) 100%)',
+        }}
+        aria-hidden
+      />
+
+      <div
+        className="relative z-10 px-5 text-left"
+        style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top))' }}
+      >
+        <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#C7C7CC]">
+          Ranked Gym // Upper
+        </p>
+        <p className="mt-2 max-w-[85%] text-[22px] font-black uppercase leading-[1.05] tracking-tight text-white">
+          Séance
+          <br />
+          validée
+        </p>
+        <p className="mt-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-white/55">
+          {stats.title}
+        </p>
+      </div>
+
+      <div className="relative z-10 mt-auto px-5 pb-4 text-left">
+        <div className="flex items-end gap-6">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/50">Volume</p>
+            <p className="mt-0.5 text-[48px] font-black leading-none tracking-tighter text-white tabular-nums">
+              {formatVolume(stats.volumeKg)}
+              <span className="ml-1 text-[18px] font-bold tracking-normal text-white/60">KG</span>
+            </p>
+          </div>
+          <div className="pb-1">
+            <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/50">Temps</p>
+            <p className="mt-0.5 text-[32px] font-black leading-none tracking-tight text-white tabular-nums">
+              {formatDuration(stats.durationMin)}
+            </p>
+          </div>
+        </div>
+
+        {stats.prCount > 0 ? (
+          <p className="mt-3 inline-block border border-white/25 bg-black/35 px-2.5 py-1 text-[12px] font-black uppercase tracking-[0.16em] text-[#FF453A]">
+            {prLabel(stats.prCount)}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  )
 
   const ui = (
     <div
@@ -175,12 +246,12 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
         <>
           <div className="relative min-h-0 flex-1 overflow-hidden bg-black">
             {cameraError ? (
-              <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
+              <div className="flex h-full flex-col items-start justify-center gap-4 px-8 text-left">
                 <p className="text-[15px] leading-relaxed text-[#AEAEB2]">{cameraError}</p>
                 <button
                   type="button"
                   onClick={() => void startCamera()}
-                  className="ios-press rounded-2xl border border-[#FF2B2B]/40 bg-[#FF2B2B]/20 px-5 py-3 text-[14px] font-semibold text-white"
+                  className="ios-press rounded-none border border-white/30 bg-white/10 px-5 py-3 text-[13px] font-bold uppercase tracking-wider text-white"
                 >
                   Réessayer
                 </button>
@@ -189,6 +260,7 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
               <video
                 ref={videoRef}
                 className="h-full w-full object-cover"
+                style={isFrontCamera ? { transform: 'scaleX(-1)' } : undefined}
                 playsInline
                 muted
                 autoPlay
@@ -196,153 +268,122 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
             )}
 
             <div
-              className="pointer-events-none absolute inset-x-0 top-0 bg-gradient-to-b from-black/70 to-transparent px-5 pb-16"
-              style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.5) 100%)',
+              }}
+              aria-hidden
+            />
+
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 px-5 text-left"
+              style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top))' }}
             >
-              <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#FF6961]">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#C7C7CC]">
+                Ranked Gym // Upper
+              </p>
+              <p className="mt-2 text-[20px] font-black uppercase tracking-tight text-white">
                 Pump Check
               </p>
-              <h2 className="mt-1 text-center text-[22px] font-bold text-white">Montre ta victoire</h2>
             </div>
           </div>
 
           <div
-            className="flex shrink-0 flex-col items-center gap-4 bg-black px-6 pt-6"
-            style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}
+            className="flex shrink-0 flex-col items-center gap-4 bg-black px-6 pt-5"
+            style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
           >
             <button
               type="button"
               onClick={capturePhoto}
               disabled={!!cameraError}
-              className="ios-press relative z-10 flex h-[76px] w-[76px] items-center justify-center rounded-full border-4 border-white/90 bg-transparent disabled:opacity-40"
+              className="ios-press relative z-10 flex h-[72px] w-[72px] items-center justify-center rounded-full border-[3px] border-white bg-transparent disabled:opacity-40"
               aria-label="Prendre la photo"
             >
-              <span className="h-[58px] w-[58px] rounded-full bg-[#FF2B2B] shadow-[0_0_32px_rgba(255,43,43,0.65)]" />
+              <span className="h-[54px] w-[54px] rounded-full bg-[#FF2B2B] shadow-[0_0_28px_rgba(255,43,43,0.55)]" />
             </button>
             <button
               type="button"
               onClick={onComplete}
-              className="ios-press text-[13px] font-medium text-[#8E8E93]"
+              className="ios-press text-[12px] font-semibold uppercase tracking-[0.18em] text-[#8E8E93]"
             >
-              Passer · Retour au Lobby
+              Skip
             </button>
           </div>
         </>
       ) : (
         <>
-          <div className="relative min-h-0 flex-1 overflow-hidden">
+          {/* VIEWSHOT : photo + stats uniquement */}
+          <div className="relative min-h-0 flex-1 overflow-hidden bg-black">
             {photoUrl ? (
               <img src={photoUrl} alt="Pump Check" className="h-full w-full object-cover" />
             ) : null}
-
-            <div className="pointer-events-none absolute inset-0 bg-black/40" aria-hidden />
-            <div
-              className="pointer-events-none absolute inset-0"
-              style={{
-                background:
-                  'linear-gradient(145deg, rgba(255,43,43,0.32) 0%, rgba(0,0,0,0.15) 45%, rgba(255,43,43,0.22) 100%)',
-              }}
-              aria-hidden
-            />
-            <div
-              className="pointer-events-none absolute inset-4 rounded-[28px] border-2 border-[#FF2B2B] shadow-[inset_0_0_40px_rgba(255,43,43,0.2)]"
-              aria-hidden
-            />
-            <div
-              className="pointer-events-none absolute inset-7 rounded-[22px] border border-[#FF6961]/50"
-              aria-hidden
-            />
-
-            <div
-              className="pointer-events-none absolute inset-x-0 top-0 px-6 text-center"
-              style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top))' }}
-            >
-              <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#FF6961] drop-shadow-lg">
-                Ranked Gym
-              </p>
-              <p className="mt-2 text-[13px] font-bold uppercase tracking-[0.22em] text-white drop-shadow-lg">
-                Séance validée
-              </p>
-              <p className="mt-1 text-[12px] font-semibold uppercase tracking-wider text-[#FF6961]">
-                {stats.title}
-              </p>
-            </div>
-
-            <div className="pointer-events-none absolute inset-x-0 bottom-4 px-6 text-center">
-              <p className="text-[56px] font-black leading-none tracking-tight text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.8)]">
-                {formatVolume(stats.volumeKg)}
-              </p>
-              <p className="mt-1 text-[12px] font-bold uppercase tracking-[0.18em] text-[#AEAEB2]">
-                Volume total
-              </p>
-              <p className="mt-4 text-[36px] font-black tabular-nums text-white drop-shadow-lg">
-                {stats.durationMin} min
-              </p>
-              <p className="mt-3 text-[28px] font-black uppercase text-[#FF2B2B] drop-shadow-lg">
-                {stats.prCount === 0
-                  ? '0 PR'
-                  : stats.prCount === 1
-                    ? '1 PR battu'
-                    : `${stats.prCount} PR battus`}
-              </p>
-              <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/55">
-                Ranked Gym · Pump Check
-              </p>
-            </div>
+            {shotOverlay}
           </div>
 
+          {/* ACTIONS hors capture */}
           <div
-            className="shrink-0 space-y-2.5 bg-black px-5 pt-4"
-            style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
+            className="shrink-0 px-4 pt-3"
+            style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
           >
             {actionHint ? (
-              <p className="text-center text-[12px] font-medium text-[#30D158]">{actionHint}</p>
+              <p className="mb-2 text-center text-[11px] font-semibold uppercase tracking-wider text-[#30D158]">
+                {actionHint}
+              </p>
             ) : null}
 
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => void handleSave()}
-                disabled={!!busy}
-                className="ios-press flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.08] py-3.5 text-[14px] font-semibold text-white disabled:opacity-60"
-              >
-                {busy === 'save' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                ) : (
-                  <Download className="h-4 w-4" aria-hidden />
-                )}
-                Sauvegarder
-              </button>
+            <div
+              className="mx-auto flex max-w-sm items-center justify-between gap-1 rounded-full border border-white/15 px-2 py-2"
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+              }}
+            >
               <button
                 type="button"
                 onClick={() => void handleShare()}
                 disabled={!!busy}
-                className="ios-press flex items-center justify-center gap-2 rounded-2xl border border-[#FF2B2B]/45 bg-[#FF2B2B]/22 py-3.5 text-[14px] font-semibold text-white disabled:opacity-60"
+                className="ios-press flex h-11 w-11 items-center justify-center rounded-full text-white disabled:opacity-50"
+                aria-label="Partager"
               >
                 {busy === 'share' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  <Loader2 className="h-[18px] w-[18px] animate-spin" aria-hidden />
                 ) : (
-                  <Share2 className="h-4 w-4" aria-hidden />
+                  <Share2 className="h-[18px] w-[18px]" strokeWidth={2.25} aria-hidden />
                 )}
-                Partager
               </button>
-            </div>
 
-            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void handleSave()}
+                disabled={!!busy}
+                className="ios-press flex h-11 w-11 items-center justify-center rounded-full text-white disabled:opacity-50"
+                aria-label="Sauvegarder"
+              >
+                {busy === 'save' ? (
+                  <Loader2 className="h-[18px] w-[18px] animate-spin" aria-hidden />
+                ) : (
+                  <Download className="h-[18px] w-[18px]" strokeWidth={2.25} aria-hidden />
+                )}
+              </button>
+
               <button
                 type="button"
                 onClick={retake}
-                className="ios-press flex flex-1 items-center justify-center gap-1.5 rounded-2xl border border-white/12 bg-white/[0.06] py-3.5 text-[14px] font-semibold text-[#AEAEB2]"
+                className="ios-press flex h-11 w-11 items-center justify-center rounded-full text-white/80"
+                aria-label="Reprendre la photo"
               >
-                <ArrowLeft className="h-4 w-4" aria-hidden />
-                Reprendre
+                <Trash2 className="h-[18px] w-[18px]" strokeWidth={2.25} aria-hidden />
               </button>
+
               <button
                 type="button"
                 onClick={onComplete}
-                className="ios-press flex flex-[1.4] items-center justify-center rounded-2xl border border-white/12 bg-white py-3.5 text-[14px] font-semibold text-black"
+                className="ios-press flex h-11 w-11 items-center justify-center rounded-full bg-white text-black"
+                aria-label="Fermer et retour Lobby"
               >
-                Retour au Lobby
+                <X className="h-[18px] w-[18px]" strokeWidth={2.5} aria-hidden />
               </button>
             </div>
           </div>

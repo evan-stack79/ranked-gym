@@ -27,74 +27,91 @@ function drawCover(
   ctx.drawImage(img, x, y, drawW, drawH)
 }
 
-function drawArenaOverlay(ctx: CanvasRenderingContext2D, width: number, height: number) {
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'
-  ctx.fillRect(0, 0, width, height)
+/** Vignette haut/bas — remplace l'ancienne bordure rouge. */
+function drawVignette(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  const top = ctx.createLinearGradient(0, 0, 0, height * 0.42)
+  top.addColorStop(0, 'rgba(0, 0, 0, 0.72)')
+  top.addColorStop(0.55, 'rgba(0, 0, 0, 0.12)')
+  top.addColorStop(1, 'rgba(0, 0, 0, 0)')
+  ctx.fillStyle = top
+  ctx.fillRect(0, 0, width, height * 0.42)
 
-  const gradient = ctx.createLinearGradient(0, 0, width, height)
-  gradient.addColorStop(0, 'rgba(255, 43, 43, 0.35)')
-  gradient.addColorStop(0.5, 'rgba(255, 43, 43, 0.08)')
-  gradient.addColorStop(1, 'rgba(255, 43, 43, 0.28)')
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, 0, width, height)
-
-  ctx.strokeStyle = '#FF2B2B'
-  ctx.lineWidth = 12
-  ctx.strokeRect(24, 24, width - 48, height - 48)
-
-  ctx.strokeStyle = 'rgba(255, 105, 97, 0.55)'
-  ctx.lineWidth = 4
-  ctx.strokeRect(48, 48, width - 96, height - 96)
+  const bottom = ctx.createLinearGradient(0, height * 0.55, 0, height)
+  bottom.addColorStop(0, 'rgba(0, 0, 0, 0)')
+  bottom.addColorStop(0.35, 'rgba(0, 0, 0, 0.1)')
+  bottom.addColorStop(1, 'rgba(0, 0, 0, 0.78)')
+  ctx.fillStyle = bottom
+  ctx.fillRect(0, height * 0.55, width, height * 0.45)
 }
 
-function drawStats(ctx: CanvasRenderingContext2D, stats: VictorySessionStats, width: number) {
-  const centerX = width / 2
+/** Stats brutalistes left-aligned — miroir UI (hors boutons). */
+function drawStats(ctx: CanvasRenderingContext2D, stats: VictorySessionStats) {
+  const left = 64
+  ctx.textAlign = 'left'
 
-  ctx.textAlign = 'center'
-
-  // Filigrane marque
-  ctx.fillStyle = '#FF6961'
-  ctx.font = 'bold 34px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
-  ctx.fillText('RANKED GYM', centerX, 160)
-
-  ctx.fillStyle = '#FFFFFF'
-  ctx.font = 'bold 72px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
-  ctx.fillText('SÉANCE VALIDÉE', centerX, 250)
-
-  ctx.fillStyle = '#FF6961'
-  ctx.font = '600 36px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
-  ctx.fillText(stats.title.toUpperCase(), centerX, 320)
-
-  const midY = CARD_HEIGHT * 0.52
+  ctx.fillStyle = '#C7C7CC'
+  ctx.font = '600 28px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
+  ctx.fillText('RANKED GYM // UPPER', left, 140)
 
   ctx.fillStyle = '#FFFFFF'
-  ctx.font = 'bold 120px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
-  ctx.fillText(`${stats.volumeKg.toLocaleString('fr-FR')} kg`, centerX, midY - 40)
+  ctx.font = '900 92px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
+  ctx.fillText('SÉANCE', left, 250)
+  ctx.fillText('VALIDÉE', left, 340)
 
-  ctx.fillStyle = '#AEAEB2'
-  ctx.font = '600 42px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
-  ctx.fillText('VOLUME TOTAL', centerX, midY + 20)
+  ctx.fillStyle = 'rgba(255,255,255,0.55)'
+  ctx.font = '700 28px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
+  ctx.fillText(stats.title.toUpperCase(), left, 400)
+
+  const baseY = CARD_HEIGHT - 420
+
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'
+  ctx.font = '700 26px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
+  ctx.fillText('VOLUME', left, baseY)
 
   ctx.fillStyle = '#FFFFFF'
-  ctx.font = 'bold 88px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
-  ctx.fillText(`${stats.durationMin} min`, centerX, midY + 160)
+  ctx.font = '900 110px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
+  const vol = Math.round(stats.volumeKg).toLocaleString('fr-FR')
+  ctx.fillText(vol, left, baseY + 110)
 
-  ctx.fillStyle = '#FF2B2B'
-  ctx.font = 'bold 96px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
-  const prLabel =
-    stats.prCount === 0
-      ? '0 PR'
-      : stats.prCount === 1
-        ? '1 PR BATTU'
-        : `${stats.prCount} PR BATTUS`
-  ctx.fillText(prLabel, centerX, CARD_HEIGHT - 280)
+  const volWidth = ctx.measureText(vol).width
+  ctx.fillStyle = 'rgba(255,255,255,0.6)'
+  ctx.font = '700 36px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
+  ctx.fillText('KG', left + volWidth + 16, baseY + 100)
 
-  ctx.fillStyle = '#8E8E93'
-  ctx.font = '600 32px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
-  ctx.fillText('RANKED GYM · PUMP CHECK', centerX, CARD_HEIGHT - 180)
+  const timeX = left + 520
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'
+  ctx.font = '700 26px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
+  ctx.fillText('TEMPS', timeX, baseY)
+
+  ctx.fillStyle = '#FFFFFF'
+  ctx.font = '900 72px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
+  const timeLabel =
+    stats.durationMin < 60
+      ? `${stats.durationMin} MIN`
+      : (() => {
+          const h = Math.floor(stats.durationMin / 60)
+          const m = stats.durationMin % 60
+          return m > 0 ? `${h}H ${m}M` : `${h}H`
+        })()
+  ctx.fillText(timeLabel, timeX, baseY + 100)
+
+  if (stats.prCount > 0) {
+    const label = stats.prCount === 1 ? '1 PR BATTU' : `${stats.prCount} PR BATTUS`
+    ctx.fillStyle = '#FF453A'
+    ctx.font = '900 36px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
+    ctx.fillText(label, left, baseY + 190)
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)'
+    ctx.lineWidth = 2
+    const tw = ctx.measureText(label).width
+    ctx.strokeRect(left - 12, baseY + 150, tw + 24, 54)
+  }
 }
 
-/** Capture photo + overlay (filigrane inclus) en une image JPEG. */
+/**
+ * Export de la zone « ViewShot » uniquement :
+ * photo + overlay stats (pas les boutons d'action).
+ */
 export async function exportVictoryCard(
   photoSrc: string,
   stats: VictorySessionStats,
@@ -107,8 +124,8 @@ export async function exportVictoryCard(
   if (!ctx) throw new Error('Canvas indisponible')
 
   drawCover(ctx, img, CARD_WIDTH, CARD_HEIGHT)
-  drawArenaOverlay(ctx, CARD_WIDTH, CARD_HEIGHT)
-  drawStats(ctx, stats, CARD_WIDTH)
+  drawVignette(ctx, CARD_WIDTH, CARD_HEIGHT)
+  drawStats(ctx, stats)
 
   return new Promise((resolve, reject) => {
     canvas.toBlob(
@@ -137,13 +154,11 @@ function downloadBlob(blob: Blob, fileName: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 4000)
 }
 
-/** Télécharge la carte (fallback galerie web). */
 export async function saveVictoryCardToGallery(blob: Blob): Promise<void> {
   const file = toVictoryFile(blob)
   downloadBlob(blob, file.name)
 }
 
-/** Partage natif ; sinon télécharge. */
 export async function shareVictoryCard(
   blob: Blob,
   title: string,
@@ -171,7 +186,7 @@ export async function shareVictoryCard(
   return 'saved'
 }
 
-/** @deprecated Préférer saveVictoryCardToGallery / shareVictoryCard */
+/** @deprecated */
 export async function shareOrSaveVictoryCard(
   blob: Blob,
   title: string,
