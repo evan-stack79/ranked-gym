@@ -1,4 +1,8 @@
-/** Radar / spider chart — axes combat (données factices pour le design). */
+/** Radar / spider chart — axes combat (Upper, Lower, Force, Volume, Régularité). */
+
+export const RADAR_AXIS_LABELS = {
+  regularity: 'Régularité',
+} as const
 
 export type ArenaRadarAxis = {
   label: string
@@ -8,6 +12,7 @@ export type ArenaRadarAxis = {
 interface ArenaRadarChartProps {
   axes?: ArenaRadarAxis[]
   className?: string
+  loading?: boolean
 }
 
 const DEFAULT_AXES: ArenaRadarAxis[] = [
@@ -15,7 +20,7 @@ const DEFAULT_AXES: ArenaRadarAxis[] = [
   { label: 'Lower', value: 68 },
   { label: 'Force', value: 82 },
   { label: 'Volume', value: 61 },
-  { label: 'Régularité', value: 77 },
+  { label: RADAR_AXIS_LABELS.regularity, value: 77 },
 ]
 
 const SIZE = 260
@@ -43,11 +48,25 @@ function polygonPath(values: number[], count: number, scale: number): string {
 export function ArenaRadarChart({
   axes = DEFAULT_AXES,
   className = '',
+  loading = false,
 }: ArenaRadarChartProps) {
-  const count = axes.length
+  if (loading) {
+    return (
+      <div className={`flex min-h-[260px] items-center justify-center ${className}`}>
+        <div className="avatar-spinner h-8 w-8 rounded-full border-2 border-white/20 border-t-[#FF2B2B]" aria-label="Chargement du radar" />
+      </div>
+    )
+  }
+
+  const displayAxes = axes.map((axis) =>
+    axis.label.toLowerCase().includes('gularit')
+      ? { ...axis, label: RADAR_AXIS_LABELS.regularity }
+      : axis,
+  )
+  const count = displayAxes.length
   const gridPolygons = LEVELS.map((level) => polygonPath(Array(count).fill(100), count, level))
   const dataPath = polygonPath(
-    axes.map((a) => a.value),
+    displayAxes.map((a) => a.value),
     count,
     1,
   )
@@ -109,7 +128,7 @@ export function ArenaRadarChart({
           filter="url(#arena-radar-glow)"
         />
 
-        {axes.map((axis, i) => {
+        {displayAxes.map((axis, i) => {
           const r = (axis.value / 100) * MAX_R
           const [x, y] = axisPoint(i, count, r)
           return (
@@ -117,7 +136,7 @@ export function ArenaRadarChart({
           )
         })}
 
-        {axes.map((axis, i) => {
+        {displayAxes.map((axis, i) => {
           const [x, y] = axisPoint(i, count, MAX_R + 22)
           return (
             <text

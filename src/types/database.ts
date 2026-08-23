@@ -291,6 +291,10 @@ export interface Database {
         }
         Returns: string
       }
+      get_user_stats: {
+        Args: { p_user_id?: string | null }
+        Returns: Json
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>

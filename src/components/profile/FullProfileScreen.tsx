@@ -28,6 +28,8 @@ import {
   saveCalorieProfile,
 } from '../../services/nutritionStorage'
 import { getRankFromLevel } from '../../utils/rank'
+import { fetchUserStats, type UserStatsPayload } from '../../services/userStatsService'
+import { ChartSkeleton } from './charts/ChartSkeleton'
 
 const XP_PER_LEVEL = 1000
 
@@ -83,6 +85,8 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [arenaStats, setArenaStats] = useState<UserStatsPayload | null>(null)
 
   const username = profile?.pseudo || user?.displayName || 'Athlète'
   const level = profile?.level ?? 1
@@ -97,6 +101,36 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
     setHeightCm(calorie.heightCm > 0 ? calorie.heightCm : null)
     setAge(calorie.age > 0 ? calorie.age : null)
   }, [])
+
+  useEffect(() => {
+    if (!user?.id) {
+      setArenaStats(null)
+      setStatsLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setStatsLoading(true)
+
+    void fetchUserStats(user.id).then((payload) => {
+      if (!cancelled) {
+        setArenaStats(payload)
+        setStatsLoading(false)
+      }
+    })
+
+    const onRestore = () => {
+      void fetchUserStats(user.id).then((payload) => {
+        if (!cancelled) setArenaStats(payload)
+      })
+    }
+    window.addEventListener('ranked-gym:backup-restored', onRestore)
+
+    return () => {
+      cancelled = true
+      window.removeEventListener('ranked-gym:backup-restored', onRestore)
+    }
+  }, [user?.id])
 
   const openAvatarPicker = () => {
     if (!user?.id || avatarUploading) return
@@ -254,11 +288,15 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
         <SectionTitle
           icon={Swords}
           title="Bilan de l'Arène"
-          subtitle="Profil de force — données de démonstration"
+          subtitle={statsLoading ? 'Synchronisation Supabase…' : 'Calculé depuis tes séances enregistrées'}
         />
 
         <div className="glass-card rounded-2xl p-4">
-          <ArenaRadarChart />
+          {statsLoading ? (
+            <ChartSkeleton variant="radar" />
+          ) : (
+            <ArenaRadarChart axes={arenaStats?.radar} />
+          )}
         </div>
 
         <div className="glass-card rounded-2xl p-4">
@@ -266,14 +304,27 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
             <TrendingUp className="h-4 w-4 text-[#FF2B2B]" strokeWidth={2.25} />
             <p className="text-[14px] font-semibold text-white">Courbe de Puissance</p>
           </div>
-          <PowerCurveChart />
+          {statsLoading ? (
+            <ChartSkeleton variant="line" />
+          ) : (
+            <PowerCurveChart points={arenaStats?.benchCurve} />
+          )}
         </div>
       </section>
 
       {/* Assiduité */}
       <section className="space-y-3">
         <SectionTitle icon={Target} title="Assiduité hebdomadaire" />
-        <WeeklyAssiduityGauge completed={3} target={4} />
+        {statsLoading ? (
+          <div className="glass-card rounded-2xl p-4">
+            <ChartSkeleton variant="gauge" />
+          </div>
+        ) : (
+          <WeeklyAssiduityGauge
+            completed={arenaStats?.weeklySessions.completed ?? 0}
+            target={arenaStats?.weeklySessions.target ?? 4}
+          />
+        )}
       </section>
 
       {/* Corps & métabolisme */}

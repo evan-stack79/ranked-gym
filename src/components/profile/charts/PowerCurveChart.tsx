@@ -9,6 +9,7 @@ interface PowerCurveChartProps {
   points?: PowerCurvePoint[]
   exerciseLabel?: string
   className?: string
+  loading?: boolean
 }
 
 const DEFAULT_POINTS: PowerCurvePoint[] = [
@@ -55,10 +56,20 @@ export function PowerCurveChart({
   points = DEFAULT_POINTS,
   exerciseLabel = 'Développé couché',
   className = '',
+  loading = false,
 }: PowerCurveChartProps) {
+  if (loading) {
+    return (
+      <div className={`flex min-h-[148px] items-center justify-center ${className}`}>
+        <div className="avatar-spinner h-8 w-8 rounded-full border-2 border-white/20 border-t-[#FF2B2B]" aria-label="Chargement de la courbe" />
+      </div>
+    )
+  }
+
   const values = points.map((p) => p.valueKg)
-  const minY = Math.floor(Math.min(...values) - 5)
-  const maxY = Math.ceil(Math.max(...values) + 3)
+  const hasData = values.some((v) => v > 0)
+  const minY = hasData ? Math.floor(Math.min(...values.filter((v) => v > 0)) - 5) : 0
+  const maxY = hasData ? Math.ceil(Math.max(...values) + 3) : 100
   const range = maxY - minY || 1
   const gridSteps = 3
 
@@ -148,7 +159,7 @@ export function PowerCurveChart({
       <div className="mt-1 flex items-center justify-between px-1">
         <p className="text-[12px] text-[#8E8E93]">{exerciseLabel} · 1RM estimé</p>
         <p className="text-[13px] font-bold tabular-nums text-[#FF6961]">
-          {points[points.length - 1]?.valueKg} kg
+          {hasData ? `${points[points.length - 1]?.valueKg} kg` : '—'}
         </p>
       </div>
     </div>
