@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Download, Loader2 } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { ArrowLeft, Download, Loader2, Share2 } from 'lucide-react'
 import type { VictorySessionStats } from '../../types/victory'
-import { exportVictoryCard, shareOrSaveVictoryCard } from '../../utils/victoryCardExport'
+import {
+  exportVictoryCard,
+  saveVictoryCardToGallery,
+  shareVictoryCard,
+} from '../../utils/victoryCardExport'
 import { vibrate } from '../../utils/haptics'
+import { useRestTimerContext } from '../../context/RestTimerContext'
 
 interface VictoryCameraProps {
   stats: VictorySessionStats
@@ -15,14 +21,20 @@ function formatVolume(kg: number): string {
   return `${kg.toLocaleString('fr-FR')} kg`
 }
 
+/**
+ * Pump Check plein écran — portail hors du stacking context AppLayout
+ * pour passer au-dessus Tab Bar / timer repos.
+ */
 export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const { setChromeHidden } = useRestTimerContext()
+
   const [phase, setPhase] = useState<Phase>('camera')
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [cameraError, setCameraError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [shareHint, setShareHint] = useState<string | null>(null)
+  const [busy, setBusy] = useState<'save' | 'share' | null>(null)
+  const [actionHint, setActionHint] = useState<string | null>(null)
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop())
@@ -58,6 +70,18 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
     }
   }, [stopCamera])
 
+  // Masque Tab Bar + tue le timer zombie pendant tout le Pump Check
+  useEffect(() => {
+    setChromeHidden(true)
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      setChromeHidden(false)
+      document.body.style.overflow = previousOverflow
+      stopCamera()
+    }
+  }, [setChromeHidden, stopCamera])
+
   useEffect(() => {
     if (phase !== 'camera') return
     void startCamera()
@@ -66,10 +90,9 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
 
   useEffect(() => {
     return () => {
-      stopCamera()
       if (photoUrl) URL.revokeObjectURL(photoUrl)
     }
-  }, [photoUrl, stopCamera])
+  }, [photoUrl])
 
   const capturePhoto = () => {
     const video = videoRef.current
@@ -100,42 +123,57 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
   const retake = () => {
     if (photoUrl) URL.revokeObjectURL(photoUrl)
     setPhotoUrl(null)
-    setShareHint(null)
+    setActionHint(null)
     setPhase('camera')
+  }
+
+  const handleSave = async () => {
+    if (!photoUrl || busy) return
+    setBusy('save')
+    setActionHint(null)
+    try {
+      const blob = await exportVictoryCard(photoUrl, stats)
+      await saveVictoryCardToGallery(blob)
+      setActionHint('Carte sauvegardée dans tes téléchargements ✓')
+      vibrate(12)
+    } catch {
+      setActionHint('Impossible de sauvegarder — réessaie.')
+    } finally {
+      setBusy(null)
+    }
   }
 
   const handleShare = async () => {
     if (!photoUrl || busy) return
-    setBusy(true)
-    setShareHint(null)
+    setBusy('share')
+    setActionHint(null)
     try {
       const blob = await exportVictoryCard(photoUrl, stats)
-      const result = await shareOrSaveVictoryCard(blob, stats.title)
-      setShareHint(
+      const result = await shareVictoryCard(blob, stats.title)
+      setActionHint(
         result === 'shared'
           ? 'Carte partagée ✓'
-          : 'Carte enregistrée dans tes téléchargements ✓',
+          : 'Partage indisponible — carte téléchargée ✓',
       )
       vibrate(12)
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
-      setShareHint('Impossible de partager — réessaie.')
+      setActionHint('Impossible de partager — réessaie.')
     } finally {
-      setBusy(false)
+      setBusy(null)
     }
   }
 
-  return (
+  const ui = (
     <div
-      className="fixed inset-0 z-[200] flex flex-col bg-black"
-      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+      className="fixed inset-0 z-[9999] flex h-[100dvh] w-screen flex-col bg-black"
       role="dialog"
       aria-modal="true"
       aria-label="Pump Check — photo de victoire"
     >
       {phase === 'camera' ? (
         <>
-          <div className="relative flex-1 overflow-hidden bg-black">
+          <div className="relative min-h-0 flex-1 overflow-hidden bg-black">
             {cameraError ? (
               <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
                 <p className="text-[15px] leading-relaxed text-[#AEAEB2]">{cameraError}</p>
@@ -157,7 +195,10 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
               />
             )}
 
-            <div className="pointer-events-none absolute inset-x-0 top-0 bg-gradient-to-b from-black/70 to-transparent px-5 pb-16 pt-4">
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 bg-gradient-to-b from-black/70 to-transparent px-5 pb-16"
+              style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
+            >
               <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#FF6961]">
                 Pump Check
               </p>
@@ -165,12 +206,15 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
             </div>
           </div>
 
-          <div className="flex shrink-0 flex-col items-center gap-4 bg-black px-6 py-8">
+          <div
+            className="flex shrink-0 flex-col items-center gap-4 bg-black px-6 pt-6"
+            style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}
+          >
             <button
               type="button"
               onClick={capturePhoto}
               disabled={!!cameraError}
-              className="ios-press relative flex h-[76px] w-[76px] items-center justify-center rounded-full border-4 border-white/90 bg-transparent disabled:opacity-40"
+              className="ios-press relative z-10 flex h-[76px] w-[76px] items-center justify-center rounded-full border-4 border-white/90 bg-transparent disabled:opacity-40"
               aria-label="Prendre la photo"
             >
               <span className="h-[58px] w-[58px] rounded-full bg-[#FF2B2B] shadow-[0_0_32px_rgba(255,43,43,0.65)]" />
@@ -186,7 +230,7 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
         </>
       ) : (
         <>
-          <div className="relative flex-1 overflow-hidden">
+          <div className="relative min-h-0 flex-1 overflow-hidden">
             {photoUrl ? (
               <img src={photoUrl} alt="Pump Check" className="h-full w-full object-cover" />
             ) : null}
@@ -209,8 +253,14 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
               aria-hidden
             />
 
-            <div className="pointer-events-none absolute inset-x-0 top-0 px-6 pt-6 text-center">
-              <p className="text-[13px] font-bold uppercase tracking-[0.22em] text-white drop-shadow-lg">
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 px-6 text-center"
+              style={{ paddingTop: 'max(1.5rem, env(safe-area-inset-top))' }}
+            >
+              <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#FF6961] drop-shadow-lg">
+                Ranked Gym
+              </p>
+              <p className="mt-2 text-[13px] font-bold uppercase tracking-[0.22em] text-white drop-shadow-lg">
                 Séance validée
               </p>
               <p className="mt-1 text-[12px] font-semibold uppercase tracking-wider text-[#FF6961]">
@@ -218,7 +268,7 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
               </p>
             </div>
 
-            <div className="pointer-events-none absolute inset-x-0 bottom-28 px-6 text-center">
+            <div className="pointer-events-none absolute inset-x-0 bottom-4 px-6 text-center">
               <p className="text-[56px] font-black leading-none tracking-tight text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.8)]">
                 {formatVolume(stats.volumeKg)}
               </p>
@@ -235,27 +285,48 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
                     ? '1 PR battu'
                     : `${stats.prCount} PR battus`}
               </p>
+              <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/55">
+                Ranked Gym · Pump Check
+              </p>
             </div>
           </div>
 
-          <div className="shrink-0 space-y-3 bg-black/95 px-5 py-5">
-            {shareHint ? (
-              <p className="text-center text-[12px] font-medium text-[#30D158]">{shareHint}</p>
+          <div
+            className="shrink-0 space-y-2.5 bg-black px-5 pt-4"
+            style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
+          >
+            {actionHint ? (
+              <p className="text-center text-[12px] font-medium text-[#30D158]">{actionHint}</p>
             ) : null}
 
-            <button
-              type="button"
-              onClick={() => void handleShare()}
-              disabled={busy}
-              className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-[#FF2B2B]/45 bg-[#FF2B2B]/22 py-4 text-[15px] font-semibold text-white disabled:opacity-60"
-            >
-              {busy ? (
-                <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-              ) : (
-                <Download className="h-5 w-5" aria-hidden />
-              )}
-              Partager / Sauvegarder dans la galerie
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => void handleSave()}
+                disabled={!!busy}
+                className="ios-press flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.08] py-3.5 text-[14px] font-semibold text-white disabled:opacity-60"
+              >
+                {busy === 'save' ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                ) : (
+                  <Download className="h-4 w-4" aria-hidden />
+                )}
+                Sauvegarder
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleShare()}
+                disabled={!!busy}
+                className="ios-press flex items-center justify-center gap-2 rounded-2xl border border-[#FF2B2B]/45 bg-[#FF2B2B]/22 py-3.5 text-[14px] font-semibold text-white disabled:opacity-60"
+              >
+                {busy === 'share' ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                ) : (
+                  <Share2 className="h-4 w-4" aria-hidden />
+                )}
+                Partager
+              </button>
+            </div>
 
             <div className="flex gap-2">
               <button
@@ -279,4 +350,7 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
       )}
     </div>
   )
+
+  if (typeof document === 'undefined') return null
+  return createPortal(ui, document.body)
 }

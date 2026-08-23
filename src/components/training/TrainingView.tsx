@@ -114,9 +114,11 @@ export function TrainingView({
   const showEnduranceTools = isEnduranceFamily(disciplineId)
 
   useEffect(() => {
-    setReadyBarEnabled(showStrengthTools)
+    // Pendant Pump Check le chrome est masqué ; on coupe aussi la ready bar
+    // pour éviter tout flash si le portail se ferme avant le unmount.
+    setReadyBarEnabled(showStrengthTools && !pumpCheckSession)
     return () => setReadyBarEnabled(false)
-  }, [showStrengthTools, setReadyBarEnabled])
+  }, [showStrengthTools, setReadyBarEnabled, pumpCheckSession])
 
   useEffect(() => {
     if (!launchRoutineId || !showStrengthTools) return

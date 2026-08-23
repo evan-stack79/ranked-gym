@@ -51,25 +51,33 @@ function drawStats(ctx: CanvasRenderingContext2D, stats: VictorySessionStats, wi
   const centerX = width / 2
 
   ctx.textAlign = 'center'
+
+  // Filigrane marque
+  ctx.fillStyle = '#FF6961'
+  ctx.font = 'bold 34px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
+  ctx.fillText('RANKED GYM', centerX, 160)
+
   ctx.fillStyle = '#FFFFFF'
   ctx.font = 'bold 72px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
-  ctx.fillText('SÉANCE VALIDÉE', centerX, 220)
+  ctx.fillText('SÉANCE VALIDÉE', centerX, 250)
 
   ctx.fillStyle = '#FF6961'
   ctx.font = '600 36px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
-  ctx.fillText(stats.title.toUpperCase(), centerX, 290)
+  ctx.fillText(stats.title.toUpperCase(), centerX, 320)
+
+  const midY = CARD_HEIGHT * 0.52
 
   ctx.fillStyle = '#FFFFFF'
   ctx.font = 'bold 120px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
-  ctx.fillText(`${stats.volumeKg.toLocaleString('fr-FR')} kg`, centerX, heightCenter(stats) - 40)
+  ctx.fillText(`${stats.volumeKg.toLocaleString('fr-FR')} kg`, centerX, midY - 40)
 
   ctx.fillStyle = '#AEAEB2'
   ctx.font = '600 42px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
-  ctx.fillText('VOLUME TOTAL', centerX, heightCenter(stats) + 20)
+  ctx.fillText('VOLUME TOTAL', centerX, midY + 20)
 
   ctx.fillStyle = '#FFFFFF'
   ctx.font = 'bold 88px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
-  ctx.fillText(`${stats.durationMin} min`, centerX, heightCenter(stats) + 160)
+  ctx.fillText(`${stats.durationMin} min`, centerX, midY + 160)
 
   ctx.fillStyle = '#FF2B2B'
   ctx.font = 'bold 96px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
@@ -86,11 +94,7 @@ function drawStats(ctx: CanvasRenderingContext2D, stats: VictorySessionStats, wi
   ctx.fillText('RANKED GYM · PUMP CHECK', centerX, CARD_HEIGHT - 180)
 }
 
-function heightCenter(_stats: VictorySessionStats): number {
-  return CARD_HEIGHT * 0.52
-}
-
-/** Capture photo + overlay en une image JPEG (équivalent view-shot). */
+/** Capture photo + overlay (filigrane inclus) en une image JPEG. */
 export async function exportVictoryCard(
   photoSrc: string,
   stats: VictorySessionStats,
@@ -118,11 +122,33 @@ export async function exportVictoryCard(
   })
 }
 
-/** Partage natif ou téléchargement de la carte Pump Check. */
-export async function shareOrSaveVictoryCard(blob: Blob, title: string): Promise<'shared' | 'saved'> {
-  const file = new File([blob], `ranked-gym-pump-check-${Date.now()}.jpg`, {
+function toVictoryFile(blob: Blob): File {
+  return new File([blob], `ranked-gym-pump-check-${Date.now()}.jpg`, {
     type: 'image/jpeg',
   })
+}
+
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = fileName
+  anchor.click()
+  window.setTimeout(() => URL.revokeObjectURL(url), 4000)
+}
+
+/** Télécharge la carte (fallback galerie web). */
+export async function saveVictoryCardToGallery(blob: Blob): Promise<void> {
+  const file = toVictoryFile(blob)
+  downloadBlob(blob, file.name)
+}
+
+/** Partage natif ; sinon télécharge. */
+export async function shareVictoryCard(
+  blob: Blob,
+  title: string,
+): Promise<'shared' | 'saved'> {
+  const file = toVictoryFile(blob)
 
   if (typeof navigator !== 'undefined' && navigator.share) {
     try {
@@ -141,11 +167,14 @@ export async function shareOrSaveVictoryCard(blob: Blob, title: string): Promise
     }
   }
 
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = file.name
-  anchor.click()
-  window.setTimeout(() => URL.revokeObjectURL(url), 4000)
+  downloadBlob(blob, file.name)
   return 'saved'
+}
+
+/** @deprecated Préférer saveVictoryCardToGallery / shareVictoryCard */
+export async function shareOrSaveVictoryCard(
+  blob: Blob,
+  title: string,
+): Promise<'shared' | 'saved'> {
+  return shareVictoryCard(blob, title)
 }

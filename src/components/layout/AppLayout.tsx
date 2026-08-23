@@ -14,9 +14,17 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) {
-  const { state, isBarVisible, readyBarEnabled, start, skip, dismiss } = useRestTimerContext()
+  const {
+    state,
+    isBarVisible,
+    readyBarEnabled,
+    chromeHidden,
+    start,
+    skip,
+    dismiss,
+  } = useRestTimerContext()
 
-  const showReadyBar = activeTab === 'training' && readyBarEnabled
+  const showReadyBar = !chromeHidden && activeTab === 'training' && readyBarEnabled
 
   return (
     <div className="relative flex min-h-full flex-col mesh-bg font-sans">
@@ -45,48 +53,59 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
         />
       </div>
 
-      <header className="glass-bar sticky top-0 z-40 border-b border-white/5">
-        <div
-          className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"
-          style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
-        >
-          <span className="text-[17px] font-semibold tracking-tight text-white">
-            Ranked <span className="text-[#FF2B2B]">Gym</span>
-          </span>
-        </div>
-      </header>
+      {!chromeHidden ? (
+        <header className="glass-bar sticky top-0 z-40 border-b border-white/5">
+          <div
+            className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"
+            style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+          >
+            <span className="text-[17px] font-semibold tracking-tight text-white">
+              Ranked <span className="text-[#FF2B2B]">Gym</span>
+            </span>
+          </div>
+        </header>
+      ) : null}
 
       <main
-        className="relative z-10 mx-auto w-full max-w-lg flex-1 overflow-y-auto px-5 py-8"
-        style={{
-          paddingBottom: isBarVisible
-            ? `calc(var(--app-bottom-nav) + ${REST_BAR_CONTENT_PAD} + env(safe-area-inset-bottom, 0px) + 1.5rem)`
-            : 'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 1.5rem)',
-        }}
+        className={`relative z-10 mx-auto w-full flex-1 overflow-y-auto ${
+          chromeHidden ? 'max-w-none px-0 py-0' : 'max-w-lg px-5 py-8'
+        }`}
+        style={
+          chromeHidden
+            ? { paddingBottom: 0 }
+            : {
+                paddingBottom: isBarVisible
+                  ? `calc(var(--app-bottom-nav) + ${REST_BAR_CONTENT_PAD} + env(safe-area-inset-bottom, 0px) + 1.5rem)`
+                  : 'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 1.5rem)',
+              }
+        }
       >
         {children}
       </main>
 
-      <RestTimerOverlay
-        showReadyBar={showReadyBar}
-        state={state}
-        onPreset={(sec: RestPresetSec) => {
-          const target = state.target ?? {
-            exerciseId: 'quick-rest',
-            setIndex: 0,
-            exerciseName: 'Repos libre',
-            setLabel: `${sec}s`,
-          }
-          start(sec, {
-            ...target,
-            setLabel: target.exerciseId === 'quick-rest' ? `${sec}s` : target.setLabel,
-          })
-        }}
-        onSkip={skip}
-        onDismiss={dismiss}
-      />
-
-      <BottomNav activeTab={activeTab} onTabChange={onTabChange} />
+      {!chromeHidden ? (
+        <>
+          <RestTimerOverlay
+            showReadyBar={showReadyBar}
+            state={state}
+            onPreset={(sec: RestPresetSec) => {
+              const target = state.target ?? {
+                exerciseId: 'quick-rest',
+                setIndex: 0,
+                exerciseName: 'Repos libre',
+                setLabel: `${sec}s`,
+              }
+              start(sec, {
+                ...target,
+                setLabel: target.exerciseId === 'quick-rest' ? `${sec}s` : target.setLabel,
+              })
+            }}
+            onSkip={skip}
+            onDismiss={dismiss}
+          />
+          <BottomNav activeTab={activeTab} onTabChange={onTabChange} />
+        </>
+      ) : null}
     </div>
   )
 }

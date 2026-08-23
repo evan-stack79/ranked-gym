@@ -55,8 +55,14 @@ type RestTimerContextValue = {
   setReadyBarEnabled: (enabled: boolean) => void
   /** Barre visible (décompte ou fin) — tous les onglets */
   isSessionVisible: boolean
-  /** Barre affichée (session globale ou ready sur Train) */
+  /** Barre affichée (session globale ou ready sur Train) — false si overlay plein écran */
   isBarVisible: boolean
+  /**
+   * Masque Tab Bar + timer (Pump Check / modales plein écran).
+   * Quand true : dismiss le timer zombie et coupe la ready bar.
+   */
+  chromeHidden: boolean
+  setChromeHidden: (hidden: boolean) => void
   start: (seconds: number, target: RestTimerTarget) => void
   skip: () => void
   dismiss: () => void
@@ -68,6 +74,7 @@ const RestTimerContext = createContext<RestTimerContextValue | null>(null)
 export function RestTimerProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<RestTimerState>(IDLE)
   const [readyBarEnabled, setReadyBarEnabled] = useState(false)
+  const [chromeHidden, setChromeHiddenState] = useState(false)
 
   const targetRef = useRef<RestTimerTarget | null>(null)
   const totalRef = useRef(90)
@@ -188,7 +195,20 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
 
   const isSessionVisible = state.active || state.finished
   const idle = !state.active && !state.finished
-  const isBarVisible = isSessionVisible || (readyBarEnabled && idle)
+  const isBarVisible =
+    !chromeHidden && (isSessionVisible || (readyBarEnabled && idle))
+
+  const setChromeHidden = useCallback(
+    (hidden: boolean) => {
+      setChromeHiddenState(hidden)
+      if (hidden) {
+        // Timer zombie : stop immédiat. La barre reste masquée via !chromeHidden
+        // (on ne touche pas readyBarEnabled pour qu’elle réapparaisse au retour Train).
+        dismiss()
+      }
+    },
+    [dismiss],
+  )
 
   const value = useMemo<RestTimerContextValue>(
     () => ({
@@ -197,12 +217,24 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       setReadyBarEnabled,
       isSessionVisible,
       isBarVisible,
+      chromeHidden,
+      setChromeHidden,
       start,
       skip,
       dismiss,
       presets: REST_PRESETS_SEC,
     }),
-    [state, readyBarEnabled, isSessionVisible, isBarVisible, start, skip, dismiss],
+    [
+      state,
+      readyBarEnabled,
+      isSessionVisible,
+      isBarVisible,
+      chromeHidden,
+      setChromeHidden,
+      start,
+      skip,
+      dismiss,
+    ],
   )
 
   return <RestTimerContext.Provider value={value}>{children}</RestTimerContext.Provider>
