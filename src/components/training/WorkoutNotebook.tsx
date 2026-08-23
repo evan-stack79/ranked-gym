@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BookOpen, Plus, Trash2, TrendingUp } from 'lucide-react'
+import { BookOpen, Info, Plus, Trash2, TrendingUp } from 'lucide-react'
 import type {
   ExerciseEntry,
+  ScheduledSession,
   SetDifficulty,
   WorkoutNote,
   WorkoutRoutine,
@@ -11,9 +12,10 @@ import {
   bestSet1RM,
   computeStrengthSessionStats,
   relativeStrength,
-  relativeStrengthLabel,
   suggestNextWeight,
 } from '../../utils/strength'
+import { sanitizeExerciseName } from '../../utils/exerciseName'
+import { detectProgramSplit, filterRoutinesForProgram } from '../../utils/workoutProgram'
 import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
 import { WorkoutHistory } from './WorkoutHistory'
 
@@ -21,6 +23,7 @@ interface WorkoutNotebookProps {
   id?: string
   bodyWeightKg: number
   routines: WorkoutRoutine[]
+  schedule?: ScheduledSession[]
   history: WorkoutNote[]
   initialRoutineId?: string | null
   onSave: (note: {
@@ -83,6 +86,7 @@ export function WorkoutNotebook({
   id,
   bodyWeightKg,
   routines,
+  schedule = [],
   history,
   initialRoutineId,
   onSave,
@@ -101,9 +105,14 @@ export function WorkoutNotebook({
   const [customLabel, setCustomLabel] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const visibleRoutines = useMemo(() => {
+    const split = detectProgramSplit(schedule, routines)
+    return filterRoutinesForProgram(routines, split)
+  }, [schedule, routines])
+
   const activeRoutine = useMemo(
-    () => routines.find((r) => r.id === routineId) ?? routines[0],
-    [routines, routineId],
+    () => visibleRoutines.find((r) => r.id === routineId) ?? visibleRoutines[0],
+    [visibleRoutines, routineId],
   )
 
   const selectRoutine = (id: string) => {
@@ -114,7 +123,14 @@ export function WorkoutNotebook({
     setExercises(cloneFromRoutine(routine))
   }
 
-  // If routines list gains a new custom, keep selection valid
+  // Keep selection valid when program filter changes
+  useEffect(() => {
+    if (!visibleRoutines.some((r) => r.id === routineId) && visibleRoutines[0]) {
+      selectRoutine(visibleRoutines[0].id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleRoutines])
+
   useEffect(() => {
     if (!routines.some((r) => r.id === routineId) && routines[0]) {
       selectRoutine(routines[0].id)
@@ -214,7 +230,7 @@ export function WorkoutNotebook({
     const cleaned = exercises
       .map((e) => ({
         ...e,
-        name: e.name.trim() || 'Exercice',
+        name: sanitizeExerciseName(e.name.trim() || 'Exercice'),
         sets: e.sets.filter((s) => s.reps > 0 && s.weightKg >= 0),
       }))
       .filter((e) => e.sets.length > 0)
@@ -256,8 +272,8 @@ export function WorkoutNotebook({
         </p>
       </div>
 
-      <div className="flex gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {routines.map((r) => {
+      <div className="flex gap-1.5 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {visibleRoutines.map((r) => {
           const active = r.id === routineId
           return (
             <button
@@ -314,7 +330,7 @@ export function WorkoutNotebook({
       )}
 
       <div
-        className="rounded-3xl border border-white/10 p-4"
+        className="rounded-3xl border border-white/10 px-5 py-4"
         style={{
           background: `radial-gradient(ellipse 80% 60% at 100% 0%, ${activeRoutine?.accent ?? '#FF2B2B'}28 0%, transparent 55%), rgb(22 22 24 / 0.96)`,
           boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.06)',
@@ -354,7 +370,9 @@ export function WorkoutNotebook({
                   <input
                     type="text"
                     value={ex.name}
-                    onChange={(e) => updateExercise(ex.id, { name: e.target.value })}
+                    onChange={(e) =>
+                      updateExercise(ex.id, { name: sanitizeExerciseName(e.target.value) })
+                    }
                     placeholder="Exercice (ex. Développé couché)"
                     className="w-full bg-transparent text-[15px] font-semibold text-white placeholder:text-[#636366] outline-none"
                   />
@@ -487,17 +505,25 @@ export function WorkoutNotebook({
                 ) : null}
 
                 {oneRm > 0 && (
-                  <div className="mt-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                  <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                     <p className="flex items-center gap-1.5 text-[12px] text-[#AEAEB2]">
-                      <TrendingUp className="h-3.5 w-3.5 text-[#30D158]" />
-                      1RM est. <span className="font-semibold text-white">{oneRm} kg</span>
-                      {' · '}
-                      {ratio}× ton poids ({relativeStrengthLabel(ratio)})
+                      <TrendingUp className="h-3.5 w-3.5 shrink-0 text-[#30D158]" />
+                      <span>
+                        1RM ~<span className="font-semibold text-white">{oneRm} kg</span>
+                        {ratio > 0 && (
+                          <span className="text-[#636366]"> · {ratio}× poids</span>
+                        )}
+                      </span>
                     </p>
                     {tip && (
-                      <p className="mt-1 text-[11px] leading-relaxed text-[#8E8E93]">
-                        {tip.message}
-                      </p>
+                      <button
+                        type="button"
+                        title={tip.message}
+                        aria-label="Conseil de progression"
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/10 text-[#8E8E93]"
+                      >
+                        <Info className="h-3.5 w-3.5" />
+                      </button>
                     )}
                   </div>
                 )}
@@ -519,11 +545,12 @@ export function WorkoutNotebook({
             type="button"
             onClick={() => void handleSave()}
             disabled={saving}
-            className="btn-brand ios-press flex-[1.4] rounded-2xl py-3 text-[13px] font-semibold text-white disabled:opacity-60"
+            className="btn-brand ios-press flex flex-[1.4] flex-col items-center justify-center rounded-2xl py-2.5 text-[13px] font-semibold leading-tight text-white disabled:opacity-60"
           >
-            {saving
-              ? 'Envoi Supabase…'
-              : `Sauver ${activeRoutine?.label} · ~${stats.kcal} kcal`}
+            <span>{saving ? 'Synchro…' : 'Terminer la séance'}</span>
+            {!saving && (
+              <span className="mt-0.5 text-[11px] font-normal text-white/65">~{stats.kcal} kcal</span>
+            )}
           </button>
         </div>
 

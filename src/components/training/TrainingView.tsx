@@ -17,7 +17,7 @@ import {
   todayWorkoutKcal,
   upsertSchedule,
 } from '../../services/trainingStorage'
-import { flushCloudPushAsync } from '../../services/cloudBackup'
+import { saveAndSyncWorkoutSession } from '../../services/trainingSyncService'
 import { safeError } from '../../utils/safeLog'
 import { connectHealthIntent } from '../../services/healthSteps'
 import { startReminderWatcher } from '../../services/reminderService'
@@ -182,21 +182,26 @@ export function TrainingView({
 
   const persistAndSyncNote = useCallback(
     async (note: Parameters<typeof saveWorkoutNote>[0]) => {
-      const next = saveWorkoutNote(note)
-      setState(next)
-
       if (!isAuthenticated) {
+        const local = saveWorkoutNote(note)
+        setState(local)
         showToast(`${note.title} sauvé en local — connecte-toi pour Supabase`)
         requireAuth(() => undefined)
         return
       }
 
-      const result = await flushCloudPushAsync()
-      if (result.ok) {
-        showToast(`${note.title} → Supabase OK`)
-      } else {
-        safeError('[Train] Sauver cloud failed', result.error)
-        showToast(`Échec cloud : ${result.error ?? 'inconnu'}`)
+      try {
+        const result = await saveAndSyncWorkoutSession(note)
+        setState(result.state)
+        if (result.ok) {
+          showToast('Séance enregistrée ✓')
+        } else {
+          safeError('[Train] session sync failed', result.error)
+          showToast(result.error ?? 'Erreur de synchro')
+        }
+      } catch (error) {
+        safeError('[Train] session save exception', error)
+        showToast('Erreur de synchro')
       }
     },
     [isAuthenticated, requireAuth, showToast],
@@ -226,23 +231,32 @@ export function TrainingView({
     showToast(result.message)
   }
 
-  const confirmCardio = () => {
+  const confirmCardio = async () => {
     const kcalPerHour = sport?.kcalPerHour ?? 500
     const estimated = estimateSessionKcal(durationMin, kcalPerHour, profile.weightKg)
-    persist(
-      saveWorkoutNote({
-        title: sport?.name ?? 'Cardio',
-        exercises: [
-          {
-            id: `cardio-${Date.now()}`,
-            name: sport?.name ?? 'Cardio',
-            sets: [{ reps: durationMin, weightKg: 0, difficulty: 'ok' }],
-          },
-        ],
-        durationMin,
-        estimatedKcal: estimated,
-      }),
-    )
+    const note = {
+      title: sport?.name ?? 'Cardio',
+      exercises: [
+        {
+          id: `cardio-${Date.now()}`,
+          name: sport?.name ?? 'Cardio',
+          sets: [{ reps: durationMin, weightKg: 0, difficulty: 'ok' as const }],
+        },
+      ],
+      durationMin,
+      estimatedKcal: estimated,
+    }
+
+    if (isAuthenticated) {
+      const result = await saveAndSyncWorkoutSession(note)
+      setState(result.state)
+      if (!result.ok) {
+        showToast(result.error ?? 'Erreur de synchro')
+      }
+    } else {
+      persist(saveWorkoutNote(note))
+    }
+
     setCardioOpen(false)
     showToast(`${sport?.name ?? 'Séance'} · ~${estimated} kcal → Nutri`)
   }
@@ -343,6 +357,7 @@ export function TrainingView({
           id="workout-notebook"
           bodyWeightKg={profile.weightKg}
           routines={state.routines}
+          schedule={state.schedule}
           history={state.workoutNotes}
           initialRoutineId={launchRoutineId}
           restLogRequest={restLogRequest}

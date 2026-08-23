@@ -59,7 +59,6 @@ let activeUserId: string | null = null
 let meta: CloudBackupMeta = loadMeta()
 const listeners = new Set<Listener>()
 let pushTimer: ReturnType<typeof setTimeout> | null = null
-let pushing = false
 let needsRepush = false
 let hydratedUserId: string | null = null
 /** Block auto-push until first pull finishes (avoids overwriting cloud with empty local). */
@@ -485,6 +484,8 @@ async function upsertTables(userId: string, payload: CloudBackupPayload): Promis
   }
 }
 
+let pushInFlight: Promise<{ ok: boolean; error?: string }> | null = null
+
 export async function pushCloudBackup(
   userId?: string | null,
 ): Promise<{ ok: boolean; error?: string }> {
@@ -492,44 +493,45 @@ export async function pushCloudBackup(
   if (!uid || !isSupabaseConfigured()) {
     return { ok: false, error: 'Connecte-toi pour activer la sauvegarde cloud.' }
   }
-  if (pushing) {
-    needsRepush = true
-    setMeta({ pending: true })
-    return { ok: false, error: 'already_pushing' }
+  if (pushInFlight) {
+    return pushInFlight
   }
 
-  pushing = true
   setMeta({ pending: true, lastError: null })
 
-  try {
-    const payload = collectLocalBackup()
-    const { error } = await upsertTables(uid, payload)
-    if (error) {
-      safeError('[cloudBackup] pushCloudBackup failed', error)
-      setMeta({ pending: false, lastError: error })
-      emitBackupEvent('ranked-gym:backup-error', { error, source: 'push' })
-      return { ok: false, error }
+  pushInFlight = (async () => {
+    try {
+      const payload = collectLocalBackup()
+      const { error } = await upsertTables(uid, payload)
+      if (error) {
+        safeError('[cloudBackup] pushCloudBackup failed', error)
+        setMeta({ pending: false, lastError: error })
+        emitBackupEvent('ranked-gym:backup-error', { error, source: 'push' })
+        return { ok: false, error }
+      }
+      setMeta({
+        pending: false,
+        lastPushAt: new Date().toISOString(),
+        lastError: null,
+      })
+      emitBackupEvent('ranked-gym:backup-saved', { source: 'push' })
+      return { ok: true }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Erreur de sauvegarde'
+      safeError('[cloudBackup] pushCloudBackup exception', e)
+      setMeta({ pending: false, lastError: msg })
+      emitBackupEvent('ranked-gym:backup-error', { error: msg, source: 'push' })
+      return { ok: false, error: msg }
+    } finally {
+      pushInFlight = null
+      if (needsRepush && activeUserId) {
+        needsRepush = false
+        scheduleCloudPush(activeUserId)
+      }
     }
-    setMeta({
-      pending: false,
-      lastPushAt: new Date().toISOString(),
-      lastError: null,
-    })
-    emitBackupEvent('ranked-gym:backup-saved', { source: 'push' })
-    return { ok: true }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Erreur de sauvegarde'
-    safeError('[cloudBackup] pushCloudBackup exception', e)
-    setMeta({ pending: false, lastError: msg })
-    emitBackupEvent('ranked-gym:backup-error', { error: msg, source: 'push' })
-    return { ok: false, error: msg }
-  } finally {
-    pushing = false
-    if (needsRepush && activeUserId) {
-      needsRepush = false
-      scheduleCloudPush(activeUserId)
-    }
-  }
+  })()
+
+  return pushInFlight
 }
 
 /**
