@@ -1,19 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ChevronLeft,
-  Dumbbell,
+  Crosshair,
   Pencil,
   Ruler,
   Scale,
   Shield,
+  Swords,
+  Target,
+  TrendingUp,
   UserRound,
 } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
 import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
-import { RankShowcase } from './RankShowcase'
-import { ProfileXPBar } from './ProfileXPBar'
-import { StatGrid } from './StatGrid'
-import { BadgeShowcase } from './BadgeShowcase'
+import { ArenaRadarChart } from './charts/ArenaRadarChart'
+import { PowerCurveChart } from './charts/PowerCurveChart'
+import { WeeklyAssiduityGauge } from './charts/WeeklyAssiduityGauge'
 import { useAuth } from '../../context/AuthContext'
 import { uploadUserAvatar } from '../../services/avatarService'
 import {
@@ -21,10 +23,7 @@ import {
   normalizeCalorieProfile,
   saveCalorieProfile,
 } from '../../services/nutritionStorage'
-import { loadProfileStats } from '../../services/profileStats'
 import { getRankFromLevel } from '../../utils/rank'
-
-const XP_PER_LEVEL = 1000
 
 interface FullProfileScreenProps {
   onBack: () => void
@@ -45,14 +44,34 @@ function TrustBanner() {
   )
 }
 
+function SectionTitle({
+  icon: Icon,
+  title,
+  subtitle,
+}: {
+  icon: typeof Swords
+  title: string
+  subtitle?: string
+}) {
+  return (
+    <div className="px-1">
+      <div className="flex items-center gap-2">
+        <Icon className="h-4 w-4 text-[#FF2B2B]" strokeWidth={2.25} />
+        <h2 className="text-[13px] font-bold uppercase tracking-[0.14em] text-white">{title}</h2>
+      </div>
+      {subtitle ? <p className="mt-1 text-[12px] text-[#636366]">{subtitle}</p> : null}
+    </div>
+  )
+}
+
 export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
   const { user, profile, refreshProfile, patchProfile } = useAuth()
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [avatarError, setAvatarError] = useState<string | null>(null)
-  const [sessionCount, setSessionCount] = useState(0)
   const [weightKg, setWeightKg] = useState<number | null>(null)
+  const [goalWeightKg, setGoalWeightKg] = useState<number | null>(null)
   const [heightCm, setHeightCm] = useState<number | null>(null)
   const [age, setAge] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
@@ -61,34 +80,16 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
 
   const username = profile?.pseudo || user?.displayName || 'Athlète'
   const level = profile?.level ?? 1
-  const currentXp = profile?.xp ?? 0
   const rank = getRankFromLevel(level)
   const displayAvatarUrl = avatarPreview || profile?.avatar_url || null
 
   useEffect(() => {
     const calorie = getCalorieProfile()
     setWeightKg(calorie.weightKg > 0 ? calorie.weightKg : null)
+    setGoalWeightKg(calorie.goalWeightKg > 0 ? calorie.goalWeightKg : null)
     setHeightCm(calorie.heightCm > 0 ? calorie.heightCm : null)
     setAge(calorie.age > 0 ? calorie.age : null)
   }, [])
-
-  const refreshSessions = useCallback(() => {
-    if (!user?.id) {
-      setSessionCount(0)
-      return
-    }
-    void loadProfileStats({
-      userId: user.id,
-      streakDays: profile?.current_streak ?? 0,
-    }).then((stats) => setSessionCount(stats.sessionCount))
-  }, [user?.id, profile?.current_streak])
-
-  useEffect(() => {
-    refreshSessions()
-    const onRestore = () => refreshSessions()
-    window.addEventListener('ranked-gym:backup-restored', onRestore)
-    return () => window.removeEventListener('ranked-gym:backup-restored', onRestore)
-  }, [refreshSessions])
 
   const openAvatarPicker = () => {
     if (!user?.id || avatarUploading) return
@@ -124,11 +125,11 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
     setSaveError(null)
     setSaveMessage(null)
 
-    if (weightKg == null || heightCm == null || age == null) {
-      setSaveError('Remplis poids, taille et âge.')
+    if (weightKg == null || goalWeightKg == null || heightCm == null || age == null) {
+      setSaveError('Remplis poids actuel, poids cible, taille et âge.')
       return
     }
-    if (weightKg <= 0 || heightCm <= 0 || age <= 0) {
+    if (weightKg <= 0 || goalWeightKg <= 0 || heightCm <= 0 || age <= 0) {
       setSaveError('Les valeurs doivent être supérieures à zéro.')
       return
     }
@@ -140,9 +141,9 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
         normalizeCalorieProfile({
           ...current,
           weightKg,
+          goalWeightKg,
           heightCm,
           age,
-          goalWeightKg: current.goalWeightKg > 0 ? current.goalWeightKg : weightKg,
           onboardingComplete: current.onboardingComplete || true,
         }),
       )
@@ -156,7 +157,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
   }
 
   return (
-    <div className="flex flex-col gap-6 pb-6 ios-fade-up">
+    <div className="flex flex-col gap-6 pb-8 ios-fade-up">
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -167,121 +168,156 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
           <ChevronLeft className="h-5 w-5" strokeWidth={2.25} />
         </button>
         <div className="min-w-0 flex-1">
-          <h1 className="text-[20px] font-bold tracking-tight text-white">Mon profil</h1>
-          <p className="text-[13px] text-[#8E8E93]">Statistiques & données personnelles</p>
+          <h1 className="text-[20px] font-bold tracking-tight text-white">Fiche combattant</h1>
+          <p className="text-[13px] text-[#8E8E93]">Stats d&apos;arène & données corporelles</p>
         </div>
         <Shield className="h-5 w-5 shrink-0 text-[#636366]" strokeWidth={2} aria-hidden />
       </div>
 
       <TrustBanner />
 
-      <div className="flex flex-col items-center gap-3 pt-1">
-        <div className="relative">
-          <button
-            type="button"
-            onClick={openAvatarPicker}
-            disabled={avatarUploading || !user?.id}
-            className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/55"
-            aria-label="Changer la photo de profil"
-          >
-            <Avatar
-              username={username}
-              imageUrl={displayAvatarUrl}
-              size="xl"
-              loading={avatarUploading}
-              className="h-28 w-28 text-3xl ring-[3px] ring-[#FF2B2B]/40"
+      {/* En-tête joueur */}
+      <section
+        className="relative overflow-hidden rounded-3xl border border-[#FF2B2B]/20 p-5"
+        style={{
+          background:
+            'linear-gradient(160deg, rgb(20 20 22) 0%, rgb(28 14 16) 55%, rgb(18 18 20) 100%)',
+          boxShadow: '0 16px 48px rgb(255 43 43 / 0.08), inset 0 1px 0 rgb(255 255 255 / 0.05)',
+        }}
+      >
+        <div
+          className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full blur-3xl"
+          style={{ background: 'radial-gradient(circle, rgb(255 43 43 / 0.25) 0%, transparent 70%)' }}
+          aria-hidden
+        />
+
+        <div className="relative flex flex-col items-center gap-3 text-center">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={openAvatarPicker}
+              disabled={avatarUploading || !user?.id}
+              className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/55"
+              aria-label="Changer la photo de profil"
+            >
+              <div className="rounded-full p-1 ring-2 ring-[#FF2B2B]/50 ring-offset-2 ring-offset-[#141416]">
+                <Avatar
+                  username={username}
+                  imageUrl={displayAvatarUrl}
+                  size="xl"
+                  loading={avatarUploading}
+                  className="h-24 w-24 text-3xl"
+                />
+              </div>
+              {user?.id ? (
+                <span
+                  className="absolute -bottom-0.5 -right-0.5 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-[#2C2C2E] text-white shadow-[0_4px_12px_rgb(0_0_0_/0.45)]"
+                  aria-hidden
+                >
+                  <Pencil className="h-3.5 w-3.5" strokeWidth={2.5} />
+                </span>
+              ) : null}
+            </button>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={handleAvatarChange}
+              tabIndex={-1}
             />
-            {user?.id ? (
-              <span
-                className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-[#2C2C2E] text-white shadow-[0_4px_12px_rgb(0_0_0_/0.45)]"
-                aria-hidden
-              >
-                <Pencil className="h-3.5 w-3.5" strokeWidth={2.5} />
-              </span>
-            ) : null}
-          </button>
-          <input
-            ref={avatarInputRef}
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            onChange={handleAvatarChange}
-            tabIndex={-1}
-          />
-        </div>
-        <p className="text-[22px] font-bold tracking-tight text-white">{username}</p>
-        <p className="text-[14px] font-medium text-[#FF6961]">{rank.title}</p>
-        {avatarError ? (
-          <p className="text-center text-[12px] text-[#FF453A]">{avatarError}</p>
-        ) : null}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="glass-card rounded-2xl p-4">
-          <p className="text-[12px] font-semibold uppercase tracking-wide text-[#8E8E93]">
-            Niveau
-          </p>
-          <p className="mt-1 text-[32px] font-black tabular-nums tracking-tight text-white">
-            {level}
-          </p>
-          <p className="mt-0.5 text-[13px] text-[#636366]">{rank.tier}</p>
-        </div>
-        <div className="glass-card rounded-2xl p-4">
-          <div className="mb-1 flex items-center gap-1.5">
-            <Dumbbell className="h-3.5 w-3.5 text-[#00B4FF]" strokeWidth={2.25} />
-            <p className="text-[12px] font-semibold uppercase tracking-wide text-[#8E8E93]">
-              Séances
-            </p>
           </div>
-          <p className="mt-1 text-[32px] font-black tabular-nums tracking-tight text-white">
-            {sessionCount}
-          </p>
-          <p className="mt-0.5 text-[13px] text-[#636366]">Total enregistrées</p>
-        </div>
-      </div>
 
+          <div>
+            <h2 className="text-[24px] font-black tracking-tight text-white">{username}</h2>
+            <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#FF2B2B]/35 bg-[#FF2B2B]/15 px-3.5 py-1.5 text-[13px] font-bold text-[#FF6961]">
+              <Crosshair className="h-3.5 w-3.5" strokeWidth={2.5} />
+              Niveau {level} · {rank.title}
+            </span>
+          </div>
+
+          {avatarError ? (
+            <p className="text-[12px] text-[#FF453A]">{avatarError}</p>
+          ) : null}
+        </div>
+      </section>
+
+      {/* Bilan de l'Arène */}
       <section className="space-y-3">
-        <h2 className="ios-label px-1">Corps & métabolisme</h2>
+        <SectionTitle
+          icon={Swords}
+          title="Bilan de l'Arène"
+          subtitle="Profil de force — données de démonstration"
+        />
 
-        <label className="glass-card block rounded-2xl p-4">
-          <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
-            <Scale className="h-3.5 w-3.5 text-[#FF9F0A]" />
-            Poids
-          </span>
-          <div className="flex items-end gap-1">
-            <ClearableNumberInput
-              value={weightKg}
-              onChange={setWeightKg}
-              min={35}
-              max={250}
-              step={0.1}
-              required={false}
-              placeholder="70.5"
-              aria-label="Poids"
-              className="w-full bg-transparent text-[28px] font-bold text-white outline-none"
-            />
-            <span className="pb-1 text-[13px] text-[#8E8E93]">kg</span>
+        <div className="glass-card rounded-2xl p-4">
+          <ArenaRadarChart />
+        </div>
+
+        <div className="glass-card rounded-2xl p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-[#FF2B2B]" strokeWidth={2.25} />
+            <p className="text-[14px] font-semibold text-white">Courbe de Puissance</p>
           </div>
-        </label>
+          <PowerCurveChart />
+        </div>
+      </section>
+
+      {/* Assiduité */}
+      <section className="space-y-3">
+        <SectionTitle icon={Target} title="Assiduité hebdomadaire" />
+        <WeeklyAssiduityGauge completed={3} target={4} />
+      </section>
+
+      {/* Informations personnelles */}
+      <section className="space-y-3">
+        <SectionTitle icon={UserRound} title="Informations personnelles" subtitle="Corps & objectifs" />
 
         <div className="grid grid-cols-2 gap-3">
           <label className="glass-card block rounded-2xl p-4">
             <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
-              <UserRound className="h-3.5 w-3.5 text-[#FF9F0A]" />
-              Âge
+              <Scale className="h-3.5 w-3.5 text-[#FF9F0A]" />
+              Poids actuel
             </span>
-            <ClearableNumberInput
-              value={age}
-              onChange={setAge}
-              min={14}
-              max={90}
-              required={false}
-              placeholder="24"
-              aria-label="Âge"
-              className="w-full bg-transparent text-[24px] font-bold text-white outline-none"
-            />
+            <div className="flex items-end gap-1">
+              <ClearableNumberInput
+                value={weightKg}
+                onChange={setWeightKg}
+                min={35}
+                max={250}
+                step={0.1}
+                required={false}
+                placeholder="70.5"
+                aria-label="Poids actuel"
+                className="w-full bg-transparent text-[26px] font-bold text-white outline-none"
+              />
+              <span className="pb-1 text-[13px] text-[#8E8E93]">kg</span>
+            </div>
           </label>
 
+          <label className="glass-card block rounded-2xl p-4">
+            <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
+              <Target className="h-3.5 w-3.5 text-[#FF6961]" />
+              Poids cible
+            </span>
+            <div className="flex items-end gap-1">
+              <ClearableNumberInput
+                value={goalWeightKg}
+                onChange={setGoalWeightKg}
+                min={35}
+                max={250}
+                step={0.1}
+                required={false}
+                placeholder="68.0"
+                aria-label="Poids cible"
+                className="w-full bg-transparent text-[26px] font-bold text-white outline-none"
+              />
+              <span className="pb-1 text-[13px] text-[#8E8E93]">kg</span>
+            </div>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
           <label className="glass-card block rounded-2xl p-4">
             <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
               <Ruler className="h-3.5 w-3.5 text-[#00B4FF]" />
@@ -301,6 +337,23 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
               <span className="pb-0.5 text-[13px] text-[#8E8E93]">cm</span>
             </div>
           </label>
+
+          <label className="glass-card block rounded-2xl p-4">
+            <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
+              <UserRound className="h-3.5 w-3.5 text-[#FF9F0A]" />
+              Âge
+            </span>
+            <ClearableNumberInput
+              value={age}
+              onChange={setAge}
+              min={14}
+              max={90}
+              required={false}
+              placeholder="24"
+              aria-label="Âge"
+              className="w-full bg-transparent text-[24px] font-bold text-white outline-none"
+            />
+          </label>
         </div>
 
         {saveError ? (
@@ -319,17 +372,6 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
           {saving ? 'Enregistrement…' : 'Sauvegarder'}
         </button>
       </section>
-
-      <div className="flex flex-col gap-8 pt-2">
-        <RankShowcase rank={rank} level={level} />
-        <ProfileXPBar
-          level={level}
-          currentXp={currentXp % XP_PER_LEVEL}
-          xpToNextLevel={XP_PER_LEVEL}
-        />
-        <StatGrid />
-        <BadgeShowcase />
-      </div>
     </div>
   )
 }
