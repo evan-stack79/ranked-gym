@@ -295,7 +295,7 @@ export function SettingsScreen({
             }}
             className="btn-brand ios-press w-full rounded-2xl py-3.5 text-[15px] font-semibold text-white"
           >
-            Ouvrir mon profil complet
+            Voir mon profil complet
           </button>
         </div>
       </IosSheet>
@@ -314,8 +314,8 @@ export function SettingsScreen({
             disabled={ghostSaving}
           />
           <p className="px-1 text-[13px] leading-relaxed text-[#8E8E93]">
-            Le Mode Furtif masque ta localisation et ton identité dans le feed social. Tes données
-            d&apos;entraînement restent privées (RLS Supabase).
+            Le Mode Furtif masque ta localisation et ton identité. Tes données d&apos;entraînement
+            restent strictement privées et cryptées.
           </p>
         </div>
       </IosSheet>

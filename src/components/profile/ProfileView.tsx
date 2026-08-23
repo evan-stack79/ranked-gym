@@ -1,12 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
-import { RankShowcase } from './RankShowcase'
-import { ProfileXPBar } from './ProfileXPBar'
-import { StatGrid } from './StatGrid'
-import { BadgeShowcase } from './BadgeShowcase'
+import { useEffect, useState } from 'react'
 import { CloudBackupCard } from './CloudBackupCard'
 import { SettingsScreen } from '../settings/SettingsScreen'
+import { FullProfileScreen } from './FullProfileScreen'
 import { useAuth } from '../../context/AuthContext'
-import { getRankFromLevel } from '../../utils/rank'
 import {
   disciplineFromLabel,
   getDiscipline,
@@ -14,10 +10,12 @@ import {
   type AppDisciplineId,
 } from '../../data/disciplines'
 import { resolveGhostModeEnabled } from '../../services/ghostModeStorage'
+import {
+  ProfileNavigationProvider,
+  useProfileNavigation,
+} from '../../navigation/profileNavigation'
 
-const XP_PER_LEVEL = 1000
-
-export function ProfileView() {
+function ProfileViewContent() {
   const {
     user,
     profile,
@@ -29,7 +27,7 @@ export function ProfileView() {
     updateDiscipline,
     updateGhostMode,
   } = useAuth()
-  const profileSectionRef = useRef<HTMLDivElement>(null)
+  const { route, navigate, goBack } = useProfileNavigation()
   const [ghostSaving, setGhostSaving] = useState(false)
   const [disciplineId, setDisciplineId] = useState<AppDisciplineId>(() =>
     disciplineFromLabel(profile?.discipline) || getStoredDisciplineId(),
@@ -47,8 +45,12 @@ export function ProfileView() {
     }
   }, [profile?.discipline])
 
-  const scrollToProfile = () => {
-    profileSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  if (route === 'fullProfile') {
+    if (!isAuthenticated || !user) {
+      goBack()
+      return null
+    }
+    return <FullProfileScreen onBack={goBack} />
   }
 
   if (!isAuthenticated || !user) {
@@ -58,16 +60,13 @@ export function ProfileView() {
           username="Invité"
           isAuthenticated={false}
           onRequireAuth={() => requireAuth(() => undefined)}
-          onViewProfile={() => requireAuth(() => undefined)}
+          onViewProfile={() => requireAuth(() => navigate('fullProfile'))}
         />
         <CloudBackupCard />
       </div>
     )
   }
 
-  const level = profile?.level ?? 1
-  const currentXp = profile?.xp ?? 0
-  const rank = getRankFromLevel(level)
   const username = profile?.pseudo || user.displayName
   const discipline = getDiscipline(disciplineId)
   const ghostModeEnabled = resolveGhostModeEnabled(profile)
@@ -82,58 +81,42 @@ export function ProfileView() {
   }
 
   return (
-    <div className="flex flex-col gap-8 pb-4">
-      <div className="ios-fade-up">
-        <SettingsScreen
-          username={username}
-          avatarUrl={profile?.avatar_url}
-          email={user.email}
-          isAuthenticated
-          profileDiscipline={profile?.discipline ?? discipline.label}
-          ghostModeEnabled={ghostModeEnabled}
-          ghostSaving={ghostSaving}
-          userId={user.id}
-          onViewProfile={scrollToProfile}
-          onRequireAuth={() => requireAuth(() => undefined)}
-          onGhostModeChange={(enabled) => {
-            void handleGhostModeChange(enabled)
-          }}
-          onDisciplineChange={(label) => {
-            setDisciplineId(disciplineFromLabel(label))
-            void updateDiscipline(label)
-          }}
-          onAvatarUpdated={(url) => {
-            patchProfile({ avatar_url: url })
-            void refreshProfile()
-          }}
-          onSignOut={() => {
-            void signOut()
-          }}
-          showSignOut
-        />
-      </div>
-
-      <div ref={profileSectionRef} className="flex scroll-mt-6 flex-col gap-8">
-        <div className="ios-fade-up ios-fade-up-delay-1">
-          <RankShowcase rank={rank} level={level} />
-        </div>
-        <div className="ios-fade-up ios-fade-up-delay-2">
-          <ProfileXPBar
-            level={level}
-            currentXp={currentXp % XP_PER_LEVEL}
-            xpToNextLevel={XP_PER_LEVEL}
-          />
-        </div>
-        <div className="ios-fade-up ios-fade-up-delay-3">
-          <CloudBackupCard />
-        </div>
-        <div className="ios-fade-up" style={{ animationDelay: '0.18s' }}>
-          <StatGrid />
-        </div>
-        <div className="ios-fade-up" style={{ animationDelay: '0.24s' }}>
-          <BadgeShowcase />
-        </div>
-      </div>
+    <div className="flex flex-col gap-6 pb-4 ios-fade-up">
+      <SettingsScreen
+        username={username}
+        avatarUrl={profile?.avatar_url}
+        email={user.email}
+        isAuthenticated
+        profileDiscipline={profile?.discipline ?? discipline.label}
+        ghostModeEnabled={ghostModeEnabled}
+        ghostSaving={ghostSaving}
+        userId={user.id}
+        onViewProfile={() => navigate('fullProfile')}
+        onRequireAuth={() => requireAuth(() => undefined)}
+        onGhostModeChange={(enabled) => {
+          void handleGhostModeChange(enabled)
+        }}
+        onDisciplineChange={(label) => {
+          setDisciplineId(disciplineFromLabel(label))
+          void updateDiscipline(label)
+        }}
+        onAvatarUpdated={(url) => {
+          patchProfile({ avatar_url: url })
+          void refreshProfile()
+        }}
+        onSignOut={() => {
+          void signOut()
+        }}
+        showSignOut
+      />
     </div>
+  )
+}
+
+export function ProfileView() {
+  return (
+    <ProfileNavigationProvider>
+      <ProfileViewContent />
+    </ProfileNavigationProvider>
   )
 }
