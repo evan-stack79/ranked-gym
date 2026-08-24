@@ -10,7 +10,6 @@ import {
   ScanBarcode,
   Pencil,
   ScanLine,
-  Search,
 } from 'lucide-react'
 import type { BodyMorphology, MealEntry, MealType } from '../../types/nutrition'
 import { MEAL_TYPE_LABELS } from '../../utils/calories'
@@ -35,7 +34,7 @@ import { ScannedProductSheet } from './ScannedProductSheet'
 import { MealBudgetsCard } from './MealBudgetsCard'
 import { EditMealSheet } from './EditMealSheet'
 import { MealPhotoAnalyzer } from './MealPhotoAnalyzer'
-import { FoodTextSearchResults } from './FoodTextSearchResults'
+import { AddFoodScreen } from './AddFoodScreen'
 
 interface MealJournalProps {
   targetCalories: number
@@ -50,30 +49,6 @@ const MEAL_META: Record<
   lunch: { icon: Sun, accent: 'crimson', glow: '#FF2B2B' },
   dinner: { icon: Moon, accent: 'violet', glow: '#BF5AF2' },
   snack: { icon: Cookie, accent: 'blue', glow: '#00B4FF' },
-}
-
-function MealTypeChip({
-  type,
-  active,
-  onClick,
-}: {
-  type: MealType
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-all ${
-        active
-          ? 'border-[#34C759]/45 bg-[#34C759]/20 text-[#30D158]'
-          : 'border-white/10 bg-black/25 text-[#8E8E93]'
-      }`}
-    >
-      {MEAL_TYPE_LABELS[type]}
-    </button>
-  )
 }
 
 export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
@@ -189,6 +164,19 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     [user],
   )
 
+  const resetForm = () => {
+    setName('')
+    setSearchQuery('')
+    setCalories(350)
+    setProteinG('')
+    setCarbsG('')
+    setFatG('')
+    setSearchHits([])
+    setSearchError(null)
+    setSearchLoading(false)
+    setShowForm(false)
+  }
+
   const handleScanSave = (entry: {
     name: string
     mealType: MealType
@@ -213,6 +201,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     })
     setMeals(journal.meals)
     setScannedProduct(null)
+    resetForm()
 
     const remain = remainingMealBudget(
       targetCalories,
@@ -227,23 +216,11 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     }
   }
 
-  const resetForm = () => {
-    setName('')
-    setSearchQuery('')
-    setCalories(350)
-    setProteinG('')
-    setCarbsG('')
-    setFatG('')
-    setSearchHits([])
-    setSearchError(null)
-    setSearchLoading(false)
-    setShowForm(false)
-  }
-
   const openScanner = (forMeal?: MealType) => {
     if (forMeal) setPendingMealType(forMeal)
     requireAuth(() => {
       setScannerOpen(true)
+      if (showForm) return
       // Wait for the scanner panel to mount, then smooth-scroll it into view.
       requestAnimationFrame(() => {
         scrollToScanZone()
@@ -415,26 +392,28 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
         id="nutrition-scan-zone"
       >
         {!showForm ? (
-          <MealPhotoAnalyzer
-            onToast={showToast}
-            onAnalyzed={(result) => {
-              const journal = addMealToToday({
-                name: result.name,
-                mealType: result.mealType,
-                calories: result.calories,
-                proteinG: result.proteines,
-                carbsG: result.glucides,
-                fatG: result.lipides,
-              })
-              setMeals(journal.meals)
-            }}
-          />
+          <>
+            <MealPhotoAnalyzer
+              onToast={showToast}
+              onAnalyzed={(result) => {
+                const journal = addMealToToday({
+                  name: result.name,
+                  mealType: result.mealType,
+                  calories: result.calories,
+                  proteinG: result.proteines,
+                  carbsG: result.glucides,
+                  fatG: result.lipides,
+                })
+                setMeals(journal.meals)
+              }}
+            />
+            <BarcodeScanner
+              open={scannerOpen}
+              onClose={() => setScannerOpen(false)}
+              onProduct={handleScannedProduct}
+            />
+          </>
         ) : null}
-        <BarcodeScanner
-          open={scannerOpen}
-          onClose={() => setScannerOpen(false)}
-          onProduct={handleScannedProduct}
-        />
       </div>
 
       <MealBudgetsCard
@@ -473,195 +452,57 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
         </div>
       )}
 
-      {showForm && (
-        <div
-          className="glass-card space-y-4 rounded-3xl p-4"
-          style={{ boxShadow: '0 10px 30px rgb(0 0 0 / 0.25)' }}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-[15px] font-semibold text-white">Ajouter un aliment</p>
-            <button
-              type="button"
-              onClick={resetForm}
-              className="ios-press text-[12px] font-medium text-[#8E8E93]"
-            >
-              Fermer
-            </button>
-          </div>
-
-          <label className="relative block">
-            <span className="sr-only">Rechercher un aliment</span>
-            <Search
-              className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8E8E93]"
-              strokeWidth={2.25}
-              aria-hidden
-            />
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Rechercher un aliment, une marque..."
-              className="w-full rounded-2xl border border-white/10 bg-[#1C1C1E] py-3.5 pl-10 pr-3.5 text-[15px] text-white placeholder:text-[#636366] outline-none focus:border-[#FF2B2B]/45"
-              autoComplete="off"
-              autoFocus
-              role="searchbox"
-              aria-label="Rechercher un aliment Open Food Facts"
-            />
-          </label>
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => openScanner()}
-              className="ios-press flex min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border border-[#30D158]/40 bg-[#30D158]/15 px-3 py-3.5 text-[13px] font-semibold text-[#30D158]"
-            >
-              <ScanBarcode className="h-4 w-4 shrink-0" aria-hidden />
-              Scan Code-Barre
-            </button>
-            <MealPhotoAnalyzer
-              variant="button"
-              onToast={showToast}
-              onAnalyzed={(result) => {
-                const journal = addMealToToday({
-                  name: result.name,
-                  mealType: result.mealType,
-                  calories: result.calories,
-                  proteinG: result.proteines,
-                  carbsG: result.glucides,
-                  fatG: result.lipides,
-                })
-                setMeals(journal.meals)
-                setShowForm(false)
-              }}
-            />
-          </div>
-
-          <FoodTextSearchResults
-            query={searchQuery}
-            loading={searchLoading}
-            error={searchError}
-            hits={searchHits}
-            onSelect={(hit) => {
-              handleScannedProduct(hit)
-              setSearchQuery('')
-              setSearchHits([])
-              setShowForm(false)
-            }}
-          />
-
-          <form onSubmit={handleAdd} className="space-y-3 border-t border-white/8 pt-4">
-            <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-              Ou saisie manuelle
-            </p>
-
-            <div className="flex flex-wrap gap-1.5">
-              {(Object.keys(MEAL_META) as MealType[]).map((type) => (
-                <MealTypeChip
-                  key={type}
-                  type={type}
-                  active={mealType === type}
-                  onClick={() => setMealType(type)}
-                />
-              ))}
-            </div>
-
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Nom</span>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Poulet riz brocoli…"
-                className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#34C759]/40"
-                required
+      {showForm ? (
+        <AddFoodScreen
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          searchLoading={searchLoading}
+          searchError={searchError}
+          searchHits={searchHits}
+          onSelectHit={(hit) => {
+            handleScannedProduct(hit)
+            setSearchQuery('')
+            setSearchHits([])
+          }}
+          onOpenScanner={() => openScanner()}
+          scannerSlot={
+            scannerOpen ? (
+              <BarcodeScanner
+                open={scannerOpen}
+                onClose={() => setScannerOpen(false)}
+                onProduct={handleScannedProduct}
               />
-            </label>
-
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
-                  Calories
-                </span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={5000}
-                  value={calories}
-                  onChange={(e) => setCalories(Number(e.target.value))}
-                  className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#FF9F0A]/40"
-                  required
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
-                  Protéines (g)
-                </span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  max={400}
-                  value={proteinG}
-                  onChange={(e) =>
-                    setProteinG(e.target.value === '' ? '' : Number(e.target.value))
-                  }
-                  placeholder="Optionnel"
-                  className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/40"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
-                  Glucides (g)
-                </span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  max={400}
-                  value={carbsG}
-                  onChange={(e) =>
-                    setCarbsG(e.target.value === '' ? '' : Number(e.target.value))
-                  }
-                  placeholder="Optionnel"
-                  className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF9F0A]/40"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
-                  Lipides (g)
-                </span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  max={400}
-                  value={fatG}
-                  onChange={(e) => setFatG(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="Optionnel"
-                  className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#00B4FF]/40"
-                />
-              </label>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={resetForm}
-                className="flex-1 rounded-xl border border-white/10 bg-ios-inset py-3 text-[15px] font-medium text-[#8E8E93]"
-              >
-                Annuler
-              </button>
-              <button
-                type="submit"
-                className="btn-brand flex-1 rounded-xl border border-white/15 py-3 text-[15px] font-semibold text-white"
-              >
-                Enregistrer
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+            ) : null
+          }
+          onToast={showToast}
+          onPhotoAnalyzed={(result) => {
+            const journal = addMealToToday({
+              name: result.name,
+              mealType: result.mealType,
+              calories: result.calories,
+              proteinG: result.proteinG,
+              carbsG: result.carbsG,
+              fatG: result.fatG,
+            })
+            setMeals(journal.meals)
+            resetForm()
+          }}
+          name={name}
+          onNameChange={setName}
+          calories={calories}
+          onCaloriesChange={setCalories}
+          proteinG={proteinG}
+          onProteinChange={setProteinG}
+          carbsG={carbsG}
+          onCarbsChange={setCarbsG}
+          fatG={fatG}
+          onFatChange={setFatG}
+          mealType={mealType}
+          onMealTypeChange={setMealType}
+          onSubmitManual={handleAdd}
+          onClose={resetForm}
+        />
+      ) : null}
 
       {meals.length === 0 ? (
         <div className="glass-card flex flex-col items-center gap-3 rounded-3xl px-6 py-10 text-center">
@@ -750,7 +591,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
 
       {toast ? (
         <div
-          className={`fixed left-1/2 z-[80] max-w-[92%] -translate-x-1/2 rounded-2xl border px-4 py-3 text-center text-[13px] font-medium shadow-lg ${
+          className={`fixed left-1/2 z-[120] max-w-[92%] -translate-x-1/2 rounded-2xl border px-4 py-3 text-center text-[13px] font-medium shadow-lg ${
             toast.variant === 'error'
               ? 'bottom-[calc(var(--app-bottom-nav)+env(safe-area-inset-bottom,0px)+1rem)] border-[#FF453A]/40 bg-[#2C1014]/95 text-[#FF6961]'
               : 'bottom-[calc(var(--app-bottom-nav)+env(safe-area-inset-bottom,0px)+1rem)] border-[#30D158]/35 bg-[#102C18]/95 text-white'
