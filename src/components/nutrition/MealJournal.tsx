@@ -10,6 +10,7 @@ import {
   ScanBarcode,
   Pencil,
   ScanLine,
+  Search,
 } from 'lucide-react'
 import type { BodyMorphology, MealEntry, MealType } from '../../types/nutrition'
 import { MEAL_TYPE_LABELS } from '../../utils/calories'
@@ -86,6 +87,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   const [editingMeal, setEditingMeal] = useState<MealEntry | null>(null)
   const [pendingMealType, setPendingMealType] = useState<MealType | null>(null)
   const [name, setName] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const [calories, setCalories] = useState(350)
   const [proteinG, setProteinG] = useState<number | ''>('')
   const [carbsG, setCarbsG] = useState<number | ''>('')
@@ -136,7 +138,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
       return
     }
 
-    const term = name.trim()
+    const term = searchQuery.trim()
     if (term.length < 2) {
       setSearchHits([])
       setSearchError(null)
@@ -169,7 +171,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [name, showForm])
+  }, [searchQuery, showForm])
 
   const pendingRemaining = useMemo(() => {
     if (!pendingMealType) return 0
@@ -227,6 +229,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
 
   const resetForm = () => {
     setName('')
+    setSearchQuery('')
     setCalories(350)
     setProteinG('')
     setCarbsG('')
@@ -411,20 +414,22 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
         className="scroll-mt-24 space-y-3"
         id="nutrition-scan-zone"
       >
-        <MealPhotoAnalyzer
-          onToast={showToast}
-          onAnalyzed={(result) => {
-            const journal = addMealToToday({
-              name: result.name,
-              mealType: result.mealType,
-              calories: result.calories,
-              proteinG: result.proteines,
-              carbsG: result.glucides,
-              fatG: result.lipides,
-            })
-            setMeals(journal.meals)
-          }}
-        />
+        {!showForm ? (
+          <MealPhotoAnalyzer
+            onToast={showToast}
+            onAnalyzed={(result) => {
+              const journal = addMealToToday({
+                name: result.name,
+                mealType: result.mealType,
+                calories: result.calories,
+                proteinG: result.proteines,
+                carbsG: result.glucides,
+                fatG: result.lipides,
+              })
+              setMeals(journal.meals)
+            }}
+          />
+        ) : null}
         <BarcodeScanner
           open={scannerOpen}
           onClose={() => setScannerOpen(false)}
@@ -469,129 +474,193 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
       )}
 
       {showForm && (
-        <form
-          onSubmit={handleAdd}
+        <div
           className="glass-card space-y-4 rounded-3xl p-4"
           style={{ boxShadow: '0 10px 30px rgb(0 0 0 / 0.25)' }}
         >
-          <p className="text-[15px] font-semibold text-white">Nouveau repas (manuel)</p>
-
-          <div className="flex flex-wrap gap-1.5">
-            {(Object.keys(MEAL_META) as MealType[]).map((type) => (
-              <MealTypeChip
-                key={type}
-                type={type}
-                active={mealType === type}
-                onClick={() => setMealType(type)}
-              />
-            ))}
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[15px] font-semibold text-white">Ajouter un aliment</p>
+            <button
+              type="button"
+              onClick={resetForm}
+              className="ios-press text-[12px] font-medium text-[#8E8E93]"
+            >
+              Fermer
+            </button>
           </div>
 
-          <label className="block">
-            <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Nom</span>
+          <label className="relative block">
+            <span className="sr-only">Rechercher un aliment</span>
+            <Search
+              className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8E8E93]"
+              strokeWidth={2.25}
+              aria-hidden
+            />
             <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Rechercher un aliment (ex. yaourt Auchan)…"
-              className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#34C759]/40"
-              required
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Rechercher un aliment, une marque..."
+              className="w-full rounded-2xl border border-white/10 bg-[#1C1C1E] py-3.5 pl-10 pr-3.5 text-[15px] text-white placeholder:text-[#636366] outline-none focus:border-[#FF2B2B]/45"
               autoComplete="off"
+              autoFocus
               role="searchbox"
-              aria-label="Recherche d’aliments Open Food Facts"
+              aria-label="Rechercher un aliment Open Food Facts"
             />
           </label>
 
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => openScanner()}
+              className="ios-press flex min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border border-[#30D158]/40 bg-[#30D158]/15 px-3 py-3.5 text-[13px] font-semibold text-[#30D158]"
+            >
+              <ScanBarcode className="h-4 w-4 shrink-0" aria-hidden />
+              Scan Code-Barre
+            </button>
+            <MealPhotoAnalyzer
+              variant="button"
+              onToast={showToast}
+              onAnalyzed={(result) => {
+                const journal = addMealToToday({
+                  name: result.name,
+                  mealType: result.mealType,
+                  calories: result.calories,
+                  proteinG: result.proteines,
+                  carbsG: result.glucides,
+                  fatG: result.lipides,
+                })
+                setMeals(journal.meals)
+                setShowForm(false)
+              }}
+            />
+          </div>
+
           <FoodTextSearchResults
-            query={name}
+            query={searchQuery}
             loading={searchLoading}
             error={searchError}
             hits={searchHits}
             onSelect={(hit) => {
               handleScannedProduct(hit)
+              setSearchQuery('')
+              setSearchHits([])
               setShowForm(false)
             }}
           />
 
-          <div className="grid grid-cols-2 gap-3">
+          <form onSubmit={handleAdd} className="space-y-3 border-t border-white/8 pt-4">
+            <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+              Ou saisie manuelle
+            </p>
+
+            <div className="flex flex-wrap gap-1.5">
+              {(Object.keys(MEAL_META) as MealType[]).map((type) => (
+                <MealTypeChip
+                  key={type}
+                  type={type}
+                  active={mealType === type}
+                  onClick={() => setMealType(type)}
+                />
+              ))}
+            </div>
+
             <label className="block">
-              <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Calories</span>
+              <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Nom</span>
               <input
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={5000}
-                value={calories}
-                onChange={(e) => setCalories(Number(e.target.value))}
-                className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#FF9F0A]/40"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Poulet riz brocoli…"
+                className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#34C759]/40"
                 required
               />
             </label>
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
-                Protéines (g)
-              </span>
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                max={400}
-                value={proteinG}
-                onChange={(e) =>
-                  setProteinG(e.target.value === '' ? '' : Number(e.target.value))
-                }
-                placeholder="Optionnel"
-                className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/40"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
-                Glucides (g)
-              </span>
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                max={400}
-                value={carbsG}
-                onChange={(e) => setCarbsG(e.target.value === '' ? '' : Number(e.target.value))}
-                placeholder="Optionnel"
-                className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF9F0A]/40"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
-                Lipides (g)
-              </span>
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                max={400}
-                value={fatG}
-                onChange={(e) => setFatG(e.target.value === '' ? '' : Number(e.target.value))}
-                placeholder="Optionnel"
-                className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#00B4FF]/40"
-              />
-            </label>
-          </div>
 
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={resetForm}
-              className="flex-1 rounded-xl border border-white/10 bg-ios-inset py-3 text-[15px] font-medium text-[#8E8E93]"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              className="btn-brand flex-1 rounded-xl border border-white/15 py-3 text-[15px] font-semibold text-white"
-            >
-              Enregistrer
-            </button>
-          </div>
-        </form>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                  Calories
+                </span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={5000}
+                  value={calories}
+                  onChange={(e) => setCalories(Number(e.target.value))}
+                  className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#FF9F0A]/40"
+                  required
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                  Protéines (g)
+                </span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={400}
+                  value={proteinG}
+                  onChange={(e) =>
+                    setProteinG(e.target.value === '' ? '' : Number(e.target.value))
+                  }
+                  placeholder="Optionnel"
+                  className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/40"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                  Glucides (g)
+                </span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={400}
+                  value={carbsG}
+                  onChange={(e) =>
+                    setCarbsG(e.target.value === '' ? '' : Number(e.target.value))
+                  }
+                  placeholder="Optionnel"
+                  className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF9F0A]/40"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                  Lipides (g)
+                </span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={400}
+                  value={fatG}
+                  onChange={(e) => setFatG(e.target.value === '' ? '' : Number(e.target.value))}
+                  placeholder="Optionnel"
+                  className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#00B4FF]/40"
+                />
+              </label>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={resetForm}
+                className="flex-1 rounded-xl border border-white/10 bg-ios-inset py-3 text-[15px] font-medium text-[#8E8E93]"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                className="btn-brand flex-1 rounded-xl border border-white/15 py-3 text-[15px] font-semibold text-white"
+              >
+                Enregistrer
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
       {meals.length === 0 ? (
