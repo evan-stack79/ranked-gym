@@ -53,11 +53,34 @@ function renderActiveView(
   }
 }
 
+function AuthGateShell() {
+  return (
+    <div className="relative flex min-h-[100dvh] flex-col mesh-bg font-sans">
+      <header
+        className="glass-bar sticky top-0 z-40 border-b border-white/5"
+        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+      >
+        <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-3">
+          <span className="text-[17px] font-semibold tracking-tight text-white">
+            Ranked <span className="text-[#FF2B2B]">Gym</span>
+          </span>
+        </div>
+      </header>
+      <main className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center gap-3 px-5 py-8 text-center">
+        <p className="text-[22px] font-bold tracking-tight text-white">Bêta privée</p>
+        <p className="max-w-sm text-[15px] leading-relaxed text-[#8E8E93]">
+          Connexion requise. Accès sur invitation uniquement.
+        </p>
+      </main>
+    </div>
+  )
+}
+
 function AppShell() {
   const [phase, setPhase] = useState<AppPhase>('loading')
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [launchRoutineId, setLaunchRoutineId] = useState<string | null>(null)
-  const { requireAuth, isAuthenticated, isLoading } = useAuth()
+  const { openAuth, isAuthenticated, isLoading, isAuthOpen } = useAuth()
 
   useEffect(() => {
     if (isLoading) {
@@ -65,8 +88,19 @@ function AppShell() {
       return
     }
 
+    // Pas de session Supabase → bloquer toute l’app (Lobby / Train / Nutri / Profil).
+    if (!isAuthenticated) {
+      setPhase('loading')
+      return
+    }
+
     setPhase(resolveLaunchPhase())
-  }, [isLoading])
+  }, [isLoading, isAuthenticated])
+
+  useEffect(() => {
+    if (isLoading || isAuthenticated) return
+    if (!isAuthOpen) openAuth()
+  }, [isLoading, isAuthenticated, isAuthOpen, openAuth])
 
   useEffect(() => {
     const syncOnboardingPhase = () => {
@@ -89,20 +123,25 @@ function AppShell() {
   }, [])
 
   useEffect(() => {
-    if (!isAuthenticated && activeTab === 'profile') {
+    if (!isAuthenticated) {
       setActiveTab('home')
+      setLaunchRoutineId(null)
     }
-  }, [isAuthenticated, activeTab])
+  }, [isAuthenticated])
 
   const handleTabChange = (tab: TabId) => {
-    if (tab === 'profile' && !isAuthenticated) {
-      requireAuth(() => setActiveTab('profile'))
+    if (!isAuthenticated) {
+      openAuth()
       return
     }
     setActiveTab(tab)
   }
 
   const handleStartTraining = (routineId: string) => {
+    if (!isAuthenticated) {
+      openAuth()
+      return
+    }
     setLaunchRoutineId(routineId)
     setActiveTab('training')
   }
@@ -116,7 +155,7 @@ function AppShell() {
     setActiveTab('home')
   }
 
-  if (phase === 'loading') {
+  if (isLoading) {
     return (
       <>
         <SupabaseConfigBanner />
@@ -135,6 +174,16 @@ function AppShell() {
             <AppBootScreen />
           </main>
         </div>
+        <AuthBottomSheet />
+      </>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <>
+        <SupabaseConfigBanner />
+        <AuthGateShell />
         <AuthBottomSheet />
       </>
     )

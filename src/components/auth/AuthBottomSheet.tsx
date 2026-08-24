@@ -2,13 +2,11 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Loader2, Mail } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { IosSheet } from '../ui/IosSheet'
-import { DisciplinePicker } from '../discipline/DisciplinePicker'
-import {
-  getDiscipline,
-  getStoredDisciplineId,
-  type AppDisciplineId,
-} from '../../data/disciplines'
 
+/**
+ * Bêta privée — connexion email/mot de passe uniquement.
+ * Aucune inscription publique (Sign Up désactivé).
+ */
 export function AuthBottomSheet() {
   const {
     isAuthOpen,
@@ -16,102 +14,43 @@ export function AuthBottomSheet() {
     authLoading,
     authError,
     signInWithEmail,
-    signUpWithEmail,
+    isAuthenticated,
   } = useAuth()
 
-  const [mode, setMode] = useState<'signup' | 'login'>('signup')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [pseudo, setPseudo] = useState('')
-  const [disciplineId, setDisciplineId] = useState<AppDisciplineId>(() => getStoredDisciplineId())
+
+  /** Gate bêta : on ne peut pas fermer la feuille tant qu’il n’y a pas de session. */
+  const dismissible = !authLoading && isAuthenticated
 
   useEffect(() => {
     if (!isAuthOpen) {
       setEmail('')
       setPassword('')
-      setPseudo('')
-      setDisciplineId(getStoredDisciplineId())
-      setMode('signup')
     }
   }, [isAuthOpen])
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault()
-    if (mode === 'signup') {
-      void signUpWithEmail(
-        email,
-        password,
-        pseudo || undefined,
-        getDiscipline(disciplineId).label,
-      )
-    } else {
-      void signInWithEmail(email, password)
-    }
+    void signInWithEmail(email, password)
   }
 
   return (
     <IosSheet
       open={isAuthOpen}
       onClose={closeAuth}
-      dismissible={!authLoading}
+      dismissible={dismissible}
       title="Ranked Gym"
-      subtitle={mode === 'signup' ? 'Crée ton profil athlète' : 'Bon retour dans l’arène'}
+      subtitle="Bon retour dans l’arène"
       leading={<span className="mt-0.5 text-[15px] font-bold text-[#FF2B2B]">RG</span>}
     >
       <div className="space-y-4 pb-3">
-        <div className="flex gap-1 rounded-xl border border-white/10 bg-black/30 p-1">
-          <button
-            type="button"
-            onClick={() => setMode('signup')}
-            className={`ios-press flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition-colors ${
-              mode === 'signup' ? 'bg-[#FF2B2B] text-white' : 'text-[#8E8E93]'
-            }`}
-          >
-            Inscription
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('login')}
-            className={`ios-press flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition-colors ${
-              mode === 'login' ? 'bg-[#FF2B2B] text-white' : 'text-[#8E8E93]'
-            }`}
-          >
-            Connexion
-          </button>
-        </div>
-
         <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3.5 py-3">
           <Mail className="h-4 w-4 shrink-0 text-[#FF2B2B]" />
-          <p className="text-[13px] text-[#AEAEB2]">
-            Tous les sports — muscu, course, combat, vélo…
-          </p>
+          <p className="text-[13px] text-[#AEAEB2]">Connexion par email — bêta privée</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          {mode === 'signup' && (
-            <>
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Pseudo</span>
-                <input
-                  type="text"
-                  value={pseudo}
-                  onChange={(e) => setPseudo(e.target.value)}
-                  placeholder="Evan_Lift"
-                  disabled={authLoading}
-                  maxLength={24}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
-                />
-              </label>
-
-              <div>
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
-                  Sport principal
-                </span>
-                <DisciplinePicker value={disciplineId} onChange={setDisciplineId} compact />
-              </div>
-            </>
-          )}
-
           <label className="block">
             <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Email</span>
             <input
@@ -132,12 +71,12 @@ export function AuthBottomSheet() {
             </span>
             <input
               type="password"
-              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+              autoComplete="current-password"
               required
               minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="6 caractères minimum"
+              placeholder="Ton mot de passe"
               disabled={authLoading}
               className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
             />
@@ -157,10 +96,8 @@ export function AuthBottomSheet() {
             {authLoading ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin" />
-                {mode === 'signup' ? 'Création…' : 'Connexion…'}
+                Connexion…
               </>
-            ) : mode === 'signup' ? (
-              'Créer mon profil'
             ) : (
               'Se connecter'
             )}
@@ -168,9 +105,7 @@ export function AuthBottomSheet() {
         </form>
 
         <p className="pt-1 text-center text-[11px] leading-relaxed text-[#636366]">
-          {mode === 'signup'
-            ? 'Déjà un compte ? Passe sur Connexion.'
-            : 'Nouveau ici ? Passe sur Inscription.'}
+          Bêta fermée. Les inscriptions publiques sont actuellement désactivées.
         </p>
       </div>
     </IosSheet>

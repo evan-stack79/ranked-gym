@@ -17,7 +17,6 @@ import {
   mapSessionUser,
   signInWithEmail as apiSignInWithEmail,
   signOut as apiSignOut,
-  signUpWithEmail,
   updateProfileProgress,
   type AuthUser,
 } from '../services/authService'
@@ -299,11 +298,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const closeAuth = useCallback(() => {
+    // Bêta privée : pas de fermeture tant qu’il n’y a pas de session Supabase.
+    if (!session?.user) return
     setIsAuthOpen(false)
     setAuthError(null)
     pendingRef.current = null
     setAuthLoading(false)
-  }, [])
+  }, [session])
 
   const requireAuth = useCallback(
     (onSuccess: AuthSuccessCallback) => {
@@ -335,31 +336,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [completePending],
   )
 
+  /** Inscriptions publiques désactivées (bêta fermée / invitation uniquement). */
   const signUpEmail = useCallback(
-    async (email: string, password: string, pseudo?: string, discipline?: string) => {
-      if (!isSupabaseConfigured()) {
-        setAuthError(getSupabaseConfigError())
-        return
-      }
-      setAuthLoading(true)
-      setAuthError(null)
-      try {
-        const data = await signUpWithEmail(email, password, pseudo, discipline)
-        if (discipline) syncLocalDiscipline(discipline)
-        if (!data.session) {
-          setAuthError(
-            'Compte créé, mais la confirmation email est encore activée sur Supabase. Désactive “Confirm email” (Authentication → Providers → Email), puis reconnecte-toi avec le même email/mot de passe.',
-          )
-          setAuthLoading(false)
-          return
-        }
-        completePending()
-      } catch (err) {
-        setAuthError(friendlyAuthError(err, 'Inscription impossible.'))
-        setAuthLoading(false)
-      }
+    async (_email: string, _password: string, _pseudo?: string, _discipline?: string) => {
+      setAuthError(
+        'Bêta fermée. Les inscriptions publiques sont actuellement désactivées.',
+      )
+      setAuthLoading(false)
     },
-    [completePending],
+    [],
   )
 
   const updateDiscipline = useCallback(
