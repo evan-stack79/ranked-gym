@@ -4,7 +4,6 @@ import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
 interface StepsCardProps {
   steps: number
   burnedKcal: number
-  bonusKcal: number
   goalLabel: string
   healthLinked: boolean
   onStepsChange: (steps: number) => void
@@ -14,7 +13,6 @@ interface StepsCardProps {
 export function StepsCard({
   steps,
   burnedKcal,
-  bonusKcal,
   goalLabel,
   healthLinked,
   onStepsChange,
@@ -85,9 +83,9 @@ export function StepsCard({
       <div className="mt-3 flex items-start gap-2 rounded-2xl border border-[#30D158]/25 bg-[#30D158]/10 px-3.5 py-3">
         <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#30D158]" />
         <p className="text-[12px] leading-relaxed text-[#AEAEB2]">
-          ~{burnedKcal} kcal dépensées · objectif <span className="text-white">{goalLabel}</span> →
-          on ajoute <span className="font-semibold text-[#30D158]">+{bonusKcal} kcal</span> à
-          manger pour rééquilibrer (Nutri se met à jour).
+          ~{burnedKcal} kcal estimées aujourd&apos;hui (pas + séances). Ta cible Nutri (
+          <span className="text-white">{goalLabel}</span>) inclut déjà ton niveau d&apos;activité
+          habituel via l&apos;EER — ces calories ne s&apos;ajoutent pas au plan.
         </p>
       </div>
     </section>

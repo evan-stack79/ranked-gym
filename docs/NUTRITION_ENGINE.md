@@ -15,7 +15,7 @@ API Edge : `supabase/functions/nutrition-engine/index.ts`.
 | C2 | Règle 6 — Lipides | `Lip_Target_Kcal = Target × 0.25` peut être **<** `Lip_Min` (ex. 130 kg → 585 kcal lipides > 25 % d’une cible basse) | Étape 2 Waterfall bloquée | `Lip_Target_g = max(Lip_Min_g, Target_Kcal × 0.25 / 9)` |
 | C3 | Règle 6 — Glucides | `Gluc_Target = 8 g/kg` (endurance) vs « tout le reliquat aux glucides » | Le reliquat peut dépasser 8 g/kg | Comportement mathématique autorisé : `Gluc_Target` informatif ; l’étape 3 assigne **100 %** du reliquat (pas de plafond) |
 | C4 | Cas limite / test 5 | Forcer lipides à 585 kcal peut rendre `Target < BCMR` | Moteur doit rejeter avant allocation | Testé : `ERR_TARGET_BELOW_BCMR` si `Target < BCMR` — jamais de remplacement silencieux |
-| C5 | App existante | `nutritionActivity.ts` ajoute encore steps/workout kcal à la cible | Violation règle « aucune calorie montre » | Hors scope moteur pur ; migration UI à planifier séparément |
+| C5 | App existante | ~~`nutritionActivity.ts` ajoute encore steps/workout kcal à la cible~~ | Résolu : UI branchée sur `runNutritionEngine()` via `getNutritionTarget()` ; `activityBonus` toujours 0 | — |
 
 ### Cohérence vérifiée
 

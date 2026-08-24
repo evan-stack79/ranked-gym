@@ -10,7 +10,7 @@ import {
   getCalorieProfile,
   saveCalorieProfile,
 } from '../../services/nutritionStorage'
-import { getAdjustedNutritionTarget } from '../../services/nutritionActivity'
+import { getNutritionTarget } from '../../services/nutritionActivity'
 import { useAuth } from '../../context/AuthContext'
 import type { CalorieProfile } from '../../types/nutrition'
 
@@ -19,9 +19,8 @@ export function NutritionView() {
   const [profile, setProfile] = useState<CalorieProfile>(() => getCalorieProfile())
   const [showSetupEditor, setShowSetupEditor] = useState(false)
 
-  const adjusted = useMemo(() => getAdjustedNutritionTarget(profile), [profile])
-  const targetCalories = adjusted.targetCalories
-  const activityBonus = adjusted.activityBonus
+  const nutrition = useMemo(() => getNutritionTarget(profile), [profile])
+  const targetCalories = nutrition.targetCalories
 
   useEffect(() => {
     if (isBootLoading) return
@@ -81,9 +80,7 @@ export function NutritionView() {
             <p className="mt-2 text-[17px] text-[#8E8E93]">
               {showSetupEditor
                 ? 'Ajuste ton objectif et ton plan calorique.'
-                : activityBonus > 0
-                  ? `Plan +${activityBonus} kcal liés à ton activité Train.`
-                  : 'Plan adapté à ton objectif et ta morphologie.'}
+                : 'Plan IOM adapté à ton objectif, ton niveau d’activité et ton sport.'}
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">

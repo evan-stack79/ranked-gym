@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight, Ruler, Scale, Sparkles, Target, UserRound } from 'lucide-react'
 import type { ActivityLevel, BodyMorphology, CalorieProfile, NutritionGoal, Sex } from '../../types/nutrition'
-import { GOAL_LABELS, computeCaloriePlan } from '../../utils/calories'
+import { GOAL_LABELS } from '../../utils/calories'
+import { getNutritionTarget } from '../../services/nutritionActivity'
 import { MORPHOLOGY_LABELS } from '../../utils/morphology'
 import { normalizeCalorieProfile } from '../../services/nutritionStorage'
 import { IconBadge } from '../ui/IconBadge'
@@ -114,7 +115,14 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
     weeklyPaceKg,
   ])
 
-  const plan = useMemo(() => (draft ? computeCaloriePlan(draft) : null), [draft])
+  const nutrition = useMemo(() => (draft ? getNutritionTarget(draft) : null), [draft])
+
+  const estimatedWeeks = useMemo(() => {
+    if (!draft || draft.goal === 'maintain' || draft.weeklyPaceKg <= 0) return null
+    const deltaKg = Math.round((draft.goalWeightKg - draft.weightKg) * 10) / 10
+    if (deltaKg === 0) return null
+    return Math.max(1, Math.ceil(Math.abs(deltaKg) / draft.weeklyPaceKg))
+  }, [draft])
 
   const goBack = () => {
     setError(null)
@@ -480,14 +488,14 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
           </div>
         )}
 
-        {step === 'result' && draft && plan && (
+        {step === 'result' && draft && nutrition?.engineOk && (
           <div className="space-y-4">
             <div className="rounded-2xl border border-[#30D158]/25 bg-[#30D158]/10 p-4 text-center">
               <p className="text-[12px] font-semibold uppercase tracking-wide text-[#8E8E93]">
                 Objectif {GOAL_LABELS[draft.goal]} · {MORPHOLOGY_LABELS[morphology]}
               </p>
               <p className="mt-1 text-[42px] font-black tracking-tight text-white">
-                {plan.targetCalories}
+                {nutrition.targetCalories}
                 <span className="ml-1 text-[16px] font-semibold text-[#30D158]">kcal/j</span>
               </p>
               <p className="mt-2 text-[13px] text-[#AEAEB2]">
@@ -495,15 +503,15 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
                 {draft.goal !== 'maintain' && (
                   <> · {draft.weeklyPaceKg.toFixed(1)} kg/sem.</>
                 )}
-                {plan.estimatedWeeks != null && <> · ~{plan.estimatedWeeks} sem.</>}
+                {estimatedWeeks != null && <> · ~{estimatedWeeks} sem.</>}
               </p>
             </div>
 
             <div className="grid grid-cols-3 gap-2">
               {[
-                { label: 'Protéines', value: `${plan.proteinG} g` },
-                { label: 'Glucides', value: `${plan.carbsG} g` },
-                { label: 'Lipides', value: `${plan.fatG} g` },
+                { label: 'Protéines', value: `${nutrition.proteinG} g` },
+                { label: 'Glucides', value: `${nutrition.carbsG} g` },
+                { label: 'Lipides', value: `${nutrition.fatG} g` },
               ].map((item) => (
                 <div
                   key={item.label}

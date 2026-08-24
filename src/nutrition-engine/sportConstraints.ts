@@ -90,8 +90,8 @@ export function resolveProteinMinGPerKg(flags: SportFlags, goal: NutritionGoal):
 }
 
 /**
- * Prot_Target : non défini dans les règles fournies (sections A–I absentes).
- * Correction minimale auditée : Prot_Target_g = Prot_Min_g.
+ * Prot_Target — spec validée : aucune valeur numérique fournie hors Prot_Min.
+ * Voir docs/PROT_TARGET_DECISION.md. Prot_Target := Prot_Min (pas d’invention).
  */
 export function resolveProteinTargetGPerKg(protMinGPerKg: number): number {
   return protMinGPerKg
