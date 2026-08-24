@@ -44,7 +44,7 @@ function writeFired(map: Record<string, number>) {
 function buildNotificationPayload(body: string, tagKey: string): ReminderNotificationPayload {
   return {
     body,
-    icon: '/pwa-192x192.png',
+    icon: '/icon.png',
     badge: '/pwa-192x192.png',
     tag: `ranked-gym-${tagKey}`.slice(0, 64),
   }
