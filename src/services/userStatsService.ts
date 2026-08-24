@@ -3,6 +3,12 @@ import { safeError } from '../utils/safeLog'
 import type { ArenaRadarAxis } from '../components/profile/charts/ArenaRadarChart'
 import type { PowerCurvePoint } from '../components/profile/charts/PowerCurveChart'
 import { RADAR_AXIS_LABELS } from '../constants/radarLabels'
+import { dedupeWorkoutNotes } from '../utils/workoutHistory'
+import { getTrainingState } from './trainingStorage'
+import {
+  isTimestampInLocalWeek,
+  workoutValidationMs,
+} from '../utils/weekBounds'
 
 export type UserStatsRadar = {
   upper: number
@@ -19,11 +25,35 @@ export type UserStatsPayload = {
 }
 
 const EMPTY_WEEK_LABELS = ['S-3', 'S-2', 'S-1', 'Act.'] as const
+const WEEKLY_TARGET = 4
 
 function clampScore(value: unknown): number {
   const n = typeof value === 'number' ? value : Number(value)
   if (!Number.isFinite(n)) return 0
   return Math.max(0, Math.min(100, Math.round(n)))
+}
+
+function parseSessionCount(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n) || n < 0) return 0
+  return Math.round(n)
+}
+
+/**
+ * Séances validées dans la semaine locale (lun 00:00 → dim 23:59).
+ * Compte chaque note (pas seulement les séries avec poids > 0).
+ */
+export function countLocalWeekSessions(now = new Date()): number {
+  const notes = dedupeWorkoutNotes(getTrainingState().workoutNotes)
+  let count = 0
+  for (const note of notes) {
+    const ms = workoutValidationMs({
+      createdAt: note.createdAt,
+      dateKey: note.dateKey,
+    })
+    if (ms != null && isTimestampInLocalWeek(ms, now)) count += 1
+  }
+  return count
 }
 
 function emptyStats(): UserStatsPayload {
@@ -36,7 +66,7 @@ function emptyStats(): UserStatsPayload {
       { label: RADAR_AXIS_LABELS.regularity, value: 0 },
     ],
     benchCurve: EMPTY_WEEK_LABELS.map((label) => ({ label, valueKg: 0 })),
-    weeklySessions: { completed: 0, target: 4 },
+    weeklySessions: { completed: 0, target: WEEKLY_TARGET },
   }
 }
 
@@ -68,9 +98,13 @@ function parseRpcPayload(raw: unknown): UserStatsPayload {
         })
       : emptyStats().benchCurve
 
-  const completed = clampScore(weeklyRaw?.completed)
+  const rpcCompleted = parseSessionCount(weeklyRaw?.completed)
   const targetRaw = Number(weeklyRaw?.target)
-  const target = Number.isFinite(targetRaw) && targetRaw > 0 ? Math.round(targetRaw) : 4
+  const target =
+    Number.isFinite(targetRaw) && targetRaw > 0 ? Math.round(targetRaw) : WEEKLY_TARGET
+
+  const localCompleted = countLocalWeekSessions()
+  const completed = Math.max(rpcCompleted, localCompleted)
 
   return {
     radar,
@@ -80,8 +114,13 @@ function parseRpcPayload(raw: unknown): UserStatsPayload {
 }
 
 export async function fetchUserStats(userId: string): Promise<UserStatsPayload> {
+  const localCompleted = countLocalWeekSessions()
+
   if (!userId || !isSupabaseConfigured()) {
-    return emptyStats()
+    return {
+      ...emptyStats(),
+      weeklySessions: { completed: localCompleted, target: WEEKLY_TARGET },
+    }
   }
 
   try {
@@ -90,12 +129,25 @@ export async function fetchUserStats(userId: string): Promise<UserStatsPayload> 
 
     if (error) {
       safeError('[userStats] get_user_stats failed', error.message)
-      return emptyStats()
+      return {
+        ...emptyStats(),
+        weeklySessions: { completed: localCompleted, target: WEEKLY_TARGET },
+      }
     }
 
-    return parseRpcPayload(data)
+    const parsed = parseRpcPayload(data)
+    return {
+      ...parsed,
+      weeklySessions: {
+        completed: Math.max(parsed.weeklySessions.completed, localCompleted),
+        target: parsed.weeklySessions.target || WEEKLY_TARGET,
+      },
+    }
   } catch (err) {
     safeError('[userStats] fetchUserStats', err)
-    return emptyStats()
+    return {
+      ...emptyStats(),
+      weeklySessions: { completed: localCompleted, target: WEEKLY_TARGET },
+    }
   }
 }

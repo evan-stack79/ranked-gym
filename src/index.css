@@ -42,9 +42,9 @@ body {
 :root {
   /* Hauteur utile BottomNav (hors safe-area), ~70–80px */
   --app-bottom-nav: 80px;
-  /* Hauteur visuelle de l’îlot repos (compact) */
-  --rest-island-h: 6.5rem;
-  --rest-island-gap: 10px;
+  /* Hauteur visuelle de l’îlot repos (header + presets) */
+  --rest-island-h: 8.25rem;
+  --rest-island-gap: 12px;
   /* Ancrage fixed : juste au-dessus de la nav */
   --rest-bar-bottom: calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px));
   /* Espace scroll supplémentaire sous le contenu Train */
