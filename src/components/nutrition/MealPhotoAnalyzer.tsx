@@ -14,6 +14,8 @@ import { safeError } from '../../utils/safeLog'
 interface MealPhotoAnalyzerProps {
   onAnalyzed: (macros: MealPhotoMacros & { name: string; mealType: MealType }) => void
   onToast?: (message: string, variant?: 'success' | 'error') => void
+  /** Affichage compact (bouton) — même logique état / réseau que la carte. */
+  variant?: 'card' | 'button'
 }
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -26,7 +28,11 @@ function defaultMealType(): MealType {
   return 'snack'
 }
 
-export function MealPhotoAnalyzer({ onAnalyzed, onToast }: MealPhotoAnalyzerProps) {
+export function MealPhotoAnalyzer({
+  onAnalyzed,
+  onToast,
+  variant = 'card',
+}: MealPhotoAnalyzerProps) {
   const { user, isAuthenticated, requireAuth } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
@@ -125,68 +131,97 @@ export function MealPhotoAnalyzer({ onAnalyzed, onToast }: MealPhotoAnalyzerProp
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/25 p-3.5">
-      <div className="flex items-start gap-3">
-        <div className="shrink-0 rounded-xl bg-[#BF5AF2]/15 p-2.5">
-          {busy ? (
-            <Loader2 className="h-5 w-5 animate-spin text-[#BF5AF2]" />
-          ) : (
-            <Sparkles className="h-5 w-5 text-[#BF5AF2]" />
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-semibold text-white">Photo → macros (Gemini)</p>
-          <p className="mt-0.5 text-[12px] leading-snug text-[#8E8E93]">
-            Compression locale puis analyse sécurisée.
-          </p>
-          <p
-            className={`mt-1 text-[12px] font-semibold tabular-nums ${
-              remaining === 0 ? 'text-[#FF453A]' : 'text-[#30D158]'
-            }`}
-          >
-            {remaining == null
-              ? 'Scans IA : —/5 restants aujourd’hui'
-              : `Scans IA : ${remaining}/5 restants aujourd’hui`}
-          </p>
-
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {MEAL_TYPES.map((type) => (
-              <button
-                key={type}
-                type="button"
-                disabled={busy}
-                onClick={() => setMealType(type)}
-                className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-all ${
-                  mealType === type
-                    ? 'border-[#BF5AF2]/45 bg-[#BF5AF2]/20 text-[#E9D5FF]'
-                    : 'border-white/10 bg-black/25 text-[#8E8E93]'
-                }`}
-              >
-                {MEAL_TYPE_LABELS[type]}
-              </button>
-            ))}
-          </div>
-
+    <div
+      className={
+        variant === 'button'
+          ? 'min-w-0 flex-1'
+          : 'rounded-2xl border border-white/10 bg-black/25 p-3.5'
+      }
+    >
+      {variant === 'button' ? (
+        <>
           <button
             type="button"
             onClick={openPicker}
             disabled={busy || remaining === 0}
-            className="ios-press mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-[#BF5AF2]/40 bg-[#BF5AF2]/15 px-3.5 py-2 text-[13px] font-semibold text-[#E9D5FF] disabled:opacity-50"
+            className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-[#BF5AF2]/40 bg-[#BF5AF2]/15 px-3 py-3.5 text-[13px] font-semibold text-[#E9D5FF] disabled:opacity-50"
           >
-            <Camera className="h-4 w-4" />
-            {busy ? 'Analyse en cours…' : 'Photo repas'}
+            {busy ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+            ) : (
+              <Camera className="h-4 w-4" aria-hidden />
+            )}
+            {busy ? 'Analyse…' : 'Photo IA'}
           </button>
-        </div>
-        {previewUrl ? (
-          <img
-            src={previewUrl}
-            alt="Aperçu repas"
-            className="h-14 w-14 shrink-0 rounded-xl border border-white/10 object-cover"
-          />
-        ) : null}
-      </div>
+          {errorMessage ? (
+            <p className="mt-2 text-[11px] leading-snug text-[#FF6961]" role="alert">
+              {errorMessage}
+            </p>
+          ) : null}
+        </>
+      ) : (
+        <div className="flex items-start gap-3">
+          <div className="shrink-0 rounded-xl bg-[#BF5AF2]/15 p-2.5">
+            {busy ? (
+              <Loader2 className="h-5 w-5 animate-spin text-[#BF5AF2]" />
+            ) : (
+              <Sparkles className="h-5 w-5 text-[#BF5AF2]" />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-semibold text-white">Photo → macros (Gemini)</p>
+            <p className="mt-0.5 text-[12px] leading-snug text-[#8E8E93]">
+              Compression locale puis analyse sécurisée.
+            </p>
+            <p
+              className={`mt-1 text-[12px] font-semibold tabular-nums ${
+                remaining === 0 ? 'text-[#FF453A]' : 'text-[#30D158]'
+              }`}
+            >
+              {remaining == null
+                ? 'Scans IA : —/5 restants aujourd’hui'
+                : `Scans IA : ${remaining}/5 restants aujourd’hui`}
+            </p>
 
-      {errorMessage ? (
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              {MEAL_TYPES.map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setMealType(type)}
+                  className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                    mealType === type
+                      ? 'border-[#BF5AF2]/45 bg-[#BF5AF2]/20 text-[#E9D5FF]'
+                      : 'border-white/10 bg-black/25 text-[#8E8E93]'
+                  }`}
+                >
+                  {MEAL_TYPE_LABELS[type]}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={openPicker}
+              disabled={busy || remaining === 0}
+              className="ios-press mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-[#BF5AF2]/40 bg-[#BF5AF2]/15 px-3.5 py-2 text-[13px] font-semibold text-[#E9D5FF] disabled:opacity-50"
+            >
+              <Camera className="h-4 w-4" />
+              {busy ? 'Analyse en cours…' : 'Photo repas'}
+            </button>
+          </div>
+          {previewUrl ? (
+            <img
+              src={previewUrl}
+              alt="Aperçu repas"
+              className="h-14 w-14 shrink-0 rounded-xl border border-white/10 object-cover"
+            />
+          ) : null}
+        </div>
+      )}
+
+      {variant === 'card' && errorMessage ? (
         <div
           className="mt-3 flex items-start gap-2 rounded-xl border border-[#FF453A]/35 bg-[#FF453A]/10 px-3 py-2.5"
           role="alert"

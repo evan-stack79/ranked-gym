@@ -36,7 +36,11 @@ export function FoodTextSearchResults({
       ) : null}
 
       {hits.length > 0 ? (
-        <ul className="max-h-64 divide-y divide-white/8 overflow-y-auto overscroll-contain">
+        <ul
+          className="max-h-72 divide-y divide-white/8 overflow-y-auto overscroll-contain"
+          role="listbox"
+          aria-label="Résultats Open Food Facts"
+        >
           {hits.map((hit) => (
             <li key={`${hit.barcode}-${hit.nom}`}>
               <button
