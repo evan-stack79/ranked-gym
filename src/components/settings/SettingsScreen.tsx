@@ -11,7 +11,6 @@ import {
 import { Avatar } from '../ui/Avatar'
 import { uploadUserAvatar } from '../../services/avatarService'
 import { IosSheet } from '../ui/IosSheet'
-import { GhostModeToggle } from '../profile/GhostModeToggle'
 import { DisciplinePicker } from '../discipline/DisciplinePicker'
 import { ProPassCard } from './ProPassCard'
 import { SettingsMenuRow } from './SettingsMenuRow'
@@ -20,15 +19,12 @@ import {
   getDiscipline,
   type AppDisciplineId,
 } from '../../data/disciplines'
-import {
-  getLocalGhostModeEnabled,
-  resolveGhostModeEnabled,
-  setLocalGhostModeEnabled,
-} from '../../services/ghostModeStorage'
 
 const PRO_PASS_DISMISSED_KEY = 'ranked-gym:pro-pass-dismissed'
 
-export type SettingsSheet = 'personal' | 'privacy' | 'payment' | 'preferences' | null
+export type SettingsSheet = 'payment' | 'preferences' | null
+
+export type SettingsMenuId = 'personal' | 'privacy' | 'payment' | 'preferences'
 
 interface SettingsScreenProps {
   username: string
@@ -36,12 +32,11 @@ interface SettingsScreenProps {
   email?: string
   isAuthenticated: boolean
   profileDiscipline?: string
-  ghostModeEnabled?: boolean
-  ghostSaving?: boolean
   onViewProfile?: () => void
+  onOpenPersonalInfo?: () => void
+  onOpenSecurity?: () => void
   onRequireAuth?: () => void
   onTryPro?: () => void
-  onGhostModeChange?: (enabled: boolean) => void
   onDisciplineChange?: (disciplineLabel: string) => void
   onSignOut?: () => void
   showSignOut?: boolean
@@ -68,15 +63,13 @@ function writeProPassDismissed() {
 export function SettingsScreen({
   username,
   avatarUrl,
-  email,
   isAuthenticated,
   profileDiscipline,
-  ghostModeEnabled: ghostProp,
-  ghostSaving = false,
   onViewProfile,
+  onOpenPersonalInfo,
+  onOpenSecurity,
   onRequireAuth,
   onTryPro,
-  onGhostModeChange,
   onDisciplineChange,
   onSignOut,
   showSignOut = false,
@@ -86,7 +79,6 @@ export function SettingsScreen({
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const [proDismissed, setProDismissed] = useState(readProPassDismissed)
   const [sheet, setSheet] = useState<SettingsSheet>(null)
-  const [localGhost, setLocalGhost] = useState(getLocalGhostModeEnabled)
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [avatarError, setAvatarError] = useState<string | null>(null)
@@ -102,20 +94,6 @@ export function SettingsScreen({
       setDisciplineId(disciplineFromLabel(profileDiscipline))
     }
   }, [profileDiscipline])
-
-  const ghostEnabled = isAuthenticated
-    ? Boolean(ghostProp)
-    : localGhost
-
-  const handleGhostChange = (enabled: boolean) => {
-    if (isAuthenticated && onGhostModeChange) {
-      onGhostModeChange(enabled)
-      return
-    }
-    setLocalGhostModeEnabled(enabled)
-    setLocalGhost(enabled)
-    window.dispatchEvent(new Event('ranked-gym:ghost-mode-changed'))
-  }
 
   const openAvatarPicker = () => {
     if (!canEditAvatar || avatarUploading) return
@@ -158,8 +136,24 @@ export function SettingsScreen({
     setSheet('payment')
   }
 
+  const openPersonal = () => {
+    if (!isAuthenticated) {
+      onRequireAuth?.()
+      return
+    }
+    ;(onOpenPersonalInfo ?? onViewProfile)?.()
+  }
+
+  const openSecurity = () => {
+    if (!isAuthenticated) {
+      onRequireAuth?.()
+      return
+    }
+    onOpenSecurity?.()
+  }
+
   const menuSections: Array<{
-    items: Array<{ id: SettingsSheet; icon: typeof UserRound; label: string }>
+    items: Array<{ id: SettingsMenuId; icon: typeof UserRound; label: string }>
   }> = [
     {
       items: [
@@ -177,7 +171,7 @@ export function SettingsScreen({
         <div className="relative shrink-0">
           <button
             type="button"
-            onClick={canEditAvatar ? openAvatarPicker : onViewProfile}
+            onClick={canEditAvatar ? openAvatarPicker : openPersonal}
             disabled={avatarUploading}
             className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/55 disabled:opacity-100"
             aria-label={canEditAvatar ? 'Changer la photo de profil' : `Avatar de ${username}`}
@@ -203,13 +197,13 @@ export function SettingsScreen({
             type="file"
             accept="image/*"
             className="sr-only"
-            onChange={handleAvatarChange}
+            onChange={(e) => void handleAvatarChange(e)}
             tabIndex={-1}
           />
         </div>
         <button
           type="button"
-          onClick={onViewProfile}
+          onClick={openPersonal}
           className="ios-press min-w-0 flex-1 text-left"
         >
           <p className="truncate text-[22px] font-bold tracking-tight text-white">{username}</p>
@@ -245,7 +239,15 @@ export function SettingsScreen({
                   icon={item.icon}
                   label={item.label}
                   onClick={() => {
-                    if (!isAuthenticated && item.id !== 'privacy') {
+                    if (item.id === 'personal') {
+                      openPersonal()
+                      return
+                    }
+                    if (item.id === 'privacy') {
+                      openSecurity()
+                      return
+                    }
+                    if (!isAuthenticated) {
                       onRequireAuth?.()
                       return
                     }
@@ -270,57 +272,6 @@ export function SettingsScreen({
       )}
 
       <IosSheet
-        open={sheet === 'personal'}
-        onClose={() => setSheet(null)}
-        title="Informations personnelles"
-        subtitle="Compte & identité"
-        leading={<UserRound className="mt-0.5 h-5 w-5 text-[#8E8E93]" />}
-      >
-        <div className="space-y-4 pb-2">
-          <div className="glass-card rounded-2xl p-4">
-            <p className="text-[13px] text-[#8E8E93]">Pseudo</p>
-            <p className="mt-1 text-[17px] font-semibold text-white">{username}</p>
-            {email && (
-              <>
-                <p className="mt-4 text-[13px] text-[#8E8E93]">Email</p>
-                <p className="mt-1 break-all text-[15px] text-[#EBEBF5]">{email}</p>
-              </>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setSheet(null)
-              onViewProfile?.()
-            }}
-            className="btn-brand ios-press w-full rounded-2xl py-3.5 text-[15px] font-semibold text-white"
-          >
-            Voir mon profil complet
-          </button>
-        </div>
-      </IosSheet>
-
-      <IosSheet
-        open={sheet === 'privacy'}
-        onClose={() => setSheet(null)}
-        title="Sécurité & Confidentialité"
-        subtitle="Mode Furtif & données"
-        leading={<Shield className="mt-0.5 h-5 w-5 text-[#8E8E93]" />}
-      >
-        <div className="space-y-4 pb-2">
-          <GhostModeToggle
-            enabled={ghostEnabled}
-            onChange={handleGhostChange}
-            disabled={ghostSaving}
-          />
-          <p className="px-1 text-[13px] leading-relaxed text-[#8E8E93]">
-            Le Mode Furtif masque ta localisation et ton identité. Tes données d&apos;entraînement
-            restent strictement privées et cryptées.
-          </p>
-        </div>
-      </IosSheet>
-
-      <IosSheet
         open={sheet === 'payment'}
         onClose={() => setSheet(null)}
         title="Méthodes de paiement"
@@ -328,10 +279,7 @@ export function SettingsScreen({
         leading={<CreditCard className="mt-0.5 h-5 w-5 text-[#8E8E93]" />}
       >
         <div className="space-y-4 pb-2">
-          <ProPassCard
-            onTryFree={handleTryPro}
-            onDismiss={() => setSheet(null)}
-          />
+          <ProPassCard onTryFree={handleTryPro} onDismiss={() => setSheet(null)} />
           <p className="text-center text-[12px] text-[#636366]">
             Paiement sécurisé · Annulation à tout moment
           </p>
@@ -372,5 +320,3 @@ export function SettingsScreen({
     </div>
   )
 }
-
-export { resolveGhostModeEnabled }

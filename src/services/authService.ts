@@ -79,6 +79,27 @@ export async function signOut() {
   if (error) throw error
 }
 
+/** Vérifie l’ancien mot de passe puis met à jour le nouveau. */
+export async function changePassword(email: string, currentPassword: string, newPassword: string) {
+  const supabase = getSupabase()
+  const { error: reauthError } = await supabase.auth.signInWithPassword({
+    email: email.trim().toLowerCase(),
+    password: currentPassword,
+  })
+  if (reauthError) throw reauthError
+
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) throw error
+}
+
+/** Supprime le compte via RPC `delete_own_account` (cascade auth.users). */
+export async function deleteOwnAccount() {
+  const supabase = getSupabase()
+  const { error } = await supabase.rpc('delete_own_account')
+  if (error) throw error
+  await supabase.auth.signOut()
+}
+
 export async function fetchProfile(userId: string): Promise<ProfileRow | null> {
   const supabase = getSupabase()
   const { data, error } = await supabase
