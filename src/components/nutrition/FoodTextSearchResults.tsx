@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react'
+import { Loader2, Search } from 'lucide-react'
 import type { OpenFoodFactsSearchHit } from '../../services/alimentsService'
 
 interface FoodTextSearchResultsProps {
@@ -7,6 +7,8 @@ interface FoodTextSearchResultsProps {
   error: string | null
   hits: OpenFoodFactsSearchHit[]
   onSelect: (hit: OpenFoodFactsSearchHit) => void
+  /** Liste en flex-1 : occupe tout l’espace restant sous la barre de recherche. */
+  fill?: boolean
 }
 
 export function FoodTextSearchResults({
@@ -15,29 +17,53 @@ export function FoodTextSearchResults({
   error,
   hits,
   onSelect,
+  fill = false,
 }: FoodTextSearchResultsProps) {
-  if (query.trim().length < 2) return null
+  const trimmed = query.trim()
+  const idle = trimmed.length < 2
 
   return (
-    <div className="overflow-hidden rounded-xl border border-white/10 bg-black/40">
-      {loading ? (
-        <div className="flex items-center gap-2 px-3.5 py-3 text-[13px] text-[#8E8E93]">
+    <div
+      className={`flex min-h-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-black/40 ${
+        fill ? 'h-full' : ''
+      }`}
+    >
+      {idle ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-6 py-10 text-center">
+          <Search className="h-6 w-6 text-[#636366]" strokeWidth={1.75} aria-hidden />
+          <p className="text-[14px] font-medium text-[#8E8E93]">
+            Tape un aliment ou une marque
+          </p>
+          <p className="text-[12px] text-[#636366]">Résultats Open Food Facts (France)</p>
+        </div>
+      ) : null}
+
+      {!idle && loading ? (
+        <div
+          className={`flex items-center gap-2 px-3.5 py-3 text-[13px] text-[#8E8E93] ${
+            hits.length === 0 ? 'min-h-0 flex-1 justify-center' : ''
+          }`}
+        >
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Recherche Open Food Facts…
         </div>
       ) : null}
 
-      {error && !loading ? (
-        <p className="px-3.5 py-3 text-[13px] text-[#FF6961]">{error}</p>
+      {!idle && error && !loading ? (
+        <p className="flex min-h-0 flex-1 items-center px-3.5 py-3 text-[13px] text-[#FF6961]">{error}</p>
       ) : null}
 
-      {!loading && !error && hits.length === 0 ? (
-        <p className="px-3.5 py-3 text-[13px] text-[#8E8E93]">Aucun produit trouvé.</p>
+      {!idle && !loading && !error && hits.length === 0 ? (
+        <p className="flex min-h-0 flex-1 items-center px-3.5 py-3 text-[13px] text-[#8E8E93]">
+          Aucun produit trouvé.
+        </p>
       ) : null}
 
-      {hits.length > 0 ? (
+      {!idle && hits.length > 0 ? (
         <ul
-          className="max-h-72 divide-y divide-white/8 overflow-y-auto overscroll-contain"
+          className={`min-h-0 divide-y divide-white/8 overflow-y-auto overscroll-contain ${
+            fill ? 'flex-1' : 'max-h-72'
+          }`}
           role="listbox"
           aria-label="Résultats Open Food Facts"
         >

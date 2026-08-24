@@ -114,7 +114,7 @@ interface OffSearchResponse {
 const SEARCH_PAGE_SIZE = 20
 
 /**
- * Recherche textuelle Open Food Facts (indépendante du scan code-barres).
+ * Recherche textuelle Open Food Facts (base FR, tri par scans).
  * GET search.pl — limitée à 20 résultats.
  */
 export async function searchOpenFoodFacts(
@@ -125,9 +125,10 @@ export async function searchOpenFoodFacts(
   if (query.length < 2) return []
 
   const url =
-    `https://world.openfoodfacts.org/cgi/search.pl` +
+    `https://fr.openfoodfacts.org/cgi/search.pl` +
     `?search_terms=${encodeURIComponent(query)}` +
-    `&search_simple=1&action=process&json=1&page_size=${SEARCH_PAGE_SIZE}`
+    `&search_simple=1&action=process&json=1` +
+    `&sort_by=unique_scans_n&page_size=${SEARCH_PAGE_SIZE}`
 
   const response = await fetch(url, {
     signal,
