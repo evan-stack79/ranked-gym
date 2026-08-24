@@ -1,10 +1,13 @@
 import { KCAL_PER_G } from './constants/iom'
-import type { MacroFloorsAndTargets, MacroGrams } from './types'
+import { ERROR_CODES, engineError } from './errors'
+import type { MacroFloorsAndTargets, MacroGrams, NutritionEngineFailure } from './types'
 
 export interface WaterfallResult {
   macros: MacroGrams
   kcal_dispo: number
 }
+
+const EPS = 1e-9
 
 /**
  * Allocation Waterfall séquentielle après validation BCMR.
@@ -25,19 +28,20 @@ export function allocateWaterfall(
 
   let kcalDispo = targetKcal - bcmr
 
-  // Étape 1 — Protéines : Prot_Min → Prot_Target
-  const protRoomG = Math.max(0, constraints.prot_target_g - proteines_g)
-  const protAddG = Math.min(protRoomG, kcalDispo / KCAL_PER_G.protein)
-  proteines_g += protAddG
-  kcalDispo -= protAddG * KCAL_PER_G.protein
+  const protTargetKcal = constraints.prot_target_g * KCAL_PER_G.protein
+  const minProtKcal = proteines_g * KCAL_PER_G.protein
+  const diffProt = protTargetKcal - minProtKcal
+  const addedProt = Math.min(kcalDispo, Math.max(0, diffProt))
+  proteines_g += addedProt / KCAL_PER_G.protein
+  kcalDispo -= addedProt
 
-  // Étape 2 — Lipides : Lip_Min → Lip_Target (25 % des kcal cible, ≥ plancher)
-  const lipRoomG = Math.max(0, constraints.lip_target_g - lipides_g)
-  const lipAddG = Math.min(lipRoomG, kcalDispo / KCAL_PER_G.fat)
-  lipides_g += lipAddG
-  kcalDispo -= lipAddG * KCAL_PER_G.fat
+  const lipTargetKcal = targetKcal * 0.25
+  const minLipKcal = lipides_g * KCAL_PER_G.fat
+  const diffLip = lipTargetKcal - minLipKcal
+  const addedLip = Math.min(kcalDispo, Math.max(0, diffLip))
+  lipides_g += addedLip / KCAL_PER_G.fat
+  kcalDispo -= addedLip
 
-  // Étape 3 — Glucides : tout le reliquat
   glucides_g += kcalDispo / KCAL_PER_G.carb
   kcalDispo = 0
 
@@ -45,4 +49,28 @@ export function allocateWaterfall(
     macros: { proteines_g, lipides_g, glucides_g },
     kcal_dispo: targetKcal - bcmr,
   }
+}
+
+export function assertAllocationInvariants(
+  targetKcal: number,
+  constraints: MacroFloorsAndTargets,
+  macros: MacroGrams,
+): NutritionEngineFailure | null {
+  if (
+    macros.proteines_g + EPS < constraints.prot_min_g ||
+    macros.lipides_g + EPS < constraints.lip_min_g ||
+    macros.glucides_g + EPS < constraints.gluc_min_g ||
+    macros.proteines_g < 0 ||
+    macros.lipides_g < 0 ||
+    macros.glucides_g < 0
+  ) {
+    return engineError(
+      ERROR_CODES.INTERNAL_ALLOCATION,
+      'Allocation Waterfall invalide : invariant de plancher violé.',
+      500,
+      { target_kcal: targetKcal, constraints, macros },
+    )
+  }
+
+  return null
 }

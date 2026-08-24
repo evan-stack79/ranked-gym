@@ -11,7 +11,7 @@ API Edge : `supabase/functions/nutrition-engine/index.ts`.
 
 | ID | Section | Problème | Conséquence | Correction minimale proposée |
 |----|---------|----------|-------------|----------------------------|
-| C1 | Livrables / prompt | Sections A–I complètes absentes du dépôt (`[Insérer ici…]`) | Coefficients PA IOM et `Prot_Target` non fournis textuellement | Utiliser les équations & PA IOM DRI 2005 (documentés dans `constants/iom.ts`) ; `Prot_Target_g := Prot_Min_g` en attendant la spec complète |
+| C1 | Livrables / prompt | Sections A–I complètes absentes du dépôt historique | Coefficients PA IOM documentés dans `constants/iom.ts` ; **Prot_Target** selon spec §9 : 2.4 (cut+muscu) / 1.6 (sport) / 0.8 (sédentaire) |
 | C2 | Règle 6 — Lipides | `Lip_Target_Kcal = Target × 0.25` peut être **<** `Lip_Min` (ex. 130 kg → 585 kcal lipides > 25 % d’une cible basse) | Étape 2 Waterfall bloquée | `Lip_Target_g = max(Lip_Min_g, Target_Kcal × 0.25 / 9)` |
 | C3 | Règle 6 — Glucides | `Gluc_Target = 8 g/kg` (endurance) vs « tout le reliquat aux glucides » | Le reliquat peut dépasser 8 g/kg | Comportement mathématique autorisé : `Gluc_Target` informatif ; l’étape 3 assigne **100 %** du reliquat (pas de plafond) |
 | C4 | Cas limite / test 5 | Forcer lipides à 585 kcal peut rendre `Target < BCMR` | Moteur doit rejeter avant allocation | Testé : `ERR_TARGET_BELOW_BCMR` si `Target < BCMR` — jamais de remplacement silencieux |

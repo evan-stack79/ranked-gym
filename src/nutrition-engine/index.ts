@@ -6,15 +6,17 @@ export {
   runNutritionEngineApi,
   runNutritionEngineWithTarget,
   serializeEngineResult,
+  formatApiPayload,
 } from './engine'
 export { computeEer, computeTargetKcal } from './eer'
 export { computeBcmrKcal, macrosToKcal } from './bcmr'
-export { allocateWaterfall } from './waterfall'
-export { resolveSportFlags, resolveMacroConstraints } from './sportConstraints'
+export { allocateWaterfall, assertAllocationInvariants } from './waterfall'
+export { resolveSportFlags, resolveMacroConstraints, resolveProteinMinGPerKg, resolveProteinTargetGPerKg, hasAnySport } from './sportConstraints'
 export { buildRecommendations } from './recommendations'
-export { validateInput } from './validation'
+export { validateInput, validateForbiddenActivityFields } from './validation'
 export type {
   ActivityLevel,
+  EffortIntensity,
   MacroFloorsAndTargets,
   MacroGrams,
   NutritionEngineFailure,
