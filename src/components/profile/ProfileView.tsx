@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { CloudBackupCard } from './CloudBackupCard'
 import { SettingsScreen } from '../settings/SettingsScreen'
+import { PersonalInformationScreen } from '../settings/PersonalInformationScreen'
+import { SecurityScreen } from '../settings/SecurityScreen'
 import { FullProfileScreen } from './FullProfileScreen'
 import { useAuth } from '../../context/AuthContext'
 import {
@@ -46,35 +48,12 @@ function ProfileViewContent() {
   }, [profile?.discipline])
 
   useEffect(() => {
-    if (route === 'fullProfile' && (!isAuthenticated || !user)) {
+    const needsAuth =
+      route === 'fullProfile' || route === 'personalInfo' || route === 'security'
+    if (needsAuth && (!isAuthenticated || !user)) {
       goBack()
     }
   }, [route, isAuthenticated, user, goBack])
-
-  if (route === 'fullProfile') {
-    if (!isAuthenticated || !user) {
-      return null
-    }
-    return <FullProfileScreen onBack={goBack} />
-  }
-
-  if (!isAuthenticated || !user) {
-    return (
-      <div className="flex flex-col gap-6 pb-4 ios-fade-up">
-        <SettingsScreen
-          username="Invité"
-          isAuthenticated={false}
-          onRequireAuth={() => requireAuth(() => undefined)}
-          onViewProfile={() => requireAuth(() => navigate('fullProfile'))}
-        />
-        <CloudBackupCard />
-      </div>
-    )
-  }
-
-  const username = profile?.pseudo || user.displayName
-  const discipline = getDiscipline(disciplineId)
-  const ghostModeEnabled = resolveGhostModeEnabled(profile)
 
   const handleGhostModeChange = async (enabled: boolean) => {
     setGhostSaving(true)
@@ -85,6 +64,57 @@ function ProfileViewContent() {
     }
   }
 
+  if (route === 'personalInfo') {
+    if (!isAuthenticated || !user) return null
+    return (
+      <PersonalInformationScreen
+        onBack={goBack}
+        onOpenFullProfile={() => navigate('fullProfile')}
+      />
+    )
+  }
+
+  if (route === 'security') {
+    if (!isAuthenticated || !user) return null
+    return (
+      <SecurityScreen
+        onBack={goBack}
+        ghostModeEnabled={resolveGhostModeEnabled(profile)}
+        ghostSaving={ghostSaving}
+        onGhostModeChange={(enabled) => {
+          void handleGhostModeChange(enabled)
+        }}
+        onSignOut={() => {
+          void signOut()
+        }}
+      />
+    )
+  }
+
+  if (route === 'fullProfile') {
+    if (!isAuthenticated || !user) return null
+    return <FullProfileScreen onBack={goBack} />
+  }
+
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="flex flex-col gap-6 pb-4 ios-fade-up">
+        <SettingsScreen
+          username="Invité"
+          isAuthenticated={false}
+          onRequireAuth={() => requireAuth(() => undefined)}
+          onViewProfile={() => requireAuth(() => navigate('personalInfo'))}
+          onOpenPersonalInfo={() => requireAuth(() => navigate('personalInfo'))}
+          onOpenSecurity={() => requireAuth(() => navigate('security'))}
+        />
+        <CloudBackupCard />
+      </div>
+    )
+  }
+
+  const username = profile?.pseudo || user.displayName
+  const discipline = getDiscipline(disciplineId)
+
   return (
     <div className="flex flex-col gap-6 pb-4 ios-fade-up">
       <SettingsScreen
@@ -93,14 +123,11 @@ function ProfileViewContent() {
         email={user.email}
         isAuthenticated
         profileDiscipline={profile?.discipline ?? discipline.label}
-        ghostModeEnabled={ghostModeEnabled}
-        ghostSaving={ghostSaving}
         userId={user.id}
-        onViewProfile={() => navigate('fullProfile')}
+        onViewProfile={() => navigate('personalInfo')}
+        onOpenPersonalInfo={() => navigate('personalInfo')}
+        onOpenSecurity={() => navigate('security')}
         onRequireAuth={() => requireAuth(() => undefined)}
-        onGhostModeChange={(enabled) => {
-          void handleGhostModeChange(enabled)
-        }}
         onDisciplineChange={(label) => {
           setDisciplineId(disciplineFromLabel(label))
           void updateDiscipline(label)

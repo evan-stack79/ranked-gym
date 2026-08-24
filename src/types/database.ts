@@ -253,6 +253,10 @@ export interface Database {
       profiles_public: ProfilesPublicView
     }
     Functions: {
+      delete_own_account: {
+        Args: Record<string, never>
+        Returns: undefined
+      }
       reserve_ai_meal_scan: {
         Args: { p_user_id: string }
         Returns: { allowed: boolean; scan_count: number; daily_limit: number }[]
