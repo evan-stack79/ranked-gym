@@ -98,6 +98,11 @@ export function AddFoodScreen({
   onClose,
 }: AddFoodScreenProps) {
   const [manualOpen, setManualOpen] = useState(false)
+  const searchActive = searchQuery.trim().length > 0
+
+  useEffect(() => {
+    if (searchActive) setManualOpen(false)
+  }, [searchActive])
 
   useEffect(() => {
     const previous = document.body.style.overflow
@@ -205,115 +210,124 @@ export function AddFoodScreen({
         ) : null}
       </div>
 
-      <div className="shrink-0 border-t border-white/8 px-4 pb-4 pt-2">
-        <button
-          type="button"
-          onClick={() => setManualOpen((v) => !v)}
-          className="ios-press w-full py-2 text-left text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]"
-          aria-expanded={manualOpen}
-        >
-          {manualOpen ? 'Masquer la saisie manuelle' : 'Ou saisie manuelle'}
-        </button>
+      {!searchActive ? (
+        <div className="shrink-0 border-t border-white/8 px-4 pb-4 pt-2">
+          <button
+            type="button"
+            onClick={() => setManualOpen((v) => !v)}
+            className="ios-press w-full py-2 text-left text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]"
+            aria-expanded={manualOpen}
+          >
+            {manualOpen ? 'Masquer la saisie manuelle' : 'Ou saisie manuelle'}
+          </button>
 
-        {manualOpen ? (
-          <form onSubmit={onSubmitManual} className="mt-2 max-h-[42vh] space-y-3 overflow-y-auto overscroll-contain">
-            <div className="flex flex-wrap gap-1.5">
-              {MEAL_TYPES.map((type) => (
-                <MealTypeChip
-                  key={type}
-                  type={type}
-                  active={mealType === type}
-                  onClick={() => onMealTypeChange(type)}
-                />
-              ))}
-            </div>
+          {manualOpen ? (
+            <form
+              onSubmit={onSubmitManual}
+              className="mt-2 max-h-[42vh] space-y-3 overflow-y-auto overscroll-contain"
+            >
+              <div className="flex flex-wrap gap-1.5">
+                {MEAL_TYPES.map((type) => (
+                  <MealTypeChip
+                    key={type}
+                    type={type}
+                    active={mealType === type}
+                    onClick={() => onMealTypeChange(type)}
+                  />
+                ))}
+              </div>
 
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Nom</span>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => onNameChange(e.target.value)}
-                placeholder="Poulet riz brocoli…"
-                className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#34C759]/40"
-                required
-              />
-            </label>
-
-            <div className="grid grid-cols-2 gap-3">
               <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Calories</span>
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Nom</span>
                 <input
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={5000}
-                  value={calories}
-                  onChange={(e) => onCaloriesChange(Number(e.target.value))}
-                  className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#FF9F0A]/40"
+                  type="text"
+                  value={name}
+                  onChange={(e) => onNameChange(e.target.value)}
+                  placeholder="Poulet riz brocoli…"
+                  className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#34C759]/40"
                   required
                 />
               </label>
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
-                  Protéines (g)
-                </span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  max={400}
-                  value={proteinG}
-                  onChange={(e) =>
-                    onProteinChange(e.target.value === '' ? '' : Number(e.target.value))
-                  }
-                  placeholder="Optionnel"
-                  className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/40"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
-                  Glucides (g)
-                </span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  max={400}
-                  value={carbsG}
-                  onChange={(e) =>
-                    onCarbsChange(e.target.value === '' ? '' : Number(e.target.value))
-                  }
-                  placeholder="Optionnel"
-                  className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF9F0A]/40"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
-                  Lipides (g)
-                </span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  max={400}
-                  value={fatG}
-                  onChange={(e) => onFatChange(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="Optionnel"
-                  className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#00B4FF]/40"
-                />
-              </label>
-            </div>
 
-            <button
-              type="submit"
-              className="btn-brand w-full rounded-xl border border-white/15 py-3 text-[15px] font-semibold text-white"
-            >
-              Enregistrer
-            </button>
-          </form>
-        ) : null}
-      </div>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                    Calories
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={5000}
+                    value={calories}
+                    onChange={(e) => onCaloriesChange(Number(e.target.value))}
+                    className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#FF9F0A]/40"
+                    required
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                    Protéines (g)
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    max={400}
+                    value={proteinG}
+                    onChange={(e) =>
+                      onProteinChange(e.target.value === '' ? '' : Number(e.target.value))
+                    }
+                    placeholder="Optionnel"
+                    className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/40"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                    Glucides (g)
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    max={400}
+                    value={carbsG}
+                    onChange={(e) =>
+                      onCarbsChange(e.target.value === '' ? '' : Number(e.target.value))
+                    }
+                    placeholder="Optionnel"
+                    className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF9F0A]/40"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                    Lipides (g)
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    max={400}
+                    value={fatG}
+                    onChange={(e) =>
+                      onFatChange(e.target.value === '' ? '' : Number(e.target.value))
+                    }
+                    placeholder="Optionnel"
+                    className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#00B4FF]/40"
+                  />
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                className="btn-brand w-full rounded-xl border border-white/15 py-3 text-[15px] font-semibold text-white"
+              >
+                Enregistrer
+              </button>
+            </form>
+          ) : null}
+        </div>
+      ) : null}
     </div>,
     document.body,
   )

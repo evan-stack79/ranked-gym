@@ -295,9 +295,8 @@ export function TrainingView({
     <div
       className="flex flex-col gap-8"
       style={{
-        paddingBottom: showStrengthTools
-          ? 'max(120px, calc(var(--rest-content-clearance, 7rem) + 3.5rem))'
-          : '0.5rem',
+        // Clearance sous le timer « Prêt à lancer » / repos (historique + carnet).
+        paddingBottom: showStrengthTools || isBarVisible ? 130 : 8,
       }}
     >
       <header className="relative ios-fade-up">

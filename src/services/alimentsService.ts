@@ -114,19 +114,20 @@ interface OffSearchResponse {
 const SEARCH_PAGE_SIZE = 20
 
 /**
- * Recherche textuelle Open Food Facts (base FR, tri par scans).
+ * Recherche textuelle Open Food Facts (world + tri par scans).
  * GET search.pl — limitée à 20 résultats.
+ * `encodeURIComponent` obligatoire pour espaces / accents (ex. « Pâte panzani »).
  */
 export async function searchOpenFoodFacts(
   term: string,
   signal?: AbortSignal,
 ): Promise<OpenFoodFactsSearchHit[]> {
-  const query = term.trim()
-  if (query.length < 2) return []
+  const searchTerm = term.trim()
+  if (searchTerm.length < 2) return []
 
   const url =
-    `https://fr.openfoodfacts.org/cgi/search.pl` +
-    `?search_terms=${encodeURIComponent(query)}` +
+    `https://world.openfoodfacts.org/cgi/search.pl` +
+    `?search_terms=${encodeURIComponent(searchTerm)}` +
     `&search_simple=1&action=process&json=1` +
     `&sort_by=unique_scans_n&page_size=${SEARCH_PAGE_SIZE}`
 
@@ -134,7 +135,6 @@ export async function searchOpenFoodFacts(
     signal,
     headers: {
       Accept: 'application/json',
-      'User-Agent': 'RankedGym/1.0 (https://github.com/evan-stack79/ranked-gym)',
     },
   })
 
