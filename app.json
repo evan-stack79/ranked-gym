@@ -34,5 +34,5 @@
       ]
     }
   },
-  "_comment": "Ranked Gym est une PWA Vite + Capacitor. Pump Check utilise getUserMedia (web) ; ce fichier documente les permissions natives équivalentes à expo-camera / expo-media-library."
+  "_comment": "Ranked Gym est une PWA Vite + Capacitor (pas Expo Web). La config PWA native (display:standalone, meta Apple, viewport anti-zoom) vit dans index.html + vite.config.ts (VitePWA). Ce fichier documente seulement les permissions natives équivalentes à expo-camera / expo-media-library."
 }
