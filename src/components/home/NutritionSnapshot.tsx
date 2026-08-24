@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Leaf } from 'lucide-react'
-import { getAdjustedNutritionTarget } from '../../services/nutritionActivity'
+import { getNutritionTarget } from '../../services/nutritionActivity'
 import { getCalorieProfile, getTodayJournal, getTodayWaterMl } from '../../services/nutritionStorage'
 import { getDailyWaterGoalMl, isTrainingDayToday } from '../../utils/waterGoal'
 import { HydrationProgressBar } from '../nutrition/HydrationProgressBar'
@@ -58,7 +58,7 @@ export function NutritionSnapshot() {
   }, [])
 
   const snapshot = useMemo(() => {
-    const adjusted = getAdjustedNutritionTarget()
+    const nutrition = getNutritionTarget()
     const profile = getCalorieProfile()
     const meals = getTodayJournal().meals
     const waterMl = getTodayWaterMl()
@@ -74,18 +74,18 @@ export function NutritionSnapshot() {
       { calories: 0, protein: 0, carbs: 0, fat: 0 },
     )
 
-    const targetCalories = adjusted.targetCalories
+    const targetCalories = nutrition.targetCalories
     const remainingCalories = Math.max(0, targetCalories - totals.calories)
     const progress = targetCalories > 0 ? Math.min(totals.calories / targetCalories, 1) : 0
 
     return {
-      onboardingComplete: adjusted.profile.onboardingComplete,
+      onboardingComplete: nutrition.profile.onboardingComplete,
       targetCalories,
       remainingCalories,
       progress,
-      proteinTarget: adjusted.plan.proteinG,
-      carbsTarget: adjusted.plan.carbsG,
-      fatTarget: adjusted.plan.fatG,
+      proteinTarget: nutrition.proteinG,
+      carbsTarget: nutrition.carbsG,
+      fatTarget: nutrition.fatG,
       totals,
       waterMl,
       waterGoalMl,

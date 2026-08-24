@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Flame, Ruler, Scale, Target, Pencil } from 'lucide-react'
 import type { CalorieProfile, Sex } from '../../types/nutrition'
-import { GOAL_LABELS, computeCaloriePlan } from '../../utils/calories'
+import { GOAL_LABELS } from '../../utils/calories'
 import { normalizeCalorieProfile } from '../../services/nutritionStorage'
 import { IconBadge } from '../ui/IconBadge'
 import { MacroRing } from './MacroRing'
@@ -11,7 +11,7 @@ import { ActivityLevelPicker } from './ActivityLevelPicker'
 import { MorphologyPicker } from './MorphologyPicker'
 import { GoalPicker, WeeklyPacePicker } from './GoalPacePickers'
 import { MORPHOLOGY_LABELS } from '../../utils/morphology'
-import { getAdjustedNutritionTarget } from '../../services/nutritionActivity'
+import { getNutritionTarget } from '../../services/nutritionActivity'
 
 interface NutritionPlanCardProps {
   profile: CalorieProfile
@@ -69,8 +69,16 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
     setDraft(profile)
   }, [profile])
 
-  const plan = useMemo(() => computeCaloriePlan(profile), [profile])
-  const adjusted = useMemo(() => getAdjustedNutritionTarget(profile), [profile])
+  const nutrition = useMemo(() => getNutritionTarget(profile), [profile])
+
+  const deltaKg = useMemo(() => {
+    return Math.round((profile.goalWeightKg - profile.weightKg) * 10) / 10
+  }, [profile.goalWeightKg, profile.weightKg])
+
+  const estimatedWeeks = useMemo(() => {
+    if (profile.goal === 'maintain' || profile.weeklyPaceKg <= 0 || deltaKg === 0) return null
+    return Math.max(1, Math.ceil(Math.abs(deltaKg) / profile.weeklyPaceKg))
+  }, [profile.goal, profile.weeklyPaceKg, deltaKg])
 
   const progressToGoal = useMemo(() => {
     const start = profile.weightKg
@@ -105,7 +113,7 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
             <IconBadge icon={Flame} variant="green" size="sm" />
             <div>
               <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-                Plan · {GOAL_LABELS[plan.goal]} · {MORPHOLOGY_LABELS[profile.morphology]}
+                Plan · {GOAL_LABELS[profile.goal]} · {MORPHOLOGY_LABELS[profile.morphology]}
                 {profile.goal !== 'maintain' && (
                   <> · {profile.weeklyPaceKg.toFixed(1)} kg/sem.</>
                 )}
@@ -127,7 +135,7 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
           <MacroRing progress={1} size={120} stroke={9} color="#34C759">
             <p className="text-[11px] font-semibold text-[#8E8E93]">Cible</p>
             <p className="text-[24px] font-black tracking-tight text-white">
-              {adjusted.targetCalories}
+              {nutrition.targetCalories}
             </p>
             <p className="text-[11px] font-medium text-[#30D158]">kcal</p>
           </MacroRing>
@@ -149,27 +157,21 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
               />
             </div>
             <p className="text-[12px] text-[#8E8E93]">
-              {plan.deltaKg === 0
+              {deltaKg === 0
                 ? 'Tu es sur ton poids cible'
-                : plan.deltaKg < 0
-                  ? `${Math.abs(plan.deltaKg)} kg à perdre`
-                  : `+${plan.deltaKg} kg à prendre`}
-              {plan.estimatedWeeks != null && <> · ~{plan.estimatedWeeks} sem.</>}
-              {adjusted.activityBonus > 0 && (
-                <>
-                  {' '}
-                  · <span className="text-[#30D158]">+{adjusted.activityBonus} act.</span>
-                </>
-              )}
+                : deltaKg < 0
+                  ? `${Math.abs(deltaKg)} kg à perdre`
+                  : `+${deltaKg} kg à prendre`}
+              {estimatedWeeks != null && <> · ~{estimatedWeeks} sem.</>}
             </p>
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-2">
           {[
-            { label: 'Protéines', value: `${plan.proteinG} g`, color: '#FF2B2B' },
-            { label: 'Glucides', value: `${plan.carbsG} g`, color: '#FF9F0A' },
-            { label: 'Lipides', value: `${plan.fatG} g`, color: '#00B4FF' },
+            { label: 'Protéines', value: `${nutrition.proteinG} g`, color: '#FF2B2B' },
+            { label: 'Glucides', value: `${nutrition.carbsG} g`, color: '#FF9F0A' },
+            { label: 'Lipides', value: `${nutrition.fatG} g`, color: '#00B4FF' },
           ].map((macro) => (
             <div key={macro.label} className="rounded-2xl border border-white/10 bg-black/20 p-2.5">
               <p className="text-[10px] font-medium text-[#8E8E93]">{macro.label}</p>
@@ -183,12 +185,12 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
 
         <div className="mt-4 grid grid-cols-3 gap-2 text-center">
           <div className="rounded-xl border border-white/10 bg-black/20 px-2 py-2">
-            <p className="text-[10px] text-[#8E8E93]">BMR</p>
-            <p className="text-[14px] font-semibold text-[#00B4FF]">{plan.bmr}</p>
+            <p className="text-[10px] text-[#8E8E93]">EER</p>
+            <p className="text-[14px] font-semibold text-[#00B4FF]">{nutrition.eerKcal}</p>
           </div>
           <div className="rounded-xl border border-white/10 bg-black/20 px-2 py-2">
-            <p className="text-[10px] text-[#8E8E93]">TDEE</p>
-            <p className="text-[14px] font-semibold text-[#FF9F0A]">{plan.tdee}</p>
+            <p className="text-[10px] text-[#8E8E93]">BCMR</p>
+            <p className="text-[14px] font-semibold text-[#FF9F0A]">{nutrition.bcmrKcal}</p>
           </div>
           <div className="rounded-xl border border-white/10 bg-black/20 px-2 py-2">
             <p className="text-[10px] text-[#8E8E93]">Taille</p>

@@ -22,12 +22,9 @@ import { safeError } from '../../utils/safeLog'
 import { connectHealthIntent } from '../../services/healthSteps'
 import { startReminderWatcher } from '../../services/reminderService'
 import { getCalorieProfile } from '../../services/nutritionStorage'
-import { computeCaloriePlan, GOAL_LABELS } from '../../utils/calories'
-import {
-  applyActivityToTarget,
-  estimateSessionKcal,
-  stepsToKcal,
-} from '../../utils/activityCalories'
+import { GOAL_LABELS } from '../../utils/calories'
+import { estimateSessionKcal, stepsToKcal } from '../../utils/activityCalories'
+import { getNutritionTarget } from '../../services/nutritionActivity'
 import { SportPicker, SportChip } from './SportPicker'
 import { StepsCard } from './StepsCard'
 import { TrainingAgenda } from './TrainingAgenda'
@@ -97,15 +94,10 @@ export function TrainingView({
     state.completed,
     state.workoutNotes,
   ])
-  const plan = useMemo(() => computeCaloriePlan(profile), [profile])
+  const nutrition = useMemo(() => getNutritionTarget(profile), [profile])
 
   const stepsKcal = stepsToKcal(state.stepsToday, profile.weightKg)
   const workoutKcal = todayWorkoutKcal(state)
-  const adjusted = applyActivityToTarget(
-    plan.targetCalories,
-    plan.goal,
-    stepsKcal + workoutKcal,
-  )
 
   const disciplineId = useMemo(() => getStoredDisciplineId(), [disciplineTick, state.primarySportId])
   const discipline = getDiscipline(disciplineId)
@@ -345,8 +337,7 @@ export function TrainingView({
       <StepsCard
         steps={state.stepsToday}
         burnedKcal={stepsKcal + workoutKcal}
-        bonusKcal={adjusted.activityBonus}
-        goalLabel={GOAL_LABELS[plan.goal]}
+        goalLabel={nutrition.goalLabel}
         healthLinked={state.healthLinked}
         onStepsChange={(steps) => persist(setStepsToday(steps))}
         onConnectHealth={() => {
@@ -355,7 +346,7 @@ export function TrainingView({
       />
 
       {showStrengthTools && (
-        <OverloadCalculator bodyWeightKg={profile.weightKg} goalLabel={GOAL_LABELS[plan.goal]} />
+        <OverloadCalculator bodyWeightKg={profile.weightKg} goalLabel={GOAL_LABELS[profile.goal]} />
       )}
 
       {showEnduranceTools && (
