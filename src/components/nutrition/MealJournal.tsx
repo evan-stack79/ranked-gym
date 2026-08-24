@@ -25,7 +25,7 @@ import {
 } from '../../services/nutritionStorage'
 import { getDailyWaterGoalMl, isTrainingDayToday } from '../../utils/waterGoal'
 import { HydrationProgressBar } from './HydrationProgressBar'
-import { saveAliment, type OpenFoodFactsProduct } from '../../services/alimentsService'
+import { saveAliment, searchOpenFoodFacts, type OpenFoodFactsProduct, type OpenFoodFactsSearchHit } from '../../services/alimentsService'
 import { useAuth } from '../../context/AuthContext'
 import { IconBadge } from '../ui/IconBadge'
 import { MacroRing } from './MacroRing'
@@ -34,6 +34,7 @@ import { ScannedProductSheet } from './ScannedProductSheet'
 import { MealBudgetsCard } from './MealBudgetsCard'
 import { EditMealSheet } from './EditMealSheet'
 import { MealPhotoAnalyzer } from './MealPhotoAnalyzer'
+import { FoodTextSearchResults } from './FoodTextSearchResults'
 
 interface MealJournalProps {
   targetCalories: number
@@ -90,6 +91,9 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   const [carbsG, setCarbsG] = useState<number | ''>('')
   const [fatG, setFatG] = useState<number | ''>('')
   const [mealType, setMealType] = useState<MealType>('lunch')
+  const [searchHits, setSearchHits] = useState<OpenFoodFactsSearchHit[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' } | null>(
     null,
   )
@@ -123,6 +127,49 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
       window.removeEventListener('ranked-gym:training-changed', onWater)
     }
   }, [])
+
+  useEffect(() => {
+    if (!showForm) {
+      setSearchHits([])
+      setSearchError(null)
+      setSearchLoading(false)
+      return
+    }
+
+    const term = name.trim()
+    if (term.length < 2) {
+      setSearchHits([])
+      setSearchError(null)
+      setSearchLoading(false)
+      return
+    }
+
+    const controller = new AbortController()
+    setSearchLoading(true)
+    setSearchError(null)
+
+    const timer = window.setTimeout(() => {
+      void searchOpenFoodFacts(term, controller.signal)
+        .then((hits) => {
+          if (controller.signal.aborted) return
+          setSearchHits(hits)
+        })
+        .catch((err) => {
+          if (controller.signal.aborted) return
+          if (err instanceof DOMException && err.name === 'AbortError') return
+          setSearchHits([])
+          setSearchError(err instanceof Error ? err.message : 'Recherche impossible.')
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setSearchLoading(false)
+        })
+    }, 500)
+
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
+    }
+  }, [name, showForm])
 
   const pendingRemaining = useMemo(() => {
     if (!pendingMealType) return 0
@@ -184,6 +231,9 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     setProteinG('')
     setCarbsG('')
     setFatG('')
+    setSearchHits([])
+    setSearchError(null)
+    setSearchLoading(false)
     setShowForm(false)
   }
 
@@ -443,11 +493,25 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Poulet riz brocoli…"
+              placeholder="Rechercher un aliment (ex. yaourt Auchan)…"
               className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#34C759]/40"
               required
+              autoComplete="off"
+              role="searchbox"
+              aria-label="Recherche d’aliments Open Food Facts"
             />
           </label>
+
+          <FoodTextSearchResults
+            query={name}
+            loading={searchLoading}
+            error={searchError}
+            hits={searchHits}
+            onSelect={(hit) => {
+              handleScannedProduct(hit)
+              setShowForm(false)
+            }}
+          />
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
