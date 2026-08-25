@@ -1,5 +1,6 @@
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { acquireBodyScrollLock } from '../../utils/bodyScrollLock'
 
 interface IosSheetProps {
   open: boolean
@@ -40,35 +41,37 @@ export function IosSheet({
     return () => window.clearTimeout(timeout)
   }, [open])
 
+  // Lock lié à `open` (pas à l’animation de démontage) — libéré dès la fermeture.
   useEffect(() => {
-    if (!mounted) return
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = previous
-    }
-  }, [mounted])
+    if (!open) return
+    return acquireBodyScrollLock()
+  }, [open])
 
   useEffect(() => {
-    if (!mounted || !dismissible) return
+    if (!open || !dismissible) return
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [mounted, dismissible, onClose])
+  }, [open, dismissible, onClose])
 
   if (!mounted || typeof document === 'undefined') return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center" role="presentation">
+    <div
+      className={`fixed inset-0 z-[100] flex items-end justify-center sm:items-center ${
+        visible ? '' : 'pointer-events-none'
+      }`}
+      role="presentation"
+    >
       <button
         type="button"
         className={`ios-sheet-backdrop absolute inset-0 bg-black/55 backdrop-blur-[18px] transition-opacity duration-300 ${
-          visible ? 'opacity-100' : 'opacity-0'
+          visible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         aria-label="Fermer"
-        disabled={!dismissible}
+        disabled={!dismissible || !visible}
         onClick={() => {
           if (dismissible) onClose()
         }}

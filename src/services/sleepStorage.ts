@@ -1,3 +1,5 @@
+import { computeTibHours } from '../sleep-engine'
+
 /**
  * Persistence locale des nuits — indépendant du Sleep Engine et de Nutrition.
  * Aucune donnée inventée : uniquement ce que l’utilisateur enregistre.
@@ -90,6 +92,11 @@ export function normalizeSleepNightEntry(
 
   if (!bedtime || !waketime || !dateKey) return null
   if (!Number.isFinite(tstHours) || tstHours < 0 || tstHours > 24) return null
+
+  const tibHours = computeTibHours(bedtime, waketime)
+  if (tibHours == null || tibHours <= 0) return null
+  // TST ne peut pas dépasser le temps au lit (TIB).
+  if (tstHours > tibHours + 1e-6) return null
 
   return {
     id: input.id ?? `sleep-${dateKey}-${Date.now()}`,
