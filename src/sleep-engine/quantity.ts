@@ -1,4 +1,4 @@
-import type { SleepQuantityResult, SleepQuantityStatus } from './types'
+import type { SleepQuantityResult, SleepQuantityStatus } from './types.ts'
 
 /**
  * Classification quantité (adultes — fourchette usuelle 7–9 h).

@@ -34,3 +34,13 @@ export const KCAL_PER_G = {
 
 /** Tolérance conservation énergétique après arrondi d’affichage (kcal). */
 export const ENERGY_ROUND_TOLERANCE_KCAL = 3
+
+/**
+ * Tolérance minimale API après réconciliation d’une seule macro entière (Atwater).
+ * Glucides/protéines : pas de 4 kcal/g → résidu |r| ≤ 2 si delta ∉ 4ℤ.
+ * Lipides : pas de 9 kcal/g — utilisé uniquement si delta ∈ 9ℤ (conservation exacte).
+ * Si ni 4 ni 9 ne divise le delta post-arrondi, la conservation exacte est
+ * mathématiquement impossible en n’ajustant qu’une macro ; on minimise |résidu|
+ * (préférentiellement sur les glucides). Max documenté : 2 kcal.
+ */
+export const API_INTEGER_ENERGY_TOLERANCE_KCAL = 2

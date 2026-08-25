@@ -27,6 +27,34 @@ API Edge : `supabase/functions/nutrition-engine/index.ts`.
 
 ---
 
+## A2. Nutrition Engine V2 — revue glucidique (politique produit)
+
+### [SCIENCE]
+- Plages de référence fréquentes : protéines sport ~1,6–2,2 g/kg ; lipides ~20–35 % des kcal ; glucides endurance souvent ~6–10 g/kg selon charge.
+- **Aucune** source ne fixe un plafond glucidique médical universel (ex. 7 g/kg) pour la musculation.
+- **Aucune** preuve que tout surplus calorique doive être converti en glucides.
+
+### [CHOIX PRODUIT]
+| Constante | Valeur | Sens |
+|-----------|--------|------|
+| `CARB_REVIEW_THRESHOLD_G_PER_KG` | **7,0** | Seuil de **revue algorithmique**, **pas** une limite médicale |
+| `LIP_MAX_PCT` | **0,35** | Borne haute de redistribution lipidique |
+| `PROTEIN_MAX_G_PER_KG` | **2,2** | Borne haute d’upgrade protéique en redistrib (n’écrase pas Prot_Target 2,4 cut+muscu) |
+
+### [ALGORITHME]
+1. Waterfall **V1 inchangé** (EER → Target → BCMR → hard stop → Prot → Lip 25 % → reliquat glucides).
+2. Post-pass **V2** : si `hasEndurance` (endurance, cyclisme, **ou force+endurance**) → **pas** de redistrib ; sinon si `glucides_g/kg > 7` :
+   - R1 : excédent → lipides jusqu’à 35 % Target ;
+   - R2 : excédent restant → protéines jusqu’à `max(Prot_Target, 2,2 g/kg)` ;
+   - si encore `> 7 g/kg` → FLAG `CARB_REVIEW_REMAINING_AFTER_LIMITS` et **stop** (macros figées).
+3. Sérialisation : UI à 1 décimale (`serializeEngineResult`) ; API macros entières (`formatApiPayload`).
+4. Réconciliation d’arrondi API (sérialisation seule) : après `Math.round` indépendant, ajuster **une** macro (glucides prioritaires) pour coller à `Target_Kcal` quand c’est possible avec Atwater (4/9/4). Si impossible (delta ∉ 4ℤ et ∉ 9ℤ), meilleure approximation — tolérance max documentée `API_INTEGER_ENERGY_TOLERANCE_KCAL = 2`.
+5. Flags exposés dans `allocation_flags` (API + UI) — informatifs, non médicaux ; **non** modifiés par la réconciliation API.
+
+Fichiers : `constants/policy.ts`, `redistribute.ts`, branchement + `reconcileApiIntegerMacros` dans `engine.ts`.
+
+---
+
 ## B. Schéma de données validé
 
 ### Entrée (`NutritionEngineInput`)
@@ -98,13 +126,14 @@ HTTP **422**.
 6. BCMR ← Prot_Min×4 + Lip_Min×9 + Gluc_Min×4
 7. IF Target < BCMR → HTTP 422 ERR_TARGET_BELOW_BCMR
 8. Kcal_Dispo ← Target - BCMR
-9. Waterfall :
+9. Waterfall V1 :
    a. Prot : min → target (4 kcal/g)
    b. Lip  : min → max(min, Target×0.25/9) (9 kcal/g)
    c. Gluc : + tout reliquat / 4
-10. ASSERT |macros_kcal - Target| ≤ 3
-11. recommendations ← UI only (âge, durée, perte fluide)
-12. SERIALIZE (arrondis affichage uniquement)
+10. Post-pass V2 (non-endurance, seuil produit 7 g/kg) — voir §A2
+11. ASSERT |macros_kcal - Target| ≤ 3 (floats)
+12. recommendations ← UI only (âge, durée, perte fluide)
+13. SERIALIZE UI (1 décimale) / API (entiers + réconciliation Atwater éventuelle)
 ```
 
 ---
@@ -218,18 +247,21 @@ Réponse 200 (extrait) :
 | Règle | Implémentée | Testée | Conforme |
 |-------|-------------|--------|----------|
 | EER IOM + PA uniquement | ✅ | ✅ | ✅ |
-| Pas de calories montre / burned | ✅ | ✅ | ✅* |
+| Pas de calories montre / burned | ✅ | ✅ | ✅ |
 | Target maintien / déficit / surplus | ✅ | ✅ | ✅ |
-| Séparation Min vs Target | ✅ | ⚠️ Prot_Target = Min (C1) | ⚠️ |
+| Séparation Min vs Target | ✅ Prot_Target 2.4 / 1.6 / 0.8 | ✅ | ✅ |
 | Sports combinés (max pertinent) | ✅ | ✅ | ✅ |
 | BCMR + gate 422 | ✅ | ✅ | ✅ |
 | Waterfall Prot → Lip → Gluc | ✅ | ✅ | ✅ |
-| Conservation énergétique | ✅ | ✅ | ✅ |
+| Post-pass V2 (non-endurance) | ✅ | ✅ | ✅ |
+| Conservation énergétique (floats) | ✅ | ✅ | ✅ |
+| Conservation API entiers (réconciliation) | ✅ | ✅ | ✅\* |
 | Recommandations UI isolées | ✅ | ✅ | ✅ |
 | Validation entrées stricte | ✅ | ✅ | ✅ |
 | Arrondis uniquement à la sérialisation | ✅ | ✅ | ✅ |
+| UI sans steps/workout/activityBonus | ✅ (C5 résolu) | ✅ | ✅ |
 
-\* Le moteur pur est conforme ; l’ancien chemin `nutritionActivity.ts` reste à migrer (C5).
+\* Si le delta post-`Math.round` n’est multiple ni de 4 ni de 9, une conservation **exacte** est impossible en n’ajustant qu’une macro Atwater ; résidu ≤ `API_INTEGER_ENERGY_TOLERANCE_KCAL` (2).
 
 ---
 

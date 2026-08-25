@@ -1,6 +1,6 @@
-import { ERROR_CODES, sleepError } from './errors'
-import { computeTibHours, parseTimeToMinutes } from './circularTime'
-import type { SleepEngineFailure, SleepInput } from './types'
+import { ERROR_CODES, sleepError } from './errors.ts'
+import { computeTibHours, parseTimeToMinutes } from './circularTime.ts'
+import type { SleepEngineFailure, SleepInput } from './types.ts'
 
 /** Minimum d’échantillons pour une dispersion circulaire informative (choix ingénierie, pas seuil clinique). */
 export const MIN_REGULARITY_SAMPLES = 3

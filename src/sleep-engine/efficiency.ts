@@ -1,4 +1,4 @@
-import type { SleepEfficiencyResult } from './types'
+import type { SleepEfficiencyResult } from './types.ts'
 
 /**
  * Efficacité du sommeil SE = TST / TIB × 100.

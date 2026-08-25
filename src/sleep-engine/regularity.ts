@@ -1,6 +1,6 @@
-import { circularStdDevMinutes, parseTimeToMinutes } from './circularTime'
-import { MIN_REGULARITY_SAMPLES } from './validation'
-import type { SleepRegularityMetrics } from './types'
+import { circularStdDevMinutes, parseTimeToMinutes } from './circularTime.ts'
+import { MIN_REGULARITY_SAMPLES } from './validation.ts'
+import type { SleepRegularityMetrics } from './types.ts'
 
 /**
  * Variabilité circulaire des horaires.

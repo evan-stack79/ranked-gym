@@ -1,4 +1,4 @@
-import type { NutritionEngineFailure } from './types'
+import type { NutritionEngineFailure } from './types.ts'
 
 export const ERROR_CODES = {
   AGE_RESTRICTION: 'ERR_AGE_RESTRICTION',

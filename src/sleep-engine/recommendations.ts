@@ -1,4 +1,4 @@
-import type { SleepMetrics } from './types'
+import type { SleepMetrics } from './types.ts'
 
 /**
  * Recommandations et warnings UI — n’altèrent jamais les métriques calculées.

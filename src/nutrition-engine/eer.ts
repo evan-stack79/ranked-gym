@@ -1,5 +1,5 @@
-import { IOM_EER, IOM_PA } from './constants/iom'
-import type { ActivityLevel, Sex } from './types'
+import { IOM_EER, IOM_PA } from './constants/iom.ts'
+import type { ActivityLevel, Sex } from './types.ts'
 
 export interface EerInput {
   sex: Sex

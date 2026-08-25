@@ -19,7 +19,8 @@ export function NutritionView() {
   const [profile, setProfile] = useState<CalorieProfile>(() => getCalorieProfile())
   const [showSetupEditor, setShowSetupEditor] = useState(false)
 
-  const nutrition = useMemo(() => getNutritionTarget(profile), [profile])
+  const [trainingTick, setTrainingTick] = useState(0)
+  const nutrition = useMemo(() => getNutritionTarget(profile), [profile, trainingTick])
   const targetCalories = nutrition.targetCalories
 
   useEffect(() => {
@@ -29,13 +30,16 @@ export function NutritionView() {
 
   useEffect(() => {
     const sync = () => setProfile(getCalorieProfile())
+    const syncTraining = () => setTrainingTick((n) => n + 1)
     window.addEventListener('ranked-gym:backup-restored', sync)
     window.addEventListener('ranked-gym:profile-changed', sync)
+    window.addEventListener('ranked-gym:training-changed', syncTraining)
     window.addEventListener('focus', sync)
     document.addEventListener('visibilitychange', sync)
     return () => {
       window.removeEventListener('ranked-gym:backup-restored', sync)
       window.removeEventListener('ranked-gym:profile-changed', sync)
+      window.removeEventListener('ranked-gym:training-changed', syncTraining)
       window.removeEventListener('focus', sync)
       document.removeEventListener('visibilitychange', sync)
     }

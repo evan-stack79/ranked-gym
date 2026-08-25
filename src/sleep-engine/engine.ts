@@ -1,11 +1,11 @@
-import { computeCatchUp } from './catchUp'
-import { computeTibHours } from './circularTime'
-import { computeSleepEfficiency } from './efficiency'
-import { classifyQuantity } from './quantity'
-import { buildSleepRecommendations } from './recommendations'
-import { computeRegularityMetrics } from './regularity'
-import type { SleepEngineResult, SleepInput, SleepMetrics } from './types'
-import { validateSleepInput } from './validation'
+import { computeCatchUp } from './catchUp.ts'
+import { computeTibHours } from './circularTime.ts'
+import { computeSleepEfficiency } from './efficiency.ts'
+import { classifyQuantity } from './quantity.ts'
+import { buildSleepRecommendations } from './recommendations.ts'
+import { computeRegularityMetrics } from './regularity.ts'
+import type { SleepEngineResult, SleepInput, SleepMetrics } from './types.ts'
+import { validateSleepInput } from './validation.ts'
 
 /**
  * Sleep Engine V1 — point d’entrée unique, pur et déterministe.

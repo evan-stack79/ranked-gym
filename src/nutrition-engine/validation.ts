@@ -1,5 +1,5 @@
-import { ERROR_CODES, engineError } from './errors'
-import type { NutritionEngineFailure, NutritionEngineInput } from './types'
+import { ERROR_CODES, engineError } from './errors.ts'
+import type { NutritionEngineFailure, NutritionEngineInput } from './types.ts'
 
 const LIMITS = {
   age: { min: 18, max: 120 },

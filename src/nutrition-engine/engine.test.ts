@@ -1,21 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import {
   ERROR_CODES,
+  ALLOCATION_FLAGS,
+  API_INTEGER_ENERGY_TOLERANCE_KCAL,
   allocateWaterfall,
   buildRecommendations,
   computeBcmrKcal,
   computeEer,
   formatApiPayload,
   macrosToKcal,
+  reconcileApiIntegerMacros,
   resolveMacroConstraints,
   resolveProteinMinGPerKg,
   resolveProteinTargetGPerKg,
   resolveSportFlags,
   runNutritionEngine,
   runNutritionEngineWithTarget,
+  serializeEngineResult,
   validateForbiddenActivityFields,
-} from './index'
-import type { NutritionEngineInput } from './types'
+} from './index.ts'
+import type { NutritionEngineInput } from './types.ts'
 
 const BASE_INPUT: NutritionEngineInput = {
   sex: 'male',
@@ -427,5 +431,304 @@ describe('Régression — recommandations isolées', () => {
     if (!withRec.ok || !withoutRec.ok) return
     expect(withRec.target_kcal).toBe(withoutRec.target_kcal)
     expect(withRec.macros).toEqual(withoutRec.macros)
+  })
+})
+
+describe('Nutrition Engine V2 — post-pass carb review (politique produit)', () => {
+  const screenBulk: NutritionEngineInput = {
+    sex: 'male',
+    age: 18,
+    weight_kg: 61.7,
+    height_m: 1.7,
+    activity: 4,
+    goal: 'bulk',
+    deficit_kcal: 0,
+    surplus_kcal: 550,
+    sport_principal: 'musculation',
+    sport_secondaire: null,
+    duration_h: 0,
+    intensity: null,
+    effort_weight_loss_kg: 0,
+    effort_fluid_loss_l: 0,
+  }
+
+  it('61,7 kg / ~3851 kcal — redistrib Lip→Prot, FLAG remaining, conservation', () => {
+    const result = runNutritionEngine(screenBulk)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(Math.round(result.target_kcal)).toBe(3851)
+    expect(Math.round(result.bcmr_kcal)).toBe(623)
+    expect(result.constraints.prot_min_g / 61.7).toBeCloseTo(1.4, 6)
+    expect(result.constraints.prot_target_g / 61.7).toBeCloseTo(1.6, 6)
+    expect(result.macros.proteines_g / 61.7).toBeCloseTo(2.2, 5)
+    expect((result.macros.lipides_g * 9) / result.target_kcal).toBeCloseTo(0.35, 5)
+    expect(result.macros.glucides_g / 61.7).toBeGreaterThan(7)
+    expect(result.allocation_flags).toContain(ALLOCATION_FLAGS.CARB_REVIEW_REMAINING_AFTER_LIMITS)
+    expect(Math.abs(macroTotal(result) - result.target_kcal)).toBeLessThanOrEqual(3)
+    expect(result.macros.proteines_g).toBeGreaterThanOrEqual(0)
+    expect(result.macros.lipides_g).toBeGreaterThanOrEqual(0)
+    expect(result.macros.glucides_g).toBeGreaterThanOrEqual(0)
+  })
+
+  it('maintien musculation — redistrib jusqu’au seuil produit ou FLAG', () => {
+    const result = runNutritionEngine({ ...screenBulk, goal: 'maintain', surplus_kcal: 0 })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const gPerKg = result.macros.glucides_g / 61.7
+    expect(result.allocation_flags.length).toBeGreaterThan(0)
+    expect(
+      result.allocation_flags.includes(ALLOCATION_FLAGS.CARB_REDISTRIBUTED_WITHIN_LIMITS) ||
+        result.allocation_flags.includes(ALLOCATION_FLAGS.CARB_REVIEW_REMAINING_AFTER_LIMITS),
+    ).toBe(true)
+    if (result.allocation_flags.includes(ALLOCATION_FLAGS.CARB_REDISTRIBUTED_WITHIN_LIMITS)) {
+      expect(gPerKg).toBeLessThanOrEqual(7 + 1e-6)
+    }
+    expect((result.macros.lipides_g * 9) / result.target_kcal).toBeLessThanOrEqual(0.35 + 1e-6)
+    expect(result.macros.proteines_g / 61.7).toBeLessThanOrEqual(2.2 + 1e-6)
+  })
+
+  it('surplus modéré musculation — conservation', () => {
+    const result = runNutritionEngine({ ...screenBulk, surplus_kcal: 250 })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(Math.abs(macroTotal(result) - result.target_kcal)).toBeLessThanOrEqual(3)
+  })
+
+  it('endurance — pas de redistrib (priorité glucides V1)', () => {
+    const result = runNutritionEngine({
+      ...BASE_INPUT,
+      weight_kg: 70,
+      sport_principal: 'velo',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.allocation_flags).toEqual([])
+    expect(result.constraints.gluc_min_g).toBeCloseTo(70 * 6, 6)
+  })
+
+  it('force + endurance — hasEndurance → pas de redistrib', () => {
+    const result = runNutritionEngine({
+      ...BASE_INPUT,
+      weight_kg: 70,
+      sport_principal: 'musculation',
+      sport_secondaire: 'course-a-pied',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.allocation_flags).toEqual([])
+    expect(result.macros.proteines_g / 70).toBeCloseTo(1.6, 5)
+  })
+
+  it('cut + musculation — Prot_Target 2.4 non downgradé', () => {
+    const result = runNutritionEngine({
+      ...BASE_INPUT,
+      weight_kg: 80,
+      activity: 3,
+      goal: 'cut',
+      deficit_kcal: 300,
+      sport_principal: 'musculation',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.constraints.prot_min_g / 80).toBeCloseTo(2.4, 6)
+    expect(result.macros.proteines_g / 80).toBeGreaterThanOrEqual(2.4 - 1e-6)
+  })
+
+  it('Target = BCMR — macros aux minimums, pas d’erreur', () => {
+    const constraints = floorsFor({ ...screenBulk, goal: 'maintain', surplus_kcal: 0 }, 9999)
+    const bcmr = computeBcmrKcal(constraints)
+    const result = runNutritionEngineWithTarget(
+      { ...screenBulk, goal: 'maintain', surplus_kcal: 0 },
+      bcmr,
+    )
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.kcal_dispo).toBeCloseTo(0, 6)
+    expect(result.macros.proteines_g).toBeCloseTo(constraints.prot_min_g, 6)
+    expect(result.allocation_flags).toEqual([])
+  })
+
+  it('Target = BCMR - 1 → ERR_TARGET_BELOW_BCMR', () => {
+    const constraints = floorsFor({ ...screenBulk, goal: 'maintain', surplus_kcal: 0 }, 9999)
+    const bcmr = computeBcmrKcal(constraints)
+    const result = runNutritionEngineWithTarget(
+      { ...screenBulk, goal: 'maintain', surplus_kcal: 0 },
+      bcmr - 1,
+    )
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.code).toBe(ERROR_CODES.TARGET_BELOW_BCMR)
+  })
+
+  it('gros surplus — Lip/Prot saturés + FLAG remaining', () => {
+    const result = runNutritionEngine({ ...screenBulk, surplus_kcal: 1000 })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.macros.proteines_g / 61.7).toBeCloseTo(2.2, 5)
+    expect((result.macros.lipides_g * 9) / result.target_kcal).toBeCloseTo(0.35, 5)
+    expect(result.allocation_flags).toContain(ALLOCATION_FLAGS.CARB_REVIEW_REMAINING_AFTER_LIMITS)
+  })
+
+  it('sédentaire — sous seuil → pas de FLAG', () => {
+    const result = runNutritionEngine({
+      ...BASE_INPUT,
+      weight_kg: 75,
+      activity: 1,
+      sport_principal: null,
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.allocation_flags).toEqual([])
+    expect(result.macros.proteines_g / 75).toBeCloseTo(0.8, 5)
+  })
+
+  it('déterminisme — deux appels identiques', () => {
+    const a = runNutritionEngine(screenBulk)
+    const b = runNutritionEngine(screenBulk)
+    expect(a.ok && b.ok).toBe(true)
+    if (!a.ok || !b.ok) return
+    expect(a.macros).toEqual(b.macros)
+    expect(a.allocation_flags).toEqual(b.allocation_flags)
+    expect(a.target_kcal).toBe(b.target_kcal)
+  })
+
+  it('steps/workout/activityBonus absents du contrat — résultat inchangé', () => {
+    const clean = runNutritionEngine(screenBulk)
+    const polluted = runNutritionEngine({
+      ...screenBulk,
+      ...( {
+        steps: 12000,
+        workout_calories: 600,
+        activityBonus: 400,
+        burned_calories: 900,
+      } as unknown as NutritionEngineInput),
+    })
+    expect(clean.ok && polluted.ok).toBe(true)
+    if (!clean.ok || !polluted.ok) return
+    expect(polluted.target_kcal).toBe(clean.target_kcal)
+    expect(polluted.macros).toEqual(clean.macros)
+  })
+})
+
+describe('Réconciliation arrondi API (sérialisation)', () => {
+  const apiCalories = (p: number, l: number, g: number) => p * 4 + l * 9 + g * 4
+
+  const screenBulk: NutritionEngineInput = {
+    sex: 'male',
+    age: 18,
+    weight_kg: 61.7,
+    height_m: 1.7,
+    activity: 4,
+    goal: 'bulk',
+    deficit_kcal: 0,
+    surplus_kcal: 550,
+    sport_principal: 'musculation',
+    sport_secondaire: null,
+    duration_h: 0,
+    intensity: null,
+    effort_weight_loss_kg: 0,
+    effort_fluid_loss_l: 0,
+  }
+
+  it('A — 61,7 kg / Target 3851 : conservation API dans la tolérance documentée', () => {
+    const result = runNutritionEngine(screenBulk)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const rawP = Math.round(result.macros.proteines_g)
+    const rawL = Math.round(result.macros.lipides_g)
+    const rawG = Math.round(result.macros.glucides_g)
+    expect(rawP).toBe(136)
+    expect(rawL).toBe(150)
+    expect(rawG).toBe(490)
+    expect(apiCalories(rawP, rawL, rawG)).toBe(3854)
+
+    const payload = formatApiPayload(result)
+    expect(payload.status).toBe('SUCCESS')
+    if (payload.status !== 'SUCCESS') return
+    expect(payload.target_kcal).toBe(3851)
+    const cal = apiCalories(
+      payload.macros.proteines_g,
+      payload.macros.lipides_g,
+      payload.macros.glucides_g,
+    )
+    // delta post-arrondi = -3 : non multiple de 4 ni 9 → exact impossible ; G-1 → 3850
+    expect(Math.abs(cal - payload.target_kcal)).toBeLessThanOrEqual(API_INTEGER_ENERGY_TOLERANCE_KCAL)
+    expect(cal).toBe(3850)
+    expect(payload.macros.glucides_g).toBe(489)
+    expect(payload.macros.proteines_g).toBe(136)
+    expect(payload.macros.lipides_g).toBe(150)
+  })
+
+  it('B — conservation exacte possible (delta multiple de 4 → glucides)', () => {
+    // 100*4+50*9+200*4 = 1650 ; target 1654 → delta +4 → G+1
+    const exact = reconcileApiIntegerMacros(1654, 100, 50, 200)
+    expect(exact).toEqual({ proteines_g: 100, lipides_g: 50, glucides_g: 201 })
+    expect(apiCalories(exact.proteines_g, exact.lipides_g, exact.glucides_g)).toBe(1654)
+  })
+
+  it('B2 — conservation exacte via lipides (delta multiple de 9, pas de 4)', () => {
+    // 100*4+50*9+200*4 = 1650 ; target 1659 → delta 9 → L+1
+    const exact = reconcileApiIntegerMacros(1659, 100, 50, 200)
+    expect(exact).toEqual({ proteines_g: 100, lipides_g: 51, glucides_g: 200 })
+    expect(apiCalories(exact.proteines_g, exact.lipides_g, exact.glucides_g)).toBe(1659)
+  })
+
+  it('C — conservation exacte impossible : tolérance documentée respectée', () => {
+    // 136*4+150*9+490*4 = 3854 ; target 3851 ; delta -3
+    const macros = reconcileApiIntegerMacros(3851, 136, 150, 490)
+    const cal = apiCalories(macros.proteines_g, macros.lipides_g, macros.glucides_g)
+    expect(cal).not.toBe(3851)
+    expect(Math.abs(cal - 3851)).toBeLessThanOrEqual(API_INTEGER_ENERGY_TOLERANCE_KCAL)
+    expect(API_INTEGER_ENERGY_TOLERANCE_KCAL).toBe(2)
+    expect(macros.glucides_g).toBe(489)
+  })
+
+  it('D — macros API jamais négatives', () => {
+    // Besoin de retirer 40 kcal (10 g) alors que G=2 → bascule protéines
+    const macros = reconcileApiIntegerMacros(100, 20, 4, 2)
+    // 20*4+4*9+2*4 = 80+36+8 = 124 ; delta = -24 → G-6 impossible ; G→0 (−8 kcal) insuffisant
+    // exact via P: -24 % 4 === 0 → try G first fails, L: -24%9 !== 0, P: -24/4=-6 → P=14
+    expect(macros.proteines_g).toBeGreaterThanOrEqual(0)
+    expect(macros.lipides_g).toBeGreaterThanOrEqual(0)
+    expect(macros.glucides_g).toBeGreaterThanOrEqual(0)
+    expect(apiCalories(macros.proteines_g, macros.lipides_g, macros.glucides_g)).toBe(100)
+
+    const clamped = reconcileApiIntegerMacros(50, 1, 0, 0)
+    // 4 kcal only ; target 50 → need +46 ; not exact with one macro from (1,0,0)
+    // G+11 = 44 residual 2; G+12 = 48 residual -2; P same
+    expect(clamped.proteines_g).toBeGreaterThanOrEqual(0)
+    expect(clamped.lipides_g).toBeGreaterThanOrEqual(0)
+    expect(clamped.glucides_g).toBeGreaterThanOrEqual(0)
+  })
+
+  it('E — floats internes inchangés après formatApiPayload', () => {
+    const result = runNutritionEngine(screenBulk)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const before = structuredClone(result.macros)
+    formatApiPayload(result)
+    expect(result.macros).toEqual(before)
+  })
+
+  it('F — allocation_flags identiques dans le payload API', () => {
+    const result = runNutritionEngine(screenBulk)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const payload = formatApiPayload(result)
+    expect(payload.status).toBe('SUCCESS')
+    if (payload.status !== 'SUCCESS') return
+    expect(payload.allocation_flags).toEqual(result.allocation_flags)
+  })
+
+  it('G — sérialisation UI 1 décimale inchangée par la réconciliation API', () => {
+    const result = runNutritionEngine(screenBulk)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const uiBefore = serializeEngineResult(result)
+    formatApiPayload(result)
+    const uiAfter = serializeEngineResult(result)
+    expect(uiAfter).toEqual(uiBefore)
+    expect(uiBefore.proteines_g).toBe(Math.round(result.macros.proteines_g * 10) / 10)
   })
 })

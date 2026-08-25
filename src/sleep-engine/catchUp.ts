@@ -1,4 +1,4 @@
-import type { CatchUpSleepResult } from './types'
+import type { CatchUpSleepResult } from './types.ts'
 
 /**
  * Catch-up sleep — recommandation informative uniquement.

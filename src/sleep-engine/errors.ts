@@ -1,4 +1,4 @@
-import type { SleepEngineFailure } from './types'
+import type { SleepEngineFailure } from './types.ts'
 
 export const ERROR_CODES = {
   INVALID_BEDTIME: 'ERR_INVALID_BEDTIME',
