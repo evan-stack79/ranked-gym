@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BookOpen, Info, Pencil, Plus, Trash2, TrendingUp, X } from 'lucide-react'
+import { BookOpen, Check, Pencil, Plus, Trash2, X } from 'lucide-react'
 import type {
   ExerciseEntry,
   ScheduledSession,
@@ -8,14 +8,13 @@ import type {
   WorkoutRoutine,
   WorkoutSet,
 } from '../../types/training'
-import {
-  bestSet1RM,
-  computeStrengthSessionStats,
-  relativeStrength,
-  suggestNextWeight,
-} from '../../utils/strength'
+import { computeStrengthSessionStats } from '../../utils/strength'
 import { sanitizeExerciseName } from '../../utils/exerciseName'
 import { detectProgramSplit, filterRoutinesForProgram } from '../../utils/workoutProgram'
+import {
+  findLastExerciseSets,
+  formatSetLoadLabel,
+} from '../../utils/workoutHistory'
 import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
 import { WorkoutHistory } from './WorkoutHistory'
 
@@ -41,7 +40,7 @@ interface WorkoutNotebookProps {
   onDraftSave?: (routineId: string, exercises: ExerciseEntry[]) => void
   onDeleteNote: (id: string) => void
   onAddRoutine: (label: string) => void
-  /** Démarre le timer de repos (validation Facile / OK / Dur). */
+  /** Démarre le timer de repos après validation d’une série. */
   onRestStart?: (info: {
     exerciseId: string
     setIndex: number
@@ -58,6 +57,7 @@ interface WorkoutNotebookProps {
   } | null
 }
 
+/** Tags optionnels — n’influencent plus la charge suivante. */
 const DIFF_OPTIONS: { id: SetDifficulty; label: string }[] = [
   { id: 'easy', label: 'Facile' },
   { id: 'ok', label: 'OK' },
@@ -65,7 +65,7 @@ const DIFF_OPTIONS: { id: SetDifficulty; label: string }[] = [
 ]
 
 function emptySet(): WorkoutSet {
-  return { reps: 8, weightKg: 20, difficulty: 'ok' }
+  return { reps: 8, weightKg: 20 }
 }
 
 function emptyExercise(): ExerciseEntry {
@@ -76,13 +76,23 @@ function emptyExercise(): ExerciseEntry {
   }
 }
 
-function cloneFromRoutine(routine: WorkoutRoutine): ExerciseEntry[] {
+function cloneFromRoutine(routine: WorkoutRoutine, history: WorkoutNote[] = []): ExerciseEntry[] {
   if (!routine.exercises.length) return [emptyExercise()]
-  return routine.exercises.map((e) => ({
-    ...e,
-    id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    sets: e.sets.map((s) => ({ ...s })),
-  }))
+  return routine.exercises.map((e) => {
+    const last = findLastExerciseSets(history, e.name)
+    // Préférer la dernière perf réelle : évite de réinjecter d’anciennes charges auto-progressées.
+    const sourceSets = last?.sets ?? e.sets
+    return {
+      ...e,
+      id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      sets: sourceSets.map((s) => ({
+        reps: s.reps,
+        weightKg: s.weightKg,
+        difficulty: undefined,
+        rpe: undefined,
+      })),
+    }
+  })
 }
 
 export function WorkoutNotebook({
@@ -102,7 +112,17 @@ export function WorkoutNotebook({
   const [routineId, setRoutineId] = useState(routines[0]?.id ?? 'upper')
   const [title, setTitle] = useState(routines[0]?.label ?? 'Séance')
   const [exercises, setExercises] = useState<ExerciseEntry[]>(() =>
-    cloneFromRoutine(routines[0] ?? { id: 'upper', label: 'Upper', subtitle: '', accent: '#fff', exercises: [], updatedAt: 0 }),
+    cloneFromRoutine(
+      routines[0] ?? {
+        id: 'upper',
+        label: 'Upper',
+        subtitle: '',
+        accent: '#fff',
+        exercises: [],
+        updatedAt: 0,
+      },
+      history,
+    ),
   )
   const [customOpen, setCustomOpen] = useState(false)
   const [customLabel, setCustomLabel] = useState('')
@@ -119,43 +139,20 @@ export function WorkoutNotebook({
     [visibleRoutines, routineId],
   )
 
-  const selectRoutine = (id: string) => {
-    const routine = routines.find((r) => r.id === id)
-    if (!routine) return
-    setRoutineId(id)
-    setTitle(routine.label)
-    setExercises(cloneFromRoutine(routine))
+  const stats = useMemo(
+    () => computeStrengthSessionStats(exercises, bodyWeightKg),
+    [exercises, bodyWeightKg],
+  )
+
+  const selectRoutine = (nextId: string) => {
+    const r = visibleRoutines.find((x) => x.id === nextId) ?? routines.find((x) => x.id === nextId)
+    if (!r) return
+    setRoutineId(r.id)
+    setTitle(r.label)
+    setExercises(cloneFromRoutine(r, history))
     setEditingNote(null)
   }
 
-  const loadNoteForEdit = (note: WorkoutNote) => {
-    setEditingNote(note)
-    setTitle(note.title)
-    if (note.routineId && routines.some((r) => r.id === note.routineId)) {
-      setRoutineId(note.routineId)
-    }
-    setExercises(
-      note.exercises.map((e) => ({
-        ...e,
-        id: e.id || `ex-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        name: sanitizeExerciseName(e.name),
-        sets: e.sets.map((s) => ({ ...s })),
-      })),
-    )
-    window.requestAnimationFrame(() => {
-      document.getElementById(id ?? 'workout-notebook')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-  }
-
-  const cancelEdit = () => {
-    setEditingNote(null)
-    if (activeRoutine) {
-      setTitle(activeRoutine.label)
-      setExercises(cloneFromRoutine(activeRoutine))
-    }
-  }
-
-  // Keep selection valid when program filter changes
   useEffect(() => {
     if (!visibleRoutines.some((r) => r.id === routineId) && visibleRoutines[0]) {
       selectRoutine(visibleRoutines[0].id)
@@ -177,48 +174,24 @@ export function WorkoutNotebook({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialRoutineId])
 
-  const stats = useMemo(
-    () => computeStrengthSessionStats(exercises, bodyWeightKg),
-    [exercises, bodyWeightKg],
-  )
-
-  const updateExercise = (id: string, patch: Partial<ExerciseEntry>) => {
-    setExercises((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)))
-  }
-
-  const updateSet = (exId: string, index: number, patch: Partial<WorkoutSet>) => {
-    setExercises((prev) =>
-      prev.map((e) => {
-        if (e.id !== exId) return e
-        const sets = e.sets.map((s, i) => (i === index ? { ...s, ...patch } : s))
-        return { ...e, sets }
-      }),
-    )
-  }
-
-  // Applique le repos loggé par le timer parent
   useEffect(() => {
     if (!restLogRequest) return
     const { exerciseId, setIndex, restSec, addNextSet } = restLogRequest
     setExercises((prev) => {
       const next = prev.map((e) => {
         if (e.id !== exerciseId) return e
-        const sets = e.sets.map((s, i) =>
-          i === setIndex ? { ...s, done: true, restSec } : s,
-        )
-        if (addNextSet && setIndex === e.sets.length - 1) {
-          const last = sets[setIndex]
-          return {
-            ...e,
-            sets: [
-              ...sets,
-              {
-                reps: last?.reps ?? 8,
-                weightKg: last?.weightKg ?? 20,
-                difficulty: last?.difficulty ?? 'ok',
-              },
-            ],
-          }
+        let sets = e.sets.map((s, i) => (i === setIndex ? { ...s, restSec, done: true } : s))
+        if (addNextSet) {
+          const last = sets[sets.length - 1]
+          sets = [
+            ...sets,
+            {
+              reps: last?.reps ?? 8,
+              weightKg: last?.weightKg ?? 20,
+              difficulty: last?.difficulty,
+              rpe: last?.rpe,
+            },
+          ]
         }
         return { ...e, sets }
       })
@@ -227,7 +200,6 @@ export function WorkoutNotebook({
     })
   }, [restLogRequest, onDraftSave, routineId])
 
-  // Autosave debounced à chaque modification du carnet
   useEffect(() => {
     if (!onDraftSave) return
     const t = window.setTimeout(() => {
@@ -235,6 +207,22 @@ export function WorkoutNotebook({
     }, 700)
     return () => window.clearTimeout(t)
   }, [exercises, routineId, onDraftSave])
+
+  const updateExercise = (exerciseId: string, patch: Partial<ExerciseEntry>) => {
+    setExercises((prev) => prev.map((e) => (e.id === exerciseId ? { ...e, ...patch } : e)))
+  }
+
+  const updateSet = (exerciseId: string, setIndex: number, patch: Partial<WorkoutSet>) => {
+    setExercises((prev) =>
+      prev.map((e) => {
+        if (e.id !== exerciseId) return e
+        return {
+          ...e,
+          sets: e.sets.map((s, i) => (i === setIndex ? { ...s, ...patch } : s)),
+        }
+      }),
+    )
+  }
 
   const finishSet = (ex: ExerciseEntry, setIndex: number, difficulty?: SetDifficulty) => {
     setExercises((prev) => {
@@ -256,6 +244,27 @@ export function WorkoutNotebook({
       exerciseName: ex.name.trim() || 'Exercice',
       setLabel: `S${setIndex + 1}`,
     })
+  }
+
+  const loadNoteForEdit = (note: WorkoutNote) => {
+    setEditingNote(note)
+    setTitle(note.title)
+    if (note.routineId) setRoutineId(note.routineId)
+    setExercises(
+      note.exercises.map((e) => ({
+        ...e,
+        id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        sets: e.sets.map((s) => ({ ...s })),
+      })),
+    )
+  }
+
+  const cancelEdit = () => {
+    setEditingNote(null)
+    if (activeRoutine) {
+      setTitle(activeRoutine.label)
+      setExercises(cloneFromRoutine(activeRoutine, history))
+    }
   }
 
   const handleSave = async () => {
@@ -283,12 +292,16 @@ export function WorkoutNotebook({
       if (editingNote) {
         setEditingNote(null)
       } else {
-        // Keep the same focus open with what was just saved (progress stays visible)
         setExercises(
           cleaned.map((e) => ({
             ...e,
             id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            sets: e.sets.map((s) => ({ ...s })),
+            sets: e.sets.map((s) => ({
+              reps: s.reps,
+              weightKg: s.weightKg,
+              difficulty: s.difficulty,
+              rpe: s.rpe,
+            })),
           })),
         )
       }
@@ -305,9 +318,9 @@ export function WorkoutNotebook({
         <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
           Carnet
         </p>
-        <h2 className="text-[20px] font-bold text-white">Focus · séries · progression</h2>
+        <h2 className="text-[20px] font-bold text-white">Mon programme · séries · historique</h2>
         <p className="mt-1 text-[12px] text-[#AEAEB2]">
-          Valide Facile / OK / Dur pour lancer le repos en bas de l’écran.
+          Tu choisis charges et reps. L&apos;historique t&apos;informe — il ne prescrit rien.
         </p>
       </div>
 
@@ -340,7 +353,7 @@ export function WorkoutNotebook({
           onClick={() => setCustomOpen((v) => !v)}
           className="ios-press shrink-0 rounded-full border border-dashed border-white/20 px-3 py-2 text-[12px] font-semibold text-[#8E8E93]"
         >
-          + Focus
+          + Programme
         </button>
       </div>
 
@@ -409,19 +422,16 @@ export function WorkoutNotebook({
         </div>
         <p className="mb-3 text-[11px] text-[#8E8E93]">
           {hasSaved
-            ? 'Dernière progression chargée — charges déjà ajustées selon Facile / OK / Dur.'
-            : 'Nouveau focus — écris tes exercices, on les gardera pour la prochaine fois.'}
+            ? 'Dernière séance mémorisée — tu décides des charges d’aujourd’hui.'
+            : 'Nouveau focus — ajoute tes exercices ; ils resteront dans ton carnet.'}
         </p>
 
         <div className="space-y-4">
           {exercises.map((ex) => {
-            const oneRm = bestSet1RM(ex.sets)
-            const ratio = relativeStrength(oneRm, bodyWeightKg)
-            const tip = suggestNextWeight({
-              sets: ex.sets,
-              bodyWeightKg,
-              difficulty: ex.sets[ex.sets.length - 1]?.difficulty ?? 'ok',
-            })
+            const last = findLastExerciseSets(history, ex.name)
+            const pendingIdx = ex.sets.findIndex((s) => !s.done)
+            const validateIdx = pendingIdx >= 0 ? pendingIdx : Math.max(0, ex.sets.length - 1)
+
             return (
               <div
                 key={ex.id}
@@ -435,7 +445,7 @@ export function WorkoutNotebook({
                       updateExercise(ex.id, { name: sanitizeExerciseName(e.target.value) })
                     }
                     placeholder="Exercice (ex. Développé couché)"
-                    className="w-full bg-transparent text-[15px] font-semibold text-white placeholder:text-[#636366] outline-none"
+                    className="w-full bg-transparent text-[15px] font-semibold uppercase tracking-wide text-white placeholder:normal-case placeholder:tracking-normal placeholder:text-[#636366] outline-none"
                   />
                   {exercises.length > 1 && (
                     <button
@@ -451,19 +461,50 @@ export function WorkoutNotebook({
                   )}
                 </div>
 
+                {last && (
+                  <div className="mb-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+                      Dernière séance
+                    </p>
+                    <ul className="mt-1 space-y-0.5">
+                      {last.sets.map((s, i) => (
+                        <li key={i} className="text-[13px] tabular-nums text-[#AEAEB2]">
+                          {formatSetLoadLabel(s.weightKg, s.reps)}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+                  Aujourd&apos;hui
+                </p>
+
                 <div className="space-y-2">
                   {ex.sets.map((set, idx) => (
                     <div
                       key={idx}
-                      className="grid grid-cols-[auto_1fr_1fr_auto] items-end gap-2"
+                      className="grid grid-cols-[auto_1fr_1fr_auto_auto] items-end gap-2"
                     >
                       <span
                         className={`pb-2 text-[11px] font-bold ${
                           set.done ? 'text-[#30D158]' : 'text-[#8E8E93]'
                         }`}
                       >
-                        S{idx + 1}
+                        {idx + 1}
                       </span>
+                      <label className="block">
+                        <span className="mb-0.5 block text-[10px] text-[#636366]">kg</span>
+                        <ClearableNumberInput
+                          value={set.weightKg}
+                          onChange={(v) => updateSet(ex.id, idx, { weightKg: v ?? 0 })}
+                          min={0}
+                          max={500}
+                          step={0.5}
+                          aria-label="Poids"
+                          className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
+                        />
+                      </label>
                       <label className="block">
                         <span className="mb-0.5 block text-[10px] text-[#636366]">Reps</span>
                         <ClearableNumberInput
@@ -477,16 +518,21 @@ export function WorkoutNotebook({
                           className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
                         />
                       </label>
-                      <label className="block">
-                        <span className="mb-0.5 block text-[10px] text-[#636366]">Poids kg</span>
+                      <label className="block w-14">
+                        <span className="mb-0.5 block text-[10px] text-[#636366]">RPE</span>
                         <ClearableNumberInput
-                          value={set.weightKg}
-                          onChange={(v) => updateSet(ex.id, idx, { weightKg: v ?? 0 })}
-                          min={0}
-                          max={500}
-                          step={0.5}
-                          aria-label="Poids"
-                          className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
+                          value={set.rpe ?? null}
+                          onChange={(v) =>
+                            updateSet(ex.id, idx, {
+                              rpe:
+                                v != null ? Math.min(10, Math.max(1, Math.round(v))) : undefined,
+                            })
+                          }
+                          min={1}
+                          max={10}
+                          required={false}
+                          aria-label="RPE optionnel"
+                          className="w-full rounded-xl border border-white/10 bg-black/40 px-2 py-2 text-[13px] font-semibold text-[#AEAEB2] outline-none"
                         />
                       </label>
                       {ex.sets.length > 1 ? (
@@ -517,40 +563,35 @@ export function WorkoutNotebook({
                     }
                     className="ios-press rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-semibold text-[#AEAEB2]"
                   >
-                    + Série
+                    + Ajouter une série
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => finishSet(ex, validateIdx)}
+                    className="ios-press inline-flex items-center gap-1 rounded-full border border-[#30D158]/40 bg-[#30D158]/15 px-3 py-1.5 text-[12px] font-semibold text-[#30D158]"
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                    Valider
                   </button>
                   {DIFF_OPTIONS.map((d) => {
-                    const last = ex.sets[ex.sets.length - 1]
-                    const lastIdx = Math.max(0, ex.sets.length - 1)
-                    const on = last?.difficulty === d.id && last?.done
+                    const set = ex.sets[validateIdx]
+                    const on = set?.difficulty === d.id
                     return (
                       <button
                         key={d.id}
                         type="button"
-                        onClick={() => finishSet(ex, lastIdx, d.id)}
-                        className={`ios-press rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
+                        title="Optionnel — n’ajuste pas automatiquement la charge"
+                        onClick={() => updateSet(ex.id, validateIdx, { difficulty: d.id })}
+                        className={`ios-press rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
                           on
-                            ? 'border-[#30D158]/40 bg-[#30D158]/18 text-[#30D158]'
-                            : d.id === 'ok'
-                              ? 'border-[#FF2B2B]/40 bg-[#FF2B2B]/18 text-white'
-                              : 'border-white/12 text-[#AEAEB2]'
+                            ? 'border-white/25 bg-white/10 text-white'
+                            : 'border-white/10 text-[#636366]'
                         }`}
                       >
                         {d.label}
                       </button>
                     )
                   })}
-                  {tip && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateSet(ex.id, ex.sets.length - 1, { weightKg: tip.nextKg })
-                      }
-                      className="rounded-full border border-[#30D158]/35 bg-[#30D158]/10 px-2.5 py-1 text-[11px] font-semibold text-[#30D158]"
-                    >
-                      Appliquer ~{tip.nextKg} kg
-                    </button>
-                  )}
                 </div>
 
                 {ex.sets.some((s) => s.restSec != null && s.restSec > 0) ? (
@@ -564,30 +605,6 @@ export function WorkoutNotebook({
                       .join(' · ')}
                   </p>
                 ) : null}
-
-                {oneRm > 0 && (
-                  <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                    <p className="flex items-center gap-1.5 text-[12px] text-[#AEAEB2]">
-                      <TrendingUp className="h-3.5 w-3.5 shrink-0 text-[#30D158]" />
-                      <span>
-                        1RM ~<span className="font-semibold text-white">{oneRm} kg</span>
-                        {ratio > 0 && (
-                          <span className="text-[#636366]"> · {ratio}× poids</span>
-                        )}
-                      </span>
-                    </p>
-                    {tip && (
-                      <button
-                        type="button"
-                        title={tip.message}
-                        aria-label="Conseil de progression"
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/10 text-[#8E8E93]"
-                      >
-                        <Info className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                )}
               </div>
             )
           })}
@@ -616,7 +633,7 @@ export function WorkoutNotebook({
         </div>
 
         <p className="mt-2 text-center text-[11px] text-[#636366]">
-          Volume {stats.volume} kg · {stats.durationMin} min · kcal = poids × durée × intensité
+          Volume {stats.volume} kg · {stats.durationMin} min
         </p>
       </div>
 

@@ -7,7 +7,6 @@ import { AppBootScreen } from './components/ui/AppBootScreen'
 import { SupabaseConfigBanner } from './components/ui/SupabaseConfigBanner'
 import { GlobalOnboardingScreen } from './components/onboarding/GlobalOnboardingScreen'
 import { HomeView } from './components/home/HomeView'
-import { LobbyView } from './components/lobby/LobbyView'
 import { TrainingView } from './components/training/TrainingView'
 import { NutritionView } from './components/nutrition/NutritionView'
 import { ProfileView } from './components/profile/ProfileView'
@@ -29,21 +28,20 @@ function resolveLaunchPhase(): AppPhase {
 function renderActiveView(
   tab: TabId,
   onStartTraining: (routineId: string) => void,
+  onOpenTraining: () => void,
   launchRoutineId: string | null,
   onLaunchConsumed: () => void,
-  onGoToLobby: () => void,
+  onAfterSession: () => void,
 ) {
   switch (tab) {
     case 'home':
-      return <HomeView onStartTraining={onStartTraining} />
-    case 'lobby':
-      return <LobbyView />
+      return <HomeView onStartTraining={onStartTraining} onOpenTraining={onOpenTraining} />
     case 'training':
       return (
         <TrainingView
           launchRoutineId={launchRoutineId}
           onLaunchConsumed={onLaunchConsumed}
-          onGoToLobby={onGoToLobby}
+          onGoToLobby={onAfterSession}
         />
       )
     case 'nutrition':
@@ -88,7 +86,7 @@ function AppShell() {
       return
     }
 
-    // Pas de session Supabase → bloquer toute l’app (Lobby / Train / Nutri / Profil).
+    // Pas de session Supabase → bloquer toute l’app (Accueil / Train / Nutri / Profil).
     if (!isAuthenticated) {
       setPhase('loading')
       return
@@ -143,6 +141,15 @@ function AppShell() {
       return
     }
     setLaunchRoutineId(routineId)
+    setActiveTab('training')
+  }
+
+  const handleOpenTraining = () => {
+    if (!isAuthenticated) {
+      openAuth()
+      return
+    }
+    setLaunchRoutineId(null)
     setActiveTab('training')
   }
 
@@ -206,9 +213,10 @@ function AppShell() {
         {renderActiveView(
           activeTab,
           handleStartTraining,
+          handleOpenTraining,
           launchRoutineId,
           handleLaunchConsumed,
-          () => setActiveTab('lobby'),
+          () => setActiveTab('home'),
         )}
       </AppLayout>
       <AuthBottomSheet />

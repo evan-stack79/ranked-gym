@@ -5,7 +5,8 @@ export interface TodayWorkoutPlan {
   title: string
   subtitle: string
   accent: string
-  source: 'schedule' | 'rotation'
+  source: 'schedule'
+  exerciseCount: number
 }
 
 const TEMPLATE_TO_ROUTINE: Record<string, string> = {
@@ -25,16 +26,6 @@ const TEMPLATE_TO_ROUTINE: Record<string, string> = {
   pecs: 'pecs',
 }
 
-const WEEKLY_ROTATION: Array<{ routineId: string; title: string; subtitle: string }> = [
-  { routineId: 'upper', title: 'Séance Upper', subtitle: 'Focus Pectoraux' },
-  { routineId: 'lower', title: 'Séance Lower', subtitle: 'Focus Quadriceps' },
-  { routineId: 'push', title: 'Séance Push', subtitle: 'Focus Pectoraux' },
-  { routineId: 'pull', title: 'Séance Pull', subtitle: 'Focus Dos' },
-  { routineId: 'legs', title: 'Séance Jambes', subtitle: 'Focus Fessiers' },
-  { routineId: 'full', title: 'Séance Full body', subtitle: 'Corps entier' },
-  { routineId: 'upper', title: 'Séance Upper', subtitle: 'Focus Épaules' },
-]
-
 function resolveRoutineId(templateId: string): string {
   return TEMPLATE_TO_ROUTINE[templateId] ?? templateId
 }
@@ -48,29 +39,26 @@ function pickScheduledToday(
   return [...todaySessions].sort((a, b) => a.time.localeCompare(b.time))[0]
 }
 
-export function getTodayWorkout(state: TrainingState, now = new Date()): TodayWorkoutPlan {
+/**
+ * Séance du jour = uniquement ce que l’utilisateur a planifié (agenda).
+ * Pas de rotation / suggestion automatique (carnet, pas coach).
+ */
+export function getTodayWorkout(
+  state: TrainingState,
+  now = new Date(),
+): TodayWorkoutPlan | null {
   const weekday = now.getDay() as Weekday
   const scheduled = pickScheduledToday(state.schedule, weekday)
+  if (!scheduled) return null
 
-  if (scheduled) {
-    const routineId = resolveRoutineId(scheduled.templateId)
-    const routine = state.routines.find((r) => r.id === routineId)
-    return {
-      routineId,
-      title: scheduled.title,
-      subtitle: routine?.subtitle ?? 'Programme du jour',
-      accent: routine?.accent ?? '#FF2B2B',
-      source: 'schedule',
-    }
-  }
-
-  const rotation = WEEKLY_ROTATION[weekday] ?? WEEKLY_ROTATION[0]
-  const routine = state.routines.find((r) => r.id === rotation.routineId)
+  const routineId = resolveRoutineId(scheduled.templateId)
+  const routine = state.routines.find((r) => r.id === routineId)
   return {
-    routineId: rotation.routineId,
-    title: rotation.title,
-    subtitle: rotation.subtitle,
+    routineId,
+    title: scheduled.title,
+    subtitle: routine?.subtitle ?? 'Programme du jour',
     accent: routine?.accent ?? '#FF2B2B',
-    source: 'rotation',
+    source: 'schedule',
+    exerciseCount: routine?.exercises.length ?? 0,
   }
 }

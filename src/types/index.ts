@@ -43,7 +43,8 @@ export interface GeoCoordinates {
   accuracy?: number
 }
 
-export type TabId = 'home' | 'lobby' | 'training' | 'nutrition' | 'profile'
+/** Navigation principale V1 : Lobby retiré du BottomNav (infra Lobby conservée). */
+export type TabId = 'home' | 'training' | 'nutrition' | 'profile'
 
 export interface NavTab {
   id: TabId

@@ -380,13 +380,13 @@ export function saveWorkoutNote(
   if (entry.routineId) {
     const base = state.routines.find((r) => r.id === entry.routineId)
     if (base) {
+      // Carnet personnel : on mémorise ce qui a été fait, sans progression auto des charges.
       const withActual: WorkoutRoutine = {
         ...base,
         exercises: cloneExercises(entry.exercises),
         updatedAt: Date.now(),
       }
-      const progressed = progressRoutineExercises(withActual, bodyWeightKg)
-      routines = state.routines.map((r) => (r.id === entry.routineId ? progressed : r))
+      routines = state.routines.map((r) => (r.id === entry.routineId ? withActual : r))
     }
   }
 
@@ -481,7 +481,8 @@ export function todayWorkoutKcal(state: TrainingState = read()): number {
     .reduce((sum, c) => sum + c.estimatedKcal, 0)
 }
 
-/** Apply Facile/OK/Dur progression to every routine that has exercises. */
+/** Apply Facile/OK/Dur progression to every routine (API legacy / ForceView).
+ * Non branché sur le flux carnet Accueil/Train — la sauvegarde mémorise les charges réalisées. */
 export function applyForceProgression(bodyWeightKg: number): TrainingState {
   const state = read()
   const routines = state.routines.map((r) =>

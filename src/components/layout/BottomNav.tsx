@@ -1,4 +1,4 @@
-import { Home, Users, Dumbbell, Salad, User } from 'lucide-react'
+import { Home, Dumbbell, Salad, User } from 'lucide-react'
 import type { TabId } from '../../types'
 
 interface BottomNavProps {
@@ -8,7 +8,6 @@ interface BottomNavProps {
 
 const tabs: { id: TabId; label: string; icon: typeof Home }[] = [
   { id: 'home', label: 'Accueil', icon: Home },
-  { id: 'lobby', label: 'Lobby', icon: Users },
   { id: 'training', label: 'Train', icon: Dumbbell },
   { id: 'nutrition', label: 'Nutri', icon: Salad },
   { id: 'profile', label: 'Profil', icon: User },

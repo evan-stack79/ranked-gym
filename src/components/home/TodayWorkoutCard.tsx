@@ -1,14 +1,43 @@
-import { Dumbbell, Play } from 'lucide-react'
+import { Dumbbell, NotebookPen, Play } from 'lucide-react'
 import type { TodayWorkoutPlan } from '../../utils/todayWorkout'
 import { NeonButton } from '../ui/NeonButton'
 import { IconBadge } from '../ui/IconBadge'
 
 interface TodayWorkoutCardProps {
-  workout: TodayWorkoutPlan
+  workout: TodayWorkoutPlan | null
   onStart: () => void
+  onOpenNotebook: () => void
 }
 
-export function TodayWorkoutCard({ workout, onStart }: TodayWorkoutCardProps) {
+/**
+ * Accueil — bloc entraînement minimal (pas d’écran de programmation).
+ */
+export function TodayWorkoutCard({ workout, onStart, onOpenNotebook }: TodayWorkoutCardProps) {
+  if (!workout) {
+    return (
+      <section className="glass-card rounded-2xl p-4">
+        <div className="mb-3 flex items-center gap-2.5">
+          <IconBadge icon={Dumbbell} variant="crimson" size="sm" />
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+            Entraînement
+          </p>
+        </div>
+        <p className="text-[17px] font-semibold text-white">Aucune séance aujourd&apos;hui</p>
+        <p className="mt-1 text-[13px] text-[#8E8E93]">
+          Ouvre ton carnet pour créer ou modifier ton programme.
+        </p>
+        <button
+          type="button"
+          onClick={onOpenNotebook}
+          className="ios-press mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/12 bg-white/5 px-4 py-3 text-[14px] font-semibold text-white"
+        >
+          <NotebookPen className="h-4 w-4" />
+          Ouvrir mon carnet
+        </button>
+      </section>
+    )
+  }
+
   return (
     <section
       className="relative overflow-hidden rounded-3xl border border-[#FF2B2B]/35 p-5"
@@ -27,14 +56,13 @@ export function TodayWorkoutCard({ workout, onStart }: TodayWorkoutCardProps) {
 
       <div className="relative flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <div className="mb-2 flex items-center gap-2">
-            <p className="ios-label">Entraînement du jour</p>
-            <span className="rounded-full border border-[#FF2B2B]/30 bg-[#FF2B2B]/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#FF6961]">
-              {workout.source === 'schedule' ? 'Agenda' : 'Suggestion'}
-            </span>
-          </div>
-          <h2 className="text-[22px] font-black tracking-tight text-white">{workout.title}</h2>
-          <p className="mt-1 text-[15px] font-medium text-[#FF9F0A]">{workout.subtitle}</p>
+          <p className="ios-label">Entraînement</p>
+          <h2 className="mt-1 text-[22px] font-black tracking-tight text-white">{workout.title}</h2>
+          <p className="mt-1 text-[15px] font-medium text-[#FF9F0A]">
+            {workout.exerciseCount > 0
+              ? `${workout.exerciseCount} exercice${workout.exerciseCount > 1 ? 's' : ''}`
+              : 'Séance planifiée'}
+          </p>
         </div>
         <IconBadge icon={Dumbbell} variant="crimson" />
       </div>
@@ -43,7 +71,7 @@ export function TodayWorkoutCard({ workout, onStart }: TodayWorkoutCardProps) {
         <NeonButton onClick={onStart} variant="primary" className="py-3.5 text-[16px]">
           <span className="flex items-center justify-center gap-2 font-bold">
             <Play className="h-5 w-5 fill-current" />
-            Démarrer la séance
+            Démarrer
           </span>
         </NeonButton>
       </div>
