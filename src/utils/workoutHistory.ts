@@ -95,3 +95,30 @@ export const DIFF_LABELS: Record<string, string> = {
   ok: 'OK',
   hard: 'Dur',
 }
+
+/**
+ * Dernière performance connue pour un exercice (historique informatif).
+ * Ne prescrit aucune charge — lecture seule pour le carnet.
+ */
+export function findLastExerciseSets(
+  history: WorkoutNote[],
+  exerciseName: string,
+): { dateKey: string; sets: WorkoutNote['exercises'][number]['sets'] } | null {
+  const needle = exerciseName.trim().toLowerCase()
+  if (!needle) return null
+
+  const notes = dedupeWorkoutNotes(history)
+  for (const note of notes) {
+    for (const ex of note.exercises) {
+      if (ex.name.trim().toLowerCase() === needle && ex.sets.length > 0) {
+        return { dateKey: note.dateKey, sets: ex.sets }
+      }
+    }
+  }
+  return null
+}
+
+export function formatSetLoadLabel(weightKg: number, reps: number): string {
+  const w = Number.isInteger(weightKg) ? String(weightKg) : weightKg.toFixed(1).replace(/\.0$/, '')
+  return `${w} kg × ${reps}`
+}

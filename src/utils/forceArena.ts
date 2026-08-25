@@ -1,3 +1,8 @@
+/**
+ * Force Arena — utilitaires de progression (legacy).
+ * Conservés pour ForceView / applyForceProgression.
+ * Le carnet Train V1 ne prescrit plus automatiquement les charges via ce module.
+ */
 import type { SetDifficulty, WorkoutRoutine, WorkoutSet } from '../types/training'
 import { bestSet1RM, relativeStrength, suggestNextWeight } from './strength'
 

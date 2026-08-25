@@ -22,14 +22,12 @@ import { safeError } from '../../utils/safeLog'
 import { connectHealthIntent } from '../../services/healthSteps'
 import { startReminderWatcher } from '../../services/reminderService'
 import { getCalorieProfile } from '../../services/nutritionStorage'
-import { GOAL_LABELS } from '../../utils/calories'
 import { estimateSessionKcal, stepsToKcal } from '../../utils/activityCalories'
 import { getNutritionTarget } from '../../services/nutritionActivity'
 import { SportPicker, SportChip } from './SportPicker'
 import { StepsCard } from './StepsCard'
 import { TrainingAgenda } from './TrainingAgenda'
 import { WorkoutNotebook } from './WorkoutNotebook'
-import { OverloadCalculator } from './OverloadCalculator'
 import { EnduranceSessionCard } from './EnduranceSessionCard'
 import { IconBadge } from '../ui/IconBadge'
 import { IosSheet } from '../ui/IosSheet'
@@ -306,7 +304,7 @@ export function TrainingView({
           </div>
           <h1 className="text-[34px] font-bold tracking-tight text-white">Entraînement</h1>
           <p className="mt-2 text-[17px] text-[#8E8E93]">
-            Mode {discipline.shortLabel} — carnet, rappels, énergie.
+            Mode {discipline.shortLabel} — ton carnet personnel.
           </p>
         </div>
       </header>
@@ -344,10 +342,6 @@ export function TrainingView({
           void handleConnectHealth()
         }}
       />
-
-      {showStrengthTools && (
-        <OverloadCalculator bodyWeightKg={profile.weightKg} goalLabel={GOAL_LABELS[profile.goal]} />
-      )}
 
       {showEnduranceTools && (
         <EnduranceSessionCard

@@ -296,7 +296,7 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
                 type="button"
                 onClick={onComplete}
                 className="ios-press -mr-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/20 bg-black/45 text-white/90 backdrop-blur-md"
-                aria-label="Passer et retour Lobby"
+                aria-label="Passer et retour Accueil"
               >
                 <X className="h-[18px] w-[18px]" strokeWidth={2.5} aria-hidden />
               </button>
@@ -395,7 +395,7 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
                 type="button"
                 onClick={onComplete}
                 className="ios-press flex h-11 w-11 items-center justify-center rounded-full bg-white text-black"
-                aria-label="Fermer et retour Lobby"
+                aria-label="Fermer et retour Accueil"
               >
                 <X className="h-[18px] w-[18px]" strokeWidth={2.5} aria-hidden />
               </button>
