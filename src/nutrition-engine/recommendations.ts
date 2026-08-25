@@ -1,4 +1,4 @@
-import type { NutritionEngineInput } from './types'
+import type { NutritionEngineInput } from './types.ts'
 
 const DIGESTIVE_COMFORT =
   'Confort digestif : évite les repas très gras juste avant l’effort ; privilégie glucides faciles à digérer 2–3 h avant.'

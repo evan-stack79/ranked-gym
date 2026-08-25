@@ -14,8 +14,8 @@ import {
   runNutritionEngine,
   runNutritionEngineWithTarget,
   validateForbiddenActivityFields,
-} from './index'
-import type { NutritionEngineInput } from './types'
+} from './index.ts'
+import type { NutritionEngineInput } from './types.ts'
 
 const BASE_INPUT: NutritionEngineInput = {
   sex: 'male',

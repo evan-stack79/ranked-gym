@@ -1,4 +1,4 @@
-import type { MacroFloorsAndTargets, NutritionGoal } from './types'
+import type { MacroFloorsAndTargets, NutritionGoal } from './types.ts'
 
 export interface SportFlags {
   hasMusculation: boolean

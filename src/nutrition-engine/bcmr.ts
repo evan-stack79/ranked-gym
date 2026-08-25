@@ -1,5 +1,5 @@
-import { KCAL_PER_G } from './constants/iom'
-import type { MacroFloorsAndTargets, MacroGrams } from './types'
+import { KCAL_PER_G } from './constants/iom.ts'
+import type { MacroFloorsAndTargets, MacroGrams } from './types.ts'
 
 export function computeBcmrKcal(constraints: MacroFloorsAndTargets): number {
   return (

@@ -1,6 +1,6 @@
-import { KCAL_PER_G } from './constants/iom'
-import { ERROR_CODES, engineError } from './errors'
-import type { MacroFloorsAndTargets, MacroGrams, NutritionEngineFailure } from './types'
+import { KCAL_PER_G } from './constants/iom.ts'
+import { ERROR_CODES, engineError } from './errors.ts'
+import type { MacroFloorsAndTargets, MacroGrams, NutritionEngineFailure } from './types.ts'
 
 export interface WaterfallResult {
   macros: MacroGrams

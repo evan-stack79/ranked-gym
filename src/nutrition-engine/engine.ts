@@ -1,12 +1,12 @@
-import { ENERGY_ROUND_TOLERANCE_KCAL } from './constants/iom'
-import { computeBcmrKcal, macrosToKcal } from './bcmr'
-import { computeEer, computeTargetKcal } from './eer'
-import { ERROR_CODES, engineError } from './errors'
-import { buildRecommendations } from './recommendations'
-import { resolveMacroConstraints, resolveSportFlags } from './sportConstraints'
-import type { MacroGrams, NutritionEngineInput, NutritionEngineResult } from './types'
-import { validateInput } from './validation'
-import { allocateWaterfall, assertAllocationInvariants } from './waterfall'
+import { ENERGY_ROUND_TOLERANCE_KCAL } from './constants/iom.ts'
+import { computeBcmrKcal, macrosToKcal } from './bcmr.ts'
+import { computeEer, computeTargetKcal } from './eer.ts'
+import { ERROR_CODES, engineError } from './errors.ts'
+import { buildRecommendations } from './recommendations.ts'
+import { resolveMacroConstraints, resolveSportFlags } from './sportConstraints.ts'
+import type { MacroGrams, NutritionEngineInput, NutritionEngineResult } from './types.ts'
+import { validateInput } from './validation.ts'
+import { allocateWaterfall, assertAllocationInvariants } from './waterfall.ts'
 
 function bcmrErrorMessage(targetKcal: number, bcmrKcal: number): string {
   return (

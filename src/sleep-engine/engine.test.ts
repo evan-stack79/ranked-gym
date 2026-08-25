@@ -9,8 +9,8 @@ import {
   experimentalSuggestTibRestriction,
   parseTimeToMinutes,
   runSleepEngine,
-} from './index'
-import type { SleepInput } from './types'
+} from './index.ts'
+import type { SleepInput } from './types.ts'
 
 const BASE: SleepInput = {
   bedtime: '23:00',

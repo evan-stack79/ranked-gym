@@ -1,27 +1,27 @@
-export { ERROR_CODES, sleepError } from './errors'
-export type { SleepErrorCode } from './errors'
+export { ERROR_CODES, sleepError } from './errors.ts'
+export type { SleepErrorCode } from './errors.ts'
 export {
   runSleepEngine,
   runSleepEngineApi,
   formatSleepApiPayload,
-} from './engine'
-export { classifyQuantity } from './quantity'
-export { computeRegularityMetrics } from './regularity'
-export { computeSleepEfficiency, CLINICAL_TIB_RESTRICTION_SE_THRESHOLD } from './efficiency'
-export { computeCatchUp } from './catchUp'
-export { buildSleepRecommendations } from './recommendations'
-export { validateSleepInput, validateForbiddenFields, MIN_REGULARITY_SAMPLES } from './validation'
+} from './engine.ts'
+export { classifyQuantity } from './quantity.ts'
+export { computeRegularityMetrics } from './regularity.ts'
+export { computeSleepEfficiency, CLINICAL_TIB_RESTRICTION_SE_THRESHOLD } from './efficiency.ts'
+export { computeCatchUp } from './catchUp.ts'
+export { buildSleepRecommendations } from './recommendations.ts'
+export { validateSleepInput, validateForbiddenFields, MIN_REGULARITY_SAMPLES } from './validation.ts'
 export {
   parseTimeToMinutes,
   circularDiffMinutes,
   circularStdDevMinutes,
   computeTibHours,
   minutesOfDay,
-} from './circularTime'
+} from './circularTime.ts'
 export {
   SLEEP_RESTRICTION_EXPERIMENTAL_ENABLED,
   experimentalSuggestTibRestriction,
-} from './experimentalRestriction'
+} from './experimentalRestriction.ts'
 export type {
   CatchUpSleepResult,
   SleepEfficiencyResult,
@@ -33,4 +33,4 @@ export type {
   SleepQuantityResult,
   SleepQuantityStatus,
   SleepRegularityMetrics,
-} from './types'
+} from './types.ts'
