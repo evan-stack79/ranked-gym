@@ -51,6 +51,37 @@ describe('sleepStorage', () => {
     expect(getSleepLog()).toEqual([])
   })
 
+  it('rejette TST > TIB (23:00→07:00 = 8 h, TST 9 h interdit)', async () => {
+    const { saveSleepNight, getSleepLog } = await import('./sleepStorage')
+    expect(
+      saveSleepNight(
+        { bedtime: '23:00', waketime: '07:00', tstHours: 9, dateKey: '2026-08-25' },
+        { skipCloud: true },
+      ),
+    ).toBeNull()
+    expect(getSleepLog()).toEqual([])
+  })
+
+  it('accepte TST = TIB (8 h pour 23:00→07:00)', async () => {
+    const { saveSleepNight, getLatestSleepNight } = await import('./sleepStorage')
+    const saved = saveSleepNight(
+      { bedtime: '23:00', waketime: '07:00', tstHours: 8, dateKey: '2026-08-25' },
+      { skipCloud: true },
+    )
+    expect(saved).not.toBeNull()
+    expect(getLatestSleepNight()?.tstHours).toBe(8)
+  })
+
+  it('accepte TST < TIB', async () => {
+    const { saveSleepNight, getLatestSleepNight } = await import('./sleepStorage')
+    const saved = saveSleepNight(
+      { bedtime: '23:00', waketime: '07:00', tstHours: 7.2, dateKey: '2026-08-25' },
+      { skipCloud: true },
+    )
+    expect(saved?.tstHours).toBe(7.2)
+    expect(getLatestSleepNight()?.tstHours).toBe(7.2)
+  })
+
   it('remplace la nuit du même dateKey', async () => {
     const { saveSleepNight, getSleepLog } = await import('./sleepStorage')
     saveSleepNight(
