@@ -82,6 +82,19 @@ describe('sleepStorage', () => {
     expect(getLatestSleepNight()?.tstHours).toBe(7.2)
   })
 
+  it('accepte TST inconnu (null) sans inventer depuis le TIB', async () => {
+    const { saveSleepNight, getLatestSleepNight } = await import('./sleepStorage')
+    const saved = saveSleepNight(
+      { bedtime: '23:00', waketime: '07:00', tstHours: null, dateKey: '2026-08-25' },
+      { skipCloud: true },
+    )
+    expect(saved).not.toBeNull()
+    expect(saved?.tstHours).toBeNull()
+    expect(getLatestSleepNight()?.tstHours).toBeNull()
+    expect(getLatestSleepNight()?.bedtime).toBe('23:00')
+    expect(getLatestSleepNight()?.waketime).toBe('07:00')
+  })
+
   it('remplace la nuit du même dateKey', async () => {
     const { saveSleepNight, getSleepLog } = await import('./sleepStorage')
     saveSleepNight(
@@ -155,5 +168,46 @@ describe('sleepEngineAdapter', () => {
     const { circularMeanBedtimeHm } = await import('./sleepEngineAdapter')
     const mean = circularMeanBedtimeHm(['23:30', '00:30'])
     expect(mean).toBe('00:00')
+  })
+
+  it('TST inconnu → TIB affiché, pas de faux heures dormies ni statut quantité', async () => {
+    const { saveSleepNight } = await import('./sleepStorage')
+    const { getSleepHomeSnapshot, formatTstHoursLabel } = await import('./sleepEngineAdapter')
+
+    saveSleepNight(
+      { bedtime: '23:00', waketime: '07:00', tstHours: null, dateKey: '2026-08-25' },
+      { skipCloud: true },
+    )
+    const snap = getSleepHomeSnapshot()
+    expect(snap.hasData).toBe(true)
+    expect(snap.tstKnown).toBe(false)
+    expect(snap.tstHours).toBeNull()
+    expect(snap.tstLabel).toBeNull()
+    expect(snap.statusKey).toBeNull()
+    expect(snap.statusLabel).toBeNull()
+    expect(snap.engine).toBeNull()
+    expect(snap.tibHours).toBe(8)
+    expect(snap.tibLabel).toBe(formatTstHoursLabel(8))
+    expect(snap.recommendations.some((r) => /inconnu/i.test(r))).toBe(true)
+  })
+
+  it('workdayTstHours ignore les nuits sans TST (pas de 0 inventé)', async () => {
+    const { saveSleepNight } = await import('./sleepStorage')
+    const { getSleepHomeSnapshot } = await import('./sleepEngineAdapter')
+
+    saveSleepNight(
+      { bedtime: '23:00', waketime: '07:00', tstHours: null, dateKey: '2026-08-23' },
+      { skipCloud: true },
+    )
+    saveSleepNight(
+      { bedtime: '23:00', waketime: '07:00', tstHours: 8, dateKey: '2026-08-25' },
+      { skipCloud: true },
+    )
+    const snap = getSleepHomeSnapshot()
+    expect(snap.tstKnown).toBe(true)
+    expect(snap.statusKey).toBe('optimal')
+    expect(snap.engine?.ok).toBe(true)
+    // Catch-up ne doit pas traiter null comme 0 h dormies
+    expect(snap.engine?.metrics.catchUp.workdayAverageHours).not.toBe(0)
   })
 })

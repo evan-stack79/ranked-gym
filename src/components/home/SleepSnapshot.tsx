@@ -9,6 +9,7 @@ import { SleepDetailsSheet } from './SleepDetailsSheet'
 /**
  * Carte Accueil sommeil — pas de Sleep Score, pas de stades REM/profond.
  * Sheets toujours montés (hors branche hasData) pour éviter remount/lock résiduel.
+ * Si TST inconnu : jamais de faux « X h dormies ».
  */
 export function SleepSnapshot() {
   const [tick, setTick] = useState(0)
@@ -57,19 +58,35 @@ export function SleepSnapshot() {
             </p>
           </div>
 
-          <p className="text-[28px] font-black tracking-tight text-white">{snapshot.tstLabel}</p>
-          <p
-            className={`mt-1 text-[14px] font-semibold ${
-              snapshot.statusKey === 'optimal'
-                ? 'text-[#30D158]'
-                : snapshot.statusKey === 'deficit'
-                  ? 'text-[#FF9F0A]'
-                  : 'text-[#AEAEB2]'
-            }`}
-          >
-            {snapshot.statusKey === 'optimal' ? '✓ ' : ''}
-            {snapshot.statusLabel}
-          </p>
+          {snapshot.tstKnown ? (
+            <>
+              <p className="text-[28px] font-black tracking-tight text-white">{snapshot.tstLabel}</p>
+              <p
+                className={`mt-1 text-[14px] font-semibold ${
+                  snapshot.statusKey === 'optimal'
+                    ? 'text-[#30D158]'
+                    : snapshot.statusKey === 'deficit'
+                      ? 'text-[#FF9F0A]'
+                      : 'text-[#AEAEB2]'
+                }`}
+              >
+                {snapshot.statusKey === 'optimal' ? '✓ ' : ''}
+                {snapshot.statusLabel}
+              </p>
+              {snapshot.tibLabel && (
+                <p className="mt-1 text-[13px] text-[#8E8E93]">{snapshot.tibLabel} au lit</p>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-[28px] font-black tracking-tight text-white">
+                {snapshot.tibLabel ? `${snapshot.tibLabel} au lit` : '—'}
+              </p>
+              <p className="mt-1 text-[14px] font-semibold text-[#AEAEB2]">
+                Temps réellement dormi : inconnu
+              </p>
+            </>
+          )}
 
           {snapshot.tonightHint && (
             <div className="mt-4 rounded-xl border border-white/8 bg-black/25 px-3.5 py-3">
@@ -106,6 +123,7 @@ export function SleepSnapshot() {
         open={logOpen}
         onClose={() => setLogOpen(false)}
         onSaved={() => setTick((n) => n + 1)}
+        initial={snapshot.latest}
       />
     </>
   )

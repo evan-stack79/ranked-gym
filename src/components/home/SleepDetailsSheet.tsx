@@ -19,8 +19,48 @@ export function SleepDetailsSheet({
   return (
     <IosSheet open={open} onClose={onClose} title="Détails sommeil" subtitle="Informations du moteur V1">
       <div className="space-y-4 pb-3">
-        {!snapshot.hasData || !engine ? (
+        {!snapshot.hasData ? (
           <p className="text-[14px] text-[#8E8E93]">Aucune nuit enregistrée.</p>
+        ) : !snapshot.tstKnown || !engine ? (
+          <>
+            <div className="rounded-2xl border border-white/10 bg-black/25 p-3.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+                Temps au lit
+              </p>
+              <p className="mt-1 text-[20px] font-bold text-white">
+                {snapshot.tibLabel ?? '—'}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/25 p-3.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+                Temps réellement dormi
+              </p>
+              <p className="mt-1 text-[20px] font-bold text-white">inconnu</p>
+              <p className="mt-1 text-[13px] leading-relaxed text-[#AEAEB2]">
+                Sans TST, le moteur ne calcule pas la quantité ni l&apos;efficacité — on n&apos;invente
+                pas d&apos;heures dormies à partir du temps au lit.
+              </p>
+            </div>
+
+            {snapshot.recommendations.length > 0 && (
+              <div>
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+                  Recommandations
+                </p>
+                <ul className="space-y-2">
+                  {snapshot.recommendations.map((r) => (
+                    <li
+                      key={r.slice(0, 48)}
+                      className="rounded-xl border border-white/8 bg-black/20 px-3 py-2 text-[12px] leading-relaxed text-[#AEAEB2]"
+                    >
+                      {r}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
         ) : (
           <>
             <div className="rounded-2xl border border-white/10 bg-black/25 p-3.5">
@@ -29,6 +69,9 @@ export function SleepDetailsSheet({
               </p>
               <p className="mt-1 text-[20px] font-bold text-white">{snapshot.tstLabel}</p>
               <p className="mt-0.5 text-[13px] text-[#AEAEB2]">{snapshot.statusLabel}</p>
+              {snapshot.tibLabel && (
+                <p className="mt-1 text-[12px] text-[#8E8E93]">{snapshot.tibLabel} au lit</p>
+              )}
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-black/25 p-3.5">
