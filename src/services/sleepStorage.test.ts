@@ -208,6 +208,6 @@ describe('sleepEngineAdapter', () => {
     expect(snap.statusKey).toBe('optimal')
     expect(snap.engine?.ok).toBe(true)
     // Catch-up ne doit pas traiter null comme 0 h dormies
-    expect(snap.engine?.metrics.catchUp.workdayAverageHours).not.toBe(0)
+    expect(snap.engine?.metrics.catchUp.workdayAverageTstHours).not.toBe(0)
   })
 })
