@@ -5,6 +5,8 @@ export type NutritionGoal = 'maintain' | 'cut' | 'bulk'
 /** Niveau d’activité IOM : 1 (sédentaire) … 4 (très actif). */
 export type ActivityLevel = 1 | 2 | 3 | 4
 
+export type EffortIntensity = 'low' | 'moderate' | 'high'
+
 export interface NutritionEngineInput {
   sex: Sex
   age: number
@@ -19,7 +21,11 @@ export interface NutritionEngineInput {
   sport_secondaire: string | null
   /** Durée effort (h) — recommandations hydratation uniquement. */
   duration_h: number
-  /** Perte liquide pendant effort (L) — recommandations uniquement. */
+  /** Intensité effort — recommandations intra-effort uniquement. */
+  intensity: EffortIntensity | null
+  /** Perte de poids pendant l’effort (kg) — recommandations post-effort uniquement. */
+  effort_weight_loss_kg: number
+  /** @deprecated Alias legacy — préférer effort_weight_loss_kg. */
   effort_fluid_loss_l: number
 }
 

@@ -1,53 +1,41 @@
-# Table de décision Prot_Target — audit spec validée
+# Table de décision Prot_Target — spec production
 
-**Source de vérité** : règles métier impératives du contrat (sections fournies au prompt).  
-**Constat** : la spec définit explicitement **Prot_Min** (g/kg) et mentionne **Prot_Target** comme champ distinct, mais **ne fournit aucune valeur numérique pour Prot_Target** (sections A–I complètes absentes du dépôt).
+**Règle Prot_Target (spec validée §9)** :
 
-## Règle Prot_Min (spec — cascade, pas de double comptage)
+| Condition | Prot_Target g/kg |
+|-----------|-------------------|
+| PERTE_POIDS **ET** musculation incluse | **2.4** |
+| Au moins un sport (`sport_principal` ou `sport_secondaire`) | **1.6** |
+| Sinon (sédentaire / AUCUN) | **0.8** |
+
+**Règle Prot_Min (spec §8 — cascade)** :
 
 | Priorité | Condition | Prot_Min g/kg |
 |----------|-----------|---------------|
-| 1 | Musculation incluse **ET** perte de poids (`cut`) | **2.4** |
+| 1 | Musculation **ET** perte | **2.4** |
 | 2 | Musculation **OU** sport collectif | **1.4** |
-| 3 | Endurance / cyclisme | **1.2** |
-| 4 | Défaut (sédentaire, marche seule sans flag endurance*, yoga, etc.) | **0.8** |
+| 3 | Endurance **OU** cyclisme | **1.2** |
+| 4 | Défaut | **0.8** |
 
-\* « Marche » est classée **endurance** dans le moteur (`marche` ∈ ENDURANCE_IDS) → Prot_Min = **1.2**, pas 0.8.
+## Table exhaustive
 
-## Prot_Target — table exhaustive demandée
+| Profil | Objectif | Prot_Min | Prot_Target | Implémentation |
+|--------|----------|----------|-------------|----------------|
+| Sédentaire | * | 0.8 | 0.8 | Conforme |
+| Marche / endurance | * | 1.2 | 1.6 | Conforme |
+| Musculation | Maintien / prise | 1.4 | 1.6 | Conforme |
+| Musculation | Perte | 2.4 | 2.4 | Conforme |
+| Cyclisme | * | 1.2 | 1.6 | Conforme |
+| Sport collectif | * | 1.4 | 1.6 | Conforme |
+| Force + Endurance | Perte | 2.4 | 2.4 | Conforme |
+| Force + Endurance | Maintien / prise | 1.4 | 1.6 | Conforme |
+| > 65 ans | * | cascade sport | cascade Prot_Target | Reco UI senior uniquement |
 
-| Profil / sport | Objectif | Prot_Min (spec) | Prot_Target (spec) | Décision implémentation |
-|----------------|----------|-----------------|--------------------|-------------------------|
-| Sédentaire (aucun sport) | Maintien | 0.8 | **NON SPÉCIFIÉ** | `Prot_Target = Prot_Min` |
-| Sédentaire | Perte | 0.8 | **NON SPÉCIFIÉ** | `Prot_Target = Prot_Min` |
-| Sédentaire | Prise | 0.8 | **NON SPÉCIFIÉ** | `Prot_Target = Prot_Min` |
-| Marche | Maintien | 1.2 | **NON SPÉCIFIÉ** | `Prot_Target = Prot_Min` |
-| Marche | Perte | 1.2 | **NON SPÉCIFIÉ** | `Prot_Target = Prot_Min` |
-| Marche | Prise | 1.2 | **NON SPÉCIFIÉ** | `Prot_Target = Prot_Min` |
-| Musculation | Maintien | 1.4 | **NON SPÉCIFIÉ** | `Prot_Target = Prot_Min` |
-| Musculation | Perte | **2.4** | **NON SPÉCIFIÉ** | `Prot_Target = Prot_Min` |
-| Musculation | Prise | 1.4 | **NON SPÉCIFIÉ** | `Prot_Target = Prot_Min` |
-| Endurance (course, natation…) | * | 1.2 | **NON SPÉCIFIÉ** | `Prot_Target = Prot_Min` |
-| Cyclisme (`velo`, VTT…) | * | 1.2 | **NON SPÉCIFIÉ** | `Prot_Target = Prot_Min` |
-| Sport collectif | * | 1.4 | **NON SPÉCIFIÉ** | `Prot_Target = Prot_Min` |
-| Force + Endurance (ex. muscu + vélo) | Maintien | 1.4 (priorité muscu) | **NON SPÉCIFIÉ** | `Prot_Target = Prot_Min` |
-| Force + Endurance | Perte | **2.4** (priorité muscu+cut) | **NON SPÉCIFIÉ** | `Prot_Target = Prot_Min` |
-| Force + Endurance | Prise | 1.4 | **NON SPÉCIFIÉ** | `Prot_Target = Prot_Min` |
-| Personne > 65 ans | * | *(même cascade sport)* | **NON SPÉCIFIÉ** | `Prot_Target = Prot_Min` ; message UI senior uniquement |
+## Ambiguïtés résolues
 
-## Ambiguïtés signalées (aucune règle inventée)
-
-| # | Combinaison | Problème |
-|---|-------------|----------|
-| A1 | **Prot_Target numérique** | Absent de la spec validée → impossible de distinguer Min et Target sans inventer un coefficient |
-| A2 | **> 65 ans** | Recommandation UI « senior » mentionnée ; **aucune** modification Prot_Min / Prot_Target dans la spec |
-| A3 | **Marche vs sédentaire** | « Marche » n’est pas une catégorie PA IOM ; traitée comme sport endurance si sélectionnée |
-| A4 | **Force + Endurance** | Spec : cumul = contraintes max pertinentes via cascade Prot_Min ; pas de règle Prot_Target supérieure au Min |
-
-## Conséquence Waterfall
-
-Tant que `Prot_Target = Prot_Min`, **l’étape 1 Waterfall n’alloue aucun kcal supplémentaire aux protéines** : le reliquat `Kcal_Dispo` va aux lipides (étape 2) puis glucides (étape 3). C’est **mathématiquement conforme** à la spec partielle.
-
-## Action requise pour finaliser Prot_Target au-delà du Min
-
-Fournir dans la spec complète un tableau `Prot_Target g/kg` (ou formules) par profil/objectif. Sans cela, toute valeur > Prot_Min serait **inventée** (interdit).
+| # | Point | Statut |
+|---|-------|--------|
+| A1 | Valeurs Prot_Target | **Résolu** — spec §9 fournit 2.4 / 1.6 / 0.8 |
+| A2 | > 65 ans | Pas de modification Prot ; message UI §16 |
+| A3 | Marche | Classée endurance → Prot_Min 1.2 |
+| A4 | Force + Endurance | Flags OR + cascade Prot_Min ; Prot_Target via §9 |

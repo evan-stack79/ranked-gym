@@ -35,6 +35,8 @@ const COLLECTIF_IDS = new Set([
 const ENDURANCE_IDS = new Set([
   'course-a-pied',
   'marche',
+  'cyclisme',
+  'endurance',
   'velo',
   'vtt',
   'spinning',
@@ -89,12 +91,25 @@ export function resolveProteinMinGPerKg(flags: SportFlags, goal: NutritionGoal):
   return 0.8
 }
 
+export function hasAnySport(
+  sportPrincipal: string | null,
+  sportSecondaire: string | null,
+): boolean {
+  return Boolean(sportPrincipal?.trim() || sportSecondaire?.trim())
+}
+
 /**
- * Prot_Target — spec validée : aucune valeur numérique fournie hors Prot_Min.
- * Voir docs/PROT_TARGET_DECISION.md. Prot_Target := Prot_Min (pas d’invention).
+ * Prot_Target — spec production :
+ * PERTE + musculation → 2.4 ; au moins un sport → 1.6 ; sinon → 0.8.
  */
-export function resolveProteinTargetGPerKg(protMinGPerKg: number): number {
-  return protMinGPerKg
+export function resolveProteinTargetGPerKg(
+  flags: SportFlags,
+  goal: NutritionGoal,
+  sportPresent: boolean,
+): number {
+  if (flags.hasMusculation && goal === 'cut') return 2.4
+  if (sportPresent) return 1.6
+  return 0.8
 }
 
 export function resolveMacroConstraints(
@@ -102,9 +117,12 @@ export function resolveMacroConstraints(
   flags: SportFlags,
   goal: NutritionGoal,
   targetKcal: number,
+  sportPrincipal: string | null = null,
+  sportSecondaire: string | null = null,
 ): MacroFloorsAndTargets {
   const protMinGPerKg = resolveProteinMinGPerKg(flags, goal)
-  const protTargetGPerKg = resolveProteinTargetGPerKg(protMinGPerKg)
+  const sportPresent = hasAnySport(sportPrincipal, sportSecondaire)
+  const protTargetGPerKg = resolveProteinTargetGPerKg(flags, goal, sportPresent)
 
   const protMinG = protMinGPerKg * weightKg
   const protTargetG = protTargetGPerKg * weightKg

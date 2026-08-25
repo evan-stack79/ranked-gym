@@ -6,7 +6,15 @@ import { buildRecommendations } from './recommendations'
 import { resolveMacroConstraints, resolveSportFlags } from './sportConstraints'
 import type { MacroGrams, NutritionEngineInput, NutritionEngineResult } from './types'
 import { validateInput } from './validation'
-import { allocateWaterfall } from './waterfall'
+import { allocateWaterfall, assertAllocationInvariants } from './waterfall'
+
+function bcmrErrorMessage(targetKcal: number, bcmrKcal: number): string {
+  return (
+    `Le déficit demandé est incompatible avec les minimums nutritionnels requis. ` +
+    `Cible calorique : ${Math.round(targetKcal)} kcal. BCMR : ${Math.round(bcmrKcal)} kcal. ` +
+    `Réduisez le déficit calorique.`
+  )
+}
 
 function assertEnergyConservation(targetKcal: number, macros: MacroGrams): NutritionEngineResult | null {
   const kcal = macrosToKcal(macros)
@@ -20,6 +28,18 @@ function assertEnergyConservation(targetKcal: number, macros: MacroGrams): Nutri
     )
   }
   return null
+}
+
+function resolveConstraints(input: NutritionEngineInput, targetKcal: number) {
+  const sportFlags = resolveSportFlags(input.sport_principal, input.sport_secondaire)
+  return resolveMacroConstraints(
+    input.weight_kg,
+    sportFlags,
+    input.goal,
+    targetKcal,
+    input.sport_principal,
+    input.sport_secondaire,
+  )
 }
 
 /**
@@ -45,20 +65,13 @@ export function runNutritionEngine(input: NutritionEngineInput): NutritionEngine
     input.surplus_kcal,
   )
 
-  const sportFlags = resolveSportFlags(input.sport_principal, input.sport_secondaire)
-  const constraints = resolveMacroConstraints(
-    input.weight_kg,
-    sportFlags,
-    input.goal,
-    targetKcal,
-  )
-
+  const constraints = resolveConstraints(input, targetKcal)
   const bcmrKcal = computeBcmrKcal(constraints)
 
   if (targetKcal < bcmrKcal) {
     return engineError(
       ERROR_CODES.TARGET_BELOW_BCMR,
-      'La cible calorique est inférieure au BCMR (planchers métaboliques).',
+      bcmrErrorMessage(targetKcal, bcmrKcal),
       422,
       {
         target_kcal: targetKcal,
@@ -69,6 +82,9 @@ export function runNutritionEngine(input: NutritionEngineInput): NutritionEngine
   }
 
   const { macros, kcal_dispo } = allocateWaterfall(targetKcal, constraints)
+
+  const allocationError = assertAllocationInvariants(targetKcal, constraints, macros)
+  if (allocationError) return allocationError
 
   const conservationError = assertEnergyConservation(targetKcal, macros)
   if (conservationError) return conservationError
@@ -92,7 +108,7 @@ export function runNutritionEngine(input: NutritionEngineInput): NutritionEngine
   }
 }
 
-/** Sérialisation API — arrondis uniquement ici. */
+/** Sérialisation interne UI — arrondis d’affichage. */
 export function serializeEngineResult(result: Extract<NutritionEngineResult, { ok: true }>) {
   const round1 = (n: number) => Math.round(n * 10) / 10
   const roundKcal = (n: number) => Math.round(n)
@@ -120,29 +136,41 @@ export function serializeEngineResult(result: Extract<NutritionEngineResult, { o
   }
 }
 
-export function runNutritionEngineApi(input: NutritionEngineInput) {
-  const result = runNutritionEngine(input)
+/** Payload API production — arrondis entiers pour kcal et macros. */
+export function formatApiPayload(result: NutritionEngineResult) {
+  const roundKcal = (n: number) => Math.round(n)
+  const roundMacro = (n: number) => Math.round(n)
+
   if (!result.ok) {
+    const target = Number(result.details?.target_kcal ?? 0)
+    const bcmr = Number(result.details?.bcmr_kcal ?? 0)
     return {
-      status: result.httpStatus,
-      body: {
-        ok: false,
-        error: {
-          code: result.code,
-          message: result.message,
-          details: result.details,
-        },
-      },
+      status: 'ERROR' as const,
+      error_code: result.code,
+      target_kcal: roundKcal(target),
+      bcmr_kcal: roundKcal(bcmr),
+      recommandations_ui: [] as string[],
     }
   }
 
   return {
-    status: 200,
-    body: {
-      ok: true,
-      data: serializeEngineResult(result),
+    status: 'SUCCESS' as const,
+    target_kcal: roundKcal(result.target_kcal),
+    bcmr_kcal: roundKcal(result.bcmr_kcal),
+    macros: {
+      proteines_g: roundMacro(result.macros.proteines_g),
+      lipides_g: roundMacro(result.macros.lipides_g),
+      glucides_g: roundMacro(result.macros.glucides_g),
     },
+    recommandations_ui: result.recommendations,
   }
+}
+
+export function runNutritionEngineApi(input: NutritionEngineInput) {
+  const result = runNutritionEngine(input)
+  const payload = formatApiPayload(result)
+  const status = result.ok ? 200 : result.httpStatus
+  return { status, body: payload }
 }
 
 /** Utilitaire tests — force une cible calorique sans recalculer EER. */
@@ -153,25 +181,23 @@ export function runNutritionEngineWithTarget(
   const validationError = validateInput(input)
   if (validationError) return validationError
 
-  const sportFlags = resolveSportFlags(input.sport_principal, input.sport_secondaire)
-  const constraints = resolveMacroConstraints(
-    input.weight_kg,
-    sportFlags,
-    input.goal,
-    targetKcalOverride,
-  )
+  const constraints = resolveConstraints(input, targetKcalOverride)
   const bcmrKcal = computeBcmrKcal(constraints)
 
   if (targetKcalOverride < bcmrKcal) {
     return engineError(
       ERROR_CODES.TARGET_BELOW_BCMR,
-      'La cible calorique est inférieure au BCMR (planchers métaboliques).',
+      bcmrErrorMessage(targetKcalOverride, bcmrKcal),
       422,
       { target_kcal: targetKcalOverride, bcmr_kcal: bcmrKcal },
     )
   }
 
   const { macros, kcal_dispo } = allocateWaterfall(targetKcalOverride, constraints)
+
+  const allocationError = assertAllocationInvariants(targetKcalOverride, constraints, macros)
+  if (allocationError) return allocationError
+
   const conservationError = assertEnergyConservation(targetKcalOverride, macros)
   if (conservationError) return conservationError
 

@@ -43,6 +43,8 @@ export function profileToEngineInput(profile: CalorieProfile): NutritionEngineIn
     sport_principal: training.primarySportId,
     sport_secondaire: null,
     duration_h: 0,
+    intensity: null,
+    effort_weight_loss_kg: 0,
     effort_fluid_loss_l: 0,
   }
 }

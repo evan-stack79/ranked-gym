@@ -9,8 +9,11 @@ const LIMITS = {
   deficit_kcal: { min: 0, max: 2000 },
   surplus_kcal: { min: 0, max: 1000 },
   duration_h: { min: 0, max: 10 },
+  effort_weight_loss_kg: { min: 0 },
   effort_fluid_loss_l: { min: 0 },
 } as const
+
+const VALID_INTENSITY = new Set(['low', 'moderate', 'high'])
 
 function rangeError(
   field: string,
@@ -27,8 +30,18 @@ function rangeError(
 }
 
 export function validateInput(input: NutritionEngineInput): NutritionEngineFailure | null {
-  const { age, weight_kg, height_m, activity, deficit_kcal, surplus_kcal, duration_h, effort_fluid_loss_l } =
-    input
+  const {
+    age,
+    weight_kg,
+    height_m,
+    activity,
+    deficit_kcal,
+    surplus_kcal,
+    duration_h,
+    effort_weight_loss_kg,
+    effort_fluid_loss_l,
+    intensity,
+  } = input
 
   if (input.sex !== 'male' && input.sex !== 'female') {
     return engineError(ERROR_CODES.INVALID_SEX, 'sex doit être "male" ou "female"', 400)
@@ -39,7 +52,7 @@ export function validateInput(input: NutritionEngineInput): NutritionEngineFailu
   }
 
   if (!Number.isFinite(age) || age < LIMITS.age.min || age > LIMITS.age.max) {
-    return rangeError('age', ERROR_CODES.INVALID_AGE, age, LIMITS.age.min, LIMITS.age.max)
+    return rangeError('age', ERROR_CODES.AGE_RESTRICTION, age, LIMITS.age.min, LIMITS.age.max)
   }
 
   if (!Number.isFinite(weight_kg) || weight_kg < LIMITS.weight_kg.min || weight_kg > LIMITS.weight_kg.max) {
@@ -102,6 +115,18 @@ export function validateInput(input: NutritionEngineInput): NutritionEngineFailu
     )
   }
 
+  if (
+    !Number.isFinite(effort_weight_loss_kg) ||
+    effort_weight_loss_kg < LIMITS.effort_weight_loss_kg.min
+  ) {
+    return rangeError(
+      'effort_weight_loss_kg',
+      ERROR_CODES.INVALID_FLUID_LOSS,
+      effort_weight_loss_kg,
+      LIMITS.effort_weight_loss_kg.min,
+    )
+  }
+
   if (!Number.isFinite(effort_fluid_loss_l) || effort_fluid_loss_l < LIMITS.effort_fluid_loss_l.min) {
     return rangeError(
       'effort_fluid_loss_l',
@@ -109,6 +134,43 @@ export function validateInput(input: NutritionEngineInput): NutritionEngineFailu
       effort_fluid_loss_l,
       LIMITS.effort_fluid_loss_l.min,
     )
+  }
+
+  if (intensity != null && !VALID_INTENSITY.has(intensity)) {
+    return engineError(
+      ERROR_CODES.INVALID_INTENSITY,
+      'intensity doit être low, moderate ou high',
+      400,
+      { intensity },
+    )
+  }
+
+  return null
+}
+
+/** Rejette les champs d’activité dynamique interdits sur l’API. */
+export function validateForbiddenActivityFields(
+  raw: Record<string, unknown>,
+): NutritionEngineFailure | null {
+  const forbidden = [
+    'burned_calories',
+    'activityBonus',
+    'steps_calories',
+    'workout_calories',
+    'active_calories',
+    'steps',
+    'workout',
+  ] as const
+
+  for (const key of forbidden) {
+    if (key in raw && raw[key] != null && raw[key] !== 0 && raw[key] !== '') {
+      return engineError(
+        ERROR_CODES.FORBIDDEN_ACTIVITY_FIELD,
+        `Le champ "${key}" est interdit — il ne doit pas influencer target_kcal.`,
+        400,
+        { field: key },
+      )
+    }
   }
 
   return null
