@@ -58,6 +58,8 @@ export interface NutritionEngineSuccess {
   }
   constraints: MacroFloorsAndTargets
   recommendations: string[]
+  /** Flags d’allocation V2 (politique produit) — n’altèrent pas le BCMR. */
+  allocation_flags: string[]
 }
 
 export interface NutritionEngineFailure {

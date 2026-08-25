@@ -80,3 +80,58 @@ describe('getNutritionTarget — pas de double comptabilisation', () => {
     expect(result.activityBonus).toBe(0)
   })
 })
+
+describe('getNutritionTarget — cas écran 61,7 kg force + prise de masse', () => {
+  const SCREEN_PROFILE: CalorieProfile = {
+    weightKg: 61.7,
+    goalWeightKg: 65,
+    heightCm: 170,
+    age: 18,
+    sex: 'male',
+    activity: 'athlete',
+    morphology: 'ectomorph',
+    goal: 'bulk',
+    weeklyPaceKg: 0.5,
+    onboardingComplete: true,
+  }
+
+  beforeEach(async () => {
+    const training = await import('./trainingStorage')
+    vi.mocked(training.getTrainingState).mockReturnValue({
+      ...BASE_TRAINING,
+      primarySportId: 'musculation',
+    })
+  })
+
+  it('Prot_Min 1.4, Prot_Target 1.6, V2 redistrib → protéines ≈ 135.7 g, FLAG remaining', async () => {
+    const { runNutritionEngine, ALLOCATION_FLAGS } = await import('../nutrition-engine')
+    const { profileToEngineInput } = await import('./nutritionEngineAdapter')
+
+    const input = profileToEngineInput(SCREEN_PROFILE)
+    expect(input.sport_principal).toBe('musculation')
+    expect(input.goal).toBe('bulk')
+    expect(input.surplus_kcal).toBe(550)
+
+    const engine = runNutritionEngine(input)
+    expect(engine.ok).toBe(true)
+    if (!engine.ok) return
+
+    expect(engine.constraints.prot_min_g / 61.7).toBeCloseTo(1.4, 6)
+    expect(engine.constraints.prot_target_g / 61.7).toBeCloseTo(1.6, 6)
+    expect(engine.macros.proteines_g).toBeCloseTo(61.7 * 2.2, 5)
+    expect(Math.round(engine.bcmr_kcal)).toBe(623)
+    expect(engine.allocation_flags).toContain(ALLOCATION_FLAGS.CARB_REVIEW_REMAINING_AFTER_LIMITS)
+
+    const ui = getNutritionTarget(SCREEN_PROFILE)
+    expect(ui.engineOk).toBe(true)
+    expect(ui.proteinG).toBeCloseTo(135.7, 1)
+    expect(ui.bcmrKcal).toBe(623)
+    expect(ui.targetCalories).toBe(3851)
+    expect(ui.allocationFlags).toContain(ALLOCATION_FLAGS.CARB_REVIEW_REMAINING_AFTER_LIMITS)
+    expect(ui.activityBonus).toBe(0)
+
+    const conserved =
+      engine.macros.proteines_g * 4 + engine.macros.lipides_g * 9 + engine.macros.glucides_g * 4
+    expect(Math.abs(conserved - engine.target_kcal)).toBeLessThanOrEqual(3)
+  })
+})

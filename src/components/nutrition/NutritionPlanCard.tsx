@@ -64,12 +64,24 @@ function Field({
 export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps) {
   const [scaleOpen, setScaleOpen] = useState(false)
   const [draft, setDraft] = useState(profile)
+  /** Sport Train → Prot_Target ; invalider quand le sport change. */
+  const [trainingTick, setTrainingTick] = useState(0)
 
   useEffect(() => {
     setDraft(profile)
   }, [profile])
 
-  const nutrition = useMemo(() => getNutritionTarget(profile), [profile])
+  useEffect(() => {
+    const sync = () => setTrainingTick((n) => n + 1)
+    window.addEventListener('ranked-gym:training-changed', sync)
+    window.addEventListener('ranked-gym:backup-restored', sync)
+    return () => {
+      window.removeEventListener('ranked-gym:training-changed', sync)
+      window.removeEventListener('ranked-gym:backup-restored', sync)
+    }
+  }, [])
+
+  const nutrition = useMemo(() => getNutritionTarget(profile), [profile, trainingTick])
 
   const deltaKg = useMemo(() => {
     return Math.round((profile.goalWeightKg - profile.weightKg) * 10) / 10

@@ -20,6 +20,8 @@ export interface NutritionTargetResult {
    * Conservé pour compatibilité d’API ; ne plus utiliser pour ajuster target_kcal.
    */
   activityBonus: number
+  /** Flags d’allocation V2 (politique produit) — informatifs uniquement. */
+  allocationFlags: string[]
   engineOk: boolean
   errorCode?: string
   errorMessage?: string
@@ -35,6 +37,7 @@ const EMPTY_TARGET: Omit<NutritionTargetResult, 'profile'> = {
   recommendations: [],
   goalLabel: GOAL_LABELS.maintain,
   activityBonus: 0,
+  allocationFlags: [],
   engineOk: false,
 }
 
@@ -54,6 +57,7 @@ function mapEngineSuccess(
     recommendations: serialized.recommendations,
     goalLabel: GOAL_LABELS[profile.goal],
     activityBonus: 0,
+    allocationFlags: serialized.allocation_flags,
     engineOk: true,
   }
 }
