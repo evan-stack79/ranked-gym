@@ -139,6 +139,7 @@ export function WorkoutNotebook({
   const [customLabel, setCustomLabel] = useState('')
   const [saving, setSaving] = useState(false)
   const [editingNote, setEditingNote] = useState<WorkoutNote | null>(null)
+  const [effortHelpOpen, setEffortHelpOpen] = useState(false)
 
   const visibleRoutines = useMemo(() => {
     const split = detectProgramSplit(schedule, routines)
@@ -330,13 +331,7 @@ export function WorkoutNotebook({
   return (
     <section id={id} className="space-y-3">
       <div className="px-1">
-        <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-          Carnet
-        </p>
-        <h2 className="text-[20px] font-bold text-white">Mon programme · séries · historique</h2>
-        <p className="mt-1 text-[12px] text-[#AEAEB2]">
-          Tu choisis charges et reps. L&apos;historique t&apos;informe — il ne prescrit rien.
-        </p>
+        <h2 className="text-[20px] font-bold text-white">Programme</h2>
       </div>
 
       <div className="flex gap-1.5 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -397,7 +392,7 @@ export function WorkoutNotebook({
       )}
 
       <div
-        className="rounded-3xl border border-white/10 px-5 py-4"
+        className="rounded-3xl border border-white/10 px-4 py-3.5"
         style={{
           background: editingNote
             ? `radial-gradient(ellipse 80% 60% at 100% 0%, #FF2B2B33 0%, transparent 55%), rgb(22 22 24 / 0.96)`
@@ -406,7 +401,7 @@ export function WorkoutNotebook({
         }}
       >
         {editingNote ? (
-          <div className="mb-3 flex items-center justify-between gap-2 rounded-2xl border border-[#FF2B2B]/35 bg-[#FF2B2B]/12 px-3 py-2.5">
+          <div className="mb-2.5 flex items-center justify-between gap-2 rounded-2xl border border-[#FF2B2B]/35 bg-[#FF2B2B]/12 px-3 py-2">
             <div className="flex items-center gap-2">
               <Pencil className="h-4 w-4 shrink-0 text-[#FF6961]" strokeWidth={2.25} />
               <div>
@@ -425,7 +420,7 @@ export function WorkoutNotebook({
           </div>
         ) : null}
 
-        <div className="mb-1 flex items-center gap-2">
+        <div className="mb-2 flex items-center gap-2">
           <BookOpen className="h-4 w-4" style={{ color: activeRoutine?.accent }} />
           <input
             type="text"
@@ -435,13 +430,54 @@ export function WorkoutNotebook({
             className="w-full bg-transparent text-[17px] font-bold text-white placeholder:text-[#636366] outline-none"
           />
         </div>
-        <p className="mb-3 text-[11px] text-[#8E8E93]">
-          {hasSaved
-            ? 'Dernière séance mémorisée — tu décides des charges d’aujourd’hui.'
-            : 'Nouveau focus — ajoute tes exercices ; ils resteront dans ton carnet.'}
-        </p>
+        {!hasSaved ? (
+          <p className="mb-2.5 text-[11px] text-[#8E8E93]">
+            Nouveau focus — ajoute tes exercices ; ils resteront dans ton carnet.
+          </p>
+        ) : null}
 
-        <div className="space-y-4">
+        <div className="mb-2 flex items-center justify-end gap-1.5">
+          <span className="text-[11px] text-[#8E8E93]">Effort facultatif</span>
+          <button
+            type="button"
+            onClick={() => setEffortHelpOpen((v) => !v)}
+            className="ios-press flex h-7 w-7 items-center justify-center rounded-full border border-white/12 text-[12px] font-bold text-[#8E8E93]"
+            aria-label="Aide Effort (facultatif)"
+            aria-expanded={effortHelpOpen}
+          >
+            ?
+          </button>
+        </div>
+
+        {effortHelpOpen ? (
+          <div
+            className="mb-2.5 rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-[11px] leading-relaxed text-[#AEAEB2]"
+            role="note"
+          >
+            <p className="font-semibold text-white">Effort · 1–10</p>
+            <ul className="mt-1 space-y-0.5">
+              <li>
+                <span className="font-semibold text-white">6</span> : Facile
+              </li>
+              <li>
+                <span className="font-semibold text-white">7</span> : Modéré
+              </li>
+              <li>
+                <span className="font-semibold text-white">8</span> : Difficile — environ 2 reps
+                possibles
+              </li>
+              <li>
+                <span className="font-semibold text-white">9</span> : Très difficile — environ 1 rep
+                possible
+              </li>
+              <li>
+                <span className="font-semibold text-white">10</span> : Maximum
+              </li>
+            </ul>
+          </div>
+        ) : null}
+
+        <div className="space-y-3">
           {exercises.map((ex) => {
             const last = findLastExerciseSets(history, ex.name)
             const pendingIdx = ex.sets.findIndex((s) => !s.done)
@@ -450,9 +486,9 @@ export function WorkoutNotebook({
             return (
               <div
                 key={ex.id}
-                className="rounded-2xl border border-white/10 bg-black/30 p-3.5"
+                className="rounded-2xl border border-white/8 bg-black/25 p-3"
               >
-                <div className="mb-2 flex items-center gap-2">
+                <div className="mb-1.5 flex items-center gap-2">
                   <input
                     type="text"
                     value={ex.name}
@@ -477,13 +513,13 @@ export function WorkoutNotebook({
                 </div>
 
                 {last && (
-                  <div className="mb-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
+                  <div className="mb-2 px-0.5 py-1">
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-[#8E8E93]">
                       Dernière séance
                     </p>
-                    <ul className="mt-1 space-y-0.5">
+                    <ul className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
                       {last.sets.map((s, i) => (
-                        <li key={i} className="text-[13px] tabular-nums text-[#AEAEB2]">
+                        <li key={i} className="text-[12px] tabular-nums text-[#AEAEB2]">
                           {formatSetLoadLabel(s.weightKg, s.reps)}
                         </li>
                       ))}
@@ -491,11 +527,11 @@ export function WorkoutNotebook({
                   </div>
                 )}
 
-                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#8E8E93]">
                   Aujourd&apos;hui
                 </p>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {ex.sets.map((set, idx) => (
                     <div
                       key={idx}
@@ -533,8 +569,8 @@ export function WorkoutNotebook({
                           className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
                         />
                       </label>
-                      <label className="block w-14">
-                        <span className="mb-0.5 block text-[10px] text-[#636366]">RPE</span>
+                      <label className="block w-[3.75rem]">
+                        <span className="mb-0.5 block text-[10px] text-[#636366]">Effort</span>
                         <ClearableNumberInput
                           value={set.rpe ?? null}
                           onChange={(v) =>
@@ -546,7 +582,9 @@ export function WorkoutNotebook({
                           min={1}
                           max={10}
                           required={false}
-                          aria-label="RPE optionnel"
+                          placeholder="1–10"
+                          placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2 text-[12px] font-semibold text-[#636366]"
+                          aria-label="Effort facultatif, 1 à 10"
                           className="w-full rounded-xl border border-white/10 bg-black/40 px-2 py-2 text-[13px] font-semibold text-[#AEAEB2] outline-none"
                         />
                       </label>

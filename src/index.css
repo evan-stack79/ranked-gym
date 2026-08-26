@@ -42,9 +42,11 @@ body {
 :root {
   /* Hauteur utile BottomNav (hors safe-area), ~70–80px */
   --app-bottom-nav: 80px;
-  /* Hauteur visuelle de l’îlot repos (header + presets) */
-  --rest-island-h: 8.25rem;
-  --rest-island-gap: 12px;
+  /* Hauteur visuelle îlot repos compact (pill / barre).
+     Écrasée à l’exécution par RestTimerOverlay (ResizeObserver)
+     pour coller à la hauteur réelle (pill / presets / actif). */
+  --rest-island-h: 3.25rem;
+  --rest-island-gap: 10px;
   /* Ancrage fixed : juste au-dessus de la nav */
   --rest-bar-bottom: calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px));
   /* Espace scroll supplémentaire sous le contenu Train */
@@ -211,6 +213,17 @@ body {
     0 0 18px rgb(48 209 88 / 0.12),
     inset 0 1px 0 rgb(255 255 255 / 0.1);
   animation: ios-fade-up 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+/* Variant compact : pill idle ou barre active (presets dépliés à la demande) */
+.rest-timer-island--compact {
+  border-radius: 999px;
+  max-width: 22rem;
+}
+
+.rest-timer-dock[data-compact='false'] .rest-timer-island--compact {
+  border-radius: 18px;
+  max-width: 28rem;
 }
 
 .badge-unlocked {

@@ -345,8 +345,8 @@ export function TrainingView({
     <div
       className="flex flex-col gap-8"
       style={{
-        // Clearance sous le timer « Prêt à lancer » / repos (historique + carnet).
-        paddingBottom: showStrengthTools || isBarVisible ? 130 : 8,
+        // Clearance timer gérée par AppLayout via --rest-island-h (hauteur mesurée).
+        paddingBottom: 8,
       }}
     >
       <header className="relative ios-fade-up">
