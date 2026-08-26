@@ -81,6 +81,12 @@ export interface ExerciseEntry {
   note?: string
 }
 
+/** Famille de séance — additive ; absente sur les notes legacy. */
+export type SessionKind = 'strength' | 'endurance' | 'team' | 'generic'
+
+/** Provenance de la saisie — additive ; absente sur les notes legacy. */
+export type SessionSource = 'manual' | 'import'
+
 export interface WorkoutNote {
   id: string
   title: string
@@ -94,6 +100,21 @@ export interface WorkoutNote {
   totalVolumeKg?: number
   /** Links to a saved focus routine (Upper, Legs, Pecs…) */
   routineId?: string
+  /**
+   * Sport réellement pratiqué au moment de la séance (figé à l’écriture).
+   * Optionnel : notes legacy sans ce champ restent valides.
+   */
+  sportId?: string
+  /**
+   * Famille de module Train utilisée pour saisir la séance.
+   * Optionnel : notes legacy sans ce champ restent valides.
+   */
+  sessionKind?: SessionKind
+  /**
+   * Source de la saisie (`manual` pour toutes les saisies UI actuelles).
+   * Optionnel : notes legacy sans ce champ restent valides.
+   */
+  source?: SessionSource
 }
 
 /** Persistent “bloc” — opens last exercises for that focus. */

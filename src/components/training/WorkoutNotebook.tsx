@@ -3,6 +3,8 @@ import { BookOpen, Check, Pencil, Plus, Trash2, X } from 'lucide-react'
 import type {
   ExerciseEntry,
   ScheduledSession,
+  SessionKind,
+  SessionSource,
   SetDifficulty,
   WorkoutNote,
   WorkoutRoutine,
@@ -25,6 +27,10 @@ interface WorkoutNotebookProps {
   schedule?: ScheduledSession[]
   history: WorkoutNote[]
   initialRoutineId?: string | null
+  /** Sport figé sur les nouvelles séances (pas de redéduction à la lecture). */
+  sportId: string
+  /** Famille de module — strength pour le carnet force / hybrid. */
+  sessionKind?: SessionKind
   onSave: (note: {
     id?: string
     title: string
@@ -35,6 +41,9 @@ interface WorkoutNotebookProps {
     routineId: string
     createdAt?: number
     dateKey?: string
+    sportId?: string
+    sessionKind?: SessionKind
+    source?: SessionSource
   }) => void | Promise<void>
   /** Autosave séries / exercices vers Supabase (routine draft). */
   onDraftSave?: (routineId: string, exercises: ExerciseEntry[]) => void
@@ -102,6 +111,8 @@ export function WorkoutNotebook({
   schedule = [],
   history,
   initialRoutineId,
+  sportId,
+  sessionKind = 'strength',
   onSave,
   onDraftSave,
   onDeleteNote,
@@ -278,6 +289,7 @@ export function WorkoutNotebook({
     if (!cleaned.length) return
     setSaving(true)
     try {
+      // Nouvelle séance : fige sport/kind/source. Édition legacy : ne pas inventer de champs.
       await onSave({
         id: editingNote?.id,
         createdAt: editingNote?.createdAt,
@@ -288,6 +300,9 @@ export function WorkoutNotebook({
         durationMin: stats.durationMin,
         totalVolumeKg: stats.volume,
         routineId,
+        sportId: editingNote ? editingNote.sportId : sportId,
+        sessionKind: editingNote ? editingNote.sessionKind : sessionKind,
+        source: editingNote ? editingNote.source : 'manual',
       })
       if (editingNote) {
         setEditingNote(null)

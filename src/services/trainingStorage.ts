@@ -350,6 +350,10 @@ export function saveWorkoutNote(
     routineId: note.routineId ?? existing?.routineId,
     dateKey: note.dateKey ?? existing?.dateKey ?? todayKey(),
     createdAt: note.createdAt ?? existing?.createdAt ?? Date.now(),
+    // Métadonnées multisport additives — jamais inventées pour les notes legacy.
+    sportId: note.sportId ?? existing?.sportId,
+    sessionKind: note.sessionKind ?? existing?.sessionKind,
+    source: note.source ?? existing?.source,
   }
   const workoutNotes = [entry, ...state.workoutNotes.filter((n) => n.id !== entry.id)].slice(
     0,

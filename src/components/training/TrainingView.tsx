@@ -48,6 +48,7 @@ import { VictoryCamera } from './VictoryCamera'
 import type { VictorySessionStats } from '../../types/victory'
 import { countSessionPersonalRecords } from '../../utils/sessionPrs'
 import { computeStrengthSessionStats } from '../../utils/strength'
+import { manualSessionMeta, sessionKindForDiscipline } from '../../utils/sessionMeta'
 
 export function TrainingView({
   launchRoutineId = null,
@@ -102,6 +103,8 @@ export function TrainingView({
   const sport = state.primarySportId ? getSportById(state.primarySportId) : getSportById(discipline.primarySportId)
   const showStrengthTools = isStrengthFamily(disciplineId)
   const showEnduranceTools = isEnduranceFamily(disciplineId)
+  const activeSportId = state.primarySportId ?? discipline.primarySportId
+  const activeSessionKind = sessionKindForDiscipline(disciplineId)
 
   useEffect(() => {
     // Pendant Pump Check le chrome est masqué ; on coupe aussi la ready bar
@@ -254,6 +257,7 @@ export function TrainingView({
   const confirmCardio = async () => {
     const kcalPerHour = sport?.kcalPerHour ?? 500
     const estimated = estimateSessionKcal(durationMin, kcalPerHour, profile.weightKg)
+    const meta = manualSessionMeta(activeSportId, activeSessionKind)
     const note = {
       title: sport?.name ?? 'Cardio',
       exercises: [
@@ -265,6 +269,7 @@ export function TrainingView({
       ],
       durationMin,
       estimatedKcal: estimated,
+      ...meta,
     }
 
     if (isAuthenticated) {
@@ -348,6 +353,7 @@ export function TrainingView({
           disciplineId={disciplineId}
           bodyWeightKg={profile.weightKg}
           onLog={(entry) => {
+            const meta = manualSessionMeta(activeSportId, 'endurance')
             persist(
               saveWorkoutNote({
                 title: entry.title,
@@ -366,6 +372,7 @@ export function TrainingView({
                 ],
                 durationMin: entry.durationMin,
                 estimatedKcal: entry.estimatedKcal,
+                ...meta,
               }),
             )
             showToast(`${entry.title} · ~${entry.estimatedKcal} kcal → Nutri`)
@@ -381,6 +388,8 @@ export function TrainingView({
           schedule={state.schedule}
           history={state.workoutNotes}
           initialRoutineId={launchRoutineId}
+          sportId={activeSportId}
+          sessionKind="strength"
           restLogRequest={restLogRequest}
           onRestStart={(info) => {
             startRestTimer(90, info)
