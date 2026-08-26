@@ -48,7 +48,15 @@ import { VictoryCamera } from './VictoryCamera'
 import type { VictorySessionStats } from '../../types/victory'
 import { countSessionPersonalRecords } from '../../utils/sessionPrs'
 import { computeStrengthSessionStats } from '../../utils/strength'
-import { manualSessionMeta, sessionKindForDiscipline, buildEnduranceDetails } from '../../utils/sessionMeta'
+import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
+import {
+  buildEnduranceDetails,
+  buildTeamDetails,
+  emptyTeamSheetFields,
+  manualSessionMeta,
+  sessionKindForDiscipline,
+} from '../../utils/sessionMeta'
+import type { TeamSessionType } from '../../types/training'
 
 export function TrainingView({
   launchRoutineId = null,
@@ -67,6 +75,9 @@ export function TrainingView({
   const [dueBanner, setDueBanner] = useState<string | null>(null)
   const [cardioOpen, setCardioOpen] = useState(false)
   const [durationMin, setDurationMin] = useState(40)
+  const [teamSessionType, setTeamSessionType] = useState<TeamSessionType>('training')
+  const [teamMinutesPlayed, setTeamMinutesPlayed] = useState<number | null>(null)
+  const [teamPosition, setTeamPosition] = useState('')
   const [restLogRequest, setRestLogRequest] = useState<{
     exerciseId: string
     setIndex: number
@@ -105,6 +116,31 @@ export function TrainingView({
   const showEnduranceTools = isEnduranceFamily(disciplineId)
   const activeSportId = state.primarySportId ?? discipline.primarySportId
   const activeSessionKind = sessionKindForDiscipline(disciplineId)
+  const isTeamSheet = activeSessionKind === 'team'
+
+  const resetCardioSheet = useCallback(() => {
+    setDurationMin(40)
+    const empty = emptyTeamSheetFields()
+    setTeamSessionType(empty.sessionType)
+    setTeamMinutesPlayed(empty.minutesPlayed)
+    setTeamPosition(empty.position)
+  }, [])
+
+  const teamDetailsPreview = useMemo(() => {
+    if (!isTeamSheet) return null
+    return buildTeamDetails({
+      sessionType: teamSessionType,
+      durationMin,
+      minutesPlayed: teamSessionType === 'match' ? teamMinutesPlayed : null,
+      position: teamPosition,
+    })
+  }, [isTeamSheet, teamSessionType, durationMin, teamMinutesPlayed, teamPosition])
+
+  const teamFieldsInvalid =
+    isTeamSheet &&
+    teamSessionType === 'match' &&
+    teamMinutesPlayed != null &&
+    teamDetailsPreview == null
 
   useEffect(() => {
     // Pendant Pump Check le chrome est masqué ; on coupe aussi la ready bar
@@ -258,6 +294,23 @@ export function TrainingView({
     const kcalPerHour = sport?.kcalPerHour ?? 500
     const estimated = estimateSessionKcal(durationMin, kcalPerHour, profile.weightKg)
     const meta = manualSessionMeta(activeSportId, activeSessionKind)
+
+    let details =
+      activeSessionKind === 'team'
+        ? buildTeamDetails({
+            sessionType: teamSessionType,
+            durationMin,
+            minutesPlayed: teamSessionType === 'match' ? teamMinutesPlayed : null,
+            position: teamPosition,
+          })
+        : undefined
+
+    // Minutes invalides → refuse proprement (pas de sauvegarde).
+    if (activeSessionKind === 'team' && details == null) {
+      showToast('Minutes jouées invalides')
+      return
+    }
+
     const note = {
       title: sport?.name ?? 'Cardio',
       exercises: [
@@ -270,6 +323,7 @@ export function TrainingView({
       durationMin,
       estimatedKcal: estimated,
       ...meta,
+      ...(details ? { details } : {}),
     }
 
     if (isAuthenticated) {
@@ -283,6 +337,7 @@ export function TrainingView({
     }
 
     setCardioOpen(false)
+    resetCardioSheet()
     showToast(`${sport?.name ?? 'Séance'} · ~${estimated} kcal → Nutri`)
   }
 
@@ -450,7 +505,10 @@ export function TrainingView({
 
       <IosSheet
         open={cardioOpen}
-        onClose={() => setCardioOpen(false)}
+        onClose={() => {
+          setCardioOpen(false)
+          resetCardioSheet()
+        }}
         title={sport?.name ?? 'Séance'}
         subtitle="Durée → calories Nutri"
       >
@@ -471,10 +529,84 @@ export function TrainingView({
               </button>
             ))}
           </div>
+
+          {isTeamSheet ? (
+            <div className="space-y-3">
+              <div>
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#636366]">
+                  Type de séance
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(
+                    [
+                      { id: 'training' as const, label: 'Entraînement' },
+                      { id: 'match' as const, label: 'Match' },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        setTeamSessionType(opt.id)
+                        if (opt.id !== 'match') setTeamMinutesPlayed(null)
+                      }}
+                      className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
+                        teamSessionType === opt.id
+                          ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-[#FF6961]'
+                          : 'border-white/10 text-[#8E8E93]'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {teamSessionType === 'match' ? (
+                <label className="block">
+                  <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#636366]">
+                    Minutes jouées (facultatif)
+                  </span>
+                  <div className="rounded-2xl border border-white/10 bg-black/35 px-3 py-3">
+                    <ClearableNumberInput
+                      value={teamMinutesPlayed}
+                      onChange={setTeamMinutesPlayed}
+                      min={1}
+                      max={durationMin}
+                      step={1}
+                      required={false}
+                      aria-label="Minutes jouées"
+                      className="w-full bg-transparent text-[22px] font-bold text-white outline-none"
+                    />
+                  </div>
+                  {teamFieldsInvalid ? (
+                    <p className="mt-1 text-[11px] text-[#FF453A]">
+                      Doit être entre 1 et {durationMin} min.
+                    </p>
+                  ) : null}
+                </label>
+              ) : null}
+
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#636366]">
+                  Poste (facultatif)
+                </span>
+                <input
+                  type="text"
+                  value={teamPosition}
+                  onChange={(e) => setTeamPosition(e.target.value)}
+                  placeholder="Ex. milieu, ailier…"
+                  className="w-full rounded-2xl border border-white/10 bg-black/35 px-3 py-3 text-[15px] text-white outline-none placeholder:text-[#636366]"
+                />
+              </label>
+            </div>
+          ) : null}
+
           <button
             type="button"
-            onClick={confirmCardio}
-            className="btn-brand ios-press w-full rounded-2xl py-3.5 text-[15px] font-semibold text-white"
+            onClick={() => void confirmCardio()}
+            disabled={teamFieldsInvalid}
+            className="btn-brand ios-press w-full rounded-2xl py-3.5 text-[15px] font-semibold text-white disabled:opacity-40"
           >
             Valider
           </button>

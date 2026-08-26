@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkoutNote } from '../types/training'
 import {
   buildEnduranceDetails,
+  buildTeamDetails,
+  emptyTeamSheetFields,
   manualSessionMeta,
   paceSecPerKmFromDuration,
   sessionKindForDiscipline,
@@ -132,7 +134,10 @@ describe('saveWorkoutNote — métadonnées multisport additives', () => {
     expect(note.source).toBe('manual')
     expect(note.durationMin).toBe(30)
     expect(note.details).toEqual({ kind: 'endurance', distanceKm: 5 })
-    expect(paceSecPerKmFromDuration(note.durationMin!, note.details!.distanceKm)).toBe(360)
+    expect(note.details?.kind).toBe('endurance')
+    if (note.details?.kind === 'endurance') {
+      expect(paceSecPerKmFromDuration(note.durationMin!, note.details.distanceKm)).toBe(360)
+    }
     expect(note.exercises[0]?.name).toBe('5 km')
     expect(note.exercises[0]?.sets[0]?.reps).toBe(30)
   })
@@ -162,7 +167,7 @@ describe('saveWorkoutNote — métadonnées multisport additives', () => {
     expect(paceSecPerKmFromDuration(90, 40)).toBe(135)
   })
 
-  it('sauvegarde football sans details endurance', async () => {
+  it('sauvegarde football legacy sans details team (toujours valide)', async () => {
     const { saveWorkoutNote, getTrainingState } = await import('../services/trainingStorage')
     const meta = manualSessionMeta('football', 'team')
     saveWorkoutNote({
@@ -183,7 +188,7 @@ describe('saveWorkoutNote — métadonnées multisport additives', () => {
     expect(note.details).toBeUndefined()
   })
 
-  it('sauvegarde générique (combat) sans details endurance', async () => {
+  it('sauvegarde générique (combat) sans details team ni endurance', async () => {
     const { saveWorkoutNote, getTrainingState } = await import('../services/trainingStorage')
     const meta = manualSessionMeta('boxe', 'generic')
     saveWorkoutNote({
@@ -266,5 +271,149 @@ describe('saveWorkoutNote — métadonnées multisport additives', () => {
     expect(getTrainingState().primarySportId).toBe('football')
     expect(note?.sportId).toBe('course-a-pied')
     expect(note?.details).toEqual({ kind: 'endurance', distanceKm: 5 })
+  })
+})
+
+describe('buildTeamDetails / emptyTeamSheetFields', () => {
+  it('réinitialise le formulaire team aux valeurs par défaut', () => {
+    expect(emptyTeamSheetFields()).toEqual({
+      sessionType: 'training',
+      minutesPlayed: null,
+      position: '',
+    })
+  })
+
+  it('sauvegarde un entraînement team correctement', async () => {
+    const { saveWorkoutNote, getTrainingState } = await import('../services/trainingStorage')
+    const details = buildTeamDetails({
+      sessionType: 'training',
+      durationMin: 75,
+      position: '  milieu  ',
+    })
+    expect(details).toEqual({
+      kind: 'team',
+      sessionType: 'training',
+      position: 'milieu',
+    })
+    saveWorkoutNote({
+      title: 'Football',
+      exercises: [
+        {
+          id: 't1',
+          name: 'Football',
+          sets: [{ reps: 75, weightKg: 0, difficulty: 'ok' }],
+        },
+      ],
+      durationMin: 75,
+      estimatedKcal: 500,
+      ...manualSessionMeta('football', 'team'),
+      details: details!,
+    })
+    const note = getTrainingState().workoutNotes[0]
+    expect(note.sessionKind).toBe('team')
+    expect(note.details).toEqual({
+      kind: 'team',
+      sessionType: 'training',
+      position: 'milieu',
+    })
+  })
+
+  it('sauvegarde un match team avec minutes jouées valides', async () => {
+    const { saveWorkoutNote, getTrainingState } = await import('../services/trainingStorage')
+    const details = buildTeamDetails({
+      sessionType: 'match',
+      durationMin: 95,
+      minutesPlayed: 78,
+      position: 'ailier',
+    })
+    expect(details).toEqual({
+      kind: 'team',
+      sessionType: 'match',
+      minutesPlayed: 78,
+      position: 'ailier',
+    })
+    saveWorkoutNote({
+      title: 'Football',
+      exercises: [
+        {
+          id: 't2',
+          name: 'Football',
+          sets: [{ reps: 95, weightKg: 0, difficulty: 'ok' }],
+        },
+      ],
+      durationMin: 95,
+      estimatedKcal: 600,
+      ...manualSessionMeta('football', 'team'),
+      details: details!,
+    })
+    const note = getTrainingState().workoutNotes[0]
+    expect(note.durationMin).toBe(95)
+    expect(note.details).toEqual({
+      kind: 'team',
+      sessionType: 'match',
+      minutesPlayed: 78,
+      position: 'ailier',
+    })
+  })
+
+  it('refuse minutes invalides ou > durée', () => {
+    expect(
+      buildTeamDetails({ sessionType: 'match', durationMin: 60, minutesPlayed: 0 }),
+    ).toBeNull()
+    expect(
+      buildTeamDetails({ sessionType: 'match', durationMin: 60, minutesPlayed: -5 }),
+    ).toBeNull()
+    expect(
+      buildTeamDetails({ sessionType: 'match', durationMin: 60, minutesPlayed: 90 }),
+    ).toBeNull()
+    expect(
+      buildTeamDetails({
+        sessionType: 'match',
+        durationMin: 60,
+        minutesPlayed: Number.NaN,
+      }),
+    ).toBeNull()
+    expect(
+      buildTeamDetails({
+        sessionType: 'match',
+        durationMin: 60,
+        minutesPlayed: Number.POSITIVE_INFINITY,
+      }),
+    ).toBeNull()
+  })
+
+  it('convertit un poste vide / whitespace en omission', () => {
+    expect(
+      buildTeamDetails({ sessionType: 'training', durationMin: 40, position: '   ' }),
+    ).toEqual({ kind: 'team', sessionType: 'training' })
+    expect(
+      buildTeamDetails({ sessionType: 'training', durationMin: 40, position: '' }),
+    ).toEqual({ kind: 'team', sessionType: 'training' })
+  })
+
+  it('n’ajoute jamais de détail team sur strength / endurance', async () => {
+    const { saveWorkoutNote, getTrainingState } = await import('../services/trainingStorage')
+    store.clear()
+    saveWorkoutNote({
+      title: 'Push',
+      exercises: [{ id: 'e', name: 'Bench', sets: [{ reps: 5, weightKg: 80 }] }],
+      estimatedKcal: 100,
+      durationMin: 40,
+      ...manualSessionMeta('musculation', 'strength'),
+    })
+    expect(getTrainingState().workoutNotes[0].details).toBeUndefined()
+
+    store.clear()
+    saveWorkoutNote({
+      title: 'Run',
+      exercises: [{ id: 'e', name: '5 km', sets: [{ reps: 30, weightKg: 0 }] }],
+      estimatedKcal: 200,
+      durationMin: 30,
+      ...manualSessionMeta('course-a-pied', 'endurance'),
+      details: buildEnduranceDetails(5)!,
+    })
+    const run = getTrainingState().workoutNotes[0]
+    expect(run.details?.kind).toBe('endurance')
+    expect(run.details && 'sessionType' in run.details).toBe(false)
   })
 })

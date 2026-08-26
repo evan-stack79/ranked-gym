@@ -122,14 +122,25 @@ export interface WorkoutNote {
   details?: SessionDetails
 }
 
-/** Détails typés — endurance uniquement en V1 (extensible plus tard). */
+/** Détails typés par module — extensible (endurance, team, …). */
 export type EnduranceSessionDetails = {
   kind: 'endurance'
   /** Distance en km — nombre fini strictement positif. */
   distanceKm: number
 }
 
-export type SessionDetails = EnduranceSessionDetails
+export type TeamSessionType = 'training' | 'match'
+
+export type TeamSessionDetails = {
+  kind: 'team'
+  sessionType: TeamSessionType
+  /** Minutes effectivement jouées — facultatif, ≤ durée de séance. */
+  minutesPlayed?: number
+  /** Poste libre — facultatif. */
+  position?: string
+}
+
+export type SessionDetails = EnduranceSessionDetails | TeamSessionDetails
 
 /** Persistent “bloc” — opens last exercises for that focus. */
 export interface WorkoutRoutine {

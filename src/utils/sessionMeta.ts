@@ -3,6 +3,8 @@ import type {
   EnduranceSessionDetails,
   SessionKind,
   SessionSource,
+  TeamSessionDetails,
+  TeamSessionType,
 } from '../types/training'
 
 /**
@@ -56,4 +58,58 @@ export function paceSecPerKmFromDuration(
   const pace = (durationMin * 60) / distanceKm
   if (!(Number.isFinite(pace) && pace > 0)) return null
   return pace
+}
+
+export type TeamSheetFields = {
+  sessionType: TeamSessionType
+  minutesPlayed: number | null
+  position: string
+}
+
+/** État initial / reset de la sheet team. */
+export function emptyTeamSheetFields(): TeamSheetFields {
+  return {
+    sessionType: 'training',
+    minutesPlayed: null,
+    position: '',
+  }
+}
+
+/**
+ * Construit des détails team valides.
+ * - position : trim ; vide → omis
+ * - minutesPlayed : facultatif ; si présent → fini, > 0 et ≤ durationMin
+ * Retourne null si minutes invalides.
+ */
+export function buildTeamDetails(input: {
+  sessionType: TeamSessionType
+  durationMin: number
+  minutesPlayed?: number | null
+  position?: string | null
+}): TeamSessionDetails | null {
+  const positionRaw = input.position?.trim() ?? ''
+  const position = positionRaw.length > 0 ? positionRaw : undefined
+
+  let minutesPlayed: number | undefined
+  if (input.minutesPlayed != null) {
+    const m = input.minutesPlayed
+    if (
+      !(
+        Number.isFinite(m) &&
+        m > 0 &&
+        Number.isFinite(input.durationMin) &&
+        m <= input.durationMin
+      )
+    ) {
+      return null
+    }
+    minutesPlayed = m
+  }
+
+  return {
+    kind: 'team',
+    sessionType: input.sessionType,
+    ...(minutesPlayed != null ? { minutesPlayed } : {}),
+    ...(position != null ? { position } : {}),
+  }
 }
