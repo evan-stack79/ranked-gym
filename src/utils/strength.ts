@@ -1,29 +1,10 @@
 /**
- * Epley estimated 1RM and safe progression helpers.
- * Educational estimates — not medical advice.
+ * Volume, durée estimée et kcal informatives pour le carnet Train.
+ * Les facteurs d’intensité (Facile / OK / Dur) n’ajustent que l’estimation kcal —
+ * jamais les charges de la prochaine séance.
  */
 
 import type { ExerciseEntry, SetDifficulty, WorkoutSet } from '../types/training'
-
-export function estimate1RM(weightKg: number, reps: number): number {
-  if (reps <= 0 || weightKg <= 0) return 0
-  if (reps === 1) return weightKg
-  // Epley
-  return Math.round(weightKg * (1 + reps / 30) * 10) / 10
-}
-
-export function bestSet1RM(sets: WorkoutSet[]): number {
-  let best = 0
-  for (const set of sets) {
-    best = Math.max(best, estimate1RM(set.weightKg, set.reps))
-  }
-  return best
-}
-
-export function relativeStrength(oneRm: number, bodyWeightKg: number): number {
-  if (!(bodyWeightKg > 0) || !(oneRm > 0)) return 0
-  return Math.round((oneRm / bodyWeightKg) * 100) / 100
-}
 
 export function totalVolume(sets: WorkoutSet[]): number {
   return Math.round(sets.reduce((sum, s) => sum + s.reps * s.weightKg, 0))
@@ -31,58 +12,6 @@ export function totalVolume(sets: WorkoutSet[]): number {
 
 export function exercisesVolume(exercises: ExerciseEntry[]): number {
   return totalVolume(exercises.flatMap((e) => e.sets))
-}
-
-export function relativeStrengthLabel(ratio: number): string {
-  if (ratio <= 0) return '—'
-  if (ratio < 0.6) return 'Base'
-  if (ratio < 1) return 'Intermédiaire'
-  if (ratio < 1.5) return 'Solide'
-  if (ratio < 2) return 'Avancé'
-  return 'Élite'
-}
-
-/**
- * Suggest next working weight from last sets + how hard it felt.
- * Caps increases so progression stays safe relative to bodyweight capacity.
- */
-export function suggestNextWeight(options: {
-  sets: WorkoutSet[]
-  bodyWeightKg: number
-  difficulty?: SetDifficulty
-}): { nextKg: number; message: string } | null {
-  const { sets, bodyWeightKg, difficulty = 'ok' } = options
-  if (!sets.length) return null
-  const last = sets[sets.length - 1]
-  const avgWeight =
-    sets.reduce((s, x) => s + x.weightKg, 0) / Math.max(1, sets.length)
-  const oneRm = bestSet1RM(sets)
-  const ratio = relativeStrength(oneRm, bodyWeightKg)
-
-  const capPct = ratio >= 1.5 ? 0.015 : ratio >= 1 ? 0.02 : 0.025
-  const maxJump = Math.max(1.25, Math.min(2.5, avgWeight * capPct))
-
-  if (difficulty === 'hard') {
-    const next = Math.round(last.weightKg * 0.95 * 4) / 4
-    return {
-      nextKg: Math.max(0, next),
-      message: `Série dure — garde ~${next} kg ou baisse un cran. Récupère bien.`,
-    }
-  }
-
-  if (difficulty === 'easy') {
-    const next = Math.round((last.weightKg + maxJump) * 4) / 4
-    return {
-      nextKg: next,
-      message: `Facile : tu peux viser ~${next} kg la prochaine fois (+${maxJump} kg max, progression safe).`,
-    }
-  }
-
-  const next = Math.round((last.weightKg + Math.min(1.25, maxJump)) * 4) / 4
-  return {
-    nextKg: next,
-    message: `OK : consolide ou +${Math.min(1.25, maxJump)} kg (~${next} kg) si la technique est clean.`,
-  }
 }
 
 /** Fixed minutes per set (effort + rest) — deterministic duration. */
@@ -137,62 +66,4 @@ export function computeStrengthSessionStats(
 export function volumeToKcal(volumeKg: number, durationMin: number): number {
   const intensity = volumeKg > 0 ? Math.min(0.12, 0.05 + volumeKg / 40000) : 0.085
   return strengthSessionKcal(70, durationMin, intensity)
-}
-
-/** Reverse Epley: working weight for a target rep count from 1RM. */
-export function weightForTargetReps(oneRmKg: number, targetReps: number): number {
-  if (!(oneRmKg > 0) || targetReps < 1) return 0
-  const raw = oneRmKg / (1 + targetReps / 30)
-  // Round to 0.5 kg — gym-friendly plates
-  return Math.round(raw * 2) / 2
-}
-
-export type OverloadAdvice = {
-  oneRmKg: number
-  nextWeightKg: number | null
-  headline: string
-  message: string
-  tone: 'up' | 'ok' | 'down'
-}
-
-/**
- * Progressive overload advice from a working set (Epley 1RM).
- * >12 reps → raise load to land in 8–12 hypertrophy range.
- */
-export function buildOverloadAdvice(weightKg: number, reps: number): OverloadAdvice | null {
-  if (!(weightKg > 0) || !(reps > 0)) return null
-  const oneRmKg = estimate1RM(weightKg, reps)
-
-  if (reps > 12) {
-    const nextWeightKg = weightForTargetReps(oneRmKg, 10)
-    const bumped = Math.max(nextWeightKg, Math.round((weightKg + 2.5) * 2) / 2)
-    return {
-      oneRmKg,
-      nextWeightKg: bumped,
-      headline: 'Tu valides ton format !',
-      message: `Augmente le poids à ${bumped} kg pour redescendre sur une fourchette de 8-12 reps et déclencher l’hypertrophie.`,
-      tone: 'up',
-    }
-  }
-
-  if (reps >= 8) {
-    const nextWeightKg = Math.round((weightKg + 1.25) * 2) / 2
-    return {
-      oneRmKg,
-      nextWeightKg,
-      headline: 'Zone hypertrophie',
-      message: `Tu es déjà sur 8-12. Prochaine séance : vise ~${nextWeightKg} kg si la technique reste clean, ou garde ${weightKg} kg pour consolider.`,
-      tone: 'ok',
-    }
-  }
-
-  // < 8 reps — strength-biased
-  const hypoWeight = weightForTargetReps(oneRmKg, 10)
-  return {
-    oneRmKg,
-    nextWeightKg: hypoWeight,
-    headline: 'Charge lourde',
-    message: `Moins de 8 reps = force pure. Pour l’hypertrophie, descends vers ~${hypoWeight} kg et remonte à 8-12 reps.`,
-    tone: 'down',
-  }
 }
