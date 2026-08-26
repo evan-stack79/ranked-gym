@@ -73,6 +73,8 @@ describe('getTodayWorkout — pas de suggestion coach', () => {
         updatedAt: 1,
       },
     ],
+    lastSelectedRoutineId: null,
+    lastSelectedSportId: null,
   }
 
   it('null sans agenda (aucune rotation automatique)', () => {

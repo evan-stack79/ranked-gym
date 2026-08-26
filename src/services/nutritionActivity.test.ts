@@ -28,6 +28,8 @@ const BASE_TRAINING: TrainingState = {
   completed: [],
   workoutNotes: [],
   routines: [],
+  lastSelectedRoutineId: null,
+  lastSelectedSportId: null,
 }
 
 vi.mock('./trainingStorage', () => ({

@@ -164,4 +164,11 @@ export interface TrainingState {
   completed: CompletedSession[]
   workoutNotes: WorkoutNote[]
   routines: WorkoutRoutine[]
+  /**
+   * Dernière routine sélectionnée dans le carnet Train (reprise type YouTube).
+   * Persistée immédiatement au changement — ne dépend pas d’un événement de fermeture.
+   */
+  lastSelectedRoutineId: string | null
+  /** Sport associé à la dernière sélection (évite une reprise incompatible). */
+  lastSelectedSportId: string | null
 }

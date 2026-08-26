@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpen, Check, Pencil, Plus, Trash2, X } from 'lucide-react'
 import type {
   ExerciseEntry,
@@ -10,6 +10,10 @@ import type {
   WorkoutRoutine,
   WorkoutSet,
 } from '../../types/training'
+import {
+  resolveResumedRoutineId,
+  setLastSelectedRoutine,
+} from '../../services/trainingStorage'
 import { computeStrengthSessionStats } from '../../utils/strength'
 import { sanitizeExerciseName } from '../../utils/exerciseName'
 import { detectProgramSplit, filterRoutinesForProgram } from '../../utils/workoutProgram'
@@ -104,6 +108,39 @@ function cloneFromRoutine(routine: WorkoutRoutine, history: WorkoutNote[] = []):
   })
 }
 
+function resolveBootRoutine(
+  routines: WorkoutRoutine[],
+  schedule: ScheduledSession[],
+  sportId: string,
+  launchRoutineId?: string | null,
+): WorkoutRoutine {
+  const split = detectProgramSplit(schedule, routines)
+  const visible = filterRoutinesForProgram(routines, split)
+  const resumedId =
+    resolveResumedRoutineId({
+      routines,
+      candidateIds: visible.map((r) => r.id),
+      sportId,
+      launchRoutineId,
+    }) ??
+    visible[0]?.id ??
+    routines[0]?.id ??
+    'upper'
+  return (
+    visible.find((r) => r.id === resumedId) ??
+    routines.find((r) => r.id === resumedId) ??
+    visible[0] ??
+    routines[0] ?? {
+      id: 'upper',
+      label: 'Upper',
+      subtitle: '',
+      accent: '#fff',
+      exercises: [],
+      updatedAt: 0,
+    }
+  )
+}
+
 export function WorkoutNotebook({
   id,
   bodyWeightKg,
@@ -120,26 +157,28 @@ export function WorkoutNotebook({
   onRestStart,
   restLogRequest,
 }: WorkoutNotebookProps) {
-  const [routineId, setRoutineId] = useState(routines[0]?.id ?? 'upper')
-  const [title, setTitle] = useState(routines[0]?.label ?? 'Séance')
+  const bootRoutine = useMemo(
+    () => resolveBootRoutine(routines, schedule, sportId, initialRoutineId),
+    // Montage uniquement — reprise locale ; les changements suivants passent par selectRoutine.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  )
+
+  const [routineId, setRoutineId] = useState(bootRoutine.id)
+  const [title, setTitle] = useState(bootRoutine.label)
   const [exercises, setExercises] = useState<ExerciseEntry[]>(() =>
-    cloneFromRoutine(
-      routines[0] ?? {
-        id: 'upper',
-        label: 'Upper',
-        subtitle: '',
-        accent: '#fff',
-        exercises: [],
-        updatedAt: 0,
-      },
-      history,
-    ),
+    cloneFromRoutine(bootRoutine, history),
   )
   const [customOpen, setCustomOpen] = useState(false)
   const [customLabel, setCustomLabel] = useState('')
   const [saving, setSaving] = useState(false)
   const [editingNote, setEditingNote] = useState<WorkoutNote | null>(null)
   const [effortHelpOpen, setEffortHelpOpen] = useState(false)
+
+  const exercisesRef = useRef(exercises)
+  const routineIdRef = useRef(routineId)
+  exercisesRef.current = exercises
+  routineIdRef.current = routineId
 
   const visibleRoutines = useMemo(() => {
     const split = detectProgramSplit(schedule, routines)
@@ -163,6 +202,8 @@ export function WorkoutNotebook({
     setTitle(r.label)
     setExercises(cloneFromRoutine(r, history))
     setEditingNote(null)
+    // Sauvegarde immédiate — iOS peut suspendre sans événement de fermeture.
+    setLastSelectedRoutine(r.id, sportId)
   }
 
   useEffect(() => {
@@ -219,6 +260,23 @@ export function WorkoutNotebook({
     }, 700)
     return () => window.clearTimeout(t)
   }, [exercises, routineId, onDraftSave])
+
+  // Flush brouillon en attente uniquement — la préférence routine est déjà écrite au select.
+  useEffect(() => {
+    if (!onDraftSave) return
+    const flushDraft = () => {
+      onDraftSave(routineIdRef.current, exercisesRef.current)
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flushDraft()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('pagehide', flushDraft)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('pagehide', flushDraft)
+    }
+  }, [onDraftSave])
 
   const updateExercise = (exerciseId: string, patch: Partial<ExerciseEntry>) => {
     setExercises((prev) => prev.map((e) => (e.id === exerciseId ? { ...e, ...patch } : e)))
