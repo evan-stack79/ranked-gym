@@ -9,7 +9,6 @@ import type {
 } from '../types/training'
 import { todayKey } from '../utils/calories'
 import { getCalorieProfile } from './nutritionStorage'
-import { progressRoutineExercises } from '../utils/forceArena'
 import {
   computeStrengthSessionStats,
   sessionIntensity,
@@ -479,16 +478,4 @@ export function todayWorkoutKcal(state: TrainingState = read()): number {
   return state.completed
     .filter((c) => c.dateKey === key)
     .reduce((sum, c) => sum + c.estimatedKcal, 0)
-}
-
-/** Apply Facile/OK/Dur progression to every routine (API legacy / ForceView).
- * Non branché sur le flux carnet Accueil/Train — la sauvegarde mémorise les charges réalisées. */
-export function applyForceProgression(bodyWeightKg: number): TrainingState {
-  const state = read()
-  const routines = state.routines.map((r) =>
-    r.exercises.length ? progressRoutineExercises(r, bodyWeightKg) : r,
-  )
-  const next = { ...state, routines }
-  write(next)
-  return next
 }
