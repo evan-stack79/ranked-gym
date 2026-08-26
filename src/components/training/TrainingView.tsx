@@ -48,7 +48,7 @@ import { VictoryCamera } from './VictoryCamera'
 import type { VictorySessionStats } from '../../types/victory'
 import { countSessionPersonalRecords } from '../../utils/sessionPrs'
 import { computeStrengthSessionStats } from '../../utils/strength'
-import { manualSessionMeta, sessionKindForDiscipline } from '../../utils/sessionMeta'
+import { manualSessionMeta, sessionKindForDiscipline, buildEnduranceDetails } from '../../utils/sessionMeta'
 
 export function TrainingView({
   launchRoutineId = null,
@@ -354,6 +354,7 @@ export function TrainingView({
           bodyWeightKg={profile.weightKg}
           onLog={(entry) => {
             const meta = manualSessionMeta(activeSportId, 'endurance')
+            const details = buildEnduranceDetails(entry.distanceKm)
             persist(
               saveWorkoutNote({
                 title: entry.title,
@@ -373,6 +374,7 @@ export function TrainingView({
                 durationMin: entry.durationMin,
                 estimatedKcal: entry.estimatedKcal,
                 ...meta,
+                ...(details ? { details } : {}),
               }),
             )
             showToast(`${entry.title} · ~${entry.estimatedKcal} kcal → Nutri`)

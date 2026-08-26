@@ -115,7 +115,21 @@ export interface WorkoutNote {
    * Optionnel : notes legacy sans ce champ restent valides.
    */
   source?: SessionSource
+  /**
+   * Détails structurés selon le module (ex. distance endurance).
+   * Optionnel : notes legacy et séances non-endurance restent valides sans ce champ.
+   */
+  details?: SessionDetails
 }
+
+/** Détails typés — endurance uniquement en V1 (extensible plus tard). */
+export type EnduranceSessionDetails = {
+  kind: 'endurance'
+  /** Distance en km — nombre fini strictement positif. */
+  distanceKm: number
+}
+
+export type SessionDetails = EnduranceSessionDetails
 
 /** Persistent “bloc” — opens last exercises for that focus. */
 export interface WorkoutRoutine {

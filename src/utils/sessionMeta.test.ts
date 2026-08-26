@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkoutNote } from '../types/training'
-import { manualSessionMeta, sessionKindForDiscipline } from './sessionMeta'
+import {
+  buildEnduranceDetails,
+  manualSessionMeta,
+  paceSecPerKmFromDuration,
+  sessionKindForDiscipline,
+} from './sessionMeta'
 
 const store = new Map<string, string>()
 
@@ -56,19 +61,40 @@ describe('sessionKindForDiscipline', () => {
   })
 })
 
+describe('paceSecPerKmFromDuration / buildEnduranceDetails', () => {
+  it('calcule une allure correcte (30 min / 5 km = 360 s/km)', () => {
+    expect(paceSecPerKmFromDuration(30, 5)).toBe(360)
+  })
+
+  it('rejette les entrées invalides sans NaN ni Infinity', () => {
+    expect(paceSecPerKmFromDuration(0, 5)).toBeNull()
+    expect(paceSecPerKmFromDuration(30, 0)).toBeNull()
+    expect(paceSecPerKmFromDuration(-10, 5)).toBeNull()
+    expect(paceSecPerKmFromDuration(30, -1)).toBeNull()
+    expect(paceSecPerKmFromDuration(Number.NaN, 5)).toBeNull()
+    expect(paceSecPerKmFromDuration(30, Number.POSITIVE_INFINITY)).toBeNull()
+    expect(buildEnduranceDetails(0)).toBeNull()
+    expect(buildEnduranceDetails(-2)).toBeNull()
+    expect(buildEnduranceDetails(Number.NaN)).toBeNull()
+    expect(buildEnduranceDetails(Number.POSITIVE_INFINITY)).toBeNull()
+  })
+
+  it('accepte une distance positive finie', () => {
+    expect(buildEnduranceDetails(5)).toEqual({ kind: 'endurance', distanceKm: 5 })
+  })
+})
+
 describe('saveWorkoutNote — métadonnées multisport additives', () => {
   beforeEach(() => {
     store.clear()
   })
 
-  it('sauvegarde musculation avec sportId, strength, manual', async () => {
+  it('sauvegarde musculation sans details endurance', async () => {
     const { saveWorkoutNote, getTrainingState } = await import('../services/trainingStorage')
     const meta = manualSessionMeta('musculation', 'strength')
     saveWorkoutNote({
       title: 'Push',
-      exercises: [
-        { id: 'e1', name: 'Bench', sets: [{ reps: 8, weightKg: 60 }] },
-      ],
+      exercises: [{ id: 'e1', name: 'Bench', sets: [{ reps: 8, weightKg: 60 }] }],
       estimatedKcal: 200,
       durationMin: 45,
       routineId: 'push',
@@ -78,11 +104,14 @@ describe('saveWorkoutNote — métadonnées multisport additives', () => {
     expect(note.sportId).toBe('musculation')
     expect(note.sessionKind).toBe('strength')
     expect(note.source).toBe('manual')
+    expect(note.details).toBeUndefined()
   })
 
-  it('sauvegarde endurance avec sportId, endurance, manual', async () => {
+  it('sauvegarde course avec distanceKm typé + durationMin', async () => {
     const { saveWorkoutNote, getTrainingState } = await import('../services/trainingStorage')
     const meta = manualSessionMeta('course-a-pied', 'endurance')
+    const details = buildEnduranceDetails(5)
+    expect(details).not.toBeNull()
     saveWorkoutNote({
       title: 'Course 5 km',
       exercises: [
@@ -95,14 +124,45 @@ describe('saveWorkoutNote — métadonnées multisport additives', () => {
       durationMin: 30,
       estimatedKcal: 320,
       ...meta,
+      details: details!,
     })
     const note = getTrainingState().workoutNotes[0]
     expect(note.sportId).toBe('course-a-pied')
     expect(note.sessionKind).toBe('endurance')
     expect(note.source).toBe('manual')
+    expect(note.durationMin).toBe(30)
+    expect(note.details).toEqual({ kind: 'endurance', distanceKm: 5 })
+    expect(paceSecPerKmFromDuration(note.durationMin!, note.details!.distanceKm)).toBe(360)
+    expect(note.exercises[0]?.name).toBe('5 km')
+    expect(note.exercises[0]?.sets[0]?.reps).toBe(30)
   })
 
-  it('sauvegarde football avec sportId, team, manual', async () => {
+  it('sauvegarde vélo avec distanceKm typé', async () => {
+    const { saveWorkoutNote, getTrainingState } = await import('../services/trainingStorage')
+    const meta = manualSessionMeta('velo', 'endurance')
+    saveWorkoutNote({
+      title: 'Vélo 40 km',
+      exercises: [
+        {
+          id: 'endurance-bike',
+          name: '40 km',
+          sets: [{ reps: 90, weightKg: 0, difficulty: 'ok' }],
+        },
+      ],
+      durationMin: 90,
+      estimatedKcal: 700,
+      ...meta,
+      details: buildEnduranceDetails(40)!,
+    })
+    const note = getTrainingState().workoutNotes[0]
+    expect(note.sportId).toBe('velo')
+    expect(note.sessionKind).toBe('endurance')
+    expect(note.durationMin).toBe(90)
+    expect(note.details).toEqual({ kind: 'endurance', distanceKm: 40 })
+    expect(paceSecPerKmFromDuration(90, 40)).toBe(135)
+  })
+
+  it('sauvegarde football sans details endurance', async () => {
     const { saveWorkoutNote, getTrainingState } = await import('../services/trainingStorage')
     const meta = manualSessionMeta('football', 'team')
     saveWorkoutNote({
@@ -119,12 +179,11 @@ describe('saveWorkoutNote — métadonnées multisport additives', () => {
       ...meta,
     })
     const note = getTrainingState().workoutNotes[0]
-    expect(note.sportId).toBe('football')
     expect(note.sessionKind).toBe('team')
-    expect(note.source).toBe('manual')
+    expect(note.details).toBeUndefined()
   })
 
-  it('sauvegarde générique (combat) avec sportId, generic, manual', async () => {
+  it('sauvegarde générique (combat) sans details endurance', async () => {
     const { saveWorkoutNote, getTrainingState } = await import('../services/trainingStorage')
     const meta = manualSessionMeta('boxe', 'generic')
     saveWorkoutNote({
@@ -141,12 +200,11 @@ describe('saveWorkoutNote — métadonnées multisport additives', () => {
       ...meta,
     })
     const note = getTrainingState().workoutNotes[0]
-    expect(note.sportId).toBe('boxe')
     expect(note.sessionKind).toBe('generic')
-    expect(note.source).toBe('manual')
+    expect(note.details).toBeUndefined()
   })
 
-  it('lit une ancienne note sans les nouveaux champs', async () => {
+  it('lit une ancienne note sans details', async () => {
     const { saveTrainingState, getTrainingState } = await import('../services/trainingStorage')
     const legacy: WorkoutNote = {
       id: 'legacy-1',
@@ -156,18 +214,13 @@ describe('saveWorkoutNote — métadonnées multisport additives', () => {
       estimatedKcal: 180,
       exercises: [{ id: 'e0', name: 'Squat', sets: [{ reps: 5, weightKg: 100 }] }],
     }
-    const state = getTrainingState()
-    saveTrainingState({ ...state, workoutNotes: [legacy] })
-
+    saveTrainingState({ ...getTrainingState(), workoutNotes: [legacy] })
     const loaded = getTrainingState().workoutNotes.find((n) => n.id === 'legacy-1')
-    expect(loaded).toBeDefined()
-    expect(loaded?.sportId).toBeUndefined()
-    expect(loaded?.sessionKind).toBeUndefined()
-    expect(loaded?.source).toBeUndefined()
+    expect(loaded?.details).toBeUndefined()
     expect(loaded?.title).toBe('Old Push')
   })
 
-  it('ne backfill pas les métadonnées sur une note legacy à l’édition', async () => {
+  it('ne backfill pas details sur une note legacy à l’édition', async () => {
     const { saveTrainingState, saveWorkoutNote, getTrainingState } = await import(
       '../services/trainingStorage'
     )
@@ -180,8 +233,6 @@ describe('saveWorkoutNote — métadonnées multisport additives', () => {
       exercises: [{ id: 'e0', name: 'Row', sets: [{ reps: 8, weightKg: 40 }] }],
     }
     saveTrainingState({ ...getTrainingState(), workoutNotes: [legacy] })
-
-    // Édition sans passer sportId/sessionKind/source (comme WorkoutNotebook legacy)
     saveWorkoutNote({
       id: 'legacy-2',
       createdAt: 2,
@@ -192,36 +243,28 @@ describe('saveWorkoutNote — métadonnées multisport additives', () => {
       durationMin: 40,
       totalVolumeKg: 340,
     })
-
     const updated = getTrainingState().workoutNotes.find((n) => n.id === 'legacy-2')
     expect(updated?.title).toBe('Legacy edited')
-    expect(updated?.sportId).toBeUndefined()
-    expect(updated?.sessionKind).toBeUndefined()
-    expect(updated?.source).toBeUndefined()
+    expect(updated?.details).toBeUndefined()
   })
 
-  it('changer primarySportId après coup ne modifie pas le sportId figé', async () => {
+  it('changer primarySportId après coup ne modifie pas sportId ni details figés', async () => {
     const { saveWorkoutNote, setPrimarySport, getTrainingState } = await import(
       '../services/trainingStorage'
     )
     saveWorkoutNote({
       title: 'Course',
-      exercises: [
-        {
-          id: 'e',
-          name: '5 km',
-          sets: [{ reps: 28, weightKg: 0 }],
-        },
-      ],
+      exercises: [{ id: 'e', name: '5 km', sets: [{ reps: 28, weightKg: 0 }] }],
       durationMin: 28,
       estimatedKcal: 300,
       ...manualSessionMeta('course-a-pied', 'endurance'),
+      details: buildEnduranceDetails(5)!,
     })
     const noteId = getTrainingState().workoutNotes[0].id
     setPrimarySport('football')
     const note = getTrainingState().workoutNotes.find((n) => n.id === noteId)
     expect(getTrainingState().primarySportId).toBe('football')
     expect(note?.sportId).toBe('course-a-pied')
-    expect(note?.sessionKind).toBe('endurance')
+    expect(note?.details).toEqual({ kind: 'endurance', distanceKm: 5 })
   })
 })

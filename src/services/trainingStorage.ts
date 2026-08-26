@@ -354,6 +354,7 @@ export function saveWorkoutNote(
     sportId: note.sportId ?? existing?.sportId,
     sessionKind: note.sessionKind ?? existing?.sessionKind,
     source: note.source ?? existing?.source,
+    details: note.details ?? existing?.details,
   }
   const workoutNotes = [entry, ...state.workoutNotes.filter((n) => n.id !== entry.id)].slice(
     0,
