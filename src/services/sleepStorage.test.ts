@@ -188,7 +188,7 @@ describe('sleepEngineAdapter', () => {
     expect(snap.engine).toBeNull()
     expect(snap.tibHours).toBe(8)
     expect(snap.tibLabel).toBe(formatTstHoursLabel(8))
-    expect(snap.recommendations.some((r) => /inconnu/i.test(r))).toBe(true)
+    expect(snap.recommendations.some((r) => /pas indiqué combien tu as dormi/i.test(r))).toBe(true)
   })
 
   it('workdayTstHours ignore les nuits sans TST (pas de 0 inventé)', async () => {

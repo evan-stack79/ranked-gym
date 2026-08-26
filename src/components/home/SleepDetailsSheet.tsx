@@ -17,7 +17,7 @@ export function SleepDetailsSheet({
   const engine = snapshot.engine
 
   return (
-    <IosSheet open={open} onClose={onClose} title="Détails sommeil" subtitle="Informations du moteur V1">
+    <IosSheet open={open} onClose={onClose} title="Ta nuit" subtitle="Ce qu’on peut en dire">
       <div className="space-y-4 pb-3">
         {!snapshot.hasData ? (
           <p className="text-[14px] text-[#8E8E93]">Aucune nuit enregistrée.</p>
@@ -25,7 +25,7 @@ export function SleepDetailsSheet({
           <>
             <div className="rounded-2xl border border-white/10 bg-black/25 p-3.5">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-                Temps au lit
+                Temps passé au lit
               </p>
               <p className="mt-1 text-[20px] font-bold text-white">
                 {snapshot.tibLabel ?? '—'}
@@ -34,19 +34,19 @@ export function SleepDetailsSheet({
 
             <div className="rounded-2xl border border-white/10 bg-black/25 p-3.5">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-                Temps réellement dormi
+                Combien tu as dormi
               </p>
               <p className="mt-1 text-[20px] font-bold text-white">inconnu</p>
               <p className="mt-1 text-[13px] leading-relaxed text-[#AEAEB2]">
-                Sans TST, le moteur ne calcule pas la quantité ni l&apos;efficacité — on n&apos;invente
-                pas d&apos;heures dormies à partir du temps au lit.
+                Sans cette info, on ne peut pas juger ta récupération — et on n&apos;invente pas
+                d&apos;heures de sommeil à partir du temps passé au lit.
               </p>
             </div>
 
             {snapshot.recommendations.length > 0 && (
               <div>
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-                  Recommandations
+                  À retenir
                 </p>
                 <ul className="space-y-2">
                   {snapshot.recommendations.map((r) => (
@@ -65,34 +65,36 @@ export function SleepDetailsSheet({
           <>
             <div className="rounded-2xl border border-white/10 bg-black/25 p-3.5">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-                Quantité
+                Combien tu as dormi
               </p>
               <p className="mt-1 text-[20px] font-bold text-white">{snapshot.tstLabel}</p>
               <p className="mt-0.5 text-[13px] text-[#AEAEB2]">{snapshot.statusLabel}</p>
               {snapshot.tibLabel && (
-                <p className="mt-1 text-[12px] text-[#8E8E93]">{snapshot.tibLabel} au lit</p>
+                <p className="mt-1 text-[12px] text-[#8E8E93]">
+                  {snapshot.tibLabel} passées au lit
+                </p>
               )}
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-black/25 p-3.5">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-                Régularité
+                Stabilité des horaires
               </p>
               {snapshot.insufficientHistory ? (
                 <p className="mt-1 text-[13px] text-[#AEAEB2]">
-                  Historique insuffisant — continue d&apos;enregistrer tes nuits. Ce n&apos;est pas un
-                  mauvais score.
+                  Encore trop peu de nuits pour juger si tes horaires sont stables. Continue
+                  d&apos;enregistrer — ce n&apos;est pas un mauvais signe.
                 </p>
               ) : (
                 <ul className="mt-1 space-y-1 text-[13px] text-[#AEAEB2]">
                   <li>
-                    σ coucher :{' '}
+                    Coucher qui varie d&apos;environ{' '}
                     {engine.metrics.regularity.bedtimeVariabilityMinutes != null
                       ? `${Math.round(engine.metrics.regularity.bedtimeVariabilityMinutes)} min`
                       : '—'}
                   </li>
                   <li>
-                    σ lever :{' '}
+                    Lever qui varie d&apos;environ{' '}
                     {engine.metrics.regularity.waketimeVariabilityMinutes != null
                       ? `${Math.round(engine.metrics.regularity.waketimeVariabilityMinutes)} min`
                       : '—'}
@@ -103,12 +105,12 @@ export function SleepDetailsSheet({
 
             <div className="rounded-2xl border border-white/10 bg-black/25 p-3.5">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-                Efficacité (TST / TIB)
+                Part du temps au lit vraiment dormie
               </p>
               <p className="mt-1 text-[13px] text-[#AEAEB2]">
                 {engine.metrics.efficiency.sleepEfficiencyPercent != null
                   ? `${engine.metrics.efficiency.sleepEfficiencyPercent.toFixed(0)} %`
-                  : 'Non calculable (TIB manquant)'}
+                  : 'Impossible à calculer pour cette nuit'}
               </p>
             </div>
 
@@ -118,8 +120,8 @@ export function SleepDetailsSheet({
                   Récupération
                 </p>
                 <p className="mt-1 text-[13px] leading-relaxed text-[#AEAEB2]">
-                  Moyenne jours travaillés basse — suggestion informative, pas une prescription
-                  médicale.
+                  Tu as dormi un peu court en semaine — une piste informative, pas un conseil
+                  médical.
                 </p>
               </div>
             )}
@@ -127,7 +129,7 @@ export function SleepDetailsSheet({
             {snapshot.recommendations.length > 0 && (
               <div>
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-                  Recommandations
+                  À retenir
                 </p>
                 <ul className="space-y-2">
                   {snapshot.recommendations.map((r) => (

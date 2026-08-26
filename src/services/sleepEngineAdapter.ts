@@ -184,7 +184,7 @@ export function getSleepHomeSnapshot(): SleepHomeViewModel {
       tonightHint: tonightHintFor(tonightHm, null),
       insufficientHistory: regularity.insufficientHistory,
       recommendations: [
-        'Temps réellement dormi inconnu — le temps au lit seul ne permet pas d’évaluer la quantité de sommeil.',
+        'Tu n’as pas indiqué combien tu as dormi — le temps passé au lit seul ne suffit pas pour estimer ta récupération.',
       ],
       warnings: [],
     }

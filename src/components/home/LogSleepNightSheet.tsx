@@ -25,8 +25,8 @@ function round1(n: number): number {
 }
 
 /**
- * Saisie simplifiée : coucher + lever (TIB auto).
- * TST facultatif (« Je ne sais pas ») — jamais déduit du TIB.
+ * Saisie : coucher + lever (temps au lit auto).
+ * Durée vraiment dormie facultative — jamais inventée à partir du temps au lit.
  */
 export function LogSleepNightSheet({ open, onClose, onSaved, initial }: LogSleepNightSheetProps) {
   const [bedtime, setBedtime] = useState('23:00')
@@ -84,12 +84,12 @@ export function LogSleepNightSheet({ open, onClose, onSaved, initial }: LogSleep
     let tstHours: number | null = null
     if (tstKnown) {
       if (tstPreview == null) {
-        setError('Indique le temps réellement dormi, ou choisis « Je ne sais pas ».')
+        setError('Indique combien tu as dormi, ou choisis « Je ne sais pas ».')
         return
       }
       if (tstPreview > tibHours + 1e-6) {
         setError(
-          `Le temps réellement dormi ne peut pas dépasser le temps au lit (${tibLabel}).`,
+          `Tu ne peux pas avoir dormi plus longtemps que le temps passé au lit (${tibLabel}).`,
         )
         return
       }
@@ -103,7 +103,7 @@ export function LogSleepNightSheet({ open, onClose, onSaved, initial }: LogSleep
       dateKey: initial?.dateKey ?? todayKey(),
     })
     if (!saved) {
-      setError('Impossible d’enregistrer — vérifie les horaires (et le TST ≤ temps au lit).')
+      setError('Impossible d’enregistrer — vérifie tes horaires.')
       return
     }
     onClose()
@@ -114,7 +114,7 @@ export function LogSleepNightSheet({ open, onClose, onSaved, initial }: LogSleep
     <IosSheet open={open} onClose={onClose} title="Comment s’est passée ta nuit ?">
       <div className="space-y-4 pb-2">
         <p className="text-[13px] leading-relaxed text-[#AEAEB2]">
-          Indique seulement coucher et lever — le temps au lit est calculé automatiquement.
+          Indique seulement quand tu t’es couché et levé — on calcule le reste.
         </p>
 
         <div className="grid grid-cols-2 gap-3">
@@ -149,7 +149,7 @@ export function LogSleepNightSheet({ open, onClose, onSaved, initial }: LogSleep
         </p>
 
         <div>
-          <p className="mb-2 text-[12px] font-semibold text-[#8E8E93]">Temps réellement dormi</p>
+          <p className="mb-2 text-[12px] font-semibold text-[#8E8E93]">Combien as-tu dormi ?</p>
           <div className="mb-3 flex gap-2">
             <button
               type="button"
@@ -218,8 +218,8 @@ export function LogSleepNightSheet({ open, onClose, onSaved, initial }: LogSleep
             </div>
           ) : (
             <p className="rounded-xl border border-white/8 bg-black/25 px-3.5 py-3 text-[13px] leading-relaxed text-[#AEAEB2]">
-              Temps réellement dormi : inconnu — on enregistre le temps au lit sans inventer
-              d&apos;heures dormies.
+              Pas de souci — on garde le temps passé au lit, sans inventer combien tu as vraiment
+              dormi.
             </p>
           )}
         </div>
@@ -233,10 +233,6 @@ export function LogSleepNightSheet({ open, onClose, onSaved, initial }: LogSleep
         >
           Enregistrer
         </button>
-
-        <p className="text-[11px] leading-relaxed text-[#636366]">
-          Pas de score médical. Le TST n&apos;est jamais déduit du temps au lit.
-        </p>
       </div>
     </IosSheet>
   )

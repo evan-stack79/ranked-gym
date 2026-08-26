@@ -1,7 +1,8 @@
 import type { SleepMetrics } from './types.ts'
 
 /**
- * Recommandations et warnings UI — n’altèrent jamais les métriques calculées.
+ * Textes affichés à l’utilisateur — n’altèrent jamais les métriques calculées.
+ * Langage courant uniquement (pas de jargon TST/TIB/σ dans l’UI).
  * Aucun diagnostic médical (apnée, insomnie, trouble circadien, etc.).
  */
 export function buildSleepRecommendations(metrics: SleepMetrics): {
@@ -14,17 +15,17 @@ export function buildSleepRecommendations(metrics: SleepMetrics): {
   switch (metrics.quantity.scientific_status) {
     case 'optimal':
       recommendations.push(
-        'Votre durée de sommeil (TST) se situe dans la fourchette usuelle de 7 à 9 heures pour les adultes.',
+        'Tu as dormi entre 7 et 9 heures, la plage habituelle pour un adulte.',
       )
       break
     case 'deficit':
       recommendations.push(
-        'Votre TST est inférieur à 7 h. Priorisez un coucher un peu plus tôt tout en gardant des horaires stables.',
+        'Tu as dormi moins de 7 heures. Essaie de te coucher un peu plus tôt, en gardant des horaires stables.',
       )
       break
     case 'excess':
       recommendations.push(
-        'Votre TST dépasse 9 h. Un sommeil très prolongé n’est pas recommandé de façon routinière ; maintenez des horaires réguliers.',
+        'Tu as dormi plus de 9 heures. Un sommeil très long tous les jours n’est pas idéal ; garde des horaires réguliers.',
       )
       break
   }
@@ -35,7 +36,7 @@ export function buildSleepRecommendations(metrics: SleepMetrics): {
 
   if (metrics.regularity.insufficientHistory) {
     recommendations.push(
-      'Historique insuffisant pour estimer la variabilité des horaires. Continuez à enregistrer vos couchers et levers.',
+      'Encore trop peu de nuits pour juger si tes horaires sont stables. Continue d’enregistrer tes couchers et levers.',
     )
   }
 
@@ -44,17 +45,14 @@ export function buildSleepRecommendations(metrics: SleepMetrics): {
     metrics.efficiency.aboveClinicalTibRestrictionThreshold85 === false
   ) {
     recommendations.push(
-      'Votre efficacité (TST/TIB) est inférieure au seuil de 85 % utilisé dans le contexte clinique de restriction du temps au lit. ' +
-        'Ce seuil n’est pas une définition universelle de la qualité du sommeil. ' +
-        'Le moteur ne modifie pas automatiquement votre temps au lit.',
+      'Une partie notable du temps passé au lit n’était pas du sommeil. L’app ne change pas pour autant tes horaires automatiquement.',
     )
   }
 
   // Signaux répétés de déficit marqué → orientation vers un professionnel (pas un diagnostic).
   if (metrics.quantity.scientific_status === 'deficit' && metrics.quantity.tstHours < 5) {
     warnings.push(
-      'Déficit de sommeil marqué. Si la fatigue, les ronflements, les pauses respiratoires ou l’hypersomnolence diurne persistent, ' +
-        'consultez un professionnel de santé. Cette application ne pose aucun diagnostic.',
+      'Tu as dormi très peu. Si la fatigue, les ronflements, les pauses respiratoires ou une somnolence importante dans la journée persistent, parle-en à un professionnel de santé. Cette app ne pose aucun diagnostic.',
     )
   }
 
@@ -64,7 +62,7 @@ export function buildSleepRecommendations(metrics: SleepMetrics): {
     metrics.catchUp.workdayAverageTstHours < 5
   ) {
     warnings.push(
-      'Moyenne de sommeil en jours travaillés très basse. Un avis médical peut être utile. Aucun diagnostic n’est établi ici.',
+      'En moyenne, tu dors très peu les jours travaillés. Un avis médical peut être utile. Aucun diagnostic n’est établi ici.',
     )
   }
 

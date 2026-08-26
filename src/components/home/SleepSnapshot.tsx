@@ -7,9 +7,9 @@ import { LogSleepNightSheet } from './LogSleepNightSheet'
 import { SleepDetailsSheet } from './SleepDetailsSheet'
 
 /**
- * Carte Accueil sommeil — pas de Sleep Score, pas de stades REM/profond.
- * Sheets toujours montés (hors branche hasData) pour éviter remount/lock résiduel.
- * Si TST inconnu : jamais de faux « X h dormies ».
+ * Carte Accueil sommeil.
+ * Sheets toujours montés pour éviter remount/lock résiduel.
+ * Si durée dormie inconnue : jamais de faux « X h dormies ».
  */
 export function SleepSnapshot() {
   const [tick, setTick] = useState(0)
@@ -60,7 +60,9 @@ export function SleepSnapshot() {
 
           {snapshot.tstKnown ? (
             <>
-              <p className="text-[28px] font-black tracking-tight text-white">{snapshot.tstLabel}</p>
+              <p className="text-[28px] font-black tracking-tight text-white">
+                {snapshot.tstLabel} dormies
+              </p>
               <p
                 className={`mt-1 text-[14px] font-semibold ${
                   snapshot.statusKey === 'optimal'
@@ -74,7 +76,9 @@ export function SleepSnapshot() {
                 {snapshot.statusLabel}
               </p>
               {snapshot.tibLabel && (
-                <p className="mt-1 text-[13px] text-[#8E8E93]">{snapshot.tibLabel} au lit</p>
+                <p className="mt-1 text-[13px] text-[#8E8E93]">
+                  {snapshot.tibLabel} passées au lit
+                </p>
               )}
             </>
           ) : (
@@ -83,7 +87,7 @@ export function SleepSnapshot() {
                 {snapshot.tibLabel ? `${snapshot.tibLabel} au lit` : '—'}
               </p>
               <p className="mt-1 text-[14px] font-semibold text-[#AEAEB2]">
-                Temps réellement dormi : inconnu
+                Durée de sommeil : inconnue
               </p>
             </>
           )}
@@ -99,7 +103,8 @@ export function SleepSnapshot() {
 
           {snapshot.insufficientHistory && (
             <p className="mt-3 text-[12px] text-[#636366]">
-              Historique encore limité pour la régularité — ce n&apos;est pas un mauvais résultat.
+              Encore peu de nuits enregistrées pour voir si tes horaires sont stables — ce n&apos;est
+              pas un mauvais signe.
             </p>
           )}
 
