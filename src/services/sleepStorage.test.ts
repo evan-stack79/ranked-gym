@@ -210,4 +210,19 @@ describe('sleepEngineAdapter', () => {
     // Catch-up ne doit pas traiter null comme 0 h dormies
     expect(snap.engine?.metrics.catchUp.workdayAverageTstHours).not.toBe(0)
   })
+
+  it('recommandations Accueil sans jargon TST/TIB', async () => {
+    const { saveSleepNight } = await import('./sleepStorage')
+    const { getSleepHomeSnapshot } = await import('./sleepEngineAdapter')
+
+    saveSleepNight(
+      { bedtime: '23:00', waketime: '07:00', tstHours: 8, dateKey: '2026-08-25' },
+      { skipCloud: true },
+    )
+    const snap = getSleepHomeSnapshot()
+    const allCopy = [...snap.recommendations, ...snap.warnings].join(' ')
+    expect(allCopy).not.toMatch(/\bTST\b/)
+    expect(allCopy).not.toMatch(/\bTIB\b/)
+    expect(allCopy).not.toMatch(/circadien/i)
+  })
 })
