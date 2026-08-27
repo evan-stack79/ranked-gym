@@ -15,11 +15,22 @@ import {
   ensureProfile,
   fetchProfile,
   mapSessionUser,
+  requestPasswordReset as apiRequestPasswordReset,
   signInWithEmail as apiSignInWithEmail,
   signOut as apiSignOut,
+  updatePassword as apiUpdatePassword,
   updateProfileProgress,
   type AuthUser,
 } from '../services/authService'
+import {
+  friendlyAuthError,
+  isAccountEnumerationError,
+  validateNewPassword,
+} from '../utils/authErrors'
+import {
+  getPasswordRecoveryRedirectTo,
+  PASSWORD_RESET_SENT_MESSAGE,
+} from '../utils/authRedirect'
 import {
   hydrateCloudBackupForUser,
   resetCloudBackupHydration,
@@ -74,6 +85,12 @@ interface AuthContextValue {
   requireAuth: (onSuccess: AuthSuccessCallback) => void
   signInWithEmail: (email: string, password: string) => Promise<void>
   signUpWithEmail: (email: string, password: string, pseudo?: string, discipline?: string) => Promise<void>
+  /** True after PASSWORD_RECOVERY until the new password is saved. */
+  isPasswordRecovery: boolean
+  authInfo: string | null
+  clearAuthMessages: () => void
+  requestPasswordReset: (email: string) => Promise<void>
+  confirmPasswordRecovery: (password: string, confirmPassword: string) => Promise<void>
   updateDiscipline: (disciplineLabel: string) => Promise<void>
   updateGhostMode: (enabled: boolean) => Promise<void>
   signOut: () => Promise<void>
@@ -81,24 +98,6 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-function friendlyAuthError(err: unknown, fallback: string): string {
-  const raw = err instanceof Error ? err.message : String(err)
-  const lower = raw.toLowerCase()
-
-  if (lower.includes('invalid login credentials')) {
-    return 'Email ou mot de passe incorrect.'
-  }
-  if (lower.includes('user already registered')) {
-    return 'Cet email est déjà utilisé. Passe sur Connexion.'
-  }
-  if (lower.includes('password') && lower.includes('6')) {
-    return 'Le mot de passe doit contenir au moins 6 caractères.'
-  }
-  if (lower.includes('email')) {
-    return raw
-  }
-  return raw || fallback
-}
 
 const HYDRATE_TIMEOUT_MS = 20_000
 
@@ -133,6 +132,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthOpen, setIsAuthOpen] = useState(false)
   const [authLoading, setAuthLoading] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
+  const [authInfo, setAuthInfo] = useState<string | null>(null)
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
   const [streakWeekBonus, setStreakWeekBonus] = useState<StreakWeekBonus | null>(null)
   const pendingRef = useRef<AuthSuccessCallback | null>(null)
   const hydrateGenRef = useRef(0)
@@ -264,13 +265,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (nextSession?.user) {
         const mapped = mapSessionUser(nextSession.user)
         setUser(mapped)
-        if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'PASSWORD_RECOVERY') {
+        if (event === 'PASSWORD_RECOVERY') {
+          setIsPasswordRecovery(true)
+          setAuthError(null)
+          setAuthInfo(null)
+          setIsAuthOpen(true)
+          void hydrateUser(mapped, metaDisciplineOf(nextSession.user))
+        } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
           void hydrateUser(mapped, metaDisciplineOf(nextSession.user))
         }
       } else {
         hydrateGenRef.current += 1
         setUser(null)
         setProfile(null)
+        setIsPasswordRecovery(false)
         resetCloudBackupHydration()
         setIsLoading(false)
       }
@@ -300,11 +308,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const closeAuth = useCallback(() => {
     // Bêta privée : pas de fermeture tant qu’il n’y a pas de session Supabase.
     if (!session?.user) return
+    // Recovery : il faut enregistrer le nouveau mot de passe.
+    if (isPasswordRecovery) return
     setIsAuthOpen(false)
     setAuthError(null)
+    setAuthInfo(null)
     pendingRef.current = null
     setAuthLoading(false)
-  }, [session])
+  }, [session, isPasswordRecovery])
 
   const requireAuth = useCallback(
     (onSuccess: AuthSuccessCallback) => {
@@ -343,6 +354,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         'Bêta fermée. Les inscriptions publiques sont actuellement désactivées.',
       )
       setAuthLoading(false)
+    },
+    [],
+  )
+
+  const clearAuthMessages = useCallback(() => {
+    setAuthError(null)
+    setAuthInfo(null)
+  }, [])
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    if (!isSupabaseConfigured()) {
+      setAuthError(getSupabaseConfigError())
+      return
+    }
+    setAuthLoading(true)
+    setAuthError(null)
+    setAuthInfo(null)
+    try {
+      const redirectTo = getPasswordRecoveryRedirectTo()
+      await apiRequestPasswordReset(email, redirectTo)
+      setAuthInfo(PASSWORD_RESET_SENT_MESSAGE)
+    } catch (err) {
+      if (isAccountEnumerationError(err)) {
+        setAuthInfo(PASSWORD_RESET_SENT_MESSAGE)
+      } else {
+        setAuthError(friendlyAuthError(err, 'Envoi impossible. Réessaie plus tard.'))
+      }
+    } finally {
+      setAuthLoading(false)
+    }
+  }, [])
+
+  const confirmPasswordRecovery = useCallback(
+    async (password: string, confirmPassword: string) => {
+      if (!isSupabaseConfigured()) {
+        setAuthError(getSupabaseConfigError())
+        return
+      }
+      const validationError = validateNewPassword(password, confirmPassword)
+      if (validationError) {
+        setAuthError(validationError)
+        return
+      }
+      setAuthLoading(true)
+      setAuthError(null)
+      setAuthInfo(null)
+      try {
+        await apiUpdatePassword(password)
+        setIsPasswordRecovery(false)
+        setAuthInfo('Mot de passe mis à jour. Tu es connecté.')
+        window.setTimeout(() => {
+          setIsAuthOpen(false)
+          setAuthInfo(null)
+          pendingRef.current = null
+        }, 900)
+      } catch (err) {
+        setAuthError(friendlyAuthError(err, 'Impossible d’enregistrer le mot de passe.'))
+      } finally {
+        setAuthLoading(false)
+      }
     },
     [],
   )
@@ -391,6 +462,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     setProfile(null)
     setStreakWeekBonus(null)
+    setIsPasswordRecovery(false)
+    setAuthInfo(null)
+    setAuthError(null)
     setIsLoading(false)
   }, [])
 
@@ -412,6 +486,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requireAuth,
       signInWithEmail,
       signUpWithEmail: signUpEmail,
+      isPasswordRecovery,
+      authInfo,
+      clearAuthMessages,
+      requestPasswordReset,
+      confirmPasswordRecovery,
       updateDiscipline,
       updateGhostMode,
       signOut,
@@ -433,6 +512,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requireAuth,
       signInWithEmail,
       signUpEmail,
+      isPasswordRecovery,
+      authInfo,
+      clearAuthMessages,
+      requestPasswordReset,
+      confirmPasswordRecovery,
       updateDiscipline,
       updateGhostMode,
       signOut,
