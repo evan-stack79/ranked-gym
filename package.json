@@ -15,7 +15,8 @@
     "deploy:cloudflare": "npm run build && npm run deploy",
     "cap:sync": "npm run build && npx cap sync",
     "cap:open:ios": "npx cap open ios",
-    "cap:open:android": "npx cap open android"
+    "cap:open:android": "npx cap open android",
+    "brand:assets": "node scripts/generate-brand-assets.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.0",
