@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { BrandMark } from '../brand/BrandMark'
 import { BottomNav } from './BottomNav'
 import { RestTimerOverlay, REST_BAR_CONTENT_PAD } from '../training/RestTimerOverlay'
 import {
@@ -59,9 +60,7 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
             className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"
             style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
           >
-            <span className="text-[17px] font-semibold tracking-tight text-white">
-              Ranked <span className="text-[#FF2B2B]">Gym</span>
-            </span>
+            <BrandMark variant="compact" />
           </div>
         </header>
       ) : null}

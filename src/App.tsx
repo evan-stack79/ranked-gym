@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { RestTimerProvider } from './context/RestTimerContext'
 import { AuthBottomSheet } from './components/auth/AuthBottomSheet'
@@ -51,26 +51,55 @@ function renderActiveView(
   }
 }
 
-function AuthGateShell() {
+/** Shell minimal (boot / gate). `showBrandHeader` défaut = comportement historique. */
+function SessionChrome({
+  showBrandHeader = true,
+  children,
+}: {
+  showBrandHeader?: boolean
+  children: ReactNode
+}) {
   return (
     <div className="relative flex min-h-[100dvh] flex-col mesh-bg font-sans">
-      <header
-        className="glass-bar sticky top-0 z-40 border-b border-white/5"
-        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+      {showBrandHeader ? (
+        <header
+          className="glass-bar sticky top-0 z-40 border-b border-white/5"
+          style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+        >
+          <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-3">
+            <span className="text-[17px] font-semibold tracking-tight text-white">
+              Ranked <span className="text-[#FF2B2B]">Gym</span>
+            </span>
+          </div>
+        </header>
+      ) : null}
+      <main
+        className="relative z-10 mx-auto w-full max-w-lg flex-1 px-5 py-8"
+        style={
+          showBrandHeader
+            ? undefined
+            : {
+                // Compense le header masqué : safe area + air, sans bandeau vide.
+                paddingTop: 'max(2rem, calc(env(safe-area-inset-top, 0px) + 1rem))',
+              }
+        }
       >
-        <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-3">
-          <span className="text-[17px] font-semibold tracking-tight text-white">
-            Ranked <span className="text-[#FF2B2B]">Gym</span>
-          </span>
-        </div>
-      </header>
-      <main className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center gap-3 px-5 py-8 text-center">
+        {children}
+      </main>
+    </div>
+  )
+}
+
+function AuthGateShell() {
+  return (
+    <SessionChrome showBrandHeader>
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
         <p className="text-[22px] font-bold tracking-tight text-white">Bêta privée</p>
         <p className="max-w-sm text-[15px] leading-relaxed text-[#8E8E93]">
           Connexion requise. Accès sur invitation uniquement.
         </p>
-      </main>
-    </div>
+      </div>
+    </SessionChrome>
   )
 }
 
@@ -166,21 +195,9 @@ function AppShell() {
     return (
       <>
         <SupabaseConfigBanner />
-        <div className="relative flex min-h-[100dvh] flex-col mesh-bg font-sans">
-          <header
-            className="glass-bar sticky top-0 z-40 border-b border-white/5"
-            style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
-          >
-            <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-3">
-              <span className="text-[17px] font-semibold tracking-tight text-white">
-                Ranked <span className="text-[#FF2B2B]">Gym</span>
-              </span>
-            </div>
-          </header>
-          <main className="relative z-10 mx-auto w-full max-w-lg flex-1 px-5 py-8">
-            <AppBootScreen />
-          </main>
-        </div>
+        <SessionChrome showBrandHeader={false}>
+          <AppBootScreen />
+        </SessionChrome>
         <AuthBottomSheet />
       </>
     )
