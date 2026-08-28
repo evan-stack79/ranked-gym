@@ -28,6 +28,13 @@ const BRAND_RED_BRIGHT = { r: 0xff, g: 0x2b, b: 0x2b }
 
 const MASTER_CALM = path.join(root, 'src/assets/brand/panther-calm-crowned.png')
 const PUBLIC_DIR = path.join(root, 'public')
+const NATIVE_DIR = path.join(root, 'assets')
+/** Sources Capacitor Assets (`@capacitor/assets`) — 1024×1024. */
+const NATIVE_EXPORT_SIZE = 1024
+/** icon-only : panthère ~72–78 % du canvas. */
+const ICON_ONLY_SCALE = 0.75
+/** icon-foreground : sujet ~58–61 %, dans la safe zone 66/108. */
+const ICON_FOREGROUND_SCALE = 0.6
 /** Marque header compacte — fond transparent, cadrage serré (BrandMark compact uniquement). */
 const HEADER_MARK_FILENAME = 'brand-header-mark.png'
 /** Export raster header — affiché en CSS à 38×38 px. */
@@ -459,6 +466,81 @@ async function measureHeaderFill(outPath) {
   return Math.round((side / info.width) * 100)
 }
 
+function clonePixelBuffer({ data, info }) {
+  return { data: Buffer.from(data), info }
+}
+
+/** icon-foreground.png — panthère transparente, centrée, safe zone Android. */
+async function writeNativeForeground(masterPixels, outPath) {
+  const { data, info } = clonePixelBuffer(masterPixels)
+  removeEdgeConnectedBackground(data, info.width, info.height)
+  lightenHeaderContours(data, info.width, info.height)
+  removeDarkFringe(data, info.width, info.height)
+  const crop = computeHeaderCropBox(data, info.width, info.height, 1)
+  const subjectSize = Math.round(NATIVE_EXPORT_SIZE * ICON_FOREGROUND_SCALE)
+  const offset = Math.round((NATIVE_EXPORT_SIZE - subjectSize) / 2)
+
+  const subject = await sharp(data, {
+    raw: { width: info.width, height: info.height, channels: 4 },
+  })
+    .extract(crop)
+    .resize(subjectSize, subjectSize, {
+      fit: 'fill',
+      kernel: sharp.kernel.lanczos3,
+    })
+    .png(PNG_OPTS)
+    .toBuffer()
+
+  await sharp({
+    create: {
+      width: NATIVE_EXPORT_SIZE,
+      height: NATIVE_EXPORT_SIZE,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite([{ input: subject, left: offset, top: offset }])
+    .png(PNG_OPTS)
+    .toFile(outPath)
+
+  const fillPct = await measureHeaderFill(outPath)
+  console.log(
+    `  ✓ ${path.relative(root, outPath)} (${NATIVE_EXPORT_SIZE}×${NATIVE_EXPORT_SIZE}, fill ~${fillPct}%, transparent)`,
+  )
+}
+
+/** Sources natives Capacitor : icon-only / icon-foreground / icon-background. */
+async function writeNativeSources(masterBuffer, headerMasterPixels) {
+  await mkdir(NATIVE_DIR, { recursive: true })
+
+  const iconOnlyPath = path.join(NATIVE_DIR, 'icon-only.png')
+  await writeSquareIcon(masterBuffer, NATIVE_EXPORT_SIZE, iconOnlyPath, {
+    contentScale: ICON_ONLY_SCALE,
+  })
+  const iconOnlyOpaque = await sharp(iconOnlyPath).removeAlpha().png(PNG_OPTS).toBuffer()
+  await writeFile(iconOnlyPath, iconOnlyOpaque)
+
+  const iconBackgroundPath = path.join(NATIVE_DIR, 'icon-background.png')
+  await sharp({
+    create: {
+      width: NATIVE_EXPORT_SIZE,
+      height: NATIVE_EXPORT_SIZE,
+      channels: 3,
+      background: BRAND_BG,
+    },
+  })
+    .png(PNG_OPTS)
+    .toFile(iconBackgroundPath)
+  console.log(
+    `  ✓ ${path.relative(root, iconBackgroundPath)} (${NATIVE_EXPORT_SIZE}×${NATIVE_EXPORT_SIZE}, #0C0C0E opaque)`,
+  )
+
+  await writeNativeForeground(
+    headerMasterPixels,
+    path.join(NATIVE_DIR, 'icon-foreground.png'),
+  )
+}
+
 async function writeSquareIcon(masterBuffer, size, outPath, { contentScale = 1 } = {}) {
   const inner = Math.max(1, Math.round(size * contentScale))
   const logo = await sharp(masterBuffer)
@@ -496,6 +578,7 @@ async function main() {
   const headerMasterPixels = await loadProcessedMasterPixels({ opaqueProductBackground: false })
 
   await writeHeaderMark(headerMasterPixels)
+  await writeNativeSources(masterBuffer, headerMasterPixels)
 
   await writeSquareIcon(masterBuffer, 180, path.join(PUBLIC_DIR, 'icon.png'), {
     contentScale: 0.92,

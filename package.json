@@ -16,7 +16,8 @@
     "cap:sync": "npm run build && npx cap sync",
     "cap:open:ios": "npx cap open ios",
     "cap:open:android": "npx cap open android",
-    "brand:assets": "node scripts/generate-brand-assets.mjs"
+    "brand:assets": "node scripts/generate-brand-assets.mjs",
+    "brand:native": "npm run brand:assets && npx capacitor-assets generate --ios && npx capacitor-assets generate --android"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.0",
@@ -28,6 +29,7 @@
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.0",
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.5.0",
     "@capacitor/ios": "^8.5.0",
     "@tailwindcss/vite": "^4.3.3",
