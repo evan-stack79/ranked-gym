@@ -15,7 +15,7 @@ interface HomeViewProps {
 
 /**
  * Accueil = dashboard quotidien.
- * Ordre : Sommeil → Séance → Nutrition → Alertes (si besoin).
+ * Ordre : Nutrition (calories + eau) → Séance → Sommeil → Série → Alertes (si besoin).
  * Ghost mode / Lobby / feed social : hors nav principale (infra conservée).
  */
 export function HomeView({ onStartTraining, onOpenTraining }: HomeViewProps) {
@@ -52,14 +52,13 @@ export function HomeView({ onStartTraining, onOpenTraining }: HomeViewProps) {
 
   return (
     <div className="flex flex-col gap-8">
-      <header className="flex flex-col gap-4">
+      <header>
         <h1 className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white">
           {greeting}
         </h1>
-        <DailyStreak />
       </header>
 
-      <SleepSnapshot />
+      <NutritionSnapshot />
 
       <TodayWorkoutCard
         workout={todayWorkout}
@@ -69,7 +68,9 @@ export function HomeView({ onStartTraining, onOpenTraining }: HomeViewProps) {
         onOpenNotebook={onOpenTraining}
       />
 
-      <NutritionSnapshot />
+      <SleepSnapshot />
+
+      <DailyStreak />
 
       {/* Alertes : uniquement si un signal produit le justifie (aucune alerte permanente). */}
     </div>
