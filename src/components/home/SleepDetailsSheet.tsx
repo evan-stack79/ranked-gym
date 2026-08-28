@@ -16,6 +16,21 @@ export function SleepDetailsSheet({
 }: SleepDetailsSheetProps) {
   const engine = snapshot.engine
 
+  const tonightBlock =
+    snapshot.tonightHint && snapshot.hasData ? (
+      <div className="rounded-2xl border border-white/8 bg-black/25 p-3.5">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+          Ce soir
+        </p>
+        <p className="mt-1 text-[14px] leading-snug text-[#E5E5EA]">{snapshot.tonightHint}</p>
+        {snapshot.tonightBedtimeLabel ? (
+          <p className="mt-1 text-[12px] text-[#8E8E93]">
+            Coucher suggéré : {snapshot.tonightBedtimeLabel}
+          </p>
+        ) : null}
+      </div>
+    ) : null
+
   return (
     <IosSheet open={open} onClose={onClose} title="Ta nuit" subtitle="Ce qu’on peut en dire">
       <div className="space-y-4 pb-3">
@@ -60,6 +75,15 @@ export function SleepDetailsSheet({
                 </ul>
               </div>
             )}
+
+            {snapshot.insufficientHistory && (
+              <p className="text-[13px] leading-relaxed text-[#AEAEB2]">
+                Encore peu de nuits enregistrées pour voir si tes horaires sont stables — ce
+                n&apos;est pas un mauvais signe.
+              </p>
+            )}
+
+            {tonightBlock}
           </>
         ) : (
           <>
@@ -161,6 +185,8 @@ export function SleepDetailsSheet({
                 </ul>
               </div>
             )}
+
+            {tonightBlock}
           </>
         )}
 
