@@ -99,6 +99,7 @@ describe('getTodayWorkout — pas de suggestion coach', () => {
     const plan = getTodayWorkout(state, new Date('2026-08-25T12:00:00'))
     expect(plan?.title).toBe('Push')
     expect(plan?.exerciseCount).toBe(1)
+    expect(plan?.canStart).toBe(true)
     expect(plan?.source).toBe('schedule')
   })
 })

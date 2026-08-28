@@ -7,6 +7,8 @@ export interface TodayWorkoutPlan {
   accent: string
   source: 'schedule'
   exerciseCount: number
+  /** Routine présente dans le carnet avec au moins un exercice — seul cas « Démarrer ». */
+  canStart: boolean
 }
 
 const TEMPLATE_TO_ROUTINE: Record<string, string> = {
@@ -53,12 +55,16 @@ export function getTodayWorkout(
 
   const routineId = resolveRoutineId(scheduled.templateId)
   const routine = state.routines.find((r) => r.id === routineId)
+  const exerciseCount = routine?.exercises.length ?? 0
+  const canStart = Boolean(routine && exerciseCount > 0)
+
   return {
     routineId,
     title: scheduled.title,
     subtitle: routine?.subtitle ?? 'Programme du jour',
     accent: routine?.accent ?? '#FF2B2B',
     source: 'schedule',
-    exerciseCount: routine?.exercises.length ?? 0,
+    exerciseCount,
+    canStart,
   }
 }

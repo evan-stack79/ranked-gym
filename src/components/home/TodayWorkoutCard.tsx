@@ -59,7 +59,7 @@ export function TodayWorkoutCard({ workout, onStart, onOpenNotebook }: TodayWork
           <p className="ios-label">Entraînement</p>
           <h2 className="mt-1 text-[22px] font-black tracking-tight text-white">{workout.title}</h2>
           <p className="mt-1 text-[15px] font-medium text-[#FF9F0A]">
-            {workout.exerciseCount > 0
+            {workout.canStart
               ? `${workout.exerciseCount} exercice${workout.exerciseCount > 1 ? 's' : ''}`
               : 'Séance planifiée'}
           </p>
@@ -68,12 +68,23 @@ export function TodayWorkoutCard({ workout, onStart, onOpenNotebook }: TodayWork
       </div>
 
       <div className="relative mt-5">
-        <NeonButton onClick={onStart} variant="primary" className="py-3.5 text-[16px]">
-          <span className="flex items-center justify-center gap-2 font-bold">
-            <Play className="h-5 w-5 fill-current" />
-            Démarrer
-          </span>
-        </NeonButton>
+        {workout.canStart ? (
+          <NeonButton onClick={onStart} variant="primary" className="py-3.5 text-[16px]">
+            <span className="flex items-center justify-center gap-2 font-bold">
+              <Play className="h-5 w-5 fill-current" />
+              Démarrer
+            </span>
+          </NeonButton>
+        ) : (
+          <button
+            type="button"
+            onClick={onOpenNotebook}
+            className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-white/12 bg-white/5 px-4 py-3.5 text-[16px] font-semibold text-white"
+          >
+            <NotebookPen className="h-5 w-5" />
+            Ouvrir Train
+          </button>
+        )}
       </div>
     </section>
   )

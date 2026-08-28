@@ -63,7 +63,7 @@ export function HomeView({ onStartTraining, onOpenTraining }: HomeViewProps) {
       <TodayWorkoutCard
         workout={todayWorkout}
         onStart={() => {
-          if (todayWorkout) onStartTraining(todayWorkout.routineId)
+          if (todayWorkout?.canStart) onStartTraining(todayWorkout.routineId)
         }}
         onOpenNotebook={onOpenTraining}
       />
