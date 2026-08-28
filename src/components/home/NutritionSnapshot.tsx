@@ -1,8 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Leaf } from 'lucide-react'
 import { getNutritionTarget } from '../../services/nutritionActivity'
 import { getCalorieProfile, getTodayJournal, getTodayWaterMl } from '../../services/nutritionStorage'
 import { getDailyWaterGoalMl, isTrainingDayToday } from '../../utils/waterGoal'
+import {
+  canSubmitHomeQuickWater,
+  HOME_QUICK_WATER_ML,
+  shouldShowHomeQuickWaterButton,
+  tryAddHomeQuickWater,
+} from '../../utils/homeNutritionQuickActions'
 import { HydrationProgressBar } from '../nutrition/HydrationProgressBar'
 import { IconBadge } from '../ui/IconBadge'
 
@@ -38,8 +44,17 @@ function MacroPill({
   )
 }
 
-export function NutritionSnapshot() {
+interface NutritionSnapshotProps {
+  onOpenNutrition?: () => void
+}
+
+export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
   const [tick, setTick] = useState(0)
+  const [waterSaving, setWaterSaving] = useState(false)
+  const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' } | null>(
+    null,
+  )
+  const toastTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     const sync = () => setTick((n) => n + 1)
@@ -54,7 +69,21 @@ export function NutritionSnapshot() {
       window.removeEventListener('ranked-gym:water-changed', sync)
       window.removeEventListener('ranked-gym:training-changed', sync)
       window.removeEventListener('focus', sync)
+      if (toastTimerRef.current != null) {
+        window.clearTimeout(toastTimerRef.current)
+      }
     }
+  }, [])
+
+  const showToast = useCallback((message: string, variant: 'success' | 'error' = 'success') => {
+    setToast({ message, variant })
+    if (toastTimerRef.current != null) {
+      window.clearTimeout(toastTimerRef.current)
+    }
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast(null)
+      toastTimerRef.current = null
+    }, 2600)
   }, [])
 
   const snapshot = useMemo(() => {
@@ -77,6 +106,7 @@ export function NutritionSnapshot() {
     const targetCalories = nutrition.targetCalories
     const remainingCalories = Math.max(0, targetCalories - totals.calories)
     const progress = targetCalories > 0 ? Math.min(totals.calories / targetCalories, 1) : 0
+    const showQuickWater = shouldShowHomeQuickWaterButton(waterMl, waterGoalMl)
 
     return {
       onboardingComplete: nutrition.profile.onboardingComplete,
@@ -90,8 +120,22 @@ export function NutritionSnapshot() {
       waterMl,
       waterGoalMl,
       isTrainingDay,
+      showQuickWater,
     }
   }, [tick])
+
+  const handleQuickWater = () => {
+    if (!canSubmitHomeQuickWater(waterSaving)) return
+    setWaterSaving(true)
+    const result = tryAddHomeQuickWater()
+    setWaterSaving(false)
+    if (result.ok) {
+      setTick((n) => n + 1)
+      showToast(`${HOME_QUICK_WATER_ML} ml ajoutés`)
+      return
+    }
+    showToast(result.message, 'error')
+  }
 
   if (!snapshot.onboardingComplete) {
     return (
@@ -138,10 +182,48 @@ export function NutritionSnapshot() {
       <HydrationProgressBar
         className="mb-3"
         compact
+        showGoalReachedNote={false}
         consumedMl={snapshot.waterMl}
         goalMl={snapshot.waterGoalMl}
         isTrainingDay={snapshot.isTrainingDay}
       />
+
+      <div className="mb-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onOpenNutrition}
+          disabled={!onOpenNutrition}
+          className="ios-press min-h-11 flex-1 rounded-2xl border border-[#34C759]/35 bg-[#34C759]/12 px-3 py-2.5 text-[14px] font-semibold text-[#30D158] disabled:opacity-50"
+        >
+          Ajouter un repas
+        </button>
+        {snapshot.showQuickWater ? (
+          <button
+            type="button"
+            onClick={handleQuickWater}
+            disabled={!canSubmitHomeQuickWater(waterSaving)}
+            aria-label="J'ai bu 250 ml"
+            className="ios-press min-h-11 shrink-0 rounded-2xl border border-cyan-400/25 bg-cyan-400/10 px-4 py-2.5 text-[14px] font-semibold text-[#67E8F9] disabled:opacity-50"
+          >
+            +250 ml
+          </button>
+        ) : (
+          <span className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border border-cyan-400/15 bg-cyan-400/[0.06] px-3 text-[13px] font-semibold text-[#7DD3FC]">
+            Objectif atteint
+          </span>
+        )}
+      </div>
+
+      {toast ? (
+        <p
+          className={`mb-3 text-center text-[12px] font-medium ${
+            toast.variant === 'error' ? 'text-[#FF6961]' : 'text-[#30D158]'
+          }`}
+          role={toast.variant === 'error' ? 'alert' : 'status'}
+        >
+          {toast.message}
+        </p>
+      ) : null}
 
       <div className="flex gap-3">
         <MacroPill

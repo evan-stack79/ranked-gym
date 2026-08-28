@@ -11,6 +11,7 @@ import { SleepSnapshot } from './SleepSnapshot'
 interface HomeViewProps {
   onStartTraining: (routineId: string) => void
   onOpenTraining: () => void
+  onOpenNutrition: () => void
 }
 
 /**
@@ -18,7 +19,7 @@ interface HomeViewProps {
  * Ordre : Nutrition (calories + eau) → Séance → Sommeil → Série → Alertes (si besoin).
  * Ghost mode / Lobby / feed social : hors nav principale (infra conservée).
  */
-export function HomeView({ onStartTraining, onOpenTraining }: HomeViewProps) {
+export function HomeView({ onStartTraining, onOpenTraining, onOpenNutrition }: HomeViewProps) {
   const { user, profile } = useAuth()
   const [trainingTick, setTrainingTick] = useState(0)
 
@@ -58,7 +59,7 @@ export function HomeView({ onStartTraining, onOpenTraining }: HomeViewProps) {
         </h1>
       </header>
 
-      <NutritionSnapshot />
+      <NutritionSnapshot onOpenNutrition={onOpenNutrition} />
 
       <TodayWorkoutCard
         workout={todayWorkout}

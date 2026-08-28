@@ -29,13 +29,20 @@ function renderActiveView(
   tab: TabId,
   onStartTraining: (routineId: string) => void,
   onOpenTraining: () => void,
+  onOpenNutrition: () => void,
   launchRoutineId: string | null,
   onLaunchConsumed: () => void,
   onAfterSession: () => void,
 ) {
   switch (tab) {
     case 'home':
-      return <HomeView onStartTraining={onStartTraining} onOpenTraining={onOpenTraining} />
+      return (
+        <HomeView
+          onStartTraining={onStartTraining}
+          onOpenTraining={onOpenTraining}
+          onOpenNutrition={onOpenNutrition}
+        />
+      )
     case 'training':
       return (
         <TrainingView
@@ -182,6 +189,14 @@ function AppShell() {
     setActiveTab('training')
   }
 
+  const handleOpenNutrition = () => {
+    if (!isAuthenticated) {
+      openAuth()
+      return
+    }
+    setActiveTab('nutrition')
+  }
+
   const handleLaunchConsumed = () => {
     setLaunchRoutineId(null)
   }
@@ -231,6 +246,7 @@ function AppShell() {
           activeTab,
           handleStartTraining,
           handleOpenTraining,
+          handleOpenNutrition,
           launchRoutineId,
           handleLaunchConsumed,
           () => setActiveTab('home'),
