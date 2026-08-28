@@ -1,48 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Leaf } from 'lucide-react'
 import { getNutritionTarget } from '../../services/nutritionActivity'
 import { getCalorieProfile, getTodayJournal, getTodayWaterMl } from '../../services/nutritionStorage'
-import { getDailyWaterGoalMl, isTrainingDayToday } from '../../utils/waterGoal'
+import { formatWaterMl, getDailyWaterGoalMl, isTrainingDayToday } from '../../utils/waterGoal'
 import {
   canSubmitHomeQuickWater,
   HOME_QUICK_WATER_ML,
   shouldShowHomeQuickWaterButton,
   tryAddHomeQuickWater,
 } from '../../utils/homeNutritionQuickActions'
-import { HydrationProgressBar } from '../nutrition/HydrationProgressBar'
-import { IconBadge } from '../ui/IconBadge'
-
-function MacroPill({
-  label,
-  current,
-  target,
-  color,
-}: {
-  label: string
-  current: number
-  target: number
-  color: string
-}) {
-  const ratio = target > 0 ? Math.min(current / target, 1) : 0
-  const remaining = Math.max(0, target - current)
-
-  return (
-    <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
-      <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color }}>
-        {label}
-      </span>
-      <div className="h-1 w-full overflow-hidden rounded-full bg-white/10">
-        <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${ratio * 100}%`, backgroundColor: color }}
-        />
-      </div>
-      <span className="text-[11px] font-semibold text-[#AEAEB2]">
-        {remaining > 0 ? `${Math.round(remaining)}g` : 'OK'}
-      </span>
-    </div>
-  )
-}
 
 interface NutritionSnapshotProps {
   onOpenNutrition?: () => void
@@ -93,34 +58,34 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
     const waterMl = getTodayWaterMl()
     const isTrainingDay = isTrainingDayToday()
     const waterGoalMl = getDailyWaterGoalMl(profile.weightKg, isTrainingDay)
-    const totals = meals.reduce(
-      (acc, meal) => ({
-        calories: acc.calories + meal.calories,
-        protein: acc.protein + (meal.proteinG ?? 0),
-        carbs: acc.carbs + (meal.carbsG ?? 0),
-        fat: acc.fat + (meal.fatG ?? 0),
-      }),
-      { calories: 0, protein: 0, carbs: 0, fat: 0 },
-    )
+    const consumedCalories = meals.reduce((sum, meal) => sum + meal.calories, 0)
 
     const targetCalories = nutrition.targetCalories
-    const remainingCalories = Math.max(0, targetCalories - totals.calories)
-    const progress = targetCalories > 0 ? Math.min(totals.calories / targetCalories, 1) : 0
+    const targetAvailable = nutrition.engineOk && targetCalories > 0
+    const remainingCalories = targetAvailable
+      ? Math.max(0, targetCalories - consumedCalories)
+      : 0
+    const progress =
+      targetAvailable && targetCalories > 0
+        ? Math.min(consumedCalories / targetCalories, 1)
+        : 0
+    const waterProgress =
+      waterGoalMl > 0 ? Math.min(Math.max(0, waterMl) / waterGoalMl, 1) : 0
     const showQuickWater = shouldShowHomeQuickWaterButton(waterMl, waterGoalMl)
+    const waterGoalReached = waterMl >= waterGoalMl
 
     return {
       onboardingComplete: nutrition.profile.onboardingComplete,
+      targetAvailable,
       targetCalories,
       remainingCalories,
+      consumedCalories,
       progress,
-      proteinTarget: nutrition.proteinG,
-      carbsTarget: nutrition.carbsG,
-      fatTarget: nutrition.fatG,
-      totals,
       waterMl,
       waterGoalMl,
-      isTrainingDay,
+      waterProgress,
       showQuickWater,
+      waterGoalReached,
     }
   }, [tick])
 
@@ -139,112 +104,114 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
 
   if (!snapshot.onboardingComplete) {
     return (
-      <section className="glass-card rounded-2xl p-4">
-        <div className="flex items-center gap-3">
-          <IconBadge icon={Leaf} variant="green" size="sm" />
-          <div>
-            <p className="text-[13px] font-semibold text-white">Nutrition</p>
-            <p className="text-[12px] text-[#8E8E93]">
-              Configure ton plan dans l&apos;onglet Nutri pour voir ton snapshot.
-            </p>
-          </div>
-        </div>
+      <section className="glass-card rounded-2xl p-4" aria-label="Nutrition">
+        <p className="text-[11px] font-medium text-[#8E8E93]">Nutrition</p>
+        <p className="mt-2 text-[14px] leading-snug text-[#AEAEB2]">
+          Configure ton plan dans l&apos;onglet Nutri pour voir ton suivi.
+        </p>
       </section>
     )
   }
 
   return (
-    <section className="glass-card rounded-2xl p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <IconBadge icon={Leaf} variant="green" size="sm" />
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-              Nutrition
+    <section className="glass-card rounded-2xl p-4" aria-label="Nutrition du jour">
+      <div>
+        <p className="text-[11px] font-medium text-[#8E8E93]">Aujourd&apos;hui</p>
+        {snapshot.targetAvailable ? (
+          <>
+            <p className="mt-1 text-[22px] font-bold leading-tight tracking-tight text-white">
+              Il te reste {snapshot.remainingCalories.toLocaleString('fr-FR')} kcal
             </p>
-            <p className="text-[15px] font-bold text-white">
-              {snapshot.remainingCalories.toLocaleString('fr-FR')} kcal restantes
+            <p className="mt-1 text-[13px] text-[#AEAEB2]">
+              {Math.round(snapshot.consumedCalories).toLocaleString('fr-FR')} consommées sur{' '}
+              {snapshot.targetCalories.toLocaleString('fr-FR')}
             </p>
+          </>
+        ) : (
+          <>
+            <p className="mt-1 text-[17px] font-semibold text-white">Objectif indisponible</p>
+            <p className="mt-1 text-[13px] text-[#AEAEB2]">Ouvre Nutri pour vérifier ton plan.</p>
+          </>
+        )}
+
+        {snapshot.targetAvailable ? (
+          <div
+            className="mt-3 h-1 overflow-hidden rounded-full bg-white/10"
+            role="progressbar"
+            aria-valuenow={Math.round(snapshot.progress * 100)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Progression calorique"
+          >
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[#B91C1C] to-[#FF2B2B] transition-all duration-500"
+              style={{ width: `${snapshot.progress * 100}%` }}
+            />
           </div>
-        </div>
-        <span className="text-[12px] text-[#636366]">
-          {Math.round(snapshot.totals.calories)} / {snapshot.targetCalories}
-        </span>
-      </div>
+        ) : null}
 
-      <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-white/10">
-        <div
-          className="h-full rounded-full bg-gradient-to-r from-[#34C759] to-[#30D158] transition-all duration-500"
-          style={{ width: `${snapshot.progress * 100}%` }}
-        />
-      </div>
-
-      <HydrationProgressBar
-        className="mb-3"
-        compact
-        showGoalReachedNote={false}
-        consumedMl={snapshot.waterMl}
-        goalMl={snapshot.waterGoalMl}
-        isTrainingDay={snapshot.isTrainingDay}
-      />
-
-      <div className="mb-3 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={onOpenNutrition}
           disabled={!onOpenNutrition}
-          className="ios-press min-h-11 flex-1 rounded-2xl border border-[#34C759]/35 bg-[#34C759]/12 px-3 py-2.5 text-[14px] font-semibold text-[#30D158] disabled:opacity-50"
+          aria-label="Ajouter un repas"
+          className="btn-brand ios-press mt-4 min-h-11 w-full rounded-2xl border border-white/15 px-3 py-2.5 text-[14px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E] disabled:opacity-50"
         >
           Ajouter un repas
         </button>
-        {snapshot.showQuickWater ? (
-          <button
-            type="button"
-            onClick={handleQuickWater}
-            disabled={!canSubmitHomeQuickWater(waterSaving)}
-            aria-label="J'ai bu 250 ml"
-            className="ios-press min-h-11 shrink-0 rounded-2xl border border-cyan-400/25 bg-cyan-400/10 px-4 py-2.5 text-[14px] font-semibold text-[#67E8F9] disabled:opacity-50"
-          >
-            +250 ml
-          </button>
-        ) : (
-          <span className="flex min-h-11 flex-1 items-center justify-center rounded-2xl border border-cyan-400/15 bg-cyan-400/[0.06] px-3 text-[13px] font-semibold text-[#7DD3FC]">
-            Objectif atteint
-          </span>
-        )}
+      </div>
+
+      <div className="mt-4 border-t border-white/8 pt-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-medium text-[#8E8E93]">Eau</p>
+            {snapshot.waterGoalReached ? (
+              <p className="mt-0.5 text-[15px] font-semibold text-[#7DD3FC]">Objectif atteint</p>
+            ) : (
+              <p className="mt-0.5 text-[15px] font-semibold text-white">
+                {formatWaterMl(snapshot.waterMl)} sur {formatWaterMl(snapshot.waterGoalMl)}
+              </p>
+            )}
+            <div
+              className="mt-2 h-1 overflow-hidden rounded-full bg-white/10"
+              role="progressbar"
+              aria-valuenow={Math.round(snapshot.waterProgress * 100)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Progression hydrique"
+            >
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#0891B2] to-[#38BDF8] transition-all duration-500"
+                style={{ width: `${Math.min(snapshot.waterProgress * 100, 100)}%` }}
+              />
+            </div>
+          </div>
+
+          {snapshot.showQuickWater ? (
+            <button
+              type="button"
+              onClick={handleQuickWater}
+              disabled={!canSubmitHomeQuickWater(waterSaving)}
+              aria-label="J'ai bu 250 ml"
+              className="ios-press min-h-11 shrink-0 rounded-2xl border border-cyan-500/20 bg-cyan-500/8 px-3.5 py-2.5 text-[14px] font-semibold text-[#7DD3FC] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E] disabled:opacity-50"
+            >
+              +250 ml
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {toast ? (
         <p
-          className={`mb-3 text-center text-[12px] font-medium ${
+          className={`mt-3 text-center text-[12px] font-medium ${
             toast.variant === 'error' ? 'text-[#FF6961]' : 'text-[#30D158]'
           }`}
           role={toast.variant === 'error' ? 'alert' : 'status'}
+          aria-live={toast.variant === 'error' ? 'assertive' : 'polite'}
         >
           {toast.message}
         </p>
       ) : null}
-
-      <div className="flex gap-3">
-        <MacroPill
-          label="P"
-          current={snapshot.totals.protein}
-          target={snapshot.proteinTarget}
-          color="#FF6961"
-        />
-        <MacroPill
-          label="G"
-          current={snapshot.totals.carbs}
-          target={snapshot.carbsTarget}
-          color="#FFD60A"
-        />
-        <MacroPill
-          label="L"
-          current={snapshot.totals.fat}
-          target={snapshot.fatTarget}
-          color="#64D2FF"
-        />
-      </div>
     </section>
   )
 }
