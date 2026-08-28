@@ -28,6 +28,15 @@ const BRAND_RED_BRIGHT = { r: 0xff, g: 0x2b, b: 0x2b }
 
 const MASTER_CALM = path.join(root, 'src/assets/brand/panther-calm-crowned.png')
 const PUBLIC_DIR = path.join(root, 'public')
+/** Marque header compacte — fond transparent, cadrage serré (BrandMark compact uniquement). */
+const HEADER_MARK_FILENAME = 'brand-header-mark.png'
+/** Export raster header — affiché en CSS à 38×38 px. */
+const HEADER_MARK_EXPORT_SIZE = 192
+/** Tête ≈ 88–92 % du carré exporté (header 38 px). */
+const HEADER_HEAD_FILL = 0.9
+/** Contours silhouette — anthracite produit. */
+const ANTHRACITE_DARK = { r: 0x24, g: 0x24, b: 0x29 }
+const ANTHRACITE_MID = { r: 0x34, g: 0x34, b: 0x3c }
 
 /** Options PNG fixes → sorties bit-identique entre deux runs. */
 const PNG_OPTS = Object.freeze({
@@ -116,7 +125,10 @@ function normalizeRedPixel(r, g, b) {
  * Fond #0C0C0E + normalisation des rouges produit.
  * Masters sur disque : jamais écrits.
  */
-async function loadProcessedMasterBuffer() {
+/**
+ * Normalise les rouges du master ; optionnellement remplace le noir pur par le fond produit.
+ */
+async function loadProcessedMasterPixels({ opaqueProductBackground = true } = {}) {
   const { data, info } = await sharp(MASTER_CALM)
     .ensureAlpha()
     .raw()
@@ -129,7 +141,7 @@ async function loadProcessedMasterBuffer() {
     const a = data[i + 3]
 
     // Fond noir pur → fond produit (ne touche pas aux gris du museau)
-    if (r === 0 && g === 0 && b === 0) {
+    if (opaqueProductBackground && r === 0 && g === 0 && b === 0) {
       data[i] = BRAND_BG.r
       data[i + 1] = BRAND_BG.g
       data[i + 2] = BRAND_BG.b
@@ -146,11 +158,305 @@ async function loadProcessedMasterBuffer() {
     }
   }
 
+  return { data, info }
+}
+
+async function loadProcessedMasterBuffer() {
+  const { data, info } = await loadProcessedMasterPixels({ opaqueProductBackground: true })
   return sharp(data, {
     raw: { width: info.width, height: info.height, channels: 4 },
   })
     .png(PNG_OPTS)
     .toBuffer()
+}
+
+/**
+ * Pixel de fond extérieur : sombre, neutre, connecté aux bords.
+ * Les noirs/gris intérieurs de la panthère (non reliés au bord) restent opaques.
+ */
+function isExteriorBackgroundPixel(r, g, b) {
+  if (isBrandRedCandidate(r, g, b)) return false
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const delta = max - min
+  // Très sombre, quasi neutre — le fond master + #0C0C0E après remap PWA.
+  if (max > 24) return false
+  if (delta > 10) return false
+  return true
+}
+
+/**
+ * Flood-fill depuis les bords : seuls les pixels « fond » connectés aux bords deviennent transparents.
+ */
+function removeEdgeConnectedBackground(data, width, height) {
+  const total = width * height
+  const exterior = new Uint8Array(total)
+  const queue = new Int32Array(total)
+  let head = 0
+  let tail = 0
+
+  const tryEnqueue = (x, y) => {
+    const idx = y * width + x
+    if (exterior[idx]) return
+    const o = idx * 4
+    if (!isExteriorBackgroundPixel(data[o], data[o + 1], data[o + 2])) return
+    exterior[idx] = 1
+    queue[tail++] = idx
+  }
+
+  for (let x = 0; x < width; x++) {
+    tryEnqueue(x, 0)
+    tryEnqueue(x, height - 1)
+  }
+  for (let y = 1; y < height - 1; y++) {
+    tryEnqueue(0, y)
+    tryEnqueue(width - 1, y)
+  }
+
+  while (head < tail) {
+    const idx = queue[head++]
+    const x = idx % width
+    const y = (idx - x) / width
+    if (x > 0) tryEnqueue(x - 1, y)
+    if (x < width - 1) tryEnqueue(x + 1, y)
+    if (y > 0) tryEnqueue(x, y - 1)
+    if (y < height - 1) tryEnqueue(x, y + 1)
+  }
+
+  for (let idx = 0; idx < total; idx++) {
+    if (!exterior[idx]) continue
+    data[idx * 4 + 3] = 0
+  }
+}
+
+/** Cadrage header : tête ≈ HEADER_HEAD_FILL du carré, centré sur le sujet. */
+function computeHeaderCropBox(data, width, height, fillRatio = HEADER_HEAD_FILL) {
+  let minX = width
+  let minY = height
+  let maxX = -1
+  let maxY = -1
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const o = (y * width + x) * 4
+      if (data[o + 3] < 8) continue
+      if (x < minX) minX = x
+      if (y < minY) minY = y
+      if (x > maxX) maxX = x
+      if (y > maxY) maxY = y
+    }
+  }
+
+  if (maxX < 0) {
+    return { left: 0, top: 0, width, height }
+  }
+
+  const bw = maxX - minX + 1
+  const bh = maxY - minY + 1
+  const subjectSide = Math.max(bw, bh)
+  const side = Math.min(
+    width,
+    height,
+    Math.max(subjectSide, Math.round(subjectSide / fillRatio)),
+  )
+  const cx = (minX + maxX + 1) / 2
+  const cy = (minY + maxY + 1) / 2
+  let left = Math.round(cx - side / 2)
+  let top = Math.round(cy - side / 2)
+  if (left < 0) left = 0
+  if (top < 0) top = 0
+  if (left + side > width) left = width - side
+  if (top + side > height) top = height - side
+  return { left, top, width: side, height: side }
+}
+
+function isOpaquePixel(data, idx) {
+  return data[idx * 4 + 3] >= 8
+}
+
+function hasTransparentNeighbor(data, width, height, x, y) {
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue
+      const nx = x + dx
+      const ny = y + dy
+      if (nx < 0 || nx >= width || ny < 0 || ny >= height) return true
+      if (!isOpaquePixel(data, ny * width + nx)) return true
+    }
+  }
+  return false
+}
+
+/**
+ * Distance au bord transparent (0 = silhouette extérieure).
+ * Profondeur max 4 px — bande de contour à éclaircir.
+ */
+function computeSilhouetteDepth(data, width, height, maxDepth = 4) {
+  const total = width * height
+  const depth = new Int16Array(total).fill(-1)
+  const queue = new Int32Array(total)
+  let head = 0
+  let tail = 0
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = y * width + x
+      if (!isOpaquePixel(data, idx)) continue
+      if (hasTransparentNeighbor(data, width, height, x, y)) {
+        depth[idx] = 0
+        queue[tail++] = idx
+      }
+    }
+  }
+
+  while (head < tail) {
+    const idx = queue[head++]
+    if (depth[idx] >= maxDepth) continue
+    const x = idx % width
+    const y = (idx - x) / width
+    const next = depth[idx] + 1
+    if (x > 0) {
+      const n = idx - 1
+      if (depth[n] === -1 && isOpaquePixel(data, n)) {
+        depth[n] = next
+        queue[tail++] = n
+      }
+    }
+    if (x < width - 1) {
+      const n = idx + 1
+      if (depth[n] === -1 && isOpaquePixel(data, n)) {
+        depth[n] = next
+        queue[tail++] = n
+      }
+    }
+    if (y > 0) {
+      const n = idx - width
+      if (depth[n] === -1 && isOpaquePixel(data, n)) {
+        depth[n] = next
+        queue[tail++] = n
+      }
+    }
+    if (y < height - 1) {
+      const n = idx + width
+      if (depth[n] === -1 && isOpaquePixel(data, n)) {
+        depth[n] = next
+        queue[tail++] = n
+      }
+    }
+  }
+
+  return depth
+}
+
+/** Éclaircit oreilles / joues / museau ; conserve le noir profond intérieur. */
+function lightenHeaderContours(data, width, height) {
+  const depth = computeSilhouetteDepth(data, width, height, 4)
+  const total = width * height
+
+  for (let idx = 0; idx < total; idx++) {
+    if (!isOpaquePixel(data, idx)) continue
+    const o = idx * 4
+    const r = data[o]
+    const g = data[o + 1]
+    const b = data[o + 2]
+    if (isBrandRedCandidate(r, g, b)) continue
+
+    const max = Math.max(r, g, b)
+    const min = Math.min(r, g, b)
+    const delta = max - min
+    if (delta > 18) continue
+
+    const band = depth[idx]
+    if (band === -1) {
+      // Intérieur : noir profond conservé tel quel.
+      continue
+    }
+
+    let target = ANTHRACITE_DARK
+    let strength = 0.72
+    if (band >= 2 || max > 28) {
+      target = ANTHRACITE_MID
+      strength = band >= 3 ? 0.55 : 0.68
+    }
+    if (max > 72) {
+      strength *= 0.45
+    }
+
+    data[o] = lerpByte(r, target.r, strength)
+    data[o + 1] = lerpByte(g, target.g, strength)
+    data[o + 2] = lerpByte(b, target.b, strength)
+  }
+}
+
+/** Supprime franges semi-transparentes sombres (pas de halo autour de la tête). */
+function removeDarkFringe(data, width, height) {
+  const total = width * height
+  for (let idx = 0; idx < total; idx++) {
+    const o = idx * 4
+    const a = data[o + 3]
+    if (a === 0 || a === 255) continue
+    const r = data[o]
+    const g = data[o + 1]
+    const b = data[o + 2]
+    const max = Math.max(r, g, b)
+    if (max < 56 && a < 210) {
+      data[o + 3] = 0
+      continue
+    }
+    if (a >= 200) {
+      data[o + 3] = 255
+    }
+  }
+}
+
+async function writeHeaderMark(masterPixels) {
+  const { data, info } = masterPixels
+  removeEdgeConnectedBackground(data, info.width, info.height)
+  lightenHeaderContours(data, info.width, info.height)
+  removeDarkFringe(data, info.width, info.height)
+  const crop = computeHeaderCropBox(data, info.width, info.height)
+  const outPath = path.join(PUBLIC_DIR, HEADER_MARK_FILENAME)
+
+  await sharp(data, {
+    raw: { width: info.width, height: info.height, channels: 4 },
+  })
+    .extract(crop)
+    .resize(HEADER_MARK_EXPORT_SIZE, HEADER_MARK_EXPORT_SIZE, {
+      fit: 'fill',
+      kernel: sharp.kernel.lanczos3,
+    })
+    .png(PNG_OPTS)
+    .toFile(outPath)
+
+  const meta = await sharp(outPath).metadata()
+  const stats = await sharp(outPath).stats()
+  const alphaMax = stats.channels[3]?.max ?? 255
+  const fillPct = await measureHeaderFill(outPath)
+  console.log(
+    `  ✓ ${path.relative(root, outPath)} (${meta.width}×${meta.height}, fill ~${fillPct}%, alpha max ${alphaMax})`,
+  )
+  return outPath
+}
+
+/** Mesure le % de remplissage du sujet dans le carré exporté (debug). */
+async function measureHeaderFill(outPath) {
+  const { data, info } = await sharp(outPath).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  let minX = info.width
+  let minY = info.height
+  let maxX = -1
+  let maxY = -1
+  for (let y = 0; y < info.height; y++) {
+    for (let x = 0; x < info.width; x++) {
+      if (data[(y * info.width + x) * 4 + 3] < 8) continue
+      if (x < minX) minX = x
+      if (y < minY) minY = y
+      if (x > maxX) maxX = x
+      if (y > maxY) maxY = y
+    }
+  }
+  if (maxX < 0) return 0
+  const side = Math.max(maxX - minX + 1, maxY - minY + 1)
+  return Math.round((side / info.width) * 100)
 }
 
 async function writeSquareIcon(masterBuffer, size, outPath, { contentScale = 1 } = {}) {
@@ -187,6 +493,9 @@ async function main() {
     'Brand assets — master intact, rouges → #B91C1C…#FF2B2B, fond #0C0C0E',
   )
   const masterBuffer = await loadProcessedMasterBuffer()
+  const headerMasterPixels = await loadProcessedMasterPixels({ opaqueProductBackground: false })
+
+  await writeHeaderMark(headerMasterPixels)
 
   await writeSquareIcon(masterBuffer, 180, path.join(PUBLIC_DIR, 'icon.png'), {
     contentScale: 0.92,

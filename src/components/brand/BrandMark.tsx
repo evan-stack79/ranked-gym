@@ -17,18 +17,22 @@ export interface BrandMarkProps {
   showWordmark?: boolean
 }
 
-/** Asset PWA léger — jamais le master 1254 px. */
-export const BRAND_MARK_SRC = '/pwa-192x192.png'
+/** Asset PWA — boot / hero uniquement. */
+export const BRAND_MARK_HERO_SRC = '/pwa-192x192.png'
+/** Marque header compacte — fond transparent, cadrage serré (`brand:assets`). */
+export const BRAND_MARK_COMPACT_SRC = '/brand-header-mark.png'
 
 const VARIANT = {
   compact: {
-    size: 30,
+    size: 38,
+    src: BRAND_MARK_COMPACT_SRC,
     textClass: 'text-[17px] font-semibold tracking-tight',
     stackClass: 'flex-row items-center gap-2',
     taglineClass: 'text-[11px]',
   },
   hero: {
     size: 96,
+    src: BRAND_MARK_HERO_SRC,
     textClass: 'text-[22px] font-semibold tracking-tight',
     stackClass: 'flex-col items-center gap-3',
     taglineClass: 'text-[13px]',
@@ -49,6 +53,7 @@ export function BrandMark({
   const [imageFailed, setImageFailed] = useState(false)
   const cfg = VARIANT[variant]
   const size = cfg.size
+  const markSrc = cfg.src
   const renderMark = showMark && !imageFailed
 
   return (
@@ -58,7 +63,7 @@ export function BrandMark({
     >
       {renderMark ? (
         <img
-          src={BRAND_MARK_SRC}
+          src={markSrc}
           width={size}
           height={size}
           alt=""
