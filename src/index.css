@@ -1275,26 +1275,21 @@ body {
 }
 
 .water-bottle--calibrating {
-  filter: brightness(1.08) saturate(1.1);
+  filter: brightness(1.08) saturate(1.06);
+  box-shadow: 0 0 28px rgb(56 189 248 / 0.2);
 }
 
 .water-bottle-fill--calibrating {
-  box-shadow: inset 0 0 20px rgb(251 191 36 / 0.25);
+  box-shadow: inset 0 0 20px rgb(56 189 248 / 0.26);
 }
 
-.water-bottle-liquid--calibrating {
-  background: linear-gradient(
-    180deg,
-    rgb(254 240 138 / 0.92) 0%,
-    rgb(251 191 36 / 0.88) 35%,
-    rgb(245 158 11 / 0.9) 70%,
-    rgb(217 119 6 / 0.95) 100%
-  );
-  box-shadow: inset 0 0 24px rgb(255 255 255 / 0.2);
+.water-calibration-level {
+  background: rgb(125 211 252 / 0.95);
+  box-shadow: 0 0 6px rgb(56 189 248 / 0.95), 0 0 15px rgb(56 189 248 / 0.55);
 }
 
-.water-validate-btn--calibrating {
-  box-shadow: 0 0 24px rgb(245 158 11 / 0.22);
+.water-calibration-bubble {
+  box-shadow: 0 4px 18px rgb(0 0 0 / 0.42), 0 0 14px rgb(56 189 248 / 0.16);
 }
 
 .water-bottle-liquid {
@@ -1443,31 +1438,6 @@ body {
     0 0 28px rgb(34 211 238 / 0.35);
 }
 
-.water-bottle-range {
-  writing-mode: vertical-lr;
-  direction: rtl;
-  appearance: none;
-  -webkit-appearance: slider-vertical;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.water-bottle-range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-}
-
-.water-bottle-range::-moz-range-thumb {
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  border: 0;
-}
-
 @keyframes ios-tab-pop {
   0% {
     transform: scale(1);
@@ -1483,4 +1453,3 @@ body {
 .ios-tab-active-icon {
   animation: ios-tab-pop 0.34s cubic-bezier(0.32, 0.72, 0, 1);
 }
-

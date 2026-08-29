@@ -17,13 +17,17 @@ import {
 } from '../../services/nutritionStorage'
 import { resolveBottleVisual } from '../../utils/deriveBottleProgress'
 import {
+  calibrationRemainingMlFromKey,
+  calibrationRemainingMlFromPointer,
+  clampCalibrationRemainingMl,
+} from '../../utils/bottleCalibrationPointer'
+import {
   formatWaterMl,
   getDailyWaterGoalMl,
   isTrainingDayToday,
 } from '../../utils/waterGoal'
 import { CompletedBottles } from './CompletedBottles'
 import { HydrationProgressBar } from './HydrationProgressBar'
-import { BottleCalibrationSheet } from './BottleCalibrationSheet'
 
 /**
  * Journal d’hydratation : jauge + raccourcis (badges ×N) + liste « Aujourd’hui »
@@ -121,7 +125,7 @@ function resolveReleaseVisual(samples: DragSample[]): number | null {
 }
 
 export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
-  const bottleRef = useRef<HTMLDivElement>(null)
+  const fillAreaRef = useRef<HTMLDivElement>(null)
   const pointerIdRef = useRef<number | null>(null)
   const hapticBucketRef = useRef(0)
   const samplesRef = useRef<DragSample[]>([])
@@ -137,7 +141,9 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
     getTodayWaterPresetsCount(),
   )
   const [entries, setEntries] = useState<WaterEntry[]>(() => getTodayWaterEntries())
-  const [calibrationOpen, setCalibrationOpen] = useState(false)
+  const [calibrationMode, setCalibrationMode] = useState(false)
+  const [calibrationPreviewRemainingMl, setCalibrationPreviewRemainingMl] =
+    useState<number | null>(null)
 
   const isTrainingDay = isTrainingDayToday()
   const dailyGoalMl = getDailyWaterGoalMl(weightKg ?? 70, isTrainingDay)
@@ -206,8 +212,15 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
     [displayTotal, resolveVisual],
   )
 
-  const displayBottleLevel =
+  const storedBottleLevel =
     awaitingConfirm || dragging ? currentBottleLevel : bottleProgress.activeMl
+  const displayBottleLevel = calibrationMode
+    ? WATER_BOTTLE_CAPACITY_ML -
+      clampCalibrationRemainingMl(
+        calibrationPreviewRemainingMl ?? WATER_BOTTLE_CAPACITY_ML - storedBottleLevel,
+        WATER_BOTTLE_CAPACITY_ML,
+      )
+    : storedBottleLevel
 
   const remainingMl = WATER_BOTTLE_CAPACITY_ML - displayBottleLevel
   const remainingPct = (remainingMl / WATER_BOTTLE_CAPACITY_ML) * 100
@@ -215,12 +228,21 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
   const showActiveBottle = bottleProgress.showActiveBottle
 
   const visualFromClientY = useCallback((clientY: number) => {
-    const el = bottleRef.current
+    const el = fillAreaRef.current
     if (!el) return dragStartLevelRef.current
     const rect = el.getBoundingClientRect()
     const ratio = 1 - (clientY - rect.top) / Math.max(rect.height, 1)
     const remaining = clampBottle(ratio * WATER_BOTTLE_CAPACITY_ML)
     return clampBottle(WATER_BOTTLE_CAPACITY_ML - remaining)
+  }, [])
+
+  const previewCalibrationFromY = useCallback((clientY: number) => {
+    const el = fillAreaRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    setCalibrationPreviewRemainingMl(
+      calibrationRemainingMlFromPointer(clientY, rect, WATER_BOTTLE_CAPACITY_ML),
+    )
   }, [])
 
   const pushSample = useCallback((clientY: number, visual: number) => {
@@ -256,6 +278,12 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
     event.preventDefault()
     pointerIdRef.current = event.pointerId
     event.currentTarget.setPointerCapture(event.pointerId)
+
+    if (calibrationMode) {
+      previewCalibrationFromY(event.clientY)
+      return
+    }
+
     setDragging(true)
     setAwaitingConfirm(false)
     samplesRef.current = []
@@ -269,6 +297,10 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
 
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     if (pointerIdRef.current !== event.pointerId) return
+    if (calibrationMode) {
+      previewCalibrationFromY(event.clientY)
+      return
+    }
     previewBottleLevel(visualFromClientY(event.clientY), event.clientY)
   }
 
@@ -280,6 +312,12 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
     } catch {
       // already released
     }
+
+    if (calibrationMode) {
+      previewCalibrationFromY(event.clientY)
+      return
+    }
+
     setDragging(false)
 
     const samples = samplesRef.current
@@ -357,20 +395,54 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
     hapticTick(14)
   }
 
-  const calibrationRemainingMl = WATER_BOTTLE_CAPACITY_ML - displayBottleLevel
+  const openCalibration = () => {
+    if (awaitingConfirm) cancelDraft()
+    const visual = resolveVisual(savedDrunkRef.current)
+    setCalibrationPreviewRemainingMl(
+      clampCalibrationRemainingMl(
+        WATER_BOTTLE_CAPACITY_ML - visual.activeMl,
+        WATER_BOTTLE_CAPACITY_ML,
+      ),
+    )
+    setCalibrationMode(true)
+  }
 
-  const saveCalibration = (remainingMl: number) => {
-    setTodayWaterBottleCalibration(remainingMl)
-    setCalibrationOpen(false)
+  const cancelCalibration = () => {
+    setCalibrationMode(false)
+    setCalibrationPreviewRemainingMl(null)
+    syncFromStorage()
+  }
+
+  const saveCalibration = () => {
+    const remaining = clampCalibrationRemainingMl(
+      calibrationPreviewRemainingMl ?? WATER_BOTTLE_CAPACITY_ML - storedBottleLevel,
+      WATER_BOTTLE_CAPACITY_ML,
+    )
+    setTodayWaterBottleCalibration(remaining)
+    setCalibrationMode(false)
+    setCalibrationPreviewRemainingMl(null)
     syncFromStorage()
     hapticTick(10)
   }
 
   const resetCalibration = () => {
     clearTodayWaterBottleCalibration()
-    setCalibrationOpen(false)
+    setCalibrationMode(false)
+    setCalibrationPreviewRemainingMl(null)
     syncFromStorage()
     hapticTick(10)
+  }
+
+  const onBottleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!calibrationMode) return
+    const next = calibrationRemainingMlFromKey(
+      calibrationPreviewRemainingMl ?? remainingMl,
+      event.key,
+      WATER_BOTTLE_CAPACITY_ML,
+    )
+    if (next === null) return
+    event.preventDefault()
+    setCalibrationPreviewRemainingMl(next)
   }
 
   return (
@@ -428,23 +500,36 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
             />
             <div className="water-bottle-shoulder relative z-10 -mt-px h-7 w-[72px]" aria-hidden />
 
-            <div
-              ref={bottleRef}
-              className={`water-bottle-slim relative -mt-1 h-[320px] w-[88px] touch-none select-none overflow-hidden ${
-                dragging ? 'water-bottle--active' : ''
-              }`}
-              style={{ touchAction: 'none' }}
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={endDrag}
-              onPointerCancel={endDrag}
-              role="slider"
-              aria-valuemin={0}
-              aria-valuemax={WATER_BOTTLE_CAPACITY_ML}
-              aria-valuenow={displayBottleLevel}
-              aria-label="Bouteille active — baisse pour indiquer ce que tu as bu (1,5 L)"
-              tabIndex={0}
-            >
+            <div className="relative">
+              <div
+                ref={fillAreaRef}
+                className={`water-bottle-slim relative -mt-1 h-[320px] w-[88px] touch-none select-none overflow-hidden ${
+                  dragging ? 'water-bottle--active' : ''
+                } ${
+                  calibrationMode ? 'water-bottle--calibrating' : ''
+                }`}
+                style={{ touchAction: 'none' }}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
+                onKeyDown={onBottleKeyDown}
+                role="slider"
+                aria-valuemin={0}
+                aria-valuemax={WATER_BOTTLE_CAPACITY_ML}
+                aria-valuenow={calibrationMode ? remainingMl : displayBottleLevel}
+                aria-valuetext={
+                  calibrationMode
+                    ? `${remainingMl} ml restants`
+                    : `${displayBottleLevel} ml bus`
+                }
+                aria-label={
+                  calibrationMode
+                    ? 'Régler le liquide restant dans ma bouteille'
+                    : 'Bouteille active — baisse pour indiquer ce que tu as bu (1,5 L)'
+                }
+                tabIndex={0}
+              >
               <div
                 className="pointer-events-none absolute inset-0 rounded-[28px] border border-white/22"
                 style={{
@@ -470,11 +555,13 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
               />
 
               <div
-                className="water-bottle-fill absolute inset-x-0 bottom-0 mx-[2px] mb-[2px] overflow-hidden rounded-b-[26px]"
+                className={`water-bottle-fill absolute inset-x-0 bottom-0 mx-[2px] mb-[2px] overflow-hidden rounded-b-[26px] ${
+                  calibrationMode ? 'water-bottle-fill--calibrating' : ''
+                }`}
                 style={{
                   height: `${remainingPct}%`,
                   maxHeight: 'calc(100% - 4px)',
-                  transition: dragging
+                  transition: dragging || calibrationMode
                     ? 'height 70ms linear'
                     : 'height 280ms cubic-bezier(0.32, 0.72, 0, 1)',
                 }}
@@ -482,6 +569,14 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
                 <div className="water-bottle-liquid absolute inset-0" />
                 <div className="water-bottle-meniscus absolute inset-x-0 top-0 h-3.5" />
               </div>
+
+              {calibrationMode ? (
+                <div
+                  className="water-calibration-level pointer-events-none absolute inset-x-1 z-30 h-px"
+                  style={{ bottom: `${remainingPct}%` }}
+                  aria-hidden
+                />
+              ) : null}
 
               <div className="pointer-events-none absolute inset-x-0 inset-y-3 z-10">
                 {GRADUATIONS_ML.map((mark) => {
@@ -503,24 +598,51 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
               </div>
 
               <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center px-2 text-center">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/65">
-                  Bu
-                </p>
-                <p
-                  className={`mt-0.5 text-[28px] font-semibold tracking-tight tabular-nums text-white transition-transform duration-200 ${
-                    dragging ? 'scale-105' : 'scale-100'
-                  }`}
-                  style={{ textShadow: '0 2px 14px rgb(0 0 0 / 0.5)' }}
-                >
-                  {displayTotal}
-                </p>
-                <p className="text-[12px] font-medium text-white/75">ml</p>
-                {displayBottleLevel > 0 ? (
-                  <p className="mt-1 text-[10px] font-medium tabular-nums text-white/50">
-                    {displayBottleLevel} / {WATER_BOTTLE_CAPACITY_ML} sur bouteille
-                  </p>
-                ) : null}
+                {calibrationMode ? (
+                  <>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#BAE6FD]">
+                      Restant
+                    </p>
+                    <p className="mt-0.5 text-[24px] font-semibold tracking-tight tabular-nums text-white">
+                      {remainingMl}
+                    </p>
+                    <p className="text-[11px] font-medium text-white/75">ml</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/65">
+                      Bu
+                    </p>
+                    <p
+                      className={`mt-0.5 text-[28px] font-semibold tracking-tight tabular-nums text-white transition-transform duration-200 ${
+                        dragging ? 'scale-105' : 'scale-100'
+                      }`}
+                      style={{ textShadow: '0 2px 14px rgb(0 0 0 / 0.5)' }}
+                    >
+                      {displayTotal}
+                    </p>
+                    <p className="text-[12px] font-medium text-white/75">ml</p>
+                    {displayBottleLevel > 0 ? (
+                      <p className="mt-1 text-[10px] font-medium tabular-nums text-white/50">
+                        {displayBottleLevel} / {WATER_BOTTLE_CAPACITY_ML} sur bouteille
+                      </p>
+                    ) : null}
+                  </>
+                )}
               </div>
+              </div>
+
+            {calibrationMode ? (
+              <div
+                className="water-calibration-bubble pointer-events-none absolute left-1/2 z-40 whitespace-nowrap rounded-full border border-[#38BDF8]/45 bg-[#07131A]/95 px-2.5 py-1 text-[11px] font-semibold tabular-nums text-[#BAE6FD]"
+                style={{
+                  top: `${Math.min(96, Math.max(4, 100 - remainingPct))}%`,
+                  transform: 'translate(-50%, -50%)',
+                }}
+              >
+                {remainingMl} ml restants
+              </div>
+              ) : null}
             </div>
 
             <div
@@ -538,13 +660,10 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
           </p>
         ) : null}
 
-        {showActiveBottle ? (
+        {showActiveBottle && !calibrationMode ? (
           <button
             type="button"
-            onClick={() => {
-              if (awaitingConfirm) cancelDraft()
-              setCalibrationOpen(true)
-            }}
+            onClick={openCalibration}
             className="ios-press min-h-11 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2.5 text-[13px] font-medium text-[#AEAEB2] hover:border-white/20 hover:text-white"
             aria-label="Régler le niveau visuel de la bouteille"
           >
@@ -553,6 +672,47 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
               <span className="ml-1.5 text-[11px] font-semibold text-[#7DD3FC]">· calibré</span>
             ) : null}
           </button>
+        ) : null}
+
+        {showActiveBottle && calibrationMode ? (
+          <div className="w-full max-w-[340px] rounded-2xl border border-[#38BDF8]/25 bg-[#38BDF8]/[0.06] p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-2.5 py-1 text-[11px] font-semibold text-[#7DD3FC]">
+                Mode calibrage
+              </span>
+              <span className="text-[12px] font-semibold tabular-nums text-white">
+                {remainingMl} ml restants
+              </span>
+            </div>
+            <p className="mt-2 text-[12px] leading-relaxed text-[#8E8E93]">
+              Glisse ton doigt sur la bouteille jusqu’au niveau réel. Cela ne change pas l’eau enregistrée.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={cancelCalibration}
+                className="ios-press min-h-11 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2.5 text-[13px] font-semibold text-[#AEAEB2]"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={saveCalibration}
+                className="ios-press min-h-11 rounded-xl border border-[#38BDF8]/40 bg-[#38BDF8]/20 px-3 py-2.5 text-[13px] font-semibold text-white"
+              >
+                Enregistrer
+              </button>
+            </div>
+            {isCalibrated ? (
+              <button
+                type="button"
+                onClick={resetCalibration}
+                className="ios-press mt-2 min-h-11 w-full rounded-xl px-3 py-2 text-[12px] font-medium text-[#8E8E93] underline-offset-2 hover:underline"
+              >
+                Revenir au suivi automatique
+              </button>
+            ) : null}
+          </div>
         ) : null}
 
         <div className="w-full max-w-[340px]">
@@ -720,14 +880,6 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
         )}
       </div>
 
-      <BottleCalibrationSheet
-        open={calibrationOpen}
-        initialRemainingMl={calibrationRemainingMl}
-        isCalibrated={isCalibrated}
-        onClose={() => setCalibrationOpen(false)}
-        onSave={saveCalibration}
-        onClearCalibration={resetCalibration}
-      />
     </section>
   )
 }
