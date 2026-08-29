@@ -45,7 +45,12 @@ function run(command, args, { cwd = ROOT, timeout = 120_000, input, env = {}, al
     };
     child.on('error', error => finish(127, error)); child.on('close', code => finish(code));
     timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL'); }, timeout);
-    child.stdin.end(input || '');
+    child.stdin.on('error', error => {
+      if (error?.code === 'EPIPE') return;
+      finish(1, error);
+    });
+    try { child.stdin.end(input || ''); }
+    catch (error) { if (error?.code !== 'EPIPE') finish(1, error); }
   });
 }
 const git = (args, options = {}) => run('git', args, options);
@@ -208,6 +213,20 @@ async function writeReport({ runDir, runId, mission, worktree, cursorRuns, revie
 }
 
 let activeRun = null;
+let internalFailureHandled = false;
+async function handleInternalFailure(error) {
+  if (internalFailureHandled || !activeRun) return;
+  internalFailureHandled = true;
+  const message = redact(error?.stack || error?.message || String(error));
+  try {
+    await writeStatus(activeRun.runDir, { runId: activeRun.runId, status: 'BLOCKED', finalVerdict: 'BLOCKED', worktree: activeRun.worktree, error: message });
+    const report = path.join(activeRun.runDir, 'FINAL_REPORT.md');
+    try { await access(report); } catch { await writeFile(report, `# Rapport Agent Team — ${activeRun.runId}\n\n## Verdict final\n\n**BLOCKED** — erreur interne : ${message}\n\n## Emplacement du worktree\n\n\`${activeRun.worktree}\`\n`); }
+    console.error(`[agent-team] ERREUR INTERNE — statut BLOCKED; rapport: ${report}; worktree conservé: ${activeRun.worktree}`);
+  } catch (reportError) { console.error(`[agent-team] ERREUR FATALE — worktree conservé: ${activeRun.worktree}`); }
+}
+process.on('uncaughtException', error => { void handleInternalFailure(error); });
+process.on('unhandledRejection', error => { void handleInternalFailure(error); });
 async function interrupted(signal) {
   if (!activeRun) { process.exitCode = 130; return; }
   try {
@@ -219,6 +238,8 @@ process.on('SIGINT', () => { void interrupted('SIGINT'); });
 process.on('SIGTERM', () => { void interrupted('SIGTERM'); });
 
 async function selfTest() {
+  const epipe = await run(process.execPath, ['-e', 'process.stdin.destroy()'], { input: 'reproductible EPIPE', timeout: 5_000, allow: allExitCodes });
+  if (epipe.code !== 0) throw new Error('régression: EPIPE stdin non absorbé');
   const removed = 'password=real-looking-token-123456';
   const added = 'password=real-looking-token-123456';
   const placeholder = 'password=${MY_PASSWORD}';
