@@ -3,15 +3,19 @@ import { CupSoda, Droplets, FlaskConical, X } from 'lucide-react'
 import type { WaterEntry, WaterPresetsCount } from '../../types/nutrition'
 import {
   addWaterEntry,
+  clearTodayWaterBottleCalibration,
+  getTodayJournal,
   getTodayWaterEntries,
   getTodayWaterMl,
   getTodayWaterPresetsCount,
+  isTodayWaterBottleCalibrated,
   MAX_DAILY_WATER_ML,
   removeWaterEntry,
+  setTodayWaterBottleCalibration,
   setWaterTotalFromGauge,
   WATER_BOTTLE_CAPACITY_ML,
 } from '../../services/nutritionStorage'
-import { deriveBottleProgress } from '../../utils/deriveBottleProgress'
+import { resolveBottleVisual } from '../../utils/deriveBottleProgress'
 import {
   formatWaterMl,
   getDailyWaterGoalMl,
@@ -19,13 +23,14 @@ import {
 } from '../../utils/waterGoal'
 import { CompletedBottles } from './CompletedBottles'
 import { HydrationProgressBar } from './HydrationProgressBar'
+import { BottleCalibrationSheet } from './BottleCalibrationSheet'
 
 /**
  * Journal d’hydratation : jauge + raccourcis (badges ×N) + liste « Aujourd’hui »
  * avec suppression explicite. Sync JSON via nutrition.journal (Supabase).
  *
- * Visualisation bouteilles dérivée de `consumedMl` uniquement.
- * `waterBottleLevelMl` (stockage legacy) n’est plus source de vérité visuelle.
+ * Visualisation bouteilles : `resolveBottleVisual` (automatique ou calibré).
+ * Le calibrage n’altère jamais `waterMl` ni les entrées du journal.
  */
 export { WATER_BOTTLE_CAPACITY_ML }
 const STEP_ML = 10
@@ -132,16 +137,30 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
     getTodayWaterPresetsCount(),
   )
   const [entries, setEntries] = useState<WaterEntry[]>(() => getTodayWaterEntries())
+  const [calibrationOpen, setCalibrationOpen] = useState(false)
 
   const isTrainingDay = isTrainingDayToday()
   const dailyGoalMl = getDailyWaterGoalMl(weightKg ?? 70, isTrainingDay)
+  const isCalibrated = isTodayWaterBottleCalibrated()
+
+  const resolveVisual = useCallback(
+    (total: number) => {
+      const journal = getTodayJournal()
+      return resolveBottleVisual(total, dailyGoalMl, {
+        capacityMl: WATER_BOTTLE_CAPACITY_ML,
+        bottleLevelMl: journal.waterBottleLevelMl,
+        calibrationTotalMl: journal.waterBottleCalibrationTotalMl,
+      })
+    },
+    [dailyGoalMl],
+  )
 
   const syncDerivedLevel = useCallback(
     (total: number) => {
-      const progress = deriveBottleProgress(total, dailyGoalMl, WATER_BOTTLE_CAPACITY_ML)
+      const progress = resolveVisual(total)
       return clampBottle(progress.activeMl)
     },
-    [dailyGoalMl],
+    [resolveVisual],
   )
 
   const applyJournalState = useCallback(
@@ -183,8 +202,8 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
   const displayTotal = awaitingConfirm || dragging ? drunkMl : savedDrunkRef.current
 
   const bottleProgress = useMemo(
-    () => deriveBottleProgress(displayTotal, dailyGoalMl, WATER_BOTTLE_CAPACITY_ML),
-    [displayTotal, dailyGoalMl],
+    () => resolveVisual(displayTotal),
+    [displayTotal, resolveVisual],
   )
 
   const displayBottleLevel =
@@ -240,11 +259,7 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
     setDragging(true)
     setAwaitingConfirm(false)
     samplesRef.current = []
-    const progress = deriveBottleProgress(
-      savedDrunkRef.current,
-      dailyGoalMl,
-      WATER_BOTTLE_CAPACITY_ML,
-    )
+    const progress = resolveVisual(savedDrunkRef.current)
     dragCompletedBaseRef.current = progress.completedCount
     dragStartLevelRef.current = clampBottle(progress.activeMl)
     const initialVisual = visualFromClientY(event.clientY)
@@ -290,7 +305,7 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
   const nudge = (delta: number) => {
     setDrunkMl((current) => {
       const next = clampDaily(current + delta)
-      const progress = deriveBottleProgress(next, dailyGoalMl, WATER_BOTTLE_CAPACITY_ML)
+      const progress = resolveVisual(next)
       setCurrentBottleLevel(clampBottle(progress.activeMl))
       setAwaitingConfirm(true)
       return next
@@ -340,6 +355,22 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
     const result = removeWaterEntry(entryId)
     applyJournalState(result.waterMl, result.journal.waterEntries)
     hapticTick(14)
+  }
+
+  const calibrationRemainingMl = WATER_BOTTLE_CAPACITY_ML - displayBottleLevel
+
+  const saveCalibration = (remainingMl: number) => {
+    setTodayWaterBottleCalibration(remainingMl)
+    setCalibrationOpen(false)
+    syncFromStorage()
+    hapticTick(10)
+  }
+
+  const resetCalibration = () => {
+    clearTodayWaterBottleCalibration()
+    setCalibrationOpen(false)
+    syncFromStorage()
+    hapticTick(10)
   }
 
   return (
@@ -507,6 +538,23 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
           </p>
         ) : null}
 
+        {showActiveBottle ? (
+          <button
+            type="button"
+            onClick={() => {
+              if (awaitingConfirm) cancelDraft()
+              setCalibrationOpen(true)
+            }}
+            className="ios-press min-h-11 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2.5 text-[13px] font-medium text-[#AEAEB2] hover:border-white/20 hover:text-white"
+            aria-label="Régler le niveau visuel de la bouteille"
+          >
+            Régler ma bouteille
+            {isCalibrated ? (
+              <span className="ml-1.5 text-[11px] font-semibold text-[#7DD3FC]">· calibré</span>
+            ) : null}
+          </button>
+        ) : null}
+
         <div className="w-full max-w-[340px]">
           <HydrationProgressBar
             consumedMl={displayTotal}
@@ -671,6 +719,15 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
           </p>
         )}
       </div>
+
+      <BottleCalibrationSheet
+        open={calibrationOpen}
+        initialRemainingMl={calibrationRemainingMl}
+        isCalibrated={isCalibrated}
+        onClose={() => setCalibrationOpen(false)}
+        onSave={saveCalibration}
+        onClearCalibration={resetCalibration}
+      />
     </section>
   )
 }
