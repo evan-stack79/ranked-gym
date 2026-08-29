@@ -157,37 +157,51 @@ async function codexPass({ worktree, runDir, prompt, outputName, logName }) {
     return { ...data, exitCode: result.code, timedOut: result.timedOut };
   } catch (error) { return { exitCode: result.code, error: `Réponse Codex illisible : ${error.message}` }; }
 }
-async function runTests(worktree, runDir) {
+async function runValidations(worktree, runDir, label = 'candidate') {
   const pkg = JSON.parse(await readFile(path.join(worktree, 'package.json'), 'utf8'));
   const names = Object.keys(pkg.scripts || {}), selected = [];
   for (const candidate of ['lint','typecheck','type-check','check:types','test','build']) if (names.includes(candidate)) selected.push(candidate);
   for (const name of names.filter(name => /^test:/.test(name) && !/^test:(watch|ui|dev)(:|$)/.test(name))) if (!selected.includes(name)) selected.push(name);
   const results = [];
   for (const name of selected) {
-    phase(`Tests — ${name}`);
+    phase(`${label} — ${name}`);
     let result;
     const unsafe = /(^|[;&|]\s*|\bnpx\s+)(?:git\s+(?:commit|push|pull|merge|reset|rebase|stash|clean)|gh\b|wrangler\b|vercel\b|netlify\b|firebase\b)|\bdeploy\b/i.test(pkg.scripts[name]);
     if (unsafe) result = { code: 126, stdout: '', stderr: `Script refusé : ${name}`, timedOut: false };
     else try { result = await run('npm', ['run', name], { cwd: worktree, timeout: name === 'build' ? 10 * 60_000 : 5 * 60_000, env: { CI: '1' } }); }
     catch (error) { result = error.result || { code: 1, stdout: '', stderr: error.message, timedOut: false }; }
     results.push({ name, code: result.code, timedOut: result.timedOut });
-    await writeFile(path.join(runDir, `test-${name.replace(/[^a-z0-9]/gi, '-')}.log`), redact(`STDOUT\n${result.stdout}\nSTDERR\n${result.stderr}\nEXIT ${result.code}\n`));
-    await assertClean();
+    await writeFile(path.join(runDir, `${label}-${name.replace(/[^a-z0-9]/gi, '-')}.log`), redact(`STDOUT\n${result.stdout}\nSTDERR\n${result.stderr}\nEXIT ${result.code}\n`));
   }
+  const diff = await run('git', ['diff', '--check', 'HEAD'], { cwd: worktree, allow: allExitCodes });
+  results.push({ name: 'git diff --check', code: diff.code, timedOut: diff.timedOut });
+  await writeFile(path.join(runDir, `${label}-diff-check.log`), redact(`STDOUT\n${diff.stdout}\nSTDERR\n${diff.stderr}\nEXIT ${diff.code}\n`));
   return results;
+}
+function validationComparison(baseline, candidate) {
+  const byName = new Map(baseline.map(item => [item.name, item])), comparison = [], regressions = [], preexisting = [], flaky = [];
+  for (const item of candidate) {
+    const before = byName.get(item.name);
+    if (item.code === 0) { comparison.push({ name: item.name, classification: before?.code ? 'fixed' : 'pass' }); continue; }
+    if (before && before.code !== 0) { comparison.push({ name: item.name, classification: 'preexisting-warning' }); preexisting.push(item); }
+    else { comparison.push({ name: item.name, classification: 'candidate-regression' }); regressions.push(item); }
+  }
+  return { comparison, regressions, preexisting, flaky };
 }
 const bullets = items => items?.length ? items.map(item => `- ${item}`).join('\n') : '- Aucun';
 async function writeStatus(runDir, data) {
   await writeFile(path.join(runDir, 'status.json'), JSON.stringify({ ...data, updatedAt: new Date().toISOString() }, null, 2));
 }
-async function writeReport({ runDir, runId, mission, worktree, cursorRuns, reviews, fixes, director, tests, finalVerdict, snap, error, secretFindings = [] }) {
+async function writeReport({ runDir, runId, mission, worktree, cursorRuns, reviews, fixes, director, tests, finalVerdict, snap, error, secretFindings = [], baseline = [], validations = [], comparisons = [], preexisting = [], fixers = 0 }) {
   const classified = predicate => snap.files.filter(file => predicate(file.status)).map(file => file.name);
   const patch = secretFindings.length ? redactPatch(snap.patch, secretFindings) : snap.patch;
   const patchNote = secretFindings.length ? 'Patch expurgé : un secret ajouté est suspecté. Le diff brut reste uniquement consultable dans le worktree.' : 'Patch binaire complet des fichiers suivis et non suivis.';
   const cursorText = cursorRuns.map((run,index) => `### Passage ${index + 1} — exécuté, code ${run.exitCode}${run.timedOut ? ' (timeout)' : ''}\n\n${run.report || run.error || 'Voir le journal.'}`).join('\n\n') || 'Non exécuté.';
   const reviewText = reviews.map((review,index) => `### Revue ${index + 1}: ${review.verdict || 'ERREUR'} — code ${review.exitCode}\n\nConstats:\n${bullets(review.findings)}\n\nCorrections requises:\n${bullets(review.required_fixes)}\n\nRisques:\n${bullets(review.risks)}${review.error ? `\n\nErreur : ${review.error}` : ''}`).join('\n\n') || 'Non exécuté.';
   const directorText = director ? `**${director.verdict || 'ERREUR'}** — code ${director.exitCode}\n\n${bullets(director.findings)}\n\nRisques:\n${bullets(director.risks)}\n\nCorrections requises:\n${bullets(director.required_fixes)}${director.error ? `\n\nErreur : ${director.error}` : ''}` : 'Non exécuté.';
-  const content = `# Rapport Agent Team — ${runId}\n\n## Mission initiale\n\n${mission}\n\n## Verdict final\n\n**${finalVerdict}**${error ? ` — ${redact(error)}` : ''}\n\n## Fichiers ajoutés\n\n${bullets(classified(code => code === '??' || code.includes('A')))}\n\n## Fichiers modifiés\n\n${bullets(classified(code => code.includes('M')))}\n\n## Fichiers supprimés\n\n${bullets(classified(code => code.includes('D')))}\n\n## Travail de Cursor\n\n${cursorText}\n\n## Avis du premier Codex\n\n${reviewText}\n\n## Corrections automatiques\n\n${fixes.length ? fixes.map((items,index) => `### Boucle ${index + 1}\n${bullets(items)}`).join('\n\n') : 'Aucune.'}\n\n## Avis du directeur technique\n\n${directorText}\n\n## Tests et builds\n\n${tests.length ? tests.map(test => `- \`${test.name}\`: code ${test.code}${test.timedOut ? ' (timeout)' : ''}`).join('\n') : '- Aucun script pertinent exécuté.'}\n\n## Secrets suspectés\n\n${secretFindings.length ? secretFindings.map(item => `- ${item.path}:${item.line} — valeur masquée`).join('\n') : '- Aucun.'}\n\n## Risques et limites\n\n${bullets([...(reviews.at(-1)?.risks || []), ...(director?.risks || []), 'Aucun patch n’a été appliqué au dépôt principal.', 'Le worktree est conservé pour décision manuelle.'])}\n\n## git diff --stat\n\n\`\`\`text\n${snap.stat || '(aucun changement)'}\n\`\`\`\n\n## Patch\n\n${patchNote} Copie : \`changes.patch\` (${Buffer.byteLength(patch)} octets).\n\n\`\`\`diff\n${patch || '(patch vide — aucun changement dans le worktree)'}\n\`\`\`\n\n## Fichiers non suivis\n\n${bullets(snap.untracked)}\n\n## Emplacement du worktree\n\n\`${worktree}\`\n`;
+  const formatResults = results => results.length ? results.map(item => `- \`${item.name}\`: code ${item.code}${item.timedOut ? ' (timeout)' : ''}`).join('\n') : '- Aucun script pertinent exécuté.';
+  const comparisonText = comparisons.length ? comparisons.flatMap((item,index) => [`### Comparaison candidat ${index + 1}`, bullets(item.comparison.map(entry => `${entry.name}: ${entry.classification}`))]).join('\n\n') : '- Aucune.';
+  const content = `# Rapport Agent Team — ${runId}\n\n## Mission initiale\n\n${mission}\n\n## Verdict final\n\n**${finalVerdict}**${error ? ` — ${redact(error)}` : ''}\n\n## Fichiers ajoutés\n\n${bullets(classified(code => code === '??' || code.includes('A')))}\n\n## Fichiers modifiés\n\n${bullets(classified(code => code.includes('M')))}\n\n## Fichiers supprimés\n\n${bullets(classified(code => code.includes('D')))}\n\n## Travail de Cursor\n\n${cursorText}\n\n## Avis du premier Codex\n\n${reviewText}\n\n## Corrections automatiques\n\n${fixes.length ? fixes.map((item,index) => `### Boucle ${index + 1} — origine ${item.origin}\n${bullets(item.details)}`).join('\n\n') : 'Aucune.'}\n\n## Validations baseline (HEAD propre)\n\n${formatResults(baseline)}\n\n## Validations candidat\n\n${validations.map(item => `### ${item.label}\n${formatResults(item.results)}`).join('\n\n') || '- Aucune.'}\n\n## Comparaison baseline / candidat\n\n${comparisonText}\n\n## Problèmes préexistants non causés par la mission\n\n${bullets(preexisting.map(item => `${item.name}: code ${item.code}`))}\n\n## Nombre global de boucles\n\n${fixers} fixer(s), maximum global ${MAX_ROUNDS}.\n\n## Avis du directeur technique\n\n${directorText}\n\n## Tests et builds\n\n${formatResults(tests)}\n\n## Secrets suspectés\n\n${secretFindings.length ? secretFindings.map(item => `- ${item.path}:${item.line} — valeur masquée`).join('\n') : '- Aucun.'}\n\n## Risques et limites\n\n${bullets([...(reviews.at(-1)?.risks || []), ...(director?.risks || []), 'Aucun patch n’a été appliqué au dépôt principal.', 'Le worktree est conservé pour décision manuelle.'])}\n\n## git diff --stat\n\n\`\`\`text\n${snap.stat || '(aucun changement)'}\n\`\`\`\n\n## Patch\n\n${patchNote} Copie : \`changes.patch\` (${Buffer.byteLength(patch)} octets).\n\n\`\`\`diff\n${patch || '(patch vide — aucun changement dans le worktree)'}\n\`\`\`\n\n## Fichiers non suivis\n\n${bullets(snap.untracked)}\n\n## Emplacement du worktree\n\n\`${worktree}\`\n`;
   await writeFile(path.join(runDir, 'changes.patch'), patch);
   await writeFile(path.join(runDir, 'FINAL_REPORT.md'), redact(content));
   await writeStatus(runDir, { runId, status: 'FINISHED', finalVerdict, worktree, report: path.join(runDir, 'FINAL_REPORT.md') });
@@ -218,6 +232,13 @@ async function selfTest() {
   const snap = { files: [{ status: ' M', name: 'docs/example.md' }], patch: realPatch, stat: ' docs/example.md | 1 +', untracked: [] };
   if (!snap.patch || !redactPatch(snap.patch, findings).includes('[REDACTED: secret suspect]')) throw new Error('régression: snapshot expurgé vide');
   if (redact('Bearer abcdefghijklmnop-secret') .includes('abcdefghijklmnop-secret')) throw new Error('régression: secret brut dans les logs');
+  const sameFail = validationComparison([{ name: 'test', code: 1 }], [{ name: 'test', code: 1 }]);
+  if (sameFail.regressions.length || sameFail.preexisting.length !== 1) throw new Error('régression: baseline identique non classée préexistante');
+  if (validationComparison([{ name: 'test', code: 0 }], [{ name: 'test', code: 1 }]).regressions.length !== 1) throw new Error('régression: nouveau test non classé régression');
+  const origins = ['validation', 'reviewer', 'director'];
+  if (origins.length !== 3 || MAX_ROUNDS !== 2) throw new Error('régression: origines/limite des fixers');
+  const preexistingDetails = validationComparison([{ name: 'test', code: 1 }], [{ name: 'test', code: 1 }]);
+  if (preexistingDetails.regressions.length !== 0 && preexistingDetails.preexisting.length !== 1) throw new Error('régression: échec préexistant transmis au fixer');
   console.log('REGRESSION TESTS OK — secrets ajoutés/supprimés/placeholders, snapshot et logs');
 }
 
@@ -234,33 +255,41 @@ async function mission(args) {
   console.log(runId); activeRun = { runId, runDir, worktree };
   try { await git(['worktree', 'add', '--detach', worktree, 'HEAD']); } catch (error) { await writeStatus(runDir, { runId, status: 'FINISHED', finalVerdict: 'BLOCKED', worktree, error: error.message }); throw error; }
   await writeStatus(runDir, { runId, status: 'ACTIVE', worktree });
-  const cursorRuns = [], reviews = [], fixes = [], tests = [];
-  let director = null, finalVerdict = 'BLOCKED', fatal = '', secretFindings = [], snap = await snapshot(worktree);
+  const cursorRuns = [], reviews = [], fixes = [], tests = [], validations = [], comparisons = [], preexisting = [];
+  let director = null, finalVerdict = 'BLOCKED', fatal = '', secretFindings = [], snap = await snapshot(worktree), fixers = 0;
   try {
+    phase('Baseline — validations HEAD propre');
+    const baseline = await runValidations(worktree, runDir, 'baseline'); validations.push({ label: 'baseline', results: baseline });
     phase('Cursor — développement');
     const builder = await read('agent-team/prompts/builder.md');
     const cursor = await cursorPass({ worktree, runDir, guard: await makeGuard(runDir), logName: 'cursor-builder.log', prompt: `${builder}\n\nMISSION:\n${missionText}` });
     cursorRuns.push(cursor);
     try { assertNoAddedSecrets(await snapshot(worktree)); } catch (error) { if (error instanceof SecretError) { secretFindings = error.findings; throw error; } throw error; }
-    for (let round = 1; round <= MAX_ROUNDS; round++) {
-      phase(`Revue Codex — passage ${round}`); snap = await snapshot(worktree);
+    let cycle = 0;
+    while (true) {
+      cycle++; phase(`Revue Codex — passage ${cycle}`); snap = await snapshot(worktree);
       const reviewer = await read('agent-team/prompts/reviewer.md');
-      const review = await codexPass({ worktree, runDir, prompt: `${reviewer}\n\nMISSION:\n${missionText}\n\nFICHIERS:\n${snap.files.map(file => `${file.status} ${file.name}`).join('\n')}`, outputName: `review-${round}.json`, logName: `codex-review-${round}.log` });
+      const review = await codexPass({ worktree, runDir, prompt: `${reviewer}\n\nMISSION:\n${missionText}\n\nFICHIERS:\n${snap.files.map(file => `${file.status} ${file.name}`).join('\n')}`, outputName: `review-${cycle}.json`, logName: `codex-review-${cycle}.log` });
       reviews.push(review);
-      if (review.verdict !== 'FIX' || round === MAX_ROUNDS) break;
-      phase(`Correction Cursor — boucle ${round}`); fixes.push(review.required_fixes || []);
+      phase('Validations — candidat'); const candidate = await runValidations(worktree, runDir, `candidate-${cycle}`); validations.push({ label: `candidate-${cycle}`, results: candidate });
+      const compared = validationComparison(baseline, candidate); comparisons.push(compared); preexisting.push(...compared.preexisting);
+      const important = [...compared.regressions, ...(review.verdict === 'FIX' ? [{ name: 'reviewer', code: 1, details: review.required_fixes || [] }] : [])];
+      phase('Directeur Codex'); snap = await snapshot(worktree);
+      director = await codexPass({ worktree, runDir, prompt: `${await read('agent-team/prompts/director.md')}\n\nMISSION:\n${missionText}\n\nREVUE:\n${JSON.stringify(review)}\n\nVALIDATIONS:\n${JSON.stringify(candidate)}\n\nFICHIERS:\n${snap.files.map(file => `${file.status} ${file.name}`).join('\n')}`, outputName: `director-${cycle}.json`, logName: `codex-director-${cycle}.log` });
+      const directorFixes = director.verdict === 'FIX' ? (director.required_fixes || []) : [];
+      if (!important.length && !directorFixes.length && review.verdict === 'GO' && director.verdict === 'GO' && compared.regressions.length === 0 && candidate.every(item => item.code === 0 || item.name !== 'git diff --check')) { finalVerdict = 'GO'; break; }
+      if (fixers >= MAX_ROUNDS) { finalVerdict = important.length || directorFixes.length ? 'BLOCKED' : 'GO'; break; }
+      fixers++; const origin = directorFixes.length ? 'director' : (compared.regressions.length ? 'validation' : 'reviewer');
+      const details = directorFixes.length ? directorFixes : (compared.regressions.length ? compared.regressions.map(item => `${item.name}: code ${item.code}`) : (review.required_fixes || []));
+      phase(`Correction Cursor — boucle ${fixers} (${origin})`); fixes.push({ origin, details });
       const fixer = await read('agent-team/prompts/fixer.md');
-      cursorRuns.push(await cursorPass({ worktree, runDir, guard: path.join(runDir, 'guard-bin'), logName: `cursor-fix-${round}.log`, prompt: `${fixer}\n\nMISSION:\n${missionText}\n\nCORRECTIONS:\n${(review.required_fixes || []).map(item => `- ${item}`).join('\n')}` }));
+      cursorRuns.push(await cursorPass({ worktree, runDir, guard: path.join(runDir, 'guard-bin'), logName: `cursor-fix-${fixers}.log`, prompt: `${fixer}\n\nMISSION STRICTE:\n${missionText}\n\nORIGINE: ${origin}\n\nCORRECTIONS OBLIGATOIRES:\n${details.map(item => `- ${typeof item === 'string' ? item : JSON.stringify(item)}`).join('\n')}\n\nNe corrige jamais un échec préexistant de la baseline.` }));
       try { assertNoAddedSecrets(await snapshot(worktree)); } catch (error) { if (error instanceof SecretError) { secretFindings = error.findings; throw error; } throw error; }
     }
-    phase('Tests et builds'); tests.push(...await runTests(worktree, runDir));
-    phase('Directeur Codex'); snap = await snapshot(worktree);
-    director = await codexPass({ worktree, runDir, prompt: `${await read('agent-team/prompts/director.md')}\n\nMISSION:\n${missionText}\n\nREVUE:\n${JSON.stringify(reviews.at(-1))}\n\nTESTS:\n${JSON.stringify(tests)}\n\nFICHIERS:\n${snap.files.map(file => `${file.status} ${file.name}`).join('\n')}`, outputName: 'director.json', logName: 'codex-director.log' });
-    const testsOk = tests.every(test => test.code === 0 && !test.timedOut), exhausted = reviews.length === MAX_ROUNDS && reviews.at(-1)?.verdict === 'FIX';
-    finalVerdict = reviews.at(-1)?.verdict === 'GO' && director.verdict === 'GO' && testsOk ? 'GO' : (reviews.at(-1)?.verdict === 'BLOCKED' || director.verdict === 'BLOCKED' || exhausted ? 'BLOCKED' : 'FIX');
+    tests.push(...(validations.at(-1)?.results || []));
   } catch (error) { fatal = error.message; finalVerdict = 'BLOCKED'; if (error instanceof SecretError) secretFindings = error.findings; }
   snap = await snapshot(worktree);
-  await writeReport({ runDir, runId, mission: missionText, worktree, cursorRuns, reviews, fixes, director, tests, finalVerdict, snap, error: fatal, secretFindings });
+  await writeReport({ runDir, runId, mission: missionText, worktree, cursorRuns, reviews, fixes, director, tests, finalVerdict, snap, error: fatal, secretFindings, baseline: validations[0]?.results || [], validations: validations.slice(1), comparisons, preexisting, fixers });
   await writeStatus(runDir, { runId, status: 'FINISHED', finalVerdict, worktree, report: path.join(runDir, 'FINAL_REPORT.md') });
   activeRun = null; await assertClean(); phase(`Rapport — ${path.join(runDir, 'FINAL_REPORT.md')}`); console.log(`Verdict: ${finalVerdict}\nWorktree conservé: ${worktree}`);
   if (finalVerdict === 'BLOCKED') process.exitCode = 2;
