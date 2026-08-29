@@ -1,64 +1,77 @@
-export interface BottleCalibrationRect {
-  top: number
-  bottom: number
-  height: number
-}
+import { WATER_BOTTLE_CAPACITY_ML } from '../services/nutritionStorage'
 
 export const BOTTLE_CALIBRATION_STEP_ML = 10
 export const BOTTLE_CALIBRATION_KEYBOARD_STEP_ML = 50
+export const CALIBRATION_KEYBOARD_STEP_ML = BOTTLE_CALIBRATION_KEYBOARD_STEP_ML
+export const KEYBOARD_NUDGE_ML = BOTTLE_CALIBRATION_KEYBOARD_STEP_ML
 
-function safeCapacity(capacityMl: number): number {
-  return Number.isFinite(capacityMl) && capacityMl > 0 ? capacityMl : 1500
+export type BottleFillRect = {
+  top: number
+  height: number
+  bottom?: number
 }
 
-export function clampCalibrationRemainingMl(
-  remainingMl: number,
-  capacityMl = 1500,
-  stepMl = BOTTLE_CALIBRATION_STEP_ML,
+function safeCapacity(capacityMl: number): number {
+  return Number.isFinite(capacityMl) && capacityMl > 0
+    ? capacityMl
+    : WATER_BOTTLE_CAPACITY_ML
+}
+
+/** Arrondit au pas demandé et borne dans [0, capacité]. */
+export function clampRemainingMl(
+  ml: number,
+  capacityMl: number = WATER_BOTTLE_CAPACITY_ML,
+  stepMl: number = BOTTLE_CALIBRATION_STEP_ML,
 ): number {
   const capacity = safeCapacity(capacityMl)
-  if (!Number.isFinite(remainingMl)) return 0
+  if (!Number.isFinite(ml)) return 0
   const step = Number.isFinite(stepMl) && stepMl > 0 ? stepMl : 1
-  const stepped = Math.round(remainingMl / step) * step
+  const stepped = Math.round(ml / step) * step
   return Math.min(capacity, Math.max(0, stepped))
 }
 
 /**
- * Convertit la position verticale du doigt en liquide physiquement restant.
- * Le rectangle doit toujours être celui de l'intérieur fixe de la bouteille,
- * jamais celui du liquide dont la hauteur varie pendant le geste.
+ * Convertit la position Y du pointeur en ml restants, sans modifier le rectangle.
+ * Le rectangle est la zone intérieure fixe, jamais la hauteur variable du liquide.
  */
-export function calibrationRemainingMlFromPointer(
+export function remainingMlFromPointerY(
   clientY: number,
-  rect: BottleCalibrationRect,
-  capacityMl = 1500,
+  fillRect: BottleFillRect,
+  capacityMl: number = WATER_BOTTLE_CAPACITY_ML,
+  stepMl: number = BOTTLE_CALIBRATION_STEP_ML,
 ): number {
   const capacity = safeCapacity(capacityMl)
-  const height = Number.isFinite(rect.height) && rect.height > 0 ? rect.height : 1
-  const bottom = Number.isFinite(rect.bottom) ? rect.bottom : rect.top + height
+  const top = Number.isFinite(fillRect.top) ? fillRect.top : 0
+  const validHeight = Number.isFinite(fillRect.height) && fillRect.height > 0
+  if (!validHeight || !Number.isFinite(clientY)) return 0
+  const height = fillRect.height
+  const bottom = Number.isFinite(fillRect.bottom) ? fillRect.bottom! : top + height
   const progress = Math.min(1, Math.max(0, (bottom - clientY) / height))
-  return clampCalibrationRemainingMl(progress * capacity, capacity)
+  return clampRemainingMl(progress * capacity, capacity, stepMl)
 }
 
-export function calibrationRemainingMlFromKey(
+/** Incrémente ou décrémente le niveau restant. */
+export function nudgeRemainingMl(
+  currentMl: number,
+  deltaMl: number,
+  capacityMl: number = WATER_BOTTLE_CAPACITY_ML,
+  stepMl: number = BOTTLE_CALIBRATION_STEP_ML,
+): number {
+  return clampRemainingMl(currentMl + deltaMl, capacityMl, stepMl)
+}
+
+/** Résout toutes les touches clavier prévues par le slider. */
+export function remainingMlFromKey(
   currentMl: number,
   key: string,
-  capacityMl = 1500,
+  capacityMl: number = WATER_BOTTLE_CAPACITY_ML,
 ): number | null {
   const capacity = safeCapacity(capacityMl)
-  const current = clampCalibrationRemainingMl(currentMl, capacity)
-
   if (key === 'ArrowUp' || key === 'ArrowRight') {
-    return clampCalibrationRemainingMl(
-      current + BOTTLE_CALIBRATION_KEYBOARD_STEP_ML,
-      capacity,
-    )
+    return nudgeRemainingMl(currentMl, BOTTLE_CALIBRATION_KEYBOARD_STEP_ML, capacity)
   }
   if (key === 'ArrowDown' || key === 'ArrowLeft') {
-    return clampCalibrationRemainingMl(
-      current - BOTTLE_CALIBRATION_KEYBOARD_STEP_ML,
-      capacity,
-    )
+    return nudgeRemainingMl(currentMl, -BOTTLE_CALIBRATION_KEYBOARD_STEP_ML, capacity)
   }
   if (key === 'Home') return 0
   if (key === 'End') return capacity

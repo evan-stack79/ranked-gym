@@ -1275,21 +1275,23 @@ body {
 }
 
 .water-bottle--calibrating {
-  filter: brightness(1.08) saturate(1.06);
-  box-shadow: 0 0 28px rgb(56 189 248 / 0.2);
+  filter: brightness(1.06) saturate(1.15);
+  box-shadow: 0 0 28px rgb(56 189 248 / 0.28);
 }
 
 .water-bottle-fill--calibrating {
-  box-shadow: inset 0 0 20px rgb(56 189 248 / 0.26);
+  box-shadow: inset 0 0 22px rgb(56 189 248 / 0.28);
 }
 
-.water-calibration-level {
-  background: rgb(125 211 252 / 0.95);
-  box-shadow: 0 0 6px rgb(56 189 248 / 0.95), 0 0 15px rgb(56 189 248 / 0.55);
-}
-
-.water-calibration-bubble {
-  box-shadow: 0 4px 18px rgb(0 0 0 / 0.42), 0 0 14px rgb(56 189 248 / 0.16);
+.water-bottle-liquid--calibrating {
+  background: linear-gradient(
+    180deg,
+    rgb(186 230 253 / 0.95) 0%,
+    rgb(125 211 252 / 0.9) 35%,
+    rgb(56 189 248 / 0.92) 70%,
+    rgb(14 165 233 / 0.96) 100%
+  );
+  box-shadow: inset 0 0 24px rgb(255 255 255 / 0.28);
 }
 
 .water-bottle-liquid {
