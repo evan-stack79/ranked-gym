@@ -39,6 +39,8 @@ for (const [label, command, args] of [
 }
 const syntax = await run(process.execPath, ['--check', 'scripts/agent-team.mjs']);
 result('syntaxe orchestrateur', syntax.code === 0, syntax.err.trim());
+const regressions = await run(process.execPath, ['scripts/agent-team.mjs', 'self-test']);
+result('tests de régression secrets/snapshot/logs', regressions.code === 0, regressions.code === 0 ? regressions.out.trim() : regressions.err.trim());
 const status = await run('git', ['status', '--porcelain=v1', '--untracked-files=all']);
 result('état du dépôt', status.code === 0, status.out.trim() ? 'changements présents (normal pendant installation)' : 'propre');
 process.exitCode = failed ? 1 : 0;

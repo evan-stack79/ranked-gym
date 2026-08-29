@@ -20,7 +20,8 @@
     "brand:native": "npm run brand:assets && npx capacitor-assets generate --ios && npx capacitor-assets generate --android",
     "agents:check": "node scripts/agent-team-check.mjs",
     "agents:mission": "node scripts/agent-team.mjs mission",
-    "agents:status": "node scripts/agent-team.mjs status"
+    "agents:status": "node scripts/agent-team.mjs status",
+    "agents:cleanup": "node scripts/agent-team.mjs cleanup"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.0",
