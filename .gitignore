@@ -49,3 +49,6 @@ ios/DerivedData
 *.jks
 *.keystore
 .android-sdk/
+
+# Autonomous agent runs (reports, logs and detached worktrees)
+.agent-runs/
