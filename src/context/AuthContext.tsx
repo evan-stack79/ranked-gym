@@ -36,7 +36,12 @@ import {
   resetCloudBackupHydration,
   setCloudBackupUserId,
 } from '../services/cloudBackup'
-import { applyDailyLoginStreak } from '../services/streakService'
+import {
+  applyDailyLoginStreak,
+  hasCelebratedStreak,
+  markStreakCelebrated,
+  localDateKey,
+} from '../services/streakService'
 import {
   disciplineFromLabel,
   getDiscipline,
@@ -61,6 +66,13 @@ export type StreakWeekBonus = {
   bonusXp: number
 }
 
+/** Payload for the premium Daily Streak celebration overlay. */
+export type StreakCelebration = {
+  previousStreak: number
+  currentStreak: number
+  dateKey: string
+}
+
 interface AuthContextValue {
   user: AuthUser | null
   profile: ProfileRow | null
@@ -77,6 +89,9 @@ interface AuthContextValue {
   /** Fired when daily streak hits a multiple of 7 (show Accueil celebration). */
   streakWeekBonus: StreakWeekBonus | null
   clearStreakWeekBonus: () => void
+  /** Set only when streak actually increments N → N+1 (first open of local day). */
+  streakCelebration: StreakCelebration | null
+  clearStreakCelebration: () => void
   refreshProfile: () => Promise<void>
   /** Met à jour localement le profil (ex. avatar) sans refetch. */
   patchProfile: (patch: Partial<ProfileRow>) => void
@@ -135,10 +150,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authInfo, setAuthInfo] = useState<string | null>(null)
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
   const [streakWeekBonus, setStreakWeekBonus] = useState<StreakWeekBonus | null>(null)
+  const [streakCelebration, setStreakCelebration] = useState<StreakCelebration | null>(null)
   const pendingRef = useRef<AuthSuccessCallback | null>(null)
   const hydrateGenRef = useRef(0)
+  const streakInFlightRef = useRef(false)
+  const profileRef = useRef<ProfileRow | null>(null)
+  const userRef = useRef<AuthUser | null>(null)
 
   const clearStreakWeekBonus = useCallback(() => setStreakWeekBonus(null), [])
+  const clearStreakCelebration = useCallback(() => setStreakCelebration(null), [])
+
+  useEffect(() => {
+    profileRef.current = profile
+  }, [profile])
+
+  useEffect(() => {
+    userRef.current = user
+  }, [user])
+
+  const applyStreakForProfile = useCallback(
+    async (authUser: AuthUser, row: ProfileRow): Promise<ProfileRow> => {
+      if (streakInFlightRef.current) return row
+      streakInFlightRef.current = true
+      try {
+        const streakResult = await applyDailyLoginStreak(row)
+        setProfile(streakResult.profile)
+        setUser({
+          ...authUser,
+          displayName: streakResult.profile.pseudo || authUser.displayName,
+        })
+
+        if (streakResult.weekBonus && streakResult.bonusXp > 0) {
+          setStreakWeekBonus({
+            streak: streakResult.profile.current_streak,
+            bonusXp: streakResult.bonusXp,
+          })
+        }
+
+        const dateKey = localDateKey()
+        const currentStreak = streakResult.profile.current_streak
+        const previousStreak = streakResult.previousStreak
+        const isIncrement = streakResult.didUpdate && currentStreak === previousStreak + 1
+
+        if (
+          isIncrement &&
+          !hasCelebratedStreak(authUser.id, dateKey, currentStreak)
+        ) {
+          markStreakCelebrated(authUser.id, dateKey, currentStreak)
+          setStreakCelebration({
+            previousStreak,
+            currentStreak,
+            dateKey,
+          })
+        }
+
+        return streakResult.profile
+      } catch {
+        // Columns may be missing until SQL migration — keep base profile.
+        return row
+      } finally {
+        streakInFlightRef.current = false
+      }
+    },
+    [],
+  )
 
   const loadProfile = useCallback(async (authUser: AuthUser, metaDiscipline?: string) => {
     setCloudBackupUserId(authUser.id)
@@ -164,22 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (row) {
-      try {
-        const streakResult = await applyDailyLoginStreak(row)
-        setProfile(streakResult.profile)
-        setUser({
-          ...authUser,
-          displayName: streakResult.profile.pseudo || authUser.displayName,
-        })
-        if (streakResult.weekBonus && streakResult.bonusXp > 0) {
-          setStreakWeekBonus({
-            streak: streakResult.profile.current_streak,
-            bonusXp: streakResult.bonusXp,
-          })
-        }
-      } catch {
-        // Columns may be missing until SQL migration — keep base profile.
-      }
+      await applyStreakForProfile(authUser, row)
     }
 
     try {
@@ -462,11 +522,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     setProfile(null)
     setStreakWeekBonus(null)
+    setStreakCelebration(null)
     setIsPasswordRecovery(false)
     setAuthInfo(null)
     setAuthError(null)
     setIsLoading(false)
   }, [])
+
+  // Retour au premier plan après minuit local → nouvelle journée validée (idempotent).
+  useEffect(() => {
+    const recheck = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      if (isLoading) return
+      const authUser = userRef.current
+      const row = profileRef.current
+      if (!authUser || !row) return
+      void applyStreakForProfile(authUser, row)
+    }
+    document.addEventListener('visibilitychange', recheck)
+    window.addEventListener('focus', recheck)
+    return () => {
+      document.removeEventListener('visibilitychange', recheck)
+      window.removeEventListener('focus', recheck)
+    }
+  }, [isLoading, applyStreakForProfile])
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -479,6 +558,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authError,
       streakWeekBonus,
       clearStreakWeekBonus,
+      streakCelebration,
+      clearStreakCelebration,
       refreshProfile,
       patchProfile,
       openAuth,
@@ -505,6 +586,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authError,
       streakWeekBonus,
       clearStreakWeekBonus,
+      streakCelebration,
+      clearStreakCelebration,
       refreshProfile,
       patchProfile,
       openAuth,
