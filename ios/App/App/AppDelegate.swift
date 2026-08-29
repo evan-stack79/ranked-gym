@@ -7,7 +7,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // CameraHeartRatePlugin (CAPBridgedPlugin, jsName "CameraHeartRate") is compiled
+        // into the App target (Plugins/CameraHeartRatePlugin.swift) and auto-registered
+        // by Capacitor's bridged-plugin loader. Do not add a second plugin implementation.
         return true
     }
 

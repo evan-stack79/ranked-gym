@@ -66,5 +66,7 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Ranked Gym utilise la caméra pour le Pump Check et le prototype expérimental de mesure BPM (doigt sur le flash). Aucune image n’est envoyée ni enregistrée pour le BPM.</string>
 </dict>
 </plist>

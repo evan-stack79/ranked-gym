@@ -48,3 +48,4 @@ ios/App/App.xcodeproj/xcuserdata
 ios/DerivedData
 *.jks
 *.keystore
+.android-sdk/
