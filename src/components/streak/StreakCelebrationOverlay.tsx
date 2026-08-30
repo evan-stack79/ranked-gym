@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+import { createPortal } from 'react-dom'
 import pantherRoaringUrl from '../../assets/brand/panther-roaring.png'
 import {
   formatStreakDaysLabel,
@@ -14,6 +23,8 @@ export type StreakCelebrationOverlayProps = {
   onComplete: () => void
   /** Test / preview only — force reduced-motion path. */
   forceReducedMotion?: boolean
+  /** Capture avant uniquement : reproduit l'ancien montage local dans la carte. */
+  portalTarget?: Element
 }
 
 export type StreakCelebrationPhase =
@@ -94,13 +105,20 @@ function FlameGlyph({ lit, className = '' }: { lit: boolean; className?: string 
  * Célébration Daily Streak — chorégraphie ~5,7 s (CSS/SVG, pas de vidéo).
  * À monter uniquement après une vraie incrémentation N → N+1.
  */
-export function StreakCelebrationOverlay({
-  previousStreak,
-  currentStreak,
-  dateKey,
-  onComplete,
-  forceReducedMotion,
-}: StreakCelebrationOverlayProps) {
+export const StreakCelebrationOverlay = forwardRef<
+  HTMLDivElement,
+  StreakCelebrationOverlayProps
+>(function StreakCelebrationOverlay(
+  {
+    previousStreak,
+    currentStreak,
+    dateKey,
+    onComplete,
+    forceReducedMotion,
+    portalTarget,
+  },
+  forwardedRef,
+) {
   const reduced = useMemo(
     () => forceReducedMotion === true || prefersReducedMotion(),
     [forceReducedMotion],
@@ -113,6 +131,8 @@ export function StreakCelebrationOverlay({
   const completedRef = useRef(false)
   const startedAtRef = useRef(0)
   const timersRef = useRef<number[]>([])
+  const overlayRef = useRef<HTMLDivElement>(null)
+  useImperativeHandle(forwardedRef, () => overlayRef.current as HTMLDivElement)
 
   const milestone = isStreakMilestone(currentStreak)
   const weekDays = useMemo(() => getWeekStripDays(currentStreak), [currentStreak])
@@ -146,10 +166,7 @@ export function StreakCelebrationOverlay({
   }, [])
 
   useEffect(() => {
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
     return () => {
-      document.body.style.overflow = prevOverflow
       clearTimers()
     }
   }, [clearTimers])
@@ -230,8 +247,9 @@ export function StreakCelebrationOverlay({
       phase === 'week' ||
       phase === 'settled')
 
-  return (
+  const overlay = (
     <div
+      ref={overlayRef}
       className={`streak-celeb streak-celeb--${phase}${reduced ? ' streak-celeb--reduced' : ''}${
         showNewCount ? ' streak-celeb--lit' : ''
       }`}
@@ -338,4 +356,8 @@ export function StreakCelebrationOverlay({
       ) : null}
     </div>
   )
-}
+
+  if (typeof document === 'undefined') return null
+
+  return createPortal(overlay, portalTarget ?? document.body)
+})

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "./";
 
 @theme {
   --color-brand: #ff2b2b;
@@ -51,6 +52,11 @@ body {
   --rest-bar-bottom: calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px));
   /* Espace scroll supplémentaire sous le contenu Train */
   --rest-content-clearance: calc(var(--rest-island-h) + var(--rest-island-gap));
+  /* Surchageables par le harness navigateur; production = vraies safe areas. */
+  --app-safe-area-top: env(safe-area-inset-top, 0px);
+  --app-safe-area-right: env(safe-area-inset-right, 0px);
+  --app-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --app-safe-area-left: env(safe-area-inset-left, 0px);
 }
 
 .glass-bar {
@@ -456,7 +462,10 @@ body {
   --sc-cream: #fff4c2;
   position: fixed;
   inset: 0;
-  z-index: 80;
+  box-sizing: border-box;
+  width: 100dvw;
+  height: 100dvh;
+  z-index: 10000;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -465,10 +474,10 @@ body {
   overscroll-behavior: none;
   background: var(--sc-bg);
   padding:
-    max(16px, env(safe-area-inset-top))
-    max(16px, env(safe-area-inset-right))
-    max(24px, env(safe-area-inset-bottom))
-    max(16px, env(safe-area-inset-left));
+    max(16px, var(--app-safe-area-top))
+    max(16px, var(--app-safe-area-right))
+    max(24px, var(--app-safe-area-bottom))
+    max(16px, var(--app-safe-area-left));
   color: #fff;
   outline: none;
   -webkit-tap-highlight-color: transparent;

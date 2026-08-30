@@ -5,7 +5,6 @@ import {
   isStreakActiveToday,
   STREAK_WEEK_BONUS_XP,
 } from '../../services/streakService'
-import { StreakCelebrationOverlay } from '../streak/StreakCelebrationOverlay'
 
 /**
  * DailyStreak — série connectée à Supabase (`profiles.current_streak`, `last_login_date`).
@@ -19,8 +18,6 @@ export function DailyStreak() {
     requireAuth,
     streakWeekBonus,
     clearStreakWeekBonus,
-    streakCelebration,
-    clearStreakCelebration,
   } = useAuth()
 
   const currentStreak = profile?.current_streak ?? 0
@@ -52,15 +49,6 @@ export function DailyStreak() {
     }, 5200)
     return () => window.clearTimeout(t)
   }, [streakWeekBonus, clearStreakWeekBonus])
-
-  const celebrationOverlay = streakCelebration ? (
-    <StreakCelebrationOverlay
-      previousStreak={streakCelebration.previousStreak}
-      currentStreak={streakCelebration.currentStreak}
-      dateKey={streakCelebration.dateKey}
-      onComplete={clearStreakCelebration}
-    />
-  ) : null
 
   if (!isAuthenticated) {
     return (
@@ -94,7 +82,6 @@ export function DailyStreak() {
 
   return (
     <section className="ios-fade-up space-y-3">
-      {celebrationOverlay}
       <div
         className={`streak-card relative overflow-hidden rounded-2xl border px-4 py-3.5 transition-all duration-500 ${
           lit

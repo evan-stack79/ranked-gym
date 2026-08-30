@@ -73,7 +73,7 @@ export type StreakCelebration = {
   dateKey: string
 }
 
-interface AuthContextValue {
+export interface AuthContextValue {
   user: AuthUser | null
   profile: ProfileRow | null
   isAuthenticated: boolean
@@ -606,6 +606,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ],
   )
 
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+/** Provider injectable pour tests intégrés et captures (valeur AuthContext complète). */
+export function AuthStateProvider({
+  value,
+  children,
+}: {
+  value: AuthContextValue
+  children: ReactNode
+}) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
