@@ -9,6 +9,7 @@ import {
 /**
  * DailyStreak — série connectée à Supabase (`profiles.current_streak`, `last_login_date`).
  * Le compteur est mis à jour automatiquement à chaque ouverture / login (AuthContext).
+ * La célébration premium ne s’affiche qu’après une vraie incrémentation N → N+1.
  */
 export function DailyStreak() {
   const {

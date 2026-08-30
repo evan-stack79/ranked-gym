@@ -3,6 +3,7 @@ import { computeTibHours } from '../sleep-engine'
 /**
  * Persistence locale des nuits — indépendant du Sleep Engine et de Nutrition.
  * Aucune donnée inventée : uniquement ce que l’utilisateur enregistre.
+ * TST optionnel (null = « Je ne sais pas » / pas de HealthKit).
  */
 
 import { getActiveCloudUserId } from './cloudSession'
@@ -19,8 +20,11 @@ export interface SleepNightEntry {
   bedtime: string
   /** HH:MM */
   waketime: string
-  /** Total Sleep Time (heures). */
-  tstHours: number
+  /**
+   * Total Sleep Time (heures).
+   * `null` = inconnu (jamais déduit du TIB).
+   */
+  tstHours: number | null
   createdAt: string
 }
 
@@ -54,13 +58,14 @@ function notifySleepChanged(options?: SleepStorageSaveOptions) {
   }
 }
 
-function asFiniteNumber(value: unknown, fallback: number): number {
+function asOptionalTstHours(value: unknown): number | null | undefined {
+  if (value === null || value === undefined) return null
   if (typeof value === 'number' && Number.isFinite(value)) return value
   if (typeof value === 'string' && value.trim() !== '') {
     const n = parseFloat(value.replace(',', '.'))
     if (Number.isFinite(n)) return n
   }
-  return fallback
+  return undefined
 }
 
 function normalizeTimeHm(raw: string): string | null {
@@ -81,22 +86,32 @@ function todayDateKey(now = new Date()): string {
 }
 
 export function normalizeSleepNightEntry(
-  input: Omit<SleepNightEntry, 'id' | 'createdAt'> & { id?: string; createdAt?: string },
+  input: Omit<SleepNightEntry, 'id' | 'createdAt'> & {
+    id?: string
+    createdAt?: string
+    tstHours?: number | null
+  },
 ): SleepNightEntry | null {
   const bedtime = normalizeTimeHm(input.bedtime)
   const waketime = normalizeTimeHm(input.waketime)
-  const tstHours = asFiniteNumber(input.tstHours, NaN)
-  const dateKey = typeof input.dateKey === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.dateKey)
-    ? input.dateKey
-    : null
+  const dateKey =
+    typeof input.dateKey === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.dateKey)
+      ? input.dateKey
+      : null
 
   if (!bedtime || !waketime || !dateKey) return null
-  if (!Number.isFinite(tstHours) || tstHours < 0 || tstHours > 24) return null
 
   const tibHours = computeTibHours(bedtime, waketime)
   if (tibHours == null || tibHours <= 0) return null
-  // TST ne peut pas dépasser le temps au lit (TIB).
-  if (tstHours > tibHours + 1e-6) return null
+
+  const tstParsed = asOptionalTstHours(input.tstHours)
+  if (tstParsed === undefined) return null
+
+  let tstHours: number | null = tstParsed
+  if (tstHours != null) {
+    if (tstHours < 0 || tstHours > 24) return null
+    if (tstHours > tibHours + 1e-6) return null
+  }
 
   return {
     id: input.id ?? `sleep-${dateKey}-${Date.now()}`,
@@ -130,7 +145,8 @@ export function saveSleepNight(
   input: {
     bedtime: string
     waketime: string
-    tstHours: number
+    /** `null` = inconnu (« Je ne sais pas »). Jamais déduit du TIB. */
+    tstHours: number | null
     dateKey?: string
   },
   options?: SleepStorageSaveOptions,
@@ -145,7 +161,6 @@ export function saveSleepNight(
 
   const log = getSleepLog().filter((n) => n.dateKey !== entry.dateKey)
   log.unshift(entry)
-  // Cap historique local
   writeJson(scopedKey(LOG_BASE), log.slice(0, 60))
   notifySleepChanged(options)
   return entry

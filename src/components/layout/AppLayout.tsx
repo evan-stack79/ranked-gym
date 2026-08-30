@@ -1,5 +1,8 @@
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
+import { useAuth } from '../../context/AuthContext'
+import { BrandMark } from '../brand/BrandMark'
 import { BottomNav } from './BottomNav'
+import { StreakCelebrationHost } from '../streak/StreakCelebrationHost'
 import { RestTimerOverlay, REST_BAR_CONTENT_PAD } from '../training/RestTimerOverlay'
 import {
   useRestTimerContext,
@@ -14,6 +17,8 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) {
+  const shellRef = useRef<HTMLDivElement>(null)
+  const { streakCelebration } = useAuth()
   const {
     state,
     isBarVisible,
@@ -24,10 +29,19 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
     dismiss,
   } = useRestTimerContext()
 
+  const streakCelebrationActive = Boolean(streakCelebration)
+  const showHeader = !chromeHidden
+  const showBottomNav = !chromeHidden
+  const bottomNavObscured = streakCelebrationActive
   const showReadyBar = !chromeHidden && activeTab === 'training' && readyBarEnabled
 
   return (
-    <div className="relative flex min-h-full flex-col mesh-bg font-sans">
+    <div
+      ref={shellRef}
+      className="relative flex min-h-full flex-col mesh-bg font-sans"
+      data-streak-celebration-active={streakCelebrationActive ? '' : undefined}
+      inert={streakCelebrationActive ? true : undefined}
+    >
       <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
         <div
           className="arena-glow absolute -left-[30%] -top-[20%] h-[70vh] w-[90vw] rounded-full blur-[90px]"
@@ -53,15 +67,16 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
         />
       </div>
 
-      {!chromeHidden ? (
-        <header className="glass-bar sticky top-0 z-40 border-b border-white/5">
+      {showHeader ? (
+        <header
+          className="glass-bar sticky top-0 z-40 border-b border-white/5"
+          aria-hidden={streakCelebrationActive ? true : undefined}
+        >
           <div
             className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"
             style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
           >
-            <span className="text-[17px] font-semibold tracking-tight text-white">
-              Ranked <span className="text-[#FF2B2B]">Gym</span>
-            </span>
+            <BrandMark variant="compact" />
           </div>
         </header>
       ) : null}
@@ -74,11 +89,15 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
           chromeHidden
             ? { paddingBottom: 0 }
             : {
-                paddingBottom: isBarVisible
-                  ? `calc(var(--app-bottom-nav) + ${REST_BAR_CONTENT_PAD} + env(safe-area-inset-bottom, 0px) + 1.5rem)`
-                  : 'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 1.5rem)',
+                paddingBottom:
+                  bottomNavObscured
+                    ? '1.5rem'
+                    : isBarVisible
+                      ? `calc(var(--app-bottom-nav) + ${REST_BAR_CONTENT_PAD} + env(safe-area-inset-bottom, 0px) + 1.5rem)`
+                      : 'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 1.5rem)',
               }
         }
+        aria-hidden={streakCelebrationActive ? true : undefined}
       >
         {children}
       </main>
@@ -103,9 +122,19 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
             onSkip={skip}
             onDismiss={dismiss}
           />
-          <BottomNav activeTab={activeTab} onTabChange={onTabChange} />
+          {showBottomNav ? (
+            <div
+              data-bottom-nav-host
+              className={bottomNavObscured ? 'pointer-events-none invisible' : undefined}
+              inert={bottomNavObscured ? true : undefined}
+              aria-hidden={bottomNavObscured ? true : undefined}
+            >
+              <BottomNav activeTab={activeTab} onTabChange={onTabChange} />
+            </div>
+          ) : null}
         </>
       ) : null}
+      <StreakCelebrationHost shellRef={shellRef} />
     </div>
   )
 }

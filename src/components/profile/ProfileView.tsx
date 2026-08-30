@@ -3,6 +3,7 @@ import { CloudBackupCard } from './CloudBackupCard'
 import { SettingsScreen } from '../settings/SettingsScreen'
 import { PersonalInformationScreen } from '../settings/PersonalInformationScreen'
 import { SecurityScreen } from '../settings/SecurityScreen'
+import { CameraHeartRateScreen } from '../settings/CameraHeartRateScreen'
 import { FullProfileScreen } from './FullProfileScreen'
 import { useAuth } from '../../context/AuthContext'
 import {
@@ -91,6 +92,11 @@ function ProfileViewContent() {
     )
   }
 
+
+  if (route === 'cameraHeartRate') {
+    return <CameraHeartRateScreen onBack={goBack} />
+  }
+
   if (route === 'fullProfile') {
     if (!isAuthenticated || !user) return null
     return <FullProfileScreen onBack={goBack} />
@@ -106,6 +112,7 @@ function ProfileViewContent() {
           onViewProfile={() => requireAuth(() => navigate('personalInfo'))}
           onOpenPersonalInfo={() => requireAuth(() => navigate('personalInfo'))}
           onOpenSecurity={() => requireAuth(() => navigate('security'))}
+          onOpenCameraHeartRate={() => navigate('cameraHeartRate')}
         />
         <CloudBackupCard />
       </div>
@@ -127,6 +134,7 @@ function ProfileViewContent() {
         onViewProfile={() => navigate('personalInfo')}
         onOpenPersonalInfo={() => navigate('personalInfo')}
         onOpenSecurity={() => navigate('security')}
+        onOpenCameraHeartRate={() => navigate('cameraHeartRate')}
         onRequireAuth={() => requireAuth(() => undefined)}
         onDisciplineChange={(label) => {
           setDisciplineId(disciplineFromLabel(label))

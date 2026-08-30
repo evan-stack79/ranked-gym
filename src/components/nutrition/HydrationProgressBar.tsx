@@ -10,6 +10,8 @@ interface HydrationProgressBarProps {
   compact?: boolean
   /** Indique le bonus séance du jour. */
   isTrainingDay?: boolean
+  /** Masque la note longue « Objectif atteint » (Accueil). */
+  showGoalReachedNote?: boolean
   className?: string
 }
 
@@ -19,6 +21,7 @@ export function HydrationProgressBar({
   showHeader = true,
   compact = false,
   isTrainingDay = false,
+  showGoalReachedNote = true,
   className = '',
 }: HydrationProgressBarProps) {
   const safeGoal = Math.max(100, goalMl)
@@ -85,7 +88,7 @@ export function HydrationProgressBar({
         />
       </div>
 
-      {goalReached ? (
+      {goalReached && showGoalReachedNote ? (
         <div
           className={`flex items-start gap-2 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.06] ${
             compact ? 'mt-2 px-2.5 py-2' : 'mt-2.5 px-3 py-2.5'

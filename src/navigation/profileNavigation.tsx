@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from 'react'
 
-export type ProfileRoute = 'settings' | 'personalInfo' | 'security' | 'fullProfile'
+export type ProfileRoute = 'settings' | 'personalInfo' | 'security' | 'fullProfile' | 'cameraHeartRate'
 
 interface ProfileNavigationContextValue {
   route: ProfileRoute

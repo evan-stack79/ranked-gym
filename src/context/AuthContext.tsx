@@ -15,17 +15,33 @@ import {
   ensureProfile,
   fetchProfile,
   mapSessionUser,
+  requestPasswordReset as apiRequestPasswordReset,
   signInWithEmail as apiSignInWithEmail,
   signOut as apiSignOut,
+  updatePassword as apiUpdatePassword,
   updateProfileProgress,
   type AuthUser,
 } from '../services/authService'
+import {
+  friendlyAuthError,
+  isAccountEnumerationError,
+  validateNewPassword,
+} from '../utils/authErrors'
+import {
+  getPasswordRecoveryRedirectTo,
+  PASSWORD_RESET_SENT_MESSAGE,
+} from '../utils/authRedirect'
 import {
   hydrateCloudBackupForUser,
   resetCloudBackupHydration,
   setCloudBackupUserId,
 } from '../services/cloudBackup'
-import { applyDailyLoginStreak } from '../services/streakService'
+import {
+  applyDailyLoginStreak,
+  hasCelebratedStreak,
+  markStreakCelebrated,
+  localDateKey,
+} from '../services/streakService'
 import {
   disciplineFromLabel,
   getDiscipline,
@@ -50,7 +66,14 @@ export type StreakWeekBonus = {
   bonusXp: number
 }
 
-interface AuthContextValue {
+/** Payload for the premium Daily Streak celebration overlay. */
+export type StreakCelebration = {
+  previousStreak: number
+  currentStreak: number
+  dateKey: string
+}
+
+export interface AuthContextValue {
   user: AuthUser | null
   profile: ProfileRow | null
   isAuthenticated: boolean
@@ -66,6 +89,9 @@ interface AuthContextValue {
   /** Fired when daily streak hits a multiple of 7 (show Accueil celebration). */
   streakWeekBonus: StreakWeekBonus | null
   clearStreakWeekBonus: () => void
+  /** Set only when streak actually increments N → N+1 (first open of local day). */
+  streakCelebration: StreakCelebration | null
+  clearStreakCelebration: () => void
   refreshProfile: () => Promise<void>
   /** Met à jour localement le profil (ex. avatar) sans refetch. */
   patchProfile: (patch: Partial<ProfileRow>) => void
@@ -74,6 +100,12 @@ interface AuthContextValue {
   requireAuth: (onSuccess: AuthSuccessCallback) => void
   signInWithEmail: (email: string, password: string) => Promise<void>
   signUpWithEmail: (email: string, password: string, pseudo?: string, discipline?: string) => Promise<void>
+  /** True after PASSWORD_RECOVERY until the new password is saved. */
+  isPasswordRecovery: boolean
+  authInfo: string | null
+  clearAuthMessages: () => void
+  requestPasswordReset: (email: string) => Promise<void>
+  confirmPasswordRecovery: (password: string, confirmPassword: string) => Promise<void>
   updateDiscipline: (disciplineLabel: string) => Promise<void>
   updateGhostMode: (enabled: boolean) => Promise<void>
   signOut: () => Promise<void>
@@ -81,24 +113,6 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-function friendlyAuthError(err: unknown, fallback: string): string {
-  const raw = err instanceof Error ? err.message : String(err)
-  const lower = raw.toLowerCase()
-
-  if (lower.includes('invalid login credentials')) {
-    return 'Email ou mot de passe incorrect.'
-  }
-  if (lower.includes('user already registered')) {
-    return 'Cet email est déjà utilisé. Passe sur Connexion.'
-  }
-  if (lower.includes('password') && lower.includes('6')) {
-    return 'Le mot de passe doit contenir au moins 6 caractères.'
-  }
-  if (lower.includes('email')) {
-    return raw
-  }
-  return raw || fallback
-}
 
 const HYDRATE_TIMEOUT_MS = 20_000
 
@@ -133,11 +147,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthOpen, setIsAuthOpen] = useState(false)
   const [authLoading, setAuthLoading] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
+  const [authInfo, setAuthInfo] = useState<string | null>(null)
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
   const [streakWeekBonus, setStreakWeekBonus] = useState<StreakWeekBonus | null>(null)
+  const [streakCelebration, setStreakCelebration] = useState<StreakCelebration | null>(null)
   const pendingRef = useRef<AuthSuccessCallback | null>(null)
   const hydrateGenRef = useRef(0)
+  const streakInFlightRef = useRef(false)
+  const profileRef = useRef<ProfileRow | null>(null)
+  const userRef = useRef<AuthUser | null>(null)
 
   const clearStreakWeekBonus = useCallback(() => setStreakWeekBonus(null), [])
+  const clearStreakCelebration = useCallback(() => setStreakCelebration(null), [])
+
+  useEffect(() => {
+    profileRef.current = profile
+  }, [profile])
+
+  useEffect(() => {
+    userRef.current = user
+  }, [user])
+
+  const applyStreakForProfile = useCallback(
+    async (authUser: AuthUser, row: ProfileRow): Promise<ProfileRow> => {
+      if (streakInFlightRef.current) return row
+      streakInFlightRef.current = true
+      try {
+        const streakResult = await applyDailyLoginStreak(row)
+        setProfile(streakResult.profile)
+        setUser({
+          ...authUser,
+          displayName: streakResult.profile.pseudo || authUser.displayName,
+        })
+
+        if (streakResult.weekBonus && streakResult.bonusXp > 0) {
+          setStreakWeekBonus({
+            streak: streakResult.profile.current_streak,
+            bonusXp: streakResult.bonusXp,
+          })
+        }
+
+        const dateKey = localDateKey()
+        const currentStreak = streakResult.profile.current_streak
+        const previousStreak = streakResult.previousStreak
+        const isIncrement = streakResult.didUpdate && currentStreak === previousStreak + 1
+
+        if (
+          isIncrement &&
+          !hasCelebratedStreak(authUser.id, dateKey, currentStreak)
+        ) {
+          markStreakCelebrated(authUser.id, dateKey, currentStreak)
+          setStreakCelebration({
+            previousStreak,
+            currentStreak,
+            dateKey,
+          })
+        }
+
+        return streakResult.profile
+      } catch {
+        // Columns may be missing until SQL migration — keep base profile.
+        return row
+      } finally {
+        streakInFlightRef.current = false
+      }
+    },
+    [],
+  )
 
   const loadProfile = useCallback(async (authUser: AuthUser, metaDiscipline?: string) => {
     setCloudBackupUserId(authUser.id)
@@ -163,22 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (row) {
-      try {
-        const streakResult = await applyDailyLoginStreak(row)
-        setProfile(streakResult.profile)
-        setUser({
-          ...authUser,
-          displayName: streakResult.profile.pseudo || authUser.displayName,
-        })
-        if (streakResult.weekBonus && streakResult.bonusXp > 0) {
-          setStreakWeekBonus({
-            streak: streakResult.profile.current_streak,
-            bonusXp: streakResult.bonusXp,
-          })
-        }
-      } catch {
-        // Columns may be missing until SQL migration — keep base profile.
-      }
+      await applyStreakForProfile(authUser, row)
     }
 
     try {
@@ -264,13 +325,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (nextSession?.user) {
         const mapped = mapSessionUser(nextSession.user)
         setUser(mapped)
-        if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'PASSWORD_RECOVERY') {
+        if (event === 'PASSWORD_RECOVERY') {
+          setIsPasswordRecovery(true)
+          setAuthError(null)
+          setAuthInfo(null)
+          setIsAuthOpen(true)
+          void hydrateUser(mapped, metaDisciplineOf(nextSession.user))
+        } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
           void hydrateUser(mapped, metaDisciplineOf(nextSession.user))
         }
       } else {
         hydrateGenRef.current += 1
         setUser(null)
         setProfile(null)
+        setIsPasswordRecovery(false)
         resetCloudBackupHydration()
         setIsLoading(false)
       }
@@ -300,11 +368,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const closeAuth = useCallback(() => {
     // Bêta privée : pas de fermeture tant qu’il n’y a pas de session Supabase.
     if (!session?.user) return
+    // Recovery : il faut enregistrer le nouveau mot de passe.
+    if (isPasswordRecovery) return
     setIsAuthOpen(false)
     setAuthError(null)
+    setAuthInfo(null)
     pendingRef.current = null
     setAuthLoading(false)
-  }, [session])
+  }, [session, isPasswordRecovery])
 
   const requireAuth = useCallback(
     (onSuccess: AuthSuccessCallback) => {
@@ -343,6 +414,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         'Bêta fermée. Les inscriptions publiques sont actuellement désactivées.',
       )
       setAuthLoading(false)
+    },
+    [],
+  )
+
+  const clearAuthMessages = useCallback(() => {
+    setAuthError(null)
+    setAuthInfo(null)
+  }, [])
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    if (!isSupabaseConfigured()) {
+      setAuthError(getSupabaseConfigError())
+      return
+    }
+    setAuthLoading(true)
+    setAuthError(null)
+    setAuthInfo(null)
+    try {
+      const redirectTo = getPasswordRecoveryRedirectTo()
+      await apiRequestPasswordReset(email, redirectTo)
+      setAuthInfo(PASSWORD_RESET_SENT_MESSAGE)
+    } catch (err) {
+      if (isAccountEnumerationError(err)) {
+        setAuthInfo(PASSWORD_RESET_SENT_MESSAGE)
+      } else {
+        setAuthError(friendlyAuthError(err, 'Envoi impossible. Réessaie plus tard.'))
+      }
+    } finally {
+      setAuthLoading(false)
+    }
+  }, [])
+
+  const confirmPasswordRecovery = useCallback(
+    async (password: string, confirmPassword: string) => {
+      if (!isSupabaseConfigured()) {
+        setAuthError(getSupabaseConfigError())
+        return
+      }
+      const validationError = validateNewPassword(password, confirmPassword)
+      if (validationError) {
+        setAuthError(validationError)
+        return
+      }
+      setAuthLoading(true)
+      setAuthError(null)
+      setAuthInfo(null)
+      try {
+        await apiUpdatePassword(password)
+        setIsPasswordRecovery(false)
+        setAuthInfo('Mot de passe mis à jour. Tu es connecté.')
+        window.setTimeout(() => {
+          setIsAuthOpen(false)
+          setAuthInfo(null)
+          pendingRef.current = null
+        }, 900)
+      } catch (err) {
+        setAuthError(friendlyAuthError(err, 'Impossible d’enregistrer le mot de passe.'))
+      } finally {
+        setAuthLoading(false)
+      }
     },
     [],
   )
@@ -391,8 +522,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     setProfile(null)
     setStreakWeekBonus(null)
+    setStreakCelebration(null)
+    setIsPasswordRecovery(false)
+    setAuthInfo(null)
+    setAuthError(null)
     setIsLoading(false)
   }, [])
+
+  // Retour au premier plan après minuit local → nouvelle journée validée (idempotent).
+  useEffect(() => {
+    const recheck = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      if (isLoading) return
+      const authUser = userRef.current
+      const row = profileRef.current
+      if (!authUser || !row) return
+      void applyStreakForProfile(authUser, row)
+    }
+    document.addEventListener('visibilitychange', recheck)
+    window.addEventListener('focus', recheck)
+    return () => {
+      document.removeEventListener('visibilitychange', recheck)
+      window.removeEventListener('focus', recheck)
+    }
+  }, [isLoading, applyStreakForProfile])
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -405,6 +558,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authError,
       streakWeekBonus,
       clearStreakWeekBonus,
+      streakCelebration,
+      clearStreakCelebration,
       refreshProfile,
       patchProfile,
       openAuth,
@@ -412,6 +567,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requireAuth,
       signInWithEmail,
       signUpWithEmail: signUpEmail,
+      isPasswordRecovery,
+      authInfo,
+      clearAuthMessages,
+      requestPasswordReset,
+      confirmPasswordRecovery,
       updateDiscipline,
       updateGhostMode,
       signOut,
@@ -426,6 +586,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authError,
       streakWeekBonus,
       clearStreakWeekBonus,
+      streakCelebration,
+      clearStreakCelebration,
       refreshProfile,
       patchProfile,
       openAuth,
@@ -433,12 +595,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requireAuth,
       signInWithEmail,
       signUpEmail,
+      isPasswordRecovery,
+      authInfo,
+      clearAuthMessages,
+      requestPasswordReset,
+      confirmPasswordRecovery,
       updateDiscipline,
       updateGhostMode,
       signOut,
     ],
   )
 
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+/** Provider injectable pour tests intégrés et captures (valeur AuthContext complète). */
+export function AuthStateProvider({
+  value,
+  children,
+}: {
+  value: AuthContextValue
+  children: ReactNode
+}) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
