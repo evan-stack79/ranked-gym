@@ -47,6 +47,10 @@ export interface ScheduledSession {
   enabled: boolean
   /** Notify X minutes before */
   remindBeforeMin?: number
+  /** Sport planifié, figé à la création. Absent sur les créneaux legacy. */
+  sportId?: string
+  /** Parcours Train à ouvrir. Absent sur les créneaux legacy. */
+  sessionKind?: SessionKind
 }
 
 export interface CompletedSession {
@@ -81,6 +85,12 @@ export interface ExerciseEntry {
   note?: string
 }
 
+/** Famille de séance — additive ; absente sur les notes legacy. */
+export type SessionKind = 'strength' | 'endurance' | 'team' | 'generic'
+
+/** Provenance de la saisie — additive ; absente sur les notes legacy. */
+export type SessionSource = 'manual' | 'import'
+
 export interface WorkoutNote {
   id: string
   title: string
@@ -94,7 +104,47 @@ export interface WorkoutNote {
   totalVolumeKg?: number
   /** Links to a saved focus routine (Upper, Legs, Pecs…) */
   routineId?: string
+  /**
+   * Sport réellement pratiqué au moment de la séance (figé à l’écriture).
+   * Optionnel : notes legacy sans ce champ restent valides.
+   */
+  sportId?: string
+  /**
+   * Famille de module Train utilisée pour saisir la séance.
+   * Optionnel : notes legacy sans ce champ restent valides.
+   */
+  sessionKind?: SessionKind
+  /**
+   * Source de la saisie (`manual` pour toutes les saisies UI actuelles).
+   * Optionnel : notes legacy sans ce champ restent valides.
+   */
+  source?: SessionSource
+  /**
+   * Détails structurés selon le module (ex. distance endurance).
+   * Optionnel : notes legacy et séances non-endurance restent valides sans ce champ.
+   */
+  details?: SessionDetails
 }
+
+/** Détails typés par module — extensible (endurance, team, …). */
+export type EnduranceSessionDetails = {
+  kind: 'endurance'
+  /** Distance en km — nombre fini strictement positif. */
+  distanceKm: number
+}
+
+export type TeamSessionType = 'training' | 'match'
+
+export type TeamSessionDetails = {
+  kind: 'team'
+  sessionType: TeamSessionType
+  /** Minutes effectivement jouées — facultatif, ≤ durée de séance. */
+  minutesPlayed?: number
+  /** Poste libre — facultatif. */
+  position?: string
+}
+
+export type SessionDetails = EnduranceSessionDetails | TeamSessionDetails
 
 /** Persistent “bloc” — opens last exercises for that focus. */
 export interface WorkoutRoutine {
@@ -103,6 +153,18 @@ export interface WorkoutRoutine {
   subtitle: string
   accent: string
   exercises: ExerciseEntry[]
+  updatedAt: number
+}
+
+/**
+ * Identité explicite de l'unique séance de musculation en cours.
+ * Additive : les états legacy sans ce champ restent valides et ne sont jamais
+ * assimilés automatiquement à une séance active à partir de seuls marqueurs `done`.
+ */
+export interface ActiveWorkoutDraft {
+  routineId: string
+  sportId: string
+  startedAt: number
   updatedAt: number
 }
 
@@ -118,4 +180,13 @@ export interface TrainingState {
   completed: CompletedSession[]
   workoutNotes: WorkoutNote[]
   routines: WorkoutRoutine[]
+  /**
+   * Dernière routine sélectionnée dans le carnet Train (reprise type YouTube).
+   * Persistée immédiatement au changement — ne dépend pas d’un événement de fermeture.
+   */
+  lastSelectedRoutineId: string | null
+  /** Sport associé à la dernière sélection (évite une reprise incompatible). */
+  lastSelectedSportId: string | null
+  /** Brouillon réellement actif ; absent/null pour les états legacy ou terminés. */
+  activeWorkoutDraft?: ActiveWorkoutDraft | null
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight, Clock, Dumbbell, Flame, Pencil, Trash2 } from 'lucide-react'
 import type { WorkoutNote } from '../../types/training'
 import {
@@ -8,26 +8,42 @@ import {
   noteDurationMin,
   noteVolumeKg,
 } from '../../utils/workoutHistory'
-import { IosSheet } from '../ui/IosSheet'
+import { TrainSheet as IosSheet } from './TrainSheet'
 
 interface WorkoutHistoryProps {
   notes: WorkoutNote[]
   onDelete: (id: string) => void
   onEdit?: (note: WorkoutNote) => void
+  /** Filtre optionnel — masque l’action Éditer si false. */
+  canEdit?: (note: WorkoutNote) => boolean
+  /** Ouvre le détail d’une séance (hub « Dernières séances »). */
+  focusNoteId?: string | null
+  onFocusConsumed?: () => void
 }
 
-export function WorkoutHistory({ notes, onDelete, onEdit }: WorkoutHistoryProps) {
+export function WorkoutHistory({
+  notes,
+  onDelete,
+  onEdit,
+  canEdit,
+  focusNoteId = null,
+  onFocusConsumed,
+}: WorkoutHistoryProps) {
   const [selected, setSelected] = useState<WorkoutNote | null>(null)
   const groups = useMemo(() => groupNotesByDate(notes), [notes])
+
+  useEffect(() => {
+    if (!focusNoteId) return
+    const hit = notes.find((n) => n.id === focusNoteId) ?? null
+    setSelected(hit)
+    onFocusConsumed?.()
+  }, [focusNoteId, notes, onFocusConsumed])
 
   if (groups.length === 0) {
     return (
       <section className="space-y-2">
         <div className="px-1">
-          <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-            Historique
-          </p>
-          <h2 className="text-[20px] font-bold text-white">Journal d’athlète</h2>
+          <h2 className="text-[20px] font-bold text-white">Historique</h2>
           <p className="mt-1 text-[12px] text-[#AEAEB2]">
             Tes séances passées apparaîtront ici, groupées par jour.
           </p>
@@ -37,15 +53,9 @@ export function WorkoutHistory({ notes, onDelete, onEdit }: WorkoutHistoryProps)
   }
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-3">
       <div className="px-1">
-        <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-          Historique
-        </p>
-        <h2 className="text-[20px] font-bold text-white">Journal d’athlète</h2>
-        <p className="mt-1 text-[12px] text-[#AEAEB2]">
-          Chronologique · volume · durée · détail des séries.
-        </p>
+        <h2 className="text-[20px] font-bold text-white">Historique</h2>
       </div>
 
       {groups.map((group) => (
@@ -58,28 +68,30 @@ export function WorkoutHistory({ notes, onDelete, onEdit }: WorkoutHistoryProps)
               const exerciseCount = note.exercises.length
               return (
                 <li key={note.id}>
-                  <button
-                    type="button"
-                    onClick={() => setSelected(note)}
-                    className="ios-press glass-card flex w-full items-center gap-3 rounded-2xl p-3.5 text-left"
-                  >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#FF2B2B]/15 text-[#FF6961]">
+                  <div className="ios-press glass-card relative flex w-full items-center gap-3 rounded-2xl p-3.5 text-left">
+                    <button
+                      type="button"
+                      onClick={() => setSelected(note)}
+                      className="absolute inset-0 z-0 rounded-2xl"
+                      aria-label={`Voir ${note.title}`}
+                    />
+                    <div className="relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#FF2B2B]/15 text-[#FF6961]">
                       <Dumbbell className="h-5 w-5" />
                     </div>
-                    <div className="min-w-0 flex-1">
+                    <div className="relative z-10 min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className="truncate font-semibold text-white">{note.title}</p>
                         <span className="shrink-0 text-[11px] text-[#636366]">
                           {formatClock(note.createdAt)}
                         </span>
-                        {onEdit ? (
+                        {onEdit && (canEdit?.(note) ?? true) ? (
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
                               onEdit(note)
                             }}
-                            className="ios-press ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-[#AEAEB2]"
+                            className="ios-press relative z-20 ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-[#AEAEB2]"
                             aria-label={`Modifier ${note.title}`}
                           >
                             <Pencil className="h-3.5 w-3.5" strokeWidth={2.25} />
@@ -106,8 +118,8 @@ export function WorkoutHistory({ notes, onDelete, onEdit }: WorkoutHistoryProps)
                         {exerciseCount > 1 ? '…' : ''}
                       </p>
                     </div>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-[#636366]" />
-                  </button>
+                    <ChevronRight className="relative z-10 h-4 w-4 shrink-0 text-[#636366]" />
+                  </div>
                 </li>
               )
             })}
@@ -128,6 +140,24 @@ export function WorkoutHistory({ notes, onDelete, onEdit }: WorkoutHistoryProps)
       >
         {selected && (
           <div className="space-y-4 pb-2">
+            {selected.details?.kind === 'team' ? (
+              <p className="text-[13px] text-[#AEAEB2]">
+                {selected.details.sessionType === 'match' ? 'Match' : 'Entraînement'}
+                {selected.details.minutesPlayed != null
+                  ? ` · ${selected.details.minutesPlayed} min jouées`
+                  : null}
+                {selected.details.position
+                  ? ` · Poste : ${selected.details.position}`
+                  : null}
+              </p>
+            ) : null}
+            {selected.details?.kind === 'endurance' &&
+            Number.isFinite(selected.details.distanceKm) &&
+            selected.details.distanceKm > 0 ? (
+              <p className="text-[13px] text-[#AEAEB2]">
+                Distance : {selected.details.distanceKm} km
+              </p>
+            ) : null}
             {selected.exercises.map((ex) => (
               <div
                 key={ex.id}
@@ -153,7 +183,7 @@ export function WorkoutHistory({ notes, onDelete, onEdit }: WorkoutHistoryProps)
               </div>
             ))}
 
-            {onEdit ? (
+            {onEdit && selected && (canEdit?.(selected) ?? true) ? (
               <button
                 type="button"
                 onClick={() => {

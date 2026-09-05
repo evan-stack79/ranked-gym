@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Bell, CalendarDays, Plus, Trash2 } from 'lucide-react'
-import type { ScheduledSession, Weekday } from '../../types/training'
-import { IosSheet } from '../ui/IosSheet'
+import type { ScheduledSession, Weekday, WorkoutRoutine } from '../../types/training'
+import { getSportById, SPORTS } from '../../data/sports'
+import { sessionKindForSport } from '../../utils/sessionMeta'
+import { TrainSheet as IosSheet } from './TrainSheet'
 import {
   notificationPermission,
   requestReminderPermission,
@@ -22,6 +24,8 @@ const DAY_NAMES = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
 
 interface TrainingAgendaProps {
   schedule: ScheduledSession[]
+  routines: WorkoutRoutine[]
+  primarySportId: string
   notificationsEnabled: boolean
   onSave: (entry: Omit<ScheduledSession, 'id'> & { id?: string }) => void
   onRemove: (id: string) => void
@@ -31,6 +35,8 @@ interface TrainingAgendaProps {
 
 export function TrainingAgenda({
   schedule,
+  routines,
+  primarySportId,
   notificationsEnabled,
   onSave,
   onRemove,
@@ -42,6 +48,14 @@ export function TrainingAgenda({
   const [days, setDays] = useState<Weekday[]>([1, 4])
   const [time, setTime] = useState('18:30')
   const [remindBefore, setRemindBefore] = useState(10)
+  const [sportId, setSportId] = useState(() =>
+    getSportById(primarySportId) ? primarySportId : 'musculation',
+  )
+  const [routineId, setRoutineId] = useState(
+    () => routines.find((routine) => routine.exercises.length > 0)?.id ?? 'notebook',
+  )
+
+  const sessionKind = sessionKindForSport(sportId)
 
   const sorted = useMemo(
     () =>
@@ -72,12 +86,14 @@ export function TrainingAgenda({
       await enableNotifs()
     }
     onSave({
-      templateId: 'notebook',
+      templateId: sessionKind === 'strength' ? routineId : 'notebook',
       title: title.trim(),
       days,
       time,
       enabled: true,
       remindBeforeMin: remindBefore,
+      sportId,
+      sessionKind,
     })
     setOpen(false)
     onToast(`Rappel « ${title.trim()} » · ${time} (−${remindBefore} min)`)
@@ -157,6 +173,11 @@ export function TrainingAgenda({
                   {' · '}-
                   {item.remindBeforeMin ?? 10} min
                 </p>
+                <p className="text-[11px] text-[#636366]">
+                  {item.sportId
+                    ? getSportById(item.sportId)?.name ?? item.title
+                    : 'Sport non précisé · ancien créneau'}
+                </p>
               </div>
               <button
                 type="button"
@@ -185,6 +206,55 @@ export function TrainingAgenda({
               className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none"
             />
           </label>
+
+          <label className="block">
+            <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+              Sport
+            </span>
+            <select
+              value={sportId}
+              onChange={(event) => {
+                const nextSportId = event.target.value
+                setSportId(nextSportId)
+                if (sessionKindForSport(nextSportId) === 'strength') {
+                  setRoutineId((current) =>
+                    routines.some((routine) => routine.id === current && routine.exercises.length > 0)
+                      ? current
+                      : routines.find((routine) => routine.exercises.length > 0)?.id ?? 'notebook',
+                  )
+                }
+              }}
+              className="min-h-11 w-full rounded-xl border border-white/10 bg-[#141416] px-3.5 py-3 text-[15px] text-white outline-none"
+            >
+              {[...SPORTS]
+                .sort((a, b) => b.popularity - a.popularity)
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+
+          {sessionKind === 'strength' ? (
+            <label className="block">
+              <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                Routine
+              </span>
+              <select
+                value={routineId}
+                onChange={(event) => setRoutineId(event.target.value)}
+                className="min-h-11 w-full rounded-xl border border-white/10 bg-[#141416] px-3.5 py-3 text-[15px] text-white outline-none"
+              >
+                <option value="notebook">Choisir dans le carnet</option>
+                {routines.map((routine) => (
+                  <option key={routine.id} value={routine.id}>
+                    {routine.label}{routine.exercises.length === 0 ? ' · vide' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
 
           <div>
             <p className="mb-2 text-[12px] font-semibold text-[#8E8E93]">Jours</p>

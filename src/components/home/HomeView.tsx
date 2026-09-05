@@ -11,14 +11,15 @@ import { SleepSnapshot } from './SleepSnapshot'
 interface HomeViewProps {
   onStartTraining: (routineId: string) => void
   onOpenTraining: () => void
+  onOpenNutrition: () => void
 }
 
 /**
  * Accueil = dashboard quotidien.
- * Ordre : Sommeil → Séance → Nutrition → Alertes (si besoin).
+ * Ordre : Nutrition (calories + eau) → Séance → Sommeil → Série → Alertes (si besoin).
  * Ghost mode / Lobby / feed social : hors nav principale (infra conservée).
  */
-export function HomeView({ onStartTraining, onOpenTraining }: HomeViewProps) {
+export function HomeView({ onStartTraining, onOpenTraining, onOpenNutrition }: HomeViewProps) {
   const { user, profile } = useAuth()
   const [trainingTick, setTrainingTick] = useState(0)
 
@@ -52,24 +53,25 @@ export function HomeView({ onStartTraining, onOpenTraining }: HomeViewProps) {
 
   return (
     <div className="flex flex-col gap-8">
-      <header className="flex flex-col gap-4">
+      <header>
         <h1 className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white">
           {greeting}
         </h1>
-        <DailyStreak />
       </header>
 
-      <SleepSnapshot />
+      <NutritionSnapshot onOpenNutrition={onOpenNutrition} />
 
       <TodayWorkoutCard
         workout={todayWorkout}
         onStart={() => {
-          if (todayWorkout) onStartTraining(todayWorkout.routineId)
+          if (todayWorkout?.canStart) onStartTraining(todayWorkout.routineId)
         }}
         onOpenNotebook={onOpenTraining}
       />
 
-      <NutritionSnapshot />
+      <SleepSnapshot />
+
+      <DailyStreak />
 
       {/* Alertes : uniquement si un signal produit le justifie (aucune alerte permanente). */}
     </div>

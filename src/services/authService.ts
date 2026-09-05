@@ -79,6 +79,24 @@ export async function signOut() {
   if (error) throw error
 }
 
+/**
+ * Envoie un email de récupération. Ne révèle pas si l’adresse existe.
+ * `redirectTo` doit être une URL HTTPS publique (voir getPasswordRecoveryRedirectTo).
+ */
+export async function requestPasswordReset(email: string, redirectTo?: string) {
+  const supabase = getSupabase()
+  const options = redirectTo ? { redirectTo } : undefined
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), options)
+  if (error) throw error
+}
+
+/** Définit le nouveau mot de passe après l’événement PASSWORD_RECOVERY. */
+export async function updatePassword(newPassword: string) {
+  const supabase = getSupabase()
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) throw error
+}
+
 /** Vérifie l’ancien mot de passe puis met à jour le nouveau. */
 export async function changePassword(email: string, currentPassword: string, newPassword: string) {
   const supabase = getSupabase()

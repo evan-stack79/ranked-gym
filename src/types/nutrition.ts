@@ -89,8 +89,15 @@ export interface DayJournal {
    */
   waterPresetsCount?: WaterPresetsCount
   /**
-   * Niveau visuel de la bouteille courante (ml déjà bus sur cette bouteille, 0–1500).
-   * Permet de calibrer une bouteille déjà entamée sans créditer l’eau au total.
+   * Phase technique de la bouteille active : ml déjà bus (0–1500), pas les ml restants UI.
+   * En calibrage : `waterBottleLevelMl = capacity − remainingMl`.
+   * Legacy : peut exister seul (sans `waterBottleCalibrationTotalMl`).
    */
   waterBottleLevelMl?: number
+  /**
+   * Ancre de calibrage : total du journal (`waterMl`) au moment du réglage.
+   * Présent uniquement en mode calibré — avec `waterBottleLevelMl`, permet de
+   * faire baisser/monter le niveau affiché quand le journal change, sans créer d’eau.
+   */
+  waterBottleCalibrationTotalMl?: number
 }

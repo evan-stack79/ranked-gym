@@ -1,4 +1,5 @@
-import type { ScheduledSession, TrainingState, Weekday } from '../types/training'
+import type { ScheduledSession, SessionKind, TrainingState, Weekday } from '../types/training'
+import { sessionKindForSport } from './sessionMeta'
 
 export interface TodayWorkoutPlan {
   routineId: string
@@ -7,6 +8,19 @@ export interface TodayWorkoutPlan {
   accent: string
   source: 'schedule'
   exerciseCount: number
+  /** Routine présente dans le carnet avec au moins un exercice — seul cas « Démarrer ». */
+  canStart: boolean
+  /** templateId brut du créneau agenda. */
+  templateId: string
+  /** Métadonnées explicites du créneau, ou fallback force legacy sûr. */
+  sportId: string | null
+  sessionKind: SessionKind | null
+  time: string
+  /**
+   * Vrai seulement si le template est une entrée force connue du registre existant.
+   * Sans `sportId` sur le créneau, c’est la seule source non ambiguë disponible.
+   */
+  isStrengthTemplate: boolean
 }
 
 const TEMPLATE_TO_ROUTINE: Record<string, string> = {
@@ -26,8 +40,40 @@ const TEMPLATE_TO_ROUTINE: Record<string, string> = {
   pecs: 'pecs',
 }
 
+/** Templates agenda explicitement mappés vers une routine force (registre existant). */
+export function isMappedStrengthTemplate(templateId: string): boolean {
+  return Object.prototype.hasOwnProperty.call(TEMPLATE_TO_ROUTINE, templateId)
+}
+
 function resolveRoutineId(templateId: string): string {
   return TEMPLATE_TO_ROUTINE[templateId] ?? templateId
+}
+
+function cleanId(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+/**
+ * Métadonnées de planning fiables : un sport connu fait autorité sur un kind incohérent.
+ * Les anciens templates force bénéficient d'un fallback sûr ; un ancien créneau notebook
+ * reste volontairement non typé afin de ne jamais inventer de sport.
+ */
+export function resolveScheduledSessionMeta(
+  scheduled: ScheduledSession,
+): { sportId: string; sessionKind: SessionKind } | null {
+  const explicitSportId = cleanId(scheduled.sportId)
+  if (explicitSportId) {
+    return {
+      sportId: explicitSportId,
+      sessionKind: sessionKindForSport(explicitSportId),
+    }
+  }
+  if (isMappedStrengthTemplate(scheduled.templateId)) {
+    return { sportId: 'musculation', sessionKind: 'strength' }
+  }
+  return null
 }
 
 function pickScheduledToday(
@@ -53,12 +99,30 @@ export function getTodayWorkout(
 
   const routineId = resolveRoutineId(scheduled.templateId)
   const routine = state.routines.find((r) => r.id === routineId)
+  const exerciseCount = routine?.exercises.length ?? 0
+  const meta = resolveScheduledSessionMeta(scheduled) ??
+    (routine && exerciseCount > 0
+      ? { sportId: 'musculation', sessionKind: 'strength' as const }
+      : null)
+  const isStrengthTemplate = meta?.sessionKind === 'strength'
+  const canStart = meta == null
+    ? false
+    : isStrengthTemplate
+      ? Boolean(routine && exerciseCount > 0)
+      : true
+
   return {
     routineId,
     title: scheduled.title,
     subtitle: routine?.subtitle ?? 'Programme du jour',
     accent: routine?.accent ?? '#FF2B2B',
     source: 'schedule',
-    exerciseCount: routine?.exercises.length ?? 0,
+    exerciseCount,
+    canStart,
+    templateId: scheduled.templateId,
+    isStrengthTemplate,
+    sportId: meta?.sportId ?? null,
+    sessionKind: meta?.sessionKind ?? null,
+    time: scheduled.time,
   }
 }

@@ -6,16 +6,18 @@ import type {
   WorkoutNote,
   WorkoutRoutine,
   ExerciseEntry,
+  ActiveWorkoutDraft,
+  SessionKind,
 } from '../types/training'
 import { todayKey } from '../utils/calories'
 import { getCalorieProfile } from './nutritionStorage'
-import { progressRoutineExercises } from '../utils/forceArena'
 import {
   computeStrengthSessionStats,
   sessionIntensity,
   strengthSessionKcal,
 } from '../utils/strength'
 import { getActiveCloudUserId } from './cloudSession'
+import { sessionKindForSport } from '../utils/sessionMeta'
 
 const KEY_BASE = 'ranked-gym:training'
 
@@ -128,6 +130,9 @@ const DEFAULT_STATE: TrainingState = {
   completed: [],
   workoutNotes: [],
   routines: DEFAULT_ROUTINES.map((r) => ({ ...r })),
+  lastSelectedRoutineId: null,
+  lastSelectedSportId: null,
+  activeWorkoutDraft: null,
 }
 
 function cloneExercises(exercises: ExerciseEntry[]): ExerciseEntry[] {
@@ -136,6 +141,68 @@ function cloneExercises(exercises: ExerciseEntry[]): ExerciseEntry[] {
     id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     sets: e.sets.map((s) => ({ ...s })),
   }))
+}
+
+/**
+ * Marqueurs transitoires de séance en cours (done / restSec).
+ * Nettoyés atomiquement à la fin d’une séance pour ne jamais réafficher « Reprendre ».
+ */
+export function stripTransientSetMarkers(exercises: ExerciseEntry[]): ExerciseEntry[] {
+  return exercises.map((e) => ({
+    ...e,
+    sets: e.sets.map((s) => {
+      const { done: _done, restSec: _rest, ...rest } = s
+      return { ...rest }
+    }),
+  }))
+}
+
+/** IDs persistés : ignore non-string / vide / trop long / caractères de contrôle. */
+export function sanitizeStoredId(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed || trimmed.length > 128) return null
+  if (/[\u0000-\u001F\u007F]/.test(trimmed)) return null
+  return trimmed
+}
+
+function isSessionKind(value: unknown): value is SessionKind {
+  return value === 'strength' || value === 'endurance' || value === 'team' || value === 'generic'
+}
+
+/** Validation stricte du marqueur additif ; une donnée legacy ambiguë reste inactive. */
+export function normalizeActiveWorkoutDraft(
+  value: unknown,
+  routines: WorkoutRoutine[],
+): ActiveWorkoutDraft | null {
+  if (!value || typeof value !== 'object') return null
+  const raw = value as Partial<ActiveWorkoutDraft>
+  const routineId = sanitizeStoredId(raw.routineId)
+  const sportId = sanitizeStoredId(raw.sportId)
+  if (!routineId || !sportId || !routines.some((routine) => routine.id === routineId)) return null
+  if (!Number.isFinite(raw.startedAt) || !Number.isFinite(raw.updatedAt)) return null
+  if ((raw.startedAt ?? 0) <= 0 || (raw.updatedAt ?? 0) <= 0) return null
+  return {
+    routineId,
+    sportId,
+    startedAt: raw.startedAt as number,
+    updatedAt: raw.updatedAt as number,
+  }
+}
+
+function normalizeScheduleEntry<T extends Omit<ScheduledSession, 'id'> & { id?: string }>(
+  entry: T,
+): T {
+  const sportId = sanitizeStoredId(entry.sportId)
+  const sessionKind = sportId
+    ? sessionKindForSport(sportId)
+    : isSessionKind(entry.sessionKind)
+      ? entry.sessionKind
+      : undefined
+  return {
+    ...entry,
+    ...(sportId ? { sportId, sessionKind } : {}),
+  }
 }
 
 function read(): TrainingState {
@@ -149,6 +216,7 @@ function read(): TrainingState {
       }
     }
     const parsed = JSON.parse(raw) as Partial<TrainingState>
+    const routines = mergeRoutines(parsed.routines)
     const merged: TrainingState = {
       ...DEFAULT_STATE,
       ...parsed,
@@ -164,8 +232,11 @@ function read(): TrainingState {
           ? parsed.favoriteSportIds
           : ['musculation'],
       workoutNotes: parsed.workoutNotes ?? [],
-      routines: mergeRoutines(parsed.routines),
+      routines,
       notificationsEnabled: Boolean(parsed.notificationsEnabled),
+      lastSelectedRoutineId: sanitizeStoredId(parsed.lastSelectedRoutineId),
+      lastSelectedSportId: sanitizeStoredId(parsed.lastSelectedSportId),
+      activeWorkoutDraft: normalizeActiveWorkoutDraft(parsed.activeWorkoutDraft, routines),
     }
     if (merged.stepsDateKey !== todayKey()) {
       merged.stepsToday = 0
@@ -197,12 +268,81 @@ export function saveTrainingState(state: TrainingState, opts?: StorageSaveOption
   write(state, opts)
 }
 
+/**
+ * Persiste immédiatement la routine active du carnet (reprise type YouTube).
+ * Ne dépend pas de visibilitychange / pagehide / fermeture — appelée au moment du changement.
+ */
+export function setLastSelectedRoutine(
+  routineId: string,
+  sportId?: string | null,
+  opts?: StorageSaveOptions,
+): TrainingState {
+  const state = read()
+  const id = sanitizeStoredId(routineId)
+  if (!id) return state
+  const nextSport =
+    sanitizeStoredId(sportId) ??
+    sanitizeStoredId(state.primarySportId) ??
+    state.lastSelectedSportId
+  if (state.lastSelectedRoutineId === id && state.lastSelectedSportId === nextSport) {
+    return state
+  }
+  const next: TrainingState = {
+    ...state,
+    lastSelectedRoutineId: id,
+    lastSelectedSportId: nextSport,
+  }
+  write(next, opts)
+  return next
+}
+
+/**
+ * Résout la routine à reprendre au montage :
+ * launch → dernière sélection valide (même sport + ID présent) → premier candidat.
+ */
+export function resolveResumedRoutineId(input: {
+  routines: { id: string }[]
+  /** Sous-ensemble visible (split programme) ; sinon toutes les routines. */
+  candidateIds?: string[]
+  sportId?: string | null
+  launchRoutineId?: string | null
+  state?: TrainingState
+}): string | null {
+  const state = input.state ?? read()
+  const pool =
+    input.candidateIds && input.candidateIds.length > 0
+      ? input.routines.filter((r) => input.candidateIds!.includes(r.id))
+      : input.routines
+  const ids = new Set(pool.map((r) => r.id))
+
+  const launch = sanitizeStoredId(input.launchRoutineId)
+  if (launch && ids.has(launch)) return launch
+
+  const preferred = sanitizeStoredId(state.lastSelectedRoutineId)
+  const storedSport = sanitizeStoredId(state.lastSelectedSportId)
+  const currentSport = sanitizeStoredId(input.sportId ?? state.primarySportId)
+  const sportOk = !preferred || !storedSport || !currentSport || storedSport === currentSport
+
+  if (preferred && sportOk && ids.has(preferred)) return preferred
+
+  return pool[0]?.id ?? null
+}
+
 export function setPrimarySport(sportId: string): TrainingState {
   const state = read()
   const favorites = state.favoriteSportIds.includes(sportId)
     ? state.favoriteSportIds
     : [sportId, ...state.favoriteSportIds].slice(0, 8)
-  const next = { ...state, primarySportId: sportId, favoriteSportIds: favorites }
+  const sportChanged = state.primarySportId !== sportId
+  const next: TrainingState = {
+    ...state,
+    primarySportId: sportId,
+    favoriteSportIds: favorites,
+    // Évite de reprendre une routine du sport précédent.
+    ...(sportChanged
+      ? { lastSelectedRoutineId: null, lastSelectedSportId: null }
+      : {}),
+  }
   write(next)
   return next
 }
@@ -255,11 +395,12 @@ export function upsertSchedule(
   entry: Omit<ScheduledSession, 'id'> & { id?: string },
 ): TrainingState {
   const state = read()
-  if (entry.id) {
+  const normalized = normalizeScheduleEntry(entry)
+  if (normalized.id) {
     const next = {
       ...state,
       schedule: state.schedule.map((s) =>
-        s.id === entry.id ? { ...s, ...entry, id: entry.id } : s,
+        s.id === normalized.id ? { ...s, ...normalized, id: normalized.id } : s,
       ),
     }
     write(next)
@@ -267,12 +408,15 @@ export function upsertSchedule(
   }
   const created: ScheduledSession = {
     id: `sch-${Date.now()}`,
-    templateId: entry.templateId || 'notebook',
-    title: entry.title,
-    days: entry.days,
-    time: entry.time,
-    enabled: entry.enabled,
-    remindBeforeMin: entry.remindBeforeMin ?? 10,
+    templateId: normalized.templateId || 'notebook',
+    title: normalized.title,
+    days: normalized.days,
+    time: normalized.time,
+    enabled: normalized.enabled,
+    remindBeforeMin: normalized.remindBeforeMin ?? 10,
+    ...(normalized.sportId
+      ? { sportId: normalized.sportId, sessionKind: normalized.sessionKind }
+      : {}),
   }
   const next = { ...state, schedule: [...state.schedule, created] }
   write(next)
@@ -351,6 +495,11 @@ export function saveWorkoutNote(
     routineId: note.routineId ?? existing?.routineId,
     dateKey: note.dateKey ?? existing?.dateKey ?? todayKey(),
     createdAt: note.createdAt ?? existing?.createdAt ?? Date.now(),
+    // Métadonnées multisport additives — jamais inventées pour les notes legacy.
+    sportId: note.sportId ?? existing?.sportId,
+    sessionKind: note.sessionKind ?? existing?.sessionKind,
+    source: note.source ?? existing?.source,
+    details: note.details ?? existing?.details,
   }
   const workoutNotes = [entry, ...state.workoutNotes.filter((n) => n.id !== entry.id)].slice(
     0,
@@ -380,17 +529,28 @@ export function saveWorkoutNote(
   if (entry.routineId) {
     const base = state.routines.find((r) => r.id === entry.routineId)
     if (base) {
-      // Carnet personnel : on mémorise ce qui a été fait, sans progression auto des charges.
+      // Carnet personnel : mémorise charges/reps, sans marqueurs transitoires (done/rest).
       const withActual: WorkoutRoutine = {
         ...base,
-        exercises: cloneExercises(entry.exercises),
+        exercises: stripTransientSetMarkers(cloneExercises(entry.exercises)),
         updatedAt: Date.now(),
       }
       routines = state.routines.map((r) => (r.id === entry.routineId ? withActual : r))
     }
   }
 
-  const next = { ...state, workoutNotes, completed, routines }
+  const completesActiveDraft = Boolean(
+    !note.id &&
+      entry.routineId &&
+      state.activeWorkoutDraft?.routineId === entry.routineId,
+  )
+  const next = {
+    ...state,
+    workoutNotes,
+    completed,
+    routines,
+    activeWorkoutDraft: completesActiveDraft ? null : state.activeWorkoutDraft ?? null,
+  }
   write(next)
   return next
 }
@@ -402,6 +562,7 @@ export function saveWorkoutNote(
 export function saveRoutineDraft(
   routineId: string,
   exercises: ExerciseEntry[],
+  sportId?: string | null,
 ): TrainingState {
   const state = read()
   const cleaned = exercises
@@ -429,7 +590,52 @@ export function saveRoutineDraft(
         }
       : r,
   )
-  const next = { ...state, routines }
+  const now = Date.now()
+  const cleanSportId =
+    sanitizeStoredId(sportId) ??
+    sanitizeStoredId(state.lastSelectedSportId) ??
+    sanitizeStoredId(state.primarySportId) ??
+    'musculation'
+  const prior = state.activeWorkoutDraft
+  const next = {
+    ...state,
+    routines,
+    activeWorkoutDraft: {
+      routineId,
+      sportId: cleanSportId,
+      startedAt: prior?.routineId === routineId ? prior.startedAt : now,
+      updatedAt: now,
+    },
+  }
+  write(next)
+  return next
+}
+
+/** Marque explicitement le clic Démarrer sans altérer le contenu de la routine. */
+export function startRoutineDraft(
+  routineId: string,
+  sportId: string,
+): TrainingState {
+  const state = read()
+  const cleanRoutineId = sanitizeStoredId(routineId)
+  const cleanSportId = sanitizeStoredId(sportId)
+  if (!cleanRoutineId || !cleanSportId) return state
+  if (!state.routines.some((routine) => routine.id === cleanRoutineId && routine.exercises.length > 0)) {
+    return state
+  }
+  const now = Date.now()
+  const prior = state.activeWorkoutDraft
+  const next: TrainingState = {
+    ...state,
+    lastSelectedRoutineId: cleanRoutineId,
+    lastSelectedSportId: cleanSportId,
+    activeWorkoutDraft: {
+      routineId: cleanRoutineId,
+      sportId: cleanSportId,
+      startedAt: prior?.routineId === cleanRoutineId ? prior.startedAt : now,
+      updatedAt: now,
+    },
+  }
   write(next)
   return next
 }
@@ -479,16 +685,4 @@ export function todayWorkoutKcal(state: TrainingState = read()): number {
   return state.completed
     .filter((c) => c.dateKey === key)
     .reduce((sum, c) => sum + c.estimatedKcal, 0)
-}
-
-/** Apply Facile/OK/Dur progression to every routine (API legacy / ForceView).
- * Non branché sur le flux carnet Accueil/Train — la sauvegarde mémorise les charges réalisées. */
-export function applyForceProgression(bodyWeightKg: number): TrainingState {
-  const state = read()
-  const routines = state.routines.map((r) =>
-    r.exercises.length ? progressRoutineExercises(r, bodyWeightKg) : r,
-  )
-  const next = { ...state, routines }
-  write(next)
-  return next
 }
