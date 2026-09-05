@@ -60,6 +60,7 @@ describe('getTodayWorkout — démarrabilité', () => {
       exerciseCount: 1,
       canStart: true,
       source: 'schedule',
+      isStrengthTemplate: true,
     })
   })
 
@@ -81,6 +82,7 @@ describe('getTodayWorkout — démarrabilité', () => {
       routineId: 'notebook',
       exerciseCount: 0,
       canStart: false,
+      isStrengthTemplate: false,
     })
   })
 

@@ -1,4 +1,9 @@
-import type { AppDisciplineId } from '../data/disciplines'
+import {
+  disciplineFromSportCategory,
+  isEnduranceFamily,
+  type AppDisciplineId,
+} from '../data/disciplines'
+import { getSportById } from '../data/sports'
 import type {
   EnduranceSessionDetails,
   SessionKind,
@@ -26,6 +31,18 @@ export function sessionKindForDiscipline(disciplineId: AppDisciplineId): Session
     default:
       return 'generic'
   }
+}
+
+/** Famille Train stable issue du catalogue ; un identifiant futur/inconnu reste générique. */
+export function sessionKindForSport(sportId: string): SessionKind {
+  const sport = getSportById(sportId)
+  if (!sport) return 'generic'
+  if (sport.category === 'strength') return 'strength'
+  if (sport.category === 'team') return 'team'
+  if (isEnduranceFamily(disciplineFromSportCategory(sport.category, sport.id))) {
+    return 'endurance'
+  }
+  return 'generic'
 }
 
 /** Métadonnées figées pour toute saisie UI actuelle. */

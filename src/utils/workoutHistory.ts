@@ -44,7 +44,8 @@ export function noteVolumeKg(note: WorkoutNote): number {
 /**
  * Keep real athlete sessions only:
  * - must have at least one exercise with sets
- * - drop near-identical duplicates (same focus + day + volume within 2 min)
+ * - drop near-identical sync duplicates (same sport/focus/day/volume within 2 min)
+ * - never merge incompatible or ambiguous sport identities
  */
 export function dedupeWorkoutNotes(notes: WorkoutNote[]): WorkoutNote[] {
   const sorted = [...notes]
@@ -54,9 +55,18 @@ export function dedupeWorkoutNotes(notes: WorkoutNote[]): WorkoutNote[] {
   const kept: WorkoutNote[] = []
   for (const note of sorted) {
     const vol = noteVolumeKg(note)
+    // Doublon de sync : même jour + même focus + volume ≈ égal + créé < 2 min
+    // (IDs distincts inclus — sync peut produire deux IDs pour une seule séance).
     const isDup = kept.some((k) => {
       if (k.dateKey !== note.dateKey) return false
       if ((k.routineId ?? '') !== (note.routineId ?? '')) return false
+      // Deux sports explicitement distincts sont toujours deux séances réelles,
+      // même si volume, focus et horodatage coïncident.
+      if ((k.sportId || note.sportId) && k.sportId !== note.sportId) return false
+      if (k.sessionKind && note.sessionKind && k.sessionKind !== note.sessionKind) return false
+      // Sans sport ni routine, les anciennes notes non-force n'ont pas assez
+      // d'identité pour être fusionnées sans risque de perte de données.
+      if (!k.sportId && !note.sportId && !k.routineId && !note.routineId) return false
       if (Math.abs(noteVolumeKg(k) - vol) > 5) return false
       return Math.abs(k.createdAt - note.createdAt) < 120_000
     })

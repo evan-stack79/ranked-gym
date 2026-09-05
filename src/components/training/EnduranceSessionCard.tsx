@@ -45,8 +45,9 @@ function estimateEnduranceKcal(
 
 function formatPace(secPerKm: number): string {
   if (!(secPerKm > 0) || !Number.isFinite(secPerKm)) return '—'
-  const m = Math.floor(secPerKm / 60)
-  const s = Math.round(secPerKm % 60)
+  const totalSec = Math.round(secPerKm)
+  const m = Math.floor(totalSec / 60)
+  const s = totalSec % 60
   return `${m}:${String(s).padStart(2, '0')} /km`
 }
 

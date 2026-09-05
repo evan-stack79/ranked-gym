@@ -47,6 +47,8 @@ const {
   setLastSelectedRoutine,
   setPrimarySport,
   resolveResumedRoutineId,
+  startRoutineDraft,
+  upsertSchedule,
 } = await import('./trainingStorage')
 
 function bicepsRoutine(overrides?: Partial<WorkoutRoutine>): WorkoutRoutine {
@@ -162,6 +164,10 @@ describe('reprise contexte Training (YouTube-like)', () => {
     expect(routine?.exercises[0]?.name).toBe('Curl barre')
     expect(routine?.exercises[0]?.sets[0]?.weightKg).toBe(30)
     expect(routine?.exercises[0]?.sets[1]?.reps).toBe(8)
+    expect(state.activeWorkoutDraft).toMatchObject({
+      routineId: 'custom-biceps',
+      sportId: 'musculation',
+    })
   })
 
   it('6. routine supprimée → fallback propre', () => {
@@ -194,6 +200,7 @@ describe('reprise contexte Training (YouTube-like)', () => {
     const state = getTrainingState()
     expect(state.lastSelectedRoutineId).toBeNull()
     expect(state.lastSelectedSportId).toBeNull()
+    expect(state.activeWorkoutDraft).toBeNull()
     expect(
       resolveResumedRoutineId({
         routines: state.routines,
@@ -292,5 +299,153 @@ describe('reprise contexte Training (YouTube-like)', () => {
         launchRoutineId: 'lower',
       }),
     ).toBe('lower')
+  })
+})
+
+describe('planning typé et brouillon actif rétrocompatibles', () => {
+  beforeEach(() => {
+    store.clear()
+    cloudUser.mockReturnValue(null)
+  })
+
+  it('fige sportId/sessionKind sur un nouveau créneau et corrige un kind incohérent', () => {
+    upsertSchedule({
+      templateId: 'notebook', title: 'Course', days: [5], time: '18:00', enabled: true,
+      sportId: 'course-a-pied', sessionKind: 'strength',
+    })
+    expect(getTrainingState().schedule[0]).toMatchObject({
+      sportId: 'course-a-pied', sessionKind: 'endurance', templateId: 'notebook',
+    })
+  })
+
+  it('relit un ancien créneau sans inventer de métadonnée', () => {
+    store.set('ranked-gym:training', JSON.stringify({
+      ...withBiceps(),
+      schedule: [{
+        id: 'legacy', templateId: 'notebook', title: 'Ancien', days: [5],
+        time: '18:00', enabled: true,
+      }],
+    }))
+    const legacy = getTrainingState().schedule[0]
+    expect(legacy.sportId).toBeUndefined()
+    expect(legacy.sessionKind).toBeUndefined()
+  })
+
+  it('ignore les done legacy et les marqueurs actifs invalides sans supprimer les séries', () => {
+    const state = withBiceps()
+    const routines = state.routines.map((routine) => routine.id === 'custom-biceps'
+      ? bicepsRoutine({
+          exercises: [{ id: 'e', name: 'Curl', sets: [{ reps: 8, weightKg: 20, done: true }] }],
+        })
+      : routine)
+    store.set('ranked-gym:training', JSON.stringify({
+      ...state,
+      routines,
+      activeWorkoutDraft: { routineId: 'missing', sportId: 'musculation', startedAt: 1, updatedAt: 2 },
+    }))
+    const restored = getTrainingState()
+    expect(restored.activeWorkoutDraft).toBeNull()
+    expect(restored.routines.find((routine) => routine.id === 'custom-biceps')
+      ?.exercises[0].sets[0].done).toBe(true)
+  })
+
+  it('Démarrer refuse une routine vide et marque une routine valide sans toucher ses données', () => {
+    saveTrainingState(withBiceps())
+    expect(startRoutineDraft('custom-biceps', 'musculation').activeWorkoutDraft).toBeNull()
+
+    const state = getTrainingState()
+    saveTrainingState({
+      ...state,
+      routines: state.routines.map((routine) => routine.id === 'custom-biceps'
+        ? bicepsRoutine({ exercises: [{ id: 'e', name: 'Curl', sets: [{ reps: 8, weightKg: 20 }] }] })
+        : routine),
+    })
+    const before = structuredClone(getTrainingState().routines)
+    const started = startRoutineDraft('custom-biceps', 'musculation')
+    expect(started.activeWorkoutDraft).toMatchObject({
+      routineId: 'custom-biceps', sportId: 'musculation',
+    })
+    expect(started.routines).toEqual(before)
+  })
+})
+
+describe('fin de séance — plus de Reprendre', () => {
+  beforeEach(() => {
+    store.clear()
+    cloudUser.mockReturnValue(null)
+  })
+
+  it('saveWorkoutNote nettoie done/restSec : séance terminée ne redevient jamais Reprendre', async () => {
+    const { deriveTodayHubCard } = await import('../utils/trainHub')
+    const { saveWorkoutNote, stripTransientSetMarkers } = await import('./trainingStorage')
+
+    const cleaned = stripTransientSetMarkers([
+      {
+        id: 'e1',
+        name: 'Curl',
+        sets: [{ reps: 10, weightKg: 12, done: true, restSec: 90 }],
+      },
+    ])
+    expect(cleaned[0].sets[0].done).toBeUndefined()
+    expect(cleaned[0].sets[0].restSec).toBeUndefined()
+    expect(cleaned[0].sets[0].reps).toBe(10)
+
+    saveTrainingState({
+      ...getTrainingState(),
+      routines: [
+        ...getTrainingState().routines.filter((r) => r.id !== 'custom-biceps'),
+        bicepsRoutine({
+          exercises: [
+            {
+              id: 'e1',
+              name: 'Curl',
+              sets: [
+                { reps: 10, weightKg: 12, done: true, restSec: 60 },
+                { reps: 10, weightKg: 12 },
+              ],
+            },
+          ],
+          updatedAt: Date.now(),
+        }),
+      ],
+      lastSelectedRoutineId: 'custom-biceps',
+      lastSelectedSportId: 'musculation',
+      activeWorkoutDraft: {
+        routineId: 'custom-biceps',
+        sportId: 'musculation',
+        startedAt: Date.now() - 1_000,
+        updatedAt: Date.now(),
+      },
+    })
+
+    const before = deriveTodayHubCard(getTrainingState(), new Date('2026-09-04T15:00:00'))
+    expect(before.cta).toBe('resume')
+
+    saveWorkoutNote({
+      title: 'Biceps',
+      routineId: 'custom-biceps',
+      sportId: 'musculation',
+      sessionKind: 'strength',
+      source: 'manual',
+      estimatedKcal: 180,
+      durationMin: 40,
+      exercises: [
+        {
+          id: 'e1',
+          name: 'Curl',
+          sets: [
+            { reps: 10, weightKg: 12, done: true, restSec: 60 },
+            { reps: 10, weightKg: 12, done: true },
+          ],
+        },
+      ],
+    })
+
+    const after = getTrainingState()
+    expect(after.activeWorkoutDraft).toBeNull()
+    const routine = after.routines.find((r) => r.id === 'custom-biceps')
+    expect(routine?.exercises.every((e) => e.sets.every((s) => s.done !== true))).toBe(true)
+    const card = deriveTodayHubCard(after, new Date('2026-09-04T15:00:00'))
+    expect(card.cta).not.toBe('resume')
   })
 })

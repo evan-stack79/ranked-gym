@@ -47,6 +47,10 @@ export interface ScheduledSession {
   enabled: boolean
   /** Notify X minutes before */
   remindBeforeMin?: number
+  /** Sport planifié, figé à la création. Absent sur les créneaux legacy. */
+  sportId?: string
+  /** Parcours Train à ouvrir. Absent sur les créneaux legacy. */
+  sessionKind?: SessionKind
 }
 
 export interface CompletedSession {
@@ -152,6 +156,18 @@ export interface WorkoutRoutine {
   updatedAt: number
 }
 
+/**
+ * Identité explicite de l'unique séance de musculation en cours.
+ * Additive : les états legacy sans ce champ restent valides et ne sont jamais
+ * assimilés automatiquement à une séance active à partir de seuls marqueurs `done`.
+ */
+export interface ActiveWorkoutDraft {
+  routineId: string
+  sportId: string
+  startedAt: number
+  updatedAt: number
+}
+
 export interface TrainingState {
   primarySportId: string | null
   favoriteSportIds: string[]
@@ -171,4 +187,6 @@ export interface TrainingState {
   lastSelectedRoutineId: string | null
   /** Sport associé à la dernière sélection (évite une reprise incompatible). */
   lastSelectedSportId: string | null
+  /** Brouillon réellement actif ; absent/null pour les états legacy ou terminés. */
+  activeWorkoutDraft?: ActiveWorkoutDraft | null
 }

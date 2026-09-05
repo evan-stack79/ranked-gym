@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight, Clock, Dumbbell, Flame, Pencil, Trash2 } from 'lucide-react'
 import type { WorkoutNote } from '../../types/training'
 import {
@@ -8,17 +8,36 @@ import {
   noteDurationMin,
   noteVolumeKg,
 } from '../../utils/workoutHistory'
-import { IosSheet } from '../ui/IosSheet'
+import { TrainSheet as IosSheet } from './TrainSheet'
 
 interface WorkoutHistoryProps {
   notes: WorkoutNote[]
   onDelete: (id: string) => void
   onEdit?: (note: WorkoutNote) => void
+  /** Filtre optionnel — masque l’action Éditer si false. */
+  canEdit?: (note: WorkoutNote) => boolean
+  /** Ouvre le détail d’une séance (hub « Dernières séances »). */
+  focusNoteId?: string | null
+  onFocusConsumed?: () => void
 }
 
-export function WorkoutHistory({ notes, onDelete, onEdit }: WorkoutHistoryProps) {
+export function WorkoutHistory({
+  notes,
+  onDelete,
+  onEdit,
+  canEdit,
+  focusNoteId = null,
+  onFocusConsumed,
+}: WorkoutHistoryProps) {
   const [selected, setSelected] = useState<WorkoutNote | null>(null)
   const groups = useMemo(() => groupNotesByDate(notes), [notes])
+
+  useEffect(() => {
+    if (!focusNoteId) return
+    const hit = notes.find((n) => n.id === focusNoteId) ?? null
+    setSelected(hit)
+    onFocusConsumed?.()
+  }, [focusNoteId, notes, onFocusConsumed])
 
   if (groups.length === 0) {
     return (
@@ -65,7 +84,7 @@ export function WorkoutHistory({ notes, onDelete, onEdit }: WorkoutHistoryProps)
                         <span className="shrink-0 text-[11px] text-[#636366]">
                           {formatClock(note.createdAt)}
                         </span>
-                        {onEdit ? (
+                        {onEdit && (canEdit?.(note) ?? true) ? (
                           <button
                             type="button"
                             onClick={(e) => {
@@ -121,6 +140,24 @@ export function WorkoutHistory({ notes, onDelete, onEdit }: WorkoutHistoryProps)
       >
         {selected && (
           <div className="space-y-4 pb-2">
+            {selected.details?.kind === 'team' ? (
+              <p className="text-[13px] text-[#AEAEB2]">
+                {selected.details.sessionType === 'match' ? 'Match' : 'Entraînement'}
+                {selected.details.minutesPlayed != null
+                  ? ` · ${selected.details.minutesPlayed} min jouées`
+                  : null}
+                {selected.details.position
+                  ? ` · Poste : ${selected.details.position}`
+                  : null}
+              </p>
+            ) : null}
+            {selected.details?.kind === 'endurance' &&
+            Number.isFinite(selected.details.distanceKm) &&
+            selected.details.distanceKm > 0 ? (
+              <p className="text-[13px] text-[#AEAEB2]">
+                Distance : {selected.details.distanceKm} km
+              </p>
+            ) : null}
             {selected.exercises.map((ex) => (
               <div
                 key={ex.id}
@@ -146,7 +183,7 @@ export function WorkoutHistory({ notes, onDelete, onEdit }: WorkoutHistoryProps)
               </div>
             ))}
 
-            {onEdit ? (
+            {onEdit && selected && (canEdit?.(selected) ?? true) ? (
               <button
                 type="button"
                 onClick={() => {

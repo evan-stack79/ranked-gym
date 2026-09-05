@@ -35,6 +35,10 @@ interface WorkoutNotebookProps {
   sportId: string
   /** Famille de module — strength pour le carnet force / hybrid. */
   sessionKind?: SessionKind
+  /** Ouvre le carnet directement en mode édition d’une note existante. */
+  initialEditNote?: WorkoutNote | null
+  /** Reprendre copie exactement la routine détectée ; ne réinjecte pas l'historique. */
+  resume?: boolean
   onSave: (note: {
     id?: string
     title: string
@@ -108,6 +112,10 @@ function cloneFromRoutine(routine: WorkoutRoutine, history: WorkoutNote[] = []):
   })
 }
 
+function copyExercises(exercises: ExerciseEntry[]): ExerciseEntry[] {
+  return exercises.map(e => ({ ...e, sets: e.sets.map(s => ({ ...s })) }))
+}
+
 function resolveBootRoutine(
   routines: WorkoutRoutine[],
   schedule: ScheduledSession[],
@@ -148,6 +156,8 @@ export function WorkoutNotebook({
   schedule = [],
   history,
   initialRoutineId,
+  initialEditNote = null,
+  resume = false,
   sportId,
   sessionKind = 'strength',
   onSave,
@@ -158,22 +168,33 @@ export function WorkoutNotebook({
   restLogRequest,
 }: WorkoutNotebookProps) {
   const bootRoutine = useMemo(
-    () => resolveBootRoutine(routines, schedule, sportId, initialRoutineId),
+    () => (resume ? routines.find(r => r.id === initialRoutineId) : undefined) ??
+      resolveBootRoutine(routines, schedule, sportId, initialRoutineId),
     // Montage uniquement — reprise locale ; les changements suivants passent par selectRoutine.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   )
 
-  const [routineId, setRoutineId] = useState(bootRoutine.id)
-  const [title, setTitle] = useState(bootRoutine.label)
+  const [routineId, setRoutineId] = useState(initialEditNote?.routineId ?? bootRoutine.id)
+  const [title, setTitle] = useState(initialEditNote?.title ?? bootRoutine.label)
   const [exercises, setExercises] = useState<ExerciseEntry[]>(() =>
-    cloneFromRoutine(bootRoutine, history),
+    initialEditNote ? copyExercises(initialEditNote.exercises)
+      : resume ? copyExercises(bootRoutine.exercises) : cloneFromRoutine(bootRoutine, history),
   )
   const [customOpen, setCustomOpen] = useState(false)
   const [customLabel, setCustomLabel] = useState('')
   const [saving, setSaving] = useState(false)
-  const [editingNote, setEditingNote] = useState<WorkoutNote | null>(null)
+  const [editingNote, setEditingNote] = useState<WorkoutNote | null>(initialEditNote)
   const [effortHelpOpen, setEffortHelpOpen] = useState(false)
+  const beforeEdit = useRef({
+    routineId: bootRoutine.id,
+    title: bootRoutine.label,
+    exercises: copyExercises(bootRoutine.exercises),
+  })
+  const draftBlocked = useRef(Boolean(initialEditNote))
+  const draftDirty = useRef(false)
+  draftBlocked.current = Boolean(editingNote) || saving
+  const initialLaunchApplied = useRef(initialRoutineId)
 
   const exercisesRef = useRef(exercises)
   const routineIdRef = useRef(routineId)
@@ -186,8 +207,8 @@ export function WorkoutNotebook({
   }, [schedule, routines])
 
   const activeRoutine = useMemo(
-    () => visibleRoutines.find((r) => r.id === routineId) ?? visibleRoutines[0],
-    [visibleRoutines, routineId],
+    () => routines.find((r) => r.id === routineId) ?? visibleRoutines[0],
+    [routines, visibleRoutines, routineId],
   )
 
   const stats = useMemo(
@@ -201,12 +222,14 @@ export function WorkoutNotebook({
     setRoutineId(r.id)
     setTitle(r.label)
     setExercises(cloneFromRoutine(r, history))
+    draftDirty.current = false
     setEditingNote(null)
     // Sauvegarde immédiate — iOS peut suspendre sans événement de fermeture.
     setLastSelectedRoutine(r.id, sportId)
   }
 
   useEffect(() => {
+    if (editingNote || (resume && routines.some(r => r.id === routineId))) return
     if (!visibleRoutines.some((r) => r.id === routineId) && visibleRoutines[0]) {
       selectRoutine(visibleRoutines[0].id)
     }
@@ -214,6 +237,7 @@ export function WorkoutNotebook({
   }, [visibleRoutines])
 
   useEffect(() => {
+    if (editingNote) return
     if (!routines.some((r) => r.id === routineId) && routines[0]) {
       selectRoutine(routines[0].id)
     }
@@ -221,6 +245,8 @@ export function WorkoutNotebook({
   }, [routines])
 
   useEffect(() => {
+    if (initialLaunchApplied.current === initialRoutineId || editingNote) return
+    initialLaunchApplied.current = initialRoutineId
     if (!initialRoutineId) return
     if (!routines.some((r) => r.id === initialRoutineId)) return
     selectRoutine(initialRoutineId)
@@ -228,9 +254,10 @@ export function WorkoutNotebook({
   }, [initialRoutineId])
 
   useEffect(() => {
-    if (!restLogRequest) return
+    if (!restLogRequest || draftBlocked.current) return
     const { exerciseId, setIndex, restSec, addNextSet } = restLogRequest
     setExercises((prev) => {
+      draftDirty.current = true
       const next = prev.map((e) => {
         if (e.id !== exerciseId) return e
         let sets = e.sets.map((s, i) => (i === setIndex ? { ...s, restSec, done: true } : s))
@@ -249,23 +276,30 @@ export function WorkoutNotebook({
         return { ...e, sets }
       })
       onDraftSave?.(routineId, next)
+      draftDirty.current = false
       return next
     })
   }, [restLogRequest, onDraftSave, routineId])
 
   useEffect(() => {
-    if (!onDraftSave) return
+    if (!onDraftSave || editingNote || saving || !draftDirty.current) return
     const t = window.setTimeout(() => {
-      onDraftSave(routineId, exercises)
+      if (!draftBlocked.current && draftDirty.current) {
+        onDraftSave(routineId, exercises)
+        draftDirty.current = false
+      }
     }, 700)
     return () => window.clearTimeout(t)
-  }, [exercises, routineId, onDraftSave])
+  }, [exercises, routineId, onDraftSave, editingNote, saving])
 
   // Flush brouillon en attente uniquement — la préférence routine est déjà écrite au select.
   useEffect(() => {
     if (!onDraftSave) return
     const flushDraft = () => {
-      onDraftSave(routineIdRef.current, exercisesRef.current)
+      if (!draftBlocked.current && draftDirty.current) {
+        onDraftSave(routineIdRef.current, exercisesRef.current)
+        draftDirty.current = false
+      }
     }
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') flushDraft()
@@ -279,10 +313,12 @@ export function WorkoutNotebook({
   }, [onDraftSave])
 
   const updateExercise = (exerciseId: string, patch: Partial<ExerciseEntry>) => {
+    draftDirty.current = true
     setExercises((prev) => prev.map((e) => (e.id === exerciseId ? { ...e, ...patch } : e)))
   }
 
   const updateSet = (exerciseId: string, setIndex: number, patch: Partial<WorkoutSet>) => {
+    draftDirty.current = true
     setExercises((prev) =>
       prev.map((e) => {
         if (e.id !== exerciseId) return e
@@ -295,6 +331,7 @@ export function WorkoutNotebook({
   }
 
   const finishSet = (ex: ExerciseEntry, setIndex: number, difficulty?: SetDifficulty) => {
+    draftDirty.current = true
     setExercises((prev) => {
       const next = prev.map((e) => {
         if (e.id !== ex.id) return e
@@ -305,10 +342,11 @@ export function WorkoutNotebook({
         )
         return { ...e, sets }
       })
-      onDraftSave?.(routineId, next)
+      if (!draftBlocked.current) onDraftSave?.(routineId, next)
+      draftDirty.current = false
       return next
     })
-    onRestStart?.({
+    if (!editingNote) onRestStart?.({
       exerciseId: ex.id,
       setIndex,
       exerciseName: ex.name.trim() || 'Exercice',
@@ -317,24 +355,23 @@ export function WorkoutNotebook({
   }
 
   const loadNoteForEdit = (note: WorkoutNote) => {
+    if (!editingNote) {
+      beforeEdit.current = { routineId, title, exercises: copyExercises(exercises) }
+    }
+    draftBlocked.current = true
+    draftDirty.current = false
     setEditingNote(note)
     setTitle(note.title)
     if (note.routineId) setRoutineId(note.routineId)
-    setExercises(
-      note.exercises.map((e) => ({
-        ...e,
-        id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        sets: e.sets.map((s) => ({ ...s })),
-      })),
-    )
+    setExercises(copyExercises(note.exercises))
   }
 
   const cancelEdit = () => {
+    draftDirty.current = false
     setEditingNote(null)
-    if (activeRoutine) {
-      setTitle(activeRoutine.label)
-      setExercises(cloneFromRoutine(activeRoutine, history))
-    }
+    setRoutineId(beforeEdit.current.routineId)
+    setTitle(beforeEdit.current.title)
+    setExercises(copyExercises(beforeEdit.current.exercises))
   }
 
   const handleSave = async () => {
@@ -346,6 +383,7 @@ export function WorkoutNotebook({
       }))
       .filter((e) => e.sets.length > 0)
     if (!cleaned.length) return
+    draftBlocked.current = true
     setSaving(true)
     try {
       // Nouvelle séance : fige sport/kind/source. Édition legacy : ne pas inventer de champs.
@@ -364,8 +402,9 @@ export function WorkoutNotebook({
         source: editingNote ? editingNote.source : 'manual',
       })
       if (editingNote) {
-        setEditingNote(null)
+        cancelEdit()
       } else {
+        draftDirty.current = false
         setExercises(
           cleaned.map((e) => ({
             ...e,
@@ -559,9 +598,10 @@ export function WorkoutNotebook({
                   {exercises.length > 1 && (
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
+                        draftDirty.current = true
                         setExercises((prev) => prev.filter((x) => x.id !== ex.id))
-                      }
+                      }}
                       className="text-[#8E8E93]"
                       aria-label="Supprimer exercice"
                     >
@@ -724,7 +764,10 @@ export function WorkoutNotebook({
         <div className="mt-3 flex gap-2">
           <button
             type="button"
-            onClick={() => setExercises((prev) => [...prev, emptyExercise()])}
+            onClick={() => {
+              draftDirty.current = true
+              setExercises((prev) => [...prev, emptyExercise()])
+            }}
             className="ios-press flex flex-1 items-center justify-center gap-1 rounded-2xl border border-white/10 bg-black/30 py-3 text-[13px] font-semibold text-[#AEAEB2]"
           >
             <Plus className="h-4 w-4" />
