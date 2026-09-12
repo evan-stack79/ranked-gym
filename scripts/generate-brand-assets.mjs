@@ -20,17 +20,21 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
 
 const BRAND_BG = { r: 0x0c, g: 0x0c, b: 0x0e, alpha: 1 }
-/** Rouge produit principal (`--color-brand`). */
-const BRAND_RED = '#FF2B2B'
 /** Rouge profond (`--color-brand-deep`). */
 const BRAND_RED_DEEP = { r: 0xb9, g: 0x1c, b: 0x1c }
+/** Rouge produit principal (`--color-brand`). */
 const BRAND_RED_BRIGHT = { r: 0xff, g: 0x2b, b: 0x2b }
 
 const MASTER_CALM = path.join(root, 'src/assets/brand/panther-calm-crowned.png')
+/** Icône store/PWA — source propriétaire opaque (A5A15C62…), jamais de fond vert. */
+const MASTER_ICON = path.join(root, 'src/assets/brand/panther-icon-opaque.png')
 const PUBLIC_DIR = path.join(root, 'public')
 const NATIVE_DIR = path.join(root, 'assets')
 /** Sources Capacitor Assets (`@capacitor/assets`) — 1024×1024. */
 const NATIVE_EXPORT_SIZE = 1024
+/** Splash Capacitor — minimum 2732×2732, fond noir + panthère calme (D96BABC8). */
+const SPLASH_EXPORT_SIZE = 2732
+const SPLASH_LOGO_SCALE = 0.42
 /** icon-only : panthère ~72–78 % du canvas. */
 const ICON_ONLY_SCALE = 0.75
 /** icon-foreground : sujet ~58–61 %, dans la safe zone 66/108. */
@@ -53,17 +57,62 @@ const PNG_OPTS = Object.freeze({
   force: true,
 })
 
-/** Favicon SVG : couronne géométrique seule (pas de PNG embarqué). */
-const FAVICON_SVG = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Ranked Gym">
-  <rect width="32" height="32" rx="7" fill="#0C0C0E"/>
-  <!-- Couronne 3 pointes, fidèle au logo panthère (centre plus haut) -->
-  <path
-    fill="${BRAND_RED}"
-    d="M7 23V13.5l4 3.2L16 7l5 9.7 4-3.2V23H7z"
-  />
-</svg>
-`
+function neutralizeTransparentRgb(data) {
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] === 0) {
+      data[i] = 0
+      data[i + 1] = 0
+      data[i + 2] = 0
+    }
+  }
+}
+
+function despillRgb(r, g, b) {
+  const limit = Math.max(r, b) * 1.05
+  if (g > limit) return [r, Math.round(limit), b]
+  return [r, g, b]
+}
+
+function despillAfterResize(data) {
+  for (let i = 0; i < data.length; i += 4) {
+    const a = data[i + 3]
+    if (a === 0) {
+      data[i] = 0
+      data[i + 1] = 0
+      data[i + 2] = 0
+      continue
+    }
+    const [nr, ng, nb] = despillRgb(data[i], data[i + 1], data[i + 2])
+    data[i] = nr
+    data[i + 1] = ng
+    data[i + 2] = nb
+    if (data[i + 1] > data[i] + 30 && data[i + 1] > data[i + 2] + 30 && data[i + 1] > 80 && a < 250) {
+      data[i] = 0
+      data[i + 1] = 0
+      data[i + 2] = 0
+      data[i + 3] = 0
+    }
+  }
+}
+
+async function countVisibleGreen(filePath) {
+  const { data } = await sharp(filePath).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  let n = 0
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < 12) continue
+    const r = data[i]
+    const g = data[i + 1]
+    const b = data[i + 2]
+    if (g > r + 35 && g > b + 35 && g > 90) n++
+  }
+  return n
+}
+
+async function assertNoVisibleGreen(filePath, label) {
+  const n = await countVisibleGreen(filePath)
+  if (n > 0) throw new Error(`Contrôle vert échoué — ${label}: ${n} pixel(s)`)
+  console.log(`  ✓ contrôle vert OK — ${label}`)
+}
 
 function clamp01(x) {
   if (x <= 0) return 0
@@ -421,10 +470,11 @@ async function writeHeaderMark(masterPixels) {
   removeEdgeConnectedBackground(data, info.width, info.height)
   lightenHeaderContours(data, info.width, info.height)
   removeDarkFringe(data, info.width, info.height)
+  neutralizeTransparentRgb(data)
   const crop = computeHeaderCropBox(data, info.width, info.height)
   const outPath = path.join(PUBLIC_DIR, HEADER_MARK_FILENAME)
 
-  await sharp(data, {
+  const resized = await sharp(data, {
     raw: { width: info.width, height: info.height, channels: 4 },
   })
     .extract(crop)
@@ -432,9 +482,20 @@ async function writeHeaderMark(masterPixels) {
       fit: 'fill',
       kernel: sharp.kernel.lanczos3,
     })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+
+  despillAfterResize(resized.data)
+  neutralizeTransparentRgb(resized.data)
+
+  await sharp(resized.data, {
+    raw: { width: resized.info.width, height: resized.info.height, channels: 4 },
+  })
     .png(PNG_OPTS)
     .toFile(outPath)
 
+  await assertNoVisibleGreen(outPath, path.relative(root, outPath))
   const meta = await sharp(outPath).metadata()
   const stats = await sharp(outPath).stats()
   const alphaMax = stats.channels[3]?.max ?? 255
@@ -466,59 +527,74 @@ async function measureHeaderFill(outPath) {
   return Math.round((side / info.width) * 100)
 }
 
-function clonePixelBuffer({ data, info }) {
-  return { data: Buffer.from(data), info }
-}
-
-/** icon-foreground.png — panthère transparente, centrée, safe zone Android. */
-async function writeNativeForeground(masterPixels, outPath) {
-  const { data, info } = clonePixelBuffer(masterPixels)
-  removeEdgeConnectedBackground(data, info.width, info.height)
-  lightenHeaderContours(data, info.width, info.height)
-  removeDarkFringe(data, info.width, info.height)
-  const crop = computeHeaderCropBox(data, info.width, info.height, 1)
-  const subjectSize = Math.round(NATIVE_EXPORT_SIZE * ICON_FOREGROUND_SCALE)
-  const offset = Math.round((NATIVE_EXPORT_SIZE - subjectSize) / 2)
-
-  const subject = await sharp(data, {
-    raw: { width: info.width, height: info.height, channels: 4 },
-  })
-    .extract(crop)
-    .resize(subjectSize, subjectSize, {
-      fit: 'fill',
+/** Splash natif Capacitor : fond noir + panthère calme (D96BABC8). */
+async function writeNativeSplash() {
+  const { data, info } = await sharp(MASTER_CALM).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  neutralizeTransparentRgb(data)
+  const logoSize = Math.round(SPLASH_EXPORT_SIZE * SPLASH_LOGO_SCALE)
+  const resized = await sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
+    .resize(logoSize, logoSize, {
+      fit: 'contain',
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
       kernel: sharp.kernel.lanczos3,
     })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+  despillAfterResize(resized.data)
+  neutralizeTransparentRgb(resized.data)
+  const logoPng = await sharp(resized.data, {
+    raw: { width: resized.info.width, height: resized.info.height, channels: 4 },
+  })
     .png(PNG_OPTS)
     .toBuffer()
 
-  await sharp({
-    create: {
-      width: NATIVE_EXPORT_SIZE,
-      height: NATIVE_EXPORT_SIZE,
-      channels: 4,
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-    },
-  })
-    .composite([{ input: subject, left: offset, top: offset }])
-    .png(PNG_OPTS)
-    .toFile(outPath)
-
-  const fillPct = await measureHeaderFill(outPath)
-  console.log(
-    `  ✓ ${path.relative(root, outPath)} (${NATIVE_EXPORT_SIZE}×${NATIVE_EXPORT_SIZE}, fill ~${fillPct}%, transparent)`,
-  )
+  const splashPath = path.join(NATIVE_DIR, 'splash.png')
+  const splashDarkPath = path.join(NATIVE_DIR, 'splash-dark.png')
+  for (const outPath of [splashPath, splashDarkPath]) {
+    await sharp({
+      create: {
+        width: SPLASH_EXPORT_SIZE,
+        height: SPLASH_EXPORT_SIZE,
+        channels: 3,
+        background: { r: 0, g: 0, b: 0 },
+      },
+    })
+      .composite([{ input: logoPng, gravity: 'centre' }])
+      .png(PNG_OPTS)
+      .toFile(outPath)
+    await assertNoVisibleGreen(outPath, path.relative(root, outPath))
+    console.log(`  ✓ ${path.relative(root, outPath)} (${SPLASH_EXPORT_SIZE}×${SPLASH_EXPORT_SIZE}, noir + calme)`)
+  }
 }
 
-/** Sources natives Capacitor : icon-only / icon-foreground / icon-background. */
-async function writeNativeSources(masterBuffer, headerMasterPixels) {
+/** Favicon raster depuis A5A15C62 (icône opaque). */
+async function writeFaviconFromIcon(iconMasterBuffer) {
+  const faviconPath = path.join(PUBLIC_DIR, 'favicon.png')
+  await writeSquareIcon(iconMasterBuffer, 64, faviconPath, { contentScale: 0.92 })
+  await assertNoVisibleGreen(faviconPath, 'public/favicon.png')
+  // Conserve un favicon.svg minimal pointant l’identité (fallback) — PNG est la source index.html.
+  const faviconSvg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Ranked Gym">
+  <rect width="64" height="64" rx="14" fill="#0C0C0E"/>
+  <image href="/favicon.png" x="0" y="0" width="64" height="64"/>
+</svg>
+`
+  await writeFile(path.join(PUBLIC_DIR, 'favicon.svg'), faviconSvg, 'utf8')
+  console.log('  ✓ public/favicon.png (A5A15C62) + favicon.svg wrapper')
+}
+
+/** Sources natives Capacitor : icon-only / icon-foreground / icon-background (A5A15C62). */
+async function writeNativeSources(iconMasterBuffer, _headerMasterPixels) {
   await mkdir(NATIVE_DIR, { recursive: true })
 
   const iconOnlyPath = path.join(NATIVE_DIR, 'icon-only.png')
-  await writeSquareIcon(masterBuffer, NATIVE_EXPORT_SIZE, iconOnlyPath, {
+  await writeSquareIcon(iconMasterBuffer, NATIVE_EXPORT_SIZE, iconOnlyPath, {
     contentScale: ICON_ONLY_SCALE,
   })
   const iconOnlyOpaque = await sharp(iconOnlyPath).removeAlpha().png(PNG_OPTS).toBuffer()
   await writeFile(iconOnlyPath, iconOnlyOpaque)
+  await assertNoVisibleGreen(iconOnlyPath, 'assets/icon-only.png')
 
   const iconBackgroundPath = path.join(NATIVE_DIR, 'icon-background.png')
   await sharp({
@@ -535,10 +611,27 @@ async function writeNativeSources(masterBuffer, headerMasterPixels) {
     `  ✓ ${path.relative(root, iconBackgroundPath)} (${NATIVE_EXPORT_SIZE}×${NATIVE_EXPORT_SIZE}, #0C0C0E opaque)`,
   )
 
-  await writeNativeForeground(
-    headerMasterPixels,
-    path.join(NATIVE_DIR, 'icon-foreground.png'),
-  )
+  // Adaptive foreground : A5A15C62 centré (safe zone), pas le master calme.
+  const subjectSize = Math.round(NATIVE_EXPORT_SIZE * ICON_FOREGROUND_SCALE)
+  const offset = Math.round((NATIVE_EXPORT_SIZE - subjectSize) / 2)
+  const subject = await sharp(iconMasterBuffer)
+    .resize(subjectSize, subjectSize, { fit: 'cover', kernel: sharp.kernel.lanczos3 })
+    .png(PNG_OPTS)
+    .toBuffer()
+  const fgPath = path.join(NATIVE_DIR, 'icon-foreground.png')
+  await sharp({
+    create: {
+      width: NATIVE_EXPORT_SIZE,
+      height: NATIVE_EXPORT_SIZE,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite([{ input: subject, left: offset, top: offset }])
+    .png(PNG_OPTS)
+    .toFile(fgPath)
+  await assertNoVisibleGreen(fgPath, 'assets/icon-foreground.png')
+  console.log(`  ✓ ${path.relative(root, fgPath)} (A5A15C62 adaptive foreground)`)
 }
 
 async function writeSquareIcon(masterBuffer, size, outPath, { contentScale = 1 } = {}) {
@@ -572,33 +665,46 @@ async function main() {
   await mkdir(PUBLIC_DIR, { recursive: true })
 
   console.log(
-    'Brand assets — master intact, rouges → #B91C1C…#FF2B2B, fond #0C0C0E',
+    'Brand assets — masters intactes, rouges → #B91C1C…#FF2B2B, fond #0C0C0E ; icônes PWA via panther-icon-opaque',
   )
   const masterBuffer = await loadProcessedMasterBuffer()
   const headerMasterPixels = await loadProcessedMasterPixels({ opaqueProductBackground: false })
 
   await writeHeaderMark(headerMasterPixels)
-  await writeNativeSources(masterBuffer, headerMasterPixels)
 
-  await writeSquareIcon(masterBuffer, 180, path.join(PUBLIC_DIR, 'icon.png'), {
+  // Icônes PWA / store : source propriétaire opaque (pas le fond vert détouré).
+  const iconMasterBuffer = await sharp(MASTER_ICON)
+    .resize(1024, 1024, { fit: 'cover', kernel: sharp.kernel.lanczos3 })
+    .png(PNG_OPTS)
+    .toBuffer()
+
+  await writeNativeSources(iconMasterBuffer, headerMasterPixels)
+  await writeNativeSplash()
+
+  await writeSquareIcon(iconMasterBuffer, 180, path.join(PUBLIC_DIR, 'icon.png'), {
     contentScale: 0.92,
   })
-  await writeSquareIcon(masterBuffer, 192, path.join(PUBLIC_DIR, 'pwa-192x192.png'), {
+  await writeSquareIcon(iconMasterBuffer, 192, path.join(PUBLIC_DIR, 'pwa-192x192.png'), {
     contentScale: 0.92,
   })
-  await writeSquareIcon(masterBuffer, 512, path.join(PUBLIC_DIR, 'pwa-512x512.png'), {
+  await writeSquareIcon(iconMasterBuffer, 512, path.join(PUBLIC_DIR, 'pwa-512x512.png'), {
     contentScale: 0.92,
   })
   await writeSquareIcon(
-    masterBuffer,
+    iconMasterBuffer,
     512,
     path.join(PUBLIC_DIR, 'pwa-maskable-512x512.png'),
     { contentScale: 0.7 },
   )
 
-  const faviconPath = path.join(PUBLIC_DIR, 'favicon.svg')
-  await writeFile(faviconPath, FAVICON_SVG, 'utf8')
-  console.log(`  ✓ ${path.relative(root, faviconPath)} (couronne SVG géométrique)`)
+  for (const name of ['icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'pwa-maskable-512x512.png']) {
+    await assertNoVisibleGreen(path.join(PUBLIC_DIR, name), `public/${name}`)
+  }
+
+  // Conservé pour composites hero éventuels (panthère calme détourée).
+  void masterBuffer
+
+  await writeFaviconFromIcon(iconMasterBuffer)
 
   console.log('Done.')
 }

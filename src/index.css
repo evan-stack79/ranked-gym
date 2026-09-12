@@ -221,6 +221,26 @@ body {
   animation: ios-fade-up 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .rest-timer-pulse,
+  .rest-timer-panel,
+  .rest-timer-island {
+    animation: none !important;
+  }
+
+  .rest-timer-dock,
+  .rest-timer-dock *,
+  .rest-timer-island,
+  .rest-timer-island * {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .rest-timer-island circle {
+    transition: none !important;
+  }
+}
+
 /* Variant compact : pill idle ou barre active (presets dépliés à la demande) */
 .rest-timer-island--compact {
   border-radius: 999px;
@@ -1463,4 +1483,111 @@ body {
 
 .ios-tab-active-icon {
   animation: ios-tab-pop 0.34s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* ——— Cold launch Ranked Gym ——— */
+.app-cold-launch {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000000;
+  pointer-events: none;
+}
+
+.app-cold-launch__safe {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding:
+    var(--app-safe-area-top, env(safe-area-inset-top, 0px))
+    var(--app-safe-area-right, env(safe-area-inset-right, 0px))
+    var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px))
+    var(--app-safe-area-left, env(safe-area-inset-left, 0px));
+}
+
+.app-cold-launch__mark {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+  user-select: none;
+}
+
+.app-cold-launch__stack {
+  position: relative;
+  width: 180px;
+  height: 180px;
+}
+
+.app-cold-launch__stack .app-cold-launch__mark {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: scale(0.97);
+  transition: opacity 160ms ease, transform 420ms cubic-bezier(0.2, 0.85, 0.2, 1);
+}
+
+.app-cold-launch__mark--calm[data-active='true'] {
+  opacity: 1;
+  transform: scale(1);
+  animation: app-cold-launch-in 420ms cubic-bezier(0.2, 0.85, 0.2, 1) both;
+}
+
+.app-cold-launch__mark--roar[data-active='true'] {
+  opacity: 1;
+  transform: scale(1.02);
+  animation: app-cold-launch-roar 480ms cubic-bezier(0.2, 0.9, 0.25, 1.05) both;
+}
+
+.app-cold-launch[data-phase='roar'] .app-cold-launch__mark--calm {
+  opacity: 0;
+}
+
+.app-cold-launch__wordmark {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+}
+
+.app-cold-launch__wordmark span {
+  color: #ff2b2b;
+}
+
+@keyframes app-cold-launch-in {
+  from {
+    opacity: 0.72;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes app-cold-launch-roar {
+  from {
+    opacity: 0.85;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
+.app-cold-launch[data-reduced='true'] .app-cold-launch__mark {
+  animation: none !important;
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-cold-launch__mark {
+    animation: none !important;
+    transition: none !important;
+  }
 }

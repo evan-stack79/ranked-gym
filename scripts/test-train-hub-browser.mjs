@@ -15,8 +15,8 @@ const projectRoot = join(scriptsDir, '..')
 const captureConfig = join(scriptsDir, 'train-hub-capture', 'vite.config.ts')
 const port = 4176
 const chromiumLaunchOptions = existsSync('/usr/local/bin/google-chrome')
-  ? { executablePath: '/usr/local/bin/google-chrome' }
-  : {}
+  ? { executablePath: '/usr/local/bin/google-chrome', args: ['--no-sandbox'] }
+  : { args: ['--no-sandbox'] }
 
 async function startServer() {
   const vite = join(projectRoot, 'node_modules', '.bin', 'vite')
@@ -78,6 +78,51 @@ async function chooseCatalogSport(page, name) {
   await chooseActivity(page, 'Autre sport')
   await page.getByPlaceholder('Ex. tennis, musculation, trail…').fill(name)
   await page.getByRole('dialog').getByRole('button', { name: new RegExp(name, 'i') }).first().click()
+}
+
+async function auditAgendaControls(page, width, scope, failures) {
+  const controls = page.locator(`${scope} [data-agenda-control]`)
+  const count = await controls.count()
+  if (count === 0) {
+    failures.push(`agenda ${width}px ${scope}: aucun contrôle auditable`)
+    return
+  }
+
+  for (let index = 0; index < count; index += 1) {
+    const control = controls.nth(index)
+    const label = await control.evaluate((element) =>
+      (element.getAttribute('aria-label') || element.textContent || element.getAttribute('data-agenda-control') || '?')
+        .trim()
+        .slice(0, 50),
+    )
+    const box = await control.boundingBox()
+    if (!box || box.width < 43.5 || box.height < 43.5) {
+      failures.push(
+        `agenda touch ${width}px ${label}: ${box ? `${Math.round(box.width)}x${Math.round(box.height)}` : 'absent'}`,
+      )
+      continue
+    }
+
+    const keyboardReady = await control.evaluate((element) =>
+      element instanceof HTMLElement && element.tabIndex >= 0 && !element.hasAttribute('disabled'),
+    )
+    if (!keyboardReady) failures.push(`agenda clavier ${width}px ${label}: non focusable`)
+
+    await control.focus()
+    await page.keyboard.press('Shift+Tab')
+    await page.keyboard.press('Tab')
+    const focus = await control.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        active: document.activeElement === element,
+        focusVisible: element.matches(':focus-visible'),
+        ring: style.boxShadow !== 'none' || (style.outlineStyle !== 'none' && style.outlineWidth !== '0px'),
+      }
+    })
+    if (!focus.active || !focus.focusVisible || !focus.ring) {
+      failures.push(`agenda focus ${width}px ${label}: ${JSON.stringify(focus)}`)
+    }
+  }
 }
 
 async function main() {
@@ -156,6 +201,23 @@ async function main() {
       const planned = (await storedTraining(page)).schedule.find(item => item.title === 'Course planifiée')
       assert.equal(planned.sportId, 'course-a-pied')
       assert.equal(planned.sessionKind, 'endurance')
+      await page.close()
+    }
+
+    // Agenda : toutes les commandes signalées font au moins 44×44 px, restent
+    // accessibles au clavier et exposent un focus visible, sans overflow mobile.
+    for (const width of [320, 375, 390]) {
+      const page = await openScenario(context, 'course', width)
+      await page.getByRole('button', { name: 'Programmes', exact: true }).first().click()
+      await auditAgendaControls(page, width, '[data-agenda-root]', failures)
+      await page.getByRole('button', { name: 'Créneau', exact: true }).click()
+      await page.getByRole('dialog').waitFor()
+      await auditAgendaControls(page, width, '[role="dialog"]', failures)
+      const overflow = await page.evaluate(() =>
+        document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+      )
+      if (overflow) failures.push(`agenda overflow ${width}px`)
+      await page.getByRole('button', { name: 'Fermer', exact: true }).last().click()
       await page.close()
     }
 
@@ -375,11 +437,185 @@ async function main() {
       await page.close()
     }
 
+    // Minuteur de repos : hydratation depuis activeWorkoutDraft + pause chronomètre
+    {
+      const page = await openScenario(context, 'rest-timer')
+      await page.getByRole('button', { name: 'Reprendre', exact: true }).click()
+      await page.locator('#workout-notebook').waitFor()
+      await page.waitForSelector('#ranked-rest-timer-bar')
+      const rest = (await storedTraining(page)).activeWorkoutDraft?.restTimer
+      assert.equal(rest?.totalSec, 90)
+      assert.equal(rest?.target.exerciseName, 'Développé couché')
+      const clock = page.locator('[data-session-clock]')
+      assert.ok(await clock.count(), 'chronomètre séance absent')
+      await page.getByRole('button', { name: 'Mettre la séance en pause' }).click()
+      await page.waitForFunction(() => {
+        const s = JSON.parse(localStorage.getItem('ranked-gym:training'))
+        return s.activeWorkoutDraft?.paused === true
+      })
+      const pausedAt = (await storedTraining(page)).activeWorkoutDraft?.elapsedActiveMs
+      await page.waitForTimeout(1200)
+      assert.equal(
+        (await storedTraining(page)).activeWorkoutDraft?.elapsedActiveMs,
+        pausedAt,
+        'pause doit figer le chronomètre',
+      )
+      // Pause repos
+      await page.getByRole('button', { name: 'Mettre le repos en pause' }).click()
+      await page.waitForFunction(() => {
+        const s = JSON.parse(localStorage.getItem('ranked-gym:training'))
+        return s.activeWorkoutDraft?.restTimer?.paused === true
+      })
+      await page.close()
+    }
+
+    // Repos depuis validation réelle d’une série + reload conservant le stockage
+    {
+      const page = await openScenario(context, 'strength', 390)
+      await page.addInitScript(() => {
+        window.__rgRestLogs = 0
+        window.addEventListener('ranked-gym:rest-logged', () => {
+          window.__rgRestLogs = (window.__rgRestLogs || 0) + 1
+        })
+      })
+      await page.getByRole('button', { name: 'Démarrer', exact: true }).click()
+      await page.locator('#workout-notebook').waitFor()
+      await page.getByRole('button', { name: 'Valider', exact: true }).first().click()
+      await page.waitForSelector('#ranked-rest-timer-bar')
+      await page.waitForFunction(() => {
+        const s = JSON.parse(localStorage.getItem('ranked-gym:training'))
+        return s.activeWorkoutDraft?.restTimer?.totalSec === 90
+      })
+      const beforeReload = (await storedTraining(page)).activeWorkoutDraft?.restTimer
+      assert.equal(beforeReload?.target.exerciseName, 'Développé couché')
+      assert.equal(beforeReload?.paused, false)
+
+      // Reload conservant le stockage
+      await page.goto(`http://127.0.0.1:${port}/?scenario=strength&keepStorage=1`, {
+        waitUntil: 'networkidle',
+      })
+      await page.waitForSelector('[data-harness-ready]')
+      await page.getByRole('button', { name: 'Reprendre', exact: true }).click()
+      await page.locator('#workout-notebook').waitFor()
+      await page.waitForSelector('#ranked-rest-timer-bar')
+      const afterReload = (await storedTraining(page)).activeWorkoutDraft?.restTimer
+      assert.ok(afterReload, 'restTimer doit survivre au reload')
+      assert.equal(afterReload.totalSec, 90)
+      assert.ok(afterReload.remainingSec > 0)
+
+      // Pause / reprise repos
+      await page.getByRole('button', { name: 'Mettre le repos en pause' }).click()
+      await page.waitForFunction(() => {
+        const s = JSON.parse(localStorage.getItem('ranked-gym:training'))
+        return s.activeWorkoutDraft?.restTimer?.paused === true
+      })
+      await page.getByRole('button', { name: 'Reprendre le repos' }).click()
+      await page.waitForFunction(() => {
+        const s = JSON.parse(localStorage.getItem('ranked-gym:training'))
+        return s.activeWorkoutDraft?.restTimer?.paused === false
+      })
+
+      // Expiration : endsAt passé + reload keepStorage (listener via init script)
+      await page.evaluate(() => {
+        const s = JSON.parse(localStorage.getItem('ranked-gym:training'))
+        s.activeWorkoutDraft.restTimer.endsAt = Date.now() - 2000
+        s.activeWorkoutDraft.restTimer.remainingSec = 0
+        s.activeWorkoutDraft.restTimer.paused = false
+        localStorage.setItem('ranked-gym:training', JSON.stringify(s))
+      })
+      await page.goto(`http://127.0.0.1:${port}/?scenario=strength&keepStorage=1`, {
+        waitUntil: 'networkidle',
+      })
+      await page.waitForSelector('[data-harness-ready]')
+      // État final observable + snapshot nettoyé + journalisation unique
+      await page.waitForFunction(() => {
+        const bar = document.querySelector('#ranked-rest-timer-bar')
+        const s = JSON.parse(localStorage.getItem('ranked-gym:training'))
+        return (
+          s.activeWorkoutDraft?.restTimer == null &&
+          Boolean(bar && /Repos OK/i.test(bar.textContent || ''))
+        )
+      })
+      const logs = await page.evaluate(() => window.__rgRestLogs || 0)
+      assert.equal(logs, 1, `journalisation unique attendue, got ${logs}`)
+      await page.getByRole('button', { name: 'OK', exact: true }).click()
+      await page.waitForFunction(() => {
+        const bar = document.querySelector('#ranked-rest-timer-bar')
+        return !bar || !/Repos OK/i.test(bar.textContent || '')
+      })
+      await page.close()
+    }
+
+    // Zones tactiles ≥ 44×44 px (parcours Train visible) à 320 / 375 / 390
+    for (const width of [320, 375, 390]) {
+      const page = await openScenario(context, 'strength', width)
+      await page.getByRole('button', { name: 'Démarrer', exact: true }).click()
+      await page.locator('#workout-notebook').waitFor()
+      await page.getByRole('button', { name: 'Valider', exact: true }).first().click()
+      await page.waitForSelector('#ranked-rest-timer-bar')
+      const undersized = await page.evaluate(() => {
+        const root = document.querySelector('[data-harness-ready]') || document.body
+        const nodes = [...root.querySelectorAll('button, [role="button"], a')]
+        const bad = []
+        for (const el of nodes) {
+          const style = getComputedStyle(el)
+          if (style.display === 'none' || style.visibility === 'hidden') continue
+          if (Number(style.opacity) === 0) continue
+          const r = el.getBoundingClientRect()
+          if (r.width < 1 || r.height < 1) continue
+          // Boutons pleine largeur : hauteur ≥ 44 ; icônes : 44×44
+          if (r.height < 44 - 0.5 || (r.width < 44 - 0.5 && r.width < r.height * 0.9)) {
+            const label = (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 40)
+            bad.push({ label, w: Math.round(r.width), h: Math.round(r.height) })
+          }
+        }
+        return bad
+      })
+      if (undersized.length) {
+        failures.push(
+          `touch ${width}px: ${undersized.map((b) => `${b.label || '?'} ${b.w}x${b.h}`).join('; ')}`,
+        )
+      }
+      // reduced-motion : transitions SVG minuteur neutres
+      const svgMotion = await page.evaluate(() => {
+        const circle = document.querySelector('#ranked-rest-timer-bar circle:nth-of-type(2)')
+        if (!circle) return { ok: false, reason: 'no circle' }
+        const tr = getComputedStyle(circle).transitionDuration || ''
+        const almostInstant = tr.split(',').every((d) => {
+          const ms = parseFloat(d) * (d.includes('ms') ? 1 : 1000)
+          return !Number.isFinite(ms) || ms <= 1
+        })
+        return { ok: almostInstant, tr }
+      })
+      if (!svgMotion.ok) {
+        failures.push(`reduced-motion rest SVG ${width}: ${svgMotion.tr}`)
+      }
+      await page.close()
+    }
+
+    // Pas de 0 kg / NaN / énergie fictive sur parcours non musculaires
+    for (const scenario of ['course', 'football-training', 'other']) {
+      const page = await openScenario(context, scenario)
+      const bodyText = await page.locator('[data-harness-ready]').innerText()
+      if (/\b0\s*kg\b/i.test(bodyText)) failures.push(`${scenario}: affiche 0 kg`)
+      if (/\bNaN\b/.test(bodyText)) failures.push(`${scenario}: affiche NaN`)
+      if (/\bundefined\b/i.test(bodyText)) failures.push(`${scenario}: affiche undefined`)
+      await page.getByRole('button', { name: 'Démarrer', exact: true }).click()
+      if (scenario === 'football-training') {
+        // sheet type déjà entraînement via créneau
+      }
+      await page.waitForTimeout(400)
+      const after = await page.locator('body').innerText()
+      if (/\b0\s*kg\b/i.test(after)) failures.push(`${scenario} after: affiche 0 kg`)
+      if (/\bNaN\b/.test(after)) failures.push(`${scenario} after: NaN`)
+      await page.close()
+    }
+
     if (failures.length) {
       console.error('FAIL\n' + failures.join('\n'))
       process.exitCode = 1
     } else {
-      console.log('OK Train : planning typé force/course/football/autre, brouillon actif explicite, reprise identique après remount, routine invalide protégée, édition isolée, catalogue, clavier, reduced-motion, halos et overflow 320/375/390.')
+      console.log('OK Train : planning typé force/course/football/autre, brouillon actif explicite, reprise identique après remount, routine invalide protégée, édition isolée, catalogue, clavier, reduced-motion, halos, overflow, rest Valider+reload, touch Train + Agenda 44px/focus 320/375/390.')
     }
   } finally {
     if (browser) await browser.close()

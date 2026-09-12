@@ -1,9 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Ranked Gym">
-  <rect width="32" height="32" rx="7" fill="#0C0C0E"/>
-  <!-- Couronne 3 pointes, fidèle au logo panthère (centre plus haut) -->
-  <path
-    fill="#FF2B2B"
-    d="M7 23V13.5l4 3.2L16 7l5 9.7 4-3.2V23H7z"
-  />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Ranked Gym">
+  <rect width="64" height="64" rx="14" fill="#0C0C0E"/>
+  <image href="/favicon.png" x="0" y="0" width="64" height="64"/>
 </svg>

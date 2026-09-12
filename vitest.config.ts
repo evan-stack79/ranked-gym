@@ -7,6 +7,7 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}'],
     environmentMatchGlobs: [
       ['src/components/streak/**', 'jsdom'],
+      ['src/components/brand/**', 'jsdom'],
       ['src/utils/streakCelebrationFocus.test.ts', 'jsdom'],
       ['src/utils/streakCelebrationSession.test.tsx', 'jsdom'],
     ],

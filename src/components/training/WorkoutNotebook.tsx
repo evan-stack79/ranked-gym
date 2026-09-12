@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpen, Check, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { BookOpen, Check, Pause, Pencil, Play, Plus, Trash2, X } from 'lucide-react'
 import type {
   ExerciseEntry,
   ScheduledSession,
@@ -72,6 +72,12 @@ interface WorkoutNotebookProps {
     addNextSet: boolean
     nonce: number
   } | null
+  /** Chronomètre séance active (durée réelle). Absent en mode édition historique. */
+  sessionClockLabel?: string | null
+  sessionPaused?: boolean
+  onToggleSessionPause?: () => void
+  /** Minutes chronométrées réelles — prioritaire à l’estimation à la sauvegarde. */
+  sessionDurationMin?: number | null
 }
 
 /** Tags optionnels — n’influencent plus la charge suivante. */
@@ -166,6 +172,10 @@ export function WorkoutNotebook({
   onAddRoutine,
   onRestStart,
   restLogRequest,
+  sessionClockLabel = null,
+  sessionPaused = false,
+  onToggleSessionPause,
+  sessionDurationMin = null,
 }: WorkoutNotebookProps) {
   const bootRoutine = useMemo(
     () => (resume ? routines.find(r => r.id === initialRoutineId) : undefined) ??
@@ -394,7 +404,10 @@ export function WorkoutNotebook({
         title: title.trim() || activeRoutine?.label || 'Séance',
         exercises: cleaned,
         estimatedKcal: stats.kcal,
-        durationMin: stats.durationMin,
+        durationMin:
+          !editingNote && sessionDurationMin != null && sessionDurationMin > 0
+            ? sessionDurationMin
+            : stats.durationMin,
         totalVolumeKg: stats.volume,
         routineId,
         sportId: editingNote ? editingNote.sportId : sportId,
@@ -427,8 +440,36 @@ export function WorkoutNotebook({
 
   return (
     <section id={id} className="space-y-3">
-      <div className="px-1">
+      <div className="flex items-end justify-between gap-3 px-1">
         <h2 className="text-[20px] font-bold text-white">Programme</h2>
+        {sessionClockLabel && !editingNote ? (
+          <div className="flex items-center gap-2">
+            <p
+              className="text-[15px] font-semibold tabular-nums tracking-tight text-white"
+              aria-live="polite"
+              data-session-clock
+            >
+              {sessionClockLabel}
+              {sessionPaused ? (
+                <span className="ml-1.5 text-[11px] font-medium text-[#8E8E93]">Pause</span>
+              ) : null}
+            </p>
+            {onToggleSessionPause ? (
+              <button
+                type="button"
+                onClick={onToggleSessionPause}
+                className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] text-white"
+                aria-label={sessionPaused ? 'Reprendre la séance' : 'Mettre la séance en pause'}
+              >
+                {sessionPaused ? (
+                  <Play className="h-4 w-4" strokeWidth={2.5} />
+                ) : (
+                  <Pause className="h-4 w-4" strokeWidth={2.5} />
+                )}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="flex gap-1.5 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -439,7 +480,7 @@ export function WorkoutNotebook({
               key={r.id}
               type="button"
               onClick={() => selectRoutine(r.id)}
-              className={`ios-press shrink-0 rounded-full border px-3.5 py-2 text-[12px] font-semibold ${
+              className={`ios-press flex min-h-11 shrink-0 items-center rounded-full border px-3.5 text-[12px] font-semibold ${
                 active
                   ? 'border-transparent text-white'
                   : 'border-white/10 bg-black/25 text-[#8E8E93]'
@@ -458,7 +499,7 @@ export function WorkoutNotebook({
         <button
           type="button"
           onClick={() => setCustomOpen((v) => !v)}
-          className="ios-press shrink-0 rounded-full border border-dashed border-white/20 px-3 py-2 text-[12px] font-semibold text-[#8E8E93]"
+          className="ios-press flex min-h-11 shrink-0 items-center rounded-full border border-dashed border-white/20 px-3 text-[12px] font-semibold text-[#8E8E93]"
         >
           + Programme
         </button>
@@ -481,7 +522,7 @@ export function WorkoutNotebook({
               setCustomLabel('')
               setCustomOpen(false)
             }}
-            className="btn-brand rounded-xl px-4 text-[13px] font-semibold text-white"
+            className="btn-brand flex min-h-11 items-center rounded-xl px-4 text-[13px] font-semibold text-white"
           >
             OK
           </button>
@@ -509,7 +550,7 @@ export function WorkoutNotebook({
             <button
               type="button"
               onClick={cancelEdit}
-              className="ios-press flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-[#8E8E93]"
+              className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/10 text-[#8E8E93]"
               aria-label="Annuler l’édition"
             >
               <X className="h-4 w-4" />
@@ -538,7 +579,7 @@ export function WorkoutNotebook({
           <button
             type="button"
             onClick={() => setEffortHelpOpen((v) => !v)}
-            className="ios-press flex h-7 w-7 items-center justify-center rounded-full border border-white/12 text-[12px] font-bold text-[#8E8E93]"
+            className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 text-[12px] font-bold text-[#8E8E93]"
             aria-label="Aide Effort (facultatif)"
             aria-expanded={effortHelpOpen}
           >
@@ -602,7 +643,7 @@ export function WorkoutNotebook({
                         draftDirty.current = true
                         setExercises((prev) => prev.filter((x) => x.id !== ex.id))
                       }}
-                      className="text-[#8E8E93]"
+                      className="ios-press flex min-h-11 min-w-11 items-center justify-center text-[#8E8E93]"
                       aria-label="Supprimer exercice"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -694,13 +735,13 @@ export function WorkoutNotebook({
                               sets: ex.sets.filter((_, i) => i !== idx),
                             })
                           }
-                          className="mb-2 text-[#636366]"
+                          className="mb-2 flex min-h-11 min-w-11 items-center justify-center text-[#636366]"
                           aria-label="Supprimer série"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       ) : (
-                        <span className="w-4" />
+                        <span className="w-11" />
                       )}
                     </div>
                   ))}
@@ -712,14 +753,14 @@ export function WorkoutNotebook({
                     onClick={() =>
                       updateExercise(ex.id, { sets: [...ex.sets, emptySet()] })
                     }
-                    className="ios-press rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-semibold text-[#AEAEB2]"
+                    className="ios-press inline-flex min-h-11 items-center rounded-full border border-white/10 px-3 text-[11px] font-semibold text-[#AEAEB2]"
                   >
                     + Ajouter une série
                   </button>
                   <button
                     type="button"
                     onClick={() => finishSet(ex, validateIdx)}
-                    className="ios-press inline-flex items-center gap-1 rounded-full border border-[#30D158]/40 bg-[#30D158]/15 px-3 py-1.5 text-[12px] font-semibold text-[#30D158]"
+                    className="ios-press inline-flex min-h-11 items-center gap-1 rounded-full border border-[#30D158]/40 bg-[#30D158]/15 px-3.5 text-[12px] font-semibold text-[#30D158]"
                   >
                     <Check className="h-3.5 w-3.5" />
                     Valider
@@ -733,7 +774,7 @@ export function WorkoutNotebook({
                         type="button"
                         title="Optionnel — n’ajuste pas automatiquement la charge"
                         onClick={() => updateSet(ex.id, validateIdx, { difficulty: d.id })}
-                        className={`ios-press rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                        className={`ios-press inline-flex min-h-11 items-center rounded-full border px-3 text-[11px] font-semibold ${
                           on
                             ? 'border-white/25 bg-white/10 text-white'
                             : 'border-white/10 text-[#636366]'
@@ -787,7 +828,10 @@ export function WorkoutNotebook({
         </div>
 
         <p className="mt-2 text-center text-[11px] text-[#636366]">
-          Volume {stats.volume} kg · {stats.durationMin} min
+          Volume {stats.volume} kg ·{' '}
+          {sessionClockLabel && !editingNote
+            ? `${sessionClockLabel} chronométré`
+            : `${stats.durationMin} min estimées`}
         </p>
       </div>
 

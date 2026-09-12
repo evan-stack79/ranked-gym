@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ExerciseEntry, TrainingState, WorkoutRoutine } from '../types/training'
+import { deriveTodayHubCard } from '../utils/trainHub'
+import { liveElapsedMs } from '../utils/sessionClock'
 
 const store = new Map<string, string>()
 
@@ -49,6 +51,9 @@ const {
   resolveResumedRoutineId,
   startRoutineDraft,
   upsertSchedule,
+  setActiveWorkoutPaused,
+  persistActiveRestTimer,
+  ensureActiveWorkoutClock,
 } = await import('./trainingStorage')
 
 function bicepsRoutine(overrides?: Partial<WorkoutRoutine>): WorkoutRoutine {
@@ -447,5 +452,208 @@ describe('fin de séance — plus de Reprendre', () => {
     expect(routine?.exercises.every((e) => e.sets.every((s) => s.done !== true))).toBe(true)
     const card = deriveTodayHubCard(after, new Date('2026-09-04T15:00:00'))
     expect(card.cta).not.toBe('resume')
+  })
+
+  it('ne fabrique ni durée ni calories pour une séance non-lift sans mesure', async () => {
+    const { saveWorkoutNote } = await import('./trainingStorage')
+
+    saveWorkoutNote({
+      title: 'Course sans mesure',
+      sportId: 'course-a-pied',
+      sessionKind: 'endurance',
+      source: 'manual',
+      estimatedKcal: 0,
+      exercises: [
+        {
+          id: 'run',
+          name: 'Course',
+          sets: [{ reps: 42, weightKg: 0 }],
+        },
+      ],
+    })
+
+    const note = getTrainingState().workoutNotes[0]
+    expect(note.durationMin).toBe(0)
+    expect(note.estimatedKcal).toBe(0)
+    expect(note.totalVolumeKg).toBe(0)
+  })
+})
+
+describe('pause + repos persistés (clé Train)', () => {
+  beforeEach(() => {
+    store.clear()
+    cloudUser.mockReturnValue(null)
+  })
+
+  function seedActiveBiceps() {
+    const base = getTrainingState()
+    const routines = [
+      ...base.routines.filter((r) => r.id !== 'custom-biceps'),
+      bicepsRoutine({
+        exercises: [{ id: 'e1', name: 'Curl', sets: [{ reps: 10, weightKg: 12 }] }],
+        updatedAt: 1,
+      }),
+    ]
+    saveTrainingState({ ...base, routines })
+    return startRoutineDraft('custom-biceps', 'musculation')
+  }
+
+  it('pause chronomètre survit à un rechargement localStorage', () => {
+    expect(seedActiveBiceps().activeWorkoutDraft?.routineId).toBe('custom-biceps')
+    vi.spyOn(Date, 'now').mockReturnValue(2_000_000)
+    setActiveWorkoutPaused(true)
+    const paused = getTrainingState().activeWorkoutDraft
+    expect(paused?.paused).toBe(true)
+    expect(paused?.runningSince).toBeNull()
+
+    const restored = getTrainingState().activeWorkoutDraft
+    expect(restored?.paused).toBe(true)
+    const t1 = liveElapsedMs(restored, 2_100_000)
+    const t2 = liveElapsedMs(restored, 2_200_000)
+    expect(t1).toBe(t2)
+
+    setActiveWorkoutPaused(false)
+    expect(getTrainingState().activeWorkoutDraft?.paused).toBe(false)
+    expect(getTrainingState().activeWorkoutDraft?.runningSince).toBe(2_000_000)
+    vi.restoreAllMocks()
+  })
+
+  it('minuteur de repos persisté : remaining via endsAt après refresh', () => {
+    seedActiveBiceps()
+    const endsAt = Date.now() + 45_000
+    persistActiveRestTimer({
+      totalSec: 90,
+      remainingSec: 45,
+      endsAt,
+      paused: false,
+      target: {
+        exerciseId: 'e1',
+        setIndex: 0,
+        exerciseName: 'Curl',
+        setLabel: 'Série 1',
+      },
+    })
+    const snap = getTrainingState().activeWorkoutDraft?.restTimer
+    expect(snap?.totalSec).toBe(90)
+    expect(snap?.target.exerciseName).toBe('Curl')
+    expect(snap?.endsAt).toBe(endsAt)
+
+    persistActiveRestTimer({
+      ...snap!,
+      paused: true,
+      remainingSec: 33,
+    })
+    expect(getTrainingState().activeWorkoutDraft?.restTimer?.paused).toBe(true)
+    expect(getTrainingState().activeWorkoutDraft?.restTimer?.remainingSec).toBe(33)
+  })
+
+  it('ensureActiveWorkoutClock hydrate un brouillon legacy sans détruire la séance', () => {
+    const base = getTrainingState()
+    saveTrainingState({
+      ...base,
+      routines: [
+        ...base.routines.filter((r) => r.id !== 'custom-biceps'),
+        bicepsRoutine({
+          exercises: [{ id: 'e1', name: 'Curl', sets: [{ reps: 10, weightKg: 12, done: true }] }],
+          updatedAt: 1,
+        }),
+      ],
+      activeWorkoutDraft: {
+        routineId: 'custom-biceps',
+        sportId: 'musculation',
+        startedAt: 1_000_000,
+        updatedAt: 1_000_000,
+      },
+    })
+    vi.spyOn(Date, 'now').mockReturnValue(1_600_000)
+    const next = ensureActiveWorkoutClock()
+    expect(next.activeWorkoutDraft?.routineId).toBe('custom-biceps')
+    // Mesure démarre à la reprise — pas startedAt
+    expect(next.activeWorkoutDraft?.runningSince).toBe(1_600_000)
+    expect(next.activeWorkoutDraft?.elapsedActiveMs).toBe(0)
+    expect(next.activeWorkoutDraft?.estimatedElapsedMs).toBe(600_000)
+    expect(next.activeWorkoutDraft?.startedAt).toBe(1_000_000)
+    expect(deriveTodayHubCard(next, new Date('2026-09-04T15:00:00')).cta).toBe('resume')
+    vi.restoreAllMocks()
+  })
+
+  it('changement de portée : rest timer guest non recopié vers compte', () => {
+    cloudUser.mockReturnValue(null)
+    seedActiveBiceps()
+    persistActiveRestTimer({
+      totalSec: 90,
+      remainingSec: 40,
+      endsAt: Date.now() + 40_000,
+      paused: false,
+      target: {
+        exerciseId: 'e1',
+        setIndex: 0,
+        exerciseName: 'Curl',
+        setLabel: 'Série 1',
+      },
+    })
+    expect(getTrainingState().activeWorkoutDraft?.restTimer?.totalSec).toBe(90)
+
+    cloudUser.mockReturnValue('user-account')
+    // Nouvelle portée vide — pas de fuite du snapshot guest
+    expect(getTrainingState().activeWorkoutDraft).toBeNull()
+    expect(store.has('ranked-gym:training')).toBe(true)
+    expect(store.has('ranked-gym:training:u:user-account')).toBe(false)
+  })
+})
+
+describe('erreurs de sauvegarde visibles', () => {
+  beforeEach(() => {
+    store.clear()
+    cloudUser.mockReturnValue(null)
+  })
+
+  it('émet une seule erreur locale puis propage l’échec de localStorage', () => {
+    const events: string[] = []
+    const listeners = new Map<string, Set<(event: Event) => void>>()
+    const dispatchEvent = (event: Event) => {
+      listeners.get(event.type)?.forEach((listener) => listener(event))
+      return true
+    }
+    const addEventListener = (type: string, listener: (event: Event) => void) => {
+      if (!listeners.has(type)) listeners.set(type, new Set())
+      listeners.get(type)!.add(listener)
+    }
+    const removeEventListener = (type: string, listener: (event: Event) => void) => {
+      listeners.get(type)?.delete(listener)
+    }
+    vi.stubGlobal('dispatchEvent', dispatchEvent)
+    vi.stubGlobal('addEventListener', addEventListener)
+    vi.stubGlobal('removeEventListener', removeEventListener)
+
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ error?: string }>).detail
+      events.push(detail?.error ?? '')
+    }
+    addEventListener('ranked-gym:training-persist-error', handler)
+
+    const originalSetItem = localStorage.setItem.bind(localStorage)
+    localStorage.setItem = () => {
+      throw new DOMException('QuotaExceededError')
+    }
+
+    try {
+      expect(() => setLastSelectedRoutine('upper', 'musculation')).toThrow(/QuotaExceeded/)
+      expect(events).toEqual(['QuotaExceededError'])
+    } finally {
+      localStorage.setItem = originalSetItem
+      removeEventListener('ranked-gym:training-persist-error', handler)
+      vi.unstubAllGlobals()
+      vi.stubGlobal('localStorage', {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          store.set(key, value)
+        },
+        removeItem: (key: string) => {
+          store.delete(key)
+        },
+        clear: () => store.clear(),
+      })
+    }
   })
 })

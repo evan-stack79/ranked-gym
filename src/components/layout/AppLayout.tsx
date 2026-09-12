@@ -25,6 +25,8 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
     readyBarEnabled,
     chromeHidden,
     start,
+    pause,
+    resume,
     skip,
     dismiss,
   } = useRestTimerContext()
@@ -121,6 +123,8 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
             }}
             onSkip={skip}
             onDismiss={dismiss}
+            onPause={pause}
+            onResume={resume}
           />
           {showBottomNav ? (
             <div

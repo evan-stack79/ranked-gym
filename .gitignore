@@ -52,3 +52,6 @@ ios/DerivedData
 
 # Autonomous agent runs (reports, logs and detached worktrees)
 .agent-runs/
+
+# Captures navigateur locales (preuves — jamais versionnées)
+scripts/screenshots/

@@ -8,6 +8,7 @@ import {
   noteDurationMin,
   noteVolumeKg,
 } from '../../utils/workoutHistory'
+import { resolveSessionKind } from '../../utils/trainHub'
 import { TrainSheet as IosSheet } from './TrainSheet'
 
 interface WorkoutHistoryProps {
@@ -19,6 +20,45 @@ interface WorkoutHistoryProps {
   /** Ouvre le détail d’une séance (hub « Dernières séances »). */
   focusNoteId?: string | null
   onFocusConsumed?: () => void
+}
+
+function isFinitePositive(n: unknown): n is number {
+  return typeof n === 'number' && Number.isFinite(n) && n > 0
+}
+
+/** Métriques affichables — jamais NaN / 0 kg / énergie fictive à 0. */
+function historyMetrics(note: WorkoutNote): {
+  kind: ReturnType<typeof resolveSessionKind>
+  duration: number | null
+  volume: number | null
+  kcal: number | null
+} {
+  const kind = resolveSessionKind(note)
+  // Le fallback par séries reste réservé aux anciennes séances de force.
+  // Pour les autres sports, seule une durée réellement enregistrée est affichée.
+  const durationRaw = kind === 'strength' ? noteDurationMin(note) : note.durationMin
+  const duration = isFinitePositive(durationRaw) ? durationRaw : null
+  const volumeRaw = noteVolumeKg(note)
+  // Volume kg uniquement pour la force avec charge réelle.
+  const volume =
+    kind === 'strength' && isFinitePositive(volumeRaw) ? Math.round(volumeRaw) : null
+  // kcal : uniquement si > 0 et fini — pas d’énergie fictive (0 / NaN).
+  const kcal = isFinitePositive(note.estimatedKcal) ? Math.round(note.estimatedKcal) : null
+  return { kind, duration, volume, kcal }
+}
+
+function setLoadLabel(
+  kind: ReturnType<typeof resolveSessionKind>,
+  reps: number,
+  weightKg: number,
+): string {
+  if (kind === 'strength' && isFinitePositive(weightKg)) {
+    return `${reps} reps × ${weightKg} kg`
+  }
+  if (kind !== 'strength') {
+    return 'Mesure non renseignée'
+  }
+  return `${reps} reps`
 }
 
 export function WorkoutHistory({
@@ -52,6 +92,24 @@ export function WorkoutHistory({
     )
   }
 
+  const selectedMetrics = selected ? historyMetrics(selected) : null
+  const selectedSubtitle = selectedMetrics
+    ? [
+        formatClock(selected!.createdAt),
+        selectedMetrics.duration != null
+          ? `${selectedMetrics.duration} min`
+          : selectedMetrics.kind !== 'strength'
+            ? 'Durée non renseignée'
+            : null,
+        selectedMetrics.volume != null
+          ? `${selectedMetrics.volume.toLocaleString('fr-FR')} kg`
+          : null,
+        selectedMetrics.kcal != null ? `${selectedMetrics.kcal} kcal` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : undefined
+
   return (
     <section className="space-y-3">
       <div className="px-1">
@@ -63,8 +121,7 @@ export function WorkoutHistory({
           <p className="px-1 text-[13px] font-bold text-white">{group.label}</p>
           <ul className="space-y-2">
             {group.sessions.map((note) => {
-              const volume = noteVolumeKg(note)
-              const duration = noteDurationMin(note)
+              const metrics = historyMetrics(note)
               const exerciseCount = note.exercises.length
               return (
                 <li key={note.id}>
@@ -91,7 +148,7 @@ export function WorkoutHistory({
                               e.stopPropagation()
                               onEdit(note)
                             }}
-                            className="ios-press relative z-20 ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-[#AEAEB2]"
+                            className="ios-press relative z-20 ml-auto flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-[#AEAEB2]"
                             aria-label={`Modifier ${note.title}`}
                           >
                             <Pencil className="h-3.5 w-3.5" strokeWidth={2.25} />
@@ -99,18 +156,29 @@ export function WorkoutHistory({
                         ) : null}
                       </div>
                       <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-[#8E8E93]">
-                        <span className="inline-flex items-center gap-1">
-                          <Dumbbell className="h-3 w-3" />
-                          {volume.toLocaleString('fr-FR')} kg
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {duration} min
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <Flame className="h-3 w-3 text-[#FF9F0A]" />
-                          {note.estimatedKcal} kcal
-                        </span>
+                        {metrics.volume != null ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Dumbbell className="h-3 w-3" />
+                            {metrics.volume.toLocaleString('fr-FR')} kg
+                          </span>
+                        ) : null}
+                        {metrics.duration != null ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {metrics.duration} min
+                          </span>
+                        ) : metrics.kind !== 'strength' ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            Durée non renseignée
+                          </span>
+                        ) : null}
+                        {metrics.kcal != null ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Flame className="h-3 w-3 text-[#FF9F0A]" />
+                            {metrics.kcal} kcal
+                          </span>
+                        ) : null}
                       </p>
                       <p className="mt-0.5 text-[11px] text-[#636366]">
                         {exerciseCount} exercice{exerciseCount > 1 ? 's' : ''}
@@ -131,14 +199,10 @@ export function WorkoutHistory({
         open={selected != null}
         onClose={() => setSelected(null)}
         title={selected?.title ?? 'Séance'}
-        subtitle={
-          selected
-            ? `${formatClock(selected.createdAt)} · ${noteDurationMin(selected)} min · ${noteVolumeKg(selected).toLocaleString('fr-FR')} kg · ${selected.estimatedKcal} kcal`
-            : undefined
-        }
+        subtitle={selectedSubtitle}
         leading={<Dumbbell className="mt-0.5 h-5 w-5 text-[#FF6961]" />}
       >
-        {selected && (
+        {selected && selectedMetrics && (
           <div className="space-y-4 pb-2">
             {selected.details?.kind === 'team' ? (
               <p className="text-[13px] text-[#AEAEB2]">
@@ -172,7 +236,7 @@ export function WorkoutHistory({
                     >
                       <span className="font-semibold text-[#8E8E93]">Série {idx + 1}</span>
                       <span className="text-white">
-                        {set.reps} reps × {set.weightKg} kg
+                        {setLoadLabel(selectedMetrics.kind, set.reps, set.weightKg)}
                       </span>
                       <span className="text-[11px] font-semibold text-[#AEAEB2]">
                         {DIFF_LABELS[set.difficulty ?? 'ok'] ?? 'OK'}
@@ -183,7 +247,7 @@ export function WorkoutHistory({
               </div>
             ))}
 
-            {onEdit && selected && (canEdit?.(selected) ?? true) ? (
+            {onEdit && (canEdit?.(selected) ?? true) ? (
               <button
                 type="button"
                 onClick={() => {
@@ -191,7 +255,7 @@ export function WorkoutHistory({
                   setSelected(null)
                   onEdit(note)
                 }}
-                className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-[#FF2B2B]/35 bg-[#FF2B2B]/12 py-3.5 text-[14px] font-semibold text-[#FF6961]"
+                className="ios-press flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-[#FF2B2B]/35 bg-[#FF2B2B]/12 py-3.5 text-[14px] font-semibold text-[#FF6961]"
               >
                 <Pencil className="h-4 w-4" />
                 Modifier cette séance
@@ -205,7 +269,7 @@ export function WorkoutHistory({
                 setSelected(null)
                 onDelete(id)
               }}
-              className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-[#FF453A]/30 bg-[#FF453A]/12 py-3.5 text-[14px] font-semibold text-[#FF453A]"
+              className="ios-press flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-[#FF453A]/30 bg-[#FF453A]/12 py-3.5 text-[14px] font-semibold text-[#FF453A]"
             >
               <Trash2 className="h-4 w-4" />
               Supprimer cette séance

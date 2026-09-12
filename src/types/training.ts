@@ -166,6 +166,39 @@ export interface ActiveWorkoutDraft {
   sportId: string
   startedAt: number
   updatedAt: number
+  /**
+   * Millisecondes chronométrées hors pause (durée réelle).
+   * Absent sur les brouillons legacy → la mesure démarre à la reprise (pas startedAt).
+   */
+  elapsedActiveMs?: number
+  /**
+   * Horodatage du début du segment courant. `null` si en pause.
+   * Absent sur legacy.
+   */
+  runningSince?: number | null
+  /** true = chronomètre en pause. Absent/false = en cours. */
+  paused?: boolean
+  /**
+   * Estimation figée (legacy) : wall-clock startedAt→reprise.
+   * Ne compte jamais comme durée réellement chronométrée.
+   */
+  estimatedElapsedMs?: number
+  /**
+   * Snapshot minuteur de repos (optionnel).
+   * Persiste décompte / pause à travers refresh. Absent = pas de repos actif.
+   */
+  restTimer?: {
+    totalSec: number
+    remainingSec: number
+    endsAt: number
+    paused: boolean
+    target: {
+      exerciseId: string
+      setIndex: number
+      exerciseName: string
+      setLabel: string
+    }
+  } | null
 }
 
 export interface TrainingState {

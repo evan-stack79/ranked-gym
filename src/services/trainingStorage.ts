@@ -18,6 +18,13 @@ import {
 } from '../utils/strength'
 import { getActiveCloudUserId } from './cloudSession'
 import { sessionKindForSport } from '../utils/sessionMeta'
+import {
+  ensureDraftClock,
+  pauseDraftClock,
+  resolvedDurationMin,
+  resumeDraftClock,
+} from '../utils/sessionClock'
+import { normalizePersistedRestTimer } from '../utils/restTimerPersist'
 
 const KEY_BASE = 'ranked-gym:training'
 
@@ -30,6 +37,11 @@ function triggerCloudBackup() {
 function storageKey(): string {
   const uid = getActiveCloudUserId()
   return uid ? `${KEY_BASE}:u:${uid}` : KEY_BASE
+}
+
+/** Portée active (guest vs compte) — pour hydratation rest timer / anti-fuite. */
+export function getTrainingStorageScope(): string {
+  return storageKey()
 }
 
 export const DEFAULT_TEMPLATES: SessionTemplate[] = [
@@ -182,12 +194,36 @@ export function normalizeActiveWorkoutDraft(
   if (!routineId || !sportId || !routines.some((routine) => routine.id === routineId)) return null
   if (!Number.isFinite(raw.startedAt) || !Number.isFinite(raw.updatedAt)) return null
   if ((raw.startedAt ?? 0) <= 0 || (raw.updatedAt ?? 0) <= 0) return null
-  return {
+
+  const draft: ActiveWorkoutDraft = {
     routineId,
     sportId,
     startedAt: raw.startedAt as number,
     updatedAt: raw.updatedAt as number,
   }
+
+  if (Number.isFinite(raw.elapsedActiveMs) && (raw.elapsedActiveMs as number) >= 0) {
+    draft.elapsedActiveMs = raw.elapsedActiveMs as number
+  }
+  if (raw.runningSince === null) {
+    draft.runningSince = null
+  } else if (Number.isFinite(raw.runningSince) && (raw.runningSince as number) > 0) {
+    draft.runningSince = raw.runningSince as number
+  }
+  if (raw.paused === true) draft.paused = true
+  else if (raw.paused === false) draft.paused = false
+  if (Number.isFinite(raw.estimatedElapsedMs) && (raw.estimatedElapsedMs as number) >= 0) {
+    draft.estimatedElapsedMs = raw.estimatedElapsedMs as number
+  }
+
+  if (raw.restTimer === null) {
+    draft.restTimer = null
+  } else {
+    const rest = normalizePersistedRestTimer(raw.restTimer)
+    if (rest) draft.restTimer = rest
+  }
+
+  return draft
 }
 
 function normalizeScheduleEntry<T extends Omit<ScheduledSession, 'id'> & { id?: string }>(
@@ -252,11 +288,44 @@ function read(): TrainingState {
   }
 }
 
+function emitTrainingPersistError(error: unknown): void {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : 'Erreur de sauvegarde locale'
+  const target =
+    typeof globalThis !== 'undefined'
+      ? (globalThis as typeof globalThis & {
+          dispatchEvent?: (event: Event) => boolean
+        })
+      : null
+  if (target && typeof target.dispatchEvent === 'function') {
+    target.dispatchEvent(
+      new CustomEvent('ranked-gym:training-persist-error', {
+        detail: { error: message },
+      }),
+    )
+  }
+}
+
 function write(state: TrainingState, opts?: StorageSaveOptions): void {
-  localStorage.setItem(storageKey(), JSON.stringify(state))
+  try {
+    localStorage.setItem(storageKey(), JSON.stringify(state))
+  } catch (error) {
+    emitTrainingPersistError(error)
+    throw error
+  }
   if (!opts?.skipCloud) triggerCloudBackup()
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('ranked-gym:training-changed'))
+  const target =
+    typeof globalThis !== 'undefined'
+      ? (globalThis as typeof globalThis & {
+          dispatchEvent?: (event: Event) => boolean
+        })
+      : null
+  if (target && typeof target.dispatchEvent === 'function') {
+    target.dispatchEvent(new Event('ranked-gym:training-changed'))
   }
 }
 
@@ -469,7 +538,15 @@ export function saveWorkoutNote(
   let estimatedKcal: number
 
   if (isLift) {
-    durationMin = stats.durationMin
+    // Durée réelle chronométrée prioritaire sur l’estimation par séries.
+    const activeDraft = state.activeWorkoutDraft
+    const liveMin =
+      note.durationMin && note.durationMin > 0
+        ? note.durationMin
+        : activeDraft && activeDraft.routineId === (note.routineId ?? activeDraft.routineId)
+          ? resolvedDurationMin(activeDraft)
+          : 0
+    durationMin = liveMin > 0 ? liveMin : stats.durationMin
     totalVolumeKg = stats.volume
     estimatedKcal = strengthSessionKcal(
       bodyWeightKg,
@@ -477,12 +554,11 @@ export function saveWorkoutNote(
       sessionIntensity(note.exercises),
     )
   } else {
-    durationMin =
-      note.durationMin && note.durationMin > 0
-        ? note.durationMin
-        : Math.max(15, note.exercises[0]?.sets[0]?.reps ?? 30)
+    // Les modules endurance/team fournissent leurs mesures réelles. Une valeur
+    // absente reste inconnue au lieu d'être déduite des répétitions de série.
+    durationMin = note.durationMin && note.durationMin > 0 ? note.durationMin : 0
     totalVolumeKg = 0
-    estimatedKcal = note.estimatedKcal > 0 ? note.estimatedKcal : stats.kcal
+    estimatedKcal = note.estimatedKcal > 0 ? note.estimatedKcal : 0
   }
 
   const entry: WorkoutNote = {
@@ -597,15 +673,21 @@ export function saveRoutineDraft(
     sanitizeStoredId(state.primarySportId) ??
     'musculation'
   const prior = state.activeWorkoutDraft
+  const same = prior?.routineId === routineId
+  const baseDraft: ActiveWorkoutDraft = {
+    routineId,
+    sportId: cleanSportId,
+    startedAt: same ? prior!.startedAt : now,
+    updatedAt: now,
+    elapsedActiveMs: same ? prior?.elapsedActiveMs : 0,
+    runningSince: same ? prior?.runningSince ?? (prior?.paused ? null : now) : now,
+    paused: same ? prior?.paused === true : false,
+    restTimer: same ? prior?.restTimer ?? null : null,
+  }
   const next = {
     ...state,
     routines,
-    activeWorkoutDraft: {
-      routineId,
-      sportId: cleanSportId,
-      startedAt: prior?.routineId === routineId ? prior.startedAt : now,
-      updatedAt: now,
-    },
+    activeWorkoutDraft: ensureDraftClock(baseDraft, now),
   }
   write(next)
   return next
@@ -625,15 +707,72 @@ export function startRoutineDraft(
   }
   const now = Date.now()
   const prior = state.activeWorkoutDraft
+  const same = prior?.routineId === cleanRoutineId
   const next: TrainingState = {
     ...state,
     lastSelectedRoutineId: cleanRoutineId,
     lastSelectedSportId: cleanSportId,
-    activeWorkoutDraft: {
+    activeWorkoutDraft: ensureDraftClock({
       routineId: cleanRoutineId,
       sportId: cleanSportId,
-      startedAt: prior?.routineId === cleanRoutineId ? prior.startedAt : now,
+      startedAt: same ? prior!.startedAt : now,
       updatedAt: now,
+      elapsedActiveMs: same ? prior?.elapsedActiveMs : 0,
+      runningSince: same && prior?.paused ? null : now,
+      paused: same ? prior?.paused === true : false,
+      restTimer: same ? prior?.restTimer ?? null : null,
+    }, now),
+  }
+  write(next)
+  return next
+}
+
+/** Pause / reprise du chronomètre de séance active (même clé Train). */
+export function setActiveWorkoutPaused(paused: boolean): TrainingState {
+  const state = read()
+  const draft = state.activeWorkoutDraft
+  if (!draft) return state
+  const now = Date.now()
+  const ensured = ensureDraftClock(draft, now)
+  const nextDraft = paused ? pauseDraftClock(ensured, now) : resumeDraftClock(ensured, now)
+  const next = { ...state, activeWorkoutDraft: nextDraft }
+  write(next)
+  return next
+}
+
+/** Garantit les champs clock sur un brouillon legacy (idempotent). */
+export function ensureActiveWorkoutClock(): TrainingState {
+  const state = read()
+  const draft = state.activeWorkoutDraft
+  if (!draft) return state
+  const now = Date.now()
+  const nextDraft = ensureDraftClock(draft, now)
+  if (
+    nextDraft.elapsedActiveMs === draft.elapsedActiveMs &&
+    nextDraft.runningSince === draft.runningSince &&
+    nextDraft.paused === draft.paused &&
+    nextDraft.estimatedElapsedMs === draft.estimatedElapsedMs
+  ) {
+    return state
+  }
+  const next = { ...state, activeWorkoutDraft: nextDraft }
+  write(next)
+  return next
+}
+
+/** Persiste le snapshot repos sur le brouillon actif (ou no-op hors séance). */
+export function persistActiveRestTimer(
+  restTimer: ActiveWorkoutDraft['restTimer'],
+): TrainingState {
+  const state = read()
+  const draft = state.activeWorkoutDraft
+  if (!draft) return state
+  const next = {
+    ...state,
+    activeWorkoutDraft: {
+      ...draft,
+      restTimer: restTimer ?? null,
+      updatedAt: Date.now(),
     },
   }
   write(next)

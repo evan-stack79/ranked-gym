@@ -22,11 +22,12 @@ const scenarios = [
   'invalid',
   'empty',
   'resume',
+  'rest-timer',
 ]
 
 const chromiumLaunchOptions = existsSync('/usr/local/bin/google-chrome')
-  ? { executablePath: '/usr/local/bin/google-chrome' }
-  : {}
+  ? { executablePath: '/usr/local/bin/google-chrome', args: ['--no-sandbox'] }
+  : { args: ['--no-sandbox'] }
 
 async function startServer() {
   const vite = join(projectRoot, 'node_modules', '.bin', 'vite')
@@ -117,9 +118,12 @@ async function main() {
 
         // Preuves après clic, avec les vrais formulaires de TrainingView.
         // Les créneaux typés ouvrent directement leur formulaire existant.
-        if (scenario === 'resume' || scenario === 'strength') {
-          await page.getByRole('button', { name: scenario === 'resume' ? 'Reprendre' : 'Démarrer', exact: true }).click()
+        if (scenario === 'resume' || scenario === 'strength' || scenario === 'rest-timer') {
+          await page.getByRole('button', { name: scenario === 'strength' ? 'Démarrer' : 'Reprendre', exact: true }).click()
           await page.locator('#workout-notebook').waitFor()
+          if (scenario === 'rest-timer') {
+            await page.waitForSelector('#ranked-rest-timer-bar')
+          }
         } else if (scenario === 'course') {
           await page.getByRole('button', { name: 'Démarrer', exact: true }).click()
           await page.getByRole('button', { name: 'Enregistrer la sortie' }).waitFor()

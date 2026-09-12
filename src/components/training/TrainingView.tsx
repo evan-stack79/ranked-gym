@@ -11,6 +11,8 @@ import {
   saveWorkoutNote,
   saveRoutineDraft,
   startRoutineDraft,
+  setActiveWorkoutPaused,
+  ensureActiveWorkoutClock,
   addCustomRoutine,
   setHealthLinked,
   setNotificationsEnabled,
@@ -72,6 +74,11 @@ import { TrainWeekStrip } from './TrainWeekStrip'
 import { TrainWeeklySummary } from './TrainWeeklySummary'
 import { TrainRecentSessions } from './TrainRecentSessions'
 import { TrainActivitySheet, type QuickActivityId } from './TrainActivitySheet'
+import {
+  formatSessionClock,
+  liveElapsedMs,
+  resolvedDurationMin,
+} from '../../utils/sessionClock'
 
 type TrainPanel = 'hub' | 'notebook' | 'endurance' | 'agenda' | 'history' | 'steps'
 
@@ -115,6 +122,7 @@ export function TrainingView({
   const [summaryFilter, setSummaryFilter] = useState<SportSummaryFilter>('all')
   const [focusNoteId, setFocusNoteId] = useState<string | null>(null)
   const [nowTick, setNowTick] = useState(() => Date.now())
+  const [clockTick, setClockTick] = useState(() => Date.now())
 
   useEffect(() => {
     if (isBootLoading) return
@@ -133,6 +141,26 @@ export function TrainingView({
       window.removeEventListener('focus', onFocus)
     }
   }, [])
+
+  // Chronomètre séance — tick 1s uniquement si une séance active non en pause.
+  useEffect(() => {
+    const draft = state.activeWorkoutDraft
+    if (!draft || draft.paused || panel !== 'notebook') return
+    const id = window.setInterval(() => setClockTick(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [state.activeWorkoutDraft, panel])
+
+  const sessionClockLabel = useMemo(() => {
+    const draft = state.activeWorkoutDraft
+    if (!draft || notebookEditNote) return null
+    return formatSessionClock(liveElapsedMs(draft, clockTick))
+  }, [state.activeWorkoutDraft, clockTick, notebookEditNote])
+
+  const sessionDurationMin = useMemo(() => {
+    const draft = state.activeWorkoutDraft
+    if (!draft || notebookEditNote) return null
+    return resolvedDurationMin(draft, clockTick)
+  }, [state.activeWorkoutDraft, clockTick, notebookEditNote])
 
   const profile = useMemo(() => getCalorieProfile(), [
     profileTick,
@@ -253,11 +281,19 @@ export function TrainingView({
       safeError('[Train] backup error', msg)
       showToast(`Cloud : ${msg}`)
     }
+    const onPersistError = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ error?: string }>).detail
+      const msg = detail?.error || 'Erreur de sauvegarde locale'
+      safeError('[Train] persist error', msg)
+      showToast(`Sauvegarde : ${msg}`)
+    }
     window.addEventListener('ranked-gym:backup-restored', onRestored)
     window.addEventListener('ranked-gym:backup-error', onBackupError)
+    window.addEventListener('ranked-gym:training-persist-error', onPersistError)
     return () => {
       window.removeEventListener('ranked-gym:backup-restored', onRestored)
       window.removeEventListener('ranked-gym:backup-error', onBackupError)
+      window.removeEventListener('ranked-gym:training-persist-error', onPersistError)
     }
   }, [showToast])
 
@@ -413,6 +449,7 @@ export function TrainingView({
         return
       }
       applySport(todayCard.sportId ?? 'musculation')
+      setState(ensureActiveWorkoutClock())
       openNotebook(id, null, cta === 'resume')
       return
     }
@@ -592,6 +629,14 @@ export function TrainingView({
             sportId={activeSportId}
             sessionKind="strength"
             restLogRequest={restLogRequest}
+            sessionClockLabel={sessionClockLabel}
+            sessionPaused={state.activeWorkoutDraft?.paused === true}
+            sessionDurationMin={sessionDurationMin}
+            onToggleSessionPause={() => {
+              const next = setActiveWorkoutPaused(!(state.activeWorkoutDraft?.paused === true))
+              setState(next)
+              setClockTick(Date.now())
+            }}
             onRestStart={(info) => {
               startRestTimer(90, info)
             }}

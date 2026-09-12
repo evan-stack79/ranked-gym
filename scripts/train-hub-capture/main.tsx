@@ -111,12 +111,35 @@ function seedState(scenario: string): TrainingState {
     routines: [pushRoutine],
     lastSelectedRoutineId: scenario === 'resume' ? 'push' : null,
     lastSelectedSportId: scenario === 'resume' ? 'musculation' : null,
-    activeWorkoutDraft: scenario === 'resume'
-      ? { routineId: 'push', sportId: 'musculation', startedAt: FIXED_MS - 60_000, updatedAt: FIXED_MS }
+    activeWorkoutDraft: scenario === 'resume' || scenario === 'rest-timer'
+      ? {
+          routineId: 'push',
+          sportId: 'musculation',
+          startedAt: FIXED_MS - 60_000,
+          updatedAt: FIXED_MS,
+          elapsedActiveMs: 45_000,
+          runningSince: scenario === 'rest-timer' ? FIXED_MS - 15_000 : null,
+          paused: scenario !== 'rest-timer',
+          restTimer:
+            scenario === 'rest-timer'
+              ? {
+                  totalSec: 90,
+                  remainingSec: 55,
+                  endsAt: FIXED_MS + 55_000,
+                  paused: false,
+                  target: {
+                    exerciseId: 'ex-bench',
+                    setIndex: 0,
+                    exerciseName: 'Développé couché',
+                    setLabel: 'Série 1',
+                  },
+                }
+              : null,
+        }
       : null,
   }
 
-  if (scenario === 'strength' || scenario === 'resume') {
+  if (scenario === 'strength' || scenario === 'resume' || scenario === 'rest-timer') {
     return {
       ...base,
       schedule: [
@@ -267,19 +290,42 @@ function seedState(scenario: string): TrainingState {
 }
 
 const scenario = new URLSearchParams(window.location.search).get('scenario') ?? 'strength'
-localStorage.setItem('ranked-gym:training', JSON.stringify(seedState(scenario)))
-if (scenario === 'endurance' || scenario === 'course') {
-  localStorage.setItem('ranked-gym:discipline', 'course')
-} else if (
-  scenario === 'football' ||
-  scenario === 'football-match' ||
-  scenario === 'football-training'
-) {
-  localStorage.setItem('ranked-gym:discipline', 'football')
-} else if (scenario === 'other') {
-  localStorage.setItem('ranked-gym:discipline', 'fitness')
-} else {
-  localStorage.setItem('ranked-gym:discipline', 'musculation')
+const keepStorage = new URLSearchParams(window.location.search).has('keepStorage')
+
+/** Profil Nutri réaliste — évite 0 kg / kcal fictives dans les parcours Train. */
+const REALISTIC_PROFILE = {
+  weightKg: 78,
+  goalWeightKg: 76,
+  heightCm: 180,
+  age: 28,
+  sex: 'male' as const,
+  activity: 'active' as const,
+  morphology: 'mesomorph' as const,
+  goal: 'maintain' as const,
+  weeklyPaceKg: 0.5,
+  onboardingComplete: true,
+}
+
+if (!keepStorage || !localStorage.getItem('ranked-gym:nutrition-profile')) {
+  localStorage.setItem('ranked-gym:nutrition-profile', JSON.stringify(REALISTIC_PROFILE))
+}
+if (!keepStorage || !localStorage.getItem('ranked-gym:training')) {
+  localStorage.setItem('ranked-gym:training', JSON.stringify(seedState(scenario)))
+}
+if (!keepStorage || !localStorage.getItem('ranked-gym:discipline')) {
+  if (scenario === 'endurance' || scenario === 'course') {
+    localStorage.setItem('ranked-gym:discipline', 'course')
+  } else if (
+    scenario === 'football' ||
+    scenario === 'football-match' ||
+    scenario === 'football-training'
+  ) {
+    localStorage.setItem('ranked-gym:discipline', 'football')
+  } else if (scenario === 'other') {
+    localStorage.setItem('ranked-gym:discipline', 'fitness')
+  } else {
+    localStorage.setItem('ranked-gym:discipline', 'musculation')
+  }
 }
 
 function CaptureApp() {
@@ -287,7 +333,13 @@ function CaptureApp() {
   const authValue = useMemo(
     () => ({
       user: null,
-      profile: null,
+      profile: {
+        id: 'harness-local',
+        pseudo: 'Alex',
+        current_streak: 4,
+        last_login_date: TODAY,
+        discipline: 'musculation',
+      },
       isAuthenticated: false,
       isLoading: false,
       isAuthOpen: false,

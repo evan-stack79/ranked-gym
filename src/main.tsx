@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { RootErrorBoundary } from './components/ui/RootErrorBoundary.tsx'
+import { AppColdLaunch } from './components/brand/AppColdLaunch.tsx'
 
 const rootEl = document.getElementById('root')
 if (!rootEl) {
@@ -12,7 +13,9 @@ if (!rootEl) {
 createRoot(rootEl).render(
   <StrictMode>
     <RootErrorBoundary>
-      <App />
+      <AppColdLaunch>
+        <App />
+      </AppColdLaunch>
     </RootErrorBoundary>
   </StrictMode>,
 )

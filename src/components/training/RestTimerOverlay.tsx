@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { Check, ChevronUp, SkipForward, Timer } from 'lucide-react'
+import { Check, ChevronUp, Pause, Play, SkipForward, Timer } from 'lucide-react'
 import type { RestPresetSec, RestTimerState } from '../../context/RestTimerContext'
 import { REST_PRESETS_SEC } from '../../context/RestTimerContext'
 
@@ -13,6 +13,8 @@ interface RestTimerOverlayProps {
   onPreset: (sec: RestPresetSec) => void
   onSkip: () => void
   onDismiss: () => void
+  onPause?: () => void
+  onResume?: () => void
   /** Affiche l’îlot « Prêt à lancer » (Train muscu uniquement). */
   showReadyBar?: boolean
 }
@@ -81,22 +83,43 @@ export function RestTimerOverlay({
   onPreset,
   onSkip,
   onDismiss,
+  onPause,
+  onResume,
   showReadyBar = false,
 }: RestTimerOverlayProps) {
   const [expanded, setExpanded] = useState(false)
+  const [reduceMotion, setReduceMotion] = useState(() => {
+    try {
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    } catch {
+      return false
+    }
+  })
 
-  const running = state.active
+  useEffect(() => {
+    try {
+      const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+      const onChange = () => setReduceMotion(mq.matches)
+      mq.addEventListener('change', onChange)
+      return () => mq.removeEventListener('change', onChange)
+    } catch {
+      return undefined
+    }
+  }, [])
+
+  const running = state.active && !state.paused
+  const paused = state.active && state.paused
   const finished = state.finished
-  const idle = !running && !finished
-  const sessionVisible = running || finished
+  const idle = !state.active && !finished
+  const sessionVisible = state.active || finished
   const visible = sessionVisible || (showReadyBar && idle)
   const wasSessionRef = useRef(false)
-  const modeKey = idle ? 'idle' : finished ? 'finished' : 'running'
+  const modeKey = idle ? 'idle' : finished ? 'finished' : paused ? 'paused' : 'running'
   const islandRef = useRestIslandClearance(visible, expanded, modeKey)
 
   // Replier à la fin d’un cycle repos (retour idle), sans combattre le dépliage idle.
   useEffect(() => {
-    if (running || finished) {
+    if (state.active || finished) {
       wasSessionRef.current = true
       return
     }
@@ -104,27 +127,32 @@ export function RestTimerOverlay({
       setExpanded(false)
       wasSessionRef.current = false
     }
-  }, [running, finished, idle])
+  }, [state.active, finished, idle])
 
   // Tous onglets : décompte ou « Repos OK ». Train : aussi barre prête.
   if (!visible) return null
 
   const total = Math.max(1, state.totalSec || 90)
-  const remaining = finished ? 0 : running ? state.remainingSec : 0
+  const remaining = finished ? 0 : state.active ? state.remainingSec : 0
   const progress = idle ? 0 : Math.min(1, Math.max(0, remaining / total))
   const color = ringColor(remaining, total, idle)
-  const pulsing = running && remaining > 0 && remaining <= 10
+  const pulsing = !reduceMotion && running && remaining > 0 && remaining <= 10
   const ringSize = 32
   const stroke = 2.75
   const radius = (ringSize - stroke) / 2
   const circumference = 2 * Math.PI * radius
   const dashOffset = circumference * (1 - progress)
+  const ringTransition = reduceMotion
+    ? 'none'
+    : 'stroke-dashoffset 0.95s linear, stroke 0.35s ease'
 
   const ariaLabel = idle
     ? expanded
       ? 'Repos — choisir une durée'
       : 'Repos — toucher pour lancer'
-    : `Repos ${formatClock(remaining)}`
+    : paused
+      ? `Repos en pause ${formatClock(remaining)}`
+      : `Repos ${formatClock(remaining)}`
 
   // ——— Idle compact : simple pill « Repos » ———
   if (idle) {
@@ -144,7 +172,7 @@ export function RestTimerOverlay({
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="ios-press flex w-full items-center justify-center gap-2 px-4 py-2.5"
+            className="ios-press flex min-h-11 w-full items-center justify-center gap-2 px-4 py-2.5"
             aria-expanded={expanded}
           >
             <Timer className="h-4 w-4 text-[#30D158]" strokeWidth={2.25} />
@@ -165,7 +193,7 @@ export function RestTimerOverlay({
                     onPreset(sec)
                     setExpanded(false)
                   }}
-                  className="ios-press flex-1 rounded-full border border-white/10 bg-white/[0.04] py-1.5 text-[12px] font-semibold tabular-nums text-[#D1D1D6] active:border-[#30D158]/50 active:bg-[#30D158]/15 active:text-[#30D158]"
+                  className="ios-press flex min-h-11 flex-1 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] px-2 text-[12px] font-semibold tabular-nums text-[#D1D1D6] active:border-[#30D158]/50 active:bg-[#30D158]/15 active:text-[#30D158]"
                 >
                   {sec}s
                 </button>
@@ -195,7 +223,7 @@ export function RestTimerOverlay({
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="ios-press flex min-w-0 flex-1 items-center gap-2 text-left"
+            className="ios-press flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left"
             aria-expanded={expanded}
           >
             <div className="relative shrink-0" style={{ width: ringSize, height: ringSize }}>
@@ -219,8 +247,9 @@ export function RestTimerOverlay({
                   strokeDasharray={circumference}
                   strokeDashoffset={dashOffset}
                   style={{
-                    transition: 'stroke-dashoffset 0.95s linear, stroke 0.35s ease',
-                    filter: running ? `drop-shadow(0 0 5px ${color}77)` : undefined,
+                    transition: ringTransition,
+                    filter:
+                      !reduceMotion && running ? `drop-shadow(0 0 5px ${color}77)` : undefined,
                   }}
                 />
               </svg>
@@ -256,11 +285,33 @@ export function RestTimerOverlay({
             />
           </button>
 
-          {running ? (
+          {running && onPause ? (
+            <button
+              type="button"
+              onClick={onPause}
+              className="ios-press flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/[0.07] text-white"
+              aria-label="Mettre le repos en pause"
+            >
+              <Pause className="h-3.5 w-3.5" strokeWidth={2.5} />
+            </button>
+          ) : null}
+
+          {paused && onResume ? (
+            <button
+              type="button"
+              onClick={onResume}
+              className="ios-press flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-[#30D158]/40 bg-[#30D158]/18 text-[#30D158]"
+              aria-label="Reprendre le repos"
+            >
+              <Play className="h-3.5 w-3.5" strokeWidth={2.5} />
+            </button>
+          ) : null}
+
+          {state.active ? (
             <button
               type="button"
               onClick={onSkip}
-              className="ios-press flex shrink-0 items-center gap-1 rounded-full border border-white/12 bg-white/[0.07] px-2.5 py-1.5 text-[11px] font-semibold text-white"
+              className="ios-press flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-full border border-white/12 bg-white/[0.07] px-2.5 text-[11px] font-semibold text-white"
             >
               <SkipForward className="h-3 w-3" strokeWidth={2.5} />
               Passer
@@ -271,7 +322,7 @@ export function RestTimerOverlay({
             <button
               type="button"
               onClick={onDismiss}
-              className="ios-press shrink-0 rounded-full border border-[#30D158]/40 bg-[#30D158]/18 px-3 py-1.5 text-[11px] font-semibold text-[#30D158]"
+              className="ios-press flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-[#30D158]/40 bg-[#30D158]/18 px-3 text-[11px] font-semibold text-[#30D158]"
             >
               OK
             </button>
@@ -290,7 +341,7 @@ export function RestTimerOverlay({
                     onPreset(sec)
                     setExpanded(false)
                   }}
-                  className={`ios-press flex-1 rounded-full border py-1.5 text-[12px] font-semibold tabular-nums transition-colors ${
+                  className={`ios-press flex min-h-11 flex-1 items-center justify-center rounded-full border px-2 text-[12px] font-semibold tabular-nums transition-colors ${
                     active
                       ? 'border-[#30D158]/50 bg-[#30D158]/22 text-[#30D158]'
                       : 'border-white/10 bg-white/[0.04] text-[#D1D1D6] active:bg-[#30D158]/15 active:text-[#30D158]'
