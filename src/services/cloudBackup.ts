@@ -138,13 +138,14 @@ export function setCloudBackupUserId(userId: string | null) {
 
 /** Called after every local write — auto cloud save, no user action. */
 export function notifyLocalDataChanged() {
-  if (!activeUserId || !isSupabaseConfigured()) return
+  const userId = readCloudUserId()
+  if (!userId || !isSupabaseConfigured()) return
   if (!cloudSyncReady) {
     deferredPush = true
     setMeta({ pending: true })
     return
   }
-  scheduleCloudPush(activeUserId)
+  scheduleCloudPush(userId)
 }
 
 export function collectLocalBackup(): CloudBackupPayload {
