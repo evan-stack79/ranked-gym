@@ -84,7 +84,7 @@ describe('AppColdLaunch', () => {
     delete window.__RG_BOOT_T0__
   })
 
-  it('document deadline stays between 0.8 and 1.2s', () => {
+  it('document deadline stays between 1.05 and 1.2s', () => {
     window.__RG_BOOT_T0__ = 0
     const d = coldLaunchDeadlineMs(50)
     expect(d.totalMs).toBeGreaterThanOrEqual(COLD_LAUNCH_MIN_MS)
@@ -121,7 +121,7 @@ describe('AppColdLaunch', () => {
     } as unknown as Animation)
 
     act(() => {
-      vi.advanceTimersByTime(410)
+      vi.advanceTimersByTime(320)
     })
 
     expect(flyerAnimate).toHaveBeenCalledOnce()
@@ -201,29 +201,29 @@ describe('AppColdLaunch', () => {
       return makeRect(0, 0, 0, 0)
     })
     act(() => {
-      vi.advanceTimersByTime(220)
+      vi.advanceTimersByTime(160)
     })
     expect(splash()?.getAttribute('data-phase')).toBe('roar')
 
     act(() => {
-      vi.advanceTimersByTime(220)
+      vi.advanceTimersByTime(110)
     })
     expect(splash()?.getAttribute('data-phase')).toBe('morphing')
 
     const centerWordmark = host.querySelector('.app-cold-launch__wordmark')
     act(() => {
-      vi.advanceTimersByTime(120)
+      vi.advanceTimersByTime(40)
     })
     expect(centerWordmark?.getAttribute('data-visible')).toBe('false')
     expect(document.documentElement.dataset.coldLaunchHeaderWordmark).toBe('0')
 
     act(() => {
-      vi.advanceTimersByTime(80)
+      vi.advanceTimersByTime(200)
     })
     expect(document.documentElement.dataset.coldLaunchHeaderWordmark).toBe('1')
 
     act(() => {
-      vi.advanceTimersByTime(420)
+      vi.advanceTimersByTime(620)
     })
     expect(splash()).toBeNull()
     expect(document.documentElement.dataset.coldLaunchPlayed).toBe('1')
