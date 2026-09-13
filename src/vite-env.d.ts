@@ -11,6 +11,8 @@ interface ImportMetaEnv {
   readonly VITE_CONVEX_URL?: string
   /** When true, request Convex as primary cloud backend. Phase A ignores this for I/O. */
   readonly VITE_ENABLE_CONVEX_PRIMARY?: string
+  /** Dedicated auth migration flag: enable Convex auth adapter. */
+  readonly VITE_ENABLE_CONVEX_AUTH?: string
 }
 
 interface ImportMeta {

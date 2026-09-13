@@ -19,6 +19,73 @@ import { v } from 'convex/values'
  * Timestamps are unix milliseconds.
  */
 export const convexTables = {
+  auth_users: defineTable({
+    userId: v.string(),
+    email: v.string(),
+    emailNorm: v.string(),
+    displayName: v.string(),
+    mustResetPassword: v.boolean(),
+    pendingDeletionAt: v.optional(v.number()),
+    deletedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_emailNorm', ['emailNorm'])
+    .index('by_mustResetPassword', ['mustResetPassword']),
+
+  auth_password_credentials: defineTable({
+    userId: v.string(),
+    passwordHash: v.string(),
+    updatedAt: v.number(),
+  }).index('by_userId', ['userId']),
+
+  auth_sessions: defineTable({
+    userId: v.string(),
+    tokenHash: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    revokedAt: v.optional(v.number()),
+  })
+    .index('by_tokenHash', ['tokenHash'])
+    .index('by_userId', ['userId'])
+    .index('by_expiresAt', ['expiresAt']),
+
+  auth_password_reset_tokens: defineTable({
+    userId: v.string(),
+    tokenHash: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    consumedAt: v.optional(v.number()),
+  })
+    .index('by_tokenHash', ['tokenHash'])
+    .index('by_userId', ['userId'])
+    .index('by_expiresAt', ['expiresAt']),
+
+  auth_password_reset_outbox: defineTable({
+    userId: v.string(),
+    email: v.string(),
+    emailNorm: v.string(),
+    resetLink: v.string(),
+    tokenHash: v.string(),
+    createdAt: v.number(),
+    sentAt: v.optional(v.number()),
+    attemptCount: v.number(),
+    lastError: v.optional(v.string()),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_sentAt', ['sentAt'])
+    .index('by_createdAt', ['createdAt']),
+
+  auth_private_notes: defineTable({
+    userId: v.string(),
+    content: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_userId_createdAt', ['userId', 'createdAt']),
+
   profiles: defineTable({
     userId: v.string(),
     pseudo: v.string(),

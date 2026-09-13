@@ -5,10 +5,21 @@ import {
   getCloudBackendAdapter,
   getRequestedCloudBackend,
 } from './adapter'
+import {
+  getActiveAuthBackend,
+  getRequestedAuthBackend,
+  isConvexAuthEnabled,
+} from './authFeatureFlag'
 import { isConvexPrimaryEnabled, parseBooleanFlag } from './featureFlag'
 import { getConvexConfigError, isConvexConfigured } from '../lib/convex'
 
-const PHASE_A_TABLES = [
+const PHASE_E_TABLES = [
+  'auth_users',
+  'auth_password_credentials',
+  'auth_sessions',
+  'auth_password_reset_tokens',
+  'auth_password_reset_outbox',
+  'auth_private_notes',
   'profiles',
   'workouts_state',
   'nutrition_state',
@@ -39,6 +50,13 @@ describe('Convex Phase A feature flag', () => {
   it('defaults Convex primary to off in this environment', () => {
     expect(isConvexPrimaryEnabled()).toBe(false)
   })
+
+  it('defaults Convex auth to off in this environment', () => {
+    expect(isConvexAuthEnabled()).toBe(false)
+    expect(isConvexAuthEnabled('YES')).toBe(true)
+    expect(getRequestedAuthBackend()).toBe('supabase')
+    expect(getActiveAuthBackend()).toBe('supabase')
+  })
 })
 
 describe('cloud backend adapter', () => {
@@ -58,7 +76,7 @@ describe('cloud backend adapter', () => {
 })
 
 describe('Convex schema contract', () => {
-  it('declares every Phase A domain / bookkeeping table from the Codex plan', () => {
-    expect(Object.keys(convexTables).sort()).toEqual([...PHASE_A_TABLES].sort())
+  it('declares every Phase E auth + Phase A domain table from the migration plan', () => {
+    expect(Object.keys(convexTables).sort()).toEqual([...PHASE_E_TABLES].sort())
   })
 })

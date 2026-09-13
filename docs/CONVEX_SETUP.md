@@ -21,6 +21,7 @@ Client / Vite build:
 |------|------|
 | `VITE_CONVEX_URL` | Convex deployment URL (`https://….convex.cloud`) |
 | `VITE_ENABLE_CONVEX_PRIMARY` | Request Convex as primary. Phase A does **not** switch domain I/O. Keep unset/`false`. |
+| `VITE_ENABLE_CONVEX_AUTH` | Enable Convex auth adapter (PR-E). Keep unset/`false` until auth validation passes. |
 | `VITE_PUBLIC_APP_URL` | Public HTTPS origin (already used for password-reset links) |
 
 Convex CLI / backend (local `.env.local` only, never git):
@@ -33,6 +34,7 @@ Convex CLI / backend (local `.env.local` only, never git):
 | `CONVEX_AUTH_EMAIL_FROM` | Reset-mail sender (later phase) |
 | `CONVEX_AUTH_RESET_REDIRECT_URL` | Reset-mail redirect (later phase) |
 | `CONVEX_AUTH_RESET_TOKEN_TTL_MIN` | Reset token TTL (later phase) |
+| `CONVEX_AUTH_SESSION_TTL_HOURS` | Session lifetime (optional override) |
 | `CONVEX_FILE_SIGNED_URL_TTL_SEC` | Avatar URL TTL (later phase) |
 
 Migration scripts (later phase, runtime env only):
@@ -61,6 +63,15 @@ Anonymous/local backends may work without an account; that is optional for Phase
 ## Locked for later Auth PRs (not Phase A)
 
 If Supabase password hashes are not safely portable to Convex: **global password reset for all users**. Do not build a legacy password bridge.
+
+## PR-E auth migration flow (global reset policy)
+
+1. Import legacy users without password hashes into `auth_users` (Convex mutation `auth.importUsersWithoutPasswords`).
+2. Imported users are flagged `mustResetPassword=true`; password login is denied until reset.
+3. Queue reset campaign emails with `auth.queueGlobalPasswordResetCampaign`.
+4. Complete reset via tokenized link to `/auth/reset-password?token=...` then `auth.consumePasswordReset`.
+
+This preserves the locked policy: no hash portability shortcuts and no legacy password bridge.
 
 ## Out of scope (do not do yet)
 
