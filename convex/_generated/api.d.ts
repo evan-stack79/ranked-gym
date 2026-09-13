@@ -10,10 +10,14 @@
 
 import type * as auth from "../auth.js";
 import type * as authPrivateData from "../authPrivateData.js";
+import type * as codexRiskStubs from "../codexRiskStubs.js";
+import type * as files from "../files.js";
 import type * as health from "../health.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_authConfig from "../lib/authConfig.js";
 import type * as lib_authCrypto from "../lib/authCrypto.js";
+import type * as profiles from "../profiles.js";
+import type * as sync from "../sync.js";
 
 import type {
   ApiFromModules,
@@ -24,10 +28,14 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   authPrivateData: typeof authPrivateData;
+  codexRiskStubs: typeof codexRiskStubs;
+  files: typeof files;
   health: typeof health;
   "lib/auth": typeof lib_auth;
   "lib/authConfig": typeof lib_authConfig;
   "lib/authCrypto": typeof lib_authCrypto;
+  profiles: typeof profiles;
+  sync: typeof sync;
 }>;
 
 /**
