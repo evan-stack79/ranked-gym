@@ -1,6 +1,14 @@
 import { getSupabase } from '../lib/supabase'
 import type { ProfileRow } from '../types/database'
 import { getRankFromLevel } from '../utils/rank'
+import { getActiveAuthBackend } from '../backend/authFeatureFlag'
+import { isConvexDomainActive } from '../backend/adapter'
+import * as convexAuth from './convexAuthService'
+import {
+  ensureConvexProfile,
+  fetchConvexProfile,
+  updateConvexProfileProgress,
+} from './convexProfileService'
 
 export type AuthMethod = 'email'
 
@@ -11,6 +19,10 @@ export type AuthUser = {
   /** Prénom propre depuis user_metadata (first_name / display_name). */
   firstName?: string
   provider: AuthMethod
+}
+
+function isConvexAuthActive(): boolean {
+  return getActiveAuthBackend() === 'convex'
 }
 
 export function mapSessionUser(user: {
@@ -45,6 +57,10 @@ export async function signUpWithEmail(
   pseudo?: string,
   disciplineLabel?: string,
 ) {
+  void disciplineLabel
+  if (isConvexAuthActive()) {
+    return convexAuth.signUpWithEmail(email, password, pseudo)
+  }
   const supabase = getSupabase()
   const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/` : undefined
 
@@ -64,6 +80,9 @@ export async function signUpWithEmail(
 }
 
 export async function signInWithEmail(email: string, password: string) {
+  if (isConvexAuthActive()) {
+    return convexAuth.signInWithPassword(email, password)
+  }
   const supabase = getSupabase()
   const { data, error } = await supabase.auth.signInWithPassword({
     email: email.trim().toLowerCase(),
@@ -74,13 +93,47 @@ export async function signInWithEmail(email: string, password: string) {
 }
 
 export async function signOut() {
+  if (isConvexAuthActive()) {
+    await convexAuth.signOut()
+    return
+  }
   const supabase = getSupabase()
   const { error } = await supabase.auth.signOut()
   if (error) throw error
 }
 
+/**
+ * Envoie un email de récupération. Ne révèle pas si l’adresse existe.
+ * `redirectTo` doit être une URL HTTPS publique (voir getPasswordRecoveryRedirectTo).
+ */
+export async function requestPasswordReset(email: string, redirectTo?: string) {
+  if (isConvexAuthActive()) {
+    await convexAuth.requestPasswordReset(email, redirectTo)
+    return
+  }
+  const supabase = getSupabase()
+  const options = redirectTo ? { redirectTo } : undefined
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), options)
+  if (error) throw error
+}
+
+/** Définit le nouveau mot de passe après l’événement PASSWORD_RECOVERY. */
+export async function updatePassword(newPassword: string) {
+  if (isConvexAuthActive()) {
+    await convexAuth.updatePassword(newPassword)
+    return
+  }
+  const supabase = getSupabase()
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) throw error
+}
+
 /** Vérifie l’ancien mot de passe puis met à jour le nouveau. */
 export async function changePassword(email: string, currentPassword: string, newPassword: string) {
+  if (isConvexAuthActive()) {
+    await convexAuth.changePassword(email, currentPassword, newPassword)
+    return
+  }
   const supabase = getSupabase()
   const { error: reauthError } = await supabase.auth.signInWithPassword({
     email: email.trim().toLowerCase(),
@@ -92,8 +145,13 @@ export async function changePassword(email: string, currentPassword: string, new
   if (error) throw error
 }
 
-/** Supprime le compte via RPC `delete_own_account` (cascade auth.users). */
-export async function deleteOwnAccount() {
+/** Supprime le compte via Supabase RPC or Convex adapter behind feature flag. */
+export async function deleteOwnAccount(password?: string) {
+  if (isConvexAuthActive()) {
+    if (!password) throw new Error('Password is required for Convex account deletion.')
+    await convexAuth.deleteOwnAccount(password)
+    return
+  }
   const supabase = getSupabase()
   const { error } = await supabase.rpc('delete_own_account')
   if (error) throw error
@@ -101,6 +159,9 @@ export async function deleteOwnAccount() {
 }
 
 export async function fetchProfile(userId: string): Promise<ProfileRow | null> {
+  if (isConvexDomainActive()) {
+    return fetchConvexProfile(userId)
+  }
   const supabase = getSupabase()
   const { data, error } = await supabase
     .from('profiles')
@@ -118,6 +179,9 @@ export async function ensureProfile(
   pseudo: string,
   disciplineLabel = 'Musculation',
 ): Promise<ProfileRow> {
+  if (isConvexDomainActive()) {
+    return ensureConvexProfile(userId, pseudo, disciplineLabel)
+  }
   const existing = await fetchProfile(userId)
   if (existing) return existing
 
@@ -157,6 +221,9 @@ export async function updateProfileProgress(
     is_ghost_mode_enabled?: boolean
   },
 ): Promise<ProfileRow> {
+  if (isConvexDomainActive()) {
+    return updateConvexProfileProgress(userId, patch)
+  }
   const supabase = getSupabase()
   const { data, error } = await supabase
     .from('profiles')

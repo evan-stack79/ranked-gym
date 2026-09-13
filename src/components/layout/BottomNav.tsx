@@ -28,13 +28,13 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
               key={id}
               type="button"
               onClick={() => onTabChange(id)}
-              className={`ios-press flex flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-2 transition-colors ${
+              className={`ios-press flex min-h-11 flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-2 transition-colors ${
                 isActive ? 'text-[#FF2B2B]' : 'text-[#8E8E93]'
               }`}
               aria-current={isActive ? 'page' : undefined}
             >
               <Icon
-                className={`h-[22px] w-[22px] ${isActive ? 'ios-tab-active-icon' : ''}`}
+                className={`h-[22px] w-[22px] transition-transform duration-150 ease-out ${isActive ? 'ios-tab-active-icon' : ''}`}
                 strokeWidth={isActive ? 2.25 : 1.75}
               />
               <span className="text-[9px] font-medium leading-tight">{label}</span>

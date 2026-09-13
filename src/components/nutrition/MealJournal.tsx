@@ -351,9 +351,9 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
             </div>
             <div className="h-2 overflow-hidden rounded-full border border-white/10 bg-black/40">
               <div
-                className="h-full rounded-full transition-all duration-500"
+                className="motion-progress-fill h-full rounded-full"
                 style={{
-                  width: `${Math.min(progress * 100, 100)}%`,
+                  transform: `scaleX(${Math.max(0, Math.min(progress, 1))})`,
                   background:
                     progress > 1
                       ? 'linear-gradient(90deg, #FF2B2B, #FF0055)'

@@ -1,13 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
-import { BookOpen, Check, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { BookOpen, Check, Pause, Pencil, Play, Plus, Trash2, X } from 'lucide-react'
 import type {
   ExerciseEntry,
   ScheduledSession,
+  SessionKind,
+  SessionSource,
   SetDifficulty,
   WorkoutNote,
   WorkoutRoutine,
   WorkoutSet,
 } from '../../types/training'
+import {
+  resolveResumedRoutineId,
+  setLastSelectedRoutine,
+} from '../../services/trainingStorage'
 import { computeStrengthSessionStats } from '../../utils/strength'
 import { sanitizeExerciseName } from '../../utils/exerciseName'
 import { detectProgramSplit, filterRoutinesForProgram } from '../../utils/workoutProgram'
@@ -25,6 +31,14 @@ interface WorkoutNotebookProps {
   schedule?: ScheduledSession[]
   history: WorkoutNote[]
   initialRoutineId?: string | null
+  /** Sport figé sur les nouvelles séances (pas de redéduction à la lecture). */
+  sportId: string
+  /** Famille de module — strength pour le carnet force / hybrid. */
+  sessionKind?: SessionKind
+  /** Ouvre le carnet directement en mode édition d’une note existante. */
+  initialEditNote?: WorkoutNote | null
+  /** Reprendre copie exactement la routine détectée ; ne réinjecte pas l'historique. */
+  resume?: boolean
   onSave: (note: {
     id?: string
     title: string
@@ -35,6 +49,9 @@ interface WorkoutNotebookProps {
     routineId: string
     createdAt?: number
     dateKey?: string
+    sportId?: string
+    sessionKind?: SessionKind
+    source?: SessionSource
   }) => void | Promise<void>
   /** Autosave séries / exercices vers Supabase (routine draft). */
   onDraftSave?: (routineId: string, exercises: ExerciseEntry[]) => void
@@ -55,6 +72,12 @@ interface WorkoutNotebookProps {
     addNextSet: boolean
     nonce: number
   } | null
+  /** Chronomètre séance active (durée réelle). Absent en mode édition historique. */
+  sessionClockLabel?: string | null
+  sessionPaused?: boolean
+  onToggleSessionPause?: () => void
+  /** Minutes chronométrées réelles — prioritaire à l’estimation à la sauvegarde. */
+  sessionDurationMin?: number | null
 }
 
 /** Tags optionnels — n’influencent plus la charge suivante. */
@@ -95,6 +118,43 @@ function cloneFromRoutine(routine: WorkoutRoutine, history: WorkoutNote[] = []):
   })
 }
 
+function copyExercises(exercises: ExerciseEntry[]): ExerciseEntry[] {
+  return exercises.map(e => ({ ...e, sets: e.sets.map(s => ({ ...s })) }))
+}
+
+function resolveBootRoutine(
+  routines: WorkoutRoutine[],
+  schedule: ScheduledSession[],
+  sportId: string,
+  launchRoutineId?: string | null,
+): WorkoutRoutine {
+  const split = detectProgramSplit(schedule, routines)
+  const visible = filterRoutinesForProgram(routines, split)
+  const resumedId =
+    resolveResumedRoutineId({
+      routines,
+      candidateIds: visible.map((r) => r.id),
+      sportId,
+      launchRoutineId,
+    }) ??
+    visible[0]?.id ??
+    routines[0]?.id ??
+    'upper'
+  return (
+    visible.find((r) => r.id === resumedId) ??
+    routines.find((r) => r.id === resumedId) ??
+    visible[0] ??
+    routines[0] ?? {
+      id: 'upper',
+      label: 'Upper',
+      subtitle: '',
+      accent: '#fff',
+      exercises: [],
+      updatedAt: 0,
+    }
+  )
+}
+
 export function WorkoutNotebook({
   id,
   bodyWeightKg,
@@ -102,32 +162,54 @@ export function WorkoutNotebook({
   schedule = [],
   history,
   initialRoutineId,
+  initialEditNote = null,
+  resume = false,
+  sportId,
+  sessionKind = 'strength',
   onSave,
   onDraftSave,
   onDeleteNote,
   onAddRoutine,
   onRestStart,
   restLogRequest,
+  sessionClockLabel = null,
+  sessionPaused = false,
+  onToggleSessionPause,
+  sessionDurationMin = null,
 }: WorkoutNotebookProps) {
-  const [routineId, setRoutineId] = useState(routines[0]?.id ?? 'upper')
-  const [title, setTitle] = useState(routines[0]?.label ?? 'Séance')
+  const bootRoutine = useMemo(
+    () => (resume ? routines.find(r => r.id === initialRoutineId) : undefined) ??
+      resolveBootRoutine(routines, schedule, sportId, initialRoutineId),
+    // Montage uniquement — reprise locale ; les changements suivants passent par selectRoutine.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  )
+
+  const [routineId, setRoutineId] = useState(initialEditNote?.routineId ?? bootRoutine.id)
+  const [title, setTitle] = useState(initialEditNote?.title ?? bootRoutine.label)
   const [exercises, setExercises] = useState<ExerciseEntry[]>(() =>
-    cloneFromRoutine(
-      routines[0] ?? {
-        id: 'upper',
-        label: 'Upper',
-        subtitle: '',
-        accent: '#fff',
-        exercises: [],
-        updatedAt: 0,
-      },
-      history,
-    ),
+    initialEditNote ? copyExercises(initialEditNote.exercises)
+      : resume ? copyExercises(bootRoutine.exercises) : cloneFromRoutine(bootRoutine, history),
   )
   const [customOpen, setCustomOpen] = useState(false)
   const [customLabel, setCustomLabel] = useState('')
   const [saving, setSaving] = useState(false)
-  const [editingNote, setEditingNote] = useState<WorkoutNote | null>(null)
+  const [editingNote, setEditingNote] = useState<WorkoutNote | null>(initialEditNote)
+  const [effortHelpOpen, setEffortHelpOpen] = useState(false)
+  const beforeEdit = useRef({
+    routineId: bootRoutine.id,
+    title: bootRoutine.label,
+    exercises: copyExercises(bootRoutine.exercises),
+  })
+  const draftBlocked = useRef(Boolean(initialEditNote))
+  const draftDirty = useRef(false)
+  draftBlocked.current = Boolean(editingNote) || saving
+  const initialLaunchApplied = useRef(initialRoutineId)
+
+  const exercisesRef = useRef(exercises)
+  const routineIdRef = useRef(routineId)
+  exercisesRef.current = exercises
+  routineIdRef.current = routineId
 
   const visibleRoutines = useMemo(() => {
     const split = detectProgramSplit(schedule, routines)
@@ -135,8 +217,8 @@ export function WorkoutNotebook({
   }, [schedule, routines])
 
   const activeRoutine = useMemo(
-    () => visibleRoutines.find((r) => r.id === routineId) ?? visibleRoutines[0],
-    [visibleRoutines, routineId],
+    () => routines.find((r) => r.id === routineId) ?? visibleRoutines[0],
+    [routines, visibleRoutines, routineId],
   )
 
   const stats = useMemo(
@@ -150,10 +232,14 @@ export function WorkoutNotebook({
     setRoutineId(r.id)
     setTitle(r.label)
     setExercises(cloneFromRoutine(r, history))
+    draftDirty.current = false
     setEditingNote(null)
+    // Sauvegarde immédiate — iOS peut suspendre sans événement de fermeture.
+    setLastSelectedRoutine(r.id, sportId)
   }
 
   useEffect(() => {
+    if (editingNote || (resume && routines.some(r => r.id === routineId))) return
     if (!visibleRoutines.some((r) => r.id === routineId) && visibleRoutines[0]) {
       selectRoutine(visibleRoutines[0].id)
     }
@@ -161,6 +247,7 @@ export function WorkoutNotebook({
   }, [visibleRoutines])
 
   useEffect(() => {
+    if (editingNote) return
     if (!routines.some((r) => r.id === routineId) && routines[0]) {
       selectRoutine(routines[0].id)
     }
@@ -168,6 +255,8 @@ export function WorkoutNotebook({
   }, [routines])
 
   useEffect(() => {
+    if (initialLaunchApplied.current === initialRoutineId || editingNote) return
+    initialLaunchApplied.current = initialRoutineId
     if (!initialRoutineId) return
     if (!routines.some((r) => r.id === initialRoutineId)) return
     selectRoutine(initialRoutineId)
@@ -175,9 +264,10 @@ export function WorkoutNotebook({
   }, [initialRoutineId])
 
   useEffect(() => {
-    if (!restLogRequest) return
+    if (!restLogRequest || draftBlocked.current) return
     const { exerciseId, setIndex, restSec, addNextSet } = restLogRequest
     setExercises((prev) => {
+      draftDirty.current = true
       const next = prev.map((e) => {
         if (e.id !== exerciseId) return e
         let sets = e.sets.map((s, i) => (i === setIndex ? { ...s, restSec, done: true } : s))
@@ -196,23 +286,49 @@ export function WorkoutNotebook({
         return { ...e, sets }
       })
       onDraftSave?.(routineId, next)
+      draftDirty.current = false
       return next
     })
   }, [restLogRequest, onDraftSave, routineId])
 
   useEffect(() => {
-    if (!onDraftSave) return
+    if (!onDraftSave || editingNote || saving || !draftDirty.current) return
     const t = window.setTimeout(() => {
-      onDraftSave(routineId, exercises)
+      if (!draftBlocked.current && draftDirty.current) {
+        onDraftSave(routineId, exercises)
+        draftDirty.current = false
+      }
     }, 700)
     return () => window.clearTimeout(t)
-  }, [exercises, routineId, onDraftSave])
+  }, [exercises, routineId, onDraftSave, editingNote, saving])
+
+  // Flush brouillon en attente uniquement — la préférence routine est déjà écrite au select.
+  useEffect(() => {
+    if (!onDraftSave) return
+    const flushDraft = () => {
+      if (!draftBlocked.current && draftDirty.current) {
+        onDraftSave(routineIdRef.current, exercisesRef.current)
+        draftDirty.current = false
+      }
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flushDraft()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('pagehide', flushDraft)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('pagehide', flushDraft)
+    }
+  }, [onDraftSave])
 
   const updateExercise = (exerciseId: string, patch: Partial<ExerciseEntry>) => {
+    draftDirty.current = true
     setExercises((prev) => prev.map((e) => (e.id === exerciseId ? { ...e, ...patch } : e)))
   }
 
   const updateSet = (exerciseId: string, setIndex: number, patch: Partial<WorkoutSet>) => {
+    draftDirty.current = true
     setExercises((prev) =>
       prev.map((e) => {
         if (e.id !== exerciseId) return e
@@ -225,6 +341,7 @@ export function WorkoutNotebook({
   }
 
   const finishSet = (ex: ExerciseEntry, setIndex: number, difficulty?: SetDifficulty) => {
+    draftDirty.current = true
     setExercises((prev) => {
       const next = prev.map((e) => {
         if (e.id !== ex.id) return e
@@ -235,10 +352,11 @@ export function WorkoutNotebook({
         )
         return { ...e, sets }
       })
-      onDraftSave?.(routineId, next)
+      if (!draftBlocked.current) onDraftSave?.(routineId, next)
+      draftDirty.current = false
       return next
     })
-    onRestStart?.({
+    if (!editingNote) onRestStart?.({
       exerciseId: ex.id,
       setIndex,
       exerciseName: ex.name.trim() || 'Exercice',
@@ -247,24 +365,23 @@ export function WorkoutNotebook({
   }
 
   const loadNoteForEdit = (note: WorkoutNote) => {
+    if (!editingNote) {
+      beforeEdit.current = { routineId, title, exercises: copyExercises(exercises) }
+    }
+    draftBlocked.current = true
+    draftDirty.current = false
     setEditingNote(note)
     setTitle(note.title)
     if (note.routineId) setRoutineId(note.routineId)
-    setExercises(
-      note.exercises.map((e) => ({
-        ...e,
-        id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        sets: e.sets.map((s) => ({ ...s })),
-      })),
-    )
+    setExercises(copyExercises(note.exercises))
   }
 
   const cancelEdit = () => {
+    draftDirty.current = false
     setEditingNote(null)
-    if (activeRoutine) {
-      setTitle(activeRoutine.label)
-      setExercises(cloneFromRoutine(activeRoutine, history))
-    }
+    setRoutineId(beforeEdit.current.routineId)
+    setTitle(beforeEdit.current.title)
+    setExercises(copyExercises(beforeEdit.current.exercises))
   }
 
   const handleSave = async () => {
@@ -276,8 +393,10 @@ export function WorkoutNotebook({
       }))
       .filter((e) => e.sets.length > 0)
     if (!cleaned.length) return
+    draftBlocked.current = true
     setSaving(true)
     try {
+      // Nouvelle séance : fige sport/kind/source. Édition legacy : ne pas inventer de champs.
       await onSave({
         id: editingNote?.id,
         createdAt: editingNote?.createdAt,
@@ -285,13 +404,20 @@ export function WorkoutNotebook({
         title: title.trim() || activeRoutine?.label || 'Séance',
         exercises: cleaned,
         estimatedKcal: stats.kcal,
-        durationMin: stats.durationMin,
+        durationMin:
+          !editingNote && sessionDurationMin != null && sessionDurationMin > 0
+            ? sessionDurationMin
+            : stats.durationMin,
         totalVolumeKg: stats.volume,
         routineId,
+        sportId: editingNote ? editingNote.sportId : sportId,
+        sessionKind: editingNote ? editingNote.sessionKind : sessionKind,
+        source: editingNote ? editingNote.source : 'manual',
       })
       if (editingNote) {
-        setEditingNote(null)
+        cancelEdit()
       } else {
+        draftDirty.current = false
         setExercises(
           cleaned.map((e) => ({
             ...e,
@@ -314,14 +440,36 @@ export function WorkoutNotebook({
 
   return (
     <section id={id} className="space-y-3">
-      <div className="px-1">
-        <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-          Carnet
-        </p>
-        <h2 className="text-[20px] font-bold text-white">Mon programme · séries · historique</h2>
-        <p className="mt-1 text-[12px] text-[#AEAEB2]">
-          Tu choisis charges et reps. L&apos;historique t&apos;informe — il ne prescrit rien.
-        </p>
+      <div className="flex items-end justify-between gap-3 px-1">
+        <h2 className="text-[20px] font-bold text-white">Programme</h2>
+        {sessionClockLabel && !editingNote ? (
+          <div className="flex items-center gap-2">
+            <p
+              className="text-[15px] font-semibold tabular-nums tracking-tight text-white"
+              aria-live="polite"
+              data-session-clock
+            >
+              {sessionClockLabel}
+              {sessionPaused ? (
+                <span className="ml-1.5 text-[11px] font-medium text-[#8E8E93]">Pause</span>
+              ) : null}
+            </p>
+            {onToggleSessionPause ? (
+              <button
+                type="button"
+                onClick={onToggleSessionPause}
+                className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] text-white"
+                aria-label={sessionPaused ? 'Reprendre la séance' : 'Mettre la séance en pause'}
+              >
+                {sessionPaused ? (
+                  <Play className="h-4 w-4" strokeWidth={2.5} />
+                ) : (
+                  <Pause className="h-4 w-4" strokeWidth={2.5} />
+                )}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="flex gap-1.5 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -332,7 +480,7 @@ export function WorkoutNotebook({
               key={r.id}
               type="button"
               onClick={() => selectRoutine(r.id)}
-              className={`ios-press shrink-0 rounded-full border px-3.5 py-2 text-[12px] font-semibold ${
+              className={`ios-press flex min-h-11 shrink-0 items-center rounded-full border px-3.5 text-[12px] font-semibold ${
                 active
                   ? 'border-transparent text-white'
                   : 'border-white/10 bg-black/25 text-[#8E8E93]'
@@ -351,7 +499,7 @@ export function WorkoutNotebook({
         <button
           type="button"
           onClick={() => setCustomOpen((v) => !v)}
-          className="ios-press shrink-0 rounded-full border border-dashed border-white/20 px-3 py-2 text-[12px] font-semibold text-[#8E8E93]"
+          className="ios-press flex min-h-11 shrink-0 items-center rounded-full border border-dashed border-white/20 px-3 text-[12px] font-semibold text-[#8E8E93]"
         >
           + Programme
         </button>
@@ -374,7 +522,7 @@ export function WorkoutNotebook({
               setCustomLabel('')
               setCustomOpen(false)
             }}
-            className="btn-brand rounded-xl px-4 text-[13px] font-semibold text-white"
+            className="btn-brand flex min-h-11 items-center rounded-xl px-4 text-[13px] font-semibold text-white"
           >
             OK
           </button>
@@ -382,7 +530,7 @@ export function WorkoutNotebook({
       )}
 
       <div
-        className="rounded-3xl border border-white/10 px-5 py-4"
+        className="rounded-3xl border border-white/10 px-4 py-3.5"
         style={{
           background: editingNote
             ? `radial-gradient(ellipse 80% 60% at 100% 0%, #FF2B2B33 0%, transparent 55%), rgb(22 22 24 / 0.96)`
@@ -391,7 +539,7 @@ export function WorkoutNotebook({
         }}
       >
         {editingNote ? (
-          <div className="mb-3 flex items-center justify-between gap-2 rounded-2xl border border-[#FF2B2B]/35 bg-[#FF2B2B]/12 px-3 py-2.5">
+          <div className="mb-2.5 flex items-center justify-between gap-2 rounded-2xl border border-[#FF2B2B]/35 bg-[#FF2B2B]/12 px-3 py-2">
             <div className="flex items-center gap-2">
               <Pencil className="h-4 w-4 shrink-0 text-[#FF6961]" strokeWidth={2.25} />
               <div>
@@ -402,7 +550,7 @@ export function WorkoutNotebook({
             <button
               type="button"
               onClick={cancelEdit}
-              className="ios-press flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-[#8E8E93]"
+              className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/10 text-[#8E8E93]"
               aria-label="Annuler l’édition"
             >
               <X className="h-4 w-4" />
@@ -410,7 +558,7 @@ export function WorkoutNotebook({
           </div>
         ) : null}
 
-        <div className="mb-1 flex items-center gap-2">
+        <div className="mb-2 flex items-center gap-2">
           <BookOpen className="h-4 w-4" style={{ color: activeRoutine?.accent }} />
           <input
             type="text"
@@ -420,13 +568,54 @@ export function WorkoutNotebook({
             className="w-full bg-transparent text-[17px] font-bold text-white placeholder:text-[#636366] outline-none"
           />
         </div>
-        <p className="mb-3 text-[11px] text-[#8E8E93]">
-          {hasSaved
-            ? 'Dernière séance mémorisée — tu décides des charges d’aujourd’hui.'
-            : 'Nouveau focus — ajoute tes exercices ; ils resteront dans ton carnet.'}
-        </p>
+        {!hasSaved ? (
+          <p className="mb-2.5 text-[11px] text-[#8E8E93]">
+            Nouveau focus — ajoute tes exercices ; ils resteront dans ton carnet.
+          </p>
+        ) : null}
 
-        <div className="space-y-4">
+        <div className="mb-2 flex items-center justify-end gap-1.5">
+          <span className="text-[11px] text-[#8E8E93]">Effort facultatif</span>
+          <button
+            type="button"
+            onClick={() => setEffortHelpOpen((v) => !v)}
+            className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 text-[12px] font-bold text-[#8E8E93]"
+            aria-label="Aide Effort (facultatif)"
+            aria-expanded={effortHelpOpen}
+          >
+            ?
+          </button>
+        </div>
+
+        {effortHelpOpen ? (
+          <div
+            className="mb-2.5 rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-[11px] leading-relaxed text-[#AEAEB2]"
+            role="note"
+          >
+            <p className="font-semibold text-white">Effort · 1–10</p>
+            <ul className="mt-1 space-y-0.5">
+              <li>
+                <span className="font-semibold text-white">6</span> : Facile
+              </li>
+              <li>
+                <span className="font-semibold text-white">7</span> : Modéré
+              </li>
+              <li>
+                <span className="font-semibold text-white">8</span> : Difficile — environ 2 reps
+                possibles
+              </li>
+              <li>
+                <span className="font-semibold text-white">9</span> : Très difficile — environ 1 rep
+                possible
+              </li>
+              <li>
+                <span className="font-semibold text-white">10</span> : Maximum
+              </li>
+            </ul>
+          </div>
+        ) : null}
+
+        <div className="space-y-3">
           {exercises.map((ex) => {
             const last = findLastExerciseSets(history, ex.name)
             const pendingIdx = ex.sets.findIndex((s) => !s.done)
@@ -435,9 +624,9 @@ export function WorkoutNotebook({
             return (
               <div
                 key={ex.id}
-                className="rounded-2xl border border-white/10 bg-black/30 p-3.5"
+                className="rounded-2xl border border-white/8 bg-black/25 p-3"
               >
-                <div className="mb-2 flex items-center gap-2">
+                <div className="mb-1.5 flex items-center gap-2">
                   <input
                     type="text"
                     value={ex.name}
@@ -450,10 +639,11 @@ export function WorkoutNotebook({
                   {exercises.length > 1 && (
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
+                        draftDirty.current = true
                         setExercises((prev) => prev.filter((x) => x.id !== ex.id))
-                      }
-                      className="text-[#8E8E93]"
+                      }}
+                      className="ios-press flex min-h-11 min-w-11 items-center justify-center text-[#8E8E93]"
                       aria-label="Supprimer exercice"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -462,13 +652,13 @@ export function WorkoutNotebook({
                 </div>
 
                 {last && (
-                  <div className="mb-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
+                  <div className="mb-2 px-0.5 py-1">
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-[#8E8E93]">
                       Dernière séance
                     </p>
-                    <ul className="mt-1 space-y-0.5">
+                    <ul className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
                       {last.sets.map((s, i) => (
-                        <li key={i} className="text-[13px] tabular-nums text-[#AEAEB2]">
+                        <li key={i} className="text-[12px] tabular-nums text-[#AEAEB2]">
                           {formatSetLoadLabel(s.weightKg, s.reps)}
                         </li>
                       ))}
@@ -476,11 +666,11 @@ export function WorkoutNotebook({
                   </div>
                 )}
 
-                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#8E8E93]">
                   Aujourd&apos;hui
                 </p>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {ex.sets.map((set, idx) => (
                     <div
                       key={idx}
@@ -518,8 +708,8 @@ export function WorkoutNotebook({
                           className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
                         />
                       </label>
-                      <label className="block w-14">
-                        <span className="mb-0.5 block text-[10px] text-[#636366]">RPE</span>
+                      <label className="block w-[3.75rem]">
+                        <span className="mb-0.5 block text-[10px] text-[#636366]">Effort</span>
                         <ClearableNumberInput
                           value={set.rpe ?? null}
                           onChange={(v) =>
@@ -531,7 +721,9 @@ export function WorkoutNotebook({
                           min={1}
                           max={10}
                           required={false}
-                          aria-label="RPE optionnel"
+                          placeholder="1–10"
+                          placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2 text-[12px] font-semibold text-[#636366]"
+                          aria-label="Effort facultatif, 1 à 10"
                           className="w-full rounded-xl border border-white/10 bg-black/40 px-2 py-2 text-[13px] font-semibold text-[#AEAEB2] outline-none"
                         />
                       </label>
@@ -543,13 +735,13 @@ export function WorkoutNotebook({
                               sets: ex.sets.filter((_, i) => i !== idx),
                             })
                           }
-                          className="mb-2 text-[#636366]"
+                          className="mb-2 flex min-h-11 min-w-11 items-center justify-center text-[#636366]"
                           aria-label="Supprimer série"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       ) : (
-                        <span className="w-4" />
+                        <span className="w-11" />
                       )}
                     </div>
                   ))}
@@ -561,14 +753,14 @@ export function WorkoutNotebook({
                     onClick={() =>
                       updateExercise(ex.id, { sets: [...ex.sets, emptySet()] })
                     }
-                    className="ios-press rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-semibold text-[#AEAEB2]"
+                    className="ios-press inline-flex min-h-11 items-center rounded-full border border-white/10 px-3 text-[11px] font-semibold text-[#AEAEB2]"
                   >
                     + Ajouter une série
                   </button>
                   <button
                     type="button"
                     onClick={() => finishSet(ex, validateIdx)}
-                    className="ios-press inline-flex items-center gap-1 rounded-full border border-[#30D158]/40 bg-[#30D158]/15 px-3 py-1.5 text-[12px] font-semibold text-[#30D158]"
+                    className="ios-press inline-flex min-h-11 items-center gap-1 rounded-full border border-[#30D158]/40 bg-[#30D158]/15 px-3.5 text-[12px] font-semibold text-[#30D158]"
                   >
                     <Check className="h-3.5 w-3.5" />
                     Valider
@@ -582,7 +774,7 @@ export function WorkoutNotebook({
                         type="button"
                         title="Optionnel — n’ajuste pas automatiquement la charge"
                         onClick={() => updateSet(ex.id, validateIdx, { difficulty: d.id })}
-                        className={`ios-press rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                        className={`ios-press inline-flex min-h-11 items-center rounded-full border px-3 text-[11px] font-semibold ${
                           on
                             ? 'border-white/25 bg-white/10 text-white'
                             : 'border-white/10 text-[#636366]'
@@ -613,7 +805,10 @@ export function WorkoutNotebook({
         <div className="mt-3 flex gap-2">
           <button
             type="button"
-            onClick={() => setExercises((prev) => [...prev, emptyExercise()])}
+            onClick={() => {
+              draftDirty.current = true
+              setExercises((prev) => [...prev, emptyExercise()])
+            }}
             className="ios-press flex flex-1 items-center justify-center gap-1 rounded-2xl border border-white/10 bg-black/30 py-3 text-[13px] font-semibold text-[#AEAEB2]"
           >
             <Plus className="h-4 w-4" />
@@ -633,7 +828,10 @@ export function WorkoutNotebook({
         </div>
 
         <p className="mt-2 text-center text-[11px] text-[#636366]">
-          Volume {stats.volume} kg · {stats.durationMin} min
+          Volume {stats.volume} kg ·{' '}
+          {sessionClockLabel && !editingNote
+            ? `${sessionClockLabel} chronométré`
+            : `${stats.durationMin} min estimées`}
         </p>
       </div>
 

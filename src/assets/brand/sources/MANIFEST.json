@@ -1,0 +1,18 @@
+{
+  "calm": {
+    "id": "D96BABC8-B830-4B67-AD61-57CBD4746DE0",
+    "source": "/home/ubuntu/.cursor/projects/workspace/assets/D96BABC8-B830-4B67-AD61-57CBD4746DE0-8de4613a-7813-4549-bc94-8f70de5c58f9.jpg",
+    "copy": "src/assets/brand/sources/D96BABC8-B830-4B67-AD61-57CBD4746DE0.jpg"
+  },
+  "roar": {
+    "id": "491568B1-E3DB-4AAE-8557-F7382F14F911",
+    "source": "/home/ubuntu/.cursor/projects/workspace/assets/491568B1-E3DB-4AAE-8557-F7382F14F911-a56bd39f-5028-493a-9b08-abb518b1da67.jpg",
+    "copy": "src/assets/brand/sources/491568B1-E3DB-4AAE-8557-F7382F14F911.jpg"
+  },
+  "icon": {
+    "id": "A5A15C62-BBD9-40B4-8FB8-D4C780F5497A",
+    "source": "/home/ubuntu/.cursor/projects/workspace/assets/A5A15C62-BBD9-40B4-8FB8-D4C780F5497A-84eeab67-ef1c-45b8-ab0b-65d657d93e64.jpg",
+    "copy": "src/assets/brand/sources/A5A15C62-BBD9-40B4-8FB8-D4C780F5497A.jpg"
+  },
+  "note": "Copies des sources propriétaires. Ne pas modifier. Vert = détourage uniquement."
+}

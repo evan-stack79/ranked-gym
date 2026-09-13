@@ -9,6 +9,8 @@ import {
   isTimestampInLocalWeek,
   workoutValidationMs,
 } from '../utils/weekBounds'
+import { isConvexDomainActive } from '../backend/adapter'
+import { fetchConvexUserStatsRaw } from './convexUserStatsService'
 
 export type UserStatsRadar = {
   upper: number
@@ -116,7 +118,7 @@ function parseRpcPayload(raw: unknown): UserStatsPayload {
 export async function fetchUserStats(userId: string): Promise<UserStatsPayload> {
   const localCompleted = countLocalWeekSessions()
 
-  if (!userId || !isSupabaseConfigured()) {
+  if (!userId || (!isSupabaseConfigured() && !isConvexDomainActive())) {
     return {
       ...emptyStats(),
       weeklySessions: { completed: localCompleted, target: WEEKLY_TARGET },
@@ -124,6 +126,18 @@ export async function fetchUserStats(userId: string): Promise<UserStatsPayload> 
   }
 
   try {
+    if (isConvexDomainActive()) {
+      const data = await fetchConvexUserStatsRaw()
+      const parsed = parseRpcPayload(data)
+      return {
+        ...parsed,
+        weeklySessions: {
+          completed: Math.max(parsed.weeklySessions.completed, localCompleted),
+          target: parsed.weeklySessions.target || WEEKLY_TARGET,
+        },
+      }
+    }
+
     const supabase = getSupabase()
     const { data, error } = await supabase.rpc('get_user_stats', { p_user_id: userId })
 

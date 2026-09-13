@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Check, Search } from 'lucide-react'
 import { searchSports, SPORT_CATEGORY_LABELS, getSportById } from '../../data/sports'
 import type { Sport } from '../../types/training'
-import { IosSheet } from '../ui/IosSheet'
+import { TrainSheet as IosSheet } from './TrainSheet'
 
 interface SportPickerProps {
   open: boolean

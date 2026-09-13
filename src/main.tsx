@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { RootErrorBoundary } from './components/ui/RootErrorBoundary.tsx'
+import { AppColdLaunch } from './components/brand/AppColdLaunch.tsx'
+import { ColdLaunchAccueilFixture } from './fixtures/ColdLaunchAccueilFixture.tsx'
+import { ConvexClientProvider } from './lib/ConvexClientProvider.tsx'
 
 const rootEl = document.getElementById('root')
 if (!rootEl) {
@@ -12,7 +15,15 @@ if (!rootEl) {
 createRoot(rootEl).render(
   <StrictMode>
     <RootErrorBoundary>
-      <App />
+      <ConvexClientProvider>
+        <AppColdLaunch>
+          {typeof window !== 'undefined' && window.location.pathname === '/accueil-fixture' ? (
+            <ColdLaunchAccueilFixture />
+          ) : (
+            <App />
+          )}
+        </AppColdLaunch>
+      </ConvexClientProvider>
     </RootErrorBoundary>
   </StrictMode>,
 )

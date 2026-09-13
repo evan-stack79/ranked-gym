@@ -37,7 +37,7 @@ export function IosSheet({
     }
 
     setVisible(false)
-    const timeout = window.setTimeout(() => setMounted(false), 320)
+    const timeout = window.setTimeout(() => setMounted(false), 280)
     return () => window.clearTimeout(timeout)
   }, [open])
 
@@ -67,7 +67,9 @@ export function IosSheet({
     >
       <button
         type="button"
-        className={`ios-sheet-backdrop absolute inset-0 bg-black/55 backdrop-blur-[18px] transition-opacity duration-300 ${
+        className={`ios-sheet-backdrop absolute inset-0 bg-black/55 backdrop-blur-[18px] ${
+          visible ? 'ios-sheet-backdrop--open' : ''
+        } ${
           visible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         aria-label="Fermer"
@@ -106,7 +108,7 @@ export function IosSheet({
             type="button"
             onClick={onClose}
             disabled={!dismissible}
-            className="ios-press flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#8E8E93] disabled:opacity-40"
+            className="ios-press flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#8E8E93] disabled:opacity-40"
             aria-label="Fermer"
           >
             <span className="text-[18px] leading-none">×</span>

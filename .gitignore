@@ -30,6 +30,34 @@ dist-ssr
 # Supabase CLI cache (local)
 supabase/.temp/
 
+# Convex CLI local backend / cache (never commit)
+.convex/
+
 # Build
 dist
 dist-ssr
+
+# Capacitor / native (artefacts locaux — projets ios/ et android/ versionnés)
+.capacitor
+android/app/build
+android/.gradle
+android/local.properties
+android/captures
+android/.idea
+ios/App/Pods
+ios/App/Podfile.lock
+ios/App/App.xcworkspace/xcuserdata
+ios/App/App.xcodeproj/xcuserdata
+ios/DerivedData
+*.jks
+*.keystore
+.android-sdk/
+
+# Autonomous agent runs (reports, logs and detached worktrees)
+.agent-runs/
+
+# Captures navigateur locales (preuves — jamais versionnées)
+scripts/screenshots/
+
+# Migration artifacts can contain sensitive export metadata.
+scripts/migrations/artifacts/

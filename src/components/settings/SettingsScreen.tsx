@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import {
   ChevronRight,
   CreditCard,
+  HeartPulse,
   LogOut,
   Pencil,
   Settings2,
   Shield,
   UserRound,
 } from 'lucide-react'
+import { isCameraHeartRateEnabled } from '../../native/cameraHeartRate'
 import { Avatar } from '../ui/Avatar'
 import { uploadUserAvatar } from '../../services/avatarService'
 import { IosSheet } from '../ui/IosSheet'
@@ -24,7 +26,7 @@ const PRO_PASS_DISMISSED_KEY = 'ranked-gym:pro-pass-dismissed'
 
 export type SettingsSheet = 'payment' | 'preferences' | null
 
-export type SettingsMenuId = 'personal' | 'privacy' | 'payment' | 'preferences'
+export type SettingsMenuId = 'personal' | 'privacy' | 'payment' | 'preferences' | 'cameraHeartRate'
 
 interface SettingsScreenProps {
   username: string
@@ -35,6 +37,7 @@ interface SettingsScreenProps {
   onViewProfile?: () => void
   onOpenPersonalInfo?: () => void
   onOpenSecurity?: () => void
+  onOpenCameraHeartRate?: () => void
   onRequireAuth?: () => void
   onTryPro?: () => void
   onDisciplineChange?: (disciplineLabel: string) => void
@@ -68,6 +71,7 @@ export function SettingsScreen({
   onViewProfile,
   onOpenPersonalInfo,
   onOpenSecurity,
+  onOpenCameraHeartRate,
   onRequireAuth,
   onTryPro,
   onDisciplineChange,
@@ -161,6 +165,9 @@ export function SettingsScreen({
         { id: 'privacy', icon: Shield, label: 'Sécurité & Confidentialité' },
         { id: 'payment', icon: CreditCard, label: 'Méthodes de paiement' },
         { id: 'preferences', icon: Settings2, label: 'Préférences' },
+        ...(isCameraHeartRateEnabled()
+          ? [{ id: 'cameraHeartRate' as const, icon: HeartPulse, label: 'Tester la mesure BPM' }]
+          : []),
       ],
     },
   ]
@@ -239,6 +246,10 @@ export function SettingsScreen({
                   icon={item.icon}
                   label={item.label}
                   onClick={() => {
+                    if (item.id === 'cameraHeartRate') {
+                      onOpenCameraHeartRate?.()
+                      return
+                    }
                     if (item.id === 'personal') {
                       openPersonal()
                       return

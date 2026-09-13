@@ -27,9 +27,9 @@ export function computeCatchUp(workdayTstHours?: number[]): CatchUpSleepResult {
     recoveryNeeded: true,
     workdayAverageTstHours,
     recommendation:
-      'Votre moyenne de sommeil en jours travaillés est inférieure à 7 h. ' +
-      'Envisagez une récupération progressive le week-end en avançant légèrement le coucher ' +
-      'plutôt qu’en retardant fortement le lever, afin de préserver la régularité circadienne. ' +
-      'Ceci est une suggestion informative, pas une prescription médicale.',
+      'En moyenne, tu dors moins de 7 h les jours travaillés. ' +
+      'Le week-end, tu peux récupérer un peu en te couchant un peu plus tôt, ' +
+      'plutôt qu’en te levant beaucoup plus tard — pour garder un rythme stable. ' +
+      'C’est une piste informative, pas un conseil médical.',
   }
 }

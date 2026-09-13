@@ -1,3 +1,5 @@
+import { BrandMark } from '../brand/BrandMark'
+
 /**
  * Full-screen boot UI — shown until auth session + Supabase profile/cloud hydrate finish.
  * Prevents flash of empty / default stats.
@@ -12,20 +14,25 @@ export function AppBootScreen() {
       aria-label="Chargement des données"
     >
       <div className="flex flex-col items-center gap-4 pt-10 pb-2">
-        <div className="relative flex h-14 w-14 items-center justify-center">
+        <div className="relative flex h-[104px] w-[104px] items-center justify-center">
           <span
-            className="absolute inset-0 rounded-full border-2 border-[#FF2B2B]/25"
+            className="pointer-events-none absolute inset-0 rounded-full border-2 border-[#FF2B2B]/20"
             aria-hidden
           />
           <span
-            className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[#FF2B2B]"
+            className="pointer-events-none absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[#FF2B2B]/70"
             aria-hidden
           />
-          <span className="text-[11px] font-black tracking-tight text-white">RG</span>
+          <BrandMark variant="hero" showWordmark={false} className="relative z-[1]" />
         </div>
-        <div className="text-center">
-          <p className="text-[17px] font-semibold text-white">Chargement Ranked Gym</p>
-          <p className="mt-1 text-[13px] text-[#8E8E93]">Récupération de ton profil…</p>
+
+        <div className="flex flex-col items-center text-center">
+          <BrandMark
+            variant="hero"
+            showMark={false}
+            tagline="Ton sport. Ton niveau. Ta progression."
+          />
+          <p className="mt-3 text-[13px] text-[#8E8E93]">Récupération de ton profil…</p>
         </div>
       </div>
 

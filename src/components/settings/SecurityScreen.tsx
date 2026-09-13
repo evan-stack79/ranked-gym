@@ -101,7 +101,7 @@ export function SecurityScreen({
     setDeleteBusy(true)
     try {
       await signInWithEmail(user.email, deletePassword)
-      await deleteOwnAccount()
+      await deleteOwnAccount(deletePassword)
       await signOut()
       onSignOut()
     } catch (err) {

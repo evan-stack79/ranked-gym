@@ -35,6 +35,11 @@ export function estimateSessionKcal(
   kcalPerHour: number,
   weightKg: number,
 ): number {
+  if (!Number.isFinite(durationMin) || durationMin <= 0) return 0
+  if (!Number.isFinite(kcalPerHour) || kcalPerHour <= 0) return 0
+  // Rejette poids manquant / 0 kg — pas d’énergie fictive.
+  if (!Number.isFinite(weightKg) || weightKg <= 0) return 0
   const weightFactor = weightKg / 70
-  return Math.round((durationMin / 60) * kcalPerHour * weightFactor)
+  const kcal = Math.round((durationMin / 60) * kcalPerHour * weightFactor)
+  return Number.isFinite(kcal) && kcal > 0 ? kcal : 0
 }

@@ -2,6 +2,7 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover" />
     <meta name="theme-color" content="#0C0C0E" />
@@ -16,49 +17,74 @@
     <meta http-equiv="Permissions-Policy" content="camera=(self), microphone=()" />
     <link rel="apple-touch-icon" href="/icon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icon.png" />
+    <link rel="preload" as="image" href="/brand-splash-calm.png" />
+    <link rel="preload" as="image" href="/brand-splash-roar.png" />
     <title>Ranked Gym</title>
+    <script>
+      // Marque T0 document pour l’échéance cold launch (0,8–1,2 s).
+      window.__RG_BOOT_T0__ = performance.now();
+    </script>
     <style>
       html,
       body {
         margin: 0;
-        background-color: #0c0c0e;
+        background-color: #000000;
         color: #ffffff;
       }
       #root {
         min-height: 100vh;
         min-height: 100dvh;
       }
-      .boot-fallback {
+      /* Splash natif immédiat — fond noir, panthère calme, safe areas */
+      .boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
         display: flex;
-        min-height: 100vh;
-        flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 0.5rem;
+        background: #000000;
+        padding:
+          env(safe-area-inset-top, 0px)
+          env(safe-area-inset-right, 0px)
+          env(safe-area-inset-bottom, 0px)
+          env(safe-area-inset-left, 0px);
+      }
+      .boot-splash__inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+      }
+      .boot-splash img {
+        width: 180px;
+        height: 180px;
+        object-fit: contain;
+        display: block;
+      }
+      .boot-splash strong {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-        text-align: center;
-        padding: 1.5rem;
-      }
-      .boot-fallback p {
-        margin: 0;
-        color: #8e8e93;
-        font-size: 0.9375rem;
-      }
-      .boot-fallback strong {
+        font-size: 1.125rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
         color: #ffffff;
-        font-size: 1.0625rem;
+      }
+      .boot-splash strong span {
+        color: #ff2b2b;
       }
     </style>
   </head>
   <body>
     <div id="root">
-      <div class="boot-fallback" aria-live="polite" aria-busy="true">
-        <strong>Ranked Gym</strong>
-        <p>Chargement…</p>
+      <div class="boot-splash" aria-live="polite" aria-busy="true" aria-label="Ranked Gym">
+        <div class="boot-splash__inner">
+          <img src="/brand-splash-calm.png" width="180" height="180" alt="" />
+          <strong>Ranked <span>Gym</span></strong>
+        </div>
       </div>
     </div>
     <noscript>
-      <p style="padding: 2rem; font-family: system-ui, sans-serif; color: #fff; background: #0c0c0e">
+      <p style="padding: 2rem; font-family: system-ui, sans-serif; color: #fff; background: #000">
         Ranked Gym nécessite JavaScript. Active-le pour utiliser l’application.
       </p>
     </noscript>
