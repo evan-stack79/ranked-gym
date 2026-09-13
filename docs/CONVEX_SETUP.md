@@ -2,7 +2,7 @@
 
 Scaffold only. **Supabase remains the default runtime.** Do not enable Convex as primary in production.
 
-Full architecture: `docs/migrations/supabase-to-convex-plan.md`  
+Full architecture: `docs/migrations/supabase-to-convex-plan.md`
 Inventory: `docs/migrations/supabase-to-convex-inventory.md`
 
 ## What this phase added
