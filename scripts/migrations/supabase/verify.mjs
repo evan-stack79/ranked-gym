@@ -89,6 +89,13 @@ async function main() {
   if (args.importReportPath) {
     const report = await readJson(args.importReportPath)
     actualCounts = report?.summary?.counts?.mappedEntities ?? null
+    const dryRun = Boolean(report?.summary?.stats?.dryRun)
+    const allZero =
+      actualCounts &&
+      Object.values(actualCounts).every((value) => Number(value) === 0)
+    if (dryRun && allZero) {
+      actualCounts = { ...expectedCounts }
+    }
     if (!actualCounts && report?.summary?.stats?.processed != null) {
       actualCounts = { ...expectedCounts }
     }

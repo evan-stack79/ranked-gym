@@ -72,12 +72,13 @@ class FakeQuery {
 
   withIndex(
     _indexName: string,
-    fn: (q: {
+    fn?: (q: {
       eq: (field: string, value: unknown) => {
         eq: (field: string, value: unknown) => unknown
       }
     }) => unknown,
   ) {
+    if (!fn) return this
     const clauses: Array<{ field: string; value: unknown }> = []
     const chain = {
       eq(field: string, value: unknown) {

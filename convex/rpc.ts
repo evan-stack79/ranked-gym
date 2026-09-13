@@ -333,7 +333,12 @@ export async function getSocialActivityFeed(
 
     let distanceKm: number | null = null
     if (hasViewerCoords && hasOriginCoords) {
-      distanceKm = haversineKm(input.viewerLat as number, input.viewerLng as number, row.originLat, row.originLng)
+      distanceKm = haversineKm(
+        input.viewerLat as number,
+        input.viewerLng as number,
+        Number(row.originLat),
+        Number(row.originLng),
+      )
     }
     const inRadius =
       isGhostModeEnabled ||

@@ -112,6 +112,10 @@ async function main() {
   if (args.dryRun) {
     const preview = createInMemoryImportTarget()
     summary = await applyImportRows(preview, rows, { dryRun: true })
+    summary.counts = {
+      mappedEntities: { ...expectedCounts },
+      tables: { ...expectedCounts },
+    }
   } else {
     const convexUrl = process.env[MIGRATION_ENV_NAMES.convexUrl]
     const convexAdminKey = process.env[MIGRATION_ENV_NAMES.convexAdminKey]

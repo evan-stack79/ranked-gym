@@ -1,14 +1,9 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import {
-  applyImportRows,
-  buildImportRows,
-  countBundleEntities,
-  createInMemoryImportTarget,
-  normalizeExportBundle,
-  verifyCounts,
-} from '../../scripts/migrations/supabase/core.mjs'
+// @ts-ignore TS cannot infer named exports from runtime .mjs script module.
+import * as migrationCoreMod from '../../scripts/migrations/supabase/core.mjs'
+const migrationCore = migrationCoreMod as any
 
 async function loadFixtureBundle() {
   const fixturePath = path.resolve(
@@ -16,48 +11,53 @@ async function loadFixtureBundle() {
     'scripts/migrations/fixtures/sample-export.json',
   )
   const raw = await readFile(fixturePath, 'utf8')
-  return normalizeExportBundle(JSON.parse(raw))
+  return migrationCore.normalizeExportBundle(JSON.parse(raw))
 }
 
 describe('supabase -> convex migration scripts', () => {
   it('maps fixture export rows into deterministic import rows', async () => {
     const bundle = await loadFixtureBundle()
-    const rows = buildImportRows(bundle)
-    const counts = countBundleEntities(bundle)
+    const rows = migrationCore.buildImportRows(bundle) as Array<{ entityType: string; checksum: string }>
+    const counts = migrationCore.countBundleEntities(bundle) as Record<string, number>
 
     expect(rows.length).toBe(
-      Object.values(counts).reduce((sum, value) => sum + Number(value), 0),
+      Object.values(counts).reduce((sum: number, value: number) => sum + Number(value), 0),
     )
     expect(rows[0]?.checksum).toMatch(/^[a-f0-9]{64}$/)
-    expect(rows.some((row) => row.entityType === 'profiles')).toBe(true)
-    expect(rows.some((row) => row.entityType === 'activities')).toBe(true)
+    expect(rows.some((row: { entityType: string }) => row.entityType === 'profiles')).toBe(true)
+    expect(rows.some((row: { entityType: string }) => row.entityType === 'activities')).toBe(true)
   })
 
   it('is idempotent when re-importing the same bundle', async () => {
     const bundle = await loadFixtureBundle()
-    const rows = buildImportRows(bundle)
-    const target = createInMemoryImportTarget()
+    const rows = migrationCore.buildImportRows(bundle)
+    const target = migrationCore.createInMemoryImportTarget()
 
-    const first = await applyImportRows(target, rows)
+    const first = await migrationCore.applyImportRows(target, rows)
     expect(first.stats.inserted).toBe(rows.length)
     expect(first.stats.updated).toBe(0)
     expect(first.stats.skipped).toBe(0)
 
-    const second = await applyImportRows(target, rows)
+    const second = await migrationCore.applyImportRows(target, rows)
     expect(second.stats.inserted).toBe(0)
     expect(second.stats.updated).toBe(0)
     expect(second.stats.skipped).toBe(rows.length)
 
-    const expectedCounts = countBundleEntities(bundle)
-    const verification = verifyCounts(expectedCounts, second.counts?.mappedEntities)
+    const expectedCounts = migrationCore.countBundleEntities(bundle)
+    const verification = migrationCore.verifyCounts(expectedCounts, second.counts?.mappedEntities)
     expect(verification.ok).toBe(true)
   })
 
   it('updates changed rows without creating duplicates', async () => {
     const bundle = await loadFixtureBundle()
-    const rows = buildImportRows(bundle)
-    const target = createInMemoryImportTarget()
-    await applyImportRows(target, rows)
+    const rows = migrationCore.buildImportRows(bundle) as Array<{
+      entityType: string
+      supabaseId: string
+      payload: Record<string, unknown>
+      checksum: string
+    }>
+    const target = migrationCore.createInMemoryImportTarget()
+    await migrationCore.applyImportRows(target, rows)
 
     const changed = [...rows]
     const idx = changed.findIndex(
@@ -76,13 +76,16 @@ describe('supabase -> convex migration scripts', () => {
       checksum: 'updated-checksum-profiles-user-a',
     }
 
-    const result = await applyImportRows(target, changed)
+    const result = await migrationCore.applyImportRows(target, changed)
     expect(result.stats.inserted).toBe(0)
     expect(result.stats.updated).toBe(1)
     expect(result.stats.skipped).toBe(changed.length - 1)
 
     const counts = target.getCounts()
-    const verification = verifyCounts(countBundleEntities(bundle), counts.mappedEntities)
+    const verification = migrationCore.verifyCounts(
+      migrationCore.countBundleEntities(bundle),
+      counts.mappedEntities,
+    )
     expect(verification.ok).toBe(true)
   })
 })
