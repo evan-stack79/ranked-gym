@@ -3,7 +3,13 @@ import {
   consumePasswordResetToken,
   createResetLink,
   issuePasswordResetToken,
+  upsertImportedUserWithoutPassword,
 } from '../../convex/auth'
+import {
+  createPrivateNoteForSession,
+  getPrivateNoteForSession,
+  listPrivateNotesForSession,
+} from '../../convex/authPrivateData'
 import { assertUserOwnership, requireSessionUser } from '../../convex/lib/auth'
 import { hashToken, verifyPassword } from '../../convex/lib/authCrypto'
 
@@ -36,6 +42,14 @@ class FakeDb {
 
   query(table: TableName) {
     return new FakeQuery(this.rows[table])
+  }
+
+  get(id: string) {
+    for (const tableRows of Object.values(this.rows)) {
+      const row = tableRows.find((candidate) => candidate._id === id)
+      if (row) return Promise.resolve(row)
+    }
+    return Promise.resolve(null)
   }
 
   patch(id: string, patch: Record<string, unknown>) {
@@ -213,5 +227,96 @@ describe('Convex auth isolation guard (2 users)', () => {
       /cross-user access denied/i,
     )
     expect(() => assertUserOwnership('user-a', sessionUserA.userId)).not.toThrow()
+  })
+})
+
+describe('Convex auth migration policy (global reset, no legacy bridge)', () => {
+  it('imports users without passwords and removes existing credentials', async () => {
+    const db = new FakeDb()
+    const ctx = createCtx(db)
+    const now = Date.now()
+    await db.insert('auth_users', {
+      userId: 'legacy-user',
+      email: 'legacy@example.com',
+      emailNorm: 'legacy@example.com',
+      displayName: 'Legacy User',
+      mustResetPassword: false,
+      createdAt: now,
+      updatedAt: now,
+    })
+    await db.insert('auth_password_credentials', {
+      userId: 'legacy-user',
+      passwordHash: 'pbkdf2_sha256$200000$abc$xyz',
+      updatedAt: now,
+    })
+
+    const outcome = await upsertImportedUserWithoutPassword(ctx as never, {
+      email: 'legacy@example.com',
+      displayName: 'Legacy Renamed',
+    })
+    expect(outcome).toBe('updated')
+    expect(db.table('auth_password_credentials')).toHaveLength(0)
+
+    const user = db.table('auth_users')[0]
+    expect(user.mustResetPassword).toBe(true)
+    expect(user.displayName).toBe('Legacy Renamed')
+  })
+})
+
+describe('Convex auth-gated private data isolation', () => {
+  it('ensures user A cannot read user B private note', async () => {
+    const db = new FakeDb()
+    const mutationCtx = createCtx(db)
+    const queryCtx = createCtx(db)
+    const now = Date.now()
+    await db.insert('auth_users', {
+      userId: 'user-a',
+      email: 'a@example.com',
+      emailNorm: 'a@example.com',
+      displayName: 'A',
+      mustResetPassword: false,
+      createdAt: now,
+      updatedAt: now,
+    })
+    await db.insert('auth_users', {
+      userId: 'user-b',
+      email: 'b@example.com',
+      emailNorm: 'b@example.com',
+      displayName: 'B',
+      mustResetPassword: false,
+      createdAt: now,
+      updatedAt: now,
+    })
+    await db.insert('auth_sessions', {
+      userId: 'user-a',
+      tokenHash: await hashToken('session-a'),
+      createdAt: now,
+      expiresAt: now + 60_000,
+    })
+    await db.insert('auth_sessions', {
+      userId: 'user-b',
+      tokenHash: await hashToken('session-b'),
+      createdAt: now,
+      expiresAt: now + 60_000,
+    })
+
+    const noteB = await createPrivateNoteForSession(
+      mutationCtx as never,
+      'session-b',
+      'private note from user b',
+    )
+    const notesA = await listPrivateNotesForSession(queryCtx as never, 'session-a')
+    expect(notesA).toHaveLength(0)
+
+    await expect(
+      getPrivateNoteForSession(queryCtx as never, 'session-a', noteB.noteId),
+    ).rejects.toThrow(/cross-user access denied/i)
+
+    const ownNote = await getPrivateNoteForSession(
+      queryCtx as never,
+      'session-b',
+      noteB.noteId,
+    )
+    expect(ownNote?.content).toContain('user b')
   })
 })

@@ -51,6 +51,13 @@ async function findUserByEmailNorm(ctx: MutationCtx, emailNorm: string) {
     .first()
 }
 
+type ImportedUserInput = {
+  email: string
+  displayName?: string
+}
+
+type ImportOutcome = 'imported' | 'updated' | 'skippedDeleted'
+
 async function getPasswordCredential(ctx: MutationCtx, userId: string) {
   return ctx.db
     .query('auth_password_credentials')
@@ -143,6 +150,43 @@ export async function consumePasswordResetToken(
       displayName: user.displayName,
     },
   }
+}
+
+export async function upsertImportedUserWithoutPassword(
+  ctx: MutationCtx,
+  rawUser: ImportedUserInput,
+  now = Date.now(),
+): Promise<ImportOutcome> {
+  const emailNorm = normalizeEmail(rawUser.email)
+  const existing = await findUserByEmailNorm(ctx, emailNorm)
+  if (!existing) {
+    await ctx.db.insert('auth_users', {
+      userId: crypto.randomUUID(),
+      email: emailNorm,
+      emailNorm,
+      displayName: toDisplayName(emailNorm, rawUser.displayName),
+      mustResetPassword: true,
+      createdAt: now,
+      updatedAt: now,
+    })
+    return 'imported'
+  }
+  if (existing.deletedAt) {
+    return 'skippedDeleted'
+  }
+  await ctx.db.patch(existing._id, {
+    mustResetPassword: true,
+    displayName: toDisplayName(emailNorm, rawUser.displayName || existing.displayName),
+    updatedAt: now,
+  })
+  const credentials = await ctx.db
+    .query('auth_password_credentials')
+    .withIndex('by_userId', (q) => q.eq('userId', existing.userId))
+    .collect()
+  for (const credential of credentials) {
+    await ctx.db.delete(credential._id)
+  }
+  return 'updated'
 }
 
 export const signUpWithEmail = mutation({
@@ -440,38 +484,10 @@ export const importUsersWithoutPasswords = mutation({
     let skippedDeleted = 0
     const now = Date.now()
     for (const rawUser of args.users) {
-      const emailNorm = normalizeEmail(rawUser.email)
-      const existing = await findUserByEmailNorm(ctx, emailNorm)
-      if (!existing) {
-        await ctx.db.insert('auth_users', {
-          userId: crypto.randomUUID(),
-          email: emailNorm,
-          emailNorm,
-          displayName: toDisplayName(emailNorm, rawUser.displayName),
-          mustResetPassword: true,
-          createdAt: now,
-          updatedAt: now,
-        })
-        imported += 1
-        continue
-      }
-      if (existing.deletedAt) {
-        skippedDeleted += 1
-        continue
-      }
-      await ctx.db.patch(existing._id, {
-        mustResetPassword: true,
-        displayName: toDisplayName(emailNorm, rawUser.displayName || existing.displayName),
-        updatedAt: now,
-      })
-      const credentials = await ctx.db
-        .query('auth_password_credentials')
-        .withIndex('by_userId', (q) => q.eq('userId', existing.userId))
-        .collect()
-      for (const credential of credentials) {
-        await ctx.db.delete(credential._id)
-      }
-      updated += 1
+      const outcome = await upsertImportedUserWithoutPassword(ctx, rawUser, now)
+      if (outcome === 'imported') imported += 1
+      if (outcome === 'updated') updated += 1
+      if (outcome === 'skippedDeleted') skippedDeleted += 1
     }
     return { imported, updated, skippedDeleted }
   },
