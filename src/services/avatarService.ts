@@ -1,5 +1,7 @@
 import { getSupabase } from '../lib/supabase'
+import { isConvexDomainActive } from '../backend/adapter'
 import { updateProfileProgress } from './authService'
+import { uploadConvexUserAvatar } from './convexAvatarService'
 import type { ProfileRow } from '../types/database'
 
 const MAX_EDGE_PX = 512
@@ -73,6 +75,9 @@ export async function uploadUserAvatar(
   file: File,
 ): Promise<{ profile: ProfileRow; publicUrl: string }> {
   const blob = await resizeImageForAvatar(file)
+  if (isConvexDomainActive()) {
+    return uploadConvexUserAvatar(userId, blob)
+  }
   const path = `${userId}/avatar.jpg`
   const supabase = getSupabase()
 

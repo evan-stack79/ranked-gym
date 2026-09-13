@@ -2,7 +2,13 @@ import { getSupabase } from '../lib/supabase'
 import type { ProfileRow } from '../types/database'
 import { getRankFromLevel } from '../utils/rank'
 import { getActiveAuthBackend } from '../backend/authFeatureFlag'
+import { isConvexDomainActive } from '../backend/adapter'
 import * as convexAuth from './convexAuthService'
+import {
+  ensureConvexProfile,
+  fetchConvexProfile,
+  updateConvexProfileProgress,
+} from './convexProfileService'
 
 export type AuthMethod = 'email'
 
@@ -153,6 +159,9 @@ export async function deleteOwnAccount(password?: string) {
 }
 
 export async function fetchProfile(userId: string): Promise<ProfileRow | null> {
+  if (isConvexDomainActive()) {
+    return fetchConvexProfile(userId)
+  }
   const supabase = getSupabase()
   const { data, error } = await supabase
     .from('profiles')
@@ -170,6 +179,9 @@ export async function ensureProfile(
   pseudo: string,
   disciplineLabel = 'Musculation',
 ): Promise<ProfileRow> {
+  if (isConvexDomainActive()) {
+    return ensureConvexProfile(userId, pseudo, disciplineLabel)
+  }
   const existing = await fetchProfile(userId)
   if (existing) return existing
 
@@ -209,6 +221,9 @@ export async function updateProfileProgress(
     is_ghost_mode_enabled?: boolean
   },
 ): Promise<ProfileRow> {
+  if (isConvexDomainActive()) {
+    return updateConvexProfileProgress(userId, patch)
+  }
   const supabase = getSupabase()
   const { data, error } = await supabase
     .from('profiles')

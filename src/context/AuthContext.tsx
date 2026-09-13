@@ -13,6 +13,7 @@ import type { ProfileRow } from '../types/database'
 import { getSupabaseConfigError, isSupabaseConfigured, getSupabase } from '../lib/supabase'
 import { getConvexConfigError } from '../lib/convex'
 import { getActiveAuthBackend } from '../backend/authFeatureFlag'
+import { isConvexDomainActive } from '../backend/adapter'
 import {
   ensureProfile,
   fetchProfile,
@@ -300,7 +301,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (cancelled) return
           if (existing) {
             setUser(existing)
-            setProfile(null)
+            void hydrateUser(existing)
+            return
           }
           setIsLoading(false)
         })
@@ -433,10 +435,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (!sessionUser) {
             throw new Error('AUTH_SESSION_MISSING')
           }
-          hydrateGenRef.current += 1
-          setUser(sessionUser)
-          setProfile(null)
-          setIsLoading(false)
+          void hydrateUser(sessionUser)
         }
         completePending()
       } catch (err) {
@@ -444,7 +443,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthLoading(false)
       }
     },
-    [completePending],
+    [completePending, hydrateUser],
   )
 
   /** Inscriptions publiques désactivées (bêta fermée / invitation uniquement). */
@@ -521,7 +520,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateDiscipline = useCallback(
     async (disciplineLabel: string) => {
       syncLocalDiscipline(disciplineLabel)
-      if (!user || !isSupabaseConfigured()) return
+      if (!user || (!isConvexDomainActive() && !isSupabaseConfigured())) return
       try {
         const row = await updateProfileProgress(user.id, { discipline: disciplineLabel })
         setProfile(row)
@@ -536,7 +535,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (enabled: boolean) => {
       setLocalGhostModeEnabled(enabled)
       patchProfile({ is_ghost_mode_enabled: enabled })
-      if (!user || !isSupabaseConfigured()) return
+      if (!user || (!isConvexDomainActive() && !isSupabaseConfigured())) return
       try {
         const row = await updateProfileProgress(user.id, { is_ghost_mode_enabled: enabled })
         setProfile(row)

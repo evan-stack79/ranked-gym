@@ -8,26 +8,34 @@ export type CloudBackendAdapter = {
   /** What the build flag asks for, if Convex is configured. */
   requested: CloudBackendKind
   /**
-   * Phase A lock: domain services still read/write Supabase + local storage.
-   * Later phases may return `convex` once those services are migrated.
+   * Domain I/O backend. Supabase remains default until
+   * `VITE_ENABLE_CONVEX_PRIMARY=true` and `VITE_CONVEX_URL` is configured.
    */
-  active: 'supabase'
+  active: CloudBackendKind
   convexConfigured: boolean
   supabaseConfigured: boolean
 }
 
 /**
  * Requested cloud backend after `VITE_ENABLE_CONVEX_PRIMARY`.
- * Does not change runtime I/O in Phase A.
  */
 export function getRequestedCloudBackend(): CloudBackendKind {
   if (isConvexPrimaryEnabled() && isConvexConfigured()) return 'convex'
   return 'supabase'
 }
 
-/** Actual domain I/O backend. Always Supabase until a later migration PR. */
-export function getActiveCloudBackend(): 'supabase' {
-  return 'supabase'
+/** Actual domain I/O backend for profile/train/nutrition/sleep/streak/backup. */
+export function getActiveCloudBackend(): CloudBackendKind {
+  return getRequestedCloudBackend()
+}
+
+export function isConvexDomainActive(): boolean {
+  return getActiveCloudBackend() === 'convex'
+}
+
+export function isActiveCloudBackendConfigured(): boolean {
+  if (isConvexDomainActive()) return isConvexConfigured()
+  return isSupabaseConfigured()
 }
 
 export function getCloudBackendAdapter(): CloudBackendAdapter {

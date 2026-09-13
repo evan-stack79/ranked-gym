@@ -9,7 +9,7 @@ interface ImportMetaEnv {
   readonly VITE_ENABLE_CAMERA_HEART_RATE?: string
   /** Convex deployment URL (https://….convex.cloud). Unused until cutover. */
   readonly VITE_CONVEX_URL?: string
-  /** When true, request Convex as primary cloud backend. Phase A ignores this for I/O. */
+  /** When true, request Convex as primary cloud backend for profile/train/nutrition/sleep/streak. */
   readonly VITE_ENABLE_CONVEX_PRIMARY?: string
   /** Dedicated auth migration flag: enable Convex auth adapter. */
   readonly VITE_ENABLE_CONVEX_AUTH?: string

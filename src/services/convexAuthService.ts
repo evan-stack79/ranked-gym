@@ -20,10 +20,14 @@ function readTokenFromLocation(): string | null {
   }
 }
 
-async function getStoredSessionToken(): Promise<string | null> {
+export async function getConvexSessionToken(): Promise<string | null> {
   const value = await Promise.resolve(getSecureAuthStorage().getItem(CONVEX_AUTH_STORAGE_KEY))
   if (!value || typeof value !== 'string') return null
   return value
+}
+
+async function getStoredSessionToken(): Promise<string | null> {
+  return getConvexSessionToken()
 }
 
 async function setStoredSessionToken(token: string): Promise<void> {

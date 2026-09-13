@@ -60,7 +60,7 @@ describe('Convex Phase A feature flag', () => {
 })
 
 describe('cloud backend adapter', () => {
-  it('keeps Supabase as the active runtime even if Convex is requested later', () => {
+  it('keeps Supabase as the active runtime when Convex is not configured', () => {
     expect(getRequestedCloudBackend()).toBe('supabase')
     expect(getActiveCloudBackend()).toBe('supabase')
     const adapter = getCloudBackendAdapter()
