@@ -374,7 +374,7 @@ Legend:
 - Login, logout, token refresh/session persistence.
 - Password reset email flow (web + native/deep-link cases).
 - Change password and account deletion.
-- If hash migration unavailable, validate forced-reset rollout.
+- If hashes are not safely portable: validate **global password reset** for all users (locked; no legacy password bridge).
 
 ## 9.6 Platform notes (Vite/Capacitor/iOS/Android)
 
