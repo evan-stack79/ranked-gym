@@ -58,3 +58,6 @@ ios/DerivedData
 
 # Captures navigateur locales (preuves — jamais versionnées)
 scripts/screenshots/
+
+# Migration artifacts can contain sensitive export metadata.
+scripts/migrations/artifacts/

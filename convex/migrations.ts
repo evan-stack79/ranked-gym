@@ -15,6 +15,7 @@ export const MIGRATION_ENTITY_TYPES = [
 ] as const
 
 export type MigrationEntityType = (typeof MIGRATION_ENTITY_TYPES)[number]
+type MigrationEntityCounts = Record<MigrationEntityType, number>
 
 type ImportOperation = 'inserted' | 'updated' | 'skipped'
 
@@ -472,11 +473,26 @@ export const finishRun = mutation({
   },
 })
 
-function toEntityCounts(rows: Array<{ entityType: string }>): Record<string, number> {
-  const counts: Record<string, number> = {}
-  for (const type of MIGRATION_ENTITY_TYPES) counts[type] = 0
+function createEmptyEntityCounts(): MigrationEntityCounts {
+  return {
+    auth_users: 0,
+    profiles: 0,
+    workouts: 0,
+    nutrition: 0,
+    checkins: 0,
+    aliments: 0,
+    activities: 0,
+    ai_usage_limits: 0,
+    user_backups: 0,
+  }
+}
+
+function toEntityCounts(rows: Array<{ entityType: string }>): MigrationEntityCounts {
+  const counts = createEmptyEntityCounts()
   for (const row of rows) {
-    counts[row.entityType] = (counts[row.entityType] ?? 0) + 1
+    if (row.entityType in counts) {
+      counts[row.entityType as MigrationEntityType] += 1
+    }
   }
   return counts
 }
