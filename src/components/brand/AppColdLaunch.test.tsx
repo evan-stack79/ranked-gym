@@ -60,6 +60,7 @@ describe('AppColdLaunch', () => {
     expect(d.totalMs).toBeGreaterThanOrEqual(COLD_LAUNCH_MIN_MS)
     expect(d.totalMs).toBeLessThanOrEqual(COLD_LAUNCH_MAX_MS)
     expect(d.doneAt).toBeGreaterThan(d.roarAt)
+    expect(d.exitAt).toBeLessThan(d.doneAt)
   })
 
   it('affiche calme puis rugissant puis disparaît (cold start)', async () => {
@@ -86,7 +87,11 @@ describe('AppColdLaunch', () => {
     })
     expect(splash()?.getAttribute('data-phase')).toBe('roar')
     act(() => {
-      vi.advanceTimersByTime(800)
+      vi.advanceTimersByTime(260)
+    })
+    expect(splash()?.getAttribute('data-phase')).toBe('exiting')
+    act(() => {
+      vi.advanceTimersByTime(540)
     })
     expect(splash()).toBeNull()
     expect(document.documentElement.dataset.coldLaunchPlayed).toBe('1')

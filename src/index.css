@@ -57,6 +57,13 @@ body {
   --app-safe-area-right: env(safe-area-inset-right, 0px);
   --app-safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --app-safe-area-left: env(safe-area-inset-left, 0px);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-press: 140ms;
+  --dur-fast: 180ms;
+  --dur-ui: 220ms;
+  --dur-drawer: 260ms;
 }
 
 .glass-bar {
@@ -97,15 +104,25 @@ body {
     0 0 12px rgb(255 43 43 / 0.45);
 }
 
+.motion-progress-fill {
+  width: 100%;
+  transform-origin: left center;
+  transition: transform var(--dur-ui) var(--ease-out);
+}
+
 .btn-brand {
   background: linear-gradient(180deg, #ff4d4d 0%, #ff2b2b 45%, #d91020 100%);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.28),
     0 4px 20px rgb(255 43 43 / 0.4);
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    opacity var(--dur-press) var(--ease-out);
 }
 
 .btn-brand:active {
-  opacity: 0.88;
+  opacity: 0.9;
+  transform: scale(0.98);
 }
 
 @keyframes card-shine {
@@ -187,7 +204,7 @@ body {
 }
 
 .rest-timer-panel {
-  animation: ios-fade-up 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: ios-fade-up var(--dur-ui) var(--ease-out) both;
 }
 
 /* Dock fixed — ancré au-dessus de la BottomNav, hors flux scroll */
@@ -218,7 +235,7 @@ body {
     0 0 0 0.5px rgb(255 255 255 / 0.05),
     0 0 18px rgb(48 209 88 / 0.12),
     inset 0 1px 0 rgb(255 255 255 / 0.1);
-  animation: ios-fade-up 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: ios-fade-up var(--dur-ui) var(--ease-out) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -300,9 +317,18 @@ body {
 }
 
 /* iOS sheet motion — springy ease like UIKit */
+.ios-sheet-backdrop {
+  opacity: 0;
+  transition: opacity var(--dur-ui) var(--ease-out);
+}
+
+.ios-sheet-backdrop--open {
+  opacity: 1;
+}
+
 .ios-sheet-panel {
   transform: translate3d(0, 110%, 0);
-  transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: transform var(--dur-drawer) var(--ease-drawer);
   will-change: transform;
 }
 
@@ -319,8 +345,8 @@ body {
     transform: translate3d(0, 18px, 0) scale(0.96);
     opacity: 0;
     transition:
-      transform 0.36s cubic-bezier(0.32, 0.72, 0, 1),
-      opacity 0.28s ease;
+      transform var(--dur-drawer) var(--ease-drawer),
+      opacity var(--dur-ui) var(--ease-out);
   }
 
   .ios-sheet-panel--open {
@@ -336,9 +362,10 @@ body {
 
 .ios-press {
   transition:
-    transform 0.18s cubic-bezier(0.32, 0.72, 0, 1),
-    opacity 0.18s ease,
-    background-color 0.18s ease;
+    transform var(--dur-fast) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
 }
 
 .ios-press:active {
@@ -358,7 +385,7 @@ body {
 }
 
 .ios-fade-up {
-  animation: ios-fade-up 0.45s cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: ios-fade-up var(--dur-ui) var(--ease-out) both;
 }
 
 .ios-fade-up-delay-1 {
@@ -446,7 +473,7 @@ body {
 }
 
 .streak-bonus-toast {
-  animation: ios-fade-up 0.45s cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: ios-fade-up var(--dur-ui) var(--ease-out) both;
 }
 
 .streak-confetti {
@@ -1208,16 +1235,18 @@ body {
 }
 
 .water-validate-btn {
-  animation: ios-fade-up 0.35s cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: ios-fade-up var(--dur-ui) var(--ease-out) both;
   box-shadow: 0 0 24px rgb(0 180 255 / 0.35);
 }
 
 .water-validate-bar {
-  animation: ios-fade-up 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: ios-fade-up var(--dur-ui) var(--ease-out) both;
 }
 
 .water-preset-btn {
-  transition: transform 0.18s cubic-bezier(0.32, 0.72, 0, 1), border-color 0.2s ease;
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
 }
 
 .water-preset-badge {
@@ -1258,7 +1287,7 @@ body {
 }
 
 .water-journal-row {
-  animation: ios-fade-up 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: ios-fade-up var(--dur-ui) var(--ease-out) both;
 }
 
 /* iOS Cristaline-style slim bottle */
@@ -1469,20 +1498,8 @@ body {
     0 0 28px rgb(34 211 238 / 0.35);
 }
 
-@keyframes ios-tab-pop {
-  0% {
-    transform: scale(1);
-  }
-  40% {
-    transform: scale(0.88);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
 .ios-tab-active-icon {
-  animation: ios-tab-pop 0.34s cubic-bezier(0.32, 0.72, 0, 1);
+  transform: translate3d(0, 0, 0) scale(1.04);
 }
 
 /* ——— Cold launch Ranked Gym ——— */
@@ -1495,6 +1512,12 @@ body {
   justify-content: center;
   background: #000000;
   pointer-events: none;
+  opacity: 1;
+  transition: opacity 180ms var(--ease-out);
+}
+
+.app-cold-launch[data-phase='exiting'] {
+  opacity: 0;
 }
 
 .app-cold-launch__safe {
@@ -1526,20 +1549,20 @@ body {
   position: absolute;
   inset: 0;
   opacity: 0;
-  transform: scale(0.97);
-  transition: opacity 160ms ease, transform 420ms cubic-bezier(0.2, 0.85, 0.2, 1);
+  transform: scale(0.98);
+  transition:
+    opacity var(--dur-ui) var(--ease-out),
+    transform var(--dur-ui) var(--ease-in-out);
 }
 
 .app-cold-launch__mark--calm[data-active='true'] {
   opacity: 1;
   transform: scale(1);
-  animation: app-cold-launch-in 420ms cubic-bezier(0.2, 0.85, 0.2, 1) both;
 }
 
 .app-cold-launch__mark--roar[data-active='true'] {
   opacity: 1;
-  transform: scale(1.02);
-  animation: app-cold-launch-roar 480ms cubic-bezier(0.2, 0.9, 0.25, 1.05) both;
+  transform: scale(1.025);
 }
 
 .app-cold-launch[data-phase='roar'] .app-cold-launch__mark--calm {
@@ -1558,36 +1581,57 @@ body {
   color: #ff2b2b;
 }
 
-@keyframes app-cold-launch-in {
-  from {
-    opacity: 0.72;
-    transform: scale(0.94);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes app-cold-launch-roar {
-  from {
-    opacity: 0.85;
-    transform: scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1.02);
-  }
-}
-
 .app-cold-launch[data-reduced='true'] .app-cold-launch__mark {
   animation: none !important;
-  transition: none !important;
+  transition: opacity 120ms linear !important;
+  transform: scale(1) !important;
+}
+
+.home-cold-soft-land {
+  animation: home-cold-soft-land var(--dur-ui) var(--ease-out) both;
+}
+
+@keyframes home-cold-soft-land {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .ios-sheet-backdrop {
+    transition-duration: 80ms !important;
+  }
+
+  .ios-sheet-panel {
+    transition: opacity 80ms linear !important;
+    transform: none !important;
+    opacity: 0;
+  }
+
+  .ios-sheet-panel--open {
+    opacity: 1 !important;
+  }
+
+  .ios-sheet-panel--closed {
+    opacity: 0 !important;
+  }
+
+  .app-cold-launch {
+    transition-duration: 120ms !important;
+  }
+
   .app-cold-launch__mark {
     animation: none !important;
-    transition: none !important;
+    transition: opacity 120ms linear !important;
+    transform: scale(1) !important;
+  }
+
+  .home-cold-soft-land {
+    animation: none !important;
   }
 }

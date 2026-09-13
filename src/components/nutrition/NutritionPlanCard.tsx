@@ -164,8 +164,8 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-black/40">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-[#00B4FF] to-[#30D158] transition-all duration-500"
-                style={{ width: `${Math.max(8, progressToGoal * 100)}%` }}
+                className="motion-progress-fill h-full rounded-full bg-gradient-to-r from-[#00B4FF] to-[#30D158]"
+                style={{ transform: `scaleX(${Math.max(0.08, Math.min(progressToGoal, 1))})` }}
               />
             </div>
             <p className="text-[12px] text-[#8E8E93]">

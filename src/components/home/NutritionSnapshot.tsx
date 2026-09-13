@@ -144,8 +144,8 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
             aria-label="Progression calorique"
           >
             <div
-              className="h-full rounded-full bg-gradient-to-r from-[#B91C1C] to-[#FF2B2B] transition-all duration-500"
-              style={{ width: `${snapshot.progress * 100}%` }}
+              className="motion-progress-fill h-full rounded-full bg-gradient-to-r from-[#B91C1C] to-[#FF2B2B]"
+              style={{ transform: `scaleX(${Math.max(0, Math.min(snapshot.progress, 1))})` }}
             />
           </div>
         ) : null}
@@ -181,8 +181,8 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
               aria-label="Progression hydrique"
             >
               <div
-                className="h-full rounded-full bg-gradient-to-r from-[#0891B2] to-[#38BDF8] transition-all duration-500"
-                style={{ width: `${Math.min(snapshot.waterProgress * 100, 100)}%` }}
+                className="motion-progress-fill h-full rounded-full bg-gradient-to-r from-[#0891B2] to-[#38BDF8]"
+                style={{ transform: `scaleX(${Math.max(0, Math.min(snapshot.waterProgress, 1))})` }}
               />
             </div>
           </div>

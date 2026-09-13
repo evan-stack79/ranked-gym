@@ -81,10 +81,10 @@ export function HydrationProgressBar({
         }`}
       >
         <div
-          className={`hydration-progress-fill h-full rounded-full transition-all duration-500 ${
+          className={`motion-progress-fill hydration-progress-fill h-full rounded-full ${
             overGoal ? 'hydration-progress-fill--over' : ''
           }`}
-          style={{ width: `${Math.min(progress * 100, 100)}%` }}
+          style={{ transform: `scaleX(${Math.min(progress, 1)})` }}
         />
       </div>
 

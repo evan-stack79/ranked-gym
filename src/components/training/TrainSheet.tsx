@@ -22,11 +22,25 @@ export function TrainSheet({
   const panelRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef(onClose)
   const dismissibleRef = useRef(dismissible)
+  const [mounted, setMounted] = useState(open)
   const [visible, setVisible] = useState(false)
   useEffect(() => {
     closeRef.current = onClose
     dismissibleRef.current = dismissible
   }, [onClose, dismissible])
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true)
+      const frame = requestAnimationFrame(() => {
+        requestAnimationFrame(() => setVisible(true))
+      })
+      return () => cancelAnimationFrame(frame)
+    }
+    setVisible(false)
+    const timeout = window.setTimeout(() => setMounted(false), 280)
+    return () => window.clearTimeout(timeout)
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -72,13 +86,22 @@ export function TrainSheet({
     }
   }, [open])
 
-  if (!open) return null
+  if (!mounted) return null
   return createPortal(
-    <div className="train-sheet fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
+    <div
+      className={`train-sheet fixed inset-0 z-[100] flex items-end justify-center sm:items-center ${
+        visible ? '' : 'pointer-events-none'
+      }`}
+    >
       <button
         type="button" tabIndex={-1} aria-label="Fermer"
-        className="ios-sheet-backdrop absolute inset-0 bg-black/55 backdrop-blur-[18px]"
-        disabled={!dismissible} onClick={onClose}
+        className={`ios-sheet-backdrop absolute inset-0 bg-black/55 backdrop-blur-[18px] ${
+          visible ? 'ios-sheet-backdrop--open' : ''
+        } ${visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        disabled={!dismissible || !visible}
+        onClick={() => {
+          if (dismissible) onClose()
+        }}
       />
       <div
         ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}

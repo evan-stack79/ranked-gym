@@ -10,7 +10,7 @@ export const COLD_LAUNCH_MAX_MS = 1200
 /** @deprecated alias — total cible nominal */
 export const COLD_LAUNCH_TOTAL_MS = 900
 
-type LaunchPhase = 'calm' | 'roar' | 'done'
+type LaunchPhase = 'calm' | 'roar' | 'exiting' | 'done'
 
 declare global {
   interface Window {
@@ -64,6 +64,7 @@ export function documentBootOriginMs(): number {
 
 export function coldLaunchDeadlineMs(now = performance.now()): {
   roarAt: number
+  exitAt: number
   doneAt: number
   totalMs: number
 } {
@@ -76,7 +77,8 @@ export function coldLaunchDeadlineMs(now = performance.now()): {
   const doneAt = Math.min(maxDone, Math.max(minDone, Math.max(earliestExit, idealDone)))
   const totalMs = Math.max(120, doneAt - origin)
   const roarAt = origin + totalMs * (420 / 900)
-  return { roarAt, doneAt: origin + totalMs, totalMs }
+  const exitAt = Math.max(roarAt + 40, origin + totalMs - 180)
+  return { roarAt, exitAt, doneAt: origin + totalMs, totalMs }
 }
 
 /**
@@ -93,6 +95,7 @@ export function AppColdLaunch({ children }: { children: React.ReactNode }) {
   })
   const [calmReady, setCalmReady] = useState(false)
   const [roarReady, setRoarReady] = useState(false)
+  const [hadRoar, setHadRoar] = useState(false)
   const roarReadyRef = useRef(false)
   const phaseRef = useRef<LaunchPhase>(phase)
   phaseRef.current = phase
@@ -129,33 +132,46 @@ export function AppColdLaunch({ children }: { children: React.ReactNode }) {
     window.addEventListener('pageshow', onPageShow)
 
     if (reduced.current) {
+      const toExit = window.setTimeout(() => {
+        setPhase('exiting')
+      }, 170)
       const t = window.setTimeout(() => {
         document.documentElement.dataset.coldLaunchPlayed = '1'
+        document.documentElement.dataset.coldLaunchLanding = '1'
         setPhase('done')
       }, 280)
       return () => {
+        window.clearTimeout(toExit)
         window.clearTimeout(t)
         window.removeEventListener('pageshow', onPageShow)
       }
     }
 
-    const { roarAt, doneAt } = coldLaunchDeadlineMs(performance.now())
+    const { roarAt, exitAt, doneAt } = coldLaunchDeadlineMs(performance.now())
     const now = performance.now()
     const roarDelay = Math.max(0, roarAt - now)
-    const doneDelay = Math.max(roarDelay + 80, doneAt - now)
+    const exitDelay = Math.max(roarDelay + 40, exitAt - now)
+    const doneDelay = Math.max(exitDelay + 60, doneAt - now)
 
     // Passe en roar seulement si décodé ; sinon reste calm jusqu’à la borne (pas de délai artificiel).
     const toRoar = window.setTimeout(() => {
-      if (roarReadyRef.current) setPhase('roar')
-      else setPhase('calm')
+      if (roarReadyRef.current) {
+        setHadRoar(true)
+        setPhase('roar')
+      } else setPhase('calm')
     }, roarDelay)
+    const toExit = window.setTimeout(() => {
+      setPhase('exiting')
+    }, exitDelay)
     const toDone = window.setTimeout(() => {
       document.documentElement.dataset.coldLaunchPlayed = '1'
+      document.documentElement.dataset.coldLaunchLanding = '1'
       setPhase('done')
     }, doneDelay)
 
     return () => {
       window.clearTimeout(toRoar)
+      window.clearTimeout(toExit)
       window.clearTimeout(toDone)
       window.removeEventListener('pageshow', onPageShow)
     }
@@ -167,14 +183,15 @@ export function AppColdLaunch({ children }: { children: React.ReactNode }) {
     if (phaseRef.current !== 'calm') return
     if (reduced.current) return
     if (document.documentElement.dataset.coldLaunchPlayed === '1') return
-    const { roarAt, doneAt } = coldLaunchDeadlineMs(performance.now())
+    const { roarAt, exitAt } = coldLaunchDeadlineMs(performance.now())
     const now = performance.now()
-    if (now >= roarAt && now < doneAt - 40) {
+    if (now >= roarAt && now < exitAt - 20) {
+      setHadRoar(true)
       setPhase('roar')
     }
   }, [roarReady])
 
-  const showRoar = phase === 'roar' && roarReady
+  const showRoar = (phase === 'roar' || (phase === 'exiting' && hadRoar)) && roarReady
   const visualPhase: LaunchPhase = phase === 'done' ? 'done' : showRoar ? 'roar' : 'calm'
 
   return (
@@ -183,7 +200,7 @@ export function AppColdLaunch({ children }: { children: React.ReactNode }) {
       {phase !== 'done' ? (
         <div
           className="app-cold-launch"
-          data-phase={visualPhase}
+          data-phase={phase}
           data-reduced={reduced.current ? 'true' : 'false'}
           data-calm-ready={calmReady ? 'true' : 'false'}
           data-roar-ready={roarReady ? 'true' : 'false'}

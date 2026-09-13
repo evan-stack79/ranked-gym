@@ -22,6 +22,10 @@ interface HomeViewProps {
 export function HomeView({ onStartTraining, onOpenTraining, onOpenNutrition }: HomeViewProps) {
   const { user, profile } = useAuth()
   const [trainingTick, setTrainingTick] = useState(0)
+  const [softLanding, setSoftLanding] = useState(() => {
+    if (typeof document === 'undefined') return false
+    return document.documentElement.dataset.coldLaunchLanding === '1'
+  })
 
   useEffect(() => {
     const syncTraining = () => setTrainingTick((n) => n + 1)
@@ -39,6 +43,15 @@ export function HomeView({ onStartTraining, onOpenTraining, onOpenNutrition }: H
     }
   }, [])
 
+  useEffect(() => {
+    if (!softLanding) return
+    delete document.documentElement.dataset.coldLaunchLanding
+    const t = window.setTimeout(() => {
+      setSoftLanding(false)
+    }, 240)
+    return () => window.clearTimeout(t)
+  }, [softLanding])
+
   const firstName = resolveDisplayFirstName({
     firstName: user?.firstName,
     displayName: user?.displayName,
@@ -52,7 +65,7 @@ export function HomeView({ onStartTraining, onOpenTraining, onOpenNutrition }: H
   )
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className={`flex flex-col gap-8 ${softLanding ? 'home-cold-soft-land' : ''}`}>
       <header>
         <h1 className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white">
           {greeting}

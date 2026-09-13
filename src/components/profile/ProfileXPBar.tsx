@@ -24,8 +24,8 @@ export function ProfileXPBar({ level, currentXp, xpToNextLevel }: ProfileXPBarPr
 
       <div className="h-2.5 overflow-hidden rounded-full border border-white/10 bg-black/40">
         <div
-          className="h-full rounded-full xp-fill transition-all duration-700 ease-out"
-          style={{ width: `${progress}%` }}
+          className="motion-progress-fill h-full rounded-full xp-fill"
+          style={{ transform: `scaleX(${Math.max(0, Math.min(progress / 100, 1))})` }}
         />
       </div>
 
