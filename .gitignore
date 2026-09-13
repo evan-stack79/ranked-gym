@@ -30,6 +30,9 @@ dist-ssr
 # Supabase CLI cache (local)
 supabase/.temp/
 
+# Convex CLI local backend / cache (never commit)
+.convex/
+
 # Build
 dist
 dist-ssr

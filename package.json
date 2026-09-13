@@ -23,11 +23,14 @@
     "agents:check": "node scripts/agent-team-check.mjs",
     "agents:mission": "node scripts/agent-team.mjs mission",
     "agents:status": "node scripts/agent-team.mjs status",
-    "agents:cleanup": "node scripts/agent-team.mjs cleanup"
+    "agents:cleanup": "node scripts/agent-team.mjs cleanup",
+    "convex:codegen": "convex codegen --typecheck disable",
+    "convex:dev": "convex dev"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.0",
     "@supabase/supabase-js": "^2.112.3",
+    "convex": "^1.45.0",
     "html5-qrcode": "^2.3.8",
     "lucide-react": "^1.33.0",
     "react": "^19.2.8",
