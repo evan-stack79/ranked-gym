@@ -1617,7 +1617,7 @@ body {
   transition-duration: 120ms !important;
 }
 
-:root:not([data-cold-launch-handoff='done']) [data-cold-launch-target='compact'] [data-brand-mark='compact'] {
+:root:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-mark='compact'] {
   visibility: hidden;
   opacity: 0;
 }
@@ -1626,7 +1626,7 @@ body {
   transition: opacity 140ms var(--ease-out);
 }
 
-:root[data-cold-launch-handoff='done'] [data-cold-launch-target='compact'] [data-brand-mark='compact'] {
+:root[data-cold-launch-played='1'] [data-cold-launch-target='compact'] [data-brand-mark='compact'] {
   visibility: visible;
   opacity: 1;
 }
