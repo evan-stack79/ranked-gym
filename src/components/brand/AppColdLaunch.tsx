@@ -260,7 +260,6 @@ export function AppColdLaunch({ children }: { children: React.ReactNode }) {
       morphDelay,
       backToCalmDelay,
       centerWordmarkFadeDelay,
-      flipStartDelay,
       revealDelay,
       handoffDelay,
       doneDelay,
