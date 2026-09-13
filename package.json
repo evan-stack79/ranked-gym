@@ -29,6 +29,7 @@
     "migration:supabase:export": "node scripts/migrations/supabase/export.mjs",
     "migration:supabase:import": "node scripts/migrations/supabase/import-convex.mjs",
     "migration:supabase:verify": "node scripts/migrations/supabase/verify.mjs",
+    "migration:supabase:avatars": "node scripts/migrations/supabase/avatar-storage.mjs",
     "migration:supabase:dry-run": "node scripts/migrations/supabase/dry-run.mjs"
   },
   "dependencies": {

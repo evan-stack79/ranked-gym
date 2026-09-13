@@ -3,14 +3,7 @@ import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/s
 import type { Id } from './_generated/dataModel'
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
 
-/**
- * Private avatar / user_files scaffolding (PR-F).
- *
- * Full storage cutover (Supabase avatars export, short-lived HTTP URLs,
- * cleanup jobs) remains CODEX-RISK PR-H.
- *
- * Access rule: never return a storage URL until the session user owns the file.
- */
+const DEFAULT_CONTENT_TYPE = 'image/jpeg'
 
 export type UserFileView = {
   fileId: Id<'user_files'>
@@ -20,6 +13,7 @@ export type UserFileView = {
   contentType: string
   sizeBytes: number
   sha256: string
+  legacySupabasePath?: string
   createdAt: number
   replacedAt?: number
   url: string | null
@@ -33,9 +27,23 @@ const fileViewValidator = v.object({
   contentType: v.string(),
   sizeBytes: v.number(),
   sha256: v.string(),
+  legacySupabasePath: v.optional(v.string()),
   createdAt: v.number(),
   replacedAt: v.optional(v.number()),
   url: v.union(v.string(), v.null()),
+})
+
+const importedAvatarValidator = v.object({
+  fileId: v.id('user_files'),
+  userId: v.string(),
+  storageId: v.id('_storage'),
+  legacySupabasePath: v.string(),
+  replacedAt: v.optional(v.number()),
+})
+
+const deleteAvatarResultValidator = v.object({
+  deleted: v.boolean(),
+  fileId: v.optional(v.id('user_files')),
 })
 
 async function findActiveAvatar(ctx: QueryCtx | MutationCtx, userId: string) {
@@ -43,7 +51,73 @@ async function findActiveAvatar(ctx: QueryCtx | MutationCtx, userId: string) {
     .query('user_files')
     .withIndex('by_userId_kind', (q) => q.eq('userId', userId).eq('kind', 'avatar'))
     .collect()
-  return rows.find((row) => !row.replacedAt) ?? null
+  return (
+    rows
+      .filter((row) => !row.replacedAt)
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .at(0) ?? null
+  )
+}
+
+async function toOwnedFileView(
+  ctx: QueryCtx | MutationCtx,
+  file: {
+    _id: Id<'user_files'>
+    userId: string
+    kind: 'avatar'
+    storageId: Id<'_storage'>
+    contentType: string
+    sizeBytes: number
+    sha256: string
+    legacySupabasePath?: string
+    createdAt: number
+    replacedAt?: number
+  },
+): Promise<UserFileView> {
+  const url = await ctx.storage.getUrl(file.storageId)
+  return {
+    fileId: file._id,
+    userId: file.userId,
+    kind: file.kind,
+    storageId: file.storageId,
+    contentType: file.contentType,
+    sizeBytes: file.sizeBytes,
+    sha256: file.sha256,
+    legacySupabasePath: file.legacySupabasePath,
+    createdAt: file.createdAt,
+    replacedAt: file.replacedAt,
+    url,
+  }
+}
+
+async function clearOrReplaceActiveAvatar(
+  ctx: MutationCtx,
+  userId: string,
+  nextFileId: Id<'user_files'> | null,
+  now: number,
+): Promise<void> {
+  const profile = await ctx.db
+    .query('profiles')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .first()
+  if (!profile) return
+  assertUserOwnership(profile.userId, userId)
+  if (nextFileId) {
+    await ctx.db.patch(profile._id, { avatarFileId: nextFileId, updatedAt: now })
+    return
+  }
+  if (profile.avatarFileId) {
+    await ctx.db.patch(profile._id, { avatarFileId: undefined, updatedAt: now })
+  }
+}
+
+async function ensureMigrationRun(ctx: MutationCtx, runId: string, sourceSha: string) {
+  const run = await ctx.db
+    .query('migration_runs')
+    .withIndex('by_runId', (q) => q.eq('runId', runId))
+    .first()
+  if (!run) throw new Error('MIGRATION_RUN_NOT_FOUND')
+  if (run.sourceSha !== sourceSha) throw new Error('MIGRATION_SOURCE_SHA_MISMATCH')
 }
 
 export async function assertOwnedUserFile(
@@ -73,6 +147,7 @@ export async function commitAvatarUploadForSession(
   const previous = await findActiveAvatar(ctx, user.userId)
   if (previous) {
     assertUserOwnership(previous.userId, user.userId)
+    await ctx.storage.delete(previous.storageId)
     await ctx.db.patch(previous._id, { replacedAt: now })
   }
 
@@ -80,33 +155,16 @@ export async function commitAvatarUploadForSession(
     userId: user.userId,
     kind: 'avatar',
     storageId: input.storageId,
-    contentType: input.contentType || 'image/jpeg',
+    contentType: input.contentType || DEFAULT_CONTENT_TYPE,
     sizeBytes: Math.max(0, input.sizeBytes),
     sha256: input.sha256,
     createdAt: now,
   })
 
-  const profile = await ctx.db
-    .query('profiles')
-    .withIndex('by_userId', (q) => q.eq('userId', user.userId))
-    .first()
-  if (profile) {
-    assertUserOwnership(profile.userId, user.userId)
-    await ctx.db.patch(profile._id, { avatarFileId: fileId, updatedAt: now })
-  }
-
-  const url = await ctx.storage.getUrl(input.storageId)
-  return {
-    fileId,
-    userId: user.userId,
-    kind: 'avatar',
-    storageId: input.storageId,
-    contentType: input.contentType || 'image/jpeg',
-    sizeBytes: Math.max(0, input.sizeBytes),
-    sha256: input.sha256,
-    createdAt: now,
-    url,
-  }
+  await clearOrReplaceActiveAvatar(ctx, user.userId, fileId, now)
+  const inserted = await ctx.db.get(fileId)
+  if (!inserted) throw new Error('AVATAR_INSERT_FAILED')
+  return toOwnedFileView(ctx, inserted)
 }
 
 export async function getOwnedFileView(
@@ -116,18 +174,101 @@ export async function getOwnedFileView(
 ): Promise<UserFileView | null> {
   const owned = await assertOwnedUserFile(ctx, sessionToken, fileId)
   if (!owned) return null
-  const url = await ctx.storage.getUrl(owned.file.storageId)
+  return toOwnedFileView(ctx, owned.file)
+}
+
+export async function deleteOwnAvatarForSession(
+  ctx: MutationCtx,
+  sessionToken: string,
+): Promise<{ deleted: boolean; fileId?: Id<'user_files'> }> {
+  const user = await requireSessionUser(ctx, sessionToken)
+  const active = await findActiveAvatar(ctx, user.userId)
+  if (!active) return { deleted: false }
+  assertUserOwnership(active.userId, user.userId)
+  await ctx.storage.delete(active.storageId)
+  const now = Date.now()
+  await ctx.db.patch(active._id, { replacedAt: now })
+  await clearOrReplaceActiveAvatar(ctx, user.userId, null, now)
+  return { deleted: true, fileId: active._id }
+}
+
+export async function importSupabaseAvatarForUser(
+  ctx: MutationCtx,
+  input: {
+    runId: string
+    sourceSha: string
+    userId: string
+    legacySupabasePath: string
+    storageId: Id<'_storage'>
+    contentType: string
+    sizeBytes: number
+    sha256: string
+    createdAt?: number
+  },
+): Promise<{
+  fileId: Id<'user_files'>
+  userId: string
+  storageId: Id<'_storage'>
+  legacySupabasePath: string
+  replacedAt?: number
+}> {
+  await ensureMigrationRun(ctx, input.runId, input.sourceSha)
+  const userId = input.userId.trim()
+  const legacySupabasePath = input.legacySupabasePath.trim()
+  if (!userId) throw new Error('MIGRATION_AVATAR_USER_ID_REQUIRED')
+  if (!legacySupabasePath) throw new Error('MIGRATION_AVATAR_PATH_REQUIRED')
+
+  const now = Date.now()
+  const existingByPath = await ctx.db
+    .query('user_files')
+    .withIndex('by_legacySupabasePath', (q) => q.eq('legacySupabasePath', legacySupabasePath))
+    .first()
+  if (existingByPath) {
+    assertUserOwnership(existingByPath.userId, userId)
+  }
+
+  const active = await findActiveAvatar(ctx, userId)
+  if (active && (!existingByPath || existingByPath._id !== active._id)) {
+    assertUserOwnership(active.userId, userId)
+    await ctx.db.patch(active._id, { replacedAt: now })
+  }
+
+  let fileId: Id<'user_files'>
+  if (existingByPath) {
+    if (existingByPath.storageId !== input.storageId) {
+      await ctx.storage.delete(existingByPath.storageId)
+    }
+    await ctx.db.patch(existingByPath._id, {
+      storageId: input.storageId,
+      contentType: input.contentType || DEFAULT_CONTENT_TYPE,
+      sizeBytes: Math.max(0, input.sizeBytes),
+      sha256: input.sha256,
+      createdAt: input.createdAt ?? existingByPath.createdAt,
+      replacedAt: undefined,
+    })
+    fileId = existingByPath._id
+  } else {
+    fileId = await ctx.db.insert('user_files', {
+      userId,
+      kind: 'avatar',
+      storageId: input.storageId,
+      contentType: input.contentType || DEFAULT_CONTENT_TYPE,
+      sizeBytes: Math.max(0, input.sizeBytes),
+      sha256: input.sha256,
+      legacySupabasePath,
+      createdAt: input.createdAt ?? now,
+    })
+  }
+
+  await clearOrReplaceActiveAvatar(ctx, userId, fileId, now)
+  const file = await ctx.db.get(fileId)
+  if (!file) throw new Error('MIGRATION_AVATAR_INSERT_FAILED')
   return {
-    fileId: owned.file._id,
-    userId: owned.file.userId,
-    kind: owned.file.kind,
-    storageId: owned.file.storageId,
-    contentType: owned.file.contentType,
-    sizeBytes: owned.file.sizeBytes,
-    sha256: owned.file.sha256,
-    createdAt: owned.file.createdAt,
-    replacedAt: owned.file.replacedAt,
-    url,
+    fileId,
+    userId: file.userId,
+    storageId: file.storageId,
+    legacySupabasePath: file.legacySupabasePath ?? legacySupabasePath,
+    replacedAt: file.replacedAt,
   }
 }
 
@@ -138,6 +279,21 @@ export const generateAvatarUploadUrl = mutation({
   }),
   handler: async (ctx, args) => {
     await requireSessionUser(ctx, args.sessionToken)
+    const uploadUrl = await ctx.storage.generateUploadUrl()
+    return { uploadUrl }
+  },
+})
+
+export const generateMigrationAvatarUploadUrl = mutation({
+  args: {
+    runId: v.string(),
+    sourceSha: v.string(),
+  },
+  returns: v.object({
+    uploadUrl: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    await ensureMigrationRun(ctx, args.runId, args.sourceSha)
     const uploadUrl = await ctx.storage.generateUploadUrl()
     return { uploadUrl }
   },
@@ -161,6 +317,33 @@ export const commitAvatarUpload = mutation({
     }),
 })
 
+export const importSupabaseAvatar = mutation({
+  args: {
+    runId: v.string(),
+    sourceSha: v.string(),
+    userId: v.string(),
+    legacySupabasePath: v.string(),
+    storageId: v.id('_storage'),
+    contentType: v.string(),
+    sizeBytes: v.number(),
+    sha256: v.string(),
+    createdAt: v.optional(v.number()),
+  },
+  returns: importedAvatarValidator,
+  handler: (ctx, args) =>
+    importSupabaseAvatarForUser(ctx, {
+      runId: args.runId,
+      sourceSha: args.sourceSha,
+      userId: args.userId,
+      legacySupabasePath: args.legacySupabasePath,
+      storageId: args.storageId,
+      contentType: args.contentType,
+      sizeBytes: args.sizeBytes,
+      sha256: args.sha256,
+      createdAt: args.createdAt,
+    }),
+})
+
 export const getOwnedFile = query({
   args: {
     sessionToken: v.string(),
@@ -178,18 +361,12 @@ export const getOwnAvatar = query({
     const file = await findActiveAvatar(ctx, user.userId)
     if (!file) return null
     assertUserOwnership(file.userId, user.userId)
-    const url = await ctx.storage.getUrl(file.storageId)
-    return {
-      fileId: file._id,
-      userId: file.userId,
-      kind: file.kind,
-      storageId: file.storageId,
-      contentType: file.contentType,
-      sizeBytes: file.sizeBytes,
-      sha256: file.sha256,
-      createdAt: file.createdAt,
-      replacedAt: file.replacedAt,
-      url,
-    }
+    return toOwnedFileView(ctx, file)
   },
+})
+
+export const deleteOwnAvatar = mutation({
+  args: { sessionToken: v.string() },
+  returns: deleteAvatarResultValidator,
+  handler: (ctx, args) => deleteOwnAvatarForSession(ctx, args.sessionToken),
 })

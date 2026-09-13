@@ -11,9 +11,9 @@ Inventory: `docs/migrations/supabase-to-convex-inventory.md`
 - `convex/auth.ts` + `convex/authPrivateData.ts` — PR-E auth behind `VITE_ENABLE_CONVEX_AUTH` (global password reset, no legacy hash bridge).
 - `convex/sync.ts` + `convex/profiles.ts` — PR-F backup/sync + profile/streak read/write behind `VITE_ENABLE_CONVEX_PRIMARY`.
 - `convex/rpc.ts` — PR-G checkins/feed/stats and AI usage reserve/release equivalents with session-based user isolation.
-- `convex/files.ts` — private `user_files` avatar scaffolding (full storage cutover is CODEX-RISK PR-H).
+- `convex/files.ts` — private avatar lifecycle on Convex storage (`upload` / `signed download` / `delete`) with owner checks + migration helpers.
 - `scripts/migrations/supabase/*.mjs` — PR-I export/import/verify scripts with dry-run fake-data workflow and deterministic id mapping.
-- `convex/codexRiskStubs.ts` — only PR-H remains.
+- `scripts/migrations/supabase/avatar-storage.mjs` — PR-H Supabase `avatars` bucket inventory + Convex import path (dry-run or execute).
 - Adapter: `src/backend/adapter.ts` — `getActiveCloudBackend()` is `'supabase'` unless Convex is configured **and** `VITE_ENABLE_CONVEX_PRIMARY=true`.
 
 ## Environment variable names (no secrets)
@@ -71,6 +71,32 @@ Safety constraints:
 - import is idempotent via `migration_entity_map` keys (`entityType + supabaseId`)
 - verify compares per-entity counts before/after
 
+## Avatar storage migration (PR-H)
+
+Inventory-only dry-run (safe in CI/local, no Convex writes):
+
+```bash
+npm run migration:supabase:avatars -- --dry-run --run-id <run-id>
+```
+
+End-to-end upload/import execution (requires runtime-only secrets, never commit):
+
+```bash
+npm run migration:supabase:avatars -- --execute --run-id <run-id> --source-sha <git-sha>
+```
+
+What it does:
+- reads `storage.objects` entries from Supabase bucket `avatars`
+- derives owning `userId` from object path prefix (`<userId>/...`)
+- uploads binaries into Convex storage
+- writes `user_files` metadata + `profiles.avatarFileId` pointer through `convex/files.ts`
+- writes report: `scripts/migrations/artifacts/<run-id>.avatar-storage-report.json`
+
+Notes:
+- requires a migration run (`api.migrations.startRun`) and validates `runId + sourceSha`
+- skips malformed object paths and reports warnings
+- never deletes Supabase bucket objects
+
 ## Create a Convex project (Evan)
 
 Cloud `npx convex dev` / `npx convex login` needs Evan to authenticate in the **shared browser**. Do not paste passwords or tokens in chat.
@@ -99,7 +125,6 @@ This preserves the locked policy: no hash portability shortcuts and no legacy pa
 
 ## Out of scope (do not do yet)
 
-- Avatar binary migration and signed URL cleanup (CODEX-RISK PR-H)
 - Removing Supabase
 - Production Convex deploy
 - Merging to `main`

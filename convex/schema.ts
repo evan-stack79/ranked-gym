@@ -209,11 +209,13 @@ export const convexTables = {
     contentType: v.string(),
     sizeBytes: v.number(),
     sha256: v.string(),
+    legacySupabasePath: v.optional(v.string()),
     createdAt: v.number(),
     replacedAt: v.optional(v.number()),
   })
     .index('by_userId_kind', ['userId', 'kind'])
-    .index('by_storageId', ['storageId']),
+    .index('by_storageId', ['storageId'])
+    .index('by_legacySupabasePath', ['legacySupabasePath']),
 
   migration_runs: defineTable({
     runId: v.string(),

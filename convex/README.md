@@ -9,8 +9,7 @@ Schema + auth + PR-F domain sync live here. **Supabase remains the default app b
 - `sync.ts` / `profiles.ts` — PR-F backup/sync + streak CAS
 - `rpc.ts` — PR-G checkins/feed/stats + AI usage reserve/release equivalents
 - `migrations.ts` — PR-I import/counting helpers used by migration scripts
-- `files.ts` — private avatar scaffolding (`user_files`)
-- `codexRiskStubs.ts` — **CODEX-RISK** tracker (PR-H still pending)
+- `files.ts` — private avatar storage lifecycle (`upload` / `signed URL` / `delete`) + migration helpers
 
 ## Commands
 

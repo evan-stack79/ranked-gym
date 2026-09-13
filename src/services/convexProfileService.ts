@@ -20,13 +20,20 @@ export type ConvexProfileView = {
   updatedAt: number
 }
 
+type ConvexAvatarView = {
+  url: string | null
+}
+
 async function requireToken(): Promise<string> {
   const token = await getConvexSessionToken()
   if (!token) throw new Error('AUTH_SESSION_MISSING')
   return token
 }
 
-export function mapConvexProfileToRow(view: ConvexProfileView): ProfileRow {
+export function mapConvexProfileToRow(
+  view: ConvexProfileView,
+  avatarUrl: string | null = null,
+): ProfileRow {
   return {
     id: view.userId,
     pseudo: view.pseudo,
@@ -38,19 +45,29 @@ export function mapConvexProfileToRow(view: ConvexProfileView): ProfileRow {
     active_checkin: null,
     current_streak: view.currentStreak,
     last_login_date: view.lastLoginDate,
-    avatar_url: null,
+    avatar_url: avatarUrl,
     is_ghost_mode_enabled: view.isGhostModeEnabled,
     created_at: new Date(view.createdAt).toISOString(),
     updated_at: new Date(view.updatedAt).toISOString(),
   }
 }
 
+async function fetchOwnAvatarUrlForToken(sessionToken: string): Promise<string | null> {
+  const file = (await getConvex().query(api.files.getOwnAvatar, {
+    sessionToken,
+  })) as ConvexAvatarView | null
+  return file?.url ?? null
+}
+
 export async function fetchConvexProfile(_userId: string): Promise<ProfileRow | null> {
   const sessionToken = await requireToken()
-  const view = (await getConvex().query(api.profiles.getProfile, {
-    sessionToken,
-  })) as ConvexProfileView | null
-  return view ? mapConvexProfileToRow(view) : null
+  const [view, avatarUrl] = (await Promise.all([
+    getConvex().query(api.profiles.getProfile, {
+      sessionToken,
+    }) as Promise<ConvexProfileView | null>,
+    fetchOwnAvatarUrlForToken(sessionToken),
+  ])) as [ConvexProfileView | null, string | null]
+  return view ? mapConvexProfileToRow(view, avatarUrl) : null
 }
 
 export async function ensureConvexProfile(
@@ -59,12 +76,15 @@ export async function ensureConvexProfile(
   disciplineLabel = 'Musculation',
 ): Promise<ProfileRow> {
   const sessionToken = await requireToken()
-  const view = (await getConvex().mutation(api.profiles.ensureProfile, {
-    sessionToken,
-    pseudo,
-    discipline: disciplineLabel,
-  })) as ConvexProfileView
-  return mapConvexProfileToRow(view)
+  const [view, avatarUrl] = (await Promise.all([
+    getConvex().mutation(api.profiles.ensureProfile, {
+      sessionToken,
+      pseudo,
+      discipline: disciplineLabel,
+    }) as Promise<ConvexProfileView>,
+    fetchOwnAvatarUrlForToken(sessionToken),
+  ])) as [ConvexProfileView, string | null]
+  return mapConvexProfileToRow(view, avatarUrl)
 }
 
 export async function updateConvexProfileProgress(
@@ -83,18 +103,21 @@ export async function updateConvexProfileProgress(
 ): Promise<ProfileRow> {
   void patch.avatar_url
   const sessionToken = await requireToken()
-  const view = (await getConvex().mutation(api.profiles.updateProfile, {
-    sessionToken,
-    level: patch.level,
-    xp: patch.xp,
-    rank: patch.rank,
-    pseudo: patch.pseudo,
-    discipline: patch.discipline,
-    isGhostModeEnabled: patch.is_ghost_mode_enabled,
-    currentStreak: patch.current_streak,
-    lastLoginDate: patch.last_login_date,
-  })) as ConvexProfileView
-  return mapConvexProfileToRow(view)
+  const [view, avatarUrl] = (await Promise.all([
+    getConvex().mutation(api.profiles.updateProfile, {
+      sessionToken,
+      level: patch.level,
+      xp: patch.xp,
+      rank: patch.rank,
+      pseudo: patch.pseudo,
+      discipline: patch.discipline,
+      isGhostModeEnabled: patch.is_ghost_mode_enabled,
+      currentStreak: patch.current_streak,
+      lastLoginDate: patch.last_login_date,
+    }) as Promise<ConvexProfileView>,
+    fetchOwnAvatarUrlForToken(sessionToken),
+  ])) as [ConvexProfileView, string | null]
+  return mapConvexProfileToRow(view, avatarUrl)
 }
 
 export async function applyConvexDailyLoginStreak(input: {
@@ -106,17 +129,20 @@ export async function applyConvexDailyLoginStreak(input: {
   nextRank: string
 }): Promise<{ didUpdate: boolean; profile: ProfileRow }> {
   const sessionToken = await requireToken()
-  const result = (await getConvex().mutation(api.profiles.applyDailyLoginStreak, {
-    sessionToken,
-    expectedLastLoginDate: input.expectedLastLoginDate,
-    today: input.today,
-    nextStreak: input.nextStreak,
-    nextLevel: input.nextLevel,
-    nextXp: input.nextXp,
-    nextRank: input.nextRank,
-  })) as { didUpdate: boolean; profile: ConvexProfileView }
+  const [result, avatarUrl] = (await Promise.all([
+    getConvex().mutation(api.profiles.applyDailyLoginStreak, {
+      sessionToken,
+      expectedLastLoginDate: input.expectedLastLoginDate,
+      today: input.today,
+      nextStreak: input.nextStreak,
+      nextLevel: input.nextLevel,
+      nextXp: input.nextXp,
+      nextRank: input.nextRank,
+    }) as Promise<{ didUpdate: boolean; profile: ConvexProfileView }>,
+    fetchOwnAvatarUrlForToken(sessionToken),
+  ])) as [{ didUpdate: boolean; profile: ConvexProfileView }, string | null]
   return {
     didUpdate: result.didUpdate,
-    profile: mapConvexProfileToRow(result.profile),
+    profile: mapConvexProfileToRow(result.profile, avatarUrl),
   }
 }

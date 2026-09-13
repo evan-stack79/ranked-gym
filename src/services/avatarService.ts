@@ -1,7 +1,11 @@
 import { getSupabase } from '../lib/supabase'
-import { isConvexDomainActive } from '../backend/adapter'
 import { updateProfileProgress } from './authService'
-import { uploadConvexUserAvatar } from './convexAvatarService'
+import {
+  deleteConvexOwnAvatar,
+  getConvexOwnAvatarUrl,
+  uploadConvexUserAvatar,
+} from './convexAvatarService'
+import { isConvexAvatarStorageActive } from '../backend/avatarFeatureFlag'
 import type { ProfileRow } from '../types/database'
 
 const MAX_EDGE_PX = 512
@@ -75,7 +79,7 @@ export async function uploadUserAvatar(
   file: File,
 ): Promise<{ profile: ProfileRow; publicUrl: string }> {
   const blob = await resizeImageForAvatar(file)
-  if (isConvexDomainActive()) {
+  if (isConvexAvatarStorageActive()) {
     return uploadConvexUserAvatar(userId, blob)
   }
   const path = `${userId}/avatar.jpg`
@@ -91,4 +95,27 @@ export async function uploadUserAvatar(
   const publicUrl = publicAvatarUrl(path)
   const profile = await updateProfileProgress(userId, { avatar_url: publicUrl })
   return { profile, publicUrl }
+}
+
+export async function getOwnAvatarUrl(userId: string): Promise<string | null> {
+  if (isConvexAvatarStorageActive()) {
+    return getConvexOwnAvatarUrl()
+  }
+  const path = `${userId}/avatar.jpg`
+  return publicAvatarUrl(path)
+}
+
+export async function deleteUserAvatar(
+  userId: string,
+): Promise<{ profile: ProfileRow; publicUrl: null; deleted: boolean }> {
+  if (isConvexAvatarStorageActive()) {
+    const profile = await deleteConvexOwnAvatar(userId)
+    return { profile, publicUrl: null, deleted: true }
+  }
+  const path = `${userId}/avatar.jpg`
+  const supabase = getSupabase()
+  const { error } = await supabase.storage.from('avatars').remove([path])
+  if (error) throw error
+  const profile = await updateProfileProgress(userId, { avatar_url: null })
+  return { profile, publicUrl: null, deleted: true }
 }

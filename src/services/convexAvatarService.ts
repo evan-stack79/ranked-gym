@@ -53,12 +53,13 @@ export async function uploadConvexUserAvatar(
     contentType: blob.type || 'image/jpeg',
     sizeBytes: blob.size,
     sha256: await sha256Hex(bytes),
-  })) as { url: string | null }
+  })) as { userId: string; url: string | null }
+
+  if (committed.userId !== userId) {
+    throw new Error('FORBIDDEN_CROSS_USER_AVATAR_UPLOAD')
+  }
 
   const publicUrl = committed.url ?? ''
-  if (publicUrl) {
-    await updateConvexProfileProgress(userId, { avatar_url: publicUrl })
-  }
   const profile = (await fetchConvexProfile(userId)) ?? (await updateConvexProfileProgress(userId, {}))
   return { profile: { ...profile, avatar_url: publicUrl || profile.avatar_url }, publicUrl }
 }
@@ -69,4 +70,13 @@ export async function getConvexOwnAvatarUrl(): Promise<string | null> {
     sessionToken,
   })) as { url: string | null } | null
   return file?.url ?? null
+}
+
+export async function deleteConvexOwnAvatar(userId: string): Promise<ProfileRow> {
+  const sessionToken = await requireToken()
+  await getConvex().mutation(api.files.deleteOwnAvatar, {
+    sessionToken,
+  })
+  const profile = (await fetchConvexProfile(userId)) ?? (await updateConvexProfileProgress(userId, {}))
+  return { ...profile, avatar_url: null }
 }
