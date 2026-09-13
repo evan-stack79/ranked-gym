@@ -121,7 +121,7 @@ describe('AppColdLaunch', () => {
     } as unknown as Animation)
 
     act(() => {
-      vi.advanceTimersByTime(320)
+      vi.advanceTimersByTime(620)
     })
 
     expect(flyerAnimate).toHaveBeenCalledOnce()
@@ -201,12 +201,12 @@ describe('AppColdLaunch', () => {
       return makeRect(0, 0, 0, 0)
     })
     act(() => {
-      vi.advanceTimersByTime(160)
+      vi.advanceTimersByTime(180)
     })
     expect(splash()?.getAttribute('data-phase')).toBe('roar')
 
     act(() => {
-      vi.advanceTimersByTime(110)
+      vi.advanceTimersByTime(400)
     })
     expect(splash()?.getAttribute('data-phase')).toBe('morphing')
 
@@ -218,12 +218,12 @@ describe('AppColdLaunch', () => {
     expect(document.documentElement.dataset.coldLaunchHeaderWordmark).toBe('0')
 
     act(() => {
-      vi.advanceTimersByTime(200)
+      vi.advanceTimersByTime(240)
     })
     expect(document.documentElement.dataset.coldLaunchHeaderWordmark).toBe('1')
 
     act(() => {
-      vi.advanceTimersByTime(620)
+      vi.advanceTimersByTime(280)
     })
     expect(splash()).toBeNull()
     expect(document.documentElement.dataset.coldLaunchPlayed).toBe('1')
@@ -269,7 +269,7 @@ describe('AppColdLaunch', () => {
       await Promise.resolve()
     })
     act(() => {
-      vi.advanceTimersByTime(500)
+      vi.advanceTimersByTime(580)
     })
     expect(host.querySelector('.app-cold-launch')?.getAttribute('data-phase')).toBe('morphing')
     expect(host.querySelector('.app-cold-launch__mark--calm')?.getAttribute('data-active')).toBe('true')
