@@ -3,7 +3,7 @@
  * Tests navigateur du vrai chemin App/main (pas un harness isolé).
  * - splash natif index.html (noir + panthère calme)
  * - transition React calme → rugissant → disparition
- * - durée totale 1300–1500 ms
+ * - durée totale 1800–2100 ms
  * - complete / naturalWidth des images
  * - chargement lent / erreur roar → reste calm
  * - pas de replay visibilitychange
@@ -189,16 +189,16 @@ async function main() {
     await page.waitForFunction(
       () => document.documentElement.dataset.coldLaunchPlayed === '1',
       undefined,
-      { timeout: 4000 },
+      { timeout: 6000 },
     )
     const elapsed = Date.now() - t0
-    assert.ok(elapsed >= 1000 && elapsed <= 2200, `durée cold launch hors cible: ${elapsed}ms`)
+    assert.ok(elapsed >= 1400 && elapsed <= 3200, `durée cold launch hors cible: ${elapsed}ms`)
     const documentElapsed = await page.evaluate(() => {
       const done = window.__rgLaunchTrace.find((entry) => entry.phase === 'done')
       return done ? done.at - window.__RG_BOOT_T0__ : Number.NaN
     })
     assert.ok(
-      documentElapsed >= 1300 && documentElapsed <= 1500,
+      documentElapsed >= 1800 && documentElapsed <= 2100,
       `durée document cold launch hors cible: ${documentElapsed}ms`,
     )
     assert.equal(await page.evaluate(() => document.querySelector('.app-cold-launch')), null)
@@ -257,7 +257,7 @@ async function main() {
       await pageErr.waitForFunction(
         () => document.documentElement.dataset.coldLaunchPlayed === '1',
         undefined,
-        { timeout: 4000 },
+        { timeout: 6000 },
       )
       const errorTrace = await pageErr.evaluate(() => window.__rgLaunchTrace)
       assert.ok(errorTrace.some((entry) => entry.phase === 'calm'), 'calm absent après erreur roar')
@@ -289,7 +289,7 @@ async function main() {
       await pageSlow.waitForFunction(
         () => document.documentElement.dataset.coldLaunchPlayed === '1',
         undefined,
-        { timeout: 5000 },
+        { timeout: 7000 },
       )
       await pageSlow.close()
     }

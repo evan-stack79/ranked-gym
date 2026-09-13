@@ -89,7 +89,7 @@ async function main() {
       }
       await page.waitForFunction(
         () => document.documentElement.dataset.coldLaunchPlayed === '1',
-        { timeout: 5000 },
+        { timeout: 7000 },
       )
       await page.close()
     }

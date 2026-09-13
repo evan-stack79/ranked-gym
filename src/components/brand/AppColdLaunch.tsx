@@ -3,26 +3,26 @@ import { useEffect, useRef, useState } from 'react'
 export const COLD_LAUNCH_CALM_SRC = '/brand-splash-calm.png'
 export const COLD_LAUNCH_ROAR_SRC = '/brand-splash-roar.png'
 
-// Ideal full-motion envelope is 1400ms: readable calm/roar, a short centered
-// breath, then 520ms FLIP. MAX=1500 absorbs decode/boot jitter in
-// coldLaunchDeadlineMs without leaving the 1.3–1.5s iPhone-test window.
-export const COLD_LAUNCH_MIN_MS = 1300
-export const COLD_LAUNCH_MAX_MS = 1500
-export const COLD_LAUNCH_TOTAL_MS = 1400
-// Ideal roar→morph is 280ms (460 − 180). When React mounts late, never collapse
+// Ideal full-motion envelope is 1900ms: readable calm/roar, a centered
+// breath, then 720ms FLIP. MAX=2100 absorbs decode/boot jitter in
+// coldLaunchDeadlineMs without leaving the 1.8–2.1s iPhone-test window.
+export const COLD_LAUNCH_MIN_MS = 1800
+export const COLD_LAUNCH_MAX_MS = 2100
+export const COLD_LAUNCH_TOTAL_MS = 1900
+// Ideal roar→morph is 280ms (550 − 270). When React mounts late, never collapse
 // that breath below this floor (acceptance 250–400ms). Enforcing breath can push
-// origin→done past MAX 1500 when mount is already ≳660ms after boot; prefer the
+// origin→done past MAX 2100 when mount is already ≳1060ms after boot; prefer the
 // breath over clipping it to stay inside the window.
 export const ROAR_BREATH_MIN_MS = 280
 
-const ROAR_AT_RATIO = 180 / COLD_LAUNCH_TOTAL_MS
-const MORPH_AT_RATIO = 460 / COLD_LAUNCH_TOTAL_MS
-const BACK_TO_CALM_AT_RATIO = 540 / COLD_LAUNCH_TOTAL_MS
-const CENTER_WORDMARK_FADE_AT_RATIO = 460 / COLD_LAUNCH_TOTAL_MS
-const REVEAL_AT_RATIO = 720 / COLD_LAUNCH_TOTAL_MS
-const HANDOFF_AT_RATIO = 980 / COLD_LAUNCH_TOTAL_MS
-const FLIP_START_AT_RATIO = 460 / COLD_LAUNCH_TOTAL_MS
-const FLIP_DURATION_MS = 520
+const ROAR_AT_RATIO = 270 / COLD_LAUNCH_TOTAL_MS
+const MORPH_AT_RATIO = 550 / COLD_LAUNCH_TOTAL_MS
+const BACK_TO_CALM_AT_RATIO = 630 / COLD_LAUNCH_TOTAL_MS
+const CENTER_WORDMARK_FADE_AT_RATIO = 550 / COLD_LAUNCH_TOTAL_MS
+const REVEAL_AT_RATIO = 910 / COLD_LAUNCH_TOTAL_MS
+const HANDOFF_AT_RATIO = 1270 / COLD_LAUNCH_TOTAL_MS
+const FLIP_START_AT_RATIO = 550 / COLD_LAUNCH_TOTAL_MS
+const FLIP_DURATION_MS = 720
 
 type LaunchPhase = 'calm' | 'roar' | 'morphing' | 'handoff' | 'exiting' | 'done'
 

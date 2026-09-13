@@ -86,20 +86,23 @@ describe('AppColdLaunch', () => {
     delete window.__RG_BOOT_T0__
   })
 
-  it('document deadline stays between 1.3 and 1.5s with mid-travel reveal', () => {
+  it('document deadline stays between 1.8 and 2.1s with mid-travel reveal', () => {
     window.__RG_BOOT_T0__ = 0
     const d = coldLaunchDeadlineMs(50)
-    expect(d.totalMs).toBeGreaterThanOrEqual(1300)
-    expect(d.totalMs).toBeLessThanOrEqual(1500)
+    expect(d.totalMs).toBeGreaterThanOrEqual(1800)
+    expect(d.totalMs).toBeLessThanOrEqual(2100)
     expect(d.totalMs).toBeGreaterThanOrEqual(COLD_LAUNCH_MIN_MS)
     expect(d.totalMs).toBeLessThanOrEqual(COLD_LAUNCH_MAX_MS)
-    expect(d.doneAt).toBeGreaterThanOrEqual(1300)
-    expect(d.doneAt).toBeLessThanOrEqual(1500)
-    expect(d.flipStartAt).toBeGreaterThanOrEqual(350)
-    expect(d.flipStartAt).toBeLessThanOrEqual(500)
+    expect(d.doneAt).toBeGreaterThanOrEqual(1800)
+    expect(d.doneAt).toBeLessThanOrEqual(2100)
+    expect(d.roarAt).toBeGreaterThanOrEqual(220)
+    expect(d.roarAt).toBeLessThanOrEqual(280)
+    expect(d.flipStartAt).toBeGreaterThanOrEqual(550)
+    expect(d.flipStartAt).toBeLessThanOrEqual(700)
     const travelMs = d.handoffAt - d.flipStartAt
-    expect(travelMs).toBeGreaterThanOrEqual(450)
-    expect(travelMs).toBeLessThanOrEqual(550)
+    expect(travelMs).toBeGreaterThanOrEqual(650)
+    expect(travelMs).toBeLessThanOrEqual(750)
+    expect(d.handoffAt).toBe(d.flipStartAt + travelMs)
     expect(d.revealAt).toBeGreaterThan(d.flipStartAt)
     expect(d.revealAt).toBeLessThan(d.handoffAt)
     expect(d.doneAt).toBeGreaterThan(d.handoffAt)
@@ -119,7 +122,7 @@ describe('AppColdLaunch', () => {
       return morphDelay - roarDelay
     }
 
-    for (const now of [200, 287, 400, 428]) {
+    for (const now of [287, 350, 400, 520]) {
       const d = coldLaunchDeadlineMs(now)
       expect(now).toBeGreaterThan(d.roarAt)
       const delays = computeColdLaunchPhaseDelays(now, d)
@@ -129,15 +132,15 @@ describe('AppColdLaunch', () => {
       expect(delays.morphDelay - delays.roarDelay).toBeGreaterThanOrEqual(250)
     }
 
-    // Lag probe: the old +40 floor collapsed breath into the 32–173ms band.
-    expect(previousRoarHoldMs(287)).toBe(173)
-    expect(previousRoarHoldMs(400)).toBe(60)
-    expect(previousRoarHoldMs(428)).toBe(40)
+    // Lag probe: the old +40 floor collapsed breath into the 40–150ms band.
+    expect(previousRoarHoldMs(400)).toBe(150)
+    expect(previousRoarHoldMs(480)).toBe(70)
+    expect(previousRoarHoldMs(520)).toBe(40)
 
     const moderateLag = computeColdLaunchPhaseDelays(400)
     expect(moderateLag.elapsedFromOriginAtDone).toBeLessThanOrEqual(COLD_LAUNCH_MAX_MS)
 
-    const severeLag = computeColdLaunchPhaseDelays(800)
+    const severeLag = computeColdLaunchPhaseDelays(1200)
     expect(severeLag.roarToMorphHoldMs).toBeGreaterThanOrEqual(250)
     expect(severeLag.elapsedFromOriginAtDone).toBeGreaterThan(COLD_LAUNCH_MAX_MS)
   })
@@ -283,12 +286,12 @@ describe('AppColdLaunch', () => {
       return makeRect(0, 0, 0, 0)
     })
     act(() => {
-      vi.advanceTimersByTime(180)
+      vi.advanceTimersByTime(220)
     })
     expect(splash()?.getAttribute('data-phase')).toBe('roar')
 
     act(() => {
-      vi.advanceTimersByTime(400)
+      vi.advanceTimersByTime(280)
     })
     expect(splash()?.getAttribute('data-phase')).toBe('morphing')
 
@@ -300,12 +303,12 @@ describe('AppColdLaunch', () => {
     expect(document.documentElement.dataset.coldLaunchHeaderWordmark).toBe('0')
 
     act(() => {
-      vi.advanceTimersByTime(240)
+      vi.advanceTimersByTime(340)
     })
     expect(document.documentElement.dataset.coldLaunchHeaderWordmark).toBe('1')
 
     act(() => {
-      vi.advanceTimersByTime(560)
+      vi.advanceTimersByTime(1000)
     })
     expect(splash()).toBeNull()
     expect(document.documentElement.dataset.coldLaunchPlayed).toBe('1')
@@ -356,7 +359,7 @@ describe('AppColdLaunch', () => {
     expect(host.querySelector('.app-cold-launch')?.getAttribute('data-phase')).toBe('morphing')
     expect(host.querySelector('.app-cold-launch__mark--calm')?.getAttribute('data-active')).toBe('true')
     act(() => {
-      vi.advanceTimersByTime(1000)
+      vi.advanceTimersByTime(1400)
     })
     expect(host.querySelector('.app-cold-launch')).toBeNull()
   })
