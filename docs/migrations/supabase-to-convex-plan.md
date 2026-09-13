@@ -186,12 +186,9 @@ STOP gate before implementation:
 - We must verify whether Supabase auth password hashes can be migrated safely into the selected Convex auth implementation.
 - If hashes are not portable/compatible without unsafe custom handling, do not attempt direct hash transfer.
 
-If incompatible, Evan must choose reset policy:
+**Locked product decision (Evan, 2026-09-13):** if hashes are not safely portable to Convex, use a **global password reset for all users**. Do **not** build a legacy password-verification bridge. No unsafe password export/import shortcuts.
 
-1. Force reset for all migrated accounts (recommended safer path), or
-2. Build and audit a temporary legacy-password verification bridge (higher security complexity).
-
-No unsafe password export/import shortcuts should be implemented.
+This decision does not change Phase A (schema + scaffold + feature flag). Apply it in later Auth PRs only.
 
 ---
 
@@ -445,9 +442,7 @@ Rollback exit criteria:
 
 ## Open questions requiring Evan decision
 
-1. Auth migration policy if password hashes are incompatible:
-   - choose forced reset for all users, or
-   - authorize building a temporary legacy password bridge.
+1. ~~Auth migration policy if password hashes are incompatible~~ **Locked:** global password reset for all users; no legacy password bridge.
 2. Convex auth setup in shared environment:
    - if Convex CLI/browser login is required, Evan must authenticate in the shared browser.
    - no secrets/passwords should be requested in chat.

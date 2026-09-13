@@ -58,6 +58,10 @@ The CLI writes `VITE_CONVEX_URL` and `CONVEX_DEPLOYMENT` to `.env.local` (gitign
 
 Anonymous/local backends may work without an account; that is optional for Phase A. Checked-in `convex/_generated/` types are enough to typecheck without a live deployment.
 
+## Locked for later Auth PRs (not Phase A)
+
+If Supabase password hashes are not safely portable to Convex: **global password reset for all users**. Do not build a legacy password bridge.
+
 ## Out of scope (do not do yet)
 
 - Auth / session / password-hash migration
