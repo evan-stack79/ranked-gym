@@ -22,7 +22,7 @@ interface HomeViewProps {
 export function HomeView({ onStartTraining, onOpenTraining, onOpenNutrition }: HomeViewProps) {
   const { user, profile } = useAuth()
   const [trainingTick, setTrainingTick] = useState(0)
-  const [softLanding, setSoftLanding] = useState(() => {
+  const [coldEntering, setColdEntering] = useState(() => {
     if (typeof document === 'undefined') return false
     return document.documentElement.dataset.coldLaunchLanding === '1'
   })
@@ -44,13 +44,21 @@ export function HomeView({ onStartTraining, onOpenTraining, onOpenNutrition }: H
   }, [])
 
   useEffect(() => {
-    if (!softLanding) return
+    const onColdLanding = () => {
+      setColdEntering(true)
+    }
+    window.addEventListener('ranked-gym:cold-launch-landing', onColdLanding)
+    return () => window.removeEventListener('ranked-gym:cold-launch-landing', onColdLanding)
+  }, [])
+
+  useEffect(() => {
+    if (!coldEntering) return
     delete document.documentElement.dataset.coldLaunchLanding
     const t = window.setTimeout(() => {
-      setSoftLanding(false)
-    }, 240)
+      setColdEntering(false)
+    }, 320)
     return () => window.clearTimeout(t)
-  }, [softLanding])
+  }, [coldEntering])
 
   const firstName = resolveDisplayFirstName({
     firstName: user?.firstName,
@@ -65,26 +73,34 @@ export function HomeView({ onStartTraining, onOpenTraining, onOpenNutrition }: H
   )
 
   return (
-    <div className={`flex flex-col gap-8 ${softLanding ? 'home-cold-soft-land' : ''}`}>
-      <header>
+    <div className={`flex flex-col gap-8 ${coldEntering ? 'home-cold-enter home-cold-enter--active' : ''}`}>
+      <header className="home-cold-enter__group home-cold-enter__group--0">
         <h1 className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white">
           {greeting}
         </h1>
       </header>
 
-      <NutritionSnapshot onOpenNutrition={onOpenNutrition} />
+      <div className="home-cold-enter__group home-cold-enter__group--1">
+        <NutritionSnapshot onOpenNutrition={onOpenNutrition} />
+      </div>
 
-      <TodayWorkoutCard
-        workout={todayWorkout}
-        onStart={() => {
-          if (todayWorkout?.canStart) onStartTraining(todayWorkout.routineId)
-        }}
-        onOpenNotebook={onOpenTraining}
-      />
+      <div className="home-cold-enter__group home-cold-enter__group--2">
+        <TodayWorkoutCard
+          workout={todayWorkout}
+          onStart={() => {
+            if (todayWorkout?.canStart) onStartTraining(todayWorkout.routineId)
+          }}
+          onOpenNotebook={onOpenTraining}
+        />
+      </div>
 
-      <SleepSnapshot />
+      <div className="home-cold-enter__group home-cold-enter__group--3">
+        <SleepSnapshot />
+      </div>
 
-      <DailyStreak />
+      <div className="home-cold-enter__group home-cold-enter__group--4">
+        <DailyStreak />
+      </div>
 
       {/* Alertes : uniquement si un signal produit le justifie (aucune alerte permanente). */}
     </div>

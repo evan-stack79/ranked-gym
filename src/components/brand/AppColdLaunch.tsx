@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 
-/** URLs publiques préchargées dans index.html — affichées telles quelles. */
 export const COLD_LAUNCH_CALM_SRC = '/brand-splash-calm.png'
 export const COLD_LAUNCH_ROAR_SRC = '/brand-splash-roar.png'
 
-/** Cible totale depuis le début réel du document. */
 export const COLD_LAUNCH_MIN_MS = 800
 export const COLD_LAUNCH_MAX_MS = 1200
-/** @deprecated alias — total cible nominal */
 export const COLD_LAUNCH_TOTAL_MS = 900
 
-type LaunchPhase = 'calm' | 'roar' | 'exiting' | 'done'
+const ROAR_AT_RATIO = 180 / COLD_LAUNCH_TOTAL_MS
+const MORPH_AT_RATIO = 400 / COLD_LAUNCH_TOTAL_MS
+const REVEAL_AT_RATIO = 550 / COLD_LAUNCH_TOTAL_MS
+const HANDOFF_AT_RATIO = 800 / COLD_LAUNCH_TOTAL_MS
+
+type LaunchPhase = 'calm' | 'roar' | 'morphing' | 'handoff' | 'exiting' | 'done'
 
 declare global {
   interface Window {
@@ -50,44 +52,48 @@ async function waitForDecoded(src: string, signal?: { cancelled: boolean }): Pro
   }
 }
 
-/** Début document : marque index.html, sinon timeOrigin / now. */
 export function documentBootOriginMs(): number {
   if (typeof window === 'undefined') return 0
   if (typeof window.__RG_BOOT_T0__ === 'number' && Number.isFinite(window.__RG_BOOT_T0__)) {
     return window.__RG_BOOT_T0__
-  }
-  if (typeof performance !== 'undefined' && Number.isFinite(performance.timeOrigin)) {
-    return 0 // performance.now() est déjà relatif à timeOrigin
   }
   return 0
 }
 
 export function coldLaunchDeadlineMs(now = performance.now()): {
   roarAt: number
-  exitAt: number
+  morphAt: number
+  revealAt: number
+  handoffAt: number
   doneAt: number
   totalMs: number
 } {
   const origin = documentBootOriginMs()
-  // Idéal ~0,9 s depuis le document ; clamp [0,8 ; 1,2] ; ne bloque pas un boot déjà long.
   const idealDone = origin + COLD_LAUNCH_TOTAL_MS
   const minDone = origin + COLD_LAUNCH_MIN_MS
   const maxDone = origin + COLD_LAUNCH_MAX_MS
-  const earliestExit = now + 120
-  const doneAt = Math.min(maxDone, Math.max(minDone, Math.max(earliestExit, idealDone)))
-  const totalMs = Math.max(120, doneAt - origin)
-  const roarAt = origin + totalMs * (420 / 900)
-  const exitAt = Math.max(roarAt + 40, origin + totalMs - 180)
-  return { roarAt, exitAt, doneAt: origin + totalMs, totalMs }
+  const earliestDone = now + 360
+  const doneAt = Math.min(maxDone, Math.max(minDone, Math.max(earliestDone, idealDone)))
+  const totalMs = Math.max(360, doneAt - origin)
+  const roarAt = origin + totalMs * ROAR_AT_RATIO
+  const morphAt = origin + totalMs * MORPH_AT_RATIO
+  const revealAt = origin + totalMs * REVEAL_AT_RATIO
+  const handoffAt = origin + totalMs * HANDOFF_AT_RATIO
+  return { roarAt, morphAt, revealAt, handoffAt, doneAt: origin + totalMs, totalMs }
 }
 
-/**
- * Lancement froid premium : calme → rugissant, une seule fois par document.
- * Pas de replay au retour d’arrière-plan (visibilitychange / pageshow bfcache).
- * Affiche les assets préchargés ; roar seulement si décodé ; calm en cas d’échec / lenteur.
- */
+function startLandingRevealOnce(landingStartedRef: { current: boolean }) {
+  if (landingStartedRef.current) return
+  landingStartedRef.current = true
+  document.documentElement.dataset.coldLaunchLanding = '1'
+  window.dispatchEvent(new Event('ranked-gym:cold-launch-landing'))
+}
+
 export function AppColdLaunch({ children }: { children: React.ReactNode }) {
   const reduced = useRef(typeof window !== 'undefined' ? prefersReducedMotion() : false)
+  const flyerRef = useRef<HTMLDivElement | null>(null)
+  const flipAnimationRef = useRef<Animation | null>(null)
+  const landingStartedRef = useRef(false)
   const [phase, setPhase] = useState<LaunchPhase>(() => {
     if (typeof window === 'undefined') return 'done'
     if (document.documentElement.dataset.coldLaunchPlayed === '1') return 'done'
@@ -99,6 +105,13 @@ export function AppColdLaunch({ children }: { children: React.ReactNode }) {
   const roarReadyRef = useRef(false)
   const phaseRef = useRef<LaunchPhase>(phase)
   phaseRef.current = phase
+
+  useEffect(() => {
+    if (phase === 'done') return
+    if (phase === 'calm' || phase === 'roar' || phase === 'morphing') {
+      document.documentElement.dataset.coldLaunchHandoff = 'flying'
+    }
+  }, [phase])
 
   useEffect(() => {
     const signal = { cancelled: false }
@@ -119,81 +132,137 @@ export function AppColdLaunch({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (document.documentElement.dataset.coldLaunchPlayed === '1') {
+      document.documentElement.dataset.coldLaunchHandoff = 'done'
       setPhase('done')
       return
     }
 
     const onPageShow = (ev: PageTransitionEvent) => {
-      if (ev.persisted) {
-        document.documentElement.dataset.coldLaunchPlayed = '1'
-        setPhase('done')
-      }
+      if (!ev.persisted) return
+      document.documentElement.dataset.coldLaunchPlayed = '1'
+      document.documentElement.dataset.coldLaunchHandoff = 'done'
+      setPhase('done')
     }
     window.addEventListener('pageshow', onPageShow)
 
     if (reduced.current) {
-      // Accessibility path intentionally bypasses the 0.8–1.2s delight budget.
-      const toExit = window.setTimeout(() => {
-        setPhase('exiting')
-      }, 170)
       const t = window.setTimeout(() => {
         document.documentElement.dataset.coldLaunchPlayed = '1'
-        document.documentElement.dataset.coldLaunchLanding = '1'
+        document.documentElement.dataset.coldLaunchHandoff = 'done'
         setPhase('done')
       }, 280)
       return () => {
-        window.clearTimeout(toExit)
         window.clearTimeout(t)
         window.removeEventListener('pageshow', onPageShow)
       }
     }
 
-    const { roarAt, exitAt, doneAt } = coldLaunchDeadlineMs(performance.now())
+    const { roarAt, morphAt, revealAt, handoffAt, doneAt } = coldLaunchDeadlineMs(performance.now())
     const now = performance.now()
     const roarDelay = Math.max(0, roarAt - now)
-    const exitDelay = Math.max(roarDelay + 40, exitAt - now)
-    const doneDelay = Math.max(exitDelay + 60, doneAt - now)
+    const morphDelay = Math.max(roarDelay + 40, morphAt - now)
+    const revealDelay = Math.max(morphDelay + 40, revealAt - now)
+    const handoffDelay = Math.max(revealDelay + 80, handoffAt - now)
+    const doneDelay = Math.max(handoffDelay + 40, doneAt - now)
 
-    // Passe en roar seulement si décodé ; sinon reste calm jusqu’à la borne (pas de délai artificiel).
     const toRoar = window.setTimeout(() => {
       if (roarReadyRef.current) {
         setHadRoar(true)
         setPhase('roar')
-      } else setPhase('calm')
+      } else {
+        setPhase('calm')
+      }
     }, roarDelay)
-    const toExit = window.setTimeout(() => {
-      setPhase('exiting')
-    }, exitDelay)
+    const toMorph = window.setTimeout(() => setPhase('morphing'), morphDelay)
+    const toReveal = window.setTimeout(
+      () => startLandingRevealOnce(landingStartedRef),
+      revealDelay,
+    )
+    const toHandoff = window.setTimeout(() => {
+      document.documentElement.dataset.coldLaunchHandoff = 'done'
+      setPhase('handoff')
+    }, handoffDelay)
+    const toExit = window.setTimeout(() => setPhase('exiting'), doneDelay - 80)
     const toDone = window.setTimeout(() => {
       document.documentElement.dataset.coldLaunchPlayed = '1'
-      document.documentElement.dataset.coldLaunchLanding = '1'
+      document.documentElement.dataset.coldLaunchHandoff = 'done'
       setPhase('done')
     }, doneDelay)
 
     return () => {
       window.clearTimeout(toRoar)
+      window.clearTimeout(toMorph)
+      window.clearTimeout(toReveal)
+      window.clearTimeout(toHandoff)
       window.clearTimeout(toExit)
       window.clearTimeout(toDone)
       window.removeEventListener('pageshow', onPageShow)
     }
   }, [])
 
-  // Si roar devient prêt pendant la fenêtre calm→roar prévue, bascule sans dépasser done.
   useEffect(() => {
     if (!roarReady) return
     if (phaseRef.current !== 'calm') return
     if (reduced.current) return
     if (document.documentElement.dataset.coldLaunchPlayed === '1') return
-    const { roarAt, exitAt } = coldLaunchDeadlineMs(performance.now())
+    const { roarAt, morphAt } = coldLaunchDeadlineMs(performance.now())
     const now = performance.now()
-    if (now >= roarAt && now < exitAt - 20) {
+    if (now >= roarAt && now < morphAt - 20) {
       setHadRoar(true)
       setPhase('roar')
     }
   }, [roarReady])
 
-  const showRoar = (phase === 'roar' || (phase === 'exiting' && hadRoar)) && roarReady
-  const visualPhase: LaunchPhase = phase === 'done' ? 'done' : showRoar ? 'roar' : 'calm'
+  useEffect(() => {
+    if (phase !== 'morphing' || reduced.current) return
+    const flyer = flyerRef.current
+    const target = document.querySelector<HTMLElement>(
+      '[data-cold-launch-target="compact"] [data-brand-mark="compact"]',
+    )
+    if (!flyer || !target) return
+
+    const startRect = flyer.getBoundingClientRect()
+    const endRect = target.getBoundingClientRect()
+    if (startRect.width < 1 || startRect.height < 1 || endRect.width < 1 || endRect.height < 1) return
+
+    const startCx = startRect.left + startRect.width / 2
+    const startCy = startRect.top + startRect.height / 2
+    const endCx = endRect.left + endRect.width / 2
+    const endCy = endRect.top + endRect.height / 2
+    const moveX = endCx - startCx
+    const moveY = endCy - startCy
+    const scaleX = Math.max(0.12, endRect.width / startRect.width)
+    const scaleY = Math.max(0.12, endRect.height / startRect.height)
+    const endTransform = `translate3d(${moveX}px, ${moveY}px, 0) scale(${scaleX}, ${scaleY})`
+
+    flipAnimationRef.current?.cancel()
+    if (typeof flyer.animate === 'function') {
+      const anim = flyer.animate(
+        [
+          { transform: 'translate3d(0, 0, 0) scale(1, 1)', opacity: 1 },
+          { transform: endTransform, opacity: 1 },
+        ],
+        {
+          duration: 380,
+          easing: 'cubic-bezier(0.23, 1, 0.32, 1)',
+          fill: 'forwards',
+        },
+      )
+      flipAnimationRef.current = anim
+      return () => {
+        anim.cancel()
+      }
+    }
+
+    flyer.style.transition = 'transform 380ms cubic-bezier(0.23, 1, 0.32, 1)'
+    flyer.style.transform = endTransform
+    return () => {
+      flyer.style.transition = ''
+    }
+  }, [phase])
+
+  const showRoar = (phase === 'roar' || phase === 'morphing' || phase === 'handoff' || phase === 'exiting') && hadRoar && roarReady
+  const visualPhase: 'calm' | 'roar' = showRoar ? 'roar' : 'calm'
 
   return (
     <>
@@ -209,45 +278,48 @@ export function AppColdLaunch({ children }: { children: React.ReactNode }) {
           aria-live="polite"
           aria-label="Ranked Gym"
         >
+          <div className="app-cold-launch__dimmer" aria-hidden="true" />
           <div className="app-cold-launch__safe">
-            <div className="app-cold-launch__stack">
-              <img
-                src={COLD_LAUNCH_CALM_SRC}
-                alt=""
-                width={180}
-                height={180}
-                draggable={false}
-                decoding="async"
-                className="app-cold-launch__mark app-cold-launch__mark--calm"
-                data-active={visualPhase === 'calm' ? 'true' : 'false'}
-                onLoad={(e) => {
-                  if (isDecodedImage(e.currentTarget)) setCalmReady(true)
-                }}
-              />
-              <img
-                src={COLD_LAUNCH_ROAR_SRC}
-                alt=""
-                width={180}
-                height={180}
-                draggable={false}
-                decoding="async"
-                className="app-cold-launch__mark app-cold-launch__mark--roar"
-                data-active={visualPhase === 'roar' ? 'true' : 'false'}
-                onLoad={(e) => {
-                  if (isDecodedImage(e.currentTarget)) {
-                    roarReadyRef.current = true
-                    setRoarReady(true)
-                  }
-                }}
-                onError={() => {
-                  roarReadyRef.current = false
-                  setRoarReady(false)
-                }}
-              />
+            <div ref={flyerRef} className="app-cold-launch__flyer" data-flight-phase={phase}>
+              <div className="app-cold-launch__stack">
+                <img
+                  src={COLD_LAUNCH_CALM_SRC}
+                  alt=""
+                  width={180}
+                  height={180}
+                  draggable={false}
+                  decoding="async"
+                  className="app-cold-launch__mark app-cold-launch__mark--calm"
+                  data-active={visualPhase === 'calm' ? 'true' : 'false'}
+                  onLoad={(e) => {
+                    if (isDecodedImage(e.currentTarget)) setCalmReady(true)
+                  }}
+                />
+                <img
+                  src={COLD_LAUNCH_ROAR_SRC}
+                  alt=""
+                  width={180}
+                  height={180}
+                  draggable={false}
+                  decoding="async"
+                  className="app-cold-launch__mark app-cold-launch__mark--roar"
+                  data-active={visualPhase === 'roar' ? 'true' : 'false'}
+                  onLoad={(e) => {
+                    if (isDecodedImage(e.currentTarget)) {
+                      roarReadyRef.current = true
+                      setRoarReady(true)
+                    }
+                  }}
+                  onError={() => {
+                    roarReadyRef.current = false
+                    setRoarReady(false)
+                  }}
+                />
+              </div>
+              <p className="app-cold-launch__wordmark">
+                Ranked <span>Gym</span>
+              </p>
             </div>
-            <p className="app-cold-launch__wordmark">
-              Ranked <span>Gym</span>
-            </p>
           </div>
         </div>
       ) : null}

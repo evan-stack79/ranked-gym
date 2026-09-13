@@ -20,6 +20,8 @@ describe('AppColdLaunch', () => {
 
   beforeEach(() => {
     delete document.documentElement.dataset.coldLaunchPlayed
+    delete document.documentElement.dataset.coldLaunchHandoff
+    delete document.documentElement.dataset.coldLaunchLanding
     window.__RG_BOOT_T0__ = 0
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     vi.spyOn(performance, 'now').mockReturnValue(50)
@@ -51,6 +53,8 @@ describe('AppColdLaunch', () => {
     vi.useRealTimers()
     vi.restoreAllMocks()
     delete document.documentElement.dataset.coldLaunchPlayed
+    delete document.documentElement.dataset.coldLaunchHandoff
+    delete document.documentElement.dataset.coldLaunchLanding
     delete window.__RG_BOOT_T0__
   })
 
@@ -59,11 +63,16 @@ describe('AppColdLaunch', () => {
     const d = coldLaunchDeadlineMs(50)
     expect(d.totalMs).toBeGreaterThanOrEqual(COLD_LAUNCH_MIN_MS)
     expect(d.totalMs).toBeLessThanOrEqual(COLD_LAUNCH_MAX_MS)
-    expect(d.doneAt).toBeGreaterThan(d.roarAt)
-    expect(d.exitAt).toBeLessThan(d.doneAt)
+    expect(d.doneAt).toBeGreaterThan(d.handoffAt)
+    expect(d.handoffAt).toBeGreaterThan(d.morphAt)
+    expect(d.revealAt).toBeGreaterThan(d.roarAt)
   })
 
-  it('affiche calme puis rugissant puis disparaît (cold start)', async () => {
+  it('affiche calm puis roar puis morphing et handoff avant disparition', async () => {
+    const target = document.createElement('div')
+    target.innerHTML = '<div data-cold-launch-target="compact"><div data-brand-mark="compact"></div></div>'
+    document.body.appendChild(target)
+
     act(() => {
       root.render(
         <StrictMode>
@@ -83,18 +92,28 @@ describe('AppColdLaunch', () => {
     expect(imgs[0].getAttribute('src')).toBe(COLD_LAUNCH_CALM_SRC)
     expect(imgs[1].getAttribute('src')).toBe(COLD_LAUNCH_ROAR_SRC)
     act(() => {
-      vi.advanceTimersByTime(500)
+      vi.advanceTimersByTime(200)
     })
     expect(splash()?.getAttribute('data-phase')).toBe('roar')
     act(() => {
-      vi.advanceTimersByTime(260)
+      vi.advanceTimersByTime(220)
+    })
+    expect(splash()?.getAttribute('data-phase')).toBe('morphing')
+    act(() => {
+      vi.advanceTimersByTime(140)
+    })
+    expect(document.documentElement.dataset.coldLaunchLanding).toBe('1')
+    act(() => {
+      vi.advanceTimersByTime(220)
     })
     expect(splash()?.getAttribute('data-phase')).toBe('exiting')
+    expect(document.documentElement.dataset.coldLaunchHandoff).toBe('done')
     act(() => {
-      vi.advanceTimersByTime(540)
+      vi.advanceTimersByTime(260)
     })
     expect(splash()).toBeNull()
     expect(document.documentElement.dataset.coldLaunchPlayed).toBe('1')
+    target.remove()
   })
 
   it('garde calm si roar non décodé (échec / lenteur)', async () => {
@@ -139,7 +158,7 @@ describe('AppColdLaunch', () => {
     act(() => {
       vi.advanceTimersByTime(500)
     })
-    expect(host.querySelector('.app-cold-launch')?.getAttribute('data-phase')).toBe('calm')
+    expect(host.querySelector('.app-cold-launch')?.getAttribute('data-phase')).toBe('morphing')
     act(() => {
       vi.advanceTimersByTime(800)
     })
@@ -185,6 +204,7 @@ describe('AppColdLaunch', () => {
       vi.advanceTimersByTime(300)
     })
     expect(host.querySelector('.app-cold-launch')).toBeNull()
+    expect(document.documentElement.dataset.coldLaunchLanding).toBeUndefined()
   })
 
   it('visibilitychange seul ne relance pas le splash', () => {
@@ -201,5 +221,19 @@ describe('AppColdLaunch', () => {
     expect(host.querySelector('.app-cold-launch')).toBeNull()
     document.dispatchEvent(new Event('visibilitychange'))
     expect(host.querySelector('.app-cold-launch')).toBeNull()
+  })
+
+  it('pose le marqueur handoff à done en fin de cold launch', () => {
+    act(() => {
+      root.render(
+        <AppColdLaunch>
+          <div>app</div>
+        </AppColdLaunch>,
+      )
+    })
+    act(() => {
+      vi.advanceTimersByTime(1200)
+    })
+    expect(document.documentElement.dataset.coldLaunchHandoff).toBe('done')
   })
 })

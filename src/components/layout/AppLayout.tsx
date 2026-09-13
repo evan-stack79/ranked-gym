@@ -78,7 +78,9 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
             className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"
             style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
           >
-            <BrandMark variant="compact" />
+            <div data-cold-launch-target="compact">
+              <BrandMark variant="compact" />
+            </div>
           </div>
         </header>
       ) : null}
