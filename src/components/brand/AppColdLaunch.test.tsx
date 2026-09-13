@@ -9,7 +9,9 @@ import {
   COLD_LAUNCH_MAX_MS,
   COLD_LAUNCH_MIN_MS,
   COLD_LAUNCH_ROAR_SRC,
+  ROAR_BREATH_MIN_MS,
   coldLaunchDeadlineMs,
+  computeColdLaunchPhaseDelays,
   computeUniformPantherFlight,
   isFlyerPantherVisible,
   isHeaderPantherVisible,
@@ -103,6 +105,75 @@ describe('AppColdLaunch', () => {
     expect(d.doneAt).toBeGreaterThan(d.handoffAt)
     expect(d.handoffAt).toBeGreaterThan(d.morphAt)
     expect(d.revealAt).toBeGreaterThan(d.roarAt)
+  })
+
+  it('keeps roar→morph hold >= 250ms when mounted after roarAt', () => {
+    window.__RG_BOOT_T0__ = 0
+    const onTime = coldLaunchDeadlineMs(50)
+    expect(onTime.morphAt - onTime.roarAt).toBe(ROAR_BREATH_MIN_MS)
+
+    const previousRoarHoldMs = (now: number) => {
+      const d = coldLaunchDeadlineMs(now)
+      const roarDelay = Math.max(0, d.roarAt - now)
+      const morphDelay = Math.max(roarDelay + 40, d.morphAt - now)
+      return morphDelay - roarDelay
+    }
+
+    for (const now of [200, 287, 400, 428]) {
+      const d = coldLaunchDeadlineMs(now)
+      expect(now).toBeGreaterThan(d.roarAt)
+      const delays = computeColdLaunchPhaseDelays(now, d)
+      expect(delays.roarDelay).toBe(0)
+      expect(delays.roarToMorphHoldMs).toBeGreaterThanOrEqual(250)
+      expect(delays.roarToMorphHoldMs).toBe(ROAR_BREATH_MIN_MS)
+      expect(delays.morphDelay - delays.roarDelay).toBeGreaterThanOrEqual(250)
+    }
+
+    // Lag probe: the old +40 floor collapsed breath into the 32–173ms band.
+    expect(previousRoarHoldMs(287)).toBe(173)
+    expect(previousRoarHoldMs(400)).toBe(60)
+    expect(previousRoarHoldMs(428)).toBe(40)
+
+    const moderateLag = computeColdLaunchPhaseDelays(400)
+    expect(moderateLag.elapsedFromOriginAtDone).toBeLessThanOrEqual(COLD_LAUNCH_MAX_MS)
+
+    const severeLag = computeColdLaunchPhaseDelays(800)
+    expect(severeLag.roarToMorphHoldMs).toBeGreaterThanOrEqual(250)
+    expect(severeLag.elapsedFromOriginAtDone).toBeGreaterThan(COLD_LAUNCH_MAX_MS)
+  })
+
+  it('schedules roar→morph hold >= 250ms after a late React mount', async () => {
+    window.__RG_BOOT_T0__ = 0
+    vi.spyOn(performance, 'now').mockReturnValue(400)
+
+    act(() => {
+      root.render(
+        <AppColdLaunch>
+          <div>app</div>
+        </AppColdLaunch>,
+      )
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    const splash = () => host.querySelector('.app-cold-launch')
+    expect(splash()?.getAttribute('data-phase')).toBe('roar')
+
+    act(() => {
+      vi.advanceTimersByTime(249)
+    })
+    expect(splash()?.getAttribute('data-phase')).toBe('roar')
+
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(splash()?.getAttribute('data-phase')).not.toBe('morphing')
+
+    act(() => {
+      vi.advanceTimersByTime(30)
+    })
+    expect(splash()?.getAttribute('data-phase')).toBe('morphing')
   })
 
   it('uses only uniform scale for the flying panther', async () => {

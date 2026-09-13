@@ -9,6 +9,11 @@ export const COLD_LAUNCH_ROAR_SRC = '/brand-splash-roar.png'
 export const COLD_LAUNCH_MIN_MS = 1300
 export const COLD_LAUNCH_MAX_MS = 1500
 export const COLD_LAUNCH_TOTAL_MS = 1400
+// Ideal roar→morph is 280ms (460 − 180). When React mounts late, never collapse
+// that breath below this floor (acceptance 250–400ms). Enforcing breath can push
+// origin→done past MAX 1500 when mount is already ≳660ms after boot; prefer the
+// breath over clipping it to stay inside the window.
+export const ROAR_BREATH_MIN_MS = 280
 
 const ROAR_AT_RATIO = 180 / COLD_LAUNCH_TOTAL_MS
 const MORPH_AT_RATIO = 460 / COLD_LAUNCH_TOTAL_MS
@@ -104,6 +109,32 @@ export function coldLaunchDeadlineMs(now = performance.now()): {
     handoffAt,
     doneAt: origin + totalMs,
     totalMs,
+  }
+}
+
+export function computeColdLaunchPhaseDelays(now: number, deadline = coldLaunchDeadlineMs(now)) {
+  const origin = documentBootOriginMs()
+  const roarDelay = Math.max(0, deadline.roarAt - now)
+  const morphDelay = Math.max(roarDelay + ROAR_BREATH_MIN_MS, deadline.morphAt - now)
+  const backToCalmDelay = Math.max(morphDelay + 20, deadline.backToCalmAt - now)
+  const centerWordmarkFadeDelay = Math.max(morphDelay + 20, deadline.centerWordmarkFadeAt - now)
+  const flipStartDelay = Math.max(morphDelay, deadline.flipStartAt - now)
+  const revealDelay = Math.max(flipStartDelay + 120, deadline.revealAt - now)
+  const handoffDelay = Math.max(flipStartDelay + FLIP_DURATION_MS, deadline.handoffAt - now)
+  const doneDelay = Math.max(handoffDelay + 40, deadline.doneAt - now)
+  const exitDelay = Math.max(handoffDelay + 10, doneDelay - 80)
+  return {
+    roarDelay,
+    morphDelay,
+    roarToMorphHoldMs: morphDelay - roarDelay,
+    backToCalmDelay,
+    centerWordmarkFadeDelay,
+    flipStartDelay,
+    revealDelay,
+    handoffDelay,
+    doneDelay,
+    exitDelay,
+    elapsedFromOriginAtDone: now - origin + doneDelay,
   }
 }
 
@@ -223,18 +254,18 @@ export function AppColdLaunch({ children }: { children: React.ReactNode }) {
       }
     }
 
-    const { roarAt, morphAt, backToCalmAt, centerWordmarkFadeAt, revealAt, flipStartAt, handoffAt, doneAt } =
-      coldLaunchDeadlineMs(performance.now())
     const now = performance.now()
-    const roarDelay = Math.max(0, roarAt - now)
-    const morphDelay = Math.max(roarDelay + 40, morphAt - now)
-    const backToCalmDelay = Math.max(morphDelay + 20, backToCalmAt - now)
-    const centerWordmarkFadeDelay = Math.max(morphDelay + 20, centerWordmarkFadeAt - now)
-    const flipStartDelay = Math.max(morphDelay, flipStartAt - now)
-    const revealDelay = Math.max(flipStartDelay + 120, revealAt - now)
-    const handoffDelay = Math.max(flipStartDelay + FLIP_DURATION_MS, handoffAt - now)
-    const doneDelay = Math.max(handoffDelay + 40, doneAt - now)
-    const exitDelay = Math.max(handoffDelay + 10, doneDelay - 80)
+    const {
+      roarDelay,
+      morphDelay,
+      backToCalmDelay,
+      centerWordmarkFadeDelay,
+      flipStartDelay,
+      revealDelay,
+      handoffDelay,
+      doneDelay,
+      exitDelay,
+    } = computeColdLaunchPhaseDelays(now)
 
     const toRoar = window.setTimeout(() => {
       if (roarReadyRef.current) {
