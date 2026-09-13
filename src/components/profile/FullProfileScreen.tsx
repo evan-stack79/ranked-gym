@@ -288,7 +288,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
         <SectionTitle
           icon={Swords}
           title="Bilan de l'Arène"
-          subtitle={statsLoading ? 'Synchronisation Supabase…' : 'Calculé depuis tes séances enregistrées'}
+          subtitle={statsLoading ? 'Synchronisation cloud…' : 'Calcule depuis tes seances enregistrees'}
         />
 
         <div className="glass-card rounded-2xl p-4">

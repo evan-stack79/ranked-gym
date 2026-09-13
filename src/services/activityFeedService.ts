@@ -2,6 +2,11 @@ import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 import type { LocalActivityItem } from '../data/localActivityFeed'
 import { buildLocalActivityFeed } from '../data/localActivityFeed'
 import { safeWarn } from '../utils/safeLog'
+import { isConvexDomainActive } from '../backend/adapter'
+import {
+  fetchConvexSocialActivityFeed,
+  recordConvexActivityEvent,
+} from './convexActivityFeedService'
 
 export type SocialActivityRow = {
   id: string
@@ -51,6 +56,19 @@ export async function fetchSocialActivityFeed(input: {
   areaName: string
   viewer?: { username: string; isGhostModeEnabled: boolean } | null
 }): Promise<LocalActivityItem[]> {
+  if (isConvexDomainActive()) {
+    const rows = await fetchConvexSocialActivityFeed({
+      viewerLat: input.viewerLat,
+      viewerLng: input.viewerLng,
+      radiusKm: input.radiusKm,
+      limit: input.limit,
+    })
+    if (rows.length === 0) {
+      return buildLocalActivityFeed(input.areaName, input.viewer ?? null)
+    }
+    return rows
+  }
+
   if (!isSupabaseConfigured()) {
     return buildLocalActivityFeed(input.areaName, input.viewer ?? null)
   }
@@ -83,6 +101,10 @@ export async function recordActivityEvent(input: {
   originLat?: number | null
   originLng?: number | null
 }): Promise<string | null> {
+  if (isConvexDomainActive()) {
+    return recordConvexActivityEvent(input)
+  }
+
   if (!isSupabaseConfigured()) return null
 
   try {

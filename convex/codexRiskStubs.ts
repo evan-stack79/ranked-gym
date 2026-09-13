@@ -1,20 +1,16 @@
 /**
- * CODEX-RISK — not implemented in this wave (PR-F).
+ * CODEX-RISK progress tracker.
  *
- * Next waves owned by Codex review:
- * - PR-G: checkins history + social feed + stats RPC equivalents
- *   (`get_social_activity_feed`, `record_activity`, `get_user_stats`,
- *   `reserve_ai_meal_scan` / `release_ai_meal_scan`).
- * - PR-I: migration scripts (export / import-convex / verify / reconcile).
- * - PR-H remainder: Supabase avatars export → Convex storage import,
- *   short-lived HTTP signed URLs (`CONVEX_FILE_SIGNED_URL_TTL_SEC`),
- *   replaced-file cleanup.
+ * Landed in this wave:
+ * - PR-G: checkins/feed/stats + ai usage RPC equivalents (`convex/rpc.ts`)
+ * - PR-I: migration scripts (`scripts/migrations/supabase/*`)
  *
- * Do not call these placeholders from the React app. Supabase remains
- * the runtime for these RPCs until that wave.
+ * Remaining CODEX-RISK scope:
+ * - PR-H: Supabase avatar binary export/import and signed URL TTL cleanup.
  */
-export const CODEX_RISK_NEXT_WAVES = {
-  prG: 'checkins/feed/stats RPC equivalents',
-  prH: 'avatar binary migration + signed URL TTL + cleanup',
-  prI: 'migration export/import/verify scripts',
+export const CODEX_RISK_STATUS = {
+  completed: ['PR-G', 'PR-I'],
+  remaining: {
+    prH: 'avatar binary migration + signed URL TTL + cleanup',
+  },
 } as const

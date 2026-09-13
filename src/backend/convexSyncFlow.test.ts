@@ -13,7 +13,7 @@ import { assertOwnedUserFile } from '../../convex/files'
 import { assertUserOwnership, requireSessionUser } from '../../convex/lib/auth'
 import { hashToken } from '../../convex/lib/authCrypto'
 import { upsertImportedUserWithoutPassword } from '../../convex/auth'
-import { CODEX_RISK_NEXT_WAVES } from '../../convex/codexRiskStubs'
+import { CODEX_RISK_STATUS } from '../../convex/codexRiskStubs'
 
 type TableName =
   | 'auth_users'
@@ -360,7 +360,8 @@ describe('Auth global-reset policy remains intact', () => {
   })
 
   it('marks RPC/migration leftovers as CODEX-RISK for the next wave', () => {
-    expect(CODEX_RISK_NEXT_WAVES.prG).toMatch(/feed/i)
-    expect(CODEX_RISK_NEXT_WAVES.prI).toMatch(/migration/i)
+    expect(CODEX_RISK_STATUS.completed).toContain('PR-G')
+    expect(CODEX_RISK_STATUS.completed).toContain('PR-I')
+    expect(CODEX_RISK_STATUS.remaining.prH).toMatch(/avatar/i)
   })
 })

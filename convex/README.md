@@ -7,8 +7,10 @@ Schema + auth + PR-F domain sync live here. **Supabase remains the default app b
 - `schema.ts` — compatibility tables
 - `auth.ts` / `authPrivateData.ts` — PR-E (global reset, no legacy password bridge)
 - `sync.ts` / `profiles.ts` — PR-F backup/sync + streak CAS
+- `rpc.ts` — PR-G checkins/feed/stats + AI usage reserve/release equivalents
+- `migrations.ts` — PR-I import/counting helpers used by migration scripts
 - `files.ts` — private avatar scaffolding (`user_files`)
-- `codexRiskStubs.ts` — **CODEX-RISK** PR-G/PR-H/PR-I leftovers
+- `codexRiskStubs.ts` — **CODEX-RISK** tracker (PR-H still pending)
 
 ## Commands
 

@@ -133,6 +133,7 @@ export const convexTables = {
 
   checkins: defineTable({
     userId: v.string(),
+    legacySupabaseId: v.optional(v.string()),
     salleNom: v.string(),
     salleLat: v.optional(v.union(v.number(), v.null())),
     salleLng: v.optional(v.union(v.number(), v.null())),
@@ -162,6 +163,7 @@ export const convexTables = {
 
   aliments: defineTable({
     userId: v.string(),
+    legacySupabaseId: v.optional(v.string()),
     nom: v.string(),
     calories: v.number(),
     proteines: v.number(),
@@ -175,6 +177,7 @@ export const convexTables = {
 
   activities: defineTable({
     userId: v.string(),
+    legacySupabaseId: v.optional(v.string()),
     activityType: v.string(),
     actionText: v.string(),
     xpEarned: v.number(),

@@ -10,8 +10,10 @@ Inventory: `docs/migrations/supabase-to-convex-inventory.md`
 - `convex/schema.ts` — compatibility schema for Profil, Train, Nutrition, Hydratation (nested in nutrition journal), Sommeil, Streak, file metadata, and migration bookkeeping.
 - `convex/auth.ts` + `convex/authPrivateData.ts` — PR-E auth behind `VITE_ENABLE_CONVEX_AUTH` (global password reset, no legacy hash bridge).
 - `convex/sync.ts` + `convex/profiles.ts` — PR-F backup/sync + profile/streak read/write behind `VITE_ENABLE_CONVEX_PRIMARY`.
+- `convex/rpc.ts` — PR-G checkins/feed/stats and AI usage reserve/release equivalents with session-based user isolation.
 - `convex/files.ts` — private `user_files` avatar scaffolding (full storage cutover is CODEX-RISK PR-H).
-- `convex/codexRiskStubs.ts` — PR-G/PR-I leftovers (checkins/feed/stats RPC + migration scripts).
+- `scripts/migrations/supabase/*.mjs` — PR-I export/import/verify scripts with dry-run fake-data workflow and deterministic id mapping.
+- `convex/codexRiskStubs.ts` — only PR-H remains.
 - Adapter: `src/backend/adapter.ts` — `getActiveCloudBackend()` is `'supabase'` unless Convex is configured **and** `VITE_ENABLE_CONVEX_PRIMARY=true`.
 
 ## Environment variable names (no secrets)
@@ -38,7 +40,7 @@ Convex CLI / backend (local `.env.local` only, never git):
 | `CONVEX_AUTH_SESSION_TTL_HOURS` | Session lifetime (optional override) |
 | `CONVEX_FILE_SIGNED_URL_TTL_SEC` | Avatar URL TTL (later phase) |
 
-Migration scripts (later phase, runtime env only):
+Migration scripts (runtime env only):
 
 - `MIGRATION_SUPABASE_URL`
 - `MIGRATION_SUPABASE_SERVICE_ROLE_KEY`
@@ -47,6 +49,27 @@ Migration scripts (later phase, runtime env only):
 - `MIGRATION_RUN_ID`
 
 Copy names from `.env.example`. Leave values empty in git.
+
+## Migration scripts (PR-I)
+
+Always validate migration logic with fake data before touching live credentials:
+
+```bash
+npm run migration:supabase:dry-run
+```
+
+Live export/import/verify (never commit secrets):
+
+```bash
+npm run migration:supabase:export -- --run-id <run-id>
+npm run migration:supabase:import -- --input scripts/migrations/artifacts/<run-id>.supabase-export.json --source-sha <git-sha>
+npm run migration:supabase:verify -- --bundle scripts/migrations/artifacts/<run-id>.supabase-export.json --import-report scripts/migrations/artifacts/<run-id>.convex-import-report.json
+```
+
+Safety constraints:
+- no script deletes Supabase data
+- import is idempotent via `migration_entity_map` keys (`entityType + supabaseId`)
+- verify compares per-entity counts before/after
 
 ## Create a Convex project (Evan)
 
@@ -76,8 +99,7 @@ This preserves the locked policy: no hash portability shortcuts and no legacy pa
 
 ## Out of scope (do not do yet)
 
-- Live data export/import (CODEX-RISK PR-I)
-- Checkins / social feed / stats RPC equivalents (CODEX-RISK PR-G)
+- Avatar binary migration and signed URL cleanup (CODEX-RISK PR-H)
 - Removing Supabase
 - Production Convex deploy
 - Merging to `main`
