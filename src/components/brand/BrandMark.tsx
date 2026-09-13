@@ -85,7 +85,7 @@ export function BrandMark({
         >
           <p className={`${cfg.textClass} text-white`}>
             <span data-brand-wordmark={variant}>
-            Ranked <span className="text-[#FF2B2B]">Gym</span>
+              Ranked <span className="text-[#FF2B2B]">Gym</span>
             </span>
           </p>
           {tagline ? (
