@@ -1,6 +1,6 @@
 # Ranked Gym: Supabase -> Convex Migration Plan (Architecture Only)
 
-Status: planning only (no production migration code in this pass).
+Status: Phase A scaffold landed (schema + client wiring + feature flag). Production runtime is still Supabase. No live data or auth migration in this pass.
 
 Scope locked by Evan:
 
