@@ -11,6 +11,7 @@ const ROAR_AT_RATIO = 180 / COLD_LAUNCH_TOTAL_MS
 const MORPH_AT_RATIO = 400 / COLD_LAUNCH_TOTAL_MS
 const REVEAL_AT_RATIO = 550 / COLD_LAUNCH_TOTAL_MS
 const HANDOFF_AT_RATIO = 800 / COLD_LAUNCH_TOTAL_MS
+const FLIP_DURATION_MS = 380
 
 type LaunchPhase = 'calm' | 'roar' | 'morphing' | 'handoff' | 'exiting' | 'done'
 
@@ -93,6 +94,7 @@ export function AppColdLaunch({ children }: { children: React.ReactNode }) {
   const reduced = useRef(typeof window !== 'undefined' ? prefersReducedMotion() : false)
   const flyerRef = useRef<HTMLDivElement | null>(null)
   const flipAnimationRef = useRef<Animation | null>(null)
+  const handoffTimeoutRef = useRef<number | null>(null)
   const landingStartedRef = useRef(false)
   const [phase, setPhase] = useState<LaunchPhase>(() => {
     if (typeof window === 'undefined') return 'done'
@@ -162,8 +164,9 @@ export function AppColdLaunch({ children }: { children: React.ReactNode }) {
     const roarDelay = Math.max(0, roarAt - now)
     const morphDelay = Math.max(roarDelay + 40, morphAt - now)
     const revealDelay = Math.max(morphDelay + 40, revealAt - now)
-    const handoffDelay = Math.max(revealDelay + 80, handoffAt - now)
+    const handoffDelay = Math.max(morphDelay + FLIP_DURATION_MS, handoffAt - now)
     const doneDelay = Math.max(handoffDelay + 40, doneAt - now)
+    const exitDelay = Math.max(handoffDelay + 10, doneDelay - 80)
 
     const toRoar = window.setTimeout(() => {
       if (roarReadyRef.current) {
@@ -178,11 +181,7 @@ export function AppColdLaunch({ children }: { children: React.ReactNode }) {
       () => startLandingRevealOnce(landingStartedRef),
       revealDelay,
     )
-    const toHandoff = window.setTimeout(() => {
-      document.documentElement.dataset.coldLaunchHandoff = 'done'
-      setPhase('handoff')
-    }, handoffDelay)
-    const toExit = window.setTimeout(() => setPhase('exiting'), doneDelay - 80)
+    const toExit = window.setTimeout(() => setPhase('exiting'), exitDelay)
     const toDone = window.setTimeout(() => {
       document.documentElement.dataset.coldLaunchPlayed = '1'
       document.documentElement.dataset.coldLaunchHandoff = 'done'
@@ -193,7 +192,6 @@ export function AppColdLaunch({ children }: { children: React.ReactNode }) {
       window.clearTimeout(toRoar)
       window.clearTimeout(toMorph)
       window.clearTimeout(toReveal)
-      window.clearTimeout(toHandoff)
       window.clearTimeout(toExit)
       window.clearTimeout(toDone)
       window.removeEventListener('pageshow', onPageShow)
@@ -215,6 +213,10 @@ export function AppColdLaunch({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (phase !== 'morphing' || reduced.current) return
+    if (handoffTimeoutRef.current !== null) {
+      window.clearTimeout(handoffTimeoutRef.current)
+      handoffTimeoutRef.current = null
+    }
     const flyer = flyerRef.current
     const target = document.querySelector<HTMLElement>(
       '[data-cold-launch-target="compact"] [data-brand-mark="compact"]',
@@ -243,20 +245,36 @@ export function AppColdLaunch({ children }: { children: React.ReactNode }) {
           { transform: endTransform, opacity: 1 },
         ],
         {
-          duration: 380,
+          duration: FLIP_DURATION_MS,
           easing: 'cubic-bezier(0.23, 1, 0.32, 1)',
           fill: 'forwards',
         },
       )
       flipAnimationRef.current = anim
+      handoffTimeoutRef.current = window.setTimeout(() => {
+        document.documentElement.dataset.coldLaunchHandoff = 'done'
+        setPhase((current) => (current === 'morphing' ? 'handoff' : current))
+      }, FLIP_DURATION_MS)
       return () => {
+        if (handoffTimeoutRef.current !== null) {
+          window.clearTimeout(handoffTimeoutRef.current)
+          handoffTimeoutRef.current = null
+        }
         anim.cancel()
       }
     }
 
-    flyer.style.transition = 'transform 380ms cubic-bezier(0.23, 1, 0.32, 1)'
+    flyer.style.transition = `transform ${FLIP_DURATION_MS}ms cubic-bezier(0.23, 1, 0.32, 1)`
     flyer.style.transform = endTransform
+    handoffTimeoutRef.current = window.setTimeout(() => {
+      document.documentElement.dataset.coldLaunchHandoff = 'done'
+      setPhase((current) => (current === 'morphing' ? 'handoff' : current))
+    }, FLIP_DURATION_MS)
     return () => {
+      if (handoffTimeoutRef.current !== null) {
+        window.clearTimeout(handoffTimeoutRef.current)
+        handoffTimeoutRef.current = null
+      }
       flyer.style.transition = ''
     }
   }, [phase])

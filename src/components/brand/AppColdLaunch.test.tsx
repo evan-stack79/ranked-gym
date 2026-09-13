@@ -107,9 +107,12 @@ describe('AppColdLaunch', () => {
       vi.advanceTimersByTime(220)
     })
     expect(splash()?.getAttribute('data-phase')).toBe('exiting')
+    act(() => {
+      vi.advanceTimersByTime(180)
+    })
     expect(document.documentElement.dataset.coldLaunchHandoff).toBe('done')
     act(() => {
-      vi.advanceTimersByTime(260)
+      vi.advanceTimersByTime(80)
     })
     expect(splash()).toBeNull()
     expect(document.documentElement.dataset.coldLaunchPlayed).toBe('1')

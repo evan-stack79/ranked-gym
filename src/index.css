@@ -1617,7 +1617,7 @@ body {
   transition-duration: 120ms !important;
 }
 
-:root[data-cold-launch-handoff='flying'] [data-cold-launch-target='compact'] [data-brand-mark='compact'] {
+:root:not([data-cold-launch-handoff='done']) [data-cold-launch-target='compact'] [data-brand-mark='compact'] {
   visibility: hidden;
   opacity: 0;
 }
