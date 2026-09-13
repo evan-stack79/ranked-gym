@@ -1,6 +1,6 @@
 # Ranked Gym: Supabase -> Convex Migration Plan (Architecture Only)
 
-Status: Phase A scaffold landed (schema + client wiring + feature flag). Production runtime is still Supabase. No live data or auth migration in this pass.
+Status: Phase A scaffold + PR-E auth + PR-F domain backup/sync adapters landed behind feature flags. Production runtime is still Supabase. No live data cutover in this pass.
 
 Scope locked by Evan:
 

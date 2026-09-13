@@ -1,17 +1,18 @@
-# Convex setup — Ranked Gym (Phase A)
+# Convex setup — Ranked Gym
 
-Scaffold only. **Supabase remains the default runtime.** Do not enable Convex as primary in production.
+**Supabase remains the default runtime.** Do not enable Convex as primary in production until iPhone signoff.
 
 Full architecture: `docs/migrations/supabase-to-convex-plan.md`
 Inventory: `docs/migrations/supabase-to-convex-inventory.md`
 
-## What this phase added
+## What has landed
 
 - `convex/schema.ts` — compatibility schema for Profil, Train, Nutrition, Hydratation (nested in nutrition journal), Sommeil, Streak, file metadata, and migration bookkeeping.
-- `convex/health.ts` — public `ping` query (no user data).
-- `convex/lib/auth.ts` — `requireAuthUser` helper for later phases (auth is **not** migrated yet).
-- React wiring: `ConvexClientProvider` mounts only when `VITE_CONVEX_URL` is a real URL. Default builds are a passthrough.
-- Adapter: `src/backend/adapter.ts` — `getActiveCloudBackend()` is always `'supabase'` in Phase A. Local storage paths are unchanged.
+- `convex/auth.ts` + `convex/authPrivateData.ts` — PR-E auth behind `VITE_ENABLE_CONVEX_AUTH` (global password reset, no legacy hash bridge).
+- `convex/sync.ts` + `convex/profiles.ts` — PR-F backup/sync + profile/streak read/write behind `VITE_ENABLE_CONVEX_PRIMARY`.
+- `convex/files.ts` — private `user_files` avatar scaffolding (full storage cutover is CODEX-RISK PR-H).
+- `convex/codexRiskStubs.ts` — PR-G/PR-I leftovers (checkins/feed/stats RPC + migration scripts).
+- Adapter: `src/backend/adapter.ts` — `getActiveCloudBackend()` is `'supabase'` unless Convex is configured **and** `VITE_ENABLE_CONVEX_PRIMARY=true`.
 
 ## Environment variable names (no secrets)
 
@@ -20,7 +21,7 @@ Client / Vite build:
 | Name | Role |
 |------|------|
 | `VITE_CONVEX_URL` | Convex deployment URL (`https://….convex.cloud`) |
-| `VITE_ENABLE_CONVEX_PRIMARY` | Request Convex as primary. Phase A does **not** switch domain I/O. Keep unset/`false`. |
+| `VITE_ENABLE_CONVEX_PRIMARY` | Switch domain backup/sync (profile/train/nutrition/sleep/streak) to Convex. Keep unset/`false` until validation. |
 | `VITE_ENABLE_CONVEX_AUTH` | Enable Convex auth adapter (PR-E). Keep unset/`false` until auth validation passes. |
 | `VITE_PUBLIC_APP_URL` | Public HTTPS origin (already used for password-reset links) |
 
@@ -75,8 +76,8 @@ This preserves the locked policy: no hash portability shortcuts and no legacy pa
 
 ## Out of scope (do not do yet)
 
-- Auth / session / password-hash migration
-- Live data export/import
+- Live data export/import (CODEX-RISK PR-I)
+- Checkins / social feed / stats RPC equivalents (CODEX-RISK PR-G)
 - Removing Supabase
 - Production Convex deploy
 - Merging to `main`

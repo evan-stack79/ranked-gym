@@ -226,4 +226,4 @@ Current source code behavior (`src/services/cloudBackup.ts`):
   - `ranked-gym:backup-error`
   - `ranked-gym:backup-restored`
 
-Note: `sleepStorage` triggers cloud sync, but `collectLocalBackup()` does not include sleep payload yet. Sleep is currently local-only despite cloud trigger calls.
+Note: `sleepStorage` previously triggered cloud sync without including sleep in `collectLocalBackup()`. PR-F adds `sleep` to backup payload v4 (Convex `sleep_nights` + Supabase `user_backups` blob merge).

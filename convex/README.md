@@ -1,10 +1,14 @@
 # Convex functions (Ranked Gym)
 
-Phase A scaffold only: schema + a public `health.ping` query.
+Schema + auth + PR-F domain sync live here. **Supabase remains the default app backend** unless `VITE_ENABLE_CONVEX_PRIMARY` (and auth flag) are enabled.
 
-Domain tables live in `schema.ts` (Profil, Train, Nutrition/Hydratation, Sommeil, Streak, files, migration bookkeeping).
+## Modules
 
-This directory is **not** the live app backend yet. The React app still uses Supabase unless a later phase flips `VITE_ENABLE_CONVEX_PRIMARY` *and* migrates services.
+- `schema.ts` — compatibility tables
+- `auth.ts` / `authPrivateData.ts` — PR-E (global reset, no legacy password bridge)
+- `sync.ts` / `profiles.ts` — PR-F backup/sync + streak CAS
+- `files.ts` — private avatar scaffolding (`user_files`)
+- `codexRiskStubs.ts` — **CODEX-RISK** PR-G/PR-H/PR-I leftovers
 
 ## Commands
 
@@ -13,8 +17,8 @@ npx convex codegen
 npx convex dev
 ```
 
-`npx convex dev` against a **cloud** project requires Evan to log in in the shared browser. Do not paste tokens or passwords in chat.
+`npx convex dev` against a **cloud** project requires Evan to log in in the shared browser. Do not paste tokens or passwords in chat. Existing project: `ranked-gym` / `impartial-bandicoot-899` — do not create a duplicate.
 
-Anonymous/local Convex backends may work without an account (`npx convex dev` in a non-interactive agent shell). That is optional for Phase A — generated `_generated/` types are enough to typecheck.
+Checked-in `_generated/` types are enough to typecheck without a live deployment.
 
 See `docs/CONVEX_SETUP.md`.
