@@ -71,6 +71,7 @@ export function BrandMark({
           decoding="async"
           draggable={false}
           onError={() => setImageFailed(true)}
+          data-brand-mark-image={variant}
           className="shrink-0 select-none object-contain"
           style={{ width: size, height: size }}
         />
@@ -83,7 +84,9 @@ export function BrandMark({
           }
         >
           <p className={`${cfg.textClass} text-white`}>
+            <span data-brand-wordmark={variant}>
             Ranked <span className="text-[#FF2B2B]">Gym</span>
+            </span>
           </p>
           {tagline ? (
             <p

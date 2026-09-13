@@ -1531,6 +1531,15 @@ body {
   opacity: 0;
 }
 
+.app-cold-launch[data-phase='handoff'] [data-cold-launch-panther-flyer],
+.app-cold-launch[data-phase='exiting'] [data-cold-launch-panther-flyer] {
+  opacity: 0;
+}
+
+:root[data-cold-launch-handoff='done'] .app-cold-launch [data-cold-launch-panther-flyer] {
+  opacity: 0;
+}
+
 .app-cold-launch[data-phase='exiting'] {
   opacity: 0;
   transition: opacity 80ms linear;
@@ -1559,8 +1568,10 @@ body {
 }
 
 .app-cold-launch__flyer {
-  transform-origin: center center;
-  will-change: transform, opacity;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
 }
 
 .app-cold-launch__stack {
@@ -1568,6 +1579,9 @@ body {
   width: 132px;
   height: 132px;
   margin: 0 auto;
+  transform-origin: center center;
+  will-change: transform, opacity;
+  transition: opacity 50ms linear;
 }
 
 .app-cold-launch__stack .app-cold-launch__mark {
@@ -1601,6 +1615,12 @@ body {
   font-weight: 600;
   letter-spacing: -0.02em;
   color: #ffffff;
+  opacity: 1;
+  transition: opacity 140ms var(--ease-out);
+}
+
+.app-cold-launch__wordmark[data-visible='false'] {
+  opacity: 0;
 }
 
 .app-cold-launch__wordmark span {
@@ -1617,17 +1637,28 @@ body {
   transition-duration: 120ms !important;
 }
 
-:root:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-mark='compact'] {
+:root:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-mark-image='compact'] {
   visibility: hidden;
   opacity: 0;
 }
 
-[data-cold-launch-target='compact'] [data-brand-mark='compact'] {
+[data-cold-launch-target='compact'] [data-brand-mark-image='compact'],
+[data-cold-launch-target='compact'] [data-brand-wordmark='compact'] {
   transition: opacity 140ms var(--ease-out);
 }
 
-:root[data-cold-launch-played='1'] [data-cold-launch-target='compact'] [data-brand-mark='compact'] {
+:root[data-cold-launch-handoff='done']:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-mark-image='compact'],
+:root[data-cold-launch-played='1'] [data-cold-launch-target='compact'] [data-brand-mark-image='compact'] {
   visibility: visible;
+  opacity: 1;
+}
+
+:root:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-wordmark='compact'] {
+  opacity: 0;
+}
+
+:root[data-cold-launch-header-wordmark='1']:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-wordmark='compact'],
+:root[data-cold-launch-played='1'] [data-cold-launch-target='compact'] [data-brand-wordmark='compact'] {
   opacity: 1;
 }
 

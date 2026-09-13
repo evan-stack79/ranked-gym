@@ -4,6 +4,7 @@ import './index.css'
 import App from './App.tsx'
 import { RootErrorBoundary } from './components/ui/RootErrorBoundary.tsx'
 import { AppColdLaunch } from './components/brand/AppColdLaunch.tsx'
+import { ColdLaunchAccueilFixture } from './fixtures/ColdLaunchAccueilFixture.tsx'
 
 const rootEl = document.getElementById('root')
 if (!rootEl) {
@@ -14,7 +15,11 @@ createRoot(rootEl).render(
   <StrictMode>
     <RootErrorBoundary>
       <AppColdLaunch>
-        <App />
+        {typeof window !== 'undefined' && window.location.pathname === '/accueil-fixture' ? (
+          <ColdLaunchAccueilFixture />
+        ) : (
+          <App />
+        )}
       </AppColdLaunch>
     </RootErrorBoundary>
   </StrictMode>,
