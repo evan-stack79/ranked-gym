@@ -3,7 +3,7 @@
  * Tests navigateur du vrai chemin App/main (pas un harness isolé).
  * - splash natif index.html (noir + panthère calme)
  * - transition React calme → rugissant → disparition
- * - durée totale 800–1200 ms
+ * - durée totale 1300–1500 ms
  * - complete / naturalWidth des images
  * - chargement lent / erreur roar → reste calm
  * - pas de replay visibilitychange
@@ -192,13 +192,13 @@ async function main() {
       { timeout: 4000 },
     )
     const elapsed = Date.now() - t0
-    assert.ok(elapsed >= 700 && elapsed <= 1600, `durée cold launch hors cible: ${elapsed}ms`)
+    assert.ok(elapsed >= 1000 && elapsed <= 2200, `durée cold launch hors cible: ${elapsed}ms`)
     const documentElapsed = await page.evaluate(() => {
       const done = window.__rgLaunchTrace.find((entry) => entry.phase === 'done')
       return done ? done.at - window.__RG_BOOT_T0__ : Number.NaN
     })
     assert.ok(
-      documentElapsed >= 800 && documentElapsed <= 1200,
+      documentElapsed >= 1300 && documentElapsed <= 1500,
       `durée document cold launch hors cible: ${documentElapsed}ms`,
     )
     assert.equal(await page.evaluate(() => document.querySelector('.app-cold-launch')), null)

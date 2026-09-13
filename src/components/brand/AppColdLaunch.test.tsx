@@ -84,11 +84,22 @@ describe('AppColdLaunch', () => {
     delete window.__RG_BOOT_T0__
   })
 
-  it('document deadline stays between 1.05 and 1.2s', () => {
+  it('document deadline stays between 1.3 and 1.5s with mid-travel reveal', () => {
     window.__RG_BOOT_T0__ = 0
     const d = coldLaunchDeadlineMs(50)
+    expect(d.totalMs).toBeGreaterThanOrEqual(1300)
+    expect(d.totalMs).toBeLessThanOrEqual(1500)
     expect(d.totalMs).toBeGreaterThanOrEqual(COLD_LAUNCH_MIN_MS)
     expect(d.totalMs).toBeLessThanOrEqual(COLD_LAUNCH_MAX_MS)
+    expect(d.doneAt).toBeGreaterThanOrEqual(1300)
+    expect(d.doneAt).toBeLessThanOrEqual(1500)
+    expect(d.flipStartAt).toBeGreaterThanOrEqual(350)
+    expect(d.flipStartAt).toBeLessThanOrEqual(500)
+    const travelMs = d.handoffAt - d.flipStartAt
+    expect(travelMs).toBeGreaterThanOrEqual(450)
+    expect(travelMs).toBeLessThanOrEqual(550)
+    expect(d.revealAt).toBeGreaterThan(d.flipStartAt)
+    expect(d.revealAt).toBeLessThan(d.handoffAt)
     expect(d.doneAt).toBeGreaterThan(d.handoffAt)
     expect(d.handoffAt).toBeGreaterThan(d.morphAt)
     expect(d.revealAt).toBeGreaterThan(d.roarAt)
@@ -223,7 +234,7 @@ describe('AppColdLaunch', () => {
     expect(document.documentElement.dataset.coldLaunchHeaderWordmark).toBe('1')
 
     act(() => {
-      vi.advanceTimersByTime(280)
+      vi.advanceTimersByTime(560)
     })
     expect(splash()).toBeNull()
     expect(document.documentElement.dataset.coldLaunchPlayed).toBe('1')
@@ -274,7 +285,7 @@ describe('AppColdLaunch', () => {
     expect(host.querySelector('.app-cold-launch')?.getAttribute('data-phase')).toBe('morphing')
     expect(host.querySelector('.app-cold-launch__mark--calm')?.getAttribute('data-active')).toBe('true')
     act(() => {
-      vi.advanceTimersByTime(800)
+      vi.advanceTimersByTime(1000)
     })
     expect(host.querySelector('.app-cold-launch')).toBeNull()
   })

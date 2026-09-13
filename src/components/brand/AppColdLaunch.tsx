@@ -3,18 +3,21 @@ import { useEffect, useRef, useState } from 'react'
 export const COLD_LAUNCH_CALM_SRC = '/brand-splash-calm.png'
 export const COLD_LAUNCH_ROAR_SRC = '/brand-splash-roar.png'
 
-export const COLD_LAUNCH_MIN_MS = 1050
-export const COLD_LAUNCH_MAX_MS = 1200
-export const COLD_LAUNCH_TOTAL_MS = 1100
+// Ideal full-motion envelope is 1400ms: readable calm/roar, a short centered
+// breath, then 520ms FLIP. MAX=1500 absorbs decode/boot jitter in
+// coldLaunchDeadlineMs without leaving the 1.3–1.5s iPhone-test window.
+export const COLD_LAUNCH_MIN_MS = 1300
+export const COLD_LAUNCH_MAX_MS = 1500
+export const COLD_LAUNCH_TOTAL_MS = 1400
 
-const ROAR_AT_RATIO = 200 / COLD_LAUNCH_TOTAL_MS
-const MORPH_AT_RATIO = 600 / COLD_LAUNCH_TOTAL_MS
-const BACK_TO_CALM_AT_RATIO = 680 / COLD_LAUNCH_TOTAL_MS
-const CENTER_WORDMARK_FADE_AT_RATIO = 600 / COLD_LAUNCH_TOTAL_MS
-const REVEAL_AT_RATIO = 825 / COLD_LAUNCH_TOTAL_MS
-const HANDOFF_AT_RATIO = 1060 / COLD_LAUNCH_TOTAL_MS
-const FLIP_START_AT_RATIO = 600 / COLD_LAUNCH_TOTAL_MS
-const FLIP_DURATION_MS = 450
+const ROAR_AT_RATIO = 180 / COLD_LAUNCH_TOTAL_MS
+const MORPH_AT_RATIO = 460 / COLD_LAUNCH_TOTAL_MS
+const BACK_TO_CALM_AT_RATIO = 540 / COLD_LAUNCH_TOTAL_MS
+const CENTER_WORDMARK_FADE_AT_RATIO = 460 / COLD_LAUNCH_TOTAL_MS
+const REVEAL_AT_RATIO = 720 / COLD_LAUNCH_TOTAL_MS
+const HANDOFF_AT_RATIO = 980 / COLD_LAUNCH_TOTAL_MS
+const FLIP_START_AT_RATIO = 460 / COLD_LAUNCH_TOTAL_MS
+const FLIP_DURATION_MS = 520
 
 type LaunchPhase = 'calm' | 'roar' | 'morphing' | 'handoff' | 'exiting' | 'done'
 
