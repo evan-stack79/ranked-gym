@@ -14,7 +14,11 @@ import {
   revokeAllUserSessions,
   revokeSessionByToken,
 } from './lib/auth'
-import { getResetRedirectBaseUrl, getResetTokenTtlMinutes } from './lib/authConfig'
+import {
+  getResetRedirectBaseUrl,
+  getResetTokenTtlMinutes,
+  isPublicSignupAllowed,
+} from './lib/authConfig'
 
 const RESET_ROUTE_PATH = '/auth/reset-password'
 
@@ -63,6 +67,17 @@ async function getPasswordCredential(ctx: MutationCtx, userId: string) {
     .query('auth_password_credentials')
     .withIndex('by_userId', (q) => q.eq('userId', userId))
     .first()
+}
+
+async function deleteRows(
+  ctx: MutationCtx,
+  rows: Array<{ _id: string }>,
+  deletedDocIds: Set<string>,
+): Promise<void> {
+  for (const row of rows) {
+    await ctx.db.delete(row._id as never)
+    deletedDocIds.add(String(row._id))
+  }
 }
 
 export async function issuePasswordResetToken(
@@ -189,6 +204,215 @@ export async function upsertImportedUserWithoutPassword(
   return 'updated'
 }
 
+export async function registerUserWithEmail(
+  ctx: MutationCtx,
+  args: { email: string; password: string; displayName?: string },
+) {
+  if (!isPublicSignupAllowed()) {
+    throw new Error('AUTH_SIGNUP_DISABLED')
+  }
+  const emailNorm = normalizeEmail(args.email)
+  const existing = await findUserByEmailNorm(ctx, emailNorm)
+  if (existing) {
+    throw new Error('AUTH_EMAIL_ALREADY_REGISTERED')
+  }
+
+  const now = Date.now()
+  const userId = crypto.randomUUID()
+  const passwordHash = await hashPassword(args.password)
+  const displayName = toDisplayName(emailNorm, args.displayName)
+  await ctx.db.insert('auth_users', {
+    userId,
+    email: emailNorm,
+    emailNorm,
+    displayName,
+    mustResetPassword: false,
+    createdAt: now,
+    updatedAt: now,
+  })
+  await ctx.db.insert('auth_password_credentials', {
+    userId,
+    passwordHash,
+    updatedAt: now,
+  })
+  const session = await createSession(ctx, userId)
+  return {
+    sessionToken: session.sessionToken,
+    expiresAt: session.expiresAt,
+    mustResetPassword: false,
+    user: {
+      userId,
+      email: emailNorm,
+      displayName,
+    },
+  }
+}
+
+export async function deleteAccountAndUserData(
+  ctx: MutationCtx,
+  args: { sessionToken: string; password: string },
+): Promise<{ deleted: boolean; deletedAt: number }> {
+  const user = await requireSessionUser(ctx, args.sessionToken)
+  const credential = await getPasswordCredential(ctx, user.userId)
+  if (!credential) {
+    throw new Error('AUTH_INVALID_CREDENTIALS')
+  }
+  const ok = await verifyPassword(args.password, credential.passwordHash)
+  if (!ok) {
+    throw new Error('AUTH_INVALID_CREDENTIALS')
+  }
+
+  const now = Date.now()
+  const userDoc = await ctx.db
+    .query('auth_users')
+    .withIndex('by_userId', (q) => q.eq('userId', user.userId))
+    .first()
+  if (!userDoc) {
+    throw new Error('AUTH_USER_NOT_FOUND')
+  }
+
+  const deletedDocIds = new Set<string>()
+
+  await deleteRows(
+    ctx,
+    await ctx.db.query('profiles').withIndex('by_userId', (q) => q.eq('userId', user.userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('workouts_state').withIndex('by_userId', (q) => q.eq('userId', user.userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('nutrition_state').withIndex('by_userId', (q) => q.eq('userId', user.userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('sleep_nights')
+      .withIndex('by_userId_dateKey', (q) => q.eq('userId', user.userId))
+      .collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('checkins')
+      .withIndex('by_userId_createdAt', (q) => q.eq('userId', user.userId))
+      .collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('custom_spots')
+      .withIndex('by_userId_spotId', (q) => q.eq('userId', user.userId))
+      .collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('active_checkins').withIndex('by_userId', (q) => q.eq('userId', user.userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('aliments')
+      .withIndex('by_userId_createdAt', (q) => q.eq('userId', user.userId))
+      .collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('activities')
+      .withIndex('by_userId_createdAt', (q) => q.eq('userId', user.userId))
+      .collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('ai_usage_limits')
+      .withIndex('by_userId_dateOfScan', (q) => q.eq('userId', user.userId))
+      .collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('streak_state').withIndex('by_userId', (q) => q.eq('userId', user.userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('legacy_supabase_backups')
+      .withIndex('by_userId', (q) => q.eq('userId', user.userId))
+      .collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('auth_private_notes').withIndex('by_userId', (q) => q.eq('userId', user.userId)).collect(),
+    deletedDocIds,
+  )
+
+  const userFiles = await ctx.db
+    .query('user_files')
+    .withIndex('by_userId_kind', (q) => q.eq('userId', user.userId).eq('kind', 'avatar'))
+    .collect()
+  for (const file of userFiles) {
+    await ctx.storage.delete(file.storageId)
+    await ctx.db.delete(file._id)
+    deletedDocIds.add(String(file._id))
+  }
+
+  deletedDocIds.add(String(userDoc._id))
+  await ctx.db.delete(userDoc._id)
+
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('auth_password_reset_outbox')
+      .withIndex('by_userId', (q) => q.eq('userId', user.userId))
+      .collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('auth_password_reset_tokens')
+      .withIndex('by_userId', (q) => q.eq('userId', user.userId))
+      .collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('auth_password_credentials')
+      .withIndex('by_userId', (q) => q.eq('userId', user.userId))
+      .collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('auth_sessions').withIndex('by_userId', (q) => q.eq('userId', user.userId)).collect(),
+    deletedDocIds,
+  )
+
+  const maps = await ctx.db.query('migration_entity_map').collect()
+  for (const map of maps) {
+    if (deletedDocIds.has(map.convexId)) {
+      await ctx.db.delete(map._id)
+    }
+  }
+
+  return { deleted: true, deletedAt: now }
+}
+
 export const signUpWithEmail = mutation({
   args: {
     email: v.string(),
@@ -205,43 +429,7 @@ export const signUpWithEmail = mutation({
       displayName: v.string(),
     }),
   }),
-  handler: async (ctx, args) => {
-    const emailNorm = normalizeEmail(args.email)
-    const existing = await findUserByEmailNorm(ctx, emailNorm)
-    if (existing) {
-      throw new Error('AUTH_EMAIL_ALREADY_REGISTERED')
-    }
-
-    const now = Date.now()
-    const userId = crypto.randomUUID()
-    const passwordHash = await hashPassword(args.password)
-    const displayName = toDisplayName(emailNorm, args.displayName)
-    await ctx.db.insert('auth_users', {
-      userId,
-      email: emailNorm,
-      emailNorm,
-      displayName,
-      mustResetPassword: false,
-      createdAt: now,
-      updatedAt: now,
-    })
-    await ctx.db.insert('auth_password_credentials', {
-      userId,
-      passwordHash,
-      updatedAt: now,
-    })
-    const session = await createSession(ctx, userId)
-    return {
-      sessionToken: session.sessionToken,
-      expiresAt: session.expiresAt,
-      mustResetPassword: false,
-      user: {
-        userId,
-        email: emailNorm,
-        displayName,
-      },
-    }
-  },
+  handler: (ctx, args) => registerUserWithEmail(ctx, args),
 })
 
 export const signInWithPassword = mutation({
@@ -404,64 +592,7 @@ export const deleteOwnAccount = mutation({
     deleted: v.boolean(),
     deletedAt: v.number(),
   }),
-  handler: async (ctx, args) => {
-    const user = await requireSessionUser(ctx, args.sessionToken)
-    const credential = await getPasswordCredential(ctx, user.userId)
-    if (!credential) {
-      throw new Error('AUTH_INVALID_CREDENTIALS')
-    }
-    const ok = await verifyPassword(args.password, credential.passwordHash)
-    if (!ok) {
-      throw new Error('AUTH_INVALID_CREDENTIALS')
-    }
-
-    const now = Date.now()
-    await revokeAllUserSessions(ctx, user.userId)
-
-    const userDoc = await ctx.db
-      .query('auth_users')
-      .withIndex('by_userId', (q) => q.eq('userId', user.userId))
-      .first()
-    if (!userDoc) {
-      throw new Error('AUTH_USER_NOT_FOUND')
-    }
-    const maskedEmail = `deleted+${user.userId}@ranked-gym.invalid`
-    await ctx.db.patch(userDoc._id, {
-      email: maskedEmail,
-      emailNorm: maskedEmail,
-      displayName: 'Deleted Athlete',
-      mustResetPassword: true,
-      pendingDeletionAt: now,
-      deletedAt: now,
-      updatedAt: now,
-    })
-
-    const credentials = await ctx.db
-      .query('auth_password_credentials')
-      .withIndex('by_userId', (q) => q.eq('userId', user.userId))
-      .collect()
-    for (const row of credentials) {
-      await ctx.db.delete(row._id)
-    }
-
-    const resets = await ctx.db
-      .query('auth_password_reset_tokens')
-      .withIndex('by_userId', (q) => q.eq('userId', user.userId))
-      .collect()
-    for (const row of resets) {
-      await ctx.db.delete(row._id)
-    }
-
-    const privateNotes = await ctx.db
-      .query('auth_private_notes')
-      .withIndex('by_userId', (q) => q.eq('userId', user.userId))
-      .collect()
-    for (const row of privateNotes) {
-      await ctx.db.delete(row._id)
-    }
-
-    return { deleted: true, deletedAt: now }
-  },
+  handler: (ctx, args) => deleteAccountAndUserData(ctx, args),
 })
 
 export const importUsersWithoutPasswords = mutation({

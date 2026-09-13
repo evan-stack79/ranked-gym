@@ -13,6 +13,12 @@ function parsePositiveInt(value: string | undefined): number | null {
   return parsed
 }
 
+function parseBooleanFlag(value: string | undefined): boolean {
+  if (!value) return false
+  const normalized = value.trim().toLowerCase()
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on'
+}
+
 export function getResetTokenTtlMinutes(): number {
   return parsePositiveInt(readEnv('CONVEX_AUTH_RESET_TOKEN_TTL_MIN')) ?? DEFAULT_RESET_TOKEN_TTL_MINUTES
 }
@@ -24,4 +30,8 @@ export function getSessionTtlMs(): number {
 
 export function getResetRedirectBaseUrl(): string {
   return readEnv('CONVEX_AUTH_RESET_REDIRECT_URL')?.trim() || ''
+}
+
+export function isPublicSignupAllowed(): boolean {
+  return parseBooleanFlag(readEnv('CONVEX_ALLOW_PUBLIC_SIGNUP'))
 }
