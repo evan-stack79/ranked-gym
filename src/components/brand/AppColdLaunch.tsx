@@ -132,6 +132,7 @@ export function AppColdLaunch({ children }: { children: React.ReactNode }) {
     window.addEventListener('pageshow', onPageShow)
 
     if (reduced.current) {
+      // Accessibility path intentionally bypasses the 0.8–1.2s delight budget.
       const toExit = window.setTimeout(() => {
         setPhase('exiting')
       }, 170)

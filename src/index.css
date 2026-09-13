@@ -1552,7 +1552,7 @@ body {
   transform: scale(0.98);
   transition:
     opacity var(--dur-ui) var(--ease-out),
-    transform var(--dur-ui) var(--ease-in-out);
+    transform var(--dur-ui) var(--ease-out);
 }
 
 .app-cold-launch__mark--calm[data-active='true'] {
@@ -1603,6 +1603,10 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .motion-progress-fill {
+    transition: none !important;
+  }
+
   .ios-sheet-backdrop {
     transition-duration: 80ms !important;
   }
