@@ -105,7 +105,7 @@ export function TrainSheet({
       />
       <div
         ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}
-        className={`ios-sheet-panel relative z-10 flex max-h-[min(92dvh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] border border-white/12 bg-[#1C1C1E] sm:mx-4 sm:rounded-[28px] ${visible ? 'ios-sheet-panel--open' : 'ios-sheet-panel--closed'}`}
+        className={`ios-sheet-panel relative z-10 flex max-h-[min(92dvh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] border border-white/10 sm:mx-4 sm:rounded-[28px] ${visible ? 'ios-sheet-panel--open' : 'ios-sheet-panel--closed'}`}
         style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
       >
         <div className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-white/25 sm:hidden" aria-hidden="true" />
@@ -113,12 +113,12 @@ export function TrainSheet({
           <div className="flex min-w-0 items-start gap-2.5">
             {leading}
             <div className="min-w-0">
-              <h2 id={titleId} className="text-[17px] font-semibold text-white">{title}</h2>
-              {subtitle && <p className="mt-0.5 text-[13px] text-[#8E8E93]">{subtitle}</p>}
+              <h2 id={titleId} className="text-[17px] font-semibold tracking-tight text-white">{title}</h2>
+              {subtitle && <p className="mt-0.5 text-[13px] text-[#AEAEB2]">{subtitle}</p>}
             </div>
           </div>
           <button type="button" onClick={onClose} disabled={!dismissible} aria-label="Fermer"
-            className="ios-press flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#8E8E93] disabled:opacity-40">
+            className="ios-press flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#AEAEB2] disabled:opacity-40">
             <span className="text-[18px] leading-none">×</span>
           </button>
         </div>

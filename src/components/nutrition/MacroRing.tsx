@@ -44,7 +44,7 @@ export function MacroRing({
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           style={{
-            filter: `drop-shadow(0 0 6px ${color}88)`,
+            filter: 'none',
             transition: 'stroke-dashoffset 0.6s ease',
           }}
         />

@@ -33,20 +33,6 @@ export function GlobalOnboardingScreen({ onComplete }: GlobalOnboardingScreenPro
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
-      <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
-        <div
-          className="arena-glow absolute -left-[30%] -top-[20%] h-[70vh] w-[90vw] rounded-full blur-[90px]"
-          style={{ background: 'radial-gradient(circle, #5C1018 0%, #FF2B2B33 35%, transparent 70%)' }}
-        />
-        <div
-          className="arena-glow absolute -right-[25%] top-[-5%] h-[60vh] w-[75vw] rounded-full blur-[100px]"
-          style={{
-            background: 'radial-gradient(circle, #0A1A40 0%, #00B4FF28 40%, transparent 72%)',
-            animationDelay: '3s',
-          }}
-        />
-      </div>
-
       <header className="glass-bar relative z-10 border-b border-white/5">
         <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-3">
           <span className="text-[17px] font-semibold tracking-tight text-white">

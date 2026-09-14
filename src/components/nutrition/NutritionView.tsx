@@ -67,21 +67,16 @@ export function NutritionView() {
   return (
     <div className="flex flex-col gap-8 pb-2">
       <header className="relative ios-fade-up">
-        <div
-          className="pointer-events-none absolute -left-8 -top-6 h-28 w-40 rounded-full blur-3xl"
-          style={{ background: 'radial-gradient(circle, #34C75944 0%, transparent 70%)' }}
-          aria-hidden="true"
-        />
         <div className="relative flex items-start justify-between gap-3">
           <div>
             <div className="mb-2 flex items-center gap-2">
               <IconBadge icon={Leaf} variant="green" size="sm" />
-              <span className="rounded-full border border-[#34C759]/30 bg-[#34C759]/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#30D158]">
-                Fuel
+              <span className="rounded-full border border-white/12 bg-white/5 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#AEAEB2]">
+                Nutrition
               </span>
             </div>
             <h1 className="text-[34px] font-bold tracking-tight text-white">Nutrition</h1>
-            <p className="mt-2 text-[17px] text-[#8E8E93]">
+            <p className="mt-2 text-[17px] text-[#AEAEB2]">
               {showSetupEditor
                 ? 'Ajuste ton objectif et ton plan calorique.'
                 : 'Plan IOM adapté à ton objectif, ton niveau d’activité et ton sport.'}
@@ -93,9 +88,9 @@ export function NutritionView() {
               <button
                 type="button"
                 onClick={openSetupEditor}
-                className="ios-press inline-flex items-center gap-1 text-[11px] font-medium text-[#636366]"
+                className="ios-press inline-flex min-h-11 items-center gap-1.5 rounded-xl px-2.5 text-[12px] font-medium text-[#AEAEB2]"
               >
-                <RotateCcw className="h-3 w-3" />
+                <RotateCcw className="h-3.5 w-3.5" />
                 Refaire le setup
               </button>
             )}
