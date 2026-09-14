@@ -1,7 +1,8 @@
 import { v } from 'convex/values'
-import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
+import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
+import { requireAdminCaller, requireAuthorizedMigrationRun } from './lib/migrationAdmin'
 
 const DEFAULT_CONTENT_TYPE = 'image/jpeg'
 
@@ -111,13 +112,11 @@ async function clearOrReplaceActiveAvatar(
   }
 }
 
-async function ensureMigrationRun(ctx: MutationCtx, runId: string, sourceSha: string) {
-  const run = await ctx.db
-    .query('migration_runs')
-    .withIndex('by_runId', (q) => q.eq('runId', runId))
-    .first()
-  if (!run) throw new Error('MIGRATION_RUN_NOT_FOUND')
-  if (run.sourceSha !== sourceSha) throw new Error('MIGRATION_SOURCE_SHA_MISMATCH')
+async function ensureAuthorizedMigrationRun(
+  ctx: MutationCtx | QueryCtx,
+  args: { runId: string; sourceSha: string; runSecret: string },
+) {
+  await requireAuthorizedMigrationRun(ctx, args)
 }
 
 export async function assertOwnedUserFile(
@@ -197,6 +196,7 @@ export async function importSupabaseAvatarForUser(
   input: {
     runId: string
     sourceSha: string
+    runSecret: string
     userId: string
     legacySupabasePath: string
     storageId: Id<'_storage'>
@@ -204,6 +204,8 @@ export async function importSupabaseAvatarForUser(
     sizeBytes: number
     sha256: string
     createdAt?: number
+    adminSecret?: string
+    sessionToken?: string
   },
 ): Promise<{
   fileId: Id<'user_files'>
@@ -212,7 +214,12 @@ export async function importSupabaseAvatarForUser(
   legacySupabasePath: string
   replacedAt?: number
 }> {
-  await ensureMigrationRun(ctx, input.runId, input.sourceSha)
+  await requireAdminCaller(ctx, input)
+  await ensureAuthorizedMigrationRun(ctx, {
+    runId: input.runId,
+    sourceSha: input.sourceSha,
+    runSecret: input.runSecret,
+  })
   const userId = input.userId.trim()
   const legacySupabasePath = input.legacySupabasePath.trim()
   if (!userId) throw new Error('MIGRATION_AVATAR_USER_ID_REQUIRED')
@@ -272,6 +279,26 @@ export async function importSupabaseAvatarForUser(
   }
 }
 
+export async function generateMigrationAvatarUploadUrlForRun(
+  ctx: MutationCtx,
+  args: {
+    runId: string
+    sourceSha: string
+    runSecret: string
+    adminSecret?: string
+    sessionToken?: string
+  },
+): Promise<{ uploadUrl: string }> {
+  await requireAdminCaller(ctx, args)
+  await ensureAuthorizedMigrationRun(ctx, {
+    runId: args.runId,
+    sourceSha: args.sourceSha,
+    runSecret: args.runSecret,
+  })
+  const uploadUrl = await ctx.storage.generateUploadUrl()
+  return { uploadUrl }
+}
+
 export const generateAvatarUploadUrl = mutation({
   args: { sessionToken: v.string() },
   returns: v.object({
@@ -284,19 +311,18 @@ export const generateAvatarUploadUrl = mutation({
   },
 })
 
-export const generateMigrationAvatarUploadUrl = mutation({
+export const generateMigrationAvatarUploadUrl = internalMutation({
   args: {
     runId: v.string(),
     sourceSha: v.string(),
+    runSecret: v.string(),
+    adminSecret: v.optional(v.string()),
+    sessionToken: v.optional(v.string()),
   },
   returns: v.object({
     uploadUrl: v.string(),
   }),
-  handler: async (ctx, args) => {
-    await ensureMigrationRun(ctx, args.runId, args.sourceSha)
-    const uploadUrl = await ctx.storage.generateUploadUrl()
-    return { uploadUrl }
-  },
+  handler: (ctx, args) => generateMigrationAvatarUploadUrlForRun(ctx, args),
 })
 
 export const commitAvatarUpload = mutation({
@@ -317,10 +343,11 @@ export const commitAvatarUpload = mutation({
     }),
 })
 
-export const importSupabaseAvatar = mutation({
+export const importSupabaseAvatar = internalMutation({
   args: {
     runId: v.string(),
     sourceSha: v.string(),
+    runSecret: v.string(),
     userId: v.string(),
     legacySupabasePath: v.string(),
     storageId: v.id('_storage'),
@@ -328,12 +355,15 @@ export const importSupabaseAvatar = mutation({
     sizeBytes: v.number(),
     sha256: v.string(),
     createdAt: v.optional(v.number()),
+    adminSecret: v.optional(v.string()),
+    sessionToken: v.optional(v.string()),
   },
   returns: importedAvatarValidator,
   handler: (ctx, args) =>
     importSupabaseAvatarForUser(ctx, {
       runId: args.runId,
       sourceSha: args.sourceSha,
+      runSecret: args.runSecret,
       userId: args.userId,
       legacySupabasePath: args.legacySupabasePath,
       storageId: args.storageId,
@@ -341,6 +371,8 @@ export const importSupabaseAvatar = mutation({
       sizeBytes: args.sizeBytes,
       sha256: args.sha256,
       createdAt: args.createdAt,
+      adminSecret: args.adminSecret,
+      sessionToken: args.sessionToken,
     }),
 })
 

@@ -216,42 +216,55 @@ describe('Convex file storage isolation', () => {
   })
 
   it('imports Supabase avatars only for known migration runs', async () => {
-    const db = new FakeDb()
-    const storage = new FakeStorage()
-    const ctx = createCtx(db, storage)
-    await seedUser(db, 'user-a', 'session-a')
-    await db.insert('migration_runs', {
-      runId: 'run-avatar-1',
-      startedAt: Date.now(),
-      status: 'running',
-      sourceSha: 'sha-123',
-      summaryJson: {},
-    })
-
-    await expect(
-      importSupabaseAvatarForUser(ctx as never, {
+    const previousSecret = process.env.MIGRATION_ADMIN_SECRET
+    const runSecret = 'files-isolation-run-secret'
+    process.env.MIGRATION_ADMIN_SECRET = runSecret
+    try {
+      const db = new FakeDb()
+      const storage = new FakeStorage()
+      const ctx = createCtx(db, storage)
+      await seedUser(db, 'user-a', 'session-a')
+      await db.insert('migration_runs', {
         runId: 'run-avatar-1',
-        sourceSha: 'different-sha',
+        startedAt: Date.now(),
+        status: 'running',
+        sourceSha: 'sha-123',
+        adminSecretHash: await hashToken(runSecret),
+        summaryJson: {},
+      })
+
+      await expect(
+        importSupabaseAvatarForUser(ctx as never, {
+          runId: 'run-avatar-1',
+          sourceSha: 'different-sha',
+          runSecret,
+          adminSecret: runSecret,
+          userId: 'user-a',
+          legacySupabasePath: 'user-a/avatar.jpg',
+          storageId: 'storage-a-imported' as never,
+          contentType: 'image/jpeg',
+          sizeBytes: 300,
+          sha256: 'imported',
+        }),
+      ).rejects.toThrow(/MIGRATION_SOURCE_SHA_MISMATCH/i)
+
+      const imported = await importSupabaseAvatarForUser(ctx as never, {
+        runId: 'run-avatar-1',
+        sourceSha: 'sha-123',
+        runSecret,
+        adminSecret: runSecret,
         userId: 'user-a',
         legacySupabasePath: 'user-a/avatar.jpg',
         storageId: 'storage-a-imported' as never,
         contentType: 'image/jpeg',
         sizeBytes: 300,
         sha256: 'imported',
-      }),
-    ).rejects.toThrow(/MIGRATION_SOURCE_SHA_MISMATCH/i)
-
-    const imported = await importSupabaseAvatarForUser(ctx as never, {
-      runId: 'run-avatar-1',
-      sourceSha: 'sha-123',
-      userId: 'user-a',
-      legacySupabasePath: 'user-a/avatar.jpg',
-      storageId: 'storage-a-imported' as never,
-      contentType: 'image/jpeg',
-      sizeBytes: 300,
-      sha256: 'imported',
-    })
-    expect(imported.userId).toBe('user-a')
-    expect(imported.legacySupabasePath).toBe('user-a/avatar.jpg')
+      })
+      expect(imported.userId).toBe('user-a')
+      expect(imported.legacySupabasePath).toBe('user-a/avatar.jpg')
+    } finally {
+      if (previousSecret === undefined) delete process.env.MIGRATION_ADMIN_SECRET
+      else process.env.MIGRATION_ADMIN_SECRET = previousSecret
+    }
   })
 })

@@ -1,5 +1,5 @@
 import { v } from 'convex/values'
-import { mutation, query, type MutationCtx } from './_generated/server'
+import { mutation, query, internalMutation, internalQuery, type MutationCtx, type QueryCtx } from './_generated/server'
 import {
   assertPasswordPolicy,
   createOpaqueToken,
@@ -19,6 +19,7 @@ import {
   getResetTokenTtlMinutes,
   isPublicSignupAllowed,
 } from './lib/authConfig'
+import { requireAdminCaller } from './lib/migrationAdmin'
 
 const RESET_ROUTE_PATH = '/auth/reset-password'
 
@@ -595,7 +596,77 @@ export const deleteOwnAccount = mutation({
   handler: (ctx, args) => deleteAccountAndUserData(ctx, args),
 })
 
-export const importUsersWithoutPasswords = mutation({
+export async function importUsersWithoutPasswordsForAdmin(
+  ctx: MutationCtx,
+  args: {
+    users: ImportedUserInput[]
+    adminSecret?: string
+    sessionToken?: string
+  },
+): Promise<{ imported: number; updated: number; skippedDeleted: number }> {
+  await requireAdminCaller(ctx, args)
+  let imported = 0
+  let updated = 0
+  let skippedDeleted = 0
+  const now = Date.now()
+  for (const rawUser of args.users) {
+    const outcome = await upsertImportedUserWithoutPassword(ctx, rawUser, now)
+    if (outcome === 'imported') imported += 1
+    if (outcome === 'updated') updated += 1
+    if (outcome === 'skippedDeleted') skippedDeleted += 1
+  }
+  return { imported, updated, skippedDeleted }
+}
+
+export async function queueGlobalPasswordResetCampaignForAdmin(
+  ctx: MutationCtx,
+  args: {
+    limit?: number
+    redirectTo?: string
+    adminSecret?: string
+    sessionToken?: string
+  },
+): Promise<{ queued: number }> {
+  await requireAdminCaller(ctx, args)
+  const limit = Math.max(1, Math.min(args.limit ?? 500, 5_000))
+  const users = await ctx.db
+    .query('auth_users')
+    .withIndex('by_mustResetPassword', (q) => q.eq('mustResetPassword', true))
+    .take(limit)
+  let queued = 0
+  for (const user of users) {
+    if (user.deletedAt) continue
+    await issuePasswordResetToken(ctx, user.userId, user.email, user.emailNorm, args.redirectTo)
+    queued += 1
+  }
+  return { queued }
+}
+
+export async function getPasswordResetOutboxPreviewForAdmin(
+  ctx: QueryCtx,
+  args: {
+    limit?: number
+    adminSecret?: string
+    sessionToken?: string
+  },
+) {
+  await requireAdminCaller(ctx, args)
+  const limit = Math.max(1, Math.min(args.limit ?? 50, 500))
+  const rows = await ctx.db
+    .query('auth_password_reset_outbox')
+    .withIndex('by_createdAt')
+    .order('desc')
+    .take(limit)
+  return rows.map((row) => ({
+    email: row.email,
+    createdAt: row.createdAt,
+    sentAt: row.sentAt,
+    attemptCount: row.attemptCount,
+    lastError: row.lastError,
+  }))
+}
+
+export const importUsersWithoutPasswords = internalMutation({
   args: {
     users: v.array(
       v.object({
@@ -603,54 +674,35 @@ export const importUsersWithoutPasswords = mutation({
         displayName: v.optional(v.string()),
       }),
     ),
+    adminSecret: v.optional(v.string()),
+    sessionToken: v.optional(v.string()),
   },
   returns: v.object({
     imported: v.number(),
     updated: v.number(),
     skippedDeleted: v.number(),
   }),
-  handler: async (ctx, args) => {
-    let imported = 0
-    let updated = 0
-    let skippedDeleted = 0
-    const now = Date.now()
-    for (const rawUser of args.users) {
-      const outcome = await upsertImportedUserWithoutPassword(ctx, rawUser, now)
-      if (outcome === 'imported') imported += 1
-      if (outcome === 'updated') updated += 1
-      if (outcome === 'skippedDeleted') skippedDeleted += 1
-    }
-    return { imported, updated, skippedDeleted }
-  },
+  handler: (ctx, args) => importUsersWithoutPasswordsForAdmin(ctx, args),
 })
 
-export const queueGlobalPasswordResetCampaign = mutation({
+export const queueGlobalPasswordResetCampaign = internalMutation({
   args: {
     limit: v.optional(v.number()),
     redirectTo: v.optional(v.string()),
+    adminSecret: v.optional(v.string()),
+    sessionToken: v.optional(v.string()),
   },
   returns: v.object({
     queued: v.number(),
   }),
-  handler: async (ctx, args) => {
-    const limit = Math.max(1, Math.min(args.limit ?? 500, 5_000))
-    const users = await ctx.db
-      .query('auth_users')
-      .withIndex('by_mustResetPassword', (q) => q.eq('mustResetPassword', true))
-      .take(limit)
-    let queued = 0
-    for (const user of users) {
-      if (user.deletedAt) continue
-      await issuePasswordResetToken(ctx, user.userId, user.email, user.emailNorm, args.redirectTo)
-      queued += 1
-    }
-    return { queued }
-  },
+  handler: (ctx, args) => queueGlobalPasswordResetCampaignForAdmin(ctx, args),
 })
 
-export const getPasswordResetOutboxPreview = query({
+export const getPasswordResetOutboxPreview = internalQuery({
   args: {
     limit: v.optional(v.number()),
+    adminSecret: v.optional(v.string()),
+    sessionToken: v.optional(v.string()),
   },
   returns: v.array(
     v.object({
@@ -661,19 +713,5 @@ export const getPasswordResetOutboxPreview = query({
       lastError: v.optional(v.string()),
     }),
   ),
-  handler: async (ctx, args) => {
-    const limit = Math.max(1, Math.min(args.limit ?? 50, 500))
-    const rows = await ctx.db
-      .query('auth_password_reset_outbox')
-      .withIndex('by_createdAt')
-      .order('desc')
-      .take(limit)
-    return rows.map((row) => ({
-      email: row.email,
-      createdAt: row.createdAt,
-      sentAt: row.sentAt,
-      attemptCount: row.attemptCount,
-      lastError: row.lastError,
-    }))
-  },
+  handler: (ctx, args) => getPasswordResetOutboxPreviewForAdmin(ctx, args),
 })

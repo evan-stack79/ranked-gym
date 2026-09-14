@@ -39,6 +39,7 @@ Convex CLI / backend (local `.env.local` only, never git):
 | `CONVEX_AUTH_RESET_TOKEN_TTL_MIN` | Reset token TTL (later phase) |
 | `CONVEX_AUTH_SESSION_TTL_HOURS` | Session lifetime (optional override) |
 | `CONVEX_FILE_SIGNED_URL_TTL_SEC` | Avatar URL TTL (later phase) |
+| `MIGRATION_ADMIN_SECRET` | Server-only Convex env + local script env. Gates internal migration/auth-admin functions. Never `VITE_*`. High-entropy, ≥16 chars. |
 
 Migration scripts (runtime env only):
 
@@ -46,6 +47,8 @@ Migration scripts (runtime env only):
 - `MIGRATION_SUPABASE_SERVICE_ROLE_KEY`
 - `MIGRATION_CONVEX_URL`
 - `MIGRATION_CONVEX_ADMIN_KEY`
+- `MIGRATION_ADMIN_SECRET`
+- `MIGRATION_RUN_SECRET` (optional; defaults to `MIGRATION_ADMIN_SECRET`)
 - `MIGRATION_RUN_ID`
 
 Copy names from `.env.example`. Leave values empty in git.
@@ -93,7 +96,9 @@ What it does:
 - writes report: `scripts/migrations/artifacts/<run-id>.avatar-storage-report.json`
 
 Notes:
-- requires a migration run (`api.migrations.startRun`) and validates `runId + sourceSha`
+- requires Convex admin key (`MIGRATION_CONVEX_ADMIN_KEY` via `setAdminAuth`) plus `MIGRATION_ADMIN_SECRET`
+- calls internal functions (`internal.migrations.startRun`, `internal.files.importSupabaseAvatar`, …)
+- each run stores a hash of a non-derivable `runSecret` (`MIGRATION_RUN_SECRET` or `MIGRATION_ADMIN_SECRET`); inventing a `runId`/`sourceSha` is not enough
 - skips malformed object paths and reports warnings
 - never deletes Supabase bucket objects
 
@@ -116,9 +121,9 @@ If Supabase password hashes are not safely portable to Convex: **global password
 
 ## PR-E auth migration flow (global reset policy)
 
-1. Import legacy users without password hashes into `auth_users` (Convex mutation `auth.importUsersWithoutPasswords`).
+1. Import legacy users without password hashes into `auth_users` (internal Convex mutation `internal.auth.importUsersWithoutPasswords`, admin secret or admin-role session).
 2. Imported users are flagged `mustResetPassword=true`; password login is denied until reset.
-3. Queue reset campaign emails with `auth.queueGlobalPasswordResetCampaign`.
+3. Queue reset campaign emails with `internal.auth.queueGlobalPasswordResetCampaign`.
 4. Complete reset via tokenized link to `/auth/reset-password?token=...` then `auth.consumePasswordReset`.
 
 This preserves the locked policy: no hash portability shortcuts and no legacy password bridge.

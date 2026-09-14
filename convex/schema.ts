@@ -25,6 +25,7 @@ export const convexTables = {
     emailNorm: v.string(),
     displayName: v.string(),
     mustResetPassword: v.boolean(),
+    role: v.optional(v.union(v.literal('admin'), v.literal('user'))),
     pendingDeletionAt: v.optional(v.number()),
     deletedAt: v.optional(v.number()),
     createdAt: v.number(),
@@ -228,6 +229,7 @@ export const convexTables = {
       v.literal('aborted'),
     ),
     sourceSha: v.string(),
+    adminSecretHash: v.optional(v.string()),
     summaryJson: v.any(),
   })
     .index('by_runId', ['runId'])
