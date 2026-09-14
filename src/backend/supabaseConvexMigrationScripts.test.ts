@@ -88,4 +88,18 @@ describe('supabase -> convex migration scripts', () => {
     )
     expect(verification.ok).toBe(true)
   })
+
+  it('requires a server-only admin secret name for Convex import clients', () => {
+    expect(migrationCore.MIGRATION_ENV_NAMES.adminSecret).toBe('MIGRATION_ADMIN_SECRET')
+    expect(migrationCore.MIGRATION_ENV_NAMES.runSecret).toBe('MIGRATION_RUN_SECRET')
+    expect(migrationCore.MIGRATION_ENV_NAMES.convexAdminKey).toBe('MIGRATION_CONVEX_ADMIN_KEY')
+    const previous = process.env.MIGRATION_ADMIN_SECRET
+    delete process.env.MIGRATION_ADMIN_SECRET
+    try {
+      expect(() => migrationCore.requireMigrationSecrets()).toThrow(/MIGRATION_ADMIN_SECRET/)
+    } finally {
+      if (previous === undefined) delete process.env.MIGRATION_ADMIN_SECRET
+      else process.env.MIGRATION_ADMIN_SECRET = previous
+    }
+  })
 })

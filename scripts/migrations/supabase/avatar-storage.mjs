@@ -3,9 +3,8 @@ import { createHash } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { createClient } from '@supabase/supabase-js'
-import { ConvexHttpClient } from 'convex/browser'
-import { api } from '../../../convex/_generated/api.js'
-import { MIGRATION_ENV_NAMES } from './core.mjs'
+import { internal } from '../../../convex/_generated/api.js'
+import { MIGRATION_ENV_NAMES, createConvexInternalClient } from './core.mjs'
 
 function parseArgs(argv) {
   const args = {
@@ -145,20 +144,15 @@ function requireEnv(name) {
 }
 
 function createConvexAdminClient() {
-  const convexUrl = requireEnv(MIGRATION_ENV_NAMES.convexUrl)
-  const convexAdminKey = requireEnv(MIGRATION_ENV_NAMES.convexAdminKey)
-  const client = new ConvexHttpClient(convexUrl)
-  if (typeof client.setAdminAuth !== 'function') {
-    throw new Error('ConvexHttpClient.setAdminAuth unavailable in this runtime.')
-  }
-  client.setAdminAuth(convexAdminKey)
-  return client
+  return createConvexInternalClient()
 }
 
 async function uploadToConvexStorage(client, args, bytes, contentType) {
-  const generated = await client.mutation(api.files.generateMigrationAvatarUploadUrl, {
+  const generated = await client.mutation(internal.files.generateMigrationAvatarUploadUrl, {
     runId: args.runId,
     sourceSha: args.sourceSha,
+    runSecret: args.runSecret,
+    adminSecret: args.adminSecret,
   })
   const response = await fetch(generated.uploadUrl, {
     method: 'POST',
@@ -233,21 +227,23 @@ async function main() {
     if (!supabase) {
       throw new Error('Live Supabase credentials are required for --execute.')
     }
-    const convex = createConvexAdminClient()
-    await convex.mutation(api.migrations.startRun, {
+    const { client, adminSecret, runSecret } = createConvexAdminClient()
+    const convexArgs = {
       runId: args.runId,
       sourceSha: args.sourceSha,
-    })
+      runSecret,
+      adminSecret,
+    }
+    await client.mutation(internal.migrations.startRun, convexArgs)
     try {
       for (const entry of validEntries) {
         try {
           const bytes = await downloadAvatarBytes(supabase, entry.path)
-          const storageId = await uploadToConvexStorage(convex, args, bytes, entry.contentType)
+          const storageId = await uploadToConvexStorage(client, convexArgs, bytes, entry.contentType)
           const sizeBytes = bytes.byteLength || entry.sizeBytes
           const sha256 = sha256Hex(bytes)
-          const imported = await convex.mutation(api.files.importSupabaseAvatar, {
-            runId: args.runId,
-            sourceSha: args.sourceSha,
+          const imported = await client.mutation(internal.files.importSupabaseAvatar, {
+            ...convexArgs,
             userId: entry.userId,
             legacySupabasePath: entry.path,
             storageId,
@@ -275,8 +271,10 @@ async function main() {
           })
         }
       }
-      await convex.mutation(api.migrations.finishRun, {
+      await client.mutation(internal.migrations.finishRun, {
         runId: args.runId,
+        runSecret,
+        adminSecret,
         status: report.failed.length ? 'failed' : 'completed',
         summaryJson: {
           type: 'avatar-storage-cutover',
@@ -289,8 +287,10 @@ async function main() {
       report.ok = report.failed.length === 0
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      await convex.mutation(api.migrations.finishRun, {
+      await client.mutation(internal.migrations.finishRun, {
         runId: args.runId,
+        runSecret,
+        adminSecret,
         status: 'failed',
         summaryJson: { type: 'avatar-storage-cutover', error: message },
       })

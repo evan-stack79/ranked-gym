@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { ConvexHttpClient } from 'convex/browser'
-import { api } from '../../../convex/_generated/api.js'
+import { internal } from '../../../convex/_generated/api.js'
 import {
   MIGRATION_ENV_NAMES,
   applyImportRows,
   buildImportRows,
   countBundleEntities,
+  createConvexInternalClient,
   createFakeExportBundle,
   createInMemoryImportTarget,
   normalizeExportBundle,
@@ -56,23 +56,23 @@ async function readJson(filePath) {
 }
 
 function createConvexTarget(config) {
-  const client = new ConvexHttpClient(config.convexUrl)
-  if (typeof client.setAdminAuth !== 'function') {
-    throw new Error('ConvexHttpClient.setAdminAuth unavailable in this runtime.')
-  }
-  client.setAdminAuth(config.convexAdminKey)
+  const { client, adminSecret, runSecret } = config
 
   return {
     async start() {
-      await client.mutation(api.migrations.startRun, {
+      await client.mutation(internal.migrations.startRun, {
         runId: config.runId,
         sourceSha: config.sourceSha,
+        runSecret,
+        adminSecret,
       })
     },
     async upsertImportRow(row) {
-      return client.mutation(api.migrations.importEntity, {
+      return client.mutation(internal.migrations.importEntity, {
         runId: config.runId,
         sourceSha: config.sourceSha,
+        runSecret,
+        adminSecret,
         entityType: row.entityType,
         supabaseId: row.supabaseId,
         checksum: row.checksum,
@@ -80,14 +80,20 @@ function createConvexTarget(config) {
       })
     },
     async finish(status, summaryJson) {
-      await client.mutation(api.migrations.finishRun, {
+      await client.mutation(internal.migrations.finishRun, {
         runId: config.runId,
+        runSecret,
+        adminSecret,
         status,
         summaryJson,
       })
     },
     async getCounts() {
-      return client.query(api.migrations.getCounts, { runId: config.runId })
+      return client.query(internal.migrations.getCounts, {
+        runId: config.runId,
+        runSecret,
+        adminSecret,
+      })
     },
   }
 }
@@ -117,16 +123,11 @@ async function main() {
       tables: { ...expectedCounts },
     }
   } else {
-    const convexUrl = process.env[MIGRATION_ENV_NAMES.convexUrl]
-    const convexAdminKey = process.env[MIGRATION_ENV_NAMES.convexAdminKey]
-    if (!convexUrl || !convexAdminKey) {
-      throw new Error(
-        `Missing env names: ${MIGRATION_ENV_NAMES.convexUrl} and ${MIGRATION_ENV_NAMES.convexAdminKey}`,
-      )
-    }
+    const { client, adminSecret, runSecret } = createConvexInternalClient()
     const target = createConvexTarget({
-      convexUrl,
-      convexAdminKey,
+      client,
+      adminSecret,
+      runSecret,
       runId: bundle.runId,
       sourceSha: args.sourceSha,
     })

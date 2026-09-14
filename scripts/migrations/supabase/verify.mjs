@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { ConvexHttpClient } from 'convex/browser'
-import { api } from '../../../convex/_generated/api.js'
+import { internal } from '../../../convex/_generated/api.js'
 import {
   MIGRATION_ENV_NAMES,
   countBundleEntities,
+  createConvexInternalClient,
   createFakeExportBundle,
   normalizeExportBundle,
   verifyCounts,
@@ -52,20 +52,11 @@ async function readJson(filePath) {
 }
 
 async function readActualCountsFromConvex(runId) {
-  const convexUrl = process.env[MIGRATION_ENV_NAMES.convexUrl]
-  const convexAdminKey = process.env[MIGRATION_ENV_NAMES.convexAdminKey]
-  if (!convexUrl || !convexAdminKey) {
-    throw new Error(
-      `Missing env names: ${MIGRATION_ENV_NAMES.convexUrl} and ${MIGRATION_ENV_NAMES.convexAdminKey}`,
-    )
-  }
-  const client = new ConvexHttpClient(convexUrl)
-  if (typeof client.setAdminAuth !== 'function') {
-    throw new Error('ConvexHttpClient.setAdminAuth unavailable in this runtime.')
-  }
-  client.setAdminAuth(convexAdminKey)
-  const counts = await client.query(api.migrations.getCounts, {
+  const { client, adminSecret, runSecret } = createConvexInternalClient()
+  const counts = await client.query(internal.migrations.getCounts, {
     runId: runId || undefined,
+    runSecret,
+    adminSecret,
   })
   return counts?.mappedEntities ?? {}
 }

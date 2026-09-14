@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { ConvexHttpClient } from 'convex/browser'
 
 export const MIGRATION_ENTITY_ORDER = [
   'auth_users',
@@ -17,7 +18,35 @@ export const MIGRATION_ENV_NAMES = {
   supabaseServiceRoleKey: 'MIGRATION_SUPABASE_SERVICE_ROLE_KEY',
   convexUrl: 'MIGRATION_CONVEX_URL',
   convexAdminKey: 'MIGRATION_CONVEX_ADMIN_KEY',
+  adminSecret: 'MIGRATION_ADMIN_SECRET',
+  runSecret: 'MIGRATION_RUN_SECRET',
   runId: 'MIGRATION_RUN_ID',
+}
+
+export function requireMigrationSecrets() {
+  const adminSecret = process.env[MIGRATION_ENV_NAMES.adminSecret]
+  if (!adminSecret) {
+    throw new Error(`Missing env name: ${MIGRATION_ENV_NAMES.adminSecret}`)
+  }
+  const runSecret = process.env[MIGRATION_ENV_NAMES.runSecret] || adminSecret
+  return { adminSecret, runSecret }
+}
+
+export function createConvexInternalClient() {
+  const convexUrl = process.env[MIGRATION_ENV_NAMES.convexUrl]
+  const convexAdminKey = process.env[MIGRATION_ENV_NAMES.convexAdminKey]
+  if (!convexUrl || !convexAdminKey) {
+    throw new Error(
+      `Missing env names: ${MIGRATION_ENV_NAMES.convexUrl} and ${MIGRATION_ENV_NAMES.convexAdminKey}`,
+    )
+  }
+  const client = new ConvexHttpClient(convexUrl)
+  if (typeof client.setAdminAuth !== 'function') {
+    throw new Error('ConvexHttpClient.setAdminAuth unavailable in this runtime.')
+  }
+  client.setAdminAuth(convexAdminKey)
+  const secrets = requireMigrationSecrets()
+  return { client, ...secrets }
 }
 
 function asArray(value) {

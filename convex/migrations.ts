@@ -1,6 +1,12 @@
 import { v } from 'convex/values'
-import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
-import type { Id } from './_generated/dataModel'
+import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from './_generated/server'
+import {
+  assertRunSecretStrength,
+  hashMigrationSecret,
+  requireAdminCaller,
+  requireAuthorizedMigrationRun,
+  type AdminAuthz,
+} from './lib/migrationAdmin'
 
 export const MIGRATION_ENTITY_TYPES = [
   'auth_users',
@@ -36,29 +42,16 @@ async function findMap(ctx: QueryCtx | MutationCtx, entityType: string, supabase
     .first()
 }
 
-async function ensureRun(
-  ctx: MutationCtx,
-  runId: string,
-  sourceSha: string,
-  now: number,
-): Promise<{ runDocId: Id<'migration_runs'>; created: boolean }> {
-  const existing = await findRun(ctx, runId)
-  if (existing) {
-    await ctx.db.patch(existing._id, {
-      status: 'running',
-      sourceSha: sourceSha || existing.sourceSha,
-      summaryJson: { ...(existing.summaryJson ?? {}), resumedAt: now },
-    })
-    return { runDocId: existing._id, created: false }
+const adminAuthArgs = {
+  adminSecret: v.optional(v.string()),
+  sessionToken: v.optional(v.string()),
+}
+
+function toAdminAuthz(args: AdminAuthz): AdminAuthz {
+  return {
+    adminSecret: args.adminSecret,
+    sessionToken: args.sessionToken,
   }
-  const runDocId = await ctx.db.insert('migration_runs', {
-    runId,
-    startedAt: now,
-    status: 'running',
-    sourceSha,
-    summaryJson: {},
-  })
-  return { runDocId, created: true }
 }
 
 async function upsertAuthUser(
@@ -343,20 +336,66 @@ async function upsertEntity(
   }
 }
 
+export async function startRunForAdmin(
+  ctx: MutationCtx,
+  args: {
+    runId: string
+    sourceSha: string
+    runSecret: string
+    adminSecret?: string
+    sessionToken?: string
+  },
+): Promise<{ created: boolean }> {
+  await requireAdminCaller(ctx, toAdminAuthz(args))
+  assertRunSecretStrength(args.runSecret)
+  const now = Date.now()
+  const adminSecretHash = await hashMigrationSecret(args.runSecret)
+  const existing = await findRun(ctx, args.runId)
+  if (existing) {
+    await requireAuthorizedMigrationRun(ctx, {
+      runId: args.runId,
+      runSecret: args.runSecret,
+    })
+    await ctx.db.patch(existing._id, {
+      status: 'running',
+      sourceSha: args.sourceSha || existing.sourceSha,
+      summaryJson: { ...(existing.summaryJson ?? {}), resumedAt: now },
+    })
+    return { created: false }
+  }
+  await ctx.db.insert('migration_runs', {
+    runId: args.runId,
+    startedAt: now,
+    status: 'running',
+    sourceSha: args.sourceSha,
+    adminSecretHash,
+    summaryJson: {},
+  })
+  return { created: true }
+}
+
 export async function importEntityForRun(
   ctx: MutationCtx,
   args: {
     runId: string
     sourceSha: string
+    runSecret: string
     entityType: MigrationEntityType
     supabaseId: string
     checksum: string
     payload: Record<string, unknown>
     dryRun?: boolean
+    adminSecret?: string
+    sessionToken?: string
   },
 ): Promise<{ operation: ImportOperation; convexId: string | null }> {
+  await requireAdminCaller(ctx, toAdminAuthz(args))
+  await requireAuthorizedMigrationRun(ctx, {
+    runId: args.runId,
+    runSecret: args.runSecret,
+    sourceSha: args.sourceSha,
+  })
   const now = Date.now()
-  await ensureRun(ctx, args.runId, args.sourceSha, now)
   const existingMap = await findMap(ctx, args.entityType, args.supabaseId)
   if (existingMap && existingMap.checksum === args.checksum) {
     await ctx.db.patch(existingMap._id, {
@@ -398,30 +437,54 @@ export async function importEntityForRun(
   return { operation: outcome.operation, convexId: outcome.convexId }
 }
 
-export const startRun = mutation({
+export async function finishRunForAdmin(
+  ctx: MutationCtx,
+  args: {
+    runId: string
+    runSecret: string
+    status: 'running' | 'completed' | 'failed' | 'aborted'
+    summaryJson: unknown
+    adminSecret?: string
+    sessionToken?: string
+  },
+): Promise<null> {
+  await requireAdminCaller(ctx, toAdminAuthz(args))
+  const run = await requireAuthorizedMigrationRun(ctx, {
+    runId: args.runId,
+    runSecret: args.runSecret,
+  })
+  await ctx.db.patch(run._id, {
+    status: args.status,
+    finishedAt: Date.now(),
+    summaryJson: args.summaryJson ?? {},
+  })
+  return null
+}
+
+export const startRun = internalMutation({
   args: {
     runId: v.string(),
     sourceSha: v.string(),
+    runSecret: v.string(),
+    ...adminAuthArgs,
   },
   returns: v.object({
     created: v.boolean(),
   }),
-  handler: async (ctx, args) => {
-    const now = Date.now()
-    const outcome = await ensureRun(ctx, args.runId, args.sourceSha, now)
-    return { created: outcome.created }
-  },
+  handler: (ctx, args) => startRunForAdmin(ctx, args),
 })
 
-export const importEntity = mutation({
+export const importEntity = internalMutation({
   args: {
     runId: v.string(),
     sourceSha: v.string(),
+    runSecret: v.string(),
     entityType: entityTypeValidator(),
     supabaseId: v.string(),
     checksum: v.string(),
     payload: v.any(),
     dryRun: v.optional(v.boolean()),
+    ...adminAuthArgs,
   },
   returns: v.object({
     operation: v.union(v.literal('inserted'), v.literal('updated'), v.literal('skipped')),
@@ -431,17 +494,21 @@ export const importEntity = mutation({
     importEntityForRun(ctx, {
       runId: args.runId,
       sourceSha: args.sourceSha,
+      runSecret: args.runSecret,
       entityType: args.entityType,
       supabaseId: args.supabaseId,
       checksum: args.checksum,
       payload: (args.payload ?? {}) as Record<string, unknown>,
       dryRun: args.dryRun,
+      adminSecret: args.adminSecret,
+      sessionToken: args.sessionToken,
     }),
 })
 
-export const finishRun = mutation({
+export const finishRun = internalMutation({
   args: {
     runId: v.string(),
+    runSecret: v.string(),
     status: v.union(
       v.literal('running'),
       v.literal('completed'),
@@ -449,28 +516,10 @@ export const finishRun = mutation({
       v.literal('aborted'),
     ),
     summaryJson: v.any(),
+    ...adminAuthArgs,
   },
   returns: v.null(),
-  handler: async (ctx, args) => {
-    const run = await findRun(ctx, args.runId)
-    if (!run) {
-      await ctx.db.insert('migration_runs', {
-        runId: args.runId,
-        startedAt: Date.now(),
-        finishedAt: Date.now(),
-        status: args.status,
-        sourceSha: 'unknown',
-        summaryJson: args.summaryJson ?? {},
-      })
-      return null
-    }
-    await ctx.db.patch(run._id, {
-      status: args.status,
-      finishedAt: Date.now(),
-      summaryJson: args.summaryJson ?? {},
-    })
-    return null
-  },
+  handler: (ctx, args) => finishRunForAdmin(ctx, args),
 })
 
 function createEmptyEntityCounts(): MigrationEntityCounts {
@@ -497,9 +546,46 @@ function toEntityCounts(rows: Array<{ entityType: string }>): MigrationEntityCou
   return counts
 }
 
-export const getCounts = query({
+export async function getCountsForAdmin(
+  ctx: QueryCtx,
+  args: {
+    runId?: string
+    runSecret?: string
+    adminSecret?: string
+    sessionToken?: string
+  },
+) {
+  await requireAdminCaller(ctx, toAdminAuthz(args))
+  if (args.runId) {
+    await requireAuthorizedMigrationRun(ctx, {
+      runId: args.runId,
+      runSecret: args.runSecret ?? '',
+    })
+  }
+  const mapRows = await ctx.db.query('migration_entity_map').collect()
+  const scoped = args.runId ? mapRows.filter((row) => row.runId === args.runId) : mapRows
+  const mappedEntities = toEntityCounts(scoped)
+  return {
+    tables: {
+      auth_users: (await ctx.db.query('auth_users').collect()).length,
+      profiles: (await ctx.db.query('profiles').collect()).length,
+      workouts: (await ctx.db.query('workouts_state').collect()).length,
+      nutrition: (await ctx.db.query('nutrition_state').collect()).length,
+      checkins: (await ctx.db.query('checkins').collect()).length,
+      aliments: (await ctx.db.query('aliments').collect()).length,
+      activities: (await ctx.db.query('activities').collect()).length,
+      ai_usage_limits: (await ctx.db.query('ai_usage_limits').collect()).length,
+      user_backups: (await ctx.db.query('legacy_supabase_backups').collect()).length,
+    },
+    mappedEntities,
+  }
+}
+
+export const getCounts = internalQuery({
   args: {
     runId: v.optional(v.string()),
+    runSecret: v.optional(v.string()),
+    ...adminAuthArgs,
   },
   returns: v.object({
     tables: v.object({
@@ -525,23 +611,5 @@ export const getCounts = query({
       user_backups: v.number(),
     }),
   }),
-  handler: async (ctx, args) => {
-    const mapRows = await ctx.db.query('migration_entity_map').collect()
-    const scoped = args.runId ? mapRows.filter((row) => row.runId === args.runId) : mapRows
-    const mappedEntities = toEntityCounts(scoped)
-    return {
-      tables: {
-        auth_users: (await ctx.db.query('auth_users').collect()).length,
-        profiles: (await ctx.db.query('profiles').collect()).length,
-        workouts: (await ctx.db.query('workouts_state').collect()).length,
-        nutrition: (await ctx.db.query('nutrition_state').collect()).length,
-        checkins: (await ctx.db.query('checkins').collect()).length,
-        aliments: (await ctx.db.query('aliments').collect()).length,
-        activities: (await ctx.db.query('activities').collect()).length,
-        ai_usage_limits: (await ctx.db.query('ai_usage_limits').collect()).length,
-        user_backups: (await ctx.db.query('legacy_supabase_backups').collect()).length,
-      },
-      mappedEntities,
-    }
-  },
+  handler: (ctx, args) => getCountsForAdmin(ctx, args),
 })
