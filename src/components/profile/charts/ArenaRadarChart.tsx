@@ -79,7 +79,7 @@ export function ArenaRadarChart({
         viewBox={`0 0 ${SIZE} ${SIZE}`}
         className="mx-auto h-auto w-full max-w-[280px]"
         role="img"
-        aria-label="Bilan de l'arène — graphique radar"
+        aria-label="Bilan athlète — graphique radar"
       >
         <defs>
           <linearGradient id="arena-radar-fill" x1="0%" y1="0%" x2="100%" y2="100%">
