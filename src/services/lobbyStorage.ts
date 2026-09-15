@@ -1,5 +1,6 @@
 import type { NearbyGym } from '../types'
 import { getActiveCloudUserId } from './cloudSession'
+import { readLocal, removeLocal, writeLocal } from './secureLocalStore'
 
 const CUSTOM_GYMS_BASE = 'ranked-gym:custom-gyms'
 const CHECK_IN_BASE = 'ranked-gym:check-in'
@@ -37,7 +38,7 @@ export interface StoredCheckIn {
 
 function readJson<T>(key: string, fallback: T): T {
   try {
-    const raw = localStorage.getItem(key)
+    const raw = readLocal(key)
     if (!raw) return fallback
     return JSON.parse(raw) as T
   } catch {
@@ -46,7 +47,7 @@ function readJson<T>(key: string, fallback: T): T {
 }
 
 function writeJson<T>(key: string, value: T, opts?: StorageSaveOptions): void {
-  localStorage.setItem(key, JSON.stringify(value))
+  writeLocal(key, JSON.stringify(value))
   if (!opts?.skipCloud) triggerCloudBackup()
 }
 
@@ -107,7 +108,7 @@ export function getActiveCheckIn(): StoredCheckIn | null {
 }
 
 export function clearCheckIn(opts?: StorageSaveOptions): void {
-  localStorage.removeItem(scopedKey(CHECK_IN_BASE))
+  removeLocal(scopedKey(CHECK_IN_BASE))
   if (!opts?.skipCloud) triggerCloudBackup()
 }
 
