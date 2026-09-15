@@ -1,6 +1,7 @@
 import type { ActionCtx, MutationCtx, QueryCtx } from '../_generated/server'
 import { createOpaqueToken, hashToken } from './authCrypto'
 import { getSessionTtlMs } from './authConfig'
+import { consumeRateLimit } from './rateLimit'
 
 /**
  * Auth guard for later Convex query/mutation work.
@@ -66,6 +67,7 @@ export async function createSession(
   ctx: MutationCtx,
   userId: string,
 ): Promise<{ sessionToken: string; expiresAt: number }> {
+  await consumeRateLimit(ctx, 'sessionCreate', { kind: 'userId', value: userId })
   const sessionToken = createOpaqueToken()
   const tokenHash = await hashToken(sessionToken)
   const now = Date.now()

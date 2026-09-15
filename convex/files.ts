@@ -3,6 +3,7 @@ import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } fr
 import type { Id } from './_generated/dataModel'
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
 import { requireAdminCaller, requireAuthorizedMigrationRun } from './lib/migrationAdmin'
+import { consumeRateLimit } from './lib/rateLimit'
 
 const DEFAULT_CONTENT_TYPE = 'image/jpeg'
 
@@ -142,6 +143,7 @@ export async function commitAvatarUploadForSession(
   },
 ): Promise<UserFileView> {
   const user = await requireSessionUser(ctx, sessionToken)
+  await consumeRateLimit(ctx, 'avatarCommit', { kind: 'userId', value: user.userId })
   const now = Date.now()
   const previous = await findActiveAvatar(ctx, user.userId)
   if (previous) {
@@ -299,16 +301,22 @@ export async function generateMigrationAvatarUploadUrlForRun(
   return { uploadUrl }
 }
 
+export async function generateAvatarUploadUrlForSession(
+  ctx: MutationCtx,
+  sessionToken: string,
+): Promise<{ uploadUrl: string }> {
+  const user = await requireSessionUser(ctx, sessionToken)
+  await consumeRateLimit(ctx, 'avatarUploadUrl', { kind: 'userId', value: user.userId })
+  const uploadUrl = await ctx.storage.generateUploadUrl()
+  return { uploadUrl }
+}
+
 export const generateAvatarUploadUrl = mutation({
   args: { sessionToken: v.string() },
   returns: v.object({
     uploadUrl: v.string(),
   }),
-  handler: async (ctx, args) => {
-    await requireSessionUser(ctx, args.sessionToken)
-    const uploadUrl = await ctx.storage.generateUploadUrl()
-    return { uploadUrl }
-  },
+  handler: (ctx, args) => generateAvatarUploadUrlForSession(ctx, args.sessionToken),
 })
 
 export const generateMigrationAvatarUploadUrl = internalMutation({

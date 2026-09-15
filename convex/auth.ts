@@ -20,6 +20,7 @@ import {
   isPublicSignupAllowed,
 } from './lib/authConfig'
 import { requireAdminCaller } from './lib/migrationAdmin'
+import { consumeRateLimit } from './lib/rateLimit'
 
 const RESET_ROUTE_PATH = '/auth/reset-password'
 
@@ -122,6 +123,7 @@ export async function consumePasswordResetToken(
   assertPasswordPolicy(newPassword)
   const now = Date.now()
   const tokenHash = await hashToken(token)
+  await consumeRateLimit(ctx, 'passwordResetConsume', { kind: 'token', value: tokenHash })
   const reset = await ctx.db
     .query('auth_password_reset_tokens')
     .withIndex('by_tokenHash', (q) => q.eq('tokenHash', tokenHash))
@@ -213,6 +215,7 @@ export async function registerUserWithEmail(
     throw new Error('AUTH_SIGNUP_DISABLED')
   }
   const emailNorm = normalizeEmail(args.email)
+  await consumeRateLimit(ctx, 'signUpEmail', { kind: 'email', value: emailNorm })
   const existing = await findUserByEmailNorm(ctx, emailNorm)
   if (existing) {
     throw new Error('AUTH_EMAIL_ALREADY_REGISTERED')
@@ -254,6 +257,7 @@ export async function deleteAccountAndUserData(
   args: { sessionToken: string; password: string },
 ): Promise<{ deleted: boolean; deletedAt: number }> {
   const user = await requireSessionUser(ctx, args.sessionToken)
+  await consumeRateLimit(ctx, 'deleteAccount', { kind: 'userId', value: user.userId })
   const credential = await getPasswordCredential(ctx, user.userId)
   if (!credential) {
     throw new Error('AUTH_INVALID_CREDENTIALS')
@@ -433,6 +437,40 @@ export const signUpWithEmail = mutation({
   handler: (ctx, args) => registerUserWithEmail(ctx, args),
 })
 
+export async function signInWithPasswordForEmail(
+  ctx: MutationCtx,
+  args: { email: string; password: string },
+) {
+  const emailNorm = normalizeEmail(args.email)
+  await consumeRateLimit(ctx, 'signInEmail', { kind: 'email', value: emailNorm })
+  const user = await findUserByEmailNorm(ctx, emailNorm)
+  if (!user || user.deletedAt) {
+    throw new Error('AUTH_INVALID_CREDENTIALS')
+  }
+  if (user.mustResetPassword) {
+    throw new Error('AUTH_PASSWORD_RESET_REQUIRED')
+  }
+  const credential = await getPasswordCredential(ctx, user.userId)
+  if (!credential) {
+    throw new Error('AUTH_PASSWORD_RESET_REQUIRED')
+  }
+  const ok = await verifyPassword(args.password, credential.passwordHash)
+  if (!ok) {
+    throw new Error('AUTH_INVALID_CREDENTIALS')
+  }
+  const session = await createSession(ctx, user.userId)
+  return {
+    sessionToken: session.sessionToken,
+    expiresAt: session.expiresAt,
+    mustResetPassword: user.mustResetPassword,
+    user: {
+      userId: user.userId,
+      email: user.email,
+      displayName: user.displayName,
+    },
+  }
+}
+
 export const signInWithPassword = mutation({
   args: {
     email: v.string(),
@@ -448,35 +486,7 @@ export const signInWithPassword = mutation({
       displayName: v.string(),
     }),
   }),
-  handler: async (ctx, args) => {
-    const emailNorm = normalizeEmail(args.email)
-    const user = await findUserByEmailNorm(ctx, emailNorm)
-    if (!user || user.deletedAt) {
-      throw new Error('AUTH_INVALID_CREDENTIALS')
-    }
-    if (user.mustResetPassword) {
-      throw new Error('AUTH_PASSWORD_RESET_REQUIRED')
-    }
-    const credential = await getPasswordCredential(ctx, user.userId)
-    if (!credential) {
-      throw new Error('AUTH_PASSWORD_RESET_REQUIRED')
-    }
-    const ok = await verifyPassword(args.password, credential.passwordHash)
-    if (!ok) {
-      throw new Error('AUTH_INVALID_CREDENTIALS')
-    }
-    const session = await createSession(ctx, user.userId)
-    return {
-      sessionToken: session.sessionToken,
-      expiresAt: session.expiresAt,
-      mustResetPassword: user.mustResetPassword,
-      user: {
-        userId: user.userId,
-        email: user.email,
-        displayName: user.displayName,
-      },
-    }
-  },
+  handler: (ctx, args) => signInWithPasswordForEmail(ctx, args),
 })
 
 export const signOut = mutation({
@@ -520,6 +530,19 @@ export const getSession = query({
   },
 })
 
+export async function requestPasswordResetForEmail(
+  ctx: MutationCtx,
+  args: { email: string; redirectTo?: string },
+): Promise<{ accepted: boolean }> {
+  const emailNorm = normalizeEmail(args.email)
+  await consumeRateLimit(ctx, 'passwordResetRequest', { kind: 'email', value: emailNorm })
+  const user = await findUserByEmailNorm(ctx, emailNorm)
+  if (user && !user.deletedAt) {
+    await issuePasswordResetToken(ctx, user.userId, user.email, user.emailNorm, args.redirectTo)
+  }
+  return { accepted: true }
+}
+
 export const requestPasswordReset = mutation({
   args: {
     email: v.string(),
@@ -528,14 +551,7 @@ export const requestPasswordReset = mutation({
   returns: v.object({
     accepted: v.boolean(),
   }),
-  handler: async (ctx, args) => {
-    const emailNorm = normalizeEmail(args.email)
-    const user = await findUserByEmailNorm(ctx, emailNorm)
-    if (user && !user.deletedAt) {
-      await issuePasswordResetToken(ctx, user.userId, user.email, user.emailNorm, args.redirectTo)
-    }
-    return { accepted: true }
-  },
+  handler: (ctx, args) => requestPasswordResetForEmail(ctx, args),
 })
 
 export const consumePasswordReset = mutation({
@@ -555,6 +571,28 @@ export const consumePasswordReset = mutation({
   handler: (ctx, args) => consumePasswordResetToken(ctx, args.token, args.newPassword),
 })
 
+export async function changePasswordForSession(
+  ctx: MutationCtx,
+  args: { sessionToken: string; currentPassword: string; newPassword: string },
+): Promise<{ sessionToken: string; expiresAt: number }> {
+  assertPasswordPolicy(args.newPassword)
+  const user = await requireSessionUser(ctx, args.sessionToken)
+  await consumeRateLimit(ctx, 'changePassword', { kind: 'userId', value: user.userId })
+  const credential = await getPasswordCredential(ctx, user.userId)
+  if (!credential) {
+    throw new Error('AUTH_PASSWORD_RESET_REQUIRED')
+  }
+  const currentOk = await verifyPassword(args.currentPassword, credential.passwordHash)
+  if (!currentOk) {
+    throw new Error('AUTH_INVALID_CREDENTIALS')
+  }
+  const now = Date.now()
+  const passwordHash = await hashPassword(args.newPassword)
+  await ctx.db.patch(credential._id, { passwordHash, updatedAt: now })
+  await revokeAllUserSessions(ctx, user.userId)
+  return createSession(ctx, user.userId)
+}
+
 export const changePassword = mutation({
   args: {
     sessionToken: v.string(),
@@ -565,23 +603,7 @@ export const changePassword = mutation({
     sessionToken: v.string(),
     expiresAt: v.number(),
   }),
-  handler: async (ctx, args) => {
-    assertPasswordPolicy(args.newPassword)
-    const user = await requireSessionUser(ctx, args.sessionToken)
-    const credential = await getPasswordCredential(ctx, user.userId)
-    if (!credential) {
-      throw new Error('AUTH_PASSWORD_RESET_REQUIRED')
-    }
-    const currentOk = await verifyPassword(args.currentPassword, credential.passwordHash)
-    if (!currentOk) {
-      throw new Error('AUTH_INVALID_CREDENTIALS')
-    }
-    const now = Date.now()
-    const passwordHash = await hashPassword(args.newPassword)
-    await ctx.db.patch(credential._id, { passwordHash, updatedAt: now })
-    await revokeAllUserSessions(ctx, user.userId)
-    return createSession(ctx, user.userId)
-  },
+  handler: (ctx, args) => changePasswordForSession(ctx, args),
 })
 
 export const deleteOwnAccount = mutation({
@@ -627,7 +649,11 @@ export async function queueGlobalPasswordResetCampaignForAdmin(
     sessionToken?: string
   },
 ): Promise<{ queued: number }> {
-  await requireAdminCaller(ctx, args)
+  const caller = await requireAdminCaller(ctx, args)
+  await consumeRateLimit(ctx, 'adminResetCampaign', {
+    kind: caller.userId ? 'userId' : 'admin',
+    value: caller.userId || caller.via,
+  })
   const limit = Math.max(1, Math.min(args.limit ?? 500, 5_000))
   const users = await ctx.db
     .query('auth_users')

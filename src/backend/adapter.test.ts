@@ -20,6 +20,7 @@ const PHASE_E_TABLES = [
   'auth_password_reset_tokens',
   'auth_password_reset_outbox',
   'auth_private_notes',
+  'rate_limit_buckets',
   'profiles',
   'workouts_state',
   'nutrition_state',

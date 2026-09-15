@@ -87,6 +87,18 @@ export const convexTables = {
     .index('by_userId', ['userId'])
     .index('by_userId_createdAt', ['userId', 'createdAt']),
 
+  /**
+   * Fixed-window counters for sensitive mutations.
+   * `keyHash` is SHA-256 of `policy|kind|value` — never raw email/password/token/IP.
+   */
+  rate_limit_buckets: defineTable({
+    keyHash: v.string(),
+    policy: v.string(),
+    windowStartedAt: v.number(),
+    count: v.number(),
+    updatedAt: v.number(),
+  }).index('by_keyHash', ['keyHash']),
+
   profiles: defineTable({
     userId: v.string(),
     pseudo: v.string(),
