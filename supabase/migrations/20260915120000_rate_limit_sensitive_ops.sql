@@ -181,3 +181,28 @@ before insert on storage.objects
 for each row
 when (NEW.bucket_id = 'avatars')
 execute function public.enforce_avatar_upload_rate_limit();
+
+create or replace function public.enforce_checkin_rate_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null then
+    raise exception 'authentication required';
+  end if;
+
+  -- 40 check-in writes / 15 min per hashed user id.
+  perform public.consume_rate_limit('createCheckin', v_uid::text, 40, 15 * 60);
+  return NEW;
+end;
+$$;
+
+drop trigger if exists enforce_checkin_rate_limit on public.checkins;
+create trigger enforce_checkin_rate_limit
+before insert on public.checkins
+for each row
+execute function public.enforce_checkin_rate_limit();
