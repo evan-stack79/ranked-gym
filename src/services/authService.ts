@@ -9,6 +9,7 @@ import {
   fetchConvexProfile,
   updateConvexProfileProgress,
 } from './convexProfileService'
+import { clearSecureAuthStorage } from './secureAuthStorage'
 
 export type AuthMethod = 'email'
 
@@ -95,11 +96,13 @@ export async function signInWithEmail(email: string, password: string) {
 export async function signOut() {
   if (isConvexAuthActive()) {
     await convexAuth.signOut()
+    await clearSecureAuthStorage()
     return
   }
   const supabase = getSupabase()
   const { error } = await supabase.auth.signOut()
   if (error) throw error
+  await clearSecureAuthStorage()
 }
 
 /**
@@ -150,12 +153,14 @@ export async function deleteOwnAccount(password?: string) {
   if (isConvexAuthActive()) {
     if (!password) throw new Error('Password is required for Convex account deletion.')
     await convexAuth.deleteOwnAccount(password)
+    await clearSecureAuthStorage()
     return
   }
   const supabase = getSupabase()
   const { error } = await supabase.rpc('delete_own_account')
   if (error) throw error
   await supabase.auth.signOut()
+  await clearSecureAuthStorage()
 }
 
 export async function fetchProfile(userId: string): Promise<ProfileRow | null> {

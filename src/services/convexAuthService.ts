@@ -1,9 +1,8 @@
 import { api as generatedApi } from '../../convex/_generated/api'
 import { getConvex, isConvexConfigured } from '../lib/convex'
-import { getSecureAuthStorage } from './secureAuthStorage'
+import { CONVEX_AUTH_STORAGE_KEY, getSecureAuthStorage } from './secureAuthStorage'
 import type { AuthUser } from './authService'
 
-const CONVEX_AUTH_STORAGE_KEY = 'ranked-gym-convex-auth-v1'
 const api = generatedApi as any
 
 function readTokenFromLocation(): string | null {
