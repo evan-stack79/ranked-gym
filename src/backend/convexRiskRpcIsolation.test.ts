@@ -207,19 +207,21 @@ describe('Convex PR-G RPC isolation', () => {
     const ctx = createCtx(db)
     await seedUser(db, 'user-a', 'session-a')
     await seedUser(db, 'user-b', 'session-b')
+    const now = new Date()
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
     await db.insert('workouts_state', {
       userId: 'user-b',
       stateJson: {
         workoutNotes: [
           {
             id: 'b1',
-            dateKey: '2026-09-08',
+            dateKey: todayKey,
             routineId: 'upper',
             exercises: [{ name: 'Bench Press', sets: [{ weightKg: 80, reps: 5 }] }],
           },
           {
             id: 'b2',
-            dateKey: '2026-09-12',
+            dateKey: todayKey,
             routineId: 'lower',
             exercises: [{ name: 'Squat', sets: [{ weightKg: 120, reps: 4 }] }],
           },
