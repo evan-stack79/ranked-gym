@@ -17,6 +17,7 @@
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
 		B7E4A1922FEA0101000C01A2 /* CameraHeartRatePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E4A1912FEA0101000C01A1 /* CameraHeartRatePlugin.swift */; };
+		B7E4A1972FEA0301000C01B2 /* SecureStoragePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E4A1962FEA0301000C01B1 /* SecureStoragePlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,6 +33,7 @@
 		9582B6822FE993A50072D4E8 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		B7E4A1912FEA0101000C01A1 /* CameraHeartRatePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraHeartRatePlugin.swift; sourceTree = "<group>"; };
+		B7E4A1962FEA0301000C01B1 /* SecureStoragePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureStoragePlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -84,6 +86,7 @@
 			isa = PBXGroup;
 			children = (
 				B7E4A1912FEA0101000C01A1 /* CameraHeartRatePlugin.swift */,
+				B7E4A1962FEA0301000C01B1 /* SecureStoragePlugin.swift */,
 			);
 			path = Plugins;
 			sourceTree = "<group>";
@@ -171,6 +174,7 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				B7E4A1922FEA0101000C01A2 /* CameraHeartRatePlugin.swift in Sources */,
+				B7E4A1972FEA0301000C01B2 /* SecureStoragePlugin.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
