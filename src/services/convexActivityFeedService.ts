@@ -62,8 +62,9 @@ export async function fetchConvexSocialActivityFeed(input: {
 }): Promise<LocalActivityItem[]> {
   try {
     const sessionToken = await readToken()
+    if (!sessionToken) return []
     const rows = (await getConvex().query(api.rpc.getSocialFeed, {
-      sessionToken: sessionToken ?? undefined,
+      sessionToken,
       viewerLat: input.viewerLat ?? null,
       viewerLng: input.viewerLng ?? null,
       radiusKm: input.radiusKm ?? 25,

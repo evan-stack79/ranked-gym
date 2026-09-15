@@ -164,7 +164,7 @@ describe('Convex PR-G RPC isolation', () => {
     expect(countB).toBe(1)
   })
 
-  it('returns sanitized feed rows while preserving ghost-mode privacy', async () => {
+  it('denies cross-user feed reads and keeps each session scoped to itself', async () => {
     const db = new FakeDb()
     const ctx = createCtx(db)
     await seedUser(db, 'user-a', 'session-a', false)
@@ -185,11 +185,7 @@ describe('Convex PR-G RPC isolation', () => {
       radiusKm: 1,
       limit: 10,
     })
-    expect(feedForA).toHaveLength(1)
-    expect(feedForA[0]?.pseudo).toBe('Athlete Furtif')
-    expect(feedForA[0]?.distance_label).toBeNull()
-    expect(feedForA[0]?.is_ghost_mode_enabled).toBe(true)
-    expect(feedForA[0]?.is_self).toBe(false)
+    expect(feedForA).toHaveLength(0)
 
     const feedForB = await getSocialActivityFeed(ctx as never, {
       sessionToken: 'session-b',
@@ -198,8 +194,10 @@ describe('Convex PR-G RPC isolation', () => {
       radiusKm: 25,
       limit: 10,
     })
+    expect(feedForB).toHaveLength(1)
     expect(feedForB[0]?.pseudo).toBe('Bravo')
     expect(feedForB[0]?.is_self).toBe(true)
+    expect(feedForB[0]?.is_ghost_mode_enabled).toBe(true)
   })
 
   it('isolates stats and AI daily counters between two users', async () => {
