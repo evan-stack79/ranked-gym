@@ -1,6 +1,8 @@
 import { getSupabase } from '../lib/supabase'
 import type { ProfileRow } from '../types/database'
 import { getRankFromLevel } from '../utils/rank'
+import { isConvexDomainActive } from '../backend/adapter'
+import { applyConvexDailyLoginStreak } from './convexProfileService'
 
 export const STREAK_WEEK_BONUS_XP = 500
 export const XP_PER_LEVEL = 1000
@@ -178,8 +180,29 @@ export async function applyDailyLoginStreak(
   }
 
   const progress = addXpToProfile(profile.level, profile.xp, transition.bonusXp)
-  const supabase = getSupabase()
   const expectedLastLogin = asDateKey(profile.last_login_date)
+
+  if (isConvexDomainActive()) {
+    const convex = await applyConvexDailyLoginStreak({
+      expectedLastLoginDate: expectedLastLogin,
+      today: transition.today,
+      nextStreak: transition.nextStreak,
+      nextLevel: progress.level,
+      nextXp: progress.xp,
+      nextRank: progress.rank,
+    })
+    return {
+      profile: convex.profile,
+      didUpdate: convex.didUpdate,
+      weekBonus: convex.didUpdate ? transition.weekBonus : false,
+      bonusXp: convex.didUpdate ? transition.bonusXp : 0,
+      previousStreak: convex.didUpdate
+        ? transition.previousStreak
+        : (convex.profile.current_streak ?? transition.previousStreak),
+    }
+  }
+
+  const supabase = getSupabase()
 
   let updateQuery = supabase
     .from('profiles')

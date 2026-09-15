@@ -33,7 +33,7 @@ import { generateLobbyMembersForDiscipline } from '../../data/mockData'
 import { CreateLobbyPanel } from './CreateLobbyPanel'
 import { formatDistance, SEARCH_RADIUS_METERS } from '../../utils/geo'
 import { createCheckin } from '../../services/checkinService'
-import { isSupabaseConfigured } from '../../lib/supabase'
+import { isActiveCloudBackendConfigured } from '../../backend/adapter'
 import { useAuth } from '../../context/AuthContext'
 import type { GymMember, LobbyPhase, LocationContext, NearbyGym } from '../../types'
 import { getStoredDisciplineId, getDiscipline } from '../../data/disciplines'
@@ -91,7 +91,7 @@ export function LobbyView() {
       )
       setPhase('checked-in')
 
-      if (user && isSupabaseConfigured()) {
+      if (user && isActiveCloudBackendConfigured()) {
         void createCheckin({
           userId: user.id,
           salleNom: gym.name,

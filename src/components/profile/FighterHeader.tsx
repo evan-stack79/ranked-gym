@@ -93,7 +93,7 @@ export function FighterHeader({
             />
             {canEdit ? (
               <span
-                className="absolute -bottom-0.5 -right-0.5 flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-[#2C2C2E] text-white shadow-[0_4px_12px_rgb(0_0_0_/0.45)]"
+                className="absolute -bottom-0.5 -right-0.5 flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/20 bg-[#2C2C2E] text-white shadow-[0_4px_12px_rgb(0_0_0_/0.45)]"
                 aria-hidden
               >
                 <Pencil className="h-3 w-3" strokeWidth={2.5} />

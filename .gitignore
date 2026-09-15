@@ -30,6 +30,9 @@ dist-ssr
 # Supabase CLI cache (local)
 supabase/.temp/
 
+# Convex CLI local backend / cache (never commit)
+.convex/
+
 # Build
 dist
 dist-ssr
@@ -55,3 +58,6 @@ ios/DerivedData
 
 # Captures navigateur locales (preuves — jamais versionnées)
 scripts/screenshots/
+
+# Migration artifacts can contain sensitive export metadata.
+scripts/migrations/artifacts/

@@ -67,7 +67,7 @@ export function AuthBottomSheet() {
       ? 'Reçois un lien par email'
       : panel === 'recovery'
         ? 'Choisis un mot de passe sécurisé'
-        : 'Bon retour dans l’arène'
+        : 'Bon retour à la salle'
 
   const handleLogin = (event: FormEvent) => {
     event.preventDefault()

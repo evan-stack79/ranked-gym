@@ -83,12 +83,10 @@ export function IosSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`ios-sheet-panel relative z-10 flex max-h-[min(92vh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] border border-white/12 bg-[#1C1C1E]/96 sm:mx-4 sm:rounded-[28px] ${
+        className={`ios-sheet-panel relative z-10 flex max-h-[min(92dvh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] border border-white/10 sm:mx-4 sm:rounded-[28px] ${
           visible ? 'ios-sheet-panel--open' : 'ios-sheet-panel--closed'
         }`}
         style={{
-          boxShadow:
-            '0 -12px 40px rgb(0 0 0 / 0.45), inset 0 1px 0 rgb(255 255 255 / 0.1)',
           paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))',
         }}
       >
@@ -101,14 +99,14 @@ export function IosSheet({
               <h2 id={titleId} className="text-[17px] font-semibold tracking-tight text-white">
                 {title}
               </h2>
-              {subtitle && <p className="mt-0.5 text-[13px] text-[#8E8E93]">{subtitle}</p>}
+              {subtitle && <p className="mt-0.5 text-[13px] text-[#AEAEB2]">{subtitle}</p>}
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={!dismissible}
-            className="ios-press flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#8E8E93] disabled:opacity-40"
+            className="ios-press flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#AEAEB2] disabled:opacity-40"
             aria-label="Fermer"
           >
             <span className="text-[18px] leading-none">×</span>
