@@ -36,6 +36,15 @@ describe('friendlyAuthError', () => {
   it('détecte les erreurs d’énumération de compte', () => {
     expect(isAccountEnumerationError(new Error('User not found'))).toBe(true)
   })
+
+  it('traduit un throttle serveur sans détails internes', () => {
+    expect(friendlyAuthError(new Error('RATE_LIMITED'), 'fallback')).toBe(
+      'Trop de tentatives. Réessaie dans quelques minutes.',
+    )
+    expect(friendlyAuthError(new Error('Uncaught Error: RATE_LIMITED'), 'fallback')).toMatch(
+      /trop de tentatives/i,
+    )
+  })
 })
 
 describe('authRedirect', () => {

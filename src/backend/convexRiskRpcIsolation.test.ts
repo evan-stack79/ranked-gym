@@ -19,6 +19,7 @@ type TableName =
   | 'checkins'
   | 'activities'
   | 'ai_usage_limits'
+  | 'rate_limit_buckets'
 
 type StoredRow = Record<string, unknown> & { _id: string }
 
@@ -32,6 +33,7 @@ class FakeDb {
     checkins: [],
     activities: [],
     ai_usage_limits: [],
+    rate_limit_buckets: [],
   }
 
   insert(table: TableName, value: Record<string, unknown>) {

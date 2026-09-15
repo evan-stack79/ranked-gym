@@ -1,6 +1,7 @@
 import { v } from 'convex/values'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
+import { consumeRateLimit } from './lib/rateLimit'
 
 const ACTIVITY_TYPES = new Set(['pr', 'workout', 'checkin', 'rank_up', 'streak'])
 const DEFAULT_WEEK_LABELS = ['S-3', 'S-2', 'S-1', 'Act.'] as const
@@ -218,6 +219,7 @@ export async function createCheckinForSession(
   },
 ): Promise<ConvexCheckinView> {
   const userId = await getSessionUserId(ctx, sessionToken)
+  await consumeRateLimit(ctx, 'createCheckin', { kind: 'userId', value: userId })
   const now = Date.now()
   const id = await ctx.db.insert('checkins', {
     userId,
@@ -277,6 +279,7 @@ export async function recordActivityForSession(
   },
 ): Promise<string> {
   const userId = await getSessionUserId(ctx, sessionToken)
+  await consumeRateLimit(ctx, 'recordActivity', { kind: 'userId', value: userId })
   if (!ACTIVITY_TYPES.has(input.activityType)) {
     throw new Error('ACTIVITY_TYPE_INVALID')
   }
