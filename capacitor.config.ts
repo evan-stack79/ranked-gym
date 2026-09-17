@@ -20,6 +20,7 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: false,
+    // MASVS: backup disabled in AndroidManifest (allowBackup=false + extraction rules).
   },
 }
 

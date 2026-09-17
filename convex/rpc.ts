@@ -302,14 +302,14 @@ export async function recordActivityForSession(
 export async function getSocialActivityFeed(
   ctx: QueryCtx,
   input: {
-    sessionToken?: string
+    sessionToken: string
     viewerLat?: number | null
     viewerLng?: number | null
     radiusKm?: number
     limit?: number
   },
 ): Promise<ConvexSocialActivityRow[]> {
-  const userId = input.sessionToken ? await getSessionUserId(ctx, input.sessionToken) : null
+  const userId = await getSessionUserId(ctx, input.sessionToken)
   const safeLimit = clamp(input.limit ?? 20, 1, 50)
   const radiusKm = clamp(input.radiusKm ?? 25, 1, 100)
   const rows = await ctx.db.query('activities').withIndex('by_createdAt').collect()
@@ -317,6 +317,8 @@ export async function getSocialActivityFeed(
 
   const mapped: ConvexSocialActivityRow[] = []
   for (const row of ordered) {
+    if (row.userId !== userId) continue
+    assertUserOwnership(row.userId, userId)
     const profile = await ctx.db
       .query('profiles')
       .withIndex('by_userId', (q) => q.eq('userId', row.userId))
@@ -608,7 +610,7 @@ export const recordActivity = mutation({
 
 export const getSocialFeed = query({
   args: {
-    sessionToken: v.optional(v.string()),
+    sessionToken: v.string(),
     viewerLat: v.optional(v.union(v.number(), v.null())),
     viewerLng: v.optional(v.union(v.number(), v.null())),
     radiusKm: v.optional(v.number()),

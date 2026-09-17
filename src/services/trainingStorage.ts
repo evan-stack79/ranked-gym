@@ -25,6 +25,7 @@ import {
   resumeDraftClock,
 } from '../utils/sessionClock'
 import { normalizePersistedRestTimer } from '../utils/restTimerPersist'
+import { readLocal, writeLocal } from './secureLocalStore'
 
 const KEY_BASE = 'ranked-gym:training'
 
@@ -243,7 +244,7 @@ function normalizeScheduleEntry<T extends Omit<ScheduledSession, 'id'> & { id?: 
 
 function read(): TrainingState {
   try {
-    const raw = localStorage.getItem(storageKey())
+    const raw = readLocal(storageKey())
     if (!raw) {
       return {
         ...DEFAULT_STATE,
@@ -312,7 +313,7 @@ function emitTrainingPersistError(error: unknown): void {
 
 function write(state: TrainingState, opts?: StorageSaveOptions): void {
   try {
-    localStorage.setItem(storageKey(), JSON.stringify(state))
+    writeLocal(storageKey(), JSON.stringify(state))
   } catch (error) {
     emitTrainingPersistError(error)
     throw error
