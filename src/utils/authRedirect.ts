@@ -9,6 +9,8 @@
  * ces schémas cassent le parcours mail sur appareil réel.
  */
 
+import { isSafeExternalNavigationUrl } from './safeExternalNavigation'
+
 export const PASSWORD_RESET_SENT_MESSAGE =
   'Si un compte existe avec cette adresse, un lien vient d’être envoyé.'
 
@@ -26,19 +28,7 @@ function isNativeCapacitorShell(): boolean {
 }
 
 function isSafeWebOrigin(origin: string): boolean {
-  try {
-    const url = new URL(origin)
-    if (url.protocol === 'https:') return true
-    if (
-      url.protocol === 'http:' &&
-      (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
-    ) {
-      return true
-    }
-    return false
-  } catch {
-    return false
-  }
+  return isSafeExternalNavigationUrl(origin)
 }
 
 /**
@@ -55,7 +45,8 @@ export function getPasswordRecoveryRedirectTo(
   if (configured) {
     try {
       const parsed = new URL(configured)
-      if (parsed.protocol === 'https:') {
+      // Email deep-links must be public HTTPS only (never http/localhost/capacitor).
+      if (parsed.protocol === 'https:' && isSafeExternalNavigationUrl(parsed.origin)) {
         return `${parsed.origin}/`
       }
     } catch {
