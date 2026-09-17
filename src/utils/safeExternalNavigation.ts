@@ -40,9 +40,13 @@ export function isSafeExternalNavigationUrl(raw: string): boolean {
  * Returns false if the URL is rejected (no navigation performed).
  */
 export function openExternalUrlSafely(raw: string): boolean {
-  if (typeof window === 'undefined') return false
   if (!isSafeExternalNavigationUrl(raw)) return false
-  const opened = window.open(raw, '_blank', 'noopener,noreferrer')
+  const openFn =
+    typeof globalThis.open === 'function'
+      ? (globalThis.open as typeof window.open).bind(globalThis)
+      : null
+  if (!openFn) return false
+  const opened = openFn(raw, '_blank', 'noopener,noreferrer')
   if (opened) {
     try {
       opened.opener = null
