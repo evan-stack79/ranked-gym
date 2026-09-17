@@ -98,6 +98,7 @@ async function upsertProfile(
     rank: String(payload.rank ?? 'Bronze'),
     discipline: String(payload.discipline ?? 'Musculation'),
     isGhostModeEnabled: Boolean(payload.isGhostModeEnabled),
+    isPrivate: Boolean(payload.isPrivate),
     updatedAt: Number(payload.updatedAt ?? now),
   }
   const existing = await ctx.db.query('profiles').withIndex('by_userId', (q) => q.eq('userId', userId)).first()

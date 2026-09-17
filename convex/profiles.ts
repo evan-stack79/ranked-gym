@@ -14,6 +14,7 @@ export type ConvexProfileView = {
   rank: string
   discipline: string
   isGhostModeEnabled: boolean
+  isPrivate: boolean
   avatarFileId?: Id<'user_files'>
   currentStreak: number
   lastLoginDate: string | null
@@ -29,6 +30,7 @@ const profileViewValidator = v.object({
   rank: v.string(),
   discipline: v.string(),
   isGhostModeEnabled: v.boolean(),
+  isPrivate: v.boolean(),
   avatarFileId: v.optional(v.id('user_files')),
   currentStreak: v.number(),
   lastLoginDate: v.union(v.string(), v.null()),
@@ -72,6 +74,7 @@ export async function toProfileView(
     rank: profile.rank,
     discipline: profile.discipline,
     isGhostModeEnabled: profile.isGhostModeEnabled,
+    isPrivate: Boolean(profile.isPrivate),
     avatarFileId: profile.avatarFileId,
     currentStreak: streak?.currentStreak ?? 0,
     lastLoginDate: streak?.lastLoginDate ?? null,
@@ -107,6 +110,7 @@ export async function ensureProfileForSession(
     rank: DEFAULT_RANK,
     discipline: clip(disciplineLabel, 40, DEFAULT_DISCIPLINE),
     isGhostModeEnabled: false,
+    isPrivate: false,
     createdAt: now,
     updatedAt: now,
   })
@@ -131,6 +135,7 @@ export async function updateProfileForSession(
     pseudo?: string
     discipline?: string
     isGhostModeEnabled?: boolean
+    isPrivate?: boolean
     currentStreak?: number
     lastLoginDate?: string | null
   },
@@ -154,6 +159,7 @@ export async function updateProfileForSession(
     ...(typeof patch.isGhostModeEnabled === 'boolean'
       ? { isGhostModeEnabled: patch.isGhostModeEnabled }
       : {}),
+    ...(typeof patch.isPrivate === 'boolean' ? { isPrivate: patch.isPrivate } : {}),
   })
 
   if (patch.currentStreak != null || patch.lastLoginDate !== undefined) {
@@ -266,6 +272,7 @@ export const updateProfile = mutation({
     pseudo: v.optional(v.string()),
     discipline: v.optional(v.string()),
     isGhostModeEnabled: v.optional(v.boolean()),
+    isPrivate: v.optional(v.boolean()),
     currentStreak: v.optional(v.number()),
     lastLoginDate: v.optional(v.union(v.string(), v.null())),
   },
@@ -278,6 +285,7 @@ export const updateProfile = mutation({
       pseudo: args.pseudo,
       discipline: args.discipline,
       isGhostModeEnabled: args.isGhostModeEnabled,
+      isPrivate: args.isPrivate,
       currentStreak: args.currentStreak,
       lastLoginDate: args.lastLoginDate,
     }),

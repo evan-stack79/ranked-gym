@@ -11,6 +11,7 @@ import { v } from 'convex/values'
  * - Sommeil: sleep_nights (currently local-only in the app)
  * - Streak: streak_state
  * - Files: user_files
+ * - Social privacy: user_blocks, user_follows, activity_comments, activity_reactions
  * - Migration bookkeeping: migration_runs, migration_entity_map, legacy_supabase_backups
  *
  * Convex indexes are not unique. Uniqueness listed below is a mutation invariant
@@ -108,6 +109,8 @@ export const convexTables = {
     discipline: v.string(),
     avatarFileId: v.optional(v.id('user_files')),
     isGhostModeEnabled: v.boolean(),
+    /** Private accounts are only visible to self and accepted followers. Missing = public. */
+    isPrivate: v.optional(v.boolean()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -197,9 +200,55 @@ export const convexTables = {
     originLat: v.optional(v.union(v.number(), v.null())),
     originLng: v.optional(v.union(v.number(), v.null())),
     createdAt: v.number(),
+    deletedAt: v.optional(v.number()),
   })
     .index('by_createdAt', ['createdAt'])
     .index('by_userId_createdAt', ['userId', 'createdAt']),
+
+  /**
+   * Reciprocal hide: if either direction exists, neither user may see the other
+   * via search, profiles, feed-by-id, comments, reactions, or counters.
+   */
+  user_blocks: defineTable({
+    blockerUserId: v.string(),
+    blockedUserId: v.string(),
+    createdAt: v.number(),
+  })
+    .index('by_blocker', ['blockerUserId'])
+    .index('by_blocked', ['blockedUserId'])
+    .index('by_pair', ['blockerUserId', 'blockedUserId']),
+
+  /** Subscriptions. Private followees require `accepted` before content is visible. */
+  user_follows: defineTable({
+    followerUserId: v.string(),
+    followeeUserId: v.string(),
+    status: v.union(v.literal('pending'), v.literal('accepted')),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_follower', ['followerUserId'])
+    .index('by_followee', ['followeeUserId'])
+    .index('by_pair', ['followerUserId', 'followeeUserId']),
+
+  activity_comments: defineTable({
+    activityId: v.id('activities'),
+    userId: v.string(),
+    body: v.string(),
+    createdAt: v.number(),
+    deletedAt: v.optional(v.number()),
+  })
+    .index('by_activityId', ['activityId'])
+    .index('by_userId', ['userId']),
+
+  activity_reactions: defineTable({
+    activityId: v.id('activities'),
+    userId: v.string(),
+    kind: v.literal('cheer'),
+    createdAt: v.number(),
+  })
+    .index('by_activityId', ['activityId'])
+    .index('by_activity_user', ['activityId', 'userId'])
+    .index('by_userId', ['userId']),
 
   ai_usage_limits: defineTable({
     userId: v.string(),

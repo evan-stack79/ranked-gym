@@ -36,6 +36,10 @@ const PHASE_E_TABLES = [
   'migration_runs',
   'migration_entity_map',
   'legacy_supabase_backups',
+  'user_blocks',
+  'user_follows',
+  'activity_comments',
+  'activity_reactions',
 ] as const
 
 describe('Convex Phase A feature flag', () => {
