@@ -330,12 +330,57 @@ export async function deleteAccountAndUserData(
       .collect(),
     deletedDocIds,
   )
+  const ownActivities = await ctx.db
+    .query('activities')
+    .withIndex('by_userId_createdAt', (q) => q.eq('userId', user.userId))
+    .collect()
+  for (const activity of ownActivities) {
+    await deleteRows(
+      ctx,
+      await ctx.db
+        .query('activity_comments')
+        .withIndex('by_activityId', (q) => q.eq('activityId', activity._id))
+        .collect(),
+      deletedDocIds,
+    )
+    await deleteRows(
+      ctx,
+      await ctx.db
+        .query('activity_reactions')
+        .withIndex('by_activityId', (q) => q.eq('activityId', activity._id))
+        .collect(),
+      deletedDocIds,
+    )
+  }
+  await deleteRows(ctx, ownActivities, deletedDocIds)
   await deleteRows(
     ctx,
-    await ctx.db
-      .query('activities')
-      .withIndex('by_userId_createdAt', (q) => q.eq('userId', user.userId))
-      .collect(),
+    await ctx.db.query('activity_comments').withIndex('by_userId', (q) => q.eq('userId', user.userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('activity_reactions').withIndex('by_userId', (q) => q.eq('userId', user.userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('user_blocks').withIndex('by_blocker', (q) => q.eq('blockerUserId', user.userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('user_blocks').withIndex('by_blocked', (q) => q.eq('blockedUserId', user.userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('user_follows').withIndex('by_follower', (q) => q.eq('followerUserId', user.userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('user_follows').withIndex('by_followee', (q) => q.eq('followeeUserId', user.userId)).collect(),
     deletedDocIds,
   )
   await deleteRows(

@@ -22,6 +22,10 @@ import { hashToken } from './authCrypto'
  * | adminResetCampaign     |     8 | 60 min | hashed admin id  |
  * | createCheckin          |    40 | 15 min | hashed userId    |
  * | recordActivity         |    60 | 15 min | hashed userId    |
+ * | followUser             |    40 | 15 min | hashed userId    |
+ * | blockUser              |    40 | 15 min | hashed userId    |
+ * | createComment          |    60 | 15 min | hashed userId    |
+ * | toggleReaction         |    60 | 15 min | hashed userId    |
  *
  * Convex mutations do not receive client IP. Optional `ip` subjects are hashed
  * the same way when a trusted caller supplies one (HTTP action / edge).
@@ -47,6 +51,10 @@ export const RATE_LIMIT_POLICIES = {
   adminResetCampaign: { limit: 8, windowMs: HOUR_MS },
   createCheckin: { limit: 40, windowMs: 15 * MINUTE_MS },
   recordActivity: { limit: 60, windowMs: 15 * MINUTE_MS },
+  followUser: { limit: 40, windowMs: 15 * MINUTE_MS },
+  blockUser: { limit: 40, windowMs: 15 * MINUTE_MS },
+  createComment: { limit: 60, windowMs: 15 * MINUTE_MS },
+  toggleReaction: { limit: 60, windowMs: 15 * MINUTE_MS },
 } as const
 
 export type RateLimitPolicyName = keyof typeof RATE_LIMIT_POLICIES

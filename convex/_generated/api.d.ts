@@ -18,6 +18,7 @@ import type * as lib_authCrypto from "../lib/authCrypto.js";
 import type * as migrations from "../migrations.js";
 import type * as profiles from "../profiles.js";
 import type * as rpc from "../rpc.js";
+import type * as social from "../social.js";
 import type * as sync from "../sync.js";
 
 import type {
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   migrations: typeof migrations;
   profiles: typeof profiles;
   rpc: typeof rpc;
+  social: typeof social;
   sync: typeof sync;
 }>;
 

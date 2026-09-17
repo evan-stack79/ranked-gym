@@ -37,6 +37,10 @@ type TableName =
   | 'legacy_supabase_backups'
   | 'migration_entity_map'
   | 'rate_limit_buckets'
+  | 'user_blocks'
+  | 'user_follows'
+  | 'activity_comments'
+  | 'activity_reactions'
 
 type StoredRow = Record<string, unknown> & { _id: string }
 
@@ -64,6 +68,10 @@ class FakeDb {
     legacy_supabase_backups: [],
     migration_entity_map: [],
     rate_limit_buckets: [],
+    user_blocks: [],
+    user_follows: [],
+    activity_comments: [],
+    activity_reactions: [],
   }
 
   insert(table: TableName, value: Record<string, unknown>) {

@@ -2,6 +2,7 @@ import { v } from 'convex/values'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
 import { consumeRateLimit } from './lib/rateLimit'
+import { canViewerSeeSubject } from './lib/socialVisibility'
 
 const ACTIVITY_TYPES = new Set(['pr', 'workout', 'checkin', 'rank_up', 'streak'])
 const DEFAULT_WEEK_LABELS = ['S-3', 'S-2', 'S-1', 'Act.'] as const
@@ -312,13 +313,20 @@ export async function getSocialActivityFeed(
   const userId = await getSessionUserId(ctx, input.sessionToken)
   const safeLimit = clamp(input.limit ?? 20, 1, 50)
   const radiusKm = clamp(input.radiusKm ?? 25, 1, 100)
-  const rows = await ctx.db.query('activities').withIndex('by_createdAt').collect()
+  // Mission 3 owner scope: query only the session user's rows so other users
+  // cannot leak via this feed. Mission 4 also drops deleted/blocked/private.
+  const rows = await ctx.db
+    .query('activities')
+    .withIndex('by_userId_createdAt', (q) => q.eq('userId', userId))
+    .collect()
   const ordered = rows.sort((a, b) => b.createdAt - a.createdAt)
 
   const mapped: ConvexSocialActivityRow[] = []
   for (const row of ordered) {
+    if (row.deletedAt) continue
     if (row.userId !== userId) continue
     assertUserOwnership(row.userId, userId)
+    if (!(await canViewerSeeSubject(ctx, userId, row.userId))) continue
     const profile = await ctx.db
       .query('profiles')
       .withIndex('by_userId', (q) => q.eq('userId', row.userId))
@@ -373,7 +381,14 @@ export async function getSocialActivityFeed(
   return mapped
 }
 
-export async function getUserStatsForSession(ctx: QueryCtx, sessionToken: string): Promise<unknown> {
+export async function getUserStatsForSession(
+  ctx: QueryCtx,
+  sessionToken: string,
+): Promise<{
+  radar: { upper: number; lower: number; force: number; volume: number; regularite: number }
+  bench_1rm_curve: Array<{ label: string; value_kg: number }>
+  weekly_sessions: { completed: number; target: number }
+}> {
   const userId = await getSessionUserId(ctx, sessionToken)
   const workouts = await ctx.db
     .query('workouts_state')
@@ -644,7 +659,25 @@ export const getUserStats = query({
   args: {
     sessionToken: v.string(),
   },
-  returns: v.any(),
+  returns: v.object({
+    radar: v.object({
+      upper: v.number(),
+      lower: v.number(),
+      force: v.number(),
+      volume: v.number(),
+      regularite: v.number(),
+    }),
+    bench_1rm_curve: v.array(
+      v.object({
+        label: v.string(),
+        value_kg: v.number(),
+      }),
+    ),
+    weekly_sessions: v.object({
+      completed: v.number(),
+      target: v.number(),
+    }),
+  }),
   handler: (ctx, args) => getUserStatsForSession(ctx, args.sessionToken),
 })
 
