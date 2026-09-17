@@ -62,5 +62,7 @@ describe('authRedirect', () => {
   it('ignore une URL publique non-https', () => {
     expect(getPasswordRecoveryRedirectTo('http://insecure.example.com')).toBeUndefined()
     expect(getPasswordRecoveryRedirectTo('capacitor://localhost')).toBeUndefined()
+    expect(getPasswordRecoveryRedirectTo('javascript:alert(1)')).toBeUndefined()
+    expect(getPasswordRecoveryRedirectTo('data:text/html,x')).toBeUndefined()
   })
 })
