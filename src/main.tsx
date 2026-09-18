@@ -5,6 +5,7 @@ import App from './App.tsx'
 import { RootErrorBoundary } from './components/ui/RootErrorBoundary.tsx'
 import { AppColdLaunch } from './components/brand/AppColdLaunch.tsx'
 import { ColdLaunchAccueilFixture } from './fixtures/ColdLaunchAccueilFixture.tsx'
+import { NutritionUxFixture } from './fixtures/NutritionUxFixture.tsx'
 import { ConvexClientProvider } from './lib/ConvexClientProvider.tsx'
 import { initSecureAuthStorage } from './services/secureAuthStorage'
 import { initSecureLocalStore } from './services/secureLocalStore'
@@ -19,6 +20,14 @@ function requireRoot(): HTMLElement {
 
 const rootEl = requireRoot()
 
+function resolveBootTree() {
+  if (typeof window === 'undefined') return <App />
+  const path = window.location.pathname
+  if (path === '/accueil-fixture') return <ColdLaunchAccueilFixture />
+  if (path === '/nutrition-fixture') return <NutritionUxFixture />
+  return <App />
+}
+
 async function boot() {
   try {
     await initSecureAuthStorage()
@@ -31,13 +40,7 @@ async function boot() {
     <StrictMode>
       <RootErrorBoundary>
         <ConvexClientProvider>
-          <AppColdLaunch>
-            {typeof window !== 'undefined' && window.location.pathname === '/accueil-fixture' ? (
-              <ColdLaunchAccueilFixture />
-            ) : (
-              <App />
-            )}
-          </AppColdLaunch>
+          <AppColdLaunch>{resolveBootTree()}</AppColdLaunch>
         </ConvexClientProvider>
       </RootErrorBoundary>
     </StrictMode>,
