@@ -111,7 +111,8 @@ export function TrainingView({
     nonce: number
   } | null>(null)
 
-  const { start: startRestTimer, setReadyBarEnabled, isBarVisible } = useRestTimerContext()
+  const { start: startRestTimer, setReadyBarEnabled, isBarVisible, setChromeHidden } =
+    useRestTimerContext()
 
   const [disciplineTick, setDisciplineTick] = useState(0)
   const [pumpCheckSession, setPumpCheckSession] = useState<VictorySessionStats | null>(null)
@@ -222,6 +223,19 @@ export function TrainingView({
     setReadyBarEnabled(showStrengthTools && panel === 'notebook' && !pumpCheckSession)
     return () => setReadyBarEnabled(false)
   }, [showStrengthTools, setReadyBarEnabled, pumpCheckSession, panel])
+
+  /** Séance muscu live : masque header app + BottomNav (repos inline dans l’écran immersif). */
+  const immersiveLiveSession =
+    panel === 'notebook' &&
+    showStrengthTools &&
+    !notebookEditNote &&
+    Boolean(state.activeWorkoutDraft)
+
+  useEffect(() => {
+    const hide = immersiveLiveSession || Boolean(pumpCheckSession)
+    setChromeHidden(hide)
+    return () => setChromeHidden(false)
+  }, [immersiveLiveSession, pumpCheckSession, setChromeHidden])
 
   const openNotebook = useCallback((routineId?: string | null, editNote?: WorkoutNote | null, resume = false) => {
     setNotebookLaunchId(routineId ?? editNote?.routineId ?? null)
@@ -521,9 +535,9 @@ export function TrainingView({
 
   return (
     <div
-      className="train-view flex flex-col gap-6"
+      className={`train-view flex flex-col ${immersiveLiveSession ? 'gap-0' : 'gap-6'}`}
       style={{
-        paddingBottom: 8,
+        paddingBottom: immersiveLiveSession ? 0 : 8,
       }}
     >
       {panel === 'hub' ? (
@@ -540,7 +554,7 @@ export function TrainingView({
             </button>
           </div>
         </header>
-      ) : (
+      ) : immersiveLiveSession ? null : (
         <header className="flex items-center gap-2 ios-fade-up">
           <button
             type="button"
@@ -554,11 +568,11 @@ export function TrainingView({
         </header>
       )}
 
-      {dueBanner && (
+      {dueBanner && !immersiveLiveSession ? (
         <div className="rounded-2xl border border-[#FF2B2B]/40 bg-[#FF2B2B]/15 px-4 py-3 text-[14px] font-semibold text-white">
           {dueBanner}
         </div>
-      )}
+      ) : null}
 
       {panel === 'hub' ? (
         <>
@@ -637,8 +651,9 @@ export function TrainingView({
               setState(next)
               setClockTick(Date.now())
             }}
+            onBack={goHub}
             onRestStart={(info) => {
-              startRestTimer(90, info)
+              startRestTimer(info.restSec ?? 90, info)
             }}
             onDraftSave={persistDraft}
             onSave={(note) => persistAndSyncNote(note)}
