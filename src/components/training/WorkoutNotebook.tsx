@@ -23,6 +23,7 @@ import {
 } from '../../utils/workoutHistory'
 import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
 import { WorkoutHistory } from './WorkoutHistory'
+import { ImmersiveExerciseSession } from './ImmersiveExerciseSession'
 
 interface WorkoutNotebookProps {
   id?: string
@@ -50,8 +51,8 @@ interface WorkoutNotebookProps {
     createdAt?: number
     dateKey?: string
     sportId?: string
-    sessionKind?: SessionKind
     source?: SessionSource
+    sessionKind?: SessionKind
   }) => void | Promise<void>
   /** Autosave séries / exercices vers Supabase (routine draft). */
   onDraftSave?: (routineId: string, exercises: ExerciseEntry[]) => void
@@ -63,6 +64,7 @@ interface WorkoutNotebookProps {
     setIndex: number
     exerciseName: string
     setLabel: string
+    restSec?: number
   }) => void
   /** Applique restSec / done sur une série (callback parent). */
   restLogRequest?: {
@@ -78,6 +80,8 @@ interface WorkoutNotebookProps {
   onToggleSessionPause?: () => void
   /** Minutes chronométrées réelles — prioritaire à l’estimation à la sauvegarde. */
   sessionDurationMin?: number | null
+  /** Retour hub Train (écran immersif). */
+  onBack?: () => void
 }
 
 /** Tags optionnels — n’influencent plus la charge suivante. */
@@ -176,6 +180,7 @@ export function WorkoutNotebook({
   sessionPaused = false,
   onToggleSessionPause,
   sessionDurationMin = null,
+  onBack,
 }: WorkoutNotebookProps) {
   const bootRoutine = useMemo(
     () => (resume ? routines.find(r => r.id === initialRoutineId) : undefined) ??
@@ -196,6 +201,8 @@ export function WorkoutNotebook({
   const [saving, setSaving] = useState(false)
   const [editingNote, setEditingNote] = useState<WorkoutNote | null>(initialEditNote)
   const [effortHelpOpen, setEffortHelpOpen] = useState(false)
+  const [activeExerciseIndex, setActiveExerciseIndex] = useState(0)
+  const [restPrefSec, setRestPrefSec] = useState(90)
   const beforeEdit = useRef({
     routineId: bootRoutine.id,
     title: bootRoutine.label,
@@ -340,7 +347,12 @@ export function WorkoutNotebook({
     )
   }
 
-  const finishSet = (ex: ExerciseEntry, setIndex: number, difficulty?: SetDifficulty) => {
+  const finishSet = (
+    ex: ExerciseEntry,
+    setIndex: number,
+    difficulty?: SetDifficulty,
+    restSec = 90,
+  ) => {
     draftDirty.current = true
     setExercises((prev) => {
       const next = prev.map((e) => {
@@ -361,8 +373,26 @@ export function WorkoutNotebook({
       setIndex,
       exerciseName: ex.name.trim() || 'Exercice',
       setLabel: `S${setIndex + 1}`,
+      restSec,
     })
   }
+
+  /** Séance live chronométrée → canvas immersif (édition historique reste en carnet classique). */
+  const immersiveLive = Boolean(sessionClockLabel) && !editingNote
+
+  useEffect(() => {
+    if (!immersiveLive || exercises.length === 0) return
+    setActiveExerciseIndex((i) => Math.min(i, exercises.length - 1))
+  }, [exercises.length, immersiveLive])
+
+  // Au démarrage immersif : focus sur le premier exercice avec série en cours.
+  useEffect(() => {
+    if (!immersiveLive) return
+    const idx = exercises.findIndex((e) => e.sets.some((s) => !s.done))
+    if (idx >= 0) setActiveExerciseIndex(idx)
+    // Montage immersif uniquement
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [immersiveLive])
 
   const loadNoteForEdit = (note: WorkoutNote) => {
     if (!editingNote) {
@@ -437,6 +467,31 @@ export function WorkoutNotebook({
   }
 
   const hasSaved = (activeRoutine?.exercises.length ?? 0) > 0
+
+  if (immersiveLive) {
+    return (
+      <ImmersiveExerciseSession
+        exercises={exercises}
+        activeIndex={activeExerciseIndex}
+        onActiveIndexChange={setActiveExerciseIndex}
+        sessionClockLabel={sessionClockLabel!}
+        sessionPaused={sessionPaused}
+        onToggleSessionPause={onToggleSessionPause}
+        onBack={onBack ?? (() => undefined)}
+        onUpdateSet={updateSet}
+        onAddSet={(exerciseId) => {
+          const ex = exercises.find((e) => e.id === exerciseId)
+          if (!ex) return
+          updateExercise(exerciseId, { sets: [...ex.sets, emptySet()] })
+        }}
+        onValidateSet={(ex, setIndex, restSec) => finishSet(ex, setIndex, undefined, restSec)}
+        onFinishSession={() => void handleSave()}
+        saving={saving}
+        restPrefSec={restPrefSec}
+        onRestPrefChange={setRestPrefSec}
+      />
+    )
+  }
 
   return (
     <section id={id} className="space-y-3">
