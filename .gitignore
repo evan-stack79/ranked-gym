@@ -57,7 +57,11 @@ ios/DerivedData
 .agent-runs/
 
 # Captures navigateur locales (preuves — jamais versionnées)
-scripts/screenshots/
+# Ignore le contenu, pas le dossier, pour pouvoir ré-inclure des preuves ciblées.
+scripts/screenshots/**
+!scripts/screenshots/workout-immersive/
+!scripts/screenshots/workout-immersive/workout_immersive_390x844.png
+!scripts/screenshots/workout-immersive/workout_immersive_360x800.png
 
 # Migration artifacts can contain sensitive export metadata.
 scripts/migrations/artifacts/
