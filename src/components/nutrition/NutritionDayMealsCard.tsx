@@ -36,7 +36,7 @@ export function NutritionDayMealsCard({ meals, onAddMeal }: NutritionDayMealsCar
             return (
               <li key={type}>
                 {index > 0 ? <div className="mx-4 h-px bg-white/[0.06]" /> : null}
-                <div className="flex min-h-12 items-center gap-3 px-4 py-3.5">
+                <div className="flex min-h-11 items-center gap-3 px-4 py-3">
                   <span className="min-w-0 flex-1 text-[15px] font-medium text-white">
                     {MEAL_ROW_LABELS[type]}
                   </span>

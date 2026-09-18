@@ -362,9 +362,9 @@ export function NutritionDashboard({
         />
       </div>
 
-      <div className="relative flex flex-col gap-6 px-5 pt-2">
+      <div className="relative flex flex-col gap-4 px-5 pt-1">
         <header className="flex items-center justify-between gap-3">
-          <h1 className="text-[34px] font-bold tracking-tight text-white">Nutrition</h1>
+          <h1 className="text-[32px] font-bold tracking-tight text-white">Nutrition</h1>
           <button
             type="button"
             onClick={() => setMenuOpen(true)}

@@ -24,25 +24,25 @@ export function NutritionCalorieRing({
     <div className="flex flex-col items-center">
       <MacroRing
         progress={progress}
-        size={220}
-        stroke={6}
+        size={200}
+        stroke={5}
         color="#FF2B2B"
         trackColor="#2A2A2E"
       >
-        <div className="flex flex-col items-center px-4 pt-1 text-center">
+        <div className="relative flex h-full w-full flex-col items-center justify-center px-5 text-center">
           <img
             src="/panther-trim.png"
             alt=""
             width={32}
             height={32}
-            className="mb-1.5 h-8 w-8 object-contain"
+            className="mb-1 h-8 w-8 object-contain"
             draggable={false}
           />
-          <p className="text-[40px] font-bold leading-none tracking-tight text-white tabular-nums">
+          <p className="text-[36px] font-bold leading-none tracking-tight text-white tabular-nums">
             {formatKcal(remainingCalories)}
           </p>
-          <p className="mt-1.5 text-[15px] font-medium text-[#8E8E93]">kcal restantes</p>
-          <p className="mt-3 text-[12px] font-medium tabular-nums text-white/90">
+          <p className="mt-1 text-[14px] font-medium text-[#8E8E93]">kcal restantes</p>
+          <p className="absolute bottom-5 left-0 right-0 text-[11px] font-medium tabular-nums text-white/90">
             {formatKcal(consumedCalories)} / {formatKcal(targetCalories)} kcal
           </p>
         </div>

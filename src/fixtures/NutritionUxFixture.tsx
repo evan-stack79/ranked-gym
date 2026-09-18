@@ -117,11 +117,11 @@ function NutritionFixtureShell() {
       data-nutrition-fixture="1"
     >
       <main
-        className="relative z-10 mx-auto w-full max-w-lg flex-1 overflow-y-auto px-5 py-8"
+        className="relative z-10 mx-auto w-full max-w-lg flex-1 overflow-y-auto px-5 py-4"
         style={{
           paddingBottom:
-            'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 1.5rem)',
-          paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))',
+            'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 1rem)',
+          paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0px))',
         }}
       >
         {content}

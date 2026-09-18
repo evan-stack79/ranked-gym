@@ -90,10 +90,15 @@ async function capture() {
     await page.screenshot({ path: shotPath, fullPage: false })
     await page.screenshot({ path: artifactPath, fullPage: false })
 
-    // Also capture scrolled mid for meals section
+    await page.screenshot({
+      path: join(artifactsDir, 'nutrition_ux_wave2_fullpage.png'),
+      fullPage: true,
+    })
+
+    // Scroll to reveal all meal rows if clipped
     await page.evaluate(() => {
       const main = document.querySelector('main')
-      if (main) main.scrollTop = 280
+      if (main) main.scrollTop = 220
     })
     await page.waitForTimeout(300)
     await page.screenshot({
