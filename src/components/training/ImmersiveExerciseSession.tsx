@@ -112,7 +112,7 @@ export function ImmersiveExerciseSession({
     >
       {/* Hero photo — decorative only, not a clickable wallpaper */}
       <div className="relative isolate shrink-0 overflow-hidden" aria-hidden="true">
-        <div className="relative h-[min(38vh,320px)] w-full bg-[#0a0a0a]">
+        <div className="relative h-[min(32vh,268px)] w-full bg-[#0a0a0a]">
           {showImage ? (
             <img
               src={media.imageSrc!}
@@ -126,25 +126,25 @@ export function ImmersiveExerciseSession({
             <div className="h-full w-full bg-[#121214]" />
           )}
           {/* Blend photo into UI — functional fade only */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black via-black/80 to-transparent" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/55 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black via-black/80 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/55 to-transparent" />
         </div>
 
         {/* Top chrome over hero */}
         <div
           className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 px-3"
-          style={{ paddingTop: 'max(0.65rem, env(safe-area-inset-top))' }}
+          style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}
         >
           <button
             type="button"
             onClick={onBack}
-            className="pointer-events-auto ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-[2px]"
+            className="pointer-events-auto ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full bg-black/45 text-white"
             aria-label="Retour à Train"
           >
             <ChevronLeft className="h-5 w-5" strokeWidth={2.25} />
           </button>
 
-          <div className="pointer-events-none flex items-center gap-2">
+          <div className="pointer-events-none flex items-center gap-1.5">
             <img
               src={BRAND_MARK_COMPACT_SRC}
               width={22}
@@ -167,7 +167,7 @@ export function ImmersiveExerciseSession({
             <button
               type="button"
               onClick={onToggleSessionPause}
-              className="pointer-events-auto ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full bg-black/45 text-[#FF2B2B] backdrop-blur-[2px]"
+              className="pointer-events-auto ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full bg-black/45 text-[#FF2B2B]"
               aria-label={sessionPaused ? 'Reprendre la séance' : 'Mettre la séance en pause'}
             >
               {sessionPaused ? (
@@ -184,17 +184,17 @@ export function ImmersiveExerciseSession({
 
       {/* Interactive body — flow layout */}
       <div
-        className="relative z-10 flex flex-1 flex-col px-4 pt-1"
-        style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+        className="relative z-10 flex flex-1 flex-col px-4 pt-0.5"
+        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
-        <header className="mb-4">
-          <h1 className="text-[26px] font-bold leading-tight tracking-tight text-white">
+        <header className="mb-3">
+          <h1 className="text-[24px] font-bold leading-tight tracking-tight text-white">
             {exercise.name.trim() || 'Exercice'}
           </h1>
           {muscleLine ? (
-            <p className="mt-1 text-[14px] font-medium text-[#8E8E93]">{muscleLine}</p>
+            <p className="mt-0.5 text-[13px] font-medium text-[#8E8E93]">{muscleLine}</p>
           ) : null}
-          <p className="mt-1 text-[12px] text-[#636366]">
+          <p className="mt-0.5 text-[12px] text-[#636366]">
             Exercice {safeIndex + 1} sur {exercises.length}
           </p>
         </header>
@@ -216,7 +216,7 @@ export function ImmersiveExerciseSession({
           <span className="sr-only">Validation</span>
         </div>
 
-        <div className="space-y-2" role="list" aria-label="Séries">
+        <div className="space-y-1.5" role="list" aria-label="Séries">
           {exercise.sets.map((set, idx) => {
             const done = Boolean(set.done)
             const active = !done && idx === pendingIdx
@@ -264,21 +264,30 @@ export function ImmersiveExerciseSession({
                   aria-label={`Série ${idx + 1} reps`}
                   className={FIELD}
                 />
-                <ClearableNumberInput
-                  value={set.rpe ?? null}
-                  onChange={(v) =>
-                    onUpdateSet(exercise.id, idx, {
-                      rpe: v != null ? Math.min(10, Math.max(1, Math.round(v))) : undefined,
-                    })
-                  }
-                  min={1}
-                  max={10}
-                  required={false}
-                  placeholder={done && effortDone ? effortDone : '1–10'}
-                  placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#636366]"
-                  aria-label={`Série ${idx + 1} effort facultatif`}
-                  className={`${FIELD} text-[13px] text-[#AEAEB2]`}
-                />
+                {done && effortDone ? (
+                  <div
+                    className={`${FIELD} flex items-center justify-center text-[13px] text-[#AEAEB2]`}
+                    aria-label={`Série ${idx + 1} effort ${effortDone}`}
+                  >
+                    {effortDone}
+                  </div>
+                ) : (
+                  <ClearableNumberInput
+                    value={set.rpe ?? null}
+                    onChange={(v) =>
+                      onUpdateSet(exercise.id, idx, {
+                        rpe: v != null ? Math.min(10, Math.max(1, Math.round(v))) : undefined,
+                      })
+                    }
+                    min={1}
+                    max={10}
+                    required={false}
+                    placeholder="1–10"
+                    placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#636366]"
+                    aria-label={`Série ${idx + 1} effort facultatif`}
+                    className={`${FIELD} text-[13px] text-[#AEAEB2]`}
+                  />
+                )}
                 <div className="flex items-center justify-center">
                   {done ? (
                     <span
@@ -299,11 +308,11 @@ export function ImmersiveExerciseSession({
           })}
         </div>
 
-        <div className="mt-4 flex gap-2.5">
+        <div className="mt-3 flex gap-2.5">
           <button
             type="button"
             onClick={() => onAddSet(exercise.id)}
-            className="ios-press flex min-h-12 flex-1 items-center justify-center rounded-xl border border-white/12 bg-[#1c1c1e] px-3 text-[13px] font-semibold text-[#AEAEB2]"
+            className="ios-press flex min-h-11 flex-1 items-center justify-center rounded-xl border border-white/12 bg-[#1c1c1e] px-3 text-[13px] font-semibold text-[#AEAEB2]"
           >
             + Ajouter une série
           </button>
@@ -311,7 +320,7 @@ export function ImmersiveExerciseSession({
             type="button"
             onClick={() => onValidateSet(exercise, validateIdx, restPrefSec)}
             disabled={Boolean(exercise.sets[validateIdx]?.done) && pendingIdx < 0}
-            className="ios-press flex min-h-12 flex-[1.35] items-center justify-center rounded-xl bg-[#FF2B2B] px-3 text-[14px] font-semibold text-white disabled:opacity-40"
+            className="ios-press flex min-h-11 flex-[1.35] items-center justify-center rounded-xl bg-[#FF2B2B] px-3 text-[14px] font-semibold text-white disabled:opacity-40"
           >
             Valider la série
           </button>
@@ -319,7 +328,7 @@ export function ImmersiveExerciseSession({
 
         {/* Compact rest */}
         <div
-          className="mt-4 flex min-h-12 items-center gap-3 rounded-xl border border-white/10 px-3"
+          className="mt-3 flex min-h-11 items-center gap-3 rounded-xl border border-white/10 px-3"
           role="timer"
           aria-label={
             restActive
@@ -350,10 +359,10 @@ export function ImmersiveExerciseSession({
           </button>
         </div>
 
-        <div className="mt-4 h-px w-full bg-white/8" aria-hidden="true" />
+        <div className="mt-3 h-px w-full bg-white/8" aria-hidden="true" />
 
         {/* Progress + exercise nav */}
-        <div className="mt-3 flex items-center gap-3">
+        <div className="mt-2.5 flex items-center gap-3">
           <div
             className="relative flex h-11 w-11 shrink-0 items-center justify-center"
             aria-label={`Progression ${progressLabel}`}
@@ -421,7 +430,7 @@ export function ImmersiveExerciseSession({
           type="button"
           onClick={onFinishSession}
           disabled={saving}
-          className="ios-press mt-5 mb-1 min-h-11 w-full text-center text-[13px] font-medium text-[#636366] disabled:opacity-50"
+          className="ios-press mt-3 mb-0.5 min-h-11 w-full text-center text-[13px] font-medium text-[#636366] disabled:opacity-50"
         >
           {saving ? 'Synchro…' : 'Terminer la séance'}
         </button>
