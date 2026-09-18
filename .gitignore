@@ -80,6 +80,14 @@ scripts/screenshots/**
 !scripts/screenshots/exercise-picker/picker_select_to_immersive_demo.mp4
 !scripts/screenshots/nutrition-ux/
 !scripts/screenshots/nutrition-ux/nutrition-390x844.png
+# Exception: preuves scroll marque (header en flux)
+!scripts/screenshots/brand-scroll/
+!scripts/screenshots/brand-scroll/nutrition_brand_scroll_A_top_brand_visible.png
+!scripts/screenshots/brand-scroll/nutrition_brand_scroll_B_scrolled_brand_gone.png
+!scripts/screenshots/brand-scroll/nutrition_brand_scroll_C_back_top_brand_visible.png
+!scripts/screenshots/brand-scroll/accueil_brand_scroll_A_top_brand_visible.png
+!scripts/screenshots/brand-scroll/accueil_brand_scroll_B_scrolled_brand_gone.png
+!scripts/screenshots/brand-scroll/accueil_brand_scroll_C_back_top_brand_visible.png
 
 # Migration artifacts can contain sensitive export metadata.
 scripts/migrations/artifacts/
