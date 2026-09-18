@@ -78,6 +78,8 @@ scripts/screenshots/**
 !scripts/screenshots/exercise-picker/picker-search-focused-390.png
 !scripts/screenshots/exercise-picker/immersive-after-select-390.png
 !scripts/screenshots/exercise-picker/picker_select_to_immersive_demo.mp4
+!scripts/screenshots/nutrition-ux/
+!scripts/screenshots/nutrition-ux/nutrition-390x844.png
 
 # Migration artifacts can contain sensitive export metadata.
 scripts/migrations/artifacts/
