@@ -35,13 +35,13 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
     name: 'Développé couché',
     muscles: ['Pectoraux', 'Triceps', 'Épaules'],
     equipment: 'Barre',
-    aliases: ['bench', 'bench press', 'dc', 'dev couche', 'developpe couche', 'pectoraux barre'],
+    aliases: ['bench', 'bench press', 'dc', 'dev couche', 'developpe couche', 'pectoraux barre', 'pec'],
     popularity: 100,
   },
   {
     id: 'incline_bench_press',
     name: 'Développé incliné',
-    muscles: ['Pectoraux', 'Épaules', 'Triceps'],
+    muscles: ['Pectoraux', 'Triceps', 'Épaules'],
     equipment: 'Barre',
     aliases: ['incline bench', 'dev incline', 'developpe incline', 'incliné'],
     popularity: 96,
@@ -117,7 +117,7 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
     name: 'Tirage vertical',
     muscles: ['Dos', 'Biceps'],
     equipment: 'Câble',
-    aliases: ['lat pulldown', 'pull down', 'tirage poulie haute'],
+    aliases: ['lat pulldown', 'pull down', 'tirage poulie haute', 'tirage dos', 'tirage'],
     popularity: 90,
   },
   {
@@ -167,7 +167,7 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
     name: 'Presse à cuisses',
     muscles: ['Quadriceps', 'Fessiers'],
     equipment: 'Machine',
-    aliases: ['leg press', 'presse cuisses', 'presse a cuisses'],
+    aliases: ['leg press', 'presse cuisses', 'presse a cuisses', 'jambes machine', 'jambes'],
     popularity: 89,
   },
   {
@@ -285,9 +285,9 @@ export function getCatalogExercise(id: string | null | undefined): CatalogExerci
   return BY_ID.get(id)
 }
 
-/** Ligne métadonnées : `Pectoraux · Barre`. */
+/** Ligne métadonnées : `Pectoraux · Triceps · Barre` (2 muscles max + équipement). */
 export function formatCatalogMeta(ex: CatalogExercise): string {
-  const muscles = ex.muscles.filter(Boolean).join(' · ')
+  const muscles = ex.muscles.filter(Boolean).slice(0, 2).join(' · ')
   if (!muscles) return ex.equipment
   return `${muscles} · ${ex.equipment}`
 }

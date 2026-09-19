@@ -52,7 +52,7 @@ export function ExercisePicker({
     mode === 'add' ? 'Ajouter un exercice' : 'Quel est ton premier exercice ?'
   const subtitle =
     mode === 'add'
-      ? 'Choisis un mouvement à enchaîner.'
+      ? 'Choisis un mouvement à ajouter.'
       : 'Choisis un mouvement pour commencer.'
 
   const submitCustom = () => {
@@ -71,8 +71,8 @@ export function ExercisePicker({
         paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
       }}
     >
-      {/* Top chrome */}
-      <div className="relative flex items-center justify-center px-3 pb-2 pt-1">
+      {/* Top chrome — logo panthère seul, pas de wordmark / pas de bascule programme */}
+      <div className="relative flex items-center justify-center px-3 pb-1 pt-1">
         <button
           type="button"
           onClick={onBack}
@@ -83,26 +83,28 @@ export function ExercisePicker({
         </button>
         <img
           src={BRAND_MARK_COMPACT_SRC}
-          width={28}
-          height={28}
+          width={32}
+          height={32}
           alt=""
           aria-hidden="true"
-          className="h-7 w-7 object-contain"
+          className="h-8 w-8 object-contain"
           draggable={false}
         />
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col px-4 pt-3">
-        <header className="mb-4 shrink-0">
+      <div className="flex min-h-0 flex-1 flex-col px-4 pt-8">
+        <header className="mb-5 shrink-0">
           <h1 className="text-[22px] font-bold leading-tight tracking-tight text-white">
             {title}
           </h1>
-          <p className="mt-1 text-[14px] font-medium text-[#8E8E93]">{subtitle}</p>
+          <p className="mt-1.5 text-[14px] font-medium leading-snug text-[#8E8E93]">
+            {subtitle}
+          </p>
         </header>
 
-        {/* Search */}
+        {/* Search — graphite, coins modérés */}
         <label
-          className="mb-3 flex min-h-12 shrink-0 items-center gap-2.5 rounded-xl bg-[#2c2c2e] px-3.5"
+          className="mb-2 flex min-h-12 shrink-0 items-center gap-2.5 rounded-2xl bg-[#2c2c2e] px-3.5"
           htmlFor={`${listId}-search`}
         >
           <Search className="h-5 w-5 shrink-0 text-[#8E8E93]" aria-hidden="true" />
@@ -136,12 +138,12 @@ export function ExercisePicker({
           ) : null}
         </label>
 
-        {/* Results */}
+        {/* Results — lignes sobres, scroll au-dessus du clavier */}
         <ul
           id={listId}
           role="listbox"
           aria-label="Résultats d’exercices"
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[env(keyboard-inset-height,0px)] [-webkit-overflow-scrolling:touch]"
         >
           {results.map((ex, index) => (
             <ExerciseResultRow
@@ -159,7 +161,7 @@ export function ExercisePicker({
         </ul>
 
         {/* Footer */}
-        <div className="shrink-0 border-t border-white/8 pt-3">
+        <div className="shrink-0 pt-2">
           {customOpen ? (
             <div className="mb-3 space-y-2">
               <label className="block">
@@ -192,9 +194,9 @@ export function ExercisePicker({
                 setCustomOpen(true)
                 setCustomName(query.trim())
               }}
-              className="ios-press mb-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl text-[14px] font-semibold text-[#AEAEB2]"
+              className="ios-press mb-1 flex min-h-11 w-full items-center justify-center gap-1.5 text-[14px] font-semibold text-white"
             >
-              <Plus className="h-4 w-4" strokeWidth={2.5} />
+              <Plus className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
               Créer un exercice personnalisé
             </button>
           )}
@@ -233,35 +235,32 @@ function ExerciseResultRow({
         onClick={onSelect}
         data-exercise-id={exercise.id}
         data-result-active={active ? 'true' : 'false'}
-        className="ios-press relative flex min-h-14 w-full items-center gap-3 border-b border-white/8 py-3 pl-3 pr-1 text-left"
+        className="ios-press relative flex min-h-14 w-full items-center gap-3 border-b border-[#2c2c2e] py-3.5 pl-3.5 pr-1 text-left"
       >
         {active ? (
           <span
-            className="absolute left-0 top-2.5 bottom-2.5 w-[3px] rounded-full bg-[#FF2B2B]"
+            className="absolute left-0 top-3 bottom-3 w-[2.5px] rounded-full bg-[#FF2B2B]"
             aria-hidden="true"
           />
         ) : null}
 
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#1c1c1e]">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[#1c1c1e]">
           {media.imageSrc ? (
             <img
               src={media.imageSrc}
               alt=""
               aria-hidden="true"
               draggable={false}
-              className="h-full w-full object-cover object-center contrast-[1.1] saturate-[0.55]"
+              className="h-full w-full object-cover object-center grayscale contrast-[1.05]"
             />
           ) : (
-            <span
-              className="h-full w-full bg-[linear-gradient(160deg,#2c2c2e_0%,#141416_100%)]"
-              aria-hidden="true"
-            />
+            <span className="h-full w-full bg-[#2c2c2e]" aria-hidden="true" />
           )}
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-semibold text-white">{exercise.name}</p>
-          <p className="mt-0.5 truncate text-[12px] text-[#8E8E93]">{meta}</p>
+          <p className="text-[15px] font-semibold leading-snug text-white">{exercise.name}</p>
+          <p className="mt-0.5 text-[12px] leading-snug text-[#8E8E93]">{meta}</p>
         </div>
 
         <ChevronRight

@@ -38,6 +38,16 @@ describe('exerciseSearch', () => {
     expect(results.some((e) => e.muscles.some((m) => /pecto/i.test(m)))).toBe(true)
   })
 
+  it('alias tirage dos → tirage vertical', () => {
+    const results = searchExercises('tirage dos')
+    expect(results.some((e) => e.id === 'lat_pulldown')).toBe(true)
+  })
+
+  it('alias jambes machine → presse à cuisses', () => {
+    const results = searchExercises('jambes machine')
+    expect(results[0]?.id).toBe('leg_press')
+  })
+
   it('limite l’affichage initial à 8', () => {
     expect(searchExercises('').length).toBe(8)
     expect(countExerciseMatches('')).toBe(EXERCISE_CATALOG.length)

@@ -121,6 +121,8 @@ export function TrainingView({
   const [notebookLaunchId, setNotebookLaunchId] = useState<string | null>(null)
   const [notebookResume, setNotebookResume] = useState(false)
   const [notebookEditNote, setNotebookEditNote] = useState<WorkoutNote | null>(null)
+  /** Séance libre : carnet vide → sélecteur premier exo. */
+  const [notebookStartEmpty, setNotebookStartEmpty] = useState(false)
   const [summaryFilter, setSummaryFilter] = useState<SportSummaryFilter>('all')
   const [focusNoteId, setFocusNoteId] = useState<string | null>(null)
   const [nowTick, setNowTick] = useState(() => Date.now())
@@ -238,10 +240,16 @@ export function TrainingView({
     return () => setChromeHidden(false)
   }, [immersiveLiveSession, pumpCheckSession, setChromeHidden])
 
-  const openNotebook = useCallback((routineId?: string | null, editNote?: WorkoutNote | null, resume = false) => {
+  const openNotebook = useCallback((
+    routineId?: string | null,
+    editNote?: WorkoutNote | null,
+    resume = false,
+    startEmpty = false,
+  ) => {
     setNotebookLaunchId(routineId ?? editNote?.routineId ?? null)
     setNotebookEditNote(editNote ?? null)
     setNotebookResume(resume)
+    setNotebookStartEmpty(startEmpty && !editNote && !resume)
     setPanel('notebook')
   }, [])
 
@@ -481,13 +489,14 @@ export function TrainingView({
           // Routine vide → séance libre (sélecteur premier exo).
           if (!withRoutine.activeWorkoutDraft) {
             setState(startFreeWorkoutSession(todayCard.sportId, id))
+            openNotebook(id, null, false, true)
           } else {
             setState(withRoutine)
+            openNotebook(id)
           }
-          openNotebook(id)
         } else {
           setState(startFreeWorkoutSession(todayCard.sportId))
-          openNotebook(null)
+          openNotebook(null, null, false, true)
         }
       } else if (todayCard.openTarget === 'endurance') {
         setPanel('endurance')
@@ -501,7 +510,7 @@ export function TrainingView({
       if (todayCard.openTarget === 'notebook') {
         applyDiscipline('musculation')
         setState(startFreeWorkoutSession('musculation'))
-        openNotebook(null)
+        openNotebook(null, null, false, true)
       } else {
         setActivityOpen(true)
       }
@@ -514,7 +523,7 @@ export function TrainingView({
     if (id === 'musculation') {
       applyDiscipline('musculation')
       setState(startFreeWorkoutSession('musculation'))
-      openNotebook(null)
+      openNotebook(null, null, false, true)
       return
     }
     if (id === 'course') {
@@ -624,8 +633,10 @@ export function TrainingView({
                       if (!showStrengthTools) applyDiscipline('musculation')
                       if (!state.activeWorkoutDraft) {
                         setState(startFreeWorkoutSession(activeSportId || 'musculation'))
+                        openNotebook(null, null, false, true)
+                      } else {
+                        openNotebook(null)
                       }
-                      openNotebook(null)
                       return
                     }
                     setPanel(item.id)
@@ -644,7 +655,7 @@ export function TrainingView({
       {panel === 'notebook' ? (
         showStrengthTools ? (
           <WorkoutNotebook
-            key={`notebook-${notebookLaunchId ?? 'boot'}-${notebookEditNote?.id ?? 'live'}-${activeSportId}`}
+            key={`notebook-${notebookLaunchId ?? 'boot'}-${notebookEditNote?.id ?? 'live'}-${activeSportId}-${notebookStartEmpty ? 'empty' : 'fill'}`}
             id="workout-notebook"
             bodyWeightKg={profile.weightKg}
             routines={state.routines}
@@ -653,6 +664,7 @@ export function TrainingView({
             initialRoutineId={notebookLaunchId}
             initialEditNote={notebookEditNote}
             resume={notebookResume}
+            startEmpty={notebookStartEmpty}
             sportId={activeSportId}
             sessionKind="strength"
             restLogRequest={restLogRequest}
@@ -805,7 +817,7 @@ export function TrainingView({
           const kind = trainSessionKindForSport(s.id)
           if (kind === 'strength') {
             setState(startFreeWorkoutSession(s.id))
-            openNotebook(null)
+            openNotebook(null, null, false, true)
           } else if (kind === 'endurance') {
             setPanel('endurance')
           } else {

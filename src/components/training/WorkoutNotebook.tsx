@@ -45,6 +45,11 @@ interface WorkoutNotebookProps {
   initialEditNote?: WorkoutNote | null
   /** Reprendre copie exactement la routine détectée ; ne réinjecte pas l'historique. */
   resume?: boolean
+  /**
+   * Séance libre : démarre sans exercices (sélecteur premier exo),
+   * même si la dernière routine a un brouillon.
+   */
+  startEmpty?: boolean
   onSave: (note: {
     id?: string
     title: string
@@ -197,6 +202,7 @@ export function WorkoutNotebook({
   initialRoutineId,
   initialEditNote = null,
   resume = false,
+  startEmpty = false,
   sportId,
   sessionKind = 'strength',
   onSave,
@@ -223,7 +229,9 @@ export function WorkoutNotebook({
   const [title, setTitle] = useState(initialEditNote?.title ?? bootRoutine.label)
   const [exercises, setExercises] = useState<ExerciseEntry[]>(() =>
     initialEditNote ? copyExercises(initialEditNote.exercises)
-      : resume ? copyExercises(bootRoutine.exercises) : cloneFromRoutine(bootRoutine, history),
+      : resume ? copyExercises(bootRoutine.exercises)
+      : startEmpty ? []
+      : cloneFromRoutine(bootRoutine, history),
   )
   const [customOpen, setCustomOpen] = useState(false)
   const [customLabel, setCustomLabel] = useState('')

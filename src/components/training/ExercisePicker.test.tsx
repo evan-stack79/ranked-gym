@@ -47,6 +47,7 @@ describe('ExercisePicker', () => {
       )
     })
     expect(host.textContent).toContain('Ajouter un exercice')
+    expect(host.textContent).toContain('Choisis un mouvement à ajouter.')
     expect(host.textContent).not.toContain('Séance libre')
     await act(async () => {
       root.unmount()
