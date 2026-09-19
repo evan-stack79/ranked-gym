@@ -40,29 +40,13 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
   return (
     <div
       ref={shellRef}
-      className="relative flex min-h-full flex-col mesh-bg font-sans"
+      className="relative flex h-full min-h-0 flex-col mesh-bg font-sans"
       data-streak-celebration-active={streakCelebrationActive ? '' : undefined}
       inert={streakCelebrationActive ? true : undefined}
     >
-      {showHeader ? (
-        <header
-          className="glass-bar sticky top-0 z-40 border-b border-white/5"
-          aria-hidden={streakCelebrationActive ? true : undefined}
-        >
-          <div
-            className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"
-            style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
-          >
-            <div data-cold-launch-target="compact">
-              <BrandMark variant="compact" />
-            </div>
-          </div>
-        </header>
-      ) : null}
-
       <main
-        className={`relative z-10 mx-auto w-full flex-1 overflow-y-auto ${
-          chromeHidden ? 'max-w-none px-0 py-0' : 'max-w-lg px-5 py-8'
+        className={`relative z-10 min-h-0 w-full flex-1 overflow-y-auto ${
+          chromeHidden ? 'max-w-none' : ''
         }`}
         style={
           chromeHidden
@@ -78,7 +62,30 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
         }
         aria-hidden={streakCelebrationActive ? true : undefined}
       >
-        {children}
+        {showHeader ? (
+          <header
+            className="border-b border-white/5 bg-[#0C0C0E]"
+            data-app-brand-header="1"
+            aria-hidden={streakCelebrationActive ? true : undefined}
+          >
+            <div
+              className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"
+              style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+            >
+              <div data-cold-launch-target="compact">
+                <BrandMark variant="compact" />
+              </div>
+            </div>
+          </header>
+        ) : null}
+
+        <div
+          className={
+            chromeHidden ? undefined : 'mx-auto w-full max-w-lg px-5 py-8'
+          }
+        >
+          {children}
+        </div>
       </main>
 
       {!chromeHidden ? (

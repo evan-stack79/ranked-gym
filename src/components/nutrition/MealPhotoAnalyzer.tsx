@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react'
 import { AlertCircle, Camera, Loader2, Sparkles } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import {
@@ -15,7 +22,11 @@ interface MealPhotoAnalyzerProps {
   onAnalyzed: (macros: MealPhotoMacros & { name: string; mealType: MealType }) => void
   onToast?: (message: string, variant?: 'success' | 'error') => void
   /** Affichage compact (bouton) — même logique état / réseau que la carte. */
-  variant?: 'card' | 'button'
+  variant?: 'card' | 'button' | 'headless'
+}
+
+export type MealPhotoAnalyzerHandle = {
+  open: () => void
 }
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -28,11 +39,8 @@ function defaultMealType(): MealType {
   return 'snack'
 }
 
-export function MealPhotoAnalyzer({
-  onAnalyzed,
-  onToast,
-  variant = 'card',
-}: MealPhotoAnalyzerProps) {
+export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAnalyzerProps>(
+  function MealPhotoAnalyzer({ onAnalyzed, onToast, variant = 'card' }, ref) {
   const { user, isAuthenticated, requireAuth } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
@@ -70,7 +78,7 @@ export function MealPhotoAnalyzer({
     }
   }, [previewUrl])
 
-  const openPicker = () => {
+  const openPicker = useCallback(() => {
     setErrorMessage(null)
     if (!isAuthenticated) {
       requireAuth(() => inputRef.current?.click())
@@ -83,7 +91,9 @@ export function MealPhotoAnalyzer({
       return
     }
     inputRef.current?.click()
-  }
+  }, [isAuthenticated, onToast, remaining, requireAuth])
+
+  useImperativeHandle(ref, () => ({ open: openPicker }), [openPicker])
 
   const onFile = async (file: File | undefined) => {
     if (!file) return
@@ -128,6 +138,19 @@ export function MealPhotoAnalyzer({
       setBusy(false)
       if (inputRef.current) inputRef.current.value = ''
     }
+  }
+
+  if (variant === 'headless') {
+    return (
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => void onFile(e.target.files?.[0])}
+      />
+    )
   }
 
   return (
@@ -241,4 +264,4 @@ export function MealPhotoAnalyzer({
       />
     </div>
   )
-}
+})

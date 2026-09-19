@@ -67,31 +67,34 @@ function SessionChrome({
   children: ReactNode
 }) {
   return (
-    <div className="relative flex min-h-[100dvh] flex-col mesh-bg font-sans">
-      {showBrandHeader ? (
-        <header
-          className="glass-bar sticky top-0 z-40 border-b border-white/5"
-          style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+    <div className="relative flex h-[100dvh] min-h-0 flex-col mesh-bg font-sans">
+      <main className="relative z-10 mx-auto min-h-0 w-full max-w-lg flex-1 overflow-y-auto">
+        {showBrandHeader ? (
+          <header
+            className="border-b border-white/5 bg-[#0C0C0E]"
+            data-app-brand-header="1"
+            style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+          >
+            <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-3">
+              <span className="text-[17px] font-semibold tracking-tight text-white">
+                Ranked <span className="text-[#FF2B2B]">Gym</span>
+              </span>
+            </div>
+          </header>
+        ) : null}
+        <div
+          className="px-5 py-8"
+          style={
+            showBrandHeader
+              ? undefined
+              : {
+                  // Compense le header masqué : safe area + air, sans bandeau vide.
+                  paddingTop: 'max(2rem, calc(env(safe-area-inset-top, 0px) + 1rem))',
+                }
+          }
         >
-          <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-3">
-            <span className="text-[17px] font-semibold tracking-tight text-white">
-              Ranked <span className="text-[#FF2B2B]">Gym</span>
-            </span>
-          </div>
-        </header>
-      ) : null}
-      <main
-        className="relative z-10 mx-auto w-full max-w-lg flex-1 px-5 py-8"
-        style={
-          showBrandHeader
-            ? undefined
-            : {
-                // Compense le header masqué : safe area + air, sans bandeau vide.
-                paddingTop: 'max(2rem, calc(env(safe-area-inset-top, 0px) + 1rem))',
-              }
-        }
-      >
-        {children}
+          {children}
+        </div>
       </main>
     </div>
   )
