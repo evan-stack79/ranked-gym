@@ -63,7 +63,7 @@ export function ExercisePicker({
 
   return (
     <section
-      className="flex min-h-[100dvh] flex-col bg-black text-white"
+      className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-black text-white"
       data-exercise-picker
       data-picker-mode={mode}
       style={{
