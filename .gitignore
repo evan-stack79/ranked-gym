@@ -88,6 +88,14 @@ scripts/screenshots/**
 !scripts/screenshots/brand-scroll/accueil_brand_scroll_A_top_brand_visible.png
 !scripts/screenshots/brand-scroll/accueil_brand_scroll_B_scrolled_brand_gone.png
 !scripts/screenshots/brand-scroll/accueil_brand_scroll_C_back_top_brand_visible.png
+# Exception: preuves soft-leave séance immersive → Train Reprendre
+!scripts/screenshots/session-soft-leave/
+!scripts/screenshots/session-soft-leave/CAUSE.md
+!scripts/screenshots/session-soft-leave/soft_leave_01_hub_reprendre.png
+!scripts/screenshots/session-soft-leave/soft_leave_02_session_edited.png
+!scripts/screenshots/session-soft-leave/soft_leave_03_hub_after_back.png
+!scripts/screenshots/session-soft-leave/soft_leave_04_restored.png
+!scripts/screenshots/session-soft-leave/soft_leave_session_back_to_reprendre.mp4
 
 # Migration artifacts can contain sensitive export metadata.
 scripts/migrations/artifacts/
