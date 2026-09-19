@@ -22,6 +22,7 @@ describe('ExercisePicker', () => {
 
     expect(host.textContent).toContain('Quel est ton premier exercice ?')
     expect(host.textContent).toContain('Choisis un mouvement pour commencer.')
+    expect(host.textContent).toContain('+ Créer un exercice personnalisé')
     expect(host.textContent).not.toContain('Séance libre')
     expect(host.querySelector('[data-exercise-picker]')).toBeTruthy()
     expect(host.textContent).toMatch(/\d+ résultats?/)

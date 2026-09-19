@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Plus, Search, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, X } from 'lucide-react'
 import type { CatalogExercise } from '../../data/exerciseCatalog'
 import { formatCatalogMeta } from '../../data/exerciseCatalog'
 import {
@@ -194,10 +194,9 @@ export function ExercisePicker({
                 setCustomOpen(true)
                 setCustomName(query.trim())
               }}
-              className="ios-press mb-1 flex min-h-11 w-full items-center justify-center gap-1.5 text-[14px] font-semibold text-white"
+              className="ios-press mb-1 flex min-h-11 w-full items-center justify-center text-[14px] font-semibold text-white"
             >
-              <Plus className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
-              Créer un exercice personnalisé
+              + Créer un exercice personnalisé
             </button>
           )}
           <p
