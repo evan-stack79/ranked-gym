@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "wave": 1,
+  "status": "assets_only_pending_evan_approval",
+  "wired_to_ui": false,
+  "base_sha": "e176f42a08be90a4678a7a1f0715cc2f2c474738",
+  "base_branch": "origin/bot/migrate-supabase-to-convex",
+  "directory": "assets/exercises/illustrations/wave1/",
+  "format": {
+    "type": "image/png",
+    "width": 1024,
+    "height": 1024,
+    "aspect": "1:1",
+    "mode": "RGBA",
+    "background": "real_alpha"
+  },
+  "fallback_policy": "An unknown canonical id must keep using the existing in-app neutral fallback. This manifest is documentation only. src/utils/exerciseMedia.ts is unchanged; unknown exercises still resolve imageSrc=null.",
+  "validated_bench_press": {
+    "canonical_id": "bench_press",
+    "file": null,
+    "ui_asset": "src/assets/exercises/developpe-couche.webp",
+    "note": "Do not overwrite. Official wave-style reference was used only as a visual lock for this series. The validated UI photo stays the runtime fallback for bench_press."
+  },
+  "entries": {
+    "bench_press": {
+      "canonical_id": "bench_press",
+      "label": "Développé couché",
+      "file": null,
+      "ui_asset": "src/assets/exercises/developpe-couche.webp",
+      "status": "existing_validated_not_replaced"
+    },
+    "incline_bench_press": {
+      "canonical_id": "incline_bench_press",
+      "label": "Développé incliné",
+      "file": "incline-bench-press.png"
+    },
+    "dumbbell_bench_press": {
+      "canonical_id": "dumbbell_bench_press",
+      "label": "Développé couché haltères",
+      "file": "dumbbell-bench-press.png"
+    },
+    "overhead_press": {
+      "canonical_id": "overhead_press",
+      "label": "Développé militaire",
+      "file": "overhead-press.png"
+    },
+    "back_squat": {
+      "canonical_id": "back_squat",
+      "label": "Squat barre",
+      "file": "back-squat.png"
+    },
+    "deadlift": {
+      "canonical_id": "deadlift",
+      "label": "Soulevé de terre",
+      "file": "deadlift.png"
+    },
+    "leg_press": {
+      "canonical_id": "leg_press",
+      "label": "Presse à cuisses",
+      "file": "leg-press.png"
+    },
+    "barbell_row": {
+      "canonical_id": "barbell_row",
+      "label": "Rowing barre",
+      "file": "barbell-row.png"
+    },
+    "pull_up": {
+      "canonical_id": "pull_up",
+      "label": "Tractions pronation",
+      "file": "pull-up.png"
+    },
+    "lat_pulldown": {
+      "canonical_id": "lat_pulldown",
+      "label": "Tirage vertical",
+      "file": "lat-pulldown.png"
+    },
+    "dumbbell_curl": {
+      "canonical_id": "dumbbell_curl",
+      "label": "Curl haltères",
+      "file": "dumbbell-curl.png"
+    },
+    "triceps_pushdown": {
+      "canonical_id": "triceps_pushdown",
+      "label": "Extension triceps poulie",
+      "file": "triceps-pushdown.png"
+    },
+    "lateral_raise": {
+      "canonical_id": "lateral_raise",
+      "label": "Élévations latérales",
+      "file": "lateral-raise.png"
+    }
+  }
+}
