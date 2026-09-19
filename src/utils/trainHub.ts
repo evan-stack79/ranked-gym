@@ -114,7 +114,7 @@ export function findActiveStrengthSession(state: TrainingState): ActiveStrengthS
   const active = state.activeWorkoutDraft
   if (!active || sessionKindForSport(active.sportId) !== 'strength') return null
   const routine = state.routines.find((candidate) => candidate.id === active.routineId)
-  if (!routine || routine.exercises.length === 0) return null
+  if (!routine) return null
   return {
     routineId: routine.id,
     title: routine.label?.trim() || 'Séance',

@@ -146,6 +146,7 @@ const DEFAULT_STATE: TrainingState = {
   lastSelectedRoutineId: null,
   lastSelectedSportId: null,
   activeWorkoutDraft: null,
+  lastVoluntaryRoute: null,
 }
 
 function cloneExercises(exercises: ExerciseEntry[]): ExerciseEntry[] {
@@ -224,7 +225,20 @@ export function normalizeActiveWorkoutDraft(
     if (rest) draft.restTimer = rest
   }
 
+  if (
+    Number.isFinite(raw.activeExerciseIndex) &&
+    (raw.activeExerciseIndex as number) >= 0
+  ) {
+    draft.activeExerciseIndex = Math.floor(raw.activeExerciseIndex as number)
+  }
+
   return draft
+}
+
+function normalizeLastVoluntaryRoute(
+  value: unknown,
+): TrainingState['lastVoluntaryRoute'] {
+  return value === 'train-hub' ? 'train-hub' : null
 }
 
 function normalizeScheduleEntry<T extends Omit<ScheduledSession, 'id'> & { id?: string }>(
@@ -274,6 +288,7 @@ function read(): TrainingState {
       lastSelectedRoutineId: sanitizeStoredId(parsed.lastSelectedRoutineId),
       lastSelectedSportId: sanitizeStoredId(parsed.lastSelectedSportId),
       activeWorkoutDraft: normalizeActiveWorkoutDraft(parsed.activeWorkoutDraft, routines),
+      lastVoluntaryRoute: normalizeLastVoluntaryRoute(parsed.lastVoluntaryRoute),
     }
     if (merged.stepsDateKey !== todayKey()) {
       merged.stepsToday = 0
@@ -627,6 +642,7 @@ export function saveWorkoutNote(
     completed,
     routines,
     activeWorkoutDraft: completesActiveDraft ? null : state.activeWorkoutDraft ?? null,
+    lastVoluntaryRoute: completesActiveDraft ? null : state.lastVoluntaryRoute ?? null,
   }
   write(next)
   return next
@@ -684,6 +700,7 @@ export function saveRoutineDraft(
     runningSince: same ? prior?.runningSince ?? (prior?.paused ? null : now) : now,
     paused: same ? prior?.paused === true : false,
     restTimer: same ? prior?.restTimer ?? null : null,
+    activeExerciseIndex: same ? prior?.activeExerciseIndex : undefined,
   }
   const next = {
     ...state,
@@ -713,6 +730,7 @@ export function startRoutineDraft(
     ...state,
     lastSelectedRoutineId: cleanRoutineId,
     lastSelectedSportId: cleanSportId,
+    lastVoluntaryRoute: null,
     activeWorkoutDraft: ensureDraftClock({
       routineId: cleanRoutineId,
       sportId: cleanSportId,
@@ -722,6 +740,7 @@ export function startRoutineDraft(
       runningSince: same && prior?.paused ? null : now,
       paused: same ? prior?.paused === true : false,
       restTimer: same ? prior?.restTimer ?? null : null,
+      activeExerciseIndex: same ? prior?.activeExerciseIndex : 0,
     }, now),
   }
   write(next)
@@ -755,6 +774,7 @@ export function startFreeWorkoutSession(
     ...state,
     lastSelectedRoutineId: cleanRoutineId,
     lastSelectedSportId: cleanSportId,
+    lastVoluntaryRoute: null,
     activeWorkoutDraft: ensureDraftClock({
       routineId: cleanRoutineId,
       sportId: cleanSportId,
@@ -764,6 +784,7 @@ export function startFreeWorkoutSession(
       runningSince: same && prior?.paused ? null : now,
       paused: same ? prior?.paused === true : false,
       restTimer: same ? prior?.restTimer ?? null : null,
+      activeExerciseIndex: same ? prior?.activeExerciseIndex : 0,
     }, now),
   }
   write(next)
@@ -815,6 +836,46 @@ export function persistActiveRestTimer(
     activeWorkoutDraft: {
       ...draft,
       restTimer: restTimer ?? null,
+      updatedAt: Date.now(),
+    },
+  }
+  write(next)
+  return next
+}
+
+/**
+ * Soft-leave volontaire vers le hub Train.
+ * Conserve le brouillon / repos / clock — ne termine pas la séance.
+ */
+export function markVoluntaryLeaveToTrainHub(): TrainingState {
+  const state = read()
+  if (state.lastVoluntaryRoute === 'train-hub') return state
+  const next = { ...state, lastVoluntaryRoute: 'train-hub' as const }
+  write(next)
+  return next
+}
+
+/** Efface le flag soft-leave (Reprendre / démarrage / cold reopen). */
+export function clearLastVoluntaryRoute(): TrainingState {
+  const state = read()
+  if (state.lastVoluntaryRoute == null) return state
+  const next = { ...state, lastVoluntaryRoute: null }
+  write(next)
+  return next
+}
+
+/** Persiste l’exercice affiché sur l’écran immersif. */
+export function persistActiveExerciseIndex(index: number): TrainingState {
+  const state = read()
+  const draft = state.activeWorkoutDraft
+  if (!draft) return state
+  const safe = Math.max(0, Math.floor(index))
+  if (draft.activeExerciseIndex === safe) return state
+  const next = {
+    ...state,
+    activeWorkoutDraft: {
+      ...draft,
+      activeExerciseIndex: safe,
       updatedAt: Date.now(),
     },
   }

@@ -657,3 +657,109 @@ describe('erreurs de sauvegarde visibles', () => {
     }
   })
 })
+
+describe('soft-leave séance → Train (pas Abandonner)', () => {
+  beforeEach(() => {
+    store.clear()
+    cloudUser.mockReturnValue(null)
+    vi.useRealTimers()
+  })
+
+  function seedActiveBiceps() {
+    const base = getTrainingState()
+    const routines = [
+      ...base.routines.filter((r) => r.id !== 'custom-biceps'),
+      bicepsRoutine({
+        exercises: [{ id: 'e1', name: 'Curl', sets: [{ reps: 10, weightKg: 12 }] }],
+        updatedAt: 1,
+      }),
+    ]
+    saveTrainingState({ ...base, routines })
+    return startRoutineDraft('custom-biceps', 'musculation')
+  }
+
+  it('markVoluntaryLeave conserve le brouillon + empêche auto-reopen ; clear le permet', async () => {
+    const {
+      markVoluntaryLeaveToTrainHub,
+      clearLastVoluntaryRoute,
+      persistActiveExerciseIndex,
+    } = await import('./trainingStorage')
+    const { shouldAutoReopenSession } = await import('../utils/sessionBackNav')
+    const { deriveTodayHubCard } = await import('../utils/trainHub')
+
+    seedActiveBiceps()
+    persistActiveExerciseIndex(1)
+    const left = markVoluntaryLeaveToTrainHub()
+    expect(left.lastVoluntaryRoute).toBe('train-hub')
+    expect(left.activeWorkoutDraft?.routineId).toBe('custom-biceps')
+    expect(left.activeWorkoutDraft?.activeExerciseIndex).toBe(1)
+    expect(
+      shouldAutoReopenSession({
+        hasActiveDraft: true,
+        lastVoluntaryRoute: left.lastVoluntaryRoute,
+      }),
+    ).toBe(false)
+
+    const card = deriveTodayHubCard(left, new Date('2026-09-04T15:00:00'))
+    expect(card.cta).toBe('resume')
+
+    const cleared = clearLastVoluntaryRoute()
+    expect(cleared.lastVoluntaryRoute).toBeNull()
+    expect(cleared.activeWorkoutDraft?.activeExerciseIndex).toBe(1)
+    expect(
+      shouldAutoReopenSession({
+        hasActiveDraft: true,
+        lastVoluntaryRoute: cleared.lastVoluntaryRoute,
+      }),
+    ).toBe(true)
+  })
+
+  it('Terminer efface lastVoluntaryRoute + brouillon (plus de Reprendre)', async () => {
+    const { markVoluntaryLeaveToTrainHub, saveWorkoutNote } = await import('./trainingStorage')
+    seedActiveBiceps()
+    markVoluntaryLeaveToTrainHub()
+    saveWorkoutNote({
+      title: 'Biceps',
+      routineId: 'custom-biceps',
+      sportId: 'musculation',
+      sessionKind: 'strength',
+      source: 'manual',
+      estimatedKcal: 100,
+      durationMin: 30,
+      exercises: [
+        {
+          id: 'e1',
+          name: 'Curl',
+          sets: [{ reps: 10, weightKg: 12, done: true }],
+        },
+      ],
+    })
+    const after = getTrainingState()
+    expect(after.activeWorkoutDraft).toBeNull()
+    expect(after.lastVoluntaryRoute).toBeNull()
+  })
+
+  it('repos endsAt survit soft-leave (pas de wipe)', async () => {
+    const { markVoluntaryLeaveToTrainHub, persistActiveRestTimer } = await import(
+      './trainingStorage'
+    )
+    seedActiveBiceps()
+    const endsAt = Date.now() + 45_000
+    persistActiveRestTimer({
+      totalSec: 90,
+      remainingSec: 45,
+      endsAt,
+      paused: false,
+      target: {
+        exerciseId: 'e1',
+        setIndex: 0,
+        exerciseName: 'Curl',
+        setLabel: 'S1',
+      },
+    })
+    markVoluntaryLeaveToTrainHub()
+    const snap = getTrainingState().activeWorkoutDraft?.restTimer
+    expect(snap?.endsAt).toBe(endsAt)
+    expect(snap?.remainingSec).toBe(45)
+  })
+})

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './trainView.css'
 import { BookOpen, CalendarDays, ChevronLeft, Footprints, History, Settings2 } from 'lucide-react'
 import type { TrainingState, WorkoutNote } from '../../types/training'
@@ -21,6 +21,8 @@ import {
   setStepsToday,
   todayWorkoutKcal,
   upsertSchedule,
+  markVoluntaryLeaveToTrainHub,
+  clearLastVoluntaryRoute,
 } from '../../services/trainingStorage'
 import { saveAndSyncWorkoutSession } from '../../services/trainingSyncService'
 import { safeError } from '../../utils/safeLog'
@@ -80,6 +82,12 @@ import {
   liveElapsedMs,
   resolvedDurationMin,
 } from '../../utils/sessionClock'
+import {
+  popSessionHistoryIfNeeded,
+  pushSessionHistory,
+  replaceHubHistory,
+  shouldAutoReopenSession,
+} from '../../utils/sessionBackNav'
 
 type TrainPanel = 'hub' | 'notebook' | 'endurance' | 'agenda' | 'history' | 'steps'
 
@@ -127,6 +135,10 @@ export function TrainingView({
   const [focusNoteId, setFocusNoteId] = useState<string | null>(null)
   const [nowTick, setNowTick] = useState(() => Date.now())
   const [clockTick, setClockTick] = useState(() => Date.now())
+  /** Ignore le popstate déclenché par notre propre history.back() après soft-leave flèche. */
+  const ignoringPopRef = useRef(false)
+  const draftFlushRef = useRef<(() => void) | null>(null)
+  const didAutoReopenRef = useRef(false)
 
   useEffect(() => {
     if (isBootLoading) return
@@ -146,13 +158,13 @@ export function TrainingView({
     }
   }, [])
 
-  // Chronomètre séance — tick 1s uniquement si une séance active non en pause.
+  // Chronomètre séance — tick 1s si brouillon actif non en pause (hub ou notebook).
   useEffect(() => {
     const draft = state.activeWorkoutDraft
-    if (!draft || draft.paused || panel !== 'notebook') return
+    if (!draft || draft.paused) return
     const id = window.setInterval(() => setClockTick(Date.now()), 1000)
     return () => window.clearInterval(id)
-  }, [state.activeWorkoutDraft, panel])
+  }, [state.activeWorkoutDraft])
 
   const sessionClockLabel = useMemo(() => {
     const draft = state.activeWorkoutDraft
@@ -246,6 +258,10 @@ export function TrainingView({
     resume = false,
     startEmpty = false,
   ) => {
+    if (!editNote) {
+      setState(clearLastVoluntaryRoute())
+      pushSessionHistory()
+    }
     setNotebookLaunchId(routineId ?? editNote?.routineId ?? null)
     setNotebookEditNote(editNote ?? null)
     setNotebookResume(resume)
@@ -253,11 +269,90 @@ export function TrainingView({
     setPanel('notebook')
   }, [])
 
+  /** Soft-leave : flush + flag volontaire + hub. Ne termine / reset rien. */
+  const softLeaveToHub = useCallback((opts?: { viaHistory?: boolean }) => {
+    draftFlushRef.current?.()
+    const next = markVoluntaryLeaveToTrainHub()
+    setState(next)
+    setPanel('hub')
+    setNotebookLaunchId(null)
+    setNotebookEditNote(null)
+    setNotebookResume(false)
+    setNotebookStartEmpty(false)
+    if (opts?.viaHistory) {
+      replaceHubHistory()
+      return
+    }
+    if (popSessionHistoryIfNeeded()) {
+      ignoringPopRef.current = true
+    }
+  }, [])
+
   useEffect(() => {
     if (!launchRoutineId || !showStrengthTools) return
     openNotebook(launchRoutineId)
     onLaunchConsumed?.()
   }, [launchRoutineId, showStrengthTools, onLaunchConsumed, openNotebook])
+
+  /** Cold start / remount OS : rouvrir la séance sauf soft-leave volontaire. */
+  useEffect(() => {
+    if (isBootLoading || !showStrengthTools) return
+    if (didAutoReopenRef.current) return
+    const snap = getTrainingState()
+    if (
+      !shouldAutoReopenSession({
+        hasActiveDraft: Boolean(snap.activeWorkoutDraft),
+        lastVoluntaryRoute: snap.lastVoluntaryRoute,
+      })
+    ) {
+      return
+    }
+    if (panel !== 'hub') return
+    didAutoReopenRef.current = true
+    const id = snap.activeWorkoutDraft!.routineId
+    openNotebook(id, null, true)
+    // Une fois au montage / restore — pas à chaque tick panel.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBootLoading, showStrengthTools])
+
+  /** App revient au premier plan sans soft-leave → rouvrir si on est resté sur hub. */
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState !== 'visible') return
+      const snap = getTrainingState()
+      if (
+        !shouldAutoReopenSession({
+          hasActiveDraft: Boolean(snap.activeWorkoutDraft),
+          lastVoluntaryRoute: snap.lastVoluntaryRoute,
+        })
+      ) {
+        return
+      }
+      setPanel((current) => {
+        if (current !== 'hub') return current
+        const id = snap.activeWorkoutDraft!.routineId
+        queueMicrotask(() => openNotebook(id, null, true))
+        return current
+      })
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [openNotebook])
+
+  /** Retour système / PWA / Android → même soft-leave que la flèche. */
+  useEffect(() => {
+    const onPop = () => {
+      if (ignoringPopRef.current) {
+        ignoringPopRef.current = false
+        return
+      }
+      if (panel !== 'notebook' || notebookEditNote) return
+      if (!state.activeWorkoutDraft) return
+      softLeaveToHub({ viaHistory: true })
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [panel, notebookEditNote, state.activeWorkoutDraft, softLeaveToHub])
 
   useEffect(() => {
     return subscribeRestLogged(({ target, restSec, skipped }) => {
@@ -540,6 +635,10 @@ export function TrainingView({
   }
 
   const goHub = () => {
+    if (panel === 'notebook' && state.activeWorkoutDraft && !notebookEditNote) {
+      softLeaveToHub()
+      return
+    }
     setPanel('hub')
     setNotebookLaunchId(null)
   }
@@ -635,7 +734,8 @@ export function TrainingView({
                         setState(startFreeWorkoutSession(activeSportId || 'musculation'))
                         openNotebook(null, null, false, true)
                       } else {
-                        openNotebook(null)
+                        setState(ensureActiveWorkoutClock())
+                        openNotebook(state.activeWorkoutDraft.routineId, null, true)
                       }
                       return
                     }
@@ -676,7 +776,10 @@ export function TrainingView({
               setState(next)
               setClockTick(Date.now())
             }}
-            onBack={goHub}
+            onBack={softLeaveToHub}
+            onRegisterDraftFlush={(flush) => {
+              draftFlushRef.current = flush
+            }}
             onRestStart={(info) => {
               startRestTimer(info.restSec ?? 90, info)
             }}

@@ -13,6 +13,8 @@ import type {
 import {
   resolveResumedRoutineId,
   setLastSelectedRoutine,
+  persistActiveExerciseIndex,
+  getTrainingState,
 } from '../../services/trainingStorage'
 import { computeStrengthSessionStats } from '../../utils/strength'
 import { sanitizeExerciseName } from '../../utils/exerciseName'
@@ -90,8 +92,10 @@ interface WorkoutNotebookProps {
   onToggleSessionPause?: () => void
   /** Minutes chronométrées réelles — prioritaire à l’estimation à la sauvegarde. */
   sessionDurationMin?: number | null
-  /** Retour hub Train (écran immersif). */
+  /** Retour hub Train (écran immersif) — soft-leave, pas abandon. */
   onBack?: () => void
+  /** Enregistre un flush immédiat du brouillon (soft-leave / système). */
+  onRegisterDraftFlush?: (flush: (() => void) | null) => void
 }
 
 /** Tags optionnels — n’influencent plus la charge suivante. */
@@ -216,6 +220,7 @@ export function WorkoutNotebook({
   onToggleSessionPause,
   sessionDurationMin = null,
   onBack,
+  onRegisterDraftFlush,
 }: WorkoutNotebookProps) {
   const bootRoutine = useMemo(
     () => (resume ? routines.find(r => r.id === initialRoutineId) : undefined) ??
@@ -238,7 +243,15 @@ export function WorkoutNotebook({
   const [saving, setSaving] = useState(false)
   const [editingNote, setEditingNote] = useState<WorkoutNote | null>(initialEditNote)
   const [effortHelpOpen, setEffortHelpOpen] = useState(false)
-  const [activeExerciseIndex, setActiveExerciseIndex] = useState(0)
+  const [activeExerciseIndex, setActiveExerciseIndex] = useState(() => {
+    if (initialEditNote || !resume) return 0
+    try {
+      const stored = getTrainingState().activeWorkoutDraft?.activeExerciseIndex
+      return typeof stored === 'number' && stored >= 0 ? stored : 0
+    } catch {
+      return 0
+    }
+  })
   const [restPrefSec, setRestPrefSec] = useState(90)
   /** `null` = fermé ; `first` / `add` = sélecteur ouvert. */
   const [pickerMode, setPickerMode] = useState<ExercisePickerMode | null>(null)
@@ -362,11 +375,41 @@ export function WorkoutNotebook({
     }
     document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('pagehide', flushDraft)
+    onRegisterDraftFlush?.(flushDraft)
     return () => {
+      // Soft-leave / unmount : ne pas perdre le debounce en cours.
+      flushDraft()
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('pagehide', flushDraft)
+      onRegisterDraftFlush?.(null)
     }
-  }, [onDraftSave])
+  }, [onDraftSave, onRegisterDraftFlush])
+
+  const handleActiveIndexChange = (index: number) => {
+    setActiveExerciseIndex(index)
+    if (!editingNote) {
+      try {
+        persistActiveExerciseIndex(index)
+      } catch {
+        // persist error déjà émis par trainingStorage
+      }
+    }
+  }
+
+  const handleSoftBack = () => {
+    if (!draftBlocked.current && draftDirty.current && onDraftSave) {
+      onDraftSave(routineIdRef.current, exercisesRef.current)
+      draftDirty.current = false
+    }
+    if (!editingNote) {
+      try {
+        persistActiveExerciseIndex(activeExerciseIndex)
+      } catch {
+        // ignore
+      }
+    }
+    onBack?.()
+  }
 
   const updateExercise = (exerciseId: string, patch: Partial<ExerciseEntry>) => {
     draftDirty.current = true
@@ -529,7 +572,7 @@ export function WorkoutNotebook({
         mode={resolvedPickerMode}
         onBack={() => {
           if (needsFirstPicker) {
-            onBack?.()
+            handleSoftBack()
             return
           }
           setPickerMode(null)
@@ -545,11 +588,11 @@ export function WorkoutNotebook({
       <ImmersiveExerciseSession
         exercises={exercises}
         activeIndex={activeExerciseIndex}
-        onActiveIndexChange={setActiveExerciseIndex}
+        onActiveIndexChange={handleActiveIndexChange}
         sessionClockLabel={sessionClockLabel!}
         sessionPaused={sessionPaused}
         onToggleSessionPause={onToggleSessionPause}
-        onBack={onBack ?? (() => undefined)}
+        onBack={handleSoftBack}
         onUpdateSet={updateSet}
         onAddSet={(exerciseId) => {
           const ex = exercises.find((e) => e.id === exerciseId)
