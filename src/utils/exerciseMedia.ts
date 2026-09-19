@@ -1,5 +1,11 @@
 import developpeCoucheWebp from '../assets/exercises/developpe-couche.webp'
-import { getCatalogExercise } from '../data/exerciseCatalog'
+import {
+  formatExerciseMetaLine,
+  getCatalogExercise,
+  type ExerciseEquipment,
+} from '../data/exerciseCatalog'
+
+export { formatExerciseMetaLine }
 
 /**
  * Stable media keys — NOT free-text exercise titles.
@@ -19,6 +25,13 @@ export type ExerciseMedia = {
   imageAlt: string
   /** Primary muscle labels for the subtitle line (only when canonically known). */
   muscles: string[]
+  /** Equipment label from catalog when canonically known. */
+  equipment: string | null
+  /**
+   * Illustration locale (equipment glyph) when no photo — never an invented exercise photo.
+   * Values are stable keys for SVG glyphs in the UI.
+   */
+  illustrationKey: ExerciseEquipment | 'neutral'
 }
 
 type AssetEntry = {
@@ -111,6 +124,29 @@ function musclesForCanonical(canonical: string | null): string[] {
   return []
 }
 
+function equipmentForCanonical(canonical: string | null): string | null {
+  if (!canonical) return null
+  const catalog = getCatalogExercise(canonical)
+  return catalog?.equipment ?? null
+}
+
+function illustrationKeyFor(
+  equipment: string | null,
+): ExerciseEquipment | 'neutral' {
+  if (
+    equipment === 'Barre' ||
+    equipment === 'Haltères' ||
+    equipment === 'Machine' ||
+    equipment === 'Poids du corps' ||
+    equipment === 'Câble' ||
+    equipment === 'Kettlebell' ||
+    equipment === 'Autre'
+  ) {
+    return equipment
+  }
+  return 'neutral'
+}
+
 /**
  * Resolve local media for an exercise.
  * Priority: `canonicalExerciseId` → reliable name slug → null asset (neutral fallback).
@@ -124,6 +160,8 @@ export function resolveExerciseMedia(
   const { canonical, nameSlug } = resolveCanonical(normalized)
   const asset = canonical ? CANONICAL_ASSETS[canonical] : undefined
   const muscles = musclesForCanonical(canonical)
+  const equipment = equipmentForCanonical(canonical)
+  const illustrationKey = illustrationKeyFor(equipment)
 
   if (canonical && asset) {
     return {
@@ -132,6 +170,8 @@ export function resolveExerciseMedia(
       imageSrc: asset.imageSrc,
       imageAlt: asset.imageAlt,
       muscles,
+      equipment,
+      illustrationKey,
     }
   }
 
@@ -141,10 +181,12 @@ export function resolveExerciseMedia(
     imageSrc: null,
     imageAlt: '',
     muscles,
+    equipment,
+    illustrationKey,
   }
 }
 
-/** Subtitle line: `Pectoraux · Triceps` or empty when unknown. */
+/** Subtitle muscles-only (compat). Prefer formatExerciseMetaLine for UI unifiée. */
 export function formatExerciseMuscles(muscles: string[]): string {
   return muscles.filter(Boolean).join(' · ')
 }

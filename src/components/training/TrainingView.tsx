@@ -82,6 +82,7 @@ import {
   liveElapsedMs,
   resolvedDurationMin,
 } from '../../utils/sessionClock'
+import { deriveSessionDisplayTitle } from '../../utils/sessionDisplayTitle'
 import {
   popSessionHistoryIfNeeded,
   pushSessionHistory,
@@ -355,12 +356,14 @@ export function TrainingView({
   }, [panel, notebookEditNote, state.activeWorkoutDraft, softLeaveToHub])
 
   useEffect(() => {
-    return subscribeRestLogged(({ target, restSec, skipped }) => {
+    return subscribeRestLogged(({ target, restSec }) => {
+      // BUG4 conflit résolu : skip repos ne crée plus de série auto.
+      // Ancienne règle métier : addNextSet = skipped. Nouvelle : jamais auto-créer.
       setRestLogRequest({
         exerciseId: target.exerciseId,
         setIndex: target.setIndex,
         restSec,
-        addNextSet: skipped,
+        addNextSet: false,
         nonce: Date.now(),
       })
     })
@@ -429,7 +432,7 @@ export function TrainingView({
     const bodyWeightKg = getCalorieProfile().weightKg
     const liftStats = computeStrengthSessionStats(note.exercises, bodyWeightKg)
     setPumpCheckSession({
-      title: note.title?.trim() || 'Séance',
+      title: deriveSessionDisplayTitle(note.exercises, note.title),
       volumeKg: note.totalVolumeKg ?? liftStats.volume,
       durationMin: note.durationMin ?? liftStats.durationMin,
       prCount,

@@ -9,6 +9,7 @@ import {
   noteVolumeKg,
 } from '../../utils/workoutHistory'
 import { resolveSessionKind } from '../../utils/trainHub'
+import { deriveSessionDisplayTitle } from '../../utils/sessionDisplayTitle'
 import { TrainSheet as IosSheet } from './TrainSheet'
 
 interface WorkoutHistoryProps {
@@ -130,14 +131,16 @@ export function WorkoutHistory({
                       type="button"
                       onClick={() => setSelected(note)}
                       className="absolute inset-0 z-0 rounded-2xl"
-                      aria-label={`Voir ${note.title}`}
+                      aria-label={`Voir ${deriveSessionDisplayTitle(note.exercises, note.title)}`}
                     />
                     <div className="relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#FF2B2B]/15 text-[#FF6961]">
                       <Dumbbell className="h-5 w-5" />
                     </div>
                     <div className="relative z-10 min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="truncate font-semibold text-white">{note.title}</p>
+                        <p className="truncate font-semibold text-white">
+                          {deriveSessionDisplayTitle(note.exercises, note.title)}
+                        </p>
                         <span className="shrink-0 text-[11px] text-[#636366]">
                           {formatClock(note.createdAt)}
                         </span>
@@ -149,7 +152,7 @@ export function WorkoutHistory({
                               onEdit(note)
                             }}
                             className="ios-press relative z-20 ml-auto flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-[#AEAEB2]"
-                            aria-label={`Modifier ${note.title}`}
+                            aria-label={`Modifier ${deriveSessionDisplayTitle(note.exercises, note.title)}`}
                           >
                             <Pencil className="h-3.5 w-3.5" strokeWidth={2.25} />
                           </button>
@@ -198,7 +201,11 @@ export function WorkoutHistory({
       <IosSheet
         open={selected != null}
         onClose={() => setSelected(null)}
-        title={selected?.title ?? 'Séance'}
+        title={
+          selected
+            ? deriveSessionDisplayTitle(selected.exercises, selected.title)
+            : 'Séance'
+        }
         subtitle={selectedSubtitle}
         leading={<Dumbbell className="mt-0.5 h-5 w-5 text-[#FF6961]" />}
       >

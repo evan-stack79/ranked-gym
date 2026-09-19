@@ -8,6 +8,7 @@ import {
 } from '../../utils/exerciseSearch'
 import { resolveExerciseMedia } from '../../utils/exerciseMedia'
 import { BRAND_MARK_COMPACT_SRC } from '../brand/BrandMark'
+import { ExerciseIllustration } from './ExerciseIllustration'
 
 export type ExercisePickerMode = 'first' | 'add'
 
@@ -145,11 +146,11 @@ export function ExercisePicker({
           aria-label="Résultats d’exercices"
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[env(keyboard-inset-height,0px)] [-webkit-overflow-scrolling:touch]"
         >
-          {results.map((ex, index) => (
+          {results.map((ex) => (
             <ExerciseResultRow
               key={ex.id}
               exercise={ex}
-              active={index === 0}
+              active={false}
               onSelect={() => onSelect(ex)}
             />
           ))}
@@ -253,7 +254,7 @@ function ExerciseResultRow({
               className="h-full w-full object-cover object-center grayscale contrast-[1.05]"
             />
           ) : (
-            <span className="h-full w-full bg-[#2c2c2e]" aria-hidden="true" />
+            <ExerciseIllustration kind={media.illustrationKey} />
           )}
         </div>
 

@@ -100,7 +100,7 @@ describe('deriveTodayHubCard — priorités CTA', () => {
     expect(card.canLaunchRoutine).toBe(true)
     expect(card.openTarget).toBe('notebook')
     expect(launchableRoutineId(card)).toBe('push')
-    expect(card.title).toBe('Push en cours')
+    expect(card.title).toBe('Bench')
   })
 
   it('1b. séance libre démarrée (routine encore vide) → Reprendre', () => {
@@ -350,6 +350,38 @@ describe('findActiveStrengthSession', () => {
     })
     expect(findActiveStrengthSession(state)).toBeNull()
     expect(deriveTodayHubCard(state, FIXED).cta).toBe('choose_activity')
+  })
+
+  it('1 exo bench sur routine Biceps → titre Développé couché (pas Biceps)', () => {
+    const state = baseState({
+      routines: [
+        {
+          id: 'custom-biceps',
+          label: 'Biceps',
+          subtitle: '',
+          accent: '#f00',
+          exercises: [
+            {
+              id: 'e1',
+              name: 'Développé couché',
+              canonicalExerciseId: 'bench_press',
+              sets: [{ reps: 8, weightKg: 60, done: true }],
+            },
+          ],
+          updatedAt: 10,
+        },
+      ],
+      activeWorkoutDraft: {
+        routineId: 'custom-biceps',
+        sportId: 'musculation',
+        startedAt: 1,
+        updatedAt: 10,
+      },
+    })
+    expect(findActiveStrengthSession(state)?.title).toBe('Développé couché')
+    const card = deriveTodayHubCard(state, FIXED)
+    expect(card.title).toBe('Développé couché')
+    expect(card.cta).toBe('resume')
   })
 })
 
@@ -732,7 +764,7 @@ describe('deriveRecentSessions', () => {
       2,
     )
     expect(items).toHaveLength(2)
-    expect(items[0].title).toBe('A')
+    expect(items[0].title).toBe('Bench')
   })
 
   it('déduplique les doublons proches même si IDs distincts (sync)', () => {

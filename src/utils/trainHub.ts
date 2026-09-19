@@ -9,6 +9,7 @@ import type {
 import { todayKey } from './calories'
 import { getTodayWorkout } from './todayWorkout'
 import { paceSecPerKmFromDuration, sessionKindForSport } from './sessionMeta'
+import { deriveSessionDisplayTitle } from './sessionDisplayTitle'
 import { getLocalWeekBounds, isTimestampInLocalWeek, workoutValidationMs } from './weekBounds'
 import { dedupeWorkoutNotes, noteDurationMin } from './workoutHistory'
 
@@ -117,7 +118,8 @@ export function findActiveStrengthSession(state: TrainingState): ActiveStrengthS
   if (!routine) return null
   return {
     routineId: routine.id,
-    title: routine.label?.trim() || 'Séance',
+    // Source unique : exos validés (+ label user seulement si multi / vide).
+    title: deriveSessionDisplayTitle(routine.exercises, routine.label),
     exerciseCount: routine.exercises?.length ?? 0,
     doneSetCount: countDoneSets(routine),
   }
@@ -657,7 +659,7 @@ export function deriveRecentSessions(
   const clean = dedupeWorkoutNotes(notes)
   return clean.slice(0, Math.max(0, limit)).map((note) => ({
     id: note.id,
-    title: note.title?.trim() || 'Séance',
+    title: deriveSessionDisplayTitle(note.exercises, note.title),
     sportLabel: sportLabelForNote(note),
     dateLabel: formatRecentDateLabel(note.dateKey, now),
     summary: formatSessionSummary(note),

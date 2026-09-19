@@ -285,9 +285,21 @@ export function getCatalogExercise(id: string | null | undefined): CatalogExerci
   return BY_ID.get(id)
 }
 
-/** Ligne métadonnées : `Pectoraux · Triceps · Barre` (2 muscles max + équipement). */
+/** Ligne métadonnées unifiée : tous les muscles + équipement (champs séparés, mêmes données). */
 export function formatCatalogMeta(ex: CatalogExercise): string {
-  const muscles = ex.muscles.filter(Boolean).slice(0, 2).join(' · ')
-  if (!muscles) return ex.equipment
-  return `${muscles} · ${ex.equipment}`
+  return formatExerciseMetaLine(ex.muscles, ex.equipment)
+}
+
+/**
+ * Muscles et matériel — jamais mélangés dans des listes hardcodées divergentes.
+ * Ex. `Pectoraux · Triceps · Épaules · Barre`
+ */
+export function formatExerciseMetaLine(
+  muscles: string[] | null | undefined,
+  equipment?: string | null,
+): string {
+  const musclePart = (muscles ?? []).filter(Boolean).join(' · ')
+  const eq = equipment?.trim() || ''
+  if (musclePart && eq) return `${musclePart} · ${eq}`
+  return musclePart || eq
 }

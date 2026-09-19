@@ -72,10 +72,12 @@ describe('ExercisePicker', () => {
       )
     })
 
-    // Sans requête : top popularité → bench_press en tête (indicateur actif).
+    // Sans requête : top popularité → bench_press en tête, sans faux « sélectionné » rouge.
     const bench = host.querySelector('[data-exercise-id="bench_press"]') as HTMLButtonElement | null
     expect(bench).toBeTruthy()
-    expect(bench?.getAttribute('data-result-active')).toBe('true')
+    expect(bench?.getAttribute('data-result-active')).toBe('false')
+    const actives = host.querySelectorAll('[data-result-active="true"]')
+    expect(actives.length).toBe(0)
     await act(async () => {
       bench?.click()
     })

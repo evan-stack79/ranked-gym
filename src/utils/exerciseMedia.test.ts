@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   exerciseSlug,
+  formatExerciseMetaLine,
   formatExerciseMuscles,
   resolveExerciseMedia,
 } from './exerciseMedia'
@@ -21,7 +22,11 @@ describe('exerciseMedia', () => {
     expect(media.imageSrc).toMatch(/developpe-couche/i)
     expect(media.imageAlt).toMatch(/développé couché/i)
     expect(media.muscles).toEqual(['Pectoraux', 'Triceps', 'Épaules'])
+    expect(media.equipment).toBe('Barre')
     expect(formatExerciseMuscles(media.muscles)).toBe('Pectoraux · Triceps · Épaules')
+    expect(formatExerciseMetaLine(media.muscles, media.equipment)).toBe(
+      'Pectoraux · Triceps · Épaules · Barre',
+    )
   })
 
   it('résout via canonicalExerciseId prioritaire sur le titre libre', () => {
@@ -55,10 +60,12 @@ describe('exerciseMedia', () => {
     expect(media.muscles).toEqual([])
   })
 
-  it('leg_press catalogue → muscles réels, pas d’asset encore', () => {
+  it('leg_press catalogue → muscles réels, illustration équipement, pas de photo', () => {
     const media = resolveExerciseMedia({ canonicalExerciseId: 'leg_press' })
     expect(media.canonicalExerciseId).toBe('leg_press')
     expect(media.imageSrc).toBeNull()
     expect(media.muscles).toEqual(['Quadriceps', 'Fessiers'])
+    expect(media.equipment).toBe('Machine')
+    expect(media.illustrationKey).toBe('Machine')
   })
 })

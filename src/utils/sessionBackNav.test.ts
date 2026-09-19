@@ -77,4 +77,14 @@ describe('sessionBackNav', () => {
       }),
     ).toBe(false)
   })
+
+  it('non-régression soft-leave : hub volontaire ne réouvre pas même si draft actif', () => {
+    // Contrat #42 — ne pas casser Reprendre / bandeau.
+    expect(
+      shouldAutoReopenSession({
+        hasActiveDraft: true,
+        lastVoluntaryRoute: 'train-hub',
+      }),
+    ).toBe(false)
+  })
 })

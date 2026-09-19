@@ -18,6 +18,7 @@ import {
 } from '../../services/trainingStorage'
 import { computeStrengthSessionStats } from '../../utils/strength'
 import { sanitizeExerciseName } from '../../utils/exerciseName'
+import { deriveSessionDisplayTitle } from '../../utils/sessionDisplayTitle'
 import { detectProgramSplit, filterRoutinesForProgram } from '../../utils/workoutProgram'
 import {
   findLastExerciseSets,
@@ -434,6 +435,7 @@ export function WorkoutNotebook({
     setIndex: number,
     difficulty?: SetDifficulty,
     restSec = 90,
+    setPatch?: Partial<WorkoutSet>,
   ) => {
     draftDirty.current = true
     setExercises((prev) => {
@@ -441,7 +443,12 @@ export function WorkoutNotebook({
         if (e.id !== ex.id) return e
         const sets = e.sets.map((s, i) =>
           i === setIndex
-            ? { ...s, done: true, ...(difficulty ? { difficulty } : {}) }
+            ? {
+                ...s,
+                ...setPatch,
+                done: true,
+                ...(difficulty ? { difficulty } : {}),
+              }
             : s,
         )
         return { ...e, sets }
@@ -529,7 +536,10 @@ export function WorkoutNotebook({
         id: editingNote?.id,
         createdAt: editingNote?.createdAt,
         dateKey: editingNote?.dateKey,
-        title: title.trim() || activeRoutine?.label || 'Séance',
+        title: deriveSessionDisplayTitle(
+          cleaned,
+          title.trim() || activeRoutine?.label || null,
+        ),
         exercises: cleaned,
         estimatedKcal: stats.kcal,
         durationMin:
@@ -600,7 +610,9 @@ export function WorkoutNotebook({
           updateExercise(exerciseId, { sets: [...ex.sets, emptySet()] })
         }}
         onAddExercise={() => setPickerMode('add')}
-        onValidateSet={(ex, setIndex, restSec) => finishSet(ex, setIndex, undefined, restSec)}
+        onValidateSet={(ex, setIndex, restSec, setPatch) =>
+          finishSet(ex, setIndex, undefined, restSec, setPatch)
+        }
         onFinishSession={() => void handleSave()}
         saving={saving}
         restPrefSec={restPrefSec}
