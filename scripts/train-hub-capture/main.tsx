@@ -142,6 +142,69 @@ function seedState(scenario: string): TrainingState {
       : null,
   }
 
+  if (scenario === 'biceps-bench') {
+    const bicepsRoutine = {
+      id: 'custom-biceps',
+      label: 'Biceps',
+      subtitle: '',
+      accent: '#BF5AF2',
+      exercises: [
+        {
+          id: 'ex-bench',
+          name: 'Développé couché',
+          canonicalExerciseId: 'bench_press',
+          sets: [
+            { reps: 8, weightKg: 80, done: true, rpe: 8 },
+            { reps: 8, weightKg: 80 },
+          ],
+        },
+      ],
+      updatedAt: FIXED_MS,
+    }
+    return {
+      ...base,
+      routines: [bicepsRoutine],
+      lastSelectedRoutineId: 'custom-biceps',
+      lastSelectedSportId: 'musculation',
+      lastVoluntaryRoute: 'train-hub',
+      activeWorkoutDraft: {
+        routineId: 'custom-biceps',
+        sportId: 'musculation',
+        startedAt: FIXED_MS - 60_000,
+        updatedAt: FIXED_MS,
+        elapsedActiveMs: 45_000,
+        runningSince: null,
+        paused: true,
+        activeExerciseIndex: 0,
+      },
+      workoutNotes: [
+        {
+          id: 'n-biceps-wrong',
+          title: 'Biceps',
+          routineId: 'custom-biceps',
+          dateKey: TODAY,
+          createdAt: FIXED_MS - 3_600_000,
+          estimatedKcal: 220,
+          durationMin: 42,
+          totalVolumeKg: 1280,
+          sessionKind: 'strength' as const,
+          sportId: 'musculation',
+          exercises: [
+            {
+              id: 'e1',
+              name: 'Développé couché',
+              canonicalExerciseId: 'bench_press',
+              sets: [
+                { reps: 8, weightKg: 80, done: true },
+                { reps: 8, weightKg: 80, done: true },
+              ],
+            },
+          ],
+        },
+      ],
+    }
+  }
+
   if (scenario === 'strength' || scenario === 'resume' || scenario === 'rest-timer') {
     return {
       ...base,
