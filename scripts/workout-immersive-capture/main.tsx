@@ -5,60 +5,46 @@ import { ImmersiveExerciseSession } from '../../src/components/training/Immersiv
 import { RestTimerProvider } from '../../src/context/RestTimerContext'
 import type { ExerciseEntry, WorkoutSet } from '../../src/types/training'
 
-/** Fixture réelle de séance — aucune persistance ; harness capture uniquement. */
-const FIXTURE: ExerciseEntry[] = [
+/**
+ * Fixture branchée sur le MÊME composant runtime ImmersiveExerciseSession.
+ * Miroir de la séance réelle Evan : titre libre « DÉVELOPPER », 1/1, 20 kg × 8.
+ * Pas d’ID canonique → hero fallback (ne pas inventer bench_press depuis le texte).
+ */
+const REAL_SESSION_FIXTURE: ExerciseEntry[] = [
   {
-    id: 'ex-warmup',
-    name: 'Échauffement rotator cuff',
-    sets: [{ reps: 15, weightKg: 4, done: true }],
-  },
-  {
-    id: 'ex-pushups',
-    name: 'Pompes',
-    sets: [{ reps: 12, weightKg: 0, done: true }],
-  },
-  {
-    id: 'ex-bench',
-    name: 'Développé couché',
-    sets: [
-      { reps: 6, weightKg: 80, done: true, rpe: 8 },
-      { reps: 6, weightKg: 80 },
-      { reps: 8, weightKg: 100 },
-      { reps: 8, weightKg: 102.5 },
-    ],
-  },
-  {
-    id: 'ex-ohp',
-    name: 'Développé militaire',
-    sets: [{ reps: 8, weightKg: 40 }],
-  },
-  {
-    id: 'ex-fly',
-    name: 'Écarté haltères',
-    sets: [{ reps: 12, weightKg: 16 }],
-  },
-  {
-    id: 'ex-dips',
-    name: 'Dips',
-    sets: [{ reps: 10, weightKg: 0 }],
-  },
-  {
-    id: 'ex-pushdown',
-    name: 'Triceps poulie',
-    sets: [{ reps: 12, weightKg: 25 }],
-  },
-  {
-    id: 'ex-face',
-    name: 'Face pull',
-    sets: [{ reps: 15, weightKg: 15 }],
+    id: 'ex-live-developer',
+    name: 'DÉVELOPPER',
+    sets: [{ reps: 8, weightKg: 20 }],
   },
 ]
 
+/**
+ * Variante preuve photo — même composant, métadonnée canonique explicite.
+ * Le titre reste « DÉVELOPPER » (pas de rename) ; l’asset local bench_press s’affiche.
+ */
+const CANONICAL_BENCH_FIXTURE: ExerciseEntry[] = [
+  {
+    id: 'ex-bench-meta',
+    name: 'DÉVELOPPER',
+    canonicalExerciseId: 'bench_press',
+    sets: [{ reps: 8, weightKg: 20 }],
+  },
+]
+
+function pickFixture(): ExerciseEntry[] {
+  const params = new URLSearchParams(window.location.search)
+  return params.get('fixture') === 'bench_press'
+    ? CANONICAL_BENCH_FIXTURE
+    : REAL_SESSION_FIXTURE
+}
+
 function HarnessApp() {
-  const [exercises, setExercises] = useState(FIXTURE)
-  const [activeIndex, setActiveIndex] = useState(2)
+  const [exercises, setExercises] = useState(pickFixture)
+  const [activeIndex, setActiveIndex] = useState(0)
   const [restPrefSec, setRestPrefSec] = useState(90)
   const [paused, setPaused] = useState(false)
+  const fixtureKind =
+    exercises[0]?.canonicalExerciseId === 'bench_press' ? 'bench_press' : 'real-developper'
 
   const updateSet = (exerciseId: string, setIndex: number, patch: Partial<WorkoutSet>) => {
     setExercises((prev) =>
@@ -73,12 +59,12 @@ function HarnessApp() {
   }
 
   return (
-    <div data-harness-ready data-fixture="developpe-couche">
+    <div data-harness-ready data-fixture={fixtureKind}>
       <ImmersiveExerciseSession
         exercises={exercises}
         activeIndex={activeIndex}
         onActiveIndexChange={setActiveIndex}
-        sessionClockLabel="13:27"
+        sessionClockLabel="00:42"
         sessionPaused={paused}
         onToggleSessionPause={() => setPaused((v) => !v)}
         onBack={() => undefined}
