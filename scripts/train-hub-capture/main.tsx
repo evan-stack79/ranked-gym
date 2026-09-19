@@ -111,6 +111,8 @@ function seedState(scenario: string): TrainingState {
     routines: [pushRoutine],
     lastSelectedRoutineId: scenario === 'resume' ? 'push' : null,
     lastSelectedSportId: scenario === 'resume' ? 'musculation' : null,
+    lastVoluntaryRoute:
+      scenario === 'resume' || scenario === 'rest-timer' ? 'train-hub' : null,
     activeWorkoutDraft: scenario === 'resume' || scenario === 'rest-timer'
       ? {
           routineId: 'push',
@@ -120,6 +122,7 @@ function seedState(scenario: string): TrainingState {
           elapsedActiveMs: 45_000,
           runningSince: scenario === 'rest-timer' ? FIXED_MS - 15_000 : null,
           paused: scenario !== 'rest-timer',
+          activeExerciseIndex: scenario === 'resume' ? 0 : undefined,
           restTimer:
             scenario === 'rest-timer'
               ? {

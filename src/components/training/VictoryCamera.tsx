@@ -41,7 +41,7 @@ function prLabel(count: number): string {
 export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const { setChromeHidden } = useRestTimerContext()
+  const { setChromeHidden, dismiss } = useRestTimerContext()
 
   const [phase, setPhase] = useState<Phase>('camera')
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
@@ -88,6 +88,7 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
 
   useEffect(() => {
     setChromeHidden(true)
+    dismiss()
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
@@ -95,7 +96,7 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
       document.body.style.overflow = previousOverflow
       stopCamera()
     }
-  }, [setChromeHidden, stopCamera])
+  }, [setChromeHidden, dismiss, stopCamera])
 
   useEffect(() => {
     if (phase !== 'camera') return

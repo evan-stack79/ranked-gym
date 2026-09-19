@@ -69,8 +69,8 @@ type RestTimerContextValue = {
   /** Barre affichée (session globale ou ready sur Train) — false si overlay plein écran */
   isBarVisible: boolean
   /**
-   * Masque Tab Bar + timer (Pump Check / modales plein écran).
-   * Quand true : dismiss le timer zombie et coupe la ready bar.
+   * Masque Tab Bar + chrome app (Pump Check / séance immersive / modales plein écran).
+   * Ne dismiss PAS le repos : endsAt doit survivre leave→Reprendre et chrome hide immersif.
    */
   chromeHidden: boolean
   setChromeHidden: (hidden: boolean) => void
@@ -473,15 +473,9 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
   const isBarVisible =
     !chromeHidden && (isSessionVisible || (readyBarEnabled && idle))
 
-  const setChromeHidden = useCallback(
-    (hidden: boolean) => {
-      setChromeHiddenState(hidden)
-      if (hidden) {
-        dismiss()
-      }
-    },
-    [dismiss],
-  )
+  const setChromeHidden = useCallback((hidden: boolean) => {
+    setChromeHiddenState(hidden)
+  }, [])
 
   const value = useMemo<RestTimerContextValue>(
     () => ({

@@ -205,7 +205,15 @@ export interface ActiveWorkoutDraft {
       setLabel: string
     }
   } | null
+  /**
+   * Index d’exercice affiché sur l’écran immersif.
+   * Restauré à la reprise ; absent = 0.
+   */
+  activeExerciseIndex?: number
 }
+
+/** Dernière route quittée volontairement (soft-leave séance → hub). */
+export type LastVoluntaryRoute = 'train-hub'
 
 export interface TrainingState {
   primarySportId: string | null
@@ -228,4 +236,10 @@ export interface TrainingState {
   lastSelectedSportId: string | null
   /** Brouillon réellement actif ; absent/null pour les états legacy ou terminés. */
   activeWorkoutDraft?: ActiveWorkoutDraft | null
+  /**
+   * Soft-leave volontaire vers le hub Train.
+   * Si `train-hub` + brouillon actif → rester sur hub (« Reprendre »), ne pas rouvrir auto.
+   * Absent/null → reprise inattendue (cold start / OS) peut rouvrir la séance.
+   */
+  lastVoluntaryRoute?: LastVoluntaryRoute | null
 }
