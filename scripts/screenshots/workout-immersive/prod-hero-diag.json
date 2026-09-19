@@ -1,0 +1,32 @@
+{
+  "mode": "vite build + preview (capture harness)",
+  "hashedWebpInDist": [
+    "developpe-couche-Cq4eW3hK.webp"
+  ],
+  "heroAfterRefresh": "ready",
+  "title": "DÉVELOPPER",
+  "networkHits": [
+    {
+      "url": "http://127.0.0.1:4188/assets/developpe-couche-Cq4eW3hK.webp",
+      "status": 200,
+      "contentType": "image/webp"
+    },
+    {
+      "url": "http://127.0.0.1:4188/brand-header-mark.png",
+      "status": 200,
+      "contentType": "image/png"
+    },
+    {
+      "url": "http://127.0.0.1:4188/assets/developpe-couche-Cq4eW3hK.webp",
+      "status": 304,
+      "contentType": null
+    },
+    {
+      "url": "http://127.0.0.1:4188/brand-header-mark.png",
+      "status": 304,
+      "contentType": null
+    }
+  ],
+  "screenshot": "/workspace/scripts/screenshots/workout-immersive/prod-preview-canonical-bench-390.png",
+  "cspUnchanged": true
+}

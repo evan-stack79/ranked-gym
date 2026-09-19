@@ -60,8 +60,17 @@ ios/DerivedData
 # Ignore le contenu, pas le dossier, pour pouvoir ré-inclure des preuves ciblées.
 scripts/screenshots/**
 !scripts/screenshots/workout-immersive/
-!scripts/screenshots/workout-immersive/workout_immersive_390x844.png
-!scripts/screenshots/workout-immersive/workout_immersive_360x800.png
+!scripts/screenshots/workout-immersive/DIAGNOSTIC.md
+!scripts/screenshots/workout-immersive/real-developper-iphone-390.png
+!scripts/screenshots/workout-immersive/real-developper-android-360.png
+!scripts/screenshots/workout-immersive/real-developper-diag.json
+!scripts/screenshots/workout-immersive/canonical-bench-iphone-390.png
+!scripts/screenshots/workout-immersive/canonical-bench-android-360.png
+!scripts/screenshots/workout-immersive/canonical-bench-diag.json
+!scripts/screenshots/workout-immersive/prod-preview-canonical-bench-390.png
+!scripts/screenshots/workout-immersive/prod-hero-diag.json
+!scripts/screenshots/workout-immersive/load-real-developper.webm
+!scripts/screenshots/workout-immersive/load-canonical-bench-refresh.webm
 
 # Migration artifacts can contain sensitive export metadata.
 scripts/migrations/artifacts/

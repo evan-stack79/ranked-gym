@@ -26,24 +26,26 @@ vi.mock('../../utils/haptics', () => ({
   vibrate: vi.fn(),
 }))
 
-const exercises: ExerciseEntry[] = [
-  { id: 'ex-a', name: 'Échauffement épaules', sets: [{ reps: 15, weightKg: 5, done: true }] },
-  { id: 'ex-b', name: 'Pompes', sets: [{ reps: 12, weightKg: 0, done: true }] },
+/** Evan runtime-shaped séance — titre libre, pas d’ID canonique, 20 kg × 8. */
+const realSessionExercises: ExerciseEntry[] = [
   {
-    id: 'ex-1',
-    name: 'Développé couché',
+    id: 'ex-live-1',
+    name: 'DÉVELOPPER',
+    sets: [{ reps: 8, weightKg: 20 }],
+  },
+]
+
+/** Canonical path — photo local when metadata is present. */
+const benchCanonicalExercises: ExerciseEntry[] = [
+  {
+    id: 'ex-bench',
+    name: 'DÉVELOPPER',
+    canonicalExerciseId: 'bench_press',
     sets: [
       { reps: 6, weightKg: 80, done: true, rpe: 8 },
       { reps: 6, weightKg: 80 },
-      { reps: 8, weightKg: 100 },
-      { reps: 8, weightKg: 102.5 },
     ],
   },
-  { id: 'ex-2', name: 'Développé militaire', sets: [{ reps: 10, weightKg: 40 }] },
-  { id: 'ex-3', name: 'Écarté haltères', sets: [{ reps: 12, weightKg: 16 }] },
-  { id: 'ex-4', name: 'Dips', sets: [{ reps: 10, weightKg: 0 }] },
-  { id: 'ex-5', name: 'Triceps poulie', sets: [{ reps: 12, weightKg: 25 }] },
-  { id: 'ex-6', name: 'Face pull', sets: [{ reps: 15, weightKg: 15 }] },
 ]
 
 let host: HTMLDivElement
@@ -61,16 +63,16 @@ afterEach(async () => {
 })
 
 describe('ImmersiveExerciseSession', () => {
-  it('rend le layout immersif développé couché (titre, muscles, progression, actions)', async () => {
+  it('affiche les données réelles DÉVELOPPER 1/1 20×8 sans inventer de photo', async () => {
     const onValidate = vi.fn()
     await act(async () => {
       root.render(
         <RestTimerProvider>
           <ImmersiveExerciseSession
-            exercises={exercises}
-            activeIndex={2}
+            exercises={realSessionExercises}
+            activeIndex={0}
             onActiveIndexChange={vi.fn()}
-            sessionClockLabel="13:27"
+            sessionClockLabel="00:42"
             sessionPaused={false}
             onToggleSessionPause={vi.fn()}
             onBack={vi.fn()}
@@ -84,26 +86,54 @@ describe('ImmersiveExerciseSession', () => {
     })
 
     expect(host.querySelector('[data-immersive-session]')).toBeTruthy()
-    expect(host.querySelector('[data-exercise-slug="developpe-couche"]')).toBeTruthy()
-    expect(host.textContent).toContain('Développé couché')
-    expect(host.textContent).toContain('Pectoraux · Triceps')
-    expect(host.textContent).toContain('Exercice 3 sur 8')
-    expect(host.textContent).toContain('Valider la série')
-    expect(host.textContent).toContain('+ Ajouter une série')
-    expect(host.textContent).toContain('Terminer la séance')
-    expect(host.textContent).toContain('13:27')
-    expect(host.querySelector('[data-set-row="done"]')).toBeTruthy()
-    expect(host.querySelector('[data-set-row="active"]')).toBeTruthy()
+    expect(host.querySelector('[data-exercise-slug="developper"]')).toBeTruthy()
+    expect(host.querySelector('[data-hero-image="fallback"]')).toBeTruthy()
+    expect(host.querySelector('[data-hero-fallback]')).toBeTruthy()
+    expect(host.querySelector('[data-hero-photo]')).toBeNull()
+    expect(host.textContent).toContain('DÉVELOPPER')
+    expect(host.textContent).toContain('Exercice 1 sur 1')
+    expect(host.textContent).not.toContain('Pectoraux')
+    expect(host.textContent).not.toContain('Développé couché')
+    const weightInput = host.querySelector(
+      'input[aria-label="Série 1 poids"]',
+    ) as HTMLInputElement | null
+    const repsInput = host.querySelector(
+      'input[aria-label="Série 1 reps"]',
+    ) as HTMLInputElement | null
+    expect(weightInput?.value).toBe('20')
+    expect(repsInput?.value).toBe('8')
+    expect(host.textContent).toContain('1/1')
+  })
 
-    const validateBtn = [...host.querySelectorAll('button')].find((b) =>
-      b.textContent?.includes('Valider la série'),
-    )
-    expect(validateBtn).toBeTruthy()
-    await act(async () => validateBtn!.click())
-    expect(onValidate).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'ex-1' }),
-      1,
-      90,
-    )
+  it('montre la photo locale quand canonicalExerciseId=bench_press (sans renommer le titre)', async () => {
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <ImmersiveExerciseSession
+            exercises={benchCanonicalExercises}
+            activeIndex={0}
+            onActiveIndexChange={vi.fn()}
+            sessionClockLabel="13:27"
+            sessionPaused={false}
+            onToggleSessionPause={vi.fn()}
+            onBack={vi.fn()}
+            onUpdateSet={vi.fn()}
+            onAddSet={vi.fn()}
+            onValidateSet={vi.fn()}
+            onFinishSession={vi.fn()}
+          />
+        </RestTimerProvider>,
+      )
+    })
+
+    expect(host.querySelector('[data-canonical-exercise="bench_press"]')).toBeTruthy()
+    expect(host.querySelector('[data-hero-image="ready"]')).toBeTruthy()
+    const photo = host.querySelector('[data-hero-photo]') as HTMLImageElement | null
+    expect(photo).toBeTruthy()
+    expect(photo!.getAttribute('src')).toBeTruthy()
+    expect(photo!.getAttribute('alt')).toMatch(/développé couché/i)
+    // Titre reste celui de la séance — pas de rename arbitraire
+    expect(host.textContent).toContain('DÉVELOPPER')
+    expect(host.textContent).toContain('Pectoraux · Triceps')
   })
 })

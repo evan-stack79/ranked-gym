@@ -83,6 +83,12 @@ export interface ExerciseEntry {
   name: string
   sets: WorkoutSet[]
   note?: string
+  /**
+   * Stable exercise type for media / catalog (e.g. `bench_press`).
+   * Additive — free-text-only entries (legacy / user-typed) omit this field.
+   * Never infer from ambiguous titles like « DÉVELOPPER ».
+   */
+  canonicalExerciseId?: string
 }
 
 /** Famille de séance — additive ; absente sur les notes legacy. */

@@ -66,8 +66,12 @@ export function ImmersiveExerciseSession({
   const safeIndex = Math.min(Math.max(0, activeIndex), Math.max(0, exercises.length - 1))
   const exercise = exercises[safeIndex]
   const media = useMemo(
-    () => resolveExerciseMedia(exercise?.name ?? ''),
-    [exercise?.name],
+    () =>
+      resolveExerciseMedia({
+        name: exercise?.name ?? '',
+        canonicalExerciseId: exercise?.canonicalExerciseId,
+      }),
+    [exercise?.name, exercise?.canonicalExerciseId],
   )
   const muscleLine = formatExerciseMuscles(media.muscles)
   const [imgFailedFor, setImgFailedFor] = useState<string | null>(null)
@@ -103,31 +107,46 @@ export function ImmersiveExerciseSession({
   const radius = (ringSize - stroke) / 2
   const circumference = 2 * Math.PI * radius
   const dashOffset = circumference * (1 - progressRatio)
+  const displayName = exercise.name.trim() || 'Exercice'
 
   return (
     <section
       className="flex min-h-[100dvh] flex-col bg-black text-white"
       data-immersive-session
       data-exercise-slug={media.slug}
+      data-canonical-exercise={media.canonicalExerciseId ?? ''}
+      data-hero-image={showImage ? 'ready' : 'fallback'}
     >
-      {/* Hero photo — decorative only, not a clickable wallpaper */}
-      <div className="relative isolate shrink-0 overflow-hidden" aria-hidden="true">
-        <div className="relative h-[min(32vh,268px)] w-full bg-[#0a0a0a]">
+      {/* Hero — chrome overlays photo; interactive body stays in flow below */}
+      <div className="relative isolate shrink-0 overflow-hidden">
+        <div className="relative h-[min(32vh,268px)] w-full overflow-hidden">
           {showImage ? (
             <img
               src={media.imageSrc!}
-              alt=""
+              alt={media.imageAlt || `Illustration — ${displayName}`}
               draggable={false}
               decoding="async"
-              className="pointer-events-none h-full w-full select-none object-cover object-[center_30%] opacity-90 contrast-125 saturate-[0.45]"
+              data-hero-photo
+              className="pointer-events-none h-full w-full select-none object-cover object-[center_28%] contrast-[1.15] saturate-[0.5]"
               onError={() => setImgFailedFor(media.imageSrc)}
             />
           ) : (
-            <div className="h-full w-full bg-[#121214]" />
+            /* Discreet charcoal fallback — readable as intentional empty media, not a black void */
+            <div
+              className="relative h-full w-full overflow-hidden"
+              data-hero-fallback
+              aria-hidden="true"
+            >
+              <div className="absolute inset-0 bg-[#1c1c1e]" />
+              <div className="absolute inset-0 bg-[radial-gradient(90%_70%_at_50%_35%,#3a3a3c_0%,transparent_70%)] opacity-70" />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,#252528_0%,#141416_45%,#0c0c0d_100%)] opacity-90" />
+            </div>
           )}
-          {/* Blend photo into UI — functional fade only */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black via-black/80 to-transparent" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/55 to-transparent" />
+          {/* Bottom blend into UI only — keep athlete / bar readable */}
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black via-black/55 to-transparent"
+            aria-hidden="true"
+          />
         </div>
 
         {/* Top chrome over hero */}
@@ -189,7 +208,7 @@ export function ImmersiveExerciseSession({
       >
         <header className="mb-3">
           <h1 className="text-[24px] font-bold leading-tight tracking-tight text-white">
-            {exercise.name.trim() || 'Exercice'}
+            {displayName}
           </h1>
           {muscleLine ? (
             <p className="mt-0.5 text-[13px] font-medium text-[#8E8E93]">{muscleLine}</p>
@@ -395,7 +414,7 @@ export function ImmersiveExerciseSession({
 
           <div className="min-w-0 flex-1">
             <p className="truncate text-[13px] font-semibold text-white">
-              {exercise.name.trim() || 'Exercice'}
+              {displayName}
             </p>
             <div
               className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1"
