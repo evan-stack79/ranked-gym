@@ -16,6 +16,11 @@ import {
   updateRestLiveActivity,
 } from '../services/restTimerLiveActivity'
 import {
+  drainPendingNativeActions,
+  consumePendingDeepLink,
+  parseLiveActivityDeepLink,
+} from '../native/liveActivity'
+import {
   getTrainingState,
   getTrainingStorageScope,
   persistActiveRestTimer,
@@ -33,6 +38,8 @@ export type RestTimerTarget = {
   setIndex: number
   exerciseName: string
   setLabel: string
+  /** Nombre total de séries de l'exercice courant (Live Activity). */
+  setCount?: number
 }
 
 export type RestTimerState = {
@@ -75,10 +82,18 @@ type RestTimerContextValue = {
   chromeHidden: boolean
   setChromeHidden: (hidden: boolean) => void
   start: (seconds: number, target: RestTimerTarget) => void
+  /** Ajuste le repos restant (−15 / +15) sans créer d'état contradictoire. */
+  adjust: (deltaSec: number) => void
   pause: () => void
   resume: () => void
   skip: () => void
   dismiss: () => void
+  /** Applique une action native (Island / deep link) — anti double-tap via token. */
+  applyNativeAction: (action: {
+    type: string
+    deltaSec?: number
+    token?: string
+  }) => void
   presets: typeof REST_PRESETS_SEC
 }
 
@@ -97,6 +112,39 @@ function writePersistedRest(snap: PersistedRestTimer | null) {
     persistActiveRestTimer(snap)
   } catch {
     // trainingStorage a déjà émis l'erreur locale unique et exploitable par l'UI.
+  }
+}
+
+function liveSubtitle(target: RestTimerTarget): string {
+  const current = target.setIndex + 1
+  if (target.setCount && target.setCount > 0) {
+    return `${target.exerciseName} · Série ${current}/${target.setCount}`
+  }
+  return `${target.exerciseName} · ${target.setLabel}`
+}
+
+function pushLiveActivity(opts: {
+  remainingSec: number
+  totalSec: number
+  target: RestTimerTarget
+  endsAt: number
+  paused: boolean
+  mode: 'start' | 'update'
+}) {
+  const payload = {
+    remainingSec: opts.remainingSec,
+    totalSec: opts.totalSec,
+    subtitle: liveSubtitle(opts.target),
+    exerciseName: opts.target.exerciseName,
+    setCurrent: opts.target.setIndex + 1,
+    setTotal: opts.target.setCount ?? 0,
+    restEndsAtMs: opts.paused ? null : opts.endsAt,
+    paused: opts.paused,
+  }
+  if (opts.mode === 'start') {
+    void startRestLiveActivity(payload)
+  } else {
+    void updateRestLiveActivity(payload)
   }
 }
 
@@ -204,7 +252,6 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       complete()
       return
     }
-    const target = targetRef.current
     setState((s) => ({
       ...s,
       remainingSec: next,
@@ -212,13 +259,8 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       finished: false,
       paused: false,
     }))
-    if (target) {
-      void updateRestLiveActivity({
-        remainingSec: next,
-        subtitle: `${target.exerciseName} · ${target.setLabel}`,
-      })
-      if (next === 10 || next === 5 || next === 3 || next === 1) vibrate(10)
-    }
+    // Live Activity utilise restEndsAt (timer SwiftUI local) — pas d'update/seconde.
+    if (next === 10 || next === 5 || next === 3 || next === 1) vibrate(10)
   }, [complete])
 
   const armTick = useCallback(() => {
@@ -255,15 +297,77 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
         paused: false,
         target,
       })
-      void startRestLiveActivity({
+      pushLiveActivity({
         remainingSec: total,
         totalSec: total,
-        subtitle: `${target.exerciseName} · ${target.setLabel}`,
+        target,
+        endsAt,
+        paused: false,
+        mode: 'start',
       })
       vibrate(10)
       armTick()
     },
     [armTick, clearTick, persistSnap],
+  )
+
+  const adjust = useCallback(
+    (deltaSec: number) => {
+      if (!targetRef.current || finishedRef.current) return
+      const delta = Math.round(deltaSec)
+      if (!delta) return
+      const base = pausedRef.current
+        ? remainingRef.current
+        : Math.max(0, Math.ceil((endsAtRef.current - Date.now()) / 1000))
+      const next = Math.max(15, Math.min(600, base + delta))
+      remainingRef.current = next
+      if (pausedRef.current) {
+        setState((s) => ({ ...s, remainingSec: next, active: true, paused: true }))
+        persistSnap({
+          totalSec: Math.max(totalRef.current, next),
+          remainingSec: next,
+          endsAt: endsAtRef.current,
+          paused: true,
+          target: targetRef.current,
+        })
+        pushLiveActivity({
+          remainingSec: next,
+          totalSec: Math.max(totalRef.current, next),
+          target: targetRef.current,
+          endsAt: endsAtRef.current,
+          paused: true,
+          mode: 'update',
+        })
+        return
+      }
+      const endsAt = Date.now() + next * 1000
+      endsAtRef.current = endsAt
+      totalRef.current = Math.max(totalRef.current, next)
+      setState((s) => ({
+        ...s,
+        remainingSec: next,
+        totalSec: totalRef.current,
+        active: true,
+        paused: false,
+        finished: false,
+      }))
+      persistSnap({
+        totalSec: totalRef.current,
+        remainingSec: next,
+        endsAt,
+        paused: false,
+        target: targetRef.current,
+      })
+      pushLiveActivity({
+        remainingSec: next,
+        totalSec: totalRef.current,
+        target: targetRef.current,
+        endsAt,
+        paused: false,
+        mode: 'update',
+      })
+    },
+    [persistSnap],
   )
 
   const pause = useCallback(() => {
@@ -280,9 +384,13 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       paused: true,
       target: targetRef.current,
     })
-    void updateRestLiveActivity({
+    pushLiveActivity({
       remainingSec: remaining,
-      subtitle: `${targetRef.current.exerciseName} · ${targetRef.current.setLabel}`,
+      totalSec: totalRef.current,
+      target: targetRef.current,
+      endsAt: endsAtRef.current,
+      paused: true,
+      mode: 'update',
     })
   }, [clearTick, persistSnap])
 
@@ -309,8 +417,53 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       paused: false,
       target: targetRef.current,
     })
+    pushLiveActivity({
+      remainingSec: remaining,
+      totalSec: totalRef.current,
+      target: targetRef.current,
+      endsAt: endsAtRef.current,
+      paused: false,
+      mode: 'update',
+    })
     armTick()
   }, [armTick, complete, persistSnap])
+
+  const seenNativeTokensRef = useRef<Set<string>>(new Set())
+
+  const applyNativeAction = useCallback(
+    (action: { type: string; deltaSec?: number; token?: string }) => {
+      const token = action.token
+      if (token) {
+        if (seenNativeTokensRef.current.has(token)) return
+        seenNativeTokensRef.current.add(token)
+        // Cap anti-fuite mémoire
+        if (seenNativeTokensRef.current.size > 40) {
+          const first = seenNativeTokensRef.current.values().next().value
+          if (first) seenNativeTokensRef.current.delete(first)
+        }
+      }
+      // Séance déjà terminée → ignore.
+      if (!getTrainingState().activeWorkoutDraft) return
+      const type = action.type.toLowerCase()
+      if (type === 'adjust' && action.deltaSec != null) {
+        adjust(action.deltaSec)
+        return
+      }
+      if (type === 'pause') {
+        pause()
+        return
+      }
+      if (type === 'resume') {
+        resume()
+        return
+      }
+      if (type === 'togglepause') {
+        if (pausedRef.current) resume()
+        else pause()
+      }
+    },
+    [adjust, pause, resume],
+  )
 
   const skip = useCallback(() => {
     if (!targetRef.current) {
@@ -387,6 +540,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
         persistEnabledRef.current = false
         resetMemoryRef.current()
         persistEnabledRef.current = true
+        void endRestLiveActivity(true)
       }
       return () => {
         cancelled = true
@@ -451,7 +605,12 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     void startRestLiveActivity({
       remainingSec: remaining,
       totalSec: snap.totalSec,
-      subtitle: `${snap.target.exerciseName} · ${snap.target.setLabel}`,
+      subtitle: liveSubtitle(snap.target),
+      exerciseName: snap.target.exerciseName,
+      setCurrent: snap.target.setIndex + 1,
+      setTotal: snap.target.setCount ?? 0,
+      restEndsAtMs: snap.paused ? null : snap.endsAt,
+      paused: snap.paused,
     })
     if (!snap.paused) armTickRef.current()
 
@@ -467,6 +626,53 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       void endRestLiveActivity(true)
     }
   }, [clearTick])
+
+  // Reconcile actions natives (deep link / pending store) au focus.
+  useEffect(() => {
+    let cancelled = false
+    const reconcile = async () => {
+      const actions = await drainPendingNativeActions()
+      if (cancelled) return
+      for (const action of actions) {
+        applyNativeAction({
+          type: action.type,
+          deltaSec: action.deltaSec,
+          token: action.id,
+        })
+      }
+      const deep = await consumePendingDeepLink()
+      if (cancelled || !deep) return
+      const parsed = parseLiveActivityDeepLink(deep)
+      if (!parsed) return
+      if (parsed.kind === 'action') {
+        applyNativeAction({
+          type: parsed.action,
+          deltaSec: parsed.deltaSec,
+          token: parsed.token,
+        })
+      } else if (parsed.kind === 'session') {
+        window.dispatchEvent(
+          new CustomEvent('ranked-gym:open-active-session', {
+            detail: { sessionId: parsed.sessionId },
+          }),
+        )
+      }
+    }
+    const onFocus = () => {
+      void reconcile()
+    }
+    const onVis = () => {
+      if (document.visibilityState === 'visible') void reconcile()
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVis)
+    void reconcile()
+    return () => {
+      cancelled = true
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVis)
+    }
+  }, [applyNativeAction])
 
   const isSessionVisible = state.active || state.finished
   const idle = !state.active && !state.finished
@@ -487,10 +693,12 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       chromeHidden,
       setChromeHidden,
       start,
+      adjust,
       pause,
       resume,
       skip,
       dismiss,
+      applyNativeAction,
       presets: REST_PRESETS_SEC,
     }),
     [
@@ -501,10 +709,12 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       chromeHidden,
       setChromeHidden,
       start,
+      adjust,
       pause,
       resume,
       skip,
       dismiss,
+      applyNativeAction,
     ],
   )
 

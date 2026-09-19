@@ -97,8 +97,7 @@ export function ImmersiveExerciseSession({
 
   const nudgeRest = (delta: number) => {
     if (rest.state.active && rest.state.target && !rest.state.finished) {
-      const next = Math.max(15, Math.min(600, rest.state.remainingSec + delta))
-      rest.start(next, rest.state.target)
+      rest.adjust(delta)
       return
     }
     const next = Math.max(15, Math.min(600, restPrefSec + delta))

@@ -7,6 +7,8 @@ export type PersistedRestTarget = {
   setIndex: number
   exerciseName: string
   setLabel: string
+  /** Total de séries de l'exercice (optionnel, pour Live Activity). */
+  setCount?: number
 }
 
 export type PersistedRestTimer = {
@@ -25,11 +27,16 @@ export function sanitizeRestTarget(value: unknown): PersistedRestTarget | null {
   if (typeof raw.exerciseName !== 'string') return null
   if (typeof raw.setLabel !== 'string') return null
   if (!Number.isFinite(raw.setIndex) || (raw.setIndex as number) < 0) return null
+  const setCount =
+    Number.isFinite(raw.setCount) && (raw.setCount as number) > 0
+      ? Math.floor(raw.setCount as number)
+      : undefined
   return {
     exerciseId: raw.exerciseId.trim(),
     setIndex: Math.floor(raw.setIndex as number),
     exerciseName: raw.exerciseName,
     setLabel: raw.setLabel,
+    ...(setCount != null ? { setCount } : {}),
   }
 }
 

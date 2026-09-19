@@ -25,6 +25,7 @@ import {
   clearLastVoluntaryRoute,
 } from '../../services/trainingStorage'
 import { saveAndSyncWorkoutSession } from '../../services/trainingSyncService'
+import { endRestLiveActivity } from '../../services/restTimerLiveActivity'
 import { safeError } from '../../utils/safeLog'
 import { connectHealthIntent } from '../../services/healthSteps'
 import { startReminderWatcher } from '../../services/reminderService'
@@ -251,6 +252,12 @@ export function TrainingView({
     setChromeHidden(hide)
     return () => setChromeHidden(false)
   }, [immersiveLiveSession, pumpCheckSession, setChromeHidden])
+
+  // Fin / suppression séance → cleanup Live Activity (jamais données d'une ancienne séance).
+  useEffect(() => {
+    if (state.activeWorkoutDraft) return
+    void endRestLiveActivity(true)
+  }, [state.activeWorkoutDraft])
 
   const openNotebook = useCallback((
     routineId?: string | null,

@@ -18,6 +18,17 @@
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
 		B7E4A1922FEA0101000C01A2 /* CameraHeartRatePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E4A1912FEA0101000C01A1 /* CameraHeartRatePlugin.swift */; };
 		B7E4A1972FEA0301000C01B2 /* SecureStoragePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E4A1962FEA0301000C01B1 /* SecureStoragePlugin.swift */; };
+
+		D4A3AC4F18CA5040259E193D /* RestTimerAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC82BBD7FC0A48B54A398677 /* RestTimerAttributes.swift */; };
+		87E5F7C9782F0521F70BBDDE /* RestTimerSharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6CCD9E2F742B01CC4A1373C /* RestTimerSharedStore.swift */; };
+		7543478BCF6EB0C8A49449DA /* RestTimerActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5CC9C3A7CC9992512B8BA48 /* RestTimerActivityController.swift */; };
+		5A9EE7B67FE009A2F446F332 /* RestTimerLiveActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 989D04D37285A349148D87C5 /* RestTimerLiveActivityPlugin.swift */; };
+		9D03F4ED49195C5A749E90A5 /* RestTimerLiveActivityWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0C099EDD3718F1163FB81A61 /* RestTimerLiveActivityWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F5CB8E3DC9477CCC2748457E /* RestTimerAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC82BBD7FC0A48B54A398677 /* RestTimerAttributes.swift */; };
+		5F44F9D4F466D2FE3B244814 /* RestTimerSharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6CCD9E2F742B01CC4A1373C /* RestTimerSharedStore.swift */; };
+		B4941D28393E39B1A6B76DFE /* RestTimerActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5CC9C3A7CC9992512B8BA48 /* RestTimerActivityController.swift */; };
+		8C0DD0DF141DB933903A1430 /* RestTimerLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17D314D5E34008AF81C9246E /* RestTimerLiveActivityWidget.swift */; };
+		9CE4F50A341531ED13A1B82E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4B719697E65C20C942289035 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,7 +45,31 @@
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		B7E4A1912FEA0101000C01A1 /* CameraHeartRatePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraHeartRatePlugin.swift; sourceTree = "<group>"; };
 		B7E4A1962FEA0301000C01B1 /* SecureStoragePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureStoragePlugin.swift; sourceTree = "<group>"; };
+
+		FC82BBD7FC0A48B54A398677 /* RestTimerAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerAttributes.swift; sourceTree = "<group>"; };
+		A6CCD9E2F742B01CC4A1373C /* RestTimerSharedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerSharedStore.swift; sourceTree = "<group>"; };
+		F5CC9C3A7CC9992512B8BA48 /* RestTimerActivityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerActivityController.swift; sourceTree = "<group>"; };
+		989D04D37285A349148D87C5 /* RestTimerLiveActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerLiveActivityPlugin.swift; sourceTree = "<group>"; };
+		0C099EDD3718F1163FB81A61 /* RestTimerLiveActivityWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RestTimerLiveActivityWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		17D314D5E34008AF81C9246E /* RestTimerLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerLiveActivityWidget.swift; sourceTree = "<group>"; };
+		4B719697E65C20C942289035 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F35586B246A4832AC99B376E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A145B8409814AC5B9A02477D /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				9D03F4ED49195C5A749E90A5 /* RestTimerLiveActivityWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		504EC3011FED79650016851F /* Frameworks */ = {
@@ -42,6 +77,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+
+		7E1700155068CADA07E4E3D9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -53,6 +96,7 @@
 			children = (
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
+				846373F2FFF97FCDC58D8633 /* RestTimerLiveActivityWidget */,
 				504EC3051FED79650016851F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -61,6 +105,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				0C099EDD3718F1163FB81A61 /* RestTimerLiveActivityWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -87,8 +132,22 @@
 			children = (
 				B7E4A1912FEA0101000C01A1 /* CameraHeartRatePlugin.swift */,
 				B7E4A1962FEA0301000C01B1 /* SecureStoragePlugin.swift */,
+				FC82BBD7FC0A48B54A398677 /* RestTimerAttributes.swift */,
+				A6CCD9E2F742B01CC4A1373C /* RestTimerSharedStore.swift */,
+				F5CC9C3A7CC9992512B8BA48 /* RestTimerActivityController.swift */,
+				989D04D37285A349148D87C5 /* RestTimerLiveActivityPlugin.swift */,
 			);
 			path = Plugins;
+			sourceTree = "<group>";
+		};
+		846373F2FFF97FCDC58D8633 /* RestTimerLiveActivityWidget */ = {
+			isa = PBXGroup;
+			children = (
+				17D314D5E34008AF81C9246E /* RestTimerLiveActivityWidget.swift */,
+				4B719697E65C20C942289035 /* Assets.xcassets */,
+				F35586B246A4832AC99B376E /* Info.plist */,
+			);
+			path = RestTimerLiveActivityWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -101,10 +160,12 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				A145B8409814AC5B9A02477D /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				F50124587B6A0A92EC8E4A91 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -113,6 +174,23 @@
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		274B1EA483EE937AD43C5E34 /* RestTimerLiveActivityWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0890CDCB31794DA66B826A08 /* Build configuration list for PBXNativeTarget "RestTimerLiveActivityWidget" */;
+			buildPhases = (
+				9BA81B049BEC52DEE169DCA5 /* Sources */,
+				7E1700155068CADA07E4E3D9 /* Frameworks */,
+				44A87192993AB0FC090ABABE /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RestTimerLiveActivityWidget;
+			productName = RestTimerLiveActivityWidget;
+			productReference = 0C099EDD3718F1163FB81A61 /* RestTimerLiveActivityWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -126,6 +204,10 @@
 					504EC3031FED79650016851F = {
 						CreatedOnToolsVersion = 9.2;
 						LastSwiftMigration = 1100;
+						ProvisioningStyle = Automatic;
+					};
+					274B1EA483EE937AD43C5E34 = {
+						CreatedOnToolsVersion = 15.0;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -147,6 +229,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				274B1EA483EE937AD43C5E34 /* RestTimerLiveActivityWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -165,6 +248,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		44A87192993AB0FC090ABABE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9CE4F50A341531ED13A1B82E /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -176,6 +267,21 @@
 				B7E4A1922FEA0101000C01A2 /* CameraHeartRatePlugin.swift in Sources */,
 				B7E4A1972FEA0301000C01B2 /* SecureStoragePlugin.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
+				D4A3AC4F18CA5040259E193D /* RestTimerAttributes.swift in Sources */,
+				87E5F7C9782F0521F70BBDDE /* RestTimerSharedStore.swift in Sources */,
+				7543478BCF6EB0C8A49449DA /* RestTimerActivityController.swift in Sources */,
+				5A9EE7B67FE009A2F446F332 /* RestTimerLiveActivityPlugin.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9BA81B049BEC52DEE169DCA5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F5CB8E3DC9477CCC2748457E /* RestTimerAttributes.swift in Sources */,
+				5F44F9D4F466D2FE3B244814 /* RestTimerSharedStore.swift in Sources */,
+				B4941D28393E39B1A6B76DFE /* RestTimerActivityController.swift in Sources */,
+				8C0DD0DF141DB933903A1430 /* RestTimerLiveActivityWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -354,6 +460,57 @@
 			};
 			name = Release;
 		};
+
+		4FE2BB7534036E6E5BAB0D44 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RestTimerLiveActivityWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rankedgym.app.RestTimerLiveActivityWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		04E9861AE13B10AE758BC6E7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = RestTimerLiveActivityWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rankedgym.app.RestTimerLiveActivityWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -371,6 +528,16 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+
+		0890CDCB31794DA66B826A08 /* Build configuration list for PBXNativeTarget "RestTimerLiveActivityWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4FE2BB7534036E6E5BAB0D44 /* Debug */,
+				04E9861AE13B10AE758BC6E7 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

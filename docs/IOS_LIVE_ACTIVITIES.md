@@ -1,58 +1,98 @@
-# Live Activities iOS — Chrono de repos
+# Live Activities + Dynamic Island — Ranked Gym
 
-Ranked Gym est une **PWA Vite** déployée sur Cloudflare. Les Live Activities (ActivityKit) nécessitent une **coque native iOS** (Capacitor). Le code web appelle le plugin ; le rendu lock screen / Dynamic Island est natif.
+Shell Capacitor iOS uniquement. Web / PWA / Android = **no-op** (pas d’erreur, pas d’UI Island simulée).
 
-## Prérequis
+## Audit (environnement Cloud Agent Linux)
 
-- macOS + Xcode 15+
-- iOS 16.2+ sur l’appareil de test
-- Capacitor iOS configuré (`npx cap init` si pas encore fait)
+| Point | État |
+|---|---|
+| Capacitor | **8.5.0** (`@capacitor/core` / `ios` / `cli`) |
+| Projet iOS | Présent (`ios/App`), plugins locaux sous `App/Plugins/` |
+| iOS min app | **15.0** (inchangé) — Live Activities gardés derrière `#available(iOS 16.2, *)` |
+| Widget Extension min | **16.2** |
+| Deep links | Scheme **`rankedgym://`** (`session/active`, `live-activity?action=…`) |
+| Source de vérité séance | `activeWorkoutDraft` (`routineId` + `startedAt` → `sessionId`) + `restTimer` |
+| Persistance repos | `endsAt` absolu dans trainingStorage (survit refresh / soft-leave) |
+| Xcode dans cet env | **Non** |
+| Device iOS testable ici | **Aucun** — ActivityKit / Dynamic Island **non testés sur device** |
 
-## Installation Capacitor (une fois)
+## Architecture sync retenue
+
+```
+JS SoT (activeWorkoutDraft + RestTimerContext)
+    │ start / update(endDate) / end / cleanupStale
+    ▼
+Capacitor RestTimerLiveActivityPlugin (iOS)
+    ▼
+ActivityKit ←── Widget Extension (SwiftUI Island + Lock Screen)
+    │
+    │ actions (−15 / +15 / pause / Reprendre)
+    ▼
+deep link rankedgym://… → AppDelegate enqueue → pending store
+    ▼
+JS drainPending + applyNativeAction (anti double-tap token)
+```
+
+- **Timer** : `restEndsAt` (Date) → `Text(timerInterval:)` SwiftUI — **pas** d’update JS chaque seconde.
+- **Actions** : deep links (ouvre l’app + reconcile). Cohérence Swift↔JS garantie car JS reste SoT.
+- **App Intents in-Island sans ouvrir l’app** : **non branchés** — exigent App Groups + signing (interdit sans GO Evan). Documenté ci-dessous, pas maquillé.
+
+## Fichiers
+
+| Couche | Chemin |
+|---|---|
+| Bridge JS typé | `src/native/liveActivity/` |
+| Service façade | `src/services/restTimerLiveActivity.ts` |
+| Contexte repos | `src/context/RestTimerContext.tsx` (`adjust`, `applyNativeAction`, endDate) |
+| Sources Swift canoniques | `ios-native/RestTimerLiveActivity/`, `ios-native/RestTimerLiveActivityWidget/` |
+| App iOS branchée | `ios/App/App/Plugins/RestTimer*.swift` |
+| Widget Extension | `ios/App/RestTimerLiveActivityWidget/` + target Xcode |
+| Sync sources | `scripts/ios-sync-live-activity.sh` |
+
+## Design
+
+OLED noir, charbon, blanc, gris doux, rouge `#FF2B2B` uniquement progression / actions. Logo panthère `PantherMark` (`public/panther-trim.png`). Pas de glass / néon / dégradés déco.
+
+### Dynamic Island
+
+- **Compact** : panthère + temps repos + anneau progress rouge
+- **Minimal** : marque panthère
+- **Étendu** : logo, REPOS, timer, exo réel, série x/y, barre, pause, −15 s / +15 s
+
+### Lock Screen
+
+Logo + Ranked Gym, exo, série, timer, barre, **Reprendre** → `rankedgym://session/active` (séance active, pas home).
+
+## Cycle de vie
+
+1. Start LA au vrai repos d’une séance `activeWorkoutDraft` (payload = exo/série réels)
+2. Update sur pause / reprise / adjust (nouvel `endsAt`)
+3. Survive background via `endsAt` persisté
+4. End à fin repos / skip / dismiss / fin séance / cleanup stale au launch
+5. Jamais de payload hardcodé (« Développé couché », « 01:30 », etc.)
+
+## Manque volontaire (GO Evan requis)
+
+| Élément | Statut |
+|---|---|
+| App Groups `group.com.rankedgym.app` | Non activé (signing) — pending store fallback UserDefaults |
+| App Intents iOS 17 sans ouvrir l’app | Code retiré au profit des deep links (sync SoT) |
+| Certificats / provisioning Widget | À faire sur Mac avec le compte Apple |
+| Compile Xcode app+extension | Impossible dans cet env Linux |
+
+## Build Mac
 
 ```bash
-npm install @capacitor/core @capacitor/cli @capacitor/ios
-npx cap init "Ranked Gym" com.rankedgym.app --web-dir dist
 npm run build
-npx cap add ios
+bash scripts/ios-sync-live-activity.sh
+npx cap sync ios
+npx cap open ios
+# Vérifier target RestTimerLiveActivityWidget embarqué, NSSupportsLiveActivities=true
+# Device iOS 16.2+ (Island : iPhone 14 Pro+)
 ```
 
-## Intégrer le plugin natif
+`npx cap sync ios` : ne wipe pas `App/Plugins/` ni le target Widget s’ils sont dans le pbxproj.
 
-1. Copie le dossier `ios-native/RestTimerLiveActivity/` dans `ios/App/App/Plugins/`
-2. Enregistre le plugin dans le projet Xcode (target App)
-3. Ajoute une **Widget Extension** :
-   - File → New → Target → Widget Extension
-   - Nom : `RestTimerLiveActivityWidget`
-   - Remplace le contenu par `ios-native/RestTimerLiveActivityWidget/RestTimerLiveActivityWidget.swift`
-   - Partage `RestTimerAttributes.swift` entre App et Extension (Target Membership)
+## Web / Android
 
-4. Dans `Info.plist` de l’app principale :
-
-```xml
-<key>NSSupportsLiveActivities</key>
-<true/>
-```
-
-5. Capabilities → **Live Activities** activé
-
-## Comportement
-
-| Événement JS | Action native |
-|---|---|
-| `RestTimerContext.start()` | `RestTimerLiveActivity.start()` |
-| Tick chaque seconde | `update({ remainingSec })` |
-| Fin / Passer / OK | `end({ immediate: true })` |
-
-UI Live Activity (dark) :
-- Titre : **Temps de repos**
-- Sous-titre : exercice + série
-- Compte à rebours `MM:SS` en rouge
-
-## Web / PWA seule
-
-Sans shell Capacitor, le bridge est un **no-op** : le timer in-app (« Prêt à lancer ») continue de fonctionner normalement.
-
-## Typo radar
-
-Le libellé canonique est centralisé dans `src/constants/radarLabels.ts` (`RADAR_REGULARITY_LABEL = "Régularité"`). Toute variante « Égularité » / « Egularité » est normalisée à l’affichage.
+`registerPlugin(..., { web: LiveActivityWeb })` → `available: false`. Aucune régression UI.

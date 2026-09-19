@@ -76,6 +76,7 @@ interface WorkoutNotebookProps {
     setIndex: number
     exerciseName: string
     setLabel: string
+    setCount?: number
     restSec?: number
   }) => void
   /** Applique restSec / done sur une série (callback parent). */
@@ -455,6 +456,7 @@ export function WorkoutNotebook({
       setIndex,
       exerciseName: ex.name.trim() || 'Exercice',
       setLabel: `S${setIndex + 1}`,
+      setCount: ex.sets.length,
       restSec,
     })
   }

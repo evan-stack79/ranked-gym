@@ -11,6 +11,11 @@ import { TrainingView } from './components/training/TrainingView'
 import { NutritionView } from './components/nutrition/NutritionView'
 import { ProfileView } from './components/profile/ProfileView'
 import { hasCompletedNutritionOnboarding } from './services/nutritionStorage'
+import {
+  clearLastVoluntaryRoute,
+  getTrainingState,
+} from './services/trainingStorage'
+import { reconcileLiveActivityOnLaunch } from './services/restTimerLiveActivity'
 import type { TabId } from './types'
 import { safeWarn } from './utils/safeLog'
 
@@ -165,6 +170,27 @@ function AppShell() {
       setLaunchRoutineId(null)
     }
   }, [isAuthenticated])
+
+  // Live Activity / Dynamic Island → séance active (pas home).
+  useEffect(() => {
+    const openActive = () => {
+      try {
+        const draft = getTrainingState().activeWorkoutDraft
+        if (!draft) return
+        clearLastVoluntaryRoute()
+        setLaunchRoutineId(draft.routineId)
+        setActiveTab('training')
+      } catch (error) {
+        safeWarn('[app] open-active-session failed', error)
+      }
+    }
+    window.addEventListener('ranked-gym:open-active-session', openActive)
+    return () => window.removeEventListener('ranked-gym:open-active-session', openActive)
+  }, [])
+
+  useEffect(() => {
+    void reconcileLiveActivityOnLaunch()
+  }, [])
 
   const handleTabChange = (tab: TabId) => {
     if (!isAuthenticated) {

@@ -1,9 +1,10 @@
 import ActivityKit
+import AppIntents
 import SwiftUI
 import UIKit
 import WidgetKit
 
-// MARK: - Brand (OLED / charbon / rouge Ranked Gym uniquement)
+// MARK: - Brand
 
 private enum RG {
     static let red = Color(red: 1, green: 43 / 255, blue: 43 / 255)
@@ -72,7 +73,7 @@ struct RestTimerLiveActivityWidget: Widget {
     }
 }
 
-// MARK: - Dynamic Island
+// MARK: - Dynamic Island regions
 
 private struct ExpandedCenter: View {
     let state: RestTimerAttributes.ContentState
@@ -82,6 +83,7 @@ private struct ExpandedCenter: View {
             Text("REPOS")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(RG.softGray)
+                .accessibilityHidden(true)
             restClock(state: state, font: .system(size: 28, weight: .bold).monospacedDigit())
                 .foregroundStyle(.white)
                 .accessibilityLabel(restA11y(state))
@@ -93,20 +95,37 @@ private struct ExpandedTrailing: View {
     let context: ActivityViewContext<RestTimerAttributes>
 
     var body: some View {
-        Link(destination: RestTimerLiveActivityWidget.actionURL(
-            action: context.state.paused ? "resume" : "pause",
-            sessionId: context.attributes.sessionId
-        )) {
-            ZStack {
-                Circle()
-                    .fill(RG.red)
-                    .frame(width: 36, height: 36)
-                Image(systemName: context.state.paused ? "play.fill" : "pause.fill")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
+        Group {
+            if #available(iOS 17.0, *) {
+                Button(
+                    intent: ToggleRestPauseIntent(sessionId: context.attributes.sessionId)
+                ) {
+                    pauseGlyph(paused: context.state.paused)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(context.state.paused ? "Reprendre le repos" : "Mettre le repos en pause")
+            } else {
+                Link(destination: RestTimerLiveActivityWidget.actionURL(
+                    action: context.state.paused ? "resume" : "pause",
+                    sessionId: context.attributes.sessionId
+                )) {
+                    pauseGlyph(paused: context.state.paused)
+                }
+                .accessibilityLabel(context.state.paused ? "Reprendre le repos" : "Mettre le repos en pause")
             }
         }
-        .accessibilityLabel(context.state.paused ? "Reprendre le repos" : "Mettre le repos en pause")
+    }
+
+    @ViewBuilder
+    private func pauseGlyph(paused: Bool) -> some View {
+        ZStack {
+            Circle()
+                .fill(RG.red)
+                .frame(width: 36, height: 36)
+            Image(systemName: paused ? "play.fill" : "pause.fill")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.white)
+        }
     }
 }
 
@@ -134,31 +153,46 @@ private struct ExpandedBottom: View {
             RestProgressBar(fraction: context.state.progressFraction())
 
             HStack(spacing: 10) {
-                adjustLink(delta: -15, label: "−15 s")
-                adjustLink(delta: 15, label: "+15 s")
+                adjustButton(delta: -15, label: "−15 s")
+                adjustButton(delta: 15, label: "+15 s")
             }
         }
         .padding(.top, 2)
     }
 
-    private func adjustLink(delta: Int, label: String) -> some View {
-        Link(destination: RestTimerLiveActivityWidget.actionURL(
-            action: "adjust",
-            sessionId: context.attributes.sessionId,
-            delta: delta
-        )) {
-            Text(label)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(RG.charcoal, in: Capsule())
+    @ViewBuilder
+    private func adjustButton(delta: Int, label: String) -> some View {
+        if #available(iOS 17.0, *) {
+            Button(
+                intent: AdjustRestIntent(
+                    deltaSec: delta,
+                    sessionId: context.attributes.sessionId
+                )
+            ) {
+                Text(label)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(RG.charcoal, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(delta < 0 ? "Réduire le repos de 15 secondes" : "Augmenter le repos de 15 secondes")
+        } else {
+            Link(destination: RestTimerLiveActivityWidget.actionURL(
+                action: "adjust",
+                sessionId: context.attributes.sessionId,
+                delta: delta
+            )) {
+                Text(label)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(RG.charcoal, in: Capsule())
+            }
+            .accessibilityLabel(delta < 0 ? "Réduire le repos de 15 secondes" : "Augmenter le repos de 15 secondes")
         }
-        .accessibilityLabel(
-            delta < 0
-                ? "Réduire le repos de 15 secondes"
-                : "Augmenter le repos de 15 secondes"
-        )
     }
 }
 
@@ -212,7 +246,33 @@ private struct RestTimerLockScreenView: View {
 
             RestProgressBar(fraction: context.state.progressFraction())
 
-            // Deep link direct → séance active (pas home).
+            resumeControl(context: context)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .activityBackgroundTint(Color.black)
+        .activitySystemActionForegroundColor(RG.red)
+    }
+
+    @ViewBuilder
+    private func resumeControl(context: ActivityViewContext<RestTimerAttributes>) -> some View {
+        let paused = context.state.paused
+        let label = paused ? "Reprendre" : "Ouvrir la séance"
+        let a11y = paused ? "Reprendre le repos et ouvrir la séance" : "Ouvrir la séance active"
+
+        if #available(iOS 17.0, *), paused {
+            Button(intent: ToggleRestPauseIntent(sessionId: context.attributes.sessionId)) {
+                Text(label)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(RG.red)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(RG.charcoal, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(a11y)
+        } else {
+            // Deep link direct séance active (pas home).
             Link(destination: RestTimerLiveActivityWidget.sessionURL(
                 sessionId: context.attributes.sessionId
             )) {
@@ -223,12 +283,8 @@ private struct RestTimerLockScreenView: View {
                     .padding(.vertical, 12)
                     .background(RG.charcoal, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
-            .accessibilityLabel("Reprendre la séance active")
+            .accessibilityLabel(a11y)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .activityBackgroundTint(Color.black)
-        .activitySystemActionForegroundColor(RG.red)
     }
 }
 
@@ -238,15 +294,16 @@ private struct PantherMark: View {
     let size: CGFloat
 
     var body: some View {
+        // Asset panthère officiel du projet (imageset Widget / App).
+        // Fallback SF Symbol lisible si asset absent au build.
         Group {
             if UIImage(named: "PantherMark") != nil {
                 Image("PantherMark")
                     .resizable()
                     .scaledToFit()
             } else {
-                // Symbole de secours lisible en minimal (pas un logo généré).
-                Image(systemName: "circle.fill")
-                    .font(.system(size: size * 0.85, weight: .bold))
+                Image(systemName: "flame.fill")
+                    .font(.system(size: size * 0.7, weight: .bold))
                     .foregroundStyle(RG.red)
             }
         }
@@ -294,9 +351,9 @@ private func restClock(state: RestTimerAttributes.ContentState, font: Font) -> s
     if state.paused {
         Text(formatClock(state.pausedRemainingSec))
             .font(font)
-    } else if let end = state.restEndsAt, end > Date() {
-        // Timer SwiftUI local via endDate — pas d'update JS/seconde.
-        Text(timerInterval: Date.now...end, countsDown: true)
+    } else if let end = state.restEndsAt, end.timeIntervalSinceNow > 0 {
+        // Timer SwiftUI local — pas d'update JS chaque seconde.
+        Text(timerInterval: Date()...end, countsDown: true)
             .font(font)
             .multilineTextAlignment(.trailing)
     } else {
@@ -314,8 +371,9 @@ private func restA11y(_ state: RestTimerAttributes.ContentState) -> String {
     if !state.hasActiveRest {
         return "Pas de repos en cours"
     }
+    let sec = state.remainingSec()
     let pause = state.paused ? ", en pause" : ""
-    return "Repos \(formatClock(state.remainingSec()))\(pause)"
+    return "Repos \(formatClock(sec))\(pause)"
 }
 
 @main
