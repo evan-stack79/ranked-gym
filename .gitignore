@@ -71,6 +71,13 @@ scripts/screenshots/**
 !scripts/screenshots/workout-immersive/prod-hero-diag.json
 !scripts/screenshots/workout-immersive/load-real-developper.webm
 !scripts/screenshots/workout-immersive/load-canonical-bench-refresh.webm
+!scripts/screenshots/exercise-picker/
+!scripts/screenshots/exercise-picker/VALIDATION.md
+!scripts/screenshots/exercise-picker/picker-before-query-390.png
+!scripts/screenshots/exercise-picker/picker-search-developpe-390.png
+!scripts/screenshots/exercise-picker/picker-search-focused-390.png
+!scripts/screenshots/exercise-picker/immersive-after-select-390.png
+!scripts/screenshots/exercise-picker/picker_select_to_immersive_demo.mp4
 
 # Migration artifacts can contain sensitive export metadata.
 scripts/migrations/artifacts/
