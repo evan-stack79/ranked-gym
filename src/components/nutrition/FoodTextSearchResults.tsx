@@ -7,6 +7,7 @@ interface FoodTextSearchResultsProps {
   error: string | null
   hits: OpenFoodFactsSearchHit[]
   onSelect: (hit: OpenFoodFactsSearchHit) => void
+  onRetry?: () => void
   /** Liste en flex-1 : occupe tout l’espace restant sous la barre de recherche. */
   fill?: boolean
 }
@@ -17,6 +18,7 @@ export function FoodTextSearchResults({
   error,
   hits,
   onSelect,
+  onRetry,
   fill = false,
 }: FoodTextSearchResultsProps) {
   const trimmed = query.trim()
@@ -27,6 +29,9 @@ export function FoodTextSearchResults({
       className={`flex min-h-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-black/40 ${
         fill ? 'h-full' : ''
       }`}
+      data-food-search-state={
+        idle ? 'idle' : loading ? 'loading' : error ? 'error' : hits.length === 0 ? 'empty' : 'results'
+      }
     >
       {idle ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-6 py-10 text-center">
@@ -50,7 +55,18 @@ export function FoodTextSearchResults({
       ) : null}
 
       {!idle && error && !loading ? (
-        <p className="flex min-h-0 flex-1 items-center px-3.5 py-3 text-[13px] text-[#FF6961]">{error}</p>
+        <div className="flex min-h-0 flex-1 flex-col items-start justify-center gap-3 px-3.5 py-4">
+          <p className="text-[13px] text-[#FF6961]">{error}</p>
+          {onRetry ? (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="ios-press rounded-xl border border-white/12 bg-[#1c1c1e] px-3.5 py-2 text-[13px] font-semibold text-white"
+            >
+              Réessayer
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       {!idle && !loading && !error && hits.length === 0 ? (

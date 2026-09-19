@@ -26,6 +26,7 @@ import {
 import { getDailyWaterGoalMl, isTrainingDayToday } from '../../utils/waterGoal'
 import { HydrationProgressBar } from './HydrationProgressBar'
 import { saveAliment, searchOpenFoodFacts, type OpenFoodFactsProduct, type OpenFoodFactsSearchHit } from '../../services/alimentsService'
+import { foodSearchErrorMessage } from '../../utils/foodSearchErrors'
 import { useAuth } from '../../context/AuthContext'
 import { IconBadge } from '../ui/IconBadge'
 import { MacroRing } from './MacroRing'
@@ -71,6 +72,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   const [searchHits, setSearchHits] = useState<OpenFoodFactsSearchHit[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
+  const [searchRetryNonce, setSearchRetryNonce] = useState(0)
   const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' } | null>(
     null,
   )
@@ -135,7 +137,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
           if (controller.signal.aborted) return
           if (err instanceof DOMException && err.name === 'AbortError') return
           setSearchHits([])
-          setSearchError(err instanceof Error ? err.message : 'Recherche impossible.')
+          setSearchError(foodSearchErrorMessage(err))
         })
         .finally(() => {
           if (!controller.signal.aborted) setSearchLoading(false)
@@ -146,7 +148,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [searchQuery, showForm])
+  }, [searchQuery, showForm, searchRetryNonce])
 
   const pendingRemaining = useMemo(() => {
     if (!pendingMealType) return 0
@@ -458,6 +460,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
           onSearchQueryChange={setSearchQuery}
           searchLoading={searchLoading}
           searchError={searchError}
+          onSearchRetry={() => setSearchRetryNonce((n) => n + 1)}
           searchHits={searchHits}
           onSelectHit={(hit) => {
             handleScannedProduct(hit)

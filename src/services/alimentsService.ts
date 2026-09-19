@@ -117,6 +117,7 @@ const SEARCH_PAGE_SIZE = 20
  * Recherche textuelle Open Food Facts (world + tri par scans).
  * GET search.pl — limitée à 20 résultats.
  * `encodeURIComponent` obligatoire pour espaces / accents (ex. « Pâte panzani »).
+ * Retry léger sur 5xx / réseau ; timeout borné.
  */
 export async function searchOpenFoodFacts(
   term: string,
@@ -131,46 +132,106 @@ export async function searchOpenFoodFacts(
     `&search_simple=1&action=process&json=1` +
     `&sort_by=unique_scans_n&page_size=${SEARCH_PAGE_SIZE}`
 
-  const response = await fetch(url, {
-    signal,
-    headers: {
-      Accept: 'application/json',
-    },
-  })
+  const maxAttempts = 2
+  let lastError: unknown = null
 
-  if (!response.ok) {
-    throw new Error('Recherche Open Food Facts indisponible. Réessaie.')
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (signal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError')
+    }
+    const attemptController = new AbortController()
+    const onAbort = () => attemptController.abort()
+    signal?.addEventListener('abort', onAbort, { once: true })
+    const timer = window.setTimeout(() => attemptController.abort(), 12_000)
+
+    try {
+      const response = await fetch(url, {
+        signal: attemptController.signal,
+        headers: {
+          Accept: 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        const err = new Error(
+          response.status >= 500
+            ? 'Recherche Open Food Facts indisponible. Réessaie.'
+            : `Recherche Open Food Facts indisponible (${response.status}).`,
+        )
+        lastError = err
+        if (response.status >= 500 && attempt + 1 < maxAttempts) {
+          await new Promise((r) => window.setTimeout(r, 350 * (attempt + 1)))
+          continue
+        }
+        throw err
+      }
+
+      let data: OffSearchResponse
+      try {
+        data = (await response.json()) as OffSearchResponse
+      } catch (parseErr) {
+        lastError = parseErr
+        throw new Error('Invalid response JSON from Open Food Facts')
+      }
+
+      const products = Array.isArray(data.products) ? data.products : []
+      const hits: OpenFoodFactsSearchHit[] = []
+      for (const raw of products) {
+        const nom =
+          raw.product_name_fr?.trim() || raw.product_name?.trim() || ''
+        if (!nom) continue
+
+        const n = raw.nutriments ?? {}
+        const calories = Number(n['energy-kcal_100g'] ?? n.energy_kcal_100g ?? 0)
+        const proteines = Number(n.proteins_100g ?? 0)
+        const glucides = Number(n.carbohydrates_100g ?? 0)
+        const lipides = Number(n.fat_100g ?? 0)
+        const barcode = String(raw.code || raw._id || '').trim() || `search-${hits.length}`
+
+        hits.push({
+          barcode,
+          nom,
+          brands: raw.brands?.trim() || '',
+          calories: Number.isFinite(calories) ? Math.round(calories) : 0,
+          proteines: Number.isFinite(proteines) ? Math.round(proteines * 10) / 10 : 0,
+          glucides: Number.isFinite(glucides) ? Math.round(glucides * 10) / 10 : 0,
+          lipides: Number.isFinite(lipides) ? Math.round(lipides * 10) / 10 : 0,
+          imageUrl: raw.image_front_small_url,
+        })
+
+        if (hits.length >= SEARCH_PAGE_SIZE) break
+      }
+
+      return hits
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        if (signal?.aborted) throw err
+        lastError = new Error('timeout')
+        if (attempt + 1 < maxAttempts) continue
+        throw lastError
+      }
+      lastError = err
+      if (attempt + 1 < maxAttempts && isRetryableNetwork(err)) {
+        await new Promise((r) => window.setTimeout(r, 350 * (attempt + 1)))
+        continue
+      }
+      throw err
+    } finally {
+      window.clearTimeout(timer)
+      signal?.removeEventListener('abort', onAbort)
+    }
   }
 
-  const data = (await response.json()) as OffSearchResponse
-  const products = Array.isArray(data.products) ? data.products : []
+  throw lastError ?? new Error('Recherche Open Food Facts indisponible. Réessaie.')
+}
 
-  const hits: OpenFoodFactsSearchHit[] = []
-  for (const raw of products) {
-    const nom =
-      raw.product_name_fr?.trim() || raw.product_name?.trim() || ''
-    if (!nom) continue
-
-    const n = raw.nutriments ?? {}
-    const calories = Number(n['energy-kcal_100g'] ?? n.energy_kcal_100g ?? 0)
-    const proteines = Number(n.proteins_100g ?? 0)
-    const glucides = Number(n.carbohydrates_100g ?? 0)
-    const lipides = Number(n.fat_100g ?? 0)
-    const barcode = String(raw.code || raw._id || '').trim() || `search-${hits.length}`
-
-    hits.push({
-      barcode,
-      nom,
-      brands: raw.brands?.trim() || '',
-      calories: Number.isFinite(calories) ? Math.round(calories) : 0,
-      proteines: Number.isFinite(proteines) ? Math.round(proteines * 10) / 10 : 0,
-      glucides: Number.isFinite(glucides) ? Math.round(glucides * 10) / 10 : 0,
-      lipides: Number.isFinite(lipides) ? Math.round(lipides * 10) / 10 : 0,
-      imageUrl: raw.image_front_small_url,
-    })
-
-    if (hits.length >= SEARCH_PAGE_SIZE) break
-  }
-
-  return hits
+function isRetryableNetwork(err: unknown): boolean {
+  const raw = err instanceof Error ? err.message : String(err ?? '')
+  const lower = raw.toLowerCase()
+  return (
+    lower.includes('load failed') ||
+    lower.includes('failed to fetch') ||
+    lower.includes('network') ||
+    lower.includes('timeout')
+  )
 }

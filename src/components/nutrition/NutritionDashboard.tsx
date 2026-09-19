@@ -23,6 +23,7 @@ import {
   type OpenFoodFactsProduct,
   type OpenFoodFactsSearchHit,
 } from '../../services/alimentsService'
+import { foodSearchErrorMessage } from '../../utils/foodSearchErrors'
 import { useAuth } from '../../context/AuthContext'
 import { NutritionCalorieRing } from './NutritionCalorieRing'
 import { NutritionMacrosRow } from './NutritionMacrosRow'
@@ -81,6 +82,7 @@ export function NutritionDashboard({
   const [searchHits, setSearchHits] = useState<OpenFoodFactsSearchHit[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
+  const [searchRetryNonce, setSearchRetryNonce] = useState(0)
   const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' } | null>(
     null,
   )
@@ -146,7 +148,7 @@ export function NutritionDashboard({
           if (controller.signal.aborted) return
           if (err instanceof DOMException && err.name === 'AbortError') return
           setSearchHits([])
-          setSearchError(err instanceof Error ? err.message : 'Recherche impossible.')
+          setSearchError(foodSearchErrorMessage(err))
         })
         .finally(() => {
           if (!controller.signal.aborted) setSearchLoading(false)
@@ -157,7 +159,7 @@ export function NutritionDashboard({
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [searchQuery, showForm])
+  }, [searchQuery, showForm, searchRetryNonce])
 
   const nutrition = useMemo(() => {
     void tick
@@ -510,6 +512,7 @@ export function NutritionDashboard({
           onSearchQueryChange={setSearchQuery}
           searchLoading={searchLoading}
           searchError={searchError}
+          onSearchRetry={() => setSearchRetryNonce((n) => n + 1)}
           searchHits={searchHits}
           onSelectHit={(hit) => {
             handleScannedProduct(hit)

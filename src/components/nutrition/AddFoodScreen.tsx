@@ -38,6 +38,7 @@ interface AddFoodScreenProps {
   onSearchQueryChange: (value: string) => void
   searchLoading: boolean
   searchError: string | null
+  onSearchRetry?: () => void
   searchHits: OpenFoodFactsSearchHit[]
   onSelectHit: (hit: OpenFoodFactsSearchHit) => void
   onOpenScanner: () => void
@@ -76,6 +77,7 @@ export function AddFoodScreen({
   onSearchQueryChange,
   searchLoading,
   searchError,
+  onSearchRetry,
   searchHits,
   onSelectHit,
   onOpenScanner,
@@ -201,6 +203,7 @@ export function AddFoodScreen({
           error={searchError}
           hits={searchHits}
           onSelect={onSelectHit}
+          onRetry={onSearchRetry}
           fill
         />
         {scannerSlot ? (
