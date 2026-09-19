@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Check, ChevronLeft, Minus, Pause, Play, Plus, Timer } from 'lucide-react'
 import type { ExerciseEntry, WorkoutSet } from '../../types/training'
 import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
 import { BRAND_MARK_COMPACT_SRC } from '../brand/BrandMark'
 import {
-  formatExerciseMuscles,
+  formatExerciseMetaLine,
   resolveExerciseMedia,
 } from '../../utils/exerciseMedia'
 import { useRestTimerContext } from '../../context/RestTimerContext'
@@ -21,7 +21,12 @@ export interface ImmersiveExerciseSessionProps {
   onAddSet: (exerciseId: string) => void
   /** Ouvre le sélecteur pour ajouter un exercice à la suite. */
   onAddExercise?: () => void
-  onValidateSet: (exercise: ExerciseEntry, setIndex: number, restSec: number) => void
+  onValidateSet: (
+    exercise: ExerciseEntry,
+    setIndex: number,
+    restSec: number,
+    setPatch?: Partial<WorkoutSet>,
+  ) => void
   onFinishSession: () => void
   saving?: boolean
   /** Preferred rest length when idle (seconds). */
@@ -34,11 +39,6 @@ function formatClock(totalSec: number): string {
   const m = Math.floor(s / 60)
   const r = s % 60
   return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`
-}
-
-function formatEffort(set: WorkoutSet): string | null {
-  if (set.rpe == null) return null
-  return `${set.rpe}/10`
 }
 
 const FIELD =
@@ -76,9 +76,11 @@ export function ImmersiveExerciseSession({
       }),
     [exercise?.name, exercise?.canonicalExerciseId],
   )
-  const muscleLine = formatExerciseMuscles(media.muscles)
+  const muscleLine = formatExerciseMetaLine(media.muscles, media.equipment)
   const [imgFailedFor, setImgFailedFor] = useState<string | null>(null)
   const showImage = Boolean(media.imageSrc) && imgFailedFor !== media.imageSrc
+  /** Anti double-tap / double auto-validate sur la même série. */
+  const validatingRef = useRef<string | null>(null)
 
   if (!exercise) return null
 
@@ -87,6 +89,46 @@ export function ImmersiveExerciseSession({
   const progressLabel = `${safeIndex + 1}/${exercises.length}`
   const progressRatio =
     exercises.length > 0 ? Math.min(1, (safeIndex + 1) / exercises.length) : 0
+  const allSetsDone = pendingIdx < 0 && exercise.sets.length > 0
+  const hasNextExercise = safeIndex < exercises.length - 1
+
+  const tryValidateSet = (
+    ex: ExerciseEntry,
+    setIndex: number,
+    restSec: number,
+    setPatch?: Partial<WorkoutSet>,
+  ) => {
+    const set = ex.sets[setIndex]
+    if (!set || set.done) return
+    const key = `${ex.id}:${setIndex}`
+    if (validatingRef.current === key) return
+    validatingRef.current = key
+    try {
+      onValidateSet(ex, setIndex, restSec, setPatch)
+    } finally {
+      // Relâche après un tick pour laisser le state `done` se propager.
+      window.setTimeout(() => {
+        if (validatingRef.current === key) validatingRef.current = null
+      }, 400)
+    }
+  }
+
+  const maybeAutoValidate = (
+    ex: ExerciseEntry,
+    setIndex: number,
+    patch: Partial<WorkoutSet>,
+  ) => {
+    const current = ex.sets[setIndex]
+    if (!current || current.done) return
+    const next: WorkoutSet = { ...current, ...patch }
+    const rpe = next.rpe
+    const hasEffort = rpe != null && rpe >= 1 && rpe <= 10
+    const hasLoad = Number.isFinite(next.weightKg) && next.weightKg >= 0
+    const hasReps = Number.isFinite(next.reps) && next.reps > 0
+    if (hasEffort && hasLoad && hasReps) {
+      tryValidateSet(ex, setIndex, restPrefSec, patch)
+    }
+  }
 
   const restActive = rest.state.active || rest.state.finished
   const restDisplaySec = rest.state.finished
@@ -243,7 +285,6 @@ export function ImmersiveExerciseSession({
             const done = Boolean(set.done)
             const active = !done && idx === pendingIdx
             const upcoming = !done && idx !== pendingIdx
-            const effortDone = formatEffort(set)
 
             return (
               <div
@@ -286,30 +327,30 @@ export function ImmersiveExerciseSession({
                   aria-label={`Série ${idx + 1} reps`}
                   className={FIELD}
                 />
-                {done && effortDone ? (
-                  <div
-                    className={`${FIELD} flex items-center justify-center text-[13px] text-[#AEAEB2]`}
-                    aria-label={`Série ${idx + 1} effort ${effortDone}`}
-                  >
-                    {effortDone}
-                  </div>
-                ) : (
-                  <ClearableNumberInput
-                    value={set.rpe ?? null}
-                    onChange={(v) =>
-                      onUpdateSet(exercise.id, idx, {
-                        rpe: v != null ? Math.min(10, Math.max(1, Math.round(v))) : undefined,
-                      })
+                <ClearableNumberInput
+                  value={set.rpe ?? null}
+                  onChange={(v) => {
+                    const rpe =
+                      v != null ? Math.min(10, Math.max(1, Math.round(v))) : undefined
+                    // Auto-validate sur série courante : un seul appel (patch rpe + done).
+                    if (!done && idx === validateIdx && rpe != null) {
+                      maybeAutoValidate(exercise, idx, { rpe })
+                      return
                     }
-                    min={1}
-                    max={10}
-                    required={false}
-                    placeholder="1–10"
-                    placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#636366]"
-                    aria-label={`Série ${idx + 1} effort facultatif`}
-                    className={`${FIELD} text-[13px] text-[#AEAEB2]`}
-                  />
-                )}
+                    onUpdateSet(exercise.id, idx, { rpe })
+                  }}
+                  min={1}
+                  max={10}
+                  required={false}
+                  placeholder="1–10"
+                  placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#636366]"
+                  aria-label={
+                    done
+                      ? `Série ${idx + 1} effort — corriger`
+                      : `Série ${idx + 1} effort (valide la série)`
+                  }
+                  className={`${FIELD} text-[13px] text-[#AEAEB2]`}
+                />
                 <div className="flex items-center justify-center">
                   {done ? (
                     <span
@@ -338,14 +379,33 @@ export function ImmersiveExerciseSession({
           >
             + Ajouter une série
           </button>
-          <button
-            type="button"
-            onClick={() => onValidateSet(exercise, validateIdx, restPrefSec)}
-            disabled={Boolean(exercise.sets[validateIdx]?.done) && pendingIdx < 0}
-            className="ios-press flex min-h-11 flex-[1.35] items-center justify-center rounded-xl bg-[#FF2B2B] px-3 text-[14px] font-semibold text-white disabled:opacity-40"
-          >
-            Valider la série
-          </button>
+          {!allSetsDone ? (
+            <button
+              type="button"
+              onClick={() => tryValidateSet(exercise, validateIdx, restPrefSec)}
+              disabled={Boolean(exercise.sets[validateIdx]?.done)}
+              className="ios-press flex min-h-11 flex-[1.35] items-center justify-center rounded-xl bg-[#FF2B2B] px-3 text-[14px] font-semibold text-white disabled:opacity-40"
+            >
+              Valider la série
+            </button>
+          ) : hasNextExercise ? (
+            <button
+              type="button"
+              onClick={() => onActiveIndexChange(safeIndex + 1)}
+              className="ios-press flex min-h-11 flex-[1.35] items-center justify-center rounded-xl bg-[#FF2B2B] px-3 text-[14px] font-semibold text-white"
+            >
+              Exercice suivant
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onAddExercise?.()}
+              disabled={!onAddExercise}
+              className="ios-press flex min-h-11 flex-[1.35] items-center justify-center rounded-xl border border-white/12 bg-[#1c1c1e] px-3 text-[13px] font-semibold text-[#AEAEB2] disabled:opacity-40"
+            >
+              + Exercice
+            </button>
+          )}
         </div>
 
         {/* Compact rest */}

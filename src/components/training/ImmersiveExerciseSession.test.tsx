@@ -134,6 +134,66 @@ describe('ImmersiveExerciseSession', () => {
     expect(photo!.getAttribute('alt')).toMatch(/développé couché/i)
     // Titre reste celui de la séance — pas de rename arbitraire
     expect(host.textContent).toContain('DÉVELOPPER')
-    expect(host.textContent).toContain('Pectoraux · Triceps · Épaules')
+    expect(host.textContent).toContain('Pectoraux · Triceps · Épaules · Barre')
+  })
+
+  it('saisie effort 1–10 valide auto la série (anti double-tap)', async () => {
+    const onValidate = vi.fn()
+    const onUpdate = vi.fn()
+    const exercises: ExerciseEntry[] = [
+      {
+        id: 'ex-1',
+        name: 'Développé couché',
+        canonicalExerciseId: 'bench_press',
+        sets: [
+          { reps: 8, weightKg: 60 },
+          { reps: 8, weightKg: 60 },
+        ],
+      },
+    ]
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <ImmersiveExerciseSession
+            exercises={exercises}
+            activeIndex={0}
+            onActiveIndexChange={vi.fn()}
+            sessionClockLabel="01:00"
+            sessionPaused={false}
+            onBack={vi.fn()}
+            onUpdateSet={onUpdate}
+            onAddSet={vi.fn()}
+            onValidateSet={onValidate}
+            onFinishSession={vi.fn()}
+          />
+        </RestTimerProvider>,
+      )
+    })
+
+    const effort = host.querySelector(
+      'input[aria-label="Série 1 effort (valide la série)"]',
+    ) as HTMLInputElement | null
+    expect(effort).toBeTruthy()
+    await act(async () => {
+      effort!.focus()
+      effort!.value = '7'
+      effort!.dispatchEvent(new Event('input', { bubbles: true }))
+      effort!.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    // ClearableNumberInput calls onChange on input with parsed number
+    await act(async () => {
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        'value',
+      )?.set
+      nativeInputValueSetter?.call(effort, '7')
+      effort!.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+
+    expect(onValidate).toHaveBeenCalled()
+    expect(onValidate.mock.calls[0][1]).toBe(0)
+    expect(onValidate.mock.calls[0][3]).toMatchObject({ rpe: 7 })
+    // Pas d’update séparé avant validate (évite course state)
+    expect(onUpdate).not.toHaveBeenCalled()
   })
 })
