@@ -11,6 +11,7 @@ import {
   saveWorkoutNote,
   saveRoutineDraft,
   startRoutineDraft,
+  startFreeWorkoutSession,
   setActiveWorkoutPaused,
   ensureActiveWorkoutClock,
   addCustomRoutine,
@@ -120,6 +121,8 @@ export function TrainingView({
   const [notebookLaunchId, setNotebookLaunchId] = useState<string | null>(null)
   const [notebookResume, setNotebookResume] = useState(false)
   const [notebookEditNote, setNotebookEditNote] = useState<WorkoutNote | null>(null)
+  /** Séance libre : carnet vide → sélecteur premier exo. */
+  const [notebookStartEmpty, setNotebookStartEmpty] = useState(false)
   const [summaryFilter, setSummaryFilter] = useState<SportSummaryFilter>('all')
   const [focusNoteId, setFocusNoteId] = useState<string | null>(null)
   const [nowTick, setNowTick] = useState(() => Date.now())
@@ -237,10 +240,16 @@ export function TrainingView({
     return () => setChromeHidden(false)
   }, [immersiveLiveSession, pumpCheckSession, setChromeHidden])
 
-  const openNotebook = useCallback((routineId?: string | null, editNote?: WorkoutNote | null, resume = false) => {
+  const openNotebook = useCallback((
+    routineId?: string | null,
+    editNote?: WorkoutNote | null,
+    resume = false,
+    startEmpty = false,
+  ) => {
     setNotebookLaunchId(routineId ?? editNote?.routineId ?? null)
     setNotebookEditNote(editNote ?? null)
     setNotebookResume(resume)
+    setNotebookStartEmpty(startEmpty && !editNote && !resume)
     setPanel('notebook')
   }, [])
 
@@ -475,12 +484,20 @@ export function TrainingView({
       applySport(todayCard.sportId)
       if (todayCard.openTarget === 'notebook') {
         const id = launchableRoutineId(todayCard)
-        if (!id) {
-          showToast('Routine indisponible')
-          return
+        if (id) {
+          const withRoutine = startRoutineDraft(id, todayCard.sportId)
+          // Routine vide → séance libre (sélecteur premier exo).
+          if (!withRoutine.activeWorkoutDraft) {
+            setState(startFreeWorkoutSession(todayCard.sportId, id))
+            openNotebook(id, null, false, true)
+          } else {
+            setState(withRoutine)
+            openNotebook(id)
+          }
+        } else {
+          setState(startFreeWorkoutSession(todayCard.sportId))
+          openNotebook(null, null, false, true)
         }
-        setState(startRoutineDraft(id, todayCard.sportId))
-        openNotebook(id)
       } else if (todayCard.openTarget === 'endurance') {
         setPanel('endurance')
       } else {
@@ -492,7 +509,8 @@ export function TrainingView({
       // Cible dérivée de la séance planifiée — pas du sport global courant.
       if (todayCard.openTarget === 'notebook') {
         applyDiscipline('musculation')
-        setPanel('notebook')
+        setState(startFreeWorkoutSession('musculation'))
+        openNotebook(null, null, false, true)
       } else {
         setActivityOpen(true)
       }
@@ -504,7 +522,8 @@ export function TrainingView({
   const handleQuickActivity = (id: QuickActivityId) => {
     if (id === 'musculation') {
       applyDiscipline('musculation')
-      openNotebook(null)
+      setState(startFreeWorkoutSession('musculation'))
+      openNotebook(null, null, false, true)
       return
     }
     if (id === 'course') {
@@ -612,7 +631,12 @@ export function TrainingView({
                   onClick={() => {
                     if (item.id === 'notebook') {
                       if (!showStrengthTools) applyDiscipline('musculation')
-                      openNotebook(null)
+                      if (!state.activeWorkoutDraft) {
+                        setState(startFreeWorkoutSession(activeSportId || 'musculation'))
+                        openNotebook(null, null, false, true)
+                      } else {
+                        openNotebook(null)
+                      }
                       return
                     }
                     setPanel(item.id)
@@ -631,7 +655,7 @@ export function TrainingView({
       {panel === 'notebook' ? (
         showStrengthTools ? (
           <WorkoutNotebook
-            key={`notebook-${notebookLaunchId ?? 'boot'}-${notebookEditNote?.id ?? 'live'}-${activeSportId}`}
+            key={`notebook-${notebookLaunchId ?? 'boot'}-${notebookEditNote?.id ?? 'live'}-${activeSportId}-${notebookStartEmpty ? 'empty' : 'fill'}`}
             id="workout-notebook"
             bodyWeightKg={profile.weightKg}
             routines={state.routines}
@@ -640,6 +664,7 @@ export function TrainingView({
             initialRoutineId={notebookLaunchId}
             initialEditNote={notebookEditNote}
             resume={notebookResume}
+            startEmpty={notebookStartEmpty}
             sportId={activeSportId}
             sessionKind="strength"
             restLogRequest={restLogRequest}
@@ -791,7 +816,8 @@ export function TrainingView({
 
           const kind = trainSessionKindForSport(s.id)
           if (kind === 'strength') {
-            openNotebook(null)
+            setState(startFreeWorkoutSession(s.id))
+            openNotebook(null, null, false, true)
           } else if (kind === 'endurance') {
             setPanel('endurance')
           } else {
