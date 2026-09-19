@@ -1,4 +1,5 @@
 import { getActiveCloudUserId } from './cloudSession'
+import { readLocal, writeLocal } from './secureLocalStore'
 
 const PROFILE_BASE = 'ranked-gym:profile'
 
@@ -29,7 +30,7 @@ const DEFAULT_PROGRESS: StoredProfileProgress = {
 
 function readJson<T>(key: string, fallback: T): T {
   try {
-    const raw = localStorage.getItem(key)
+    const raw = readLocal(key)
     if (!raw) return fallback
     return JSON.parse(raw) as T
   } catch {
@@ -38,7 +39,7 @@ function readJson<T>(key: string, fallback: T): T {
 }
 
 function writeJson<T>(key: string, value: T, opts?: StorageSaveOptions): void {
-  localStorage.setItem(key, JSON.stringify(value))
+  writeLocal(key, JSON.stringify(value))
   if (!opts?.skipCloud) triggerCloudBackup()
 }
 

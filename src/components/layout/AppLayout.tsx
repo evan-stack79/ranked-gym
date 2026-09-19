@@ -40,54 +40,13 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
   return (
     <div
       ref={shellRef}
-      className="relative flex min-h-full flex-col mesh-bg font-sans"
+      className="relative flex h-full min-h-0 flex-col mesh-bg font-sans"
       data-streak-celebration-active={streakCelebrationActive ? '' : undefined}
       inert={streakCelebrationActive ? true : undefined}
     >
-      <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
-        <div
-          className="arena-glow absolute -left-[30%] -top-[20%] h-[70vh] w-[90vw] rounded-full blur-[90px]"
-          style={{ background: 'radial-gradient(circle, #5C1018 0%, #FF2B2B33 35%, transparent 70%)' }}
-        />
-        <div
-          className="arena-glow absolute -right-[25%] top-[-5%] h-[60vh] w-[75vw] rounded-full blur-[100px]"
-          style={{
-            background: 'radial-gradient(circle, #0A1A40 0%, #00B4FF28 40%, transparent 72%)',
-            animationDelay: '3s',
-          }}
-        />
-        <div
-          className="arena-glow absolute -left-[10%] bottom-[10%] h-[45vh] w-[60vw] rounded-full blur-[110px]"
-          style={{
-            background: 'radial-gradient(circle, #3B0A20 0%, #FF2B2B22 45%, transparent 70%)',
-            animationDelay: '6s',
-          }}
-        />
-        <div
-          className="absolute right-[-5%] bottom-[25%] h-[40vh] w-[50vw] rounded-full opacity-40 blur-[100px]"
-          style={{ background: 'radial-gradient(circle, #1A0A38 0%, transparent 68%)' }}
-        />
-      </div>
-
-      {showHeader ? (
-        <header
-          className="glass-bar sticky top-0 z-40 border-b border-white/5"
-          aria-hidden={streakCelebrationActive ? true : undefined}
-        >
-          <div
-            className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"
-            style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
-          >
-            <div data-cold-launch-target="compact">
-              <BrandMark variant="compact" />
-            </div>
-          </div>
-        </header>
-      ) : null}
-
       <main
-        className={`relative z-10 mx-auto w-full flex-1 overflow-y-auto ${
-          chromeHidden ? 'max-w-none px-0 py-0' : 'max-w-lg px-5 py-8'
+        className={`relative z-10 min-h-0 w-full flex-1 overflow-y-auto ${
+          chromeHidden ? 'max-w-none' : ''
         }`}
         style={
           chromeHidden
@@ -103,7 +62,30 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
         }
         aria-hidden={streakCelebrationActive ? true : undefined}
       >
-        {children}
+        {showHeader ? (
+          <header
+            className="border-b border-white/5 bg-[#0C0C0E]"
+            data-app-brand-header="1"
+            aria-hidden={streakCelebrationActive ? true : undefined}
+          >
+            <div
+              className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"
+              style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+            >
+              <div data-cold-launch-target="compact">
+                <BrandMark variant="compact" />
+              </div>
+            </div>
+          </header>
+        ) : null}
+
+        <div
+          className={
+            chromeHidden ? undefined : 'mx-auto w-full max-w-lg px-5 py-8'
+          }
+        >
+          {children}
+        </div>
       </main>
 
       {!chromeHidden ? (

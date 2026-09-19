@@ -16,6 +16,7 @@ import { todayKey } from '../utils/calories'
 import { getDailyWaterGoalMl, isTrainingDayToday } from '../utils/waterGoal'
 import { getActiveCloudUserId } from './cloudSession'
 import { safeWarn } from '../utils/safeLog'
+import { readLocal, writeLocal } from './secureLocalStore'
 
 const PROFILE_BASE = 'ranked-gym:nutrition-profile'
 const JOURNAL_BASE = 'ranked-gym:nutrition-journal'
@@ -52,7 +53,7 @@ const VALID_GOALS: NutritionGoal[] = ['cut', 'maintain', 'bulk']
 
 function readJson<T>(key: string, fallback: T): T {
   try {
-    const raw = localStorage.getItem(key)
+    const raw = readLocal(key)
     if (!raw) return fallback
     return JSON.parse(raw) as T
   } catch {
@@ -61,7 +62,7 @@ function readJson<T>(key: string, fallback: T): T {
 }
 
 function writeJson<T>(key: string, value: T): void {
-  localStorage.setItem(key, JSON.stringify(value))
+  writeLocal(key, JSON.stringify(value))
 }
 
 function asFiniteNumber(value: unknown, fallback: number): number {

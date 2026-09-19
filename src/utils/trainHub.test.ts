@@ -103,6 +103,32 @@ describe('deriveTodayHubCard — priorités CTA', () => {
     expect(card.title).toBe('Push en cours')
   })
 
+  it('1b. séance libre démarrée (routine encore vide) → Reprendre', () => {
+    const card = deriveTodayHubCard(
+      baseState({
+        routines: [
+          {
+            id: 'free-1',
+            label: 'Séance libre',
+            subtitle: '',
+            accent: '#f00',
+            exercises: [],
+            updatedAt: 10,
+          },
+        ],
+        activeWorkoutDraft: {
+          routineId: 'free-1',
+          sportId: 'musculation',
+          startedAt: 1,
+          updatedAt: 10,
+        },
+      }),
+      FIXED,
+    )
+    expect(card.cta).toBe('resume')
+    expect(card.summaryLine).toContain('Séance en cours')
+  })
+
   it('2. planifié démarrable → Démarrer', () => {
     const card = deriveTodayHubCard(
       baseState({

@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import {
   ChevronLeft,
   Crosshair,
+  Dumbbell,
   Pencil,
   Ruler,
   Scale,
   Shield,
-  Swords,
   Target,
   TrendingUp,
   UserRound,
@@ -57,7 +57,7 @@ function SectionTitle({
   title,
   subtitle,
 }: {
-  icon: typeof Swords
+  icon: typeof Dumbbell
   title: string
   subtitle?: string
 }) {
@@ -210,7 +210,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
         </button>
         <div className="min-w-0 flex-1">
           <h1 className="text-[20px] font-bold tracking-tight text-white">Mon profil</h1>
-          <p className="text-[13px] text-[#8E8E93]">Stats d&apos;arène & données corporelles</p>
+          <p className="text-[13px] text-[#AEAEB2]">Stats athlète & données corporelles</p>
         </div>
         <Shield className="h-5 w-5 shrink-0 text-[#636366]" strokeWidth={2} aria-hidden />
       </div>
@@ -252,7 +252,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
               </div>
               {user?.id ? (
                 <span
-                  className="absolute -bottom-0.5 -right-0.5 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-[#2C2C2E] text-white shadow-[0_4px_12px_rgb(0_0_0_/0.45)]"
+                  className="absolute -bottom-0.5 -right-0.5 flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/20 bg-[#2C2C2E] text-white shadow-[0_4px_12px_rgb(0_0_0_/0.45)]"
                   aria-hidden
                 >
                   <Pencil className="h-3.5 w-3.5" strokeWidth={2.5} />
@@ -283,11 +283,11 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
         </div>
       </section>
 
-      {/* Bilan de l'Arène */}
+      {/* Bilan athlète */}
       <section className="space-y-3">
         <SectionTitle
-          icon={Swords}
-          title="Bilan de l'Arène"
+          icon={Dumbbell}
+          title="Bilan athlète"
           subtitle={statsLoading ? 'Synchronisation Supabase…' : 'Calculé depuis tes séances enregistrées'}
         />
 

@@ -2,8 +2,13 @@ import { FunctionsHttpError } from '@supabase/supabase-js'
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 import { compressMealImage } from '../utils/compressMealImage'
 import { safeError } from '../utils/safeLog'
+import { isConvexDomainActive } from '../backend/adapter'
+import { api as generatedApi } from '../../convex/_generated/api'
+import { getConvex } from '../lib/convex'
+import { getConvexSessionToken } from './convexAuthService'
 
 export const AI_MEAL_DAILY_LIMIT = 5
+const api = generatedApi as any
 
 export type MealPhotoMacros = {
   calories: number
@@ -106,6 +111,29 @@ function friendlyInvokeMessage(error: unknown, payload: InvokePayload | null): s
 
 /** Lecture du compteur du jour (Europe/Paris côté SQL). */
 export async function getAiMealUsageToday(userId: string): Promise<AiUsageToday> {
+  if (isConvexDomainActive()) {
+    try {
+      const sessionToken = await getConvexSessionToken()
+      if (!sessionToken) {
+        return { scanCount: 0, dailyLimit: AI_MEAL_DAILY_LIMIT, scansRemaining: AI_MEAL_DAILY_LIMIT }
+      }
+      const row = (await getConvex().query(api.rpc.getAiMealUsageToday, {
+        sessionToken,
+      })) as { scan_count: number; daily_limit: number }
+      const scanCount = Number(row.scan_count ?? 0)
+      const dailyLimit = Number(row.daily_limit ?? AI_MEAL_DAILY_LIMIT)
+      return {
+        scanCount,
+        dailyLimit,
+        scansRemaining: Math.max(0, dailyLimit - scanCount),
+      }
+    } catch (error) {
+      safeError('[mealPhotoAi] convex usage', error)
+      return { scanCount: 0, dailyLimit: AI_MEAL_DAILY_LIMIT, scansRemaining: AI_MEAL_DAILY_LIMIT }
+    }
+  }
+
+  void userId
   if (!isSupabaseConfigured()) {
     return { scanCount: 0, dailyLimit: AI_MEAL_DAILY_LIMIT, scansRemaining: AI_MEAL_DAILY_LIMIT }
   }

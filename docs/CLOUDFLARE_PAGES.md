@@ -58,5 +58,5 @@ Secrets requis en local : `CLOUDFLARE_API_TOKEN` (+ `CLOUDFLARE_ACCOUNT_ID` si b
 |---------|------|
 | `wrangler.toml` | Config Pages (`pages_build_output_dir = "./dist"`) + Functions |
 | `functions/_middleware.ts` | Middleware Pages (Content-Type HTML) |
-| `public/_headers` | MIME types statiques |
+| `public/_headers` | MIME types + CSP / security headers (H6) |
 | `package.json` → `pages:deploy` | Commande correcte : `wrangler pages deploy dist` |

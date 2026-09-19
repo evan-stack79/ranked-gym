@@ -7,6 +7,7 @@ import { computeTibHours } from '../sleep-engine'
  */
 
 import { getActiveCloudUserId } from './cloudSession'
+import { readLocal, writeLocal } from './secureLocalStore'
 
 const LOG_BASE = 'ranked-gym:sleep-log'
 
@@ -37,7 +38,7 @@ function scopedKey(base: string): string {
 
 function readJson<T>(key: string, fallback: T): T {
   try {
-    const raw = localStorage.getItem(key)
+    const raw = readLocal(key)
     if (!raw) return fallback
     return JSON.parse(raw) as T
   } catch {
@@ -46,7 +47,7 @@ function readJson<T>(key: string, fallback: T): T {
 }
 
 function writeJson<T>(key: string, value: T): void {
-  localStorage.setItem(key, JSON.stringify(value))
+  writeLocal(key, JSON.stringify(value))
 }
 
 function notifySleepChanged(options?: SleepStorageSaveOptions) {

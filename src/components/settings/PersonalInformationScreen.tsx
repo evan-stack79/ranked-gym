@@ -140,7 +140,7 @@ export function PersonalInformationScreen({
             loading={avatarUploading}
             className="ring-2 ring-[#FF2B2B]/35"
           />
-          <span className="absolute -bottom-0.5 -right-0.5 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-[#2C2C2E] text-white shadow-[0_4px_12px_rgb(0_0_0_/0.45)]">
+          <span className="absolute -bottom-0.5 -right-0.5 flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/20 bg-[#2C2C2E] text-white shadow-[0_4px_12px_rgb(0_0_0_/0.45)]">
             {avatarUploading ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
             ) : (
@@ -262,7 +262,7 @@ export function PersonalInformationScreen({
           onClick={onOpenFullProfile}
           className="ios-press text-center text-[13px] font-medium text-[#8E8E93]"
         >
-          Voir mon profil complet (stats d’arène)
+          Voir mon profil complet (stats athlète)
         </button>
       ) : null}
     </div>

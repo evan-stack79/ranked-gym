@@ -49,7 +49,7 @@ export function friendlyAuthError(err: unknown, fallback: string): string {
   const raw = err instanceof Error ? err.message : String(err ?? '')
   const lower = raw.toLowerCase()
 
-  if (lower.includes('invalid login credentials')) {
+  if (lower.includes('invalid login credentials') || lower.includes('auth_invalid_credentials')) {
     return 'Email ou mot de passe incorrect.'
   }
   if (lower.includes('user already registered')) {
@@ -61,7 +61,12 @@ export function friendlyAuthError(err: unknown, fallback: string): string {
   if (lower.includes('same password') || lower.includes('different from the old')) {
     return 'Choisis un mot de passe différent de l’ancien.'
   }
-  if (lower.includes('email rate') || lower.includes('over_email_send_rate_limit')) {
+  if (
+    lower.includes('rate_limited') ||
+    lower.includes('rate limited') ||
+    lower.includes('email rate') ||
+    lower.includes('over_email_send_rate_limit')
+  ) {
     return 'Trop de tentatives. Réessaie dans quelques minutes.'
   }
   if (lower.includes('email')) {

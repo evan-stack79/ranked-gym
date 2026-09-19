@@ -31,7 +31,7 @@ function ringColor(remaining: number, total: number, idle: boolean): string {
   const ratio = total > 0 ? remaining / total : 0
   if (remaining <= 10) return '#FF453A'
   if (ratio <= 0.35) return '#FF9F0A'
-  return '#30D158'
+  return '#FF2B2B'
 }
 
 /**
@@ -175,7 +175,7 @@ export function RestTimerOverlay({
             className="ios-press flex min-h-11 w-full items-center justify-center gap-2 px-4 py-2.5"
             aria-expanded={expanded}
           >
-            <Timer className="h-4 w-4 text-[#30D158]" strokeWidth={2.25} />
+            <Timer className="h-4 w-4 text-[#FF2B2B]" strokeWidth={2.25} />
             <span className="text-[14px] font-semibold text-white">Repos</span>
             <ChevronUp
               className={`h-3.5 w-3.5 text-[#8E8E93] transition-transform ${expanded ? '' : 'rotate-180'}`}
@@ -193,7 +193,7 @@ export function RestTimerOverlay({
                     onPreset(sec)
                     setExpanded(false)
                   }}
-                  className="ios-press flex min-h-11 flex-1 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] px-2 text-[12px] font-semibold tabular-nums text-[#D1D1D6] active:border-[#30D158]/50 active:bg-[#30D158]/15 active:text-[#30D158]"
+                  className="ios-press flex min-h-11 flex-1 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] px-2 text-[12px] font-semibold tabular-nums text-[#D1D1D6] active:border-[#FF2B2B]/50 active:bg-[#FF2B2B]/15 active:text-[#FF2B2B]"
                 >
                   {sec}s
                 </button>
@@ -248,14 +248,12 @@ export function RestTimerOverlay({
                   strokeDashoffset={dashOffset}
                   style={{
                     transition: ringTransition,
-                    filter:
-                      !reduceMotion && running ? `drop-shadow(0 0 5px ${color}77)` : undefined,
                   }}
                 />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
                 {finished ? (
-                  <Check className="h-3 w-3 text-[#30D158]" strokeWidth={2.75} />
+                  <Check className="h-3 w-3 text-[#FF2B2B]" strokeWidth={2.75} />
                 ) : (
                   <span className="text-[8px] font-bold tabular-nums text-white">
                     {Math.ceil(progress * 100)}
@@ -266,7 +264,7 @@ export function RestTimerOverlay({
 
             <div className="min-w-0 flex-1">
               {finished ? (
-                <p className="text-[14px] font-bold tracking-tight text-[#30D158]">Repos OK</p>
+                <p className="text-[14px] font-bold tracking-tight text-[#FF2B2B]">Repos OK</p>
               ) : (
                 <p className="text-[17px] font-bold leading-none tracking-tight tabular-nums text-white">
                   {formatClock(remaining)}
@@ -300,7 +298,7 @@ export function RestTimerOverlay({
             <button
               type="button"
               onClick={onResume}
-              className="ios-press flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-[#30D158]/40 bg-[#30D158]/18 text-[#30D158]"
+              className="ios-press flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-[#FF2B2B]/40 bg-[#FF2B2B]/18 text-[#FF2B2B]"
               aria-label="Reprendre le repos"
             >
               <Play className="h-3.5 w-3.5" strokeWidth={2.5} />
@@ -322,7 +320,7 @@ export function RestTimerOverlay({
             <button
               type="button"
               onClick={onDismiss}
-              className="ios-press flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-[#30D158]/40 bg-[#30D158]/18 px-3 text-[11px] font-semibold text-[#30D158]"
+              className="ios-press flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-[#FF2B2B]/40 bg-[#FF2B2B]/18 px-3 text-[11px] font-semibold text-[#FF2B2B]"
             >
               OK
             </button>
@@ -343,8 +341,8 @@ export function RestTimerOverlay({
                   }}
                   className={`ios-press flex min-h-11 flex-1 items-center justify-center rounded-full border px-2 text-[12px] font-semibold tabular-nums transition-colors ${
                     active
-                      ? 'border-[#30D158]/50 bg-[#30D158]/22 text-[#30D158]'
-                      : 'border-white/10 bg-white/[0.04] text-[#D1D1D6] active:bg-[#30D158]/15 active:text-[#30D158]'
+                      ? 'border-[#FF2B2B]/50 bg-[#FF2B2B]/22 text-[#FF2B2B]'
+                      : 'border-white/10 bg-white/[0.04] text-[#D1D1D6] active:bg-[#FF2B2B]/15 active:text-[#FF2B2B]'
                   }`}
                 >
                   {sec}s

@@ -25,6 +25,7 @@ import {
   resumeDraftClock,
 } from '../utils/sessionClock'
 import { normalizePersistedRestTimer } from '../utils/restTimerPersist'
+import { readLocal, writeLocal } from './secureLocalStore'
 
 const KEY_BASE = 'ranked-gym:training'
 
@@ -145,6 +146,7 @@ const DEFAULT_STATE: TrainingState = {
   lastSelectedRoutineId: null,
   lastSelectedSportId: null,
   activeWorkoutDraft: null,
+  lastVoluntaryRoute: null,
 }
 
 function cloneExercises(exercises: ExerciseEntry[]): ExerciseEntry[] {
@@ -223,7 +225,20 @@ export function normalizeActiveWorkoutDraft(
     if (rest) draft.restTimer = rest
   }
 
+  if (
+    Number.isFinite(raw.activeExerciseIndex) &&
+    (raw.activeExerciseIndex as number) >= 0
+  ) {
+    draft.activeExerciseIndex = Math.floor(raw.activeExerciseIndex as number)
+  }
+
   return draft
+}
+
+function normalizeLastVoluntaryRoute(
+  value: unknown,
+): TrainingState['lastVoluntaryRoute'] {
+  return value === 'train-hub' ? 'train-hub' : null
 }
 
 function normalizeScheduleEntry<T extends Omit<ScheduledSession, 'id'> & { id?: string }>(
@@ -243,7 +258,7 @@ function normalizeScheduleEntry<T extends Omit<ScheduledSession, 'id'> & { id?: 
 
 function read(): TrainingState {
   try {
-    const raw = localStorage.getItem(storageKey())
+    const raw = readLocal(storageKey())
     if (!raw) {
       return {
         ...DEFAULT_STATE,
@@ -273,6 +288,7 @@ function read(): TrainingState {
       lastSelectedRoutineId: sanitizeStoredId(parsed.lastSelectedRoutineId),
       lastSelectedSportId: sanitizeStoredId(parsed.lastSelectedSportId),
       activeWorkoutDraft: normalizeActiveWorkoutDraft(parsed.activeWorkoutDraft, routines),
+      lastVoluntaryRoute: normalizeLastVoluntaryRoute(parsed.lastVoluntaryRoute),
     }
     if (merged.stepsDateKey !== todayKey()) {
       merged.stepsToday = 0
@@ -312,7 +328,7 @@ function emitTrainingPersistError(error: unknown): void {
 
 function write(state: TrainingState, opts?: StorageSaveOptions): void {
   try {
-    localStorage.setItem(storageKey(), JSON.stringify(state))
+    writeLocal(storageKey(), JSON.stringify(state))
   } catch (error) {
     emitTrainingPersistError(error)
     throw error
@@ -626,6 +642,7 @@ export function saveWorkoutNote(
     completed,
     routines,
     activeWorkoutDraft: completesActiveDraft ? null : state.activeWorkoutDraft ?? null,
+    lastVoluntaryRoute: completesActiveDraft ? null : state.lastVoluntaryRoute ?? null,
   }
   write(next)
   return next
@@ -683,6 +700,7 @@ export function saveRoutineDraft(
     runningSince: same ? prior?.runningSince ?? (prior?.paused ? null : now) : now,
     paused: same ? prior?.paused === true : false,
     restTimer: same ? prior?.restTimer ?? null : null,
+    activeExerciseIndex: same ? prior?.activeExerciseIndex : undefined,
   }
   const next = {
     ...state,
@@ -712,6 +730,7 @@ export function startRoutineDraft(
     ...state,
     lastSelectedRoutineId: cleanRoutineId,
     lastSelectedSportId: cleanSportId,
+    lastVoluntaryRoute: null,
     activeWorkoutDraft: ensureDraftClock({
       routineId: cleanRoutineId,
       sportId: cleanSportId,
@@ -721,6 +740,51 @@ export function startRoutineDraft(
       runningSince: same && prior?.paused ? null : now,
       paused: same ? prior?.paused === true : false,
       restTimer: same ? prior?.restTimer ?? null : null,
+      activeExerciseIndex: same ? prior?.activeExerciseIndex : 0,
+    }, now),
+  }
+  write(next)
+  return next
+}
+
+/**
+ * Démarre une séance libre (carnet vide OK).
+ * Ne dépend pas d’exercices déjà présents sur la routine.
+ */
+export function startFreeWorkoutSession(
+  sportId: string,
+  routineId?: string | null,
+): TrainingState {
+  const state = read()
+  const cleanSportId =
+    sanitizeStoredId(sportId) ??
+    sanitizeStoredId(state.lastSelectedSportId) ??
+    sanitizeStoredId(state.primarySportId) ??
+    'musculation'
+  const preferred = sanitizeStoredId(routineId)
+  const cleanRoutineId =
+    (preferred && state.routines.some((r) => r.id === preferred) ? preferred : null) ??
+    sanitizeStoredId(state.lastSelectedRoutineId) ??
+    state.routines[0]?.id ??
+    'upper'
+  const now = Date.now()
+  const prior = state.activeWorkoutDraft
+  const same = prior?.routineId === cleanRoutineId && prior?.sportId === cleanSportId
+  const next: TrainingState = {
+    ...state,
+    lastSelectedRoutineId: cleanRoutineId,
+    lastSelectedSportId: cleanSportId,
+    lastVoluntaryRoute: null,
+    activeWorkoutDraft: ensureDraftClock({
+      routineId: cleanRoutineId,
+      sportId: cleanSportId,
+      startedAt: same ? prior!.startedAt : now,
+      updatedAt: now,
+      elapsedActiveMs: same ? prior?.elapsedActiveMs : 0,
+      runningSince: same && prior?.paused ? null : now,
+      paused: same ? prior?.paused === true : false,
+      restTimer: same ? prior?.restTimer ?? null : null,
+      activeExerciseIndex: same ? prior?.activeExerciseIndex : 0,
     }, now),
   }
   write(next)
@@ -772,6 +836,46 @@ export function persistActiveRestTimer(
     activeWorkoutDraft: {
       ...draft,
       restTimer: restTimer ?? null,
+      updatedAt: Date.now(),
+    },
+  }
+  write(next)
+  return next
+}
+
+/**
+ * Soft-leave volontaire vers le hub Train.
+ * Conserve le brouillon / repos / clock — ne termine pas la séance.
+ */
+export function markVoluntaryLeaveToTrainHub(): TrainingState {
+  const state = read()
+  if (state.lastVoluntaryRoute === 'train-hub') return state
+  const next = { ...state, lastVoluntaryRoute: 'train-hub' as const }
+  write(next)
+  return next
+}
+
+/** Efface le flag soft-leave (Reprendre / démarrage / cold reopen). */
+export function clearLastVoluntaryRoute(): TrainingState {
+  const state = read()
+  if (state.lastVoluntaryRoute == null) return state
+  const next = { ...state, lastVoluntaryRoute: null }
+  write(next)
+  return next
+}
+
+/** Persiste l’exercice affiché sur l’écran immersif. */
+export function persistActiveExerciseIndex(index: number): TrainingState {
+  const state = read()
+  const draft = state.activeWorkoutDraft
+  if (!draft) return state
+  const safe = Math.max(0, Math.floor(index))
+  if (draft.activeExerciseIndex === safe) return state
+  const next = {
+    ...state,
+    activeWorkoutDraft: {
+      ...draft,
+      activeExerciseIndex: safe,
       updatedAt: Date.now(),
     },
   }

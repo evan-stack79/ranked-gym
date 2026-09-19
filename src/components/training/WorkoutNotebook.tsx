@@ -13,6 +13,8 @@ import type {
 import {
   resolveResumedRoutineId,
   setLastSelectedRoutine,
+  persistActiveExerciseIndex,
+  getTrainingState,
 } from '../../services/trainingStorage'
 import { computeStrengthSessionStats } from '../../utils/strength'
 import { sanitizeExerciseName } from '../../utils/exerciseName'
@@ -23,6 +25,12 @@ import {
 } from '../../utils/workoutHistory'
 import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
 import { WorkoutHistory } from './WorkoutHistory'
+import { ImmersiveExerciseSession } from './ImmersiveExerciseSession'
+import {
+  ExercisePicker,
+  type ExercisePickerMode,
+} from './ExercisePicker'
+import type { CatalogExercise } from '../../data/exerciseCatalog'
 
 interface WorkoutNotebookProps {
   id?: string
@@ -39,6 +47,11 @@ interface WorkoutNotebookProps {
   initialEditNote?: WorkoutNote | null
   /** Reprendre copie exactement la routine détectée ; ne réinjecte pas l'historique. */
   resume?: boolean
+  /**
+   * Séance libre : démarre sans exercices (sélecteur premier exo),
+   * même si la dernière routine a un brouillon.
+   */
+  startEmpty?: boolean
   onSave: (note: {
     id?: string
     title: string
@@ -50,8 +63,8 @@ interface WorkoutNotebookProps {
     createdAt?: number
     dateKey?: string
     sportId?: string
-    sessionKind?: SessionKind
     source?: SessionSource
+    sessionKind?: SessionKind
   }) => void | Promise<void>
   /** Autosave séries / exercices vers Supabase (routine draft). */
   onDraftSave?: (routineId: string, exercises: ExerciseEntry[]) => void
@@ -63,6 +76,7 @@ interface WorkoutNotebookProps {
     setIndex: number
     exerciseName: string
     setLabel: string
+    restSec?: number
   }) => void
   /** Applique restSec / done sur une série (callback parent). */
   restLogRequest?: {
@@ -78,6 +92,10 @@ interface WorkoutNotebookProps {
   onToggleSessionPause?: () => void
   /** Minutes chronométrées réelles — prioritaire à l’estimation à la sauvegarde. */
   sessionDurationMin?: number | null
+  /** Retour hub Train (écran immersif) — soft-leave, pas abandon. */
+  onBack?: () => void
+  /** Enregistre un flush immédiat du brouillon (soft-leave / système). */
+  onRegisterDraftFlush?: (flush: (() => void) | null) => void
 }
 
 /** Tags optionnels — n’influencent plus la charge suivante. */
@@ -99,8 +117,32 @@ function emptyExercise(): ExerciseEntry {
   }
 }
 
+function hasNamedExercise(exercises: ExerciseEntry[]): boolean {
+  return exercises.some(
+    (e) => Boolean(e.canonicalExerciseId) || Boolean(e.name?.trim()),
+  )
+}
+
+function entryFromCatalog(ex: CatalogExercise): ExerciseEntry {
+  return {
+    id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name: ex.name,
+    canonicalExerciseId: ex.id,
+    sets: [emptySet()],
+  }
+}
+
+function entryFromCustomName(name: string): ExerciseEntry {
+  return {
+    id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name: sanitizeExerciseName(name.trim()) || 'Exercice',
+    sets: [emptySet()],
+  }
+}
+
 function cloneFromRoutine(routine: WorkoutRoutine, history: WorkoutNote[] = []): ExerciseEntry[] {
-  if (!routine.exercises.length) return [emptyExercise()]
+  // Séance libre vide → pas de placeholder : le sélecteur s’affiche en live.
+  if (!routine.exercises.length) return []
   return routine.exercises.map((e) => {
     const last = findLastExerciseSets(history, e.name)
     // Préférer la dernière perf réelle : évite de réinjecter d’anciennes charges auto-progressées.
@@ -164,6 +206,7 @@ export function WorkoutNotebook({
   initialRoutineId,
   initialEditNote = null,
   resume = false,
+  startEmpty = false,
   sportId,
   sessionKind = 'strength',
   onSave,
@@ -176,6 +219,8 @@ export function WorkoutNotebook({
   sessionPaused = false,
   onToggleSessionPause,
   sessionDurationMin = null,
+  onBack,
+  onRegisterDraftFlush,
 }: WorkoutNotebookProps) {
   const bootRoutine = useMemo(
     () => (resume ? routines.find(r => r.id === initialRoutineId) : undefined) ??
@@ -189,13 +234,27 @@ export function WorkoutNotebook({
   const [title, setTitle] = useState(initialEditNote?.title ?? bootRoutine.label)
   const [exercises, setExercises] = useState<ExerciseEntry[]>(() =>
     initialEditNote ? copyExercises(initialEditNote.exercises)
-      : resume ? copyExercises(bootRoutine.exercises) : cloneFromRoutine(bootRoutine, history),
+      : resume ? copyExercises(bootRoutine.exercises)
+      : startEmpty ? []
+      : cloneFromRoutine(bootRoutine, history),
   )
   const [customOpen, setCustomOpen] = useState(false)
   const [customLabel, setCustomLabel] = useState('')
   const [saving, setSaving] = useState(false)
   const [editingNote, setEditingNote] = useState<WorkoutNote | null>(initialEditNote)
   const [effortHelpOpen, setEffortHelpOpen] = useState(false)
+  const [activeExerciseIndex, setActiveExerciseIndex] = useState(() => {
+    if (initialEditNote || !resume) return 0
+    try {
+      const stored = getTrainingState().activeWorkoutDraft?.activeExerciseIndex
+      return typeof stored === 'number' && stored >= 0 ? stored : 0
+    } catch {
+      return 0
+    }
+  })
+  const [restPrefSec, setRestPrefSec] = useState(90)
+  /** `null` = fermé ; `first` / `add` = sélecteur ouvert. */
+  const [pickerMode, setPickerMode] = useState<ExercisePickerMode | null>(null)
   const beforeEdit = useRef({
     routineId: bootRoutine.id,
     title: bootRoutine.label,
@@ -316,11 +375,41 @@ export function WorkoutNotebook({
     }
     document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('pagehide', flushDraft)
+    onRegisterDraftFlush?.(flushDraft)
     return () => {
+      // Soft-leave / unmount : ne pas perdre le debounce en cours.
+      flushDraft()
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('pagehide', flushDraft)
+      onRegisterDraftFlush?.(null)
     }
-  }, [onDraftSave])
+  }, [onDraftSave, onRegisterDraftFlush])
+
+  const handleActiveIndexChange = (index: number) => {
+    setActiveExerciseIndex(index)
+    if (!editingNote) {
+      try {
+        persistActiveExerciseIndex(index)
+      } catch {
+        // persist error déjà émis par trainingStorage
+      }
+    }
+  }
+
+  const handleSoftBack = () => {
+    if (!draftBlocked.current && draftDirty.current && onDraftSave) {
+      onDraftSave(routineIdRef.current, exercisesRef.current)
+      draftDirty.current = false
+    }
+    if (!editingNote) {
+      try {
+        persistActiveExerciseIndex(activeExerciseIndex)
+      } catch {
+        // ignore
+      }
+    }
+    onBack?.()
+  }
 
   const updateExercise = (exerciseId: string, patch: Partial<ExerciseEntry>) => {
     draftDirty.current = true
@@ -340,7 +429,12 @@ export function WorkoutNotebook({
     )
   }
 
-  const finishSet = (ex: ExerciseEntry, setIndex: number, difficulty?: SetDifficulty) => {
+  const finishSet = (
+    ex: ExerciseEntry,
+    setIndex: number,
+    difficulty?: SetDifficulty,
+    restSec = 90,
+  ) => {
     draftDirty.current = true
     setExercises((prev) => {
       const next = prev.map((e) => {
@@ -361,7 +455,41 @@ export function WorkoutNotebook({
       setIndex,
       exerciseName: ex.name.trim() || 'Exercice',
       setLabel: `S${setIndex + 1}`,
+      restSec,
     })
+  }
+
+  /** Séance live chronométrée → canvas immersif (édition historique reste en carnet classique). */
+  const immersiveLive = Boolean(sessionClockLabel) && !editingNote
+  const needsFirstPicker = immersiveLive && !hasNamedExercise(exercises)
+  const showPicker = pickerMode != null || needsFirstPicker
+  const resolvedPickerMode: ExercisePickerMode =
+    pickerMode ?? (needsFirstPicker ? 'first' : 'add')
+
+  useEffect(() => {
+    if (!immersiveLive || exercises.length === 0) return
+    setActiveExerciseIndex((i) => Math.min(i, exercises.length - 1))
+  }, [exercises.length, immersiveLive])
+
+  // Au démarrage immersif : focus sur le premier exercice avec série en cours.
+  useEffect(() => {
+    if (!immersiveLive) return
+    const idx = exercises.findIndex((e) => e.sets.some((s) => !s.done))
+    if (idx >= 0) setActiveExerciseIndex(idx)
+    // Montage immersif uniquement
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [immersiveLive])
+
+  const commitPickedExercise = (entry: ExerciseEntry) => {
+    draftDirty.current = true
+    const base = hasNamedExercise(exercises) ? exercises : []
+    const next = [...base, entry]
+    const nextIndex = next.length - 1
+    setExercises(next)
+    setActiveExerciseIndex(nextIndex)
+    if (!draftBlocked.current) onDraftSave?.(routineId, next)
+    draftDirty.current = false
+    setPickerMode(null)
   }
 
   const loadNoteForEdit = (note: WorkoutNote) => {
@@ -437,6 +565,49 @@ export function WorkoutNotebook({
   }
 
   const hasSaved = (activeRoutine?.exercises.length ?? 0) > 0
+
+  if (immersiveLive && showPicker) {
+    return (
+      <ExercisePicker
+        mode={resolvedPickerMode}
+        onBack={() => {
+          if (needsFirstPicker) {
+            handleSoftBack()
+            return
+          }
+          setPickerMode(null)
+        }}
+        onSelect={(ex) => commitPickedExercise(entryFromCatalog(ex))}
+        onCreateCustom={(name) => commitPickedExercise(entryFromCustomName(name))}
+      />
+    )
+  }
+
+  if (immersiveLive) {
+    return (
+      <ImmersiveExerciseSession
+        exercises={exercises}
+        activeIndex={activeExerciseIndex}
+        onActiveIndexChange={handleActiveIndexChange}
+        sessionClockLabel={sessionClockLabel!}
+        sessionPaused={sessionPaused}
+        onToggleSessionPause={onToggleSessionPause}
+        onBack={handleSoftBack}
+        onUpdateSet={updateSet}
+        onAddSet={(exerciseId) => {
+          const ex = exercises.find((e) => e.id === exerciseId)
+          if (!ex) return
+          updateExercise(exerciseId, { sets: [...ex.sets, emptySet()] })
+        }}
+        onAddExercise={() => setPickerMode('add')}
+        onValidateSet={(ex, setIndex, restSec) => finishSet(ex, setIndex, undefined, restSec)}
+        onFinishSession={() => void handleSave()}
+        saving={saving}
+        restPrefSec={restPrefSec}
+        onRestPrefChange={setRestPrefSec}
+      />
+    )
+  }
 
   return (
     <section id={id} className="space-y-3">
@@ -807,7 +978,9 @@ export function WorkoutNotebook({
             type="button"
             onClick={() => {
               draftDirty.current = true
-              setExercises((prev) => [...prev, emptyExercise()])
+              setExercises((prev) =>
+                prev.length === 0 ? [emptyExercise()] : [...prev, emptyExercise()],
+              )
             }}
             className="ios-press flex flex-1 items-center justify-center gap-1 rounded-2xl border border-white/10 bg-black/30 py-3 text-[13px] font-semibold text-[#AEAEB2]"
           >

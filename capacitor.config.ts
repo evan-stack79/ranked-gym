@@ -11,6 +11,9 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     androidScheme: 'https',
+    // Do not allow the WebView to navigate to arbitrary third-party origins.
+    // Deep links / auth returns stay on the app origin or system browser.
+    allowNavigation: [],
   },
   ios: {
     contentInset: 'automatic',
@@ -20,6 +23,7 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: false,
+    // MASVS: backup disabled in AndroidManifest (allowBackup=false + extraction rules).
   },
 }
 

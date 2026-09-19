@@ -11,6 +11,9 @@ import {
 import type { Session } from '@supabase/supabase-js'
 import type { ProfileRow } from '../types/database'
 import { getSupabaseConfigError, isSupabaseConfigured, getSupabase } from '../lib/supabase'
+import { getConvexConfigError } from '../lib/convex'
+import { getActiveAuthBackend } from '../backend/authFeatureFlag'
+import { isConvexDomainActive } from '../backend/adapter'
 import {
   ensureProfile,
   fetchProfile,
@@ -22,6 +25,7 @@ import {
   updateProfileProgress,
   type AuthUser,
 } from '../services/authService'
+import { getCurrentSessionUser as getConvexSessionUser } from '../services/convexAuthService'
 import {
   friendlyAuthError,
   isAccountEnumerationError,
@@ -137,6 +141,10 @@ function metaDisciplineOf(user: { user_metadata?: Record<string, unknown> }): st
   return typeof user.user_metadata?.discipline === 'string'
     ? user.user_metadata.discipline
     : undefined
+}
+
+function isConvexAuthRuntime(): boolean {
+  return getActiveAuthBackend() === 'convex'
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -285,6 +293,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
+    if (isConvexAuthRuntime()) {
+      let cancelled = false
+      setIsLoading(true)
+      void getConvexSessionUser()
+        .then((existing) => {
+          if (cancelled) return
+          if (existing) {
+            setUser(existing)
+            void hydrateUser(existing)
+            return
+          }
+          setIsLoading(false)
+        })
+        .catch((error) => {
+          safeError('[auth] convex getCurrentSessionUser failed', error)
+          if (!cancelled) setIsLoading(false)
+        })
+
+      return () => {
+        cancelled = true
+      }
+    }
+
     if (!isSupabaseConfigured()) {
       setIsLoading(false)
       return
@@ -360,14 +391,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const openAuth = useCallback((onSuccess?: AuthSuccessCallback) => {
-    setAuthError(getSupabaseConfigError())
+    setAuthError(isConvexAuthRuntime() ? getConvexConfigError() : getSupabaseConfigError())
     pendingRef.current = onSuccess ?? null
     setIsAuthOpen(true)
   }, [])
 
   const closeAuth = useCallback(() => {
-    // Bêta privée : pas de fermeture tant qu’il n’y a pas de session Supabase.
-    if (!session?.user) return
+    // Bêta privée : pas de fermeture tant qu’il n’y a pas de session active.
+    if (!user) return
     // Recovery : il faut enregistrer le nouveau mot de passe.
     if (isPasswordRecovery) return
     setIsAuthOpen(false)
@@ -375,36 +406,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthInfo(null)
     pendingRef.current = null
     setAuthLoading(false)
-  }, [session, isPasswordRecovery])
+  }, [user, isPasswordRecovery])
 
   const requireAuth = useCallback(
     (onSuccess: AuthSuccessCallback) => {
-      if (session?.user) {
+      if (user) {
         onSuccess()
         return
       }
       openAuth(onSuccess)
     },
-    [session, openAuth],
+    [user, openAuth],
   )
 
   const signInWithEmail = useCallback(
     async (email: string, password: string) => {
-      if (!isSupabaseConfigured()) {
+      if (!isConvexAuthRuntime() && !isSupabaseConfigured()) {
         setAuthError(getSupabaseConfigError())
         return
       }
       setAuthLoading(true)
       setAuthError(null)
       try {
-        await apiSignInWithEmail(email, password)
+        const signedIn = await apiSignInWithEmail(email, password)
+        if (isConvexAuthRuntime()) {
+          const candidate = (signedIn as { user?: AuthUser } | undefined)?.user
+          const sessionUser = candidate ?? (await getConvexSessionUser())
+          if (!sessionUser) {
+            throw new Error('AUTH_SESSION_MISSING')
+          }
+          void hydrateUser(sessionUser)
+        }
         completePending()
       } catch (err) {
         setAuthError(friendlyAuthError(err, 'Connexion impossible.'))
         setAuthLoading(false)
       }
     },
-    [completePending],
+    [completePending, hydrateUser],
   )
 
   /** Inscriptions publiques désactivées (bêta fermée / invitation uniquement). */
@@ -424,7 +463,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const requestPasswordReset = useCallback(async (email: string) => {
-    if (!isSupabaseConfigured()) {
+    if (!isConvexAuthRuntime() && !isSupabaseConfigured()) {
       setAuthError(getSupabaseConfigError())
       return
     }
@@ -448,7 +487,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const confirmPasswordRecovery = useCallback(
     async (password: string, confirmPassword: string) => {
-      if (!isSupabaseConfigured()) {
+      if (!isConvexAuthRuntime() && !isSupabaseConfigured()) {
         setAuthError(getSupabaseConfigError())
         return
       }
@@ -481,7 +520,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateDiscipline = useCallback(
     async (disciplineLabel: string) => {
       syncLocalDiscipline(disciplineLabel)
-      if (!user || !isSupabaseConfigured()) return
+      if (!user || (!isConvexDomainActive() && !isSupabaseConfigured())) return
       try {
         const row = await updateProfileProgress(user.id, { discipline: disciplineLabel })
         setProfile(row)
@@ -496,7 +535,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (enabled: boolean) => {
       setLocalGhostModeEnabled(enabled)
       patchProfile({ is_ghost_mode_enabled: enabled })
-      if (!user || !isSupabaseConfigured()) return
+      if (!user || (!isConvexDomainActive() && !isSupabaseConfigured())) return
       try {
         const row = await updateProfileProgress(user.id, { is_ghost_mode_enabled: enabled })
         setProfile(row)
@@ -513,7 +552,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const signOut = useCallback(async () => {
-    if (isSupabaseConfigured()) {
+    if (isConvexAuthRuntime() || isSupabaseConfigured()) {
       await apiSignOut()
     }
     hydrateGenRef.current += 1
@@ -551,7 +590,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       profile,
-      isAuthenticated: Boolean(session?.user),
+      isAuthenticated: Boolean(user),
       isLoading,
       isAuthOpen,
       authLoading,

@@ -30,6 +30,9 @@ dist-ssr
 # Supabase CLI cache (local)
 supabase/.temp/
 
+# Convex CLI local backend / cache (never commit)
+.convex/
+
 # Build
 dist
 dist-ssr
@@ -54,4 +57,45 @@ ios/DerivedData
 .agent-runs/
 
 # Captures navigateur locales (preuves — jamais versionnées)
-scripts/screenshots/
+# Ignore le contenu, pas le dossier, pour pouvoir ré-inclure des preuves ciblées.
+scripts/screenshots/**
+!scripts/screenshots/workout-immersive/
+!scripts/screenshots/workout-immersive/DIAGNOSTIC.md
+!scripts/screenshots/workout-immersive/real-developper-iphone-390.png
+!scripts/screenshots/workout-immersive/real-developper-android-360.png
+!scripts/screenshots/workout-immersive/real-developper-diag.json
+!scripts/screenshots/workout-immersive/canonical-bench-iphone-390.png
+!scripts/screenshots/workout-immersive/canonical-bench-android-360.png
+!scripts/screenshots/workout-immersive/canonical-bench-diag.json
+!scripts/screenshots/workout-immersive/prod-preview-canonical-bench-390.png
+!scripts/screenshots/workout-immersive/prod-hero-diag.json
+!scripts/screenshots/workout-immersive/load-real-developper.webm
+!scripts/screenshots/workout-immersive/load-canonical-bench-refresh.webm
+!scripts/screenshots/exercise-picker/
+!scripts/screenshots/exercise-picker/VALIDATION.md
+!scripts/screenshots/exercise-picker/picker-before-query-390.png
+!scripts/screenshots/exercise-picker/picker-search-developpe-390.png
+!scripts/screenshots/exercise-picker/picker-search-focused-390.png
+!scripts/screenshots/exercise-picker/immersive-after-select-390.png
+!scripts/screenshots/exercise-picker/picker_select_to_immersive_demo.mp4
+!scripts/screenshots/nutrition-ux/
+!scripts/screenshots/nutrition-ux/nutrition-390x844.png
+# Exception: preuves scroll marque (header en flux)
+!scripts/screenshots/brand-scroll/
+!scripts/screenshots/brand-scroll/nutrition_brand_scroll_A_top_brand_visible.png
+!scripts/screenshots/brand-scroll/nutrition_brand_scroll_B_scrolled_brand_gone.png
+!scripts/screenshots/brand-scroll/nutrition_brand_scroll_C_back_top_brand_visible.png
+!scripts/screenshots/brand-scroll/accueil_brand_scroll_A_top_brand_visible.png
+!scripts/screenshots/brand-scroll/accueil_brand_scroll_B_scrolled_brand_gone.png
+!scripts/screenshots/brand-scroll/accueil_brand_scroll_C_back_top_brand_visible.png
+# Exception: preuves soft-leave séance immersive → Train Reprendre
+!scripts/screenshots/session-soft-leave/
+!scripts/screenshots/session-soft-leave/CAUSE.md
+!scripts/screenshots/session-soft-leave/soft_leave_01_hub_reprendre.png
+!scripts/screenshots/session-soft-leave/soft_leave_02_session_edited.png
+!scripts/screenshots/session-soft-leave/soft_leave_03_hub_after_back.png
+!scripts/screenshots/session-soft-leave/soft_leave_04_restored.png
+!scripts/screenshots/session-soft-leave/soft_leave_session_back_to_reprendre.mp4
+
+# Migration artifacts can contain sensitive export metadata.
+scripts/migrations/artifacts/
