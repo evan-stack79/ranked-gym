@@ -20,8 +20,8 @@ describe('exerciseMedia', () => {
     expect(media.imageSrc).toBeTruthy()
     expect(media.imageSrc).toMatch(/developpe-couche/i)
     expect(media.imageAlt).toMatch(/développé couché/i)
-    expect(media.muscles).toEqual(['Pectoraux', 'Triceps'])
-    expect(formatExerciseMuscles(media.muscles)).toBe('Pectoraux · Triceps')
+    expect(media.muscles).toEqual(['Pectoraux', 'Triceps', 'Épaules'])
+    expect(formatExerciseMuscles(media.muscles)).toBe('Pectoraux · Triceps · Épaules')
   })
 
   it('résout via canonicalExerciseId prioritaire sur le titre libre', () => {
@@ -31,7 +31,7 @@ describe('exerciseMedia', () => {
     })
     expect(media.canonicalExerciseId).toBe('bench_press')
     expect(media.imageSrc).toBeTruthy()
-    expect(media.muscles).toEqual(['Pectoraux', 'Triceps'])
+    expect(media.muscles).toEqual(['Pectoraux', 'Triceps', 'Épaules'])
   })
 
   it('alias bench → même asset', () => {
@@ -49,15 +49,16 @@ describe('exerciseMedia', () => {
   })
 
   it('fallback sobre si exercice inconnu', () => {
-    const media = resolveExerciseMedia('Soulevé de terre')
-    expect(media.slug).toBe('souleve-de-terre')
+    const media = resolveExerciseMedia('Super mouvement inventé XYZ')
+    expect(media.slug).toBe('super-mouvement-invente-xyz')
     expect(media.imageSrc).toBeNull()
     expect(media.muscles).toEqual([])
   })
 
-  it('leg_press réservé → pas d’asset encore', () => {
+  it('leg_press catalogue → muscles réels, pas d’asset encore', () => {
     const media = resolveExerciseMedia({ canonicalExerciseId: 'leg_press' })
     expect(media.canonicalExerciseId).toBe('leg_press')
     expect(media.imageSrc).toBeNull()
+    expect(media.muscles).toEqual(['Quadriceps', 'Fessiers'])
   })
 })

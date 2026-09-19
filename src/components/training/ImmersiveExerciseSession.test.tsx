@@ -134,6 +134,6 @@ describe('ImmersiveExerciseSession', () => {
     expect(photo!.getAttribute('alt')).toMatch(/développé couché/i)
     // Titre reste celui de la séance — pas de rename arbitraire
     expect(host.textContent).toContain('DÉVELOPPER')
-    expect(host.textContent).toContain('Pectoraux · Triceps')
+    expect(host.textContent).toContain('Pectoraux · Triceps · Épaules')
   })
 })

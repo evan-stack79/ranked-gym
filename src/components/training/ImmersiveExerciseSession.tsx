@@ -19,6 +19,8 @@ export interface ImmersiveExerciseSessionProps {
   onBack: () => void
   onUpdateSet: (exerciseId: string, setIndex: number, patch: Partial<WorkoutSet>) => void
   onAddSet: (exerciseId: string) => void
+  /** Ouvre le sélecteur pour ajouter un exercice à la suite. */
+  onAddExercise?: () => void
   onValidateSet: (exercise: ExerciseEntry, setIndex: number, restSec: number) => void
   onFinishSession: () => void
   saving?: boolean
@@ -56,6 +58,7 @@ export function ImmersiveExerciseSession({
   onBack,
   onUpdateSet,
   onAddSet,
+  onAddExercise,
   onValidateSet,
   onFinishSession,
   saving = false,
@@ -441,6 +444,17 @@ export function ImmersiveExerciseSession({
                   </button>
                 )
               })}
+              {onAddExercise ? (
+                <button
+                  type="button"
+                  onClick={onAddExercise}
+                  className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 text-[#AEAEB2]"
+                  aria-label="Ajouter un exercice"
+                  data-add-exercise
+                >
+                  <Plus className="h-4 w-4" strokeWidth={2.5} />
+                </button>
+              ) : null}
             </div>
           </div>
         </div>

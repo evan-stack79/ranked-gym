@@ -11,6 +11,7 @@ import {
   saveWorkoutNote,
   saveRoutineDraft,
   startRoutineDraft,
+  startFreeWorkoutSession,
   setActiveWorkoutPaused,
   ensureActiveWorkoutClock,
   addCustomRoutine,
@@ -475,12 +476,19 @@ export function TrainingView({
       applySport(todayCard.sportId)
       if (todayCard.openTarget === 'notebook') {
         const id = launchableRoutineId(todayCard)
-        if (!id) {
-          showToast('Routine indisponible')
-          return
+        if (id) {
+          const withRoutine = startRoutineDraft(id, todayCard.sportId)
+          // Routine vide → séance libre (sélecteur premier exo).
+          if (!withRoutine.activeWorkoutDraft) {
+            setState(startFreeWorkoutSession(todayCard.sportId, id))
+          } else {
+            setState(withRoutine)
+          }
+          openNotebook(id)
+        } else {
+          setState(startFreeWorkoutSession(todayCard.sportId))
+          openNotebook(null)
         }
-        setState(startRoutineDraft(id, todayCard.sportId))
-        openNotebook(id)
       } else if (todayCard.openTarget === 'endurance') {
         setPanel('endurance')
       } else {
@@ -492,7 +500,8 @@ export function TrainingView({
       // Cible dérivée de la séance planifiée — pas du sport global courant.
       if (todayCard.openTarget === 'notebook') {
         applyDiscipline('musculation')
-        setPanel('notebook')
+        setState(startFreeWorkoutSession('musculation'))
+        openNotebook(null)
       } else {
         setActivityOpen(true)
       }
@@ -504,6 +513,7 @@ export function TrainingView({
   const handleQuickActivity = (id: QuickActivityId) => {
     if (id === 'musculation') {
       applyDiscipline('musculation')
+      setState(startFreeWorkoutSession('musculation'))
       openNotebook(null)
       return
     }
@@ -612,6 +622,9 @@ export function TrainingView({
                   onClick={() => {
                     if (item.id === 'notebook') {
                       if (!showStrengthTools) applyDiscipline('musculation')
+                      if (!state.activeWorkoutDraft) {
+                        setState(startFreeWorkoutSession(activeSportId || 'musculation'))
+                      }
                       openNotebook(null)
                       return
                     }
@@ -791,6 +804,7 @@ export function TrainingView({
 
           const kind = trainSessionKindForSport(s.id)
           if (kind === 'strength') {
+            setState(startFreeWorkoutSession(s.id))
             openNotebook(null)
           } else if (kind === 'endurance') {
             setPanel('endurance')

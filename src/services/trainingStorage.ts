@@ -728,6 +728,48 @@ export function startRoutineDraft(
   return next
 }
 
+/**
+ * Démarre une séance libre (carnet vide OK).
+ * Ne dépend pas d’exercices déjà présents sur la routine.
+ */
+export function startFreeWorkoutSession(
+  sportId: string,
+  routineId?: string | null,
+): TrainingState {
+  const state = read()
+  const cleanSportId =
+    sanitizeStoredId(sportId) ??
+    sanitizeStoredId(state.lastSelectedSportId) ??
+    sanitizeStoredId(state.primarySportId) ??
+    'musculation'
+  const preferred = sanitizeStoredId(routineId)
+  const cleanRoutineId =
+    (preferred && state.routines.some((r) => r.id === preferred) ? preferred : null) ??
+    sanitizeStoredId(state.lastSelectedRoutineId) ??
+    state.routines[0]?.id ??
+    'upper'
+  const now = Date.now()
+  const prior = state.activeWorkoutDraft
+  const same = prior?.routineId === cleanRoutineId && prior?.sportId === cleanSportId
+  const next: TrainingState = {
+    ...state,
+    lastSelectedRoutineId: cleanRoutineId,
+    lastSelectedSportId: cleanSportId,
+    activeWorkoutDraft: ensureDraftClock({
+      routineId: cleanRoutineId,
+      sportId: cleanSportId,
+      startedAt: same ? prior!.startedAt : now,
+      updatedAt: now,
+      elapsedActiveMs: same ? prior?.elapsedActiveMs : 0,
+      runningSince: same && prior?.paused ? null : now,
+      paused: same ? prior?.paused === true : false,
+      restTimer: same ? prior?.restTimer ?? null : null,
+    }, now),
+  }
+  write(next)
+  return next
+}
+
 /** Pause / reprise du chronomètre de séance active (même clé Train). */
 export function setActiveWorkoutPaused(paused: boolean): TrainingState {
   const state = read()
