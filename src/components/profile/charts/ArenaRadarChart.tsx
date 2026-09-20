@@ -56,7 +56,7 @@ export function ArenaRadarChart({
   if (loading) {
     return (
       <div className={`flex min-h-[260px] items-center justify-center ${className}`}>
-        <div className="avatar-spinner h-8 w-8 rounded-full border-2 border-white/20 border-t-[#FF2B2B]" aria-label="Chargement du radar" />
+        <div className="avatar-spinner h-8 w-8 rounded-full border-2 border-white/20 border-t-[#FF2B2B]" aria-hidden />
       </div>
     )
   }
