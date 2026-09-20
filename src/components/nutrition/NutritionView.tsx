@@ -7,6 +7,7 @@ import {
 } from '../../services/nutritionStorage'
 import { useAuth } from '../../context/AuthContext'
 import type { CalorieProfile } from '../../types/nutrition'
+import { HomeBootSkeleton } from '../ui/AppBootScreen'
 
 export function NutritionView() {
   const { isLoading: isBootLoading } = useAuth()
@@ -45,7 +46,7 @@ export function NutritionView() {
     [handleProfileChange],
   )
 
-  if (isBootLoading) return null
+  if (isBootLoading) return <HomeBootSkeleton />
 
   if (showSetupEditor) {
     return (

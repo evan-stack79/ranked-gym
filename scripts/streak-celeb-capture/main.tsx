@@ -73,6 +73,8 @@ function CaptureApp() {
       profile: { current_streak: 7, last_login_date: '2026-08-30' } as never,
       isAuthenticated: true,
       isLoading: false,
+      bootIssue: null,
+      retryHydrate: async () => undefined,
       isAuthOpen: false,
       authLoading: false,
       authError: null,

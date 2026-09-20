@@ -396,9 +396,9 @@ export function TrainingView({
     const onRestored = () => setState(getTrainingState())
     const onBackupError = (ev: Event) => {
       const detail = (ev as CustomEvent<{ error?: string }>).detail
-      const msg = detail?.error || 'Échec sauvegarde Supabase'
+      const msg = detail?.error || 'Sauvegarde impossible'
       safeError('[Train] backup error', msg)
-      showToast(`Cloud : ${msg}`)
+      showToast('Sauvegarde cloud impossible. Tes données locales sont conservées.')
     }
     const onPersistError = (ev: Event) => {
       const detail = (ev as CustomEvent<{ error?: string }>).detail
@@ -444,7 +444,7 @@ export function TrainingView({
       if (!isAuthenticated) {
         const local = saveWorkoutNote(note)
         setState(local)
-        showToast(`${note.title} sauvé en local — connecte-toi pour Supabase`)
+        showToast(`${note.title} sauvé en local — connecte-toi pour sauvegarder`)
         if (isNewSession) openPumpCheck(note)
         requireAuth(() => undefined)
         return

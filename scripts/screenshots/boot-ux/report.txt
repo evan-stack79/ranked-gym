@@ -1,0 +1,6 @@
+splash: no technical copy
+after splash: no technical copy
+offline: Hors ligne banner visible
+slow network: no technical copy
+refresh: no technical copy
+video: /opt/cursor/artifacts/boot_ux_launch.webm

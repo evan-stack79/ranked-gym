@@ -4,7 +4,10 @@ import { RestTimerProvider } from './context/RestTimerContext'
 import { AuthBottomSheet } from './components/auth/AuthBottomSheet'
 import { AppLayout } from './components/layout/AppLayout'
 import { AppBootScreen } from './components/ui/AppBootScreen'
+import { BootIssueScreen, RecoverableRetryBar } from './components/ui/BootIssueScreen'
+import { OfflineBanner } from './components/ui/OfflineBanner'
 import { SupabaseConfigBanner } from './components/ui/SupabaseConfigBanner'
+import { useOnlineStatus } from './hooks/useOnlineStatus'
 import { GlobalOnboardingScreen } from './components/onboarding/GlobalOnboardingScreen'
 import { HomeView } from './components/home/HomeView'
 import { TrainingView } from './components/training/TrainingView'
@@ -117,7 +120,8 @@ function AppShell() {
   const [phase, setPhase] = useState<AppPhase>('loading')
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [launchRoutineId, setLaunchRoutineId] = useState<string | null>(null)
-  const { openAuth, isAuthenticated, isLoading, isAuthOpen } = useAuth()
+  const { openAuth, isAuthenticated, isLoading, isAuthOpen, bootIssue, retryHydrate } = useAuth()
+  const online = useOnlineStatus()
 
   useEffect(() => {
     if (isLoading) {
@@ -213,6 +217,7 @@ function AppShell() {
     return (
       <>
         <SupabaseConfigBanner />
+        {!online ? <OfflineBanner /> : null}
         <SessionChrome showBrandHeader={false}>
           <AppBootScreen />
         </SessionChrome>
@@ -225,7 +230,21 @@ function AppShell() {
     return (
       <>
         <SupabaseConfigBanner />
+        {!online ? <OfflineBanner /> : null}
         <AuthGateShell />
+        <AuthBottomSheet />
+      </>
+    )
+  }
+
+  if (bootIssue === 'blocking') {
+    return (
+      <>
+        <SupabaseConfigBanner />
+        {!online ? <OfflineBanner /> : null}
+        <SessionChrome showBrandHeader={false}>
+          <BootIssueScreen kind="blocking" onRetry={() => void retryHydrate()} />
+        </SessionChrome>
         <AuthBottomSheet />
       </>
     )
@@ -235,6 +254,7 @@ function AppShell() {
     return (
       <>
         <SupabaseConfigBanner />
+        {!online ? <OfflineBanner /> : null}
         <GlobalOnboardingScreen onComplete={handleOnboardingComplete} />
         <AuthBottomSheet />
       </>
@@ -244,7 +264,11 @@ function AppShell() {
   return (
     <>
       <SupabaseConfigBanner />
+      {!online ? <OfflineBanner /> : null}
       <AppLayout activeTab={activeTab} onTabChange={handleTabChange}>
+        {bootIssue === 'recoverable' ? (
+          <RecoverableRetryBar onRetry={() => void retryHydrate()} />
+        ) : null}
         {renderActiveView(
           activeTab,
           handleStartTraining,
