@@ -1,0 +1,102 @@
+/**
+ * Inventaire figé des opérations au lancement.
+ * Toute récupération listée ici DOIT continuer à tourner (mêmes appels, même ordre).
+ * Ce module ne déclenche rien : il documente et sert de preuve anti-régression.
+ */
+export const LAUNCH_OPERATIONS = [
+  {
+    id: 'secure-auth-storage',
+    label: 'Restauration session (stockage auth chiffré)',
+    files: ['src/main.tsx', 'src/services/secureAuthStorage.ts'],
+    symbols: ['initSecureAuthStorage'],
+  },
+  {
+    id: 'secure-local-store',
+    label: 'Restauration données locales chiffrées',
+    files: ['src/main.tsx', 'src/services/secureLocalStore.ts'],
+    symbols: ['initSecureLocalStore'],
+  },
+  {
+    id: 'session-restore',
+    label: 'Restauration de session (Convex ou getSession)',
+    files: ['src/context/AuthContext.tsx'],
+    symbols: ['getConvexSessionUser', 'getSession'],
+  },
+  {
+    id: 'user-profile',
+    label: 'Profil utilisateur (ensure + fetch)',
+    files: ['src/context/AuthContext.tsx', 'src/services/authService.ts'],
+    symbols: ['ensureProfile', 'fetchProfile'],
+  },
+  {
+    id: 'discipline-settings',
+    label: 'Objectifs / discipline / sport principal',
+    files: ['src/context/AuthContext.tsx'],
+    symbols: ['syncLocalDiscipline', 'setPrimarySport'],
+  },
+  {
+    id: 'streak-subscription',
+    label: 'Série quotidienne / droits de streak',
+    files: ['src/context/AuthContext.tsx', 'src/services/streakService.ts'],
+    symbols: ['applyDailyLoginStreak'],
+  },
+  {
+    id: 'cloud-hydrate',
+    label: 'Réconciliation distante (nutrition, train, sommeil, lobby, progression)',
+    files: ['src/context/AuthContext.tsx', 'src/services/cloudBackup.ts'],
+    symbols: ['hydrateCloudBackupForUser', 'pullCloudBackup', 'fetchRemotePayload'],
+  },
+  {
+    id: 'nutrition-local',
+    label: 'Nutrition / hydratation locales',
+    files: ['src/services/nutritionStorage.ts'],
+    symbols: ['getCalorieProfile', 'getMealJournal'],
+  },
+  {
+    id: 'training-local',
+    label: 'Entraînements / séance active',
+    files: ['src/services/trainingStorage.ts'],
+    symbols: ['getTrainingState', 'ensureActiveWorkoutClock'],
+  },
+  {
+    id: 'sleep-recovery',
+    label: 'Récupération / sommeil',
+    files: ['src/services/sleepStorage.ts'],
+    symbols: ['getSleepLog'],
+  },
+  {
+    id: 'profile-progress',
+    label: 'Progression / XP locaux',
+    files: ['src/services/profileStorage.ts'],
+    symbols: ['getProfileProgress'],
+  },
+  {
+    id: 'lobby-checkin',
+    label: 'Check-in / spots locaux',
+    files: ['src/services/lobbyStorage.ts'],
+    symbols: ['getActiveCheckIn', 'getCustomGyms'],
+  },
+  {
+    id: 'cloud-collect-local',
+    label: 'Collecte locale pour réconciliation cloud',
+    files: ['src/services/cloudBackup.ts'],
+    symbols: [
+      'getCalorieProfile',
+      'getMealJournal',
+      'getTrainingState',
+      'getSleepLog',
+      'getProfileProgress',
+      'getActiveCheckIn',
+      'getCustomGyms',
+      'collectLocalBackup',
+    ],
+  },
+  {
+    id: 'background-revalidate',
+    label: 'Retour premier plan (streak + flush cloud)',
+    files: ['src/context/AuthContext.tsx', 'src/services/cloudBackup.ts'],
+    symbols: ['visibilitychange', 'flushCloudPush'],
+  },
+] as const
+
+export type LaunchOperationId = (typeof LAUNCH_OPERATIONS)[number]['id']

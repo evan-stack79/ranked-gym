@@ -345,6 +345,8 @@ function CaptureApp() {
       },
       isAuthenticated: false,
       isLoading: false,
+      bootIssue: null,
+      retryHydrate: async () => undefined,
       isAuthOpen: false,
       authLoading: false,
       authError: null,

@@ -45,6 +45,7 @@ import {
 } from './MealPhotoAnalyzer'
 import { AddFoodScreen } from './AddFoodScreen'
 import { IosSheet } from '../ui/IosSheet'
+import { SectionSkeleton } from '../ui/AppBootScreen'
 
 interface NutritionDashboardProps {
   profile: CalorieProfile
@@ -333,7 +334,15 @@ export function NutritionDashboard({
     }
   }
 
-  if (!hydrated) return null
+  if (!hydrated) {
+    return (
+      <div className="flex flex-col gap-4 pt-2">
+        <SectionSkeleton tall label="Nutrition" />
+        <SectionSkeleton label="Hydratation" />
+        <SectionSkeleton label="Repas" />
+      </div>
+    )
+  }
 
   return (
     <div className="relative isolate -mx-5 -mt-8 min-h-[70vh] overflow-hidden pb-2">

@@ -40,7 +40,7 @@ export function CloudBackupCard() {
           <div className="min-w-0 flex-1">
             <p className="text-[16px] font-semibold text-white">Sauvegarde auto</p>
             <p className="mt-1 text-[13px] leading-snug text-[#8E8E93]">
-              Connecte-toi : nutrition, train, profil et check-ins sont stockés dans Supabase.
+              Connecte-toi pour sauvegarder nutrition, entraînements et profil.
               Même si le lien de l’app change, ta progression revient au login.
             </p>
             <button
@@ -73,14 +73,16 @@ export function CloudBackupCard() {
           <p className="text-[16px] font-semibold text-white">Sauvegarde auto</p>
           <p className="mt-1 text-[13px] leading-snug text-[#8E8E93]">
             {saving
-              ? 'Enregistrement cloud en cours…'
-              : `Données dans Supabase (workouts, nutrition, profil). Dernière sync : ${formatWhen(meta.lastPushAt)}.`}
+              ? 'Sauvegarde en cours…'
+              : `Sauvegarde active. Dernière mise à jour : ${formatWhen(meta.lastPushAt)}.`}
           </p>
           {meta.lastError ? (
-            <p className="mt-2 text-[12px] leading-snug text-[#FF453A]">{meta.lastError}</p>
+            <p className="mt-2 text-[12px] leading-snug text-[#FF453A]">
+              Sauvegarde momentanément indisponible. Tes données locales sont conservées.
+            </p>
           ) : (
             <p className="mt-2 text-[12px] font-medium text-[#30D158]">
-              Sync auto — survit aux changements d’URL.
+              Sauvegarde automatique activée.
             </p>
           )}
         </div>

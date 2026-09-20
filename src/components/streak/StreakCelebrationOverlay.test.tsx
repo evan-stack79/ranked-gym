@@ -66,6 +66,8 @@ function buildMinimalAuthValue(
     profile: null,
     isAuthenticated: true,
     isLoading: false,
+    bootIssue: null,
+    retryHydrate: vi.fn(),
     isAuthOpen: false,
     authLoading: false,
     authError: null,

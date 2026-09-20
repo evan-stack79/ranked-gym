@@ -288,7 +288,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
         <SectionTitle
           icon={Dumbbell}
           title="Bilan athlète"
-          subtitle={statsLoading ? 'Synchronisation Supabase…' : 'Calculé depuis tes séances enregistrées'}
+          subtitle={statsLoading ? undefined : 'Calculé depuis tes séances enregistrées'}
         />
 
         <div className="glass-card rounded-2xl p-4">

@@ -61,7 +61,7 @@ export function PowerCurveChart({
   if (loading) {
     return (
       <div className={`flex min-h-[148px] items-center justify-center ${className}`}>
-        <div className="avatar-spinner h-8 w-8 rounded-full border-2 border-white/20 border-t-[#FF2B2B]" aria-label="Chargement de la courbe" />
+        <div className="avatar-spinner h-8 w-8 rounded-full border-2 border-white/20 border-t-[#FF2B2B]" aria-hidden />
       </div>
     )
   }
