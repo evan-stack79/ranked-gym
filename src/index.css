@@ -375,6 +375,35 @@ body {
   outline-offset: 2px;
 }
 
+/* Historique — lignes compactes, rouge seulement press / selected / focus */
+.history-page {
+  background: #070708;
+}
+
+.history-row {
+  border-bottom: 1px solid #161618;
+  background: transparent;
+}
+
+.history-row:last-child {
+  border-bottom: 1px solid #161618;
+}
+
+.history-row:active,
+.history-row.history-row--active,
+.history-row:focus-visible {
+  background: rgb(255 43 43 / 0.12);
+}
+
+.history-row:focus-visible {
+  outline: 2px solid #ff2b2b;
+  outline-offset: -2px;
+}
+
+.history-thumb {
+  background: transparent;
+}
+
 @keyframes ios-fade-up {
   from {
     opacity: 0;

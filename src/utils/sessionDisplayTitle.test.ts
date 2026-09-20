@@ -3,6 +3,7 @@ import type { ExerciseEntry, WorkoutNote } from '../types/training'
 import {
   deriveSessionDisplayTitle,
   deriveSessionTitleFromExercises,
+  formatHistoryExerciseSummary,
   isUnprovenBicepsBugTitle,
   namedSessionExercises,
   resolveExerciseDisplayName,
@@ -109,6 +110,18 @@ describe('deriveSessionDisplayTitle — nom perso + legacy Biceps', () => {
     ).toBe('Push du soir')
   })
 
+  it('legacy titre exact « Push » (label routine) → nom de l’exo, affichage only', () => {
+    expect(
+      deriveSessionDisplayTitle({
+        exercises: [squat],
+        title: 'Push',
+        sessionKind: 'strength',
+      }),
+    ).toBe('Squat')
+    expect(isUnprovenBicepsBugTitle('Push', undefined)).toBe(true)
+    expect(isUnprovenBicepsBugTitle('Push du soir', undefined)).toBe(false)
+  })
+
   it('titleSource user + Biceps → conservé (nom volontaire prouvé)', () => {
     expect(
       deriveSessionDisplayTitle({
@@ -130,6 +143,23 @@ describe('deriveSessionDisplayTitle — nom perso + legacy Biceps', () => {
         sessionKind: 'endurance',
       }),
     ).toBe('Course 5 km')
+  })
+
+  it('résumé d’exercices : omis s’il duplique le titre, listé sinon', () => {
+    expect(formatHistoryExerciseSummary({ exercises: [squat], title: 'Biceps' })).toBeNull()
+    expect(
+      formatHistoryExerciseSummary({
+        exercises: [squat, bench],
+        title: 'Biceps',
+      }),
+    ).toBe('Squat · Développé couché')
+    expect(
+      formatHistoryExerciseSummary({
+        exercises: [bench],
+        title: 'Push du soir',
+        titleSource: 'user',
+      }),
+    ).toBe('Développé couché')
   })
 })
 

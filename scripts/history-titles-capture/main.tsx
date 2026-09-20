@@ -96,7 +96,7 @@ const notes: WorkoutNote[] = [
 function Harness() {
   return (
     <div
-      className="min-h-[100dvh] bg-black px-4 py-6 text-white"
+      className="min-h-[100dvh] bg-[#070708] px-4 py-6 text-white"
       data-harness-ready
       data-history-titles
     >

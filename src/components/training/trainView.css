@@ -3,6 +3,15 @@
   background: #0b0b0d;
 }
 
+.mesh-bg:has(.train-view--history) {
+  background: #070708;
+}
+
+.mesh-bg:has(.train-view--history) [data-app-brand-header] {
+  background: #070708;
+  border-color: #161618;
+}
+
 .mesh-bg:has(.train-view) > .pointer-events-none[aria-hidden="true"] {
   display: none;
 }

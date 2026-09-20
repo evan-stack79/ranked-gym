@@ -17,6 +17,27 @@ export const EMPTY_SESSION_TITLE = 'Séance'
  */
 export const UNPROVEN_INHERITED_TITLE = 'Biceps'
 
+/**
+ * Labels de routine / split / groupe musculaire — jamais un titre de séance
+ * par défaut. Heuristique d’affichage seulement (notes legacy sans
+ * `titleSource: 'user'`). Ne réécrit pas le stockage.
+ * Ensemble exact, pas de fuzzy.
+ */
+const UNPROVEN_INHERITED_TITLES = new Set([
+  UNPROVEN_INHERITED_TITLE,
+  'Push',
+  'Pull',
+  'Upper',
+  'Lower',
+  'Legs',
+  'Jambes',
+  'Pecs',
+  'Dos',
+  'Épaules',
+  'Bras',
+  'Full body',
+])
+
 export type SessionTitleInput = {
   exercises?: ExerciseEntry[] | null
   title?: string | null
@@ -85,19 +106,19 @@ export function isStrengthTitleScope(input: {
  *
  * Un nom est **volontaire prouvé** ssi `titleSource === 'user'` et titre non vide.
  * - `titleSource === 'derived'` : déjà calculé à la persistance → on affiche le stocké
- *   (sauf « Biceps », qui n’est jamais un dérivé légitime de catégorie).
- * - Legacy (`titleSource` absent) + titre stocké exactement « Biceps » → origine
- *   non prouvée (héritage `routine.label` / dernier focus) → dériver depuis les
- *   exercices réellement enregistrés.
- * - Legacy + tout autre titre (ex. « Push du soir », « Push ») → conserver :
- *   on ne peut pas prouver que ce n’était pas un nom volontaire.
+ *   (sauf un label de groupe / split, qui n’est jamais un dérivé légitime).
+ * - Legacy (`titleSource` absent) + titre stocké exactement « Biceps » / « Push »
+ *   / autre label de routine connu → origine non prouvée (héritage
+ *   `routine.label`) → dériver depuis les exercices réellement enregistrés.
+ * - Legacy + tout autre titre (ex. « Push du soir ») → conserver : on ne peut
+ *   pas prouver que ce n’était pas un nom volontaire.
  */
 export function isUnprovenBicepsBugTitle(
   title: string | null | undefined,
   titleSource?: SessionTitleSource | null,
 ): boolean {
   if (titleSource === 'user') return false
-  return (title ?? '').trim() === UNPROVEN_INHERITED_TITLE
+  return UNPROVEN_INHERITED_TITLES.has((title ?? '').trim())
 }
 
 /** Source unique d’affichage (historique, hub, pump check). */
@@ -153,4 +174,18 @@ export function resolvePersistedSessionTitle(
     title: deriveSessionTitleFromExercises(input.exercises),
     titleSource: 'derived',
   }
+}
+
+/**
+ * Résumé d’exercices pour la ligne historique.
+ * Omis s’il duplique le titre (1 seul exo). Vide → null.
+ */
+export function formatHistoryExerciseSummary(input: SessionTitleInput): string | null {
+  const names = namedSessionExercises(input.exercises)
+    .map((exercise) => resolveExerciseDisplayName(exercise))
+    .filter(Boolean)
+  if (names.length === 0) return null
+  const title = deriveSessionDisplayTitle(input)
+  if (names.length === 1 && names[0] === title) return null
+  return names.join(' · ')
 }

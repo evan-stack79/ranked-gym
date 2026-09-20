@@ -188,4 +188,166 @@ describe('WorkoutHistory — métriques multisport réelles', () => {
     })
     expect(text).toContain('Push du soir')
   })
+
+  it('lignes compactes : pas de tuile rouge, pas d’orange kcal, illu wave1', async () => {
+    await act(async () => {
+      root.render(
+        <WorkoutHistory
+          notes={[
+            {
+              id: 'squat-line',
+              title: 'Biceps',
+              dateKey: '2026-09-04',
+              createdAt: Date.parse('2026-09-04T15:00:00Z'),
+              estimatedKcal: 210,
+              durationMin: 20,
+              totalVolumeKg: 500,
+              sessionKind: 'strength',
+              exercises: [
+                {
+                  id: 'sq',
+                  name: 'Squat',
+                  canonicalExerciseId: 'back_squat',
+                  sets: [{ reps: 5, weightKg: 100 }],
+                },
+              ],
+            },
+            {
+              id: 'custom-line',
+              title: 'Perso',
+              titleSource: 'user',
+              dateKey: '2026-09-04',
+              createdAt: Date.parse('2026-09-04T14:00:00Z'),
+              estimatedKcal: 0,
+              durationMin: 0,
+              totalVolumeKg: 0,
+              sessionKind: 'strength',
+              exercises: [
+                {
+                  id: 'custom',
+                  name: 'Mon exo perso',
+                  sets: [{ reps: 8, weightKg: 0 }],
+                },
+              ],
+            },
+            {
+              id: 'multi-line',
+              title: 'Biceps',
+              dateKey: '2026-09-04',
+              createdAt: Date.parse('2026-09-04T13:00:00Z'),
+              estimatedKcal: 300,
+              durationMin: 40,
+              totalVolumeKg: 980,
+              sessionKind: 'strength',
+              exercises: [
+                {
+                  id: 'sq',
+                  name: 'Squat',
+                  canonicalExerciseId: 'back_squat',
+                  sets: [{ reps: 5, weightKg: 100 }],
+                },
+                {
+                  id: 'dc',
+                  name: 'Développé couché',
+                  canonicalExerciseId: 'bench_press',
+                  sets: [{ reps: 8, weightKg: 60 }],
+                },
+              ],
+            },
+          ]}
+          onDelete={vi.fn()}
+        />,
+      )
+    })
+
+    const squatRow = host.querySelector('[data-history-row="squat-line"]')
+    expect(squatRow).toBeTruthy()
+    expect(squatRow?.querySelector('[data-history-thumb-state="canonical"]')).toBeTruthy()
+    expect(squatRow?.querySelector('img')?.getAttribute('src')).toMatch(/back-squat/i)
+    expect(squatRow?.textContent).toContain('Squat')
+    expect(squatRow?.textContent).not.toMatch(/\bBiceps\b/)
+    expect(squatRow?.textContent).toContain('210 kcal')
+    expect(squatRow?.innerHTML).not.toContain('FF9F0A')
+    expect(squatRow?.className).not.toMatch(/glass-card/)
+    expect(host.querySelector('[class*="FF2B2B"]')).toBeNull()
+
+    const customRow = host.querySelector('[data-history-row="custom-line"]')
+    expect(customRow?.querySelector('[data-history-thumb-state="fallback"]')).toBeTruthy()
+    expect(customRow?.querySelector('img')).toBeNull()
+    expect(customRow?.textContent).not.toContain('kcal')
+    expect(customRow?.textContent).not.toContain(' kg')
+
+    const multiRow = host.querySelector('[data-history-row="multi-line"]')
+    expect(multiRow?.querySelector('[data-history-thumb-state="multi"]')).toBeTruthy()
+    expect(multiRow?.textContent).toContain('Séance musculation')
+    expect(multiRow?.textContent).toContain('Squat · Développé couché')
+  })
+
+  it('chaque ligne ouvre la séance correspondante', async () => {
+    const squat: WorkoutNote = {
+      id: 'open-squat',
+      title: 'Biceps',
+      dateKey: '2026-09-04',
+      createdAt: Date.parse('2026-09-04T15:00:00Z'),
+      estimatedKcal: 210,
+      durationMin: 20,
+      totalVolumeKg: 500,
+      sessionKind: 'strength',
+      exercises: [
+        {
+          id: 'sq',
+          name: 'Squat',
+          canonicalExerciseId: 'back_squat',
+          sets: [{ reps: 5, weightKg: 100 }],
+        },
+      ],
+    }
+    const bench: WorkoutNote = {
+      id: 'open-bench',
+      title: 'Biceps',
+      dateKey: '2026-09-04',
+      createdAt: Date.parse('2026-09-04T14:00:00Z'),
+      estimatedKcal: 180,
+      durationMin: 18,
+      totalVolumeKg: 480,
+      sessionKind: 'strength',
+      exercises: [
+        {
+          id: 'dc',
+          name: 'Développé couché',
+          canonicalExerciseId: 'bench_press',
+          sets: [{ reps: 8, weightKg: 60 }],
+        },
+      ],
+    }
+    await act(async () => {
+      root.render(<WorkoutHistory notes={[squat, bench]} onDelete={vi.fn()} />)
+    })
+    const squatBtn = host.querySelector('[data-history-row="open-squat"]') as HTMLButtonElement
+    await act(async () => {
+      squatBtn.click()
+    })
+    expect(host.querySelector('[data-history-detail="open-squat"]')).toBeTruthy()
+    expect(host.querySelector('[data-history-detail="open-bench"]')).toBeNull()
+    expect(document.body.textContent).toContain('Squat')
+    expect(document.body.textContent).not.toMatch(/\bBiceps\b/)
+
+    const benchBtn = host.querySelector('[data-history-row="open-bench"]') as HTMLButtonElement
+    await act(async () => {
+      benchBtn.click()
+    })
+    expect(host.querySelector('[data-history-detail="open-bench"]')).toBeTruthy()
+    expect(host.querySelector('[data-history-detail="open-squat"]')).toBeNull()
+    expect(document.body.textContent).toContain('Développé couché')
+  })
+
+  it('état vide simple, sans carte déco', async () => {
+    await act(async () => {
+      root.render(<WorkoutHistory notes={[]} onDelete={vi.fn()} />)
+    })
+    expect(host.querySelector('[data-history-page="empty"]')).toBeTruthy()
+    expect(host.textContent).toContain('Historique')
+    expect(host.textContent).toMatch(/Aucune séance/)
+    expect(host.querySelector('.glass-card')).toBeNull()
+  })
 })

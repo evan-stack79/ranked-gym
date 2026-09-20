@@ -654,7 +654,9 @@ export function TrainingView({
 
   return (
     <div
-      className={`train-view flex flex-col ${immersiveLiveSession ? 'gap-0' : 'gap-6'}`}
+      className={`train-view flex flex-col ${
+        immersiveLiveSession ? 'gap-0' : panel === 'history' ? 'gap-2' : 'gap-6'
+      }${panel === 'history' ? ' train-view--history' : ''}`}
       style={{
         paddingBottom: immersiveLiveSession ? 0 : 8,
       }}
@@ -683,7 +685,9 @@ export function TrainingView({
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
-          <h1 className="text-[22px] font-bold tracking-tight text-white">{panelTitle[panel]}</h1>
+          {panel !== 'history' ? (
+            <h1 className="text-[22px] font-bold tracking-tight text-white">{panelTitle[panel]}</h1>
+          ) : null}
         </header>
       )}
 

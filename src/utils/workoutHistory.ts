@@ -100,6 +100,19 @@ export function formatClock(createdAt: number): string {
   })
 }
 
+/** Ligne secondaire volume · durée · kcal — omet les absents / 0. */
+export function formatHistoryMetricsLine(metrics: {
+  volume: number | null
+  duration: number | null
+  kcal: number | null
+}): string {
+  const parts: string[] = []
+  if (metrics.volume != null) parts.push(`${metrics.volume.toLocaleString('fr-FR')} kg`)
+  if (metrics.duration != null) parts.push(`${metrics.duration} min`)
+  if (metrics.kcal != null) parts.push(`${metrics.kcal} kcal`)
+  return parts.join(' · ')
+}
+
 export const DIFF_LABELS: Record<string, string> = {
   easy: 'Facile',
   ok: 'OK',
