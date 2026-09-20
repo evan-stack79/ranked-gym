@@ -78,6 +78,11 @@ scripts/screenshots/**
 !scripts/screenshots/exercise-picker/picker-search-focused-390.png
 !scripts/screenshots/exercise-picker/immersive-after-select-390.png
 !scripts/screenshots/exercise-picker/picker_select_to_immersive_demo.mp4
+!scripts/screenshots/exercise-picker/picker_wave1_thumbs_default.png
+!scripts/screenshots/exercise-picker/picker_wave1_search_developpe.png
+!scripts/screenshots/exercise-picker/picker_search_fallback.png
+!scripts/screenshots/exercise-picker/immersive_after_select.png
+!scripts/screenshots/exercise-picker/immersive_incline_no_wave1_hero.png
 !scripts/screenshots/nutrition-ux/
 !scripts/screenshots/nutrition-ux/nutrition-390x844.png
 # Exception: preuves scroll marque (header en flux)
