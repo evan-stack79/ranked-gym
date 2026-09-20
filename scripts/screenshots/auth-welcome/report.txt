@@ -1,0 +1,51 @@
+Auth welcome proofs (prod preview after `npm run build`)
+origin=http://127.0.0.1:4188 mode=preview
+branch=bot/auth-welcome-redesign base=28c32cfdd8451767614ec95714ff8036013ed1cd
+
+Logo
+- Official calm D96 (mouth closed, crowned) = src/assets/brand/panther-calm-crowned.png
+- Real alpha: 56.4% transparent, corners a=0, 0 visible green pixels
+- Overlay assets: public/auth-welcome-logo.webp + .png (alpha, green=0 after despill)
+- Texture WITHOUT logo: public/auth-welcome-fabric.webp + .avif
+- Cutouts: logo-cutout-black.png, logo-cutout-white.png
+
+Session restore path
+1. Boot splash / AppColdLaunch (silent brand, no “Chargement” / “Récupération des données”)
+2. AuthProvider restores session:
+   - Convex: token + getSession. Valid user → cache + hydrate, never mount WelcomeScreen
+   - Expired (remote null, no network error) → clear token/cache → WelcomeScreen
+   - Network/service error + local token → keep local session (cache or placeholder), skip welcome
+   - No token → WelcomeScreen
+   - Supabase: getSession() local persist (already offline-capable)
+3. isLoading → AppBootScreen silent. !isAuthenticated → WelcomeScreen. isAuthenticated → app/onboarding
+
+Verify
+1 disconnected — PASS welcome-iphone-dynamic-island-393.png (prod preview /)
+2 already logged in — PASS logged-in-skips-welcome-393.png + mp4 (fixture session valide)
+3 expired session — PASS unit decideAuthRestore (token + remote null → disconnected)
+4 slow restore — PASS AppBootScreen silent (no tech copy) + fixture restoreMs
+5 offline with local session — PASS unit decideAuthRestore local-cache / local-token
+6 Se connecter — PASS welcome-login-sheet-393.png + disconnected-boot-open-sheet.mp4
+7 dismiss sheet — PASS welcome-after-dismiss-393.png
+8 bad credentials — PASS compact error welcome-bad-credentials-393.png + unit mapping
+9 service down — PASS unit friendlyAuthError(AUTH_SERVICE_UNAVAILABLE) → « Service indisponible… » ; not used as catch-all
+10 forgot password — PASS welcome-forgot-password-393.png
+11 Dynamic Island iPhone — PASS 393×852 + --app-safe-area-top 59px
+12 small iPhone — PASS welcome-iphone-se-320.png
+13 narrow Android — PASS welcome-android-narrow-360.png
+14 orientation/safe areas — PASS welcome-landscape-844x390.png
+15 local prod build — PASS npm run build + vite preview captures
+16 full page refresh — PASS goto / disconnected shows welcome (preview)
+17 no green fringe — PASS master + overlay green=0, black/white cutouts
+18 Cloudflare/Linux-style build — PASS dist/auth-welcome-logo.png|webp hasAlpha, green=0, copied as-is
+
+Tests
+- npm test: 62 files, 489 passed
+- npm run lint: oxlint warnings only (pre-existing + AuthBottomSheet setState-in-effect)
+- npm run build: tsc + vite green
+
+Remaining limits
+- Legal pages are first-class in-app routes (none existed). Copy is a short beta placeholder, not a lawyer-reviewed policy.
+- Offline/expired/service-down Convex round-trips were not exercised against a live deployment in this environment.
+- Login sheet still uses the existing IosSheet backdrop blur (validated sheet, not the welcome canvas).
+- Disconnected/logged-in videos use prefers-reduced-motion to keep them short.
