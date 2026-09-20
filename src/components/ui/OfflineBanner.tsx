@@ -4,7 +4,7 @@ import { USER_OFFLINE_LABEL } from '../../boot/bootUiCopy'
 export function OfflineBanner() {
   return (
     <div
-      className="pointer-events-none fixed left-1/2 top-[max(0.75rem,env(safe-area-inset-top))] z-[60] -translate-x-1/2"
+      className="pointer-events-none fixed left-1/2 top-[max(0.75rem,env(safe-area-inset-top))] z-[110] -translate-x-1/2"
       role="status"
       aria-live="polite"
       data-offline-banner="1"

@@ -40,7 +40,8 @@ import {
   resetCloudBackupHydration,
   setCloudBackupUserId,
 } from '../services/cloudBackup'
-import { classifyHydrateFailure, hasUsableLocalCache, type BootIssueKind } from '../boot/bootStatus'
+import { classifyHydrateFailure, type BootIssueKind } from '../boot/bootStatus'
+import { hasUsableLocalCache } from '../boot/localCache'
 import { USER_BACKEND_UNAVAILABLE } from '../boot/bootUiCopy'
 import {
   applyDailyLoginStreak,

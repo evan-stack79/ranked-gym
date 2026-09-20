@@ -7,13 +7,25 @@ export const LAUNCH_OPERATIONS = [
   {
     id: 'secure-auth-storage',
     label: 'Restauration session (stockage auth chiffré)',
-    files: ['src/main.tsx', 'src/services/secureAuthStorage.ts'],
+    files: ['src/main.tsx'],
+    symbols: ['initSecureAuthStorage'],
+  },
+  {
+    id: 'secure-auth-storage-impl',
+    label: 'Implémentation stockage auth',
+    files: ['src/services/secureAuthStorage.ts'],
     symbols: ['initSecureAuthStorage'],
   },
   {
     id: 'secure-local-store',
     label: 'Restauration données locales chiffrées',
-    files: ['src/main.tsx', 'src/services/secureLocalStore.ts'],
+    files: ['src/main.tsx'],
+    symbols: ['initSecureLocalStore'],
+  },
+  {
+    id: 'secure-local-store-impl',
+    label: 'Implémentation store local',
+    files: ['src/services/secureLocalStore.ts'],
     symbols: ['initSecureLocalStore'],
   },
   {
@@ -25,7 +37,13 @@ export const LAUNCH_OPERATIONS = [
   {
     id: 'user-profile',
     label: 'Profil utilisateur (ensure + fetch)',
-    files: ['src/context/AuthContext.tsx', 'src/services/authService.ts'],
+    files: ['src/context/AuthContext.tsx'],
+    symbols: ['ensureProfile', 'fetchProfile'],
+  },
+  {
+    id: 'user-profile-service',
+    label: 'Service profil (ensure + fetch)',
+    files: ['src/services/authService.ts'],
     symbols: ['ensureProfile', 'fetchProfile'],
   },
   {
@@ -37,14 +55,26 @@ export const LAUNCH_OPERATIONS = [
   {
     id: 'streak-subscription',
     label: 'Série quotidienne / droits de streak',
-    files: ['src/context/AuthContext.tsx', 'src/services/streakService.ts'],
+    files: ['src/context/AuthContext.tsx'],
+    symbols: ['applyDailyLoginStreak'],
+  },
+  {
+    id: 'streak-service',
+    label: 'Service streak',
+    files: ['src/services/streakService.ts'],
     symbols: ['applyDailyLoginStreak'],
   },
   {
     id: 'cloud-hydrate',
     label: 'Réconciliation distante (nutrition, train, sommeil, lobby, progression)',
-    files: ['src/context/AuthContext.tsx', 'src/services/cloudBackup.ts'],
+    files: ['src/services/cloudBackup.ts'],
     symbols: ['hydrateCloudBackupForUser', 'pullCloudBackup', 'fetchRemotePayload'],
+  },
+  {
+    id: 'cloud-hydrate-callsite',
+    label: 'Appel hydrate au login',
+    files: ['src/context/AuthContext.tsx'],
+    symbols: ['hydrateCloudBackupForUser'],
   },
   {
     id: 'nutrition-local',
@@ -92,9 +122,15 @@ export const LAUNCH_OPERATIONS = [
     ],
   },
   {
-    id: 'background-revalidate',
-    label: 'Retour premier plan (streak + flush cloud)',
-    files: ['src/context/AuthContext.tsx', 'src/services/cloudBackup.ts'],
+    id: 'background-streak',
+    label: 'Retour premier plan — streak',
+    files: ['src/context/AuthContext.tsx'],
+    symbols: ['visibilitychange', 'applyDailyLoginStreak'],
+  },
+  {
+    id: 'background-cloud-flush',
+    label: 'Retour premier plan — flush cloud',
+    files: ['src/services/cloudBackup.ts'],
     symbols: ['visibilitychange', 'flushCloudPush'],
   },
 ] as const
