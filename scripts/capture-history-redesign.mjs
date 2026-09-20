@@ -2,7 +2,7 @@
 /**
  * Captures page Historique redesigned: iPhone 390 + Android 360, scroll + détail.
  */
-import { mkdir, copyFile, readdir } from 'node:fs/promises'
+import { mkdir, copyFile, readdir, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
@@ -163,6 +163,11 @@ async function main() {
 
     const videoDir = join(outDir, 'video-scroll-detail')
     await mkdir(videoDir, { recursive: true })
+    for (const stale of await readdir(videoDir)) {
+      if (stale.endsWith('.webm')) {
+        await unlink(join(videoDir, stale))
+      }
+    }
     const videoCtx = await browser.newContext({
       viewport: { width: 390, height: 844 },
       deviceScaleFactor: 2,
@@ -171,15 +176,16 @@ async function main() {
       recordVideo: { dir: videoDir, size: { width: 390, height: 844 } },
     })
     const videoPage = await videoCtx.newPage()
-    await videoPage.emulateMedia({ reducedMotion: 'reduce' })
     await videoPage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'networkidle' })
     await assertList(videoPage)
-    await videoPage.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
-    await videoPage.waitForTimeout(400)
-    await videoPage.evaluate(() => window.scrollTo(0, 0))
-    await videoPage.waitForTimeout(250)
+    await videoPage.waitForTimeout(600)
+    await videoPage.evaluate(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }))
+    await videoPage.waitForTimeout(900)
+    await videoPage.evaluate(() => window.scrollTo({ top: 0, behavior: 'smooth' }))
+    await videoPage.waitForTimeout(700)
     await videoPage.locator('[data-history-row="n-squat"]').click()
     await videoPage.waitForSelector('[data-history-detail="n-squat"]')
+    await videoPage.waitForTimeout(900)
     const detailText = await videoPage.locator('[data-history-detail="n-squat"]').innerText()
     if (!detailText.includes('Squat')) throw new Error('Opened detail is not Squat')
     if (/\bBiceps\b/.test(detailText)) throw new Error('Biceps in Squat detail')
@@ -188,11 +194,14 @@ async function main() {
     await copyFile(detailShot, join(artifactsDir, 'history_detail_squat_390x844.png'))
     await videoCtx.close()
 
-    const videos = (await readdir(videoDir)).filter((f) => f.endsWith('.webm'))
-    if (videos[0]) {
-      const src = join(videoDir, videos[0])
-      await copyFile(src, join(outDir, 'history_scroll_open_detail.webm'))
-      await copyFile(src, join(artifactsDir, 'history_scroll_open_detail.webm'))
+    const videos = (await readdir(videoDir))
+      .filter((f) => f.endsWith('.webm'))
+      .map((f) => join(videoDir, f))
+    videos.sort()
+    const newest = videos.at(-1)
+    if (newest) {
+      await copyFile(newest, join(outDir, 'history_scroll_open_detail.webm'))
+      await copyFile(newest, join(artifactsDir, 'history_scroll_open_detail.webm'))
     }
 
     console.log('history redesign captures OK')

@@ -324,20 +324,22 @@ describe('WorkoutHistory — métriques multisport réelles', () => {
       root.render(<WorkoutHistory notes={[squat, bench]} onDelete={vi.fn()} />)
     })
     const squatBtn = host.querySelector('[data-history-row="open-squat"]') as HTMLButtonElement
+    expect(squatBtn).toBeTruthy()
     await act(async () => {
       squatBtn.click()
     })
-    expect(host.querySelector('[data-history-detail="open-squat"]')).toBeTruthy()
-    expect(host.querySelector('[data-history-detail="open-bench"]')).toBeNull()
+    expect(document.body.querySelector('[data-history-detail="open-squat"]')).toBeTruthy()
+    expect(document.body.querySelector('[data-history-detail="open-bench"]')).toBeNull()
     expect(document.body.textContent).toContain('Squat')
     expect(document.body.textContent).not.toMatch(/\bBiceps\b/)
 
     const benchBtn = host.querySelector('[data-history-row="open-bench"]') as HTMLButtonElement
+    expect(benchBtn).toBeTruthy()
     await act(async () => {
       benchBtn.click()
     })
-    expect(host.querySelector('[data-history-detail="open-bench"]')).toBeTruthy()
-    expect(host.querySelector('[data-history-detail="open-squat"]')).toBeNull()
+    expect(document.body.querySelector('[data-history-detail="open-bench"]')).toBeTruthy()
+    expect(document.body.querySelector('[data-history-detail="open-squat"]')).toBeNull()
     expect(document.body.textContent).toContain('Développé couché')
   })
 

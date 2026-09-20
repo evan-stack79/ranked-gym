@@ -172,6 +172,81 @@ const notes: WorkoutNote[] = [
       },
     ],
   },
+  {
+    id: 'n-row',
+    title: 'Biceps',
+    dateKey: OLDER,
+    createdAt: atHour(4, 18, 40),
+    estimatedKcal: 240,
+    durationMin: 28,
+    totalVolumeKg: 720,
+    sessionKind: 'strength',
+    sportId: 'musculation',
+    exercises: [
+      {
+        id: 'e-row',
+        name: 'Rowing barre',
+        canonicalExerciseId: 'barbell_row',
+        sets: [{ reps: 8, weightKg: 70 }],
+      },
+    ],
+  },
+  {
+    id: 'n-pullup',
+    title: 'Biceps',
+    dateKey: dateKeyOffset(6),
+    createdAt: atHour(6, 17, 0),
+    estimatedKcal: 160,
+    durationMin: 16,
+    sessionKind: 'strength',
+    sportId: 'musculation',
+    exercises: [
+      {
+        id: 'e-pull',
+        name: 'Tractions pronation',
+        canonicalExerciseId: 'pull_up',
+        sets: [{ reps: 6, weightKg: 0 }],
+      },
+    ],
+  },
+  {
+    id: 'n-lat',
+    title: 'Biceps',
+    dateKey: dateKeyOffset(6),
+    createdAt: atHour(6, 10, 15),
+    estimatedKcal: 190,
+    durationMin: 20,
+    totalVolumeKg: 480,
+    sessionKind: 'strength',
+    sportId: 'musculation',
+    exercises: [
+      {
+        id: 'e-lat',
+        name: 'Tirage vertical',
+        canonicalExerciseId: 'lat_pulldown',
+        sets: [{ reps: 10, weightKg: 48 }],
+      },
+    ],
+  },
+  {
+    id: 'n-press',
+    title: 'Biceps',
+    dateKey: dateKeyOffset(8),
+    createdAt: atHour(8, 11, 45),
+    estimatedKcal: 280,
+    durationMin: 32,
+    totalVolumeKg: 1600,
+    sessionKind: 'strength',
+    sportId: 'musculation',
+    exercises: [
+      {
+        id: 'e-leg',
+        name: 'Presse à cuisses',
+        canonicalExerciseId: 'leg_press',
+        sets: [{ reps: 10, weightKg: 160 }],
+      },
+    ],
+  },
 ]
 
 const empty = new URLSearchParams(window.location.search).has('empty')
