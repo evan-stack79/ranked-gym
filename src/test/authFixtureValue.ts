@@ -22,8 +22,6 @@ export function buildAuthContextValue(
     profile: null,
     isAuthenticated: false,
     isLoading: false,
-    bootIssue: null,
-    retryHydrate: asyncNoop,
     isAuthOpen: false,
     authLoading: false,
     authError: null,
