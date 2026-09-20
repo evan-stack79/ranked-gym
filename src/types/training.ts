@@ -130,6 +130,11 @@ export interface WorkoutNote {
    * Optionnel : notes legacy et séances non-endurance restent valides sans ce champ.
    */
   details?: SessionDetails
+  /**
+   * Origine du titre : `user` = nom saisi explicitement ; `derived` = calculé
+   * depuis les exercices. Absent sur les notes legacy — ne pas inventer à la lecture.
+   */
+  titleSource?: 'user' | 'derived'
 }
 
 /** Détails typés par module — extensible (endurance, team, …). */

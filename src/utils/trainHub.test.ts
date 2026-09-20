@@ -100,7 +100,7 @@ describe('deriveTodayHubCard — priorités CTA', () => {
     expect(card.canLaunchRoutine).toBe(true)
     expect(card.openTarget).toBe('notebook')
     expect(launchableRoutineId(card)).toBe('push')
-    expect(card.title).toBe('Push en cours')
+    expect(card.title).toBe('Bench')
   })
 
   it('1b. séance libre démarrée (routine encore vide) → Reprendre', () => {
@@ -786,5 +786,30 @@ describe('deriveRecentSessions', () => {
       5,
     )
     expect(items).toHaveLength(2)
+  })
+
+  it('legacy Biceps + Squat → affiche Squat (pas le label routine)', () => {
+    const items = deriveRecentSessions(
+      [
+        note({
+          id: 'biceps-squat',
+          title: 'Biceps',
+          createdAt: 3,
+          dateKey: '2026-09-04',
+          sessionKind: 'strength',
+          exercises: [
+            {
+              id: 'e',
+              name: 'Squat',
+              canonicalExerciseId: 'back_squat',
+              sets: [{ reps: 5, weightKg: 100 }],
+            },
+          ],
+        }),
+      ],
+      FIXED,
+      2,
+    )
+    expect(items[0].title).toBe('Squat')
   })
 })

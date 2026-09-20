@@ -19,6 +19,7 @@ import {
 import { computeStrengthSessionStats } from '../../utils/strength'
 import { sanitizeExerciseName } from '../../utils/exerciseName'
 import { detectProgramSplit, filterRoutinesForProgram } from '../../utils/workoutProgram'
+import { resolvePersistedSessionTitle, deriveSessionTitleFromExercises } from '../../utils/sessionDisplayTitle'
 import {
   findLastExerciseSets,
   formatSetLoadLabel,
@@ -65,6 +66,7 @@ interface WorkoutNotebookProps {
     sportId?: string
     source?: SessionSource
     sessionKind?: SessionKind
+    titleSource?: 'user' | 'derived'
   }) => void | Promise<void>
   /** Autosave séries / exercices vers Supabase (routine draft). */
   onDraftSave?: (routineId: string, exercises: ExerciseEntry[]) => void
@@ -232,6 +234,7 @@ export function WorkoutNotebook({
 
   const [routineId, setRoutineId] = useState(initialEditNote?.routineId ?? bootRoutine.id)
   const [title, setTitle] = useState(initialEditNote?.title ?? bootRoutine.label)
+  const [titleTouched, setTitleTouched] = useState(false)
   const [exercises, setExercises] = useState<ExerciseEntry[]>(() =>
     initialEditNote ? copyExercises(initialEditNote.exercises)
       : resume ? copyExercises(bootRoutine.exercises)
@@ -290,12 +293,19 @@ export function WorkoutNotebook({
     if (!r) return
     setRoutineId(r.id)
     setTitle(r.label)
+    setTitleTouched(false)
     setExercises(cloneFromRoutine(r, history))
     draftDirty.current = false
     setEditingNote(null)
     // Sauvegarde immédiate — iOS peut suspendre sans événement de fermeture.
     setLastSelectedRoutine(r.id, sportId)
   }
+
+  // Titre auto : exercices réels, jamais l’ancien label de routine (« Biceps »).
+  useEffect(() => {
+    if (titleTouched || editingNote) return
+    setTitle(deriveSessionTitleFromExercises(exercises))
+  }, [exercises, titleTouched, editingNote])
 
   useEffect(() => {
     if (editingNote || (resume && routines.some(r => r.id === routineId))) return
@@ -500,6 +510,7 @@ export function WorkoutNotebook({
     draftDirty.current = false
     setEditingNote(note)
     setTitle(note.title)
+    setTitleTouched(false)
     if (note.routineId) setRoutineId(note.routineId)
     setExercises(copyExercises(note.exercises))
   }
@@ -509,6 +520,7 @@ export function WorkoutNotebook({
     setEditingNote(null)
     setRoutineId(beforeEdit.current.routineId)
     setTitle(beforeEdit.current.title)
+    setTitleTouched(false)
     setExercises(copyExercises(beforeEdit.current.exercises))
   }
 
@@ -524,12 +536,24 @@ export function WorkoutNotebook({
     draftBlocked.current = true
     setSaving(true)
     try {
+      const explicit = titleTouched && Boolean(title.trim())
+      const persisted = resolvePersistedSessionTitle(
+        {
+          exercises: cleaned,
+          title: title.trim(),
+          titleSource: explicit ? 'user' : editingNote ? editingNote.titleSource : 'derived',
+          sessionKind: editingNote ? editingNote.sessionKind : sessionKind,
+          details: editingNote?.details,
+        },
+        editingNote,
+      )
       // Nouvelle séance : fige sport/kind/source. Édition legacy : ne pas inventer de champs.
       await onSave({
         id: editingNote?.id,
         createdAt: editingNote?.createdAt,
         dateKey: editingNote?.dateKey,
-        title: title.trim() || activeRoutine?.label || 'Séance',
+        title: persisted.title,
+        titleSource: persisted.titleSource,
         exercises: cleaned,
         estimatedKcal: stats.kcal,
         durationMin:
@@ -734,8 +758,12 @@ export function WorkoutNotebook({
           <input
             type="text"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => {
+              setTitleTouched(true)
+              setTitle(e.target.value)
+            }}
             placeholder="Nom"
+            data-session-title
             className="w-full bg-transparent text-[17px] font-bold text-white placeholder:text-[#636366] outline-none"
           />
         </div>

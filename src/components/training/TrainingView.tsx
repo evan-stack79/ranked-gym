@@ -88,6 +88,7 @@ import {
   replaceHubHistory,
   shouldAutoReopenSession,
 } from '../../utils/sessionBackNav'
+import { deriveSessionDisplayTitle } from '../../utils/sessionDisplayTitle'
 
 type TrainPanel = 'hub' | 'notebook' | 'endurance' | 'agenda' | 'history' | 'steps'
 
@@ -429,7 +430,7 @@ export function TrainingView({
     const bodyWeightKg = getCalorieProfile().weightKg
     const liftStats = computeStrengthSessionStats(note.exercises, bodyWeightKg)
     setPumpCheckSession({
-      title: note.title?.trim() || 'Séance',
+      title: deriveSessionDisplayTitle(note),
       volumeKg: note.totalVolumeKg ?? liftStats.volume,
       durationMin: note.durationMin ?? liftStats.durationMin,
       prCount,

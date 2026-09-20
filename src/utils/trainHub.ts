@@ -11,6 +11,7 @@ import { getTodayWorkout } from './todayWorkout'
 import { paceSecPerKmFromDuration, sessionKindForSport } from './sessionMeta'
 import { getLocalWeekBounds, isTimestampInLocalWeek, workoutValidationMs } from './weekBounds'
 import { dedupeWorkoutNotes, noteDurationMin } from './workoutHistory'
+import { deriveSessionDisplayTitle } from './sessionDisplayTitle'
 
 /** Priorité CTA carte Aujourd’hui. */
 export type TrainCtaKind = 'resume' | 'start' | 'open_train' | 'choose_activity'
@@ -117,7 +118,13 @@ export function findActiveStrengthSession(state: TrainingState): ActiveStrengthS
   if (!routine) return null
   return {
     routineId: routine.id,
-    title: routine.label?.trim() || 'Séance',
+    // Jamais routine.label (catégorie / ancien focus) comme titre de séance.
+    title: deriveSessionDisplayTitle({
+      exercises: routine.exercises,
+      title: null,
+      titleSource: 'derived',
+      sessionKind: 'strength',
+    }),
     exerciseCount: routine.exercises?.length ?? 0,
     doneSetCount: countDoneSets(routine),
   }
@@ -657,7 +664,7 @@ export function deriveRecentSessions(
   const clean = dedupeWorkoutNotes(notes)
   return clean.slice(0, Math.max(0, limit)).map((note) => ({
     id: note.id,
-    title: note.title?.trim() || 'Séance',
+    title: deriveSessionDisplayTitle(note),
     sportLabel: sportLabelForNote(note),
     dateLabel: formatRecentDateLabel(note.dateKey, now),
     summary: formatSessionSummary(note),
