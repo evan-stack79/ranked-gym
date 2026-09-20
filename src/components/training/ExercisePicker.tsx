@@ -6,8 +6,8 @@ import {
   countExerciseMatches,
   searchExercises,
 } from '../../utils/exerciseSearch'
-import { resolveExerciseMedia } from '../../utils/exerciseMedia'
 import { BRAND_MARK_COMPACT_SRC } from '../brand/BrandMark'
+import { ExercisePickerThumb } from './ExercisePickerThumb'
 
 export type ExercisePickerMode = 'first' | 'add'
 
@@ -221,10 +221,6 @@ function ExerciseResultRow({
   active: boolean
   onSelect: () => void
 }) {
-  const media = resolveExerciseMedia({
-    name: exercise.name,
-    canonicalExerciseId: exercise.id,
-  })
   const meta = formatCatalogMeta(exercise)
 
   return (
@@ -234,7 +230,7 @@ function ExerciseResultRow({
         onClick={onSelect}
         data-exercise-id={exercise.id}
         data-result-active={active ? 'true' : 'false'}
-        className="ios-press relative flex min-h-14 w-full items-center gap-3 border-b border-[#2c2c2e] py-3.5 pl-3.5 pr-1 text-left"
+        className="ios-press relative flex min-h-16 w-full items-center gap-3 border-b border-[#2c2c2e] py-2.5 pl-3.5 pr-1 text-left"
       >
         {active ? (
           <span
@@ -243,19 +239,7 @@ function ExerciseResultRow({
           />
         ) : null}
 
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[#1c1c1e]">
-          {media.imageSrc ? (
-            <img
-              src={media.imageSrc}
-              alt=""
-              aria-hidden="true"
-              draggable={false}
-              className="h-full w-full object-cover object-center grayscale contrast-[1.05]"
-            />
-          ) : (
-            <span className="h-full w-full bg-[#2c2c2e]" aria-hidden="true" />
-          )}
-        </div>
+        <ExercisePickerThumb canonicalExerciseId={exercise.id} />
 
         <div className="min-w-0 flex-1">
           <p className="text-[15px] font-semibold leading-snug text-white">{exercise.name}</p>
