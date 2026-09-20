@@ -329,6 +329,17 @@ body {
   will-change: transform;
 }
 
+.train-sheet--graphite .ios-sheet-backdrop {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgb(0 0 0 / 0.5);
+}
+
+.train-sheet--graphite .ios-sheet-panel {
+  background-color: #070708;
+  box-shadow: none;
+}
+
 .ios-sheet-panel--open {
   transform: translate3d(0, 0, 0);
 }

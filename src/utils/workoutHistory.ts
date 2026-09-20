@@ -141,7 +141,20 @@ export function findLastExerciseSets(
   return null
 }
 
+export function formatKgValue(weightKg: number): string {
+  return Number.isInteger(weightKg) ? String(weightKg) : weightKg.toFixed(1).replace(/\.0$/, '')
+}
+
 export function formatSetLoadLabel(weightKg: number, reps: number): string {
-  const w = Number.isInteger(weightKg) ? String(weightKg) : weightKg.toFixed(1).replace(/\.0$/, '')
-  return `${w} kg × ${reps}`
+  return `${formatKgValue(weightKg)} kg × ${reps}`
+}
+
+/** Date d’historique (Aujourd’hui / Hier / date FR) + heure réelle. */
+export function formatHistoryDateTimeLine(
+  note: Pick<WorkoutNote, 'dateKey' | 'createdAt'>,
+  now = new Date(),
+): string {
+  const day = formatHistoryDayLabel(note.dateKey, now)
+  if (!Number.isFinite(note.createdAt)) return day
+  return `${day} · ${formatClock(note.createdAt)}`
 }

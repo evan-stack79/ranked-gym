@@ -156,19 +156,45 @@ const notes: WorkoutNote[] = [
         id: 'e-ohp',
         name: 'Développé militaire',
         canonicalExerciseId: 'overhead_press',
-        sets: [{ reps: 6, weightKg: 50 }],
+        sets: [
+          { reps: 6, weightKg: 50, difficulty: 'ok' },
+          { reps: 6, weightKg: 50, difficulty: 'ok' },
+          { reps: 5, weightKg: 52.5, difficulty: 'hard' },
+          { reps: 5, weightKg: 52.5, difficulty: 'hard' },
+        ],
       },
       {
         id: 'e-raise',
         name: 'Élévations latérales',
         canonicalExerciseId: 'lateral_raise',
-        sets: [{ reps: 12, weightKg: 10 }],
+        sets: [
+          { reps: 12, weightKg: 10 },
+          { reps: 12, weightKg: 10 },
+          { reps: 12, weightKg: 8, difficulty: 'easy' },
+          { reps: 15, weightKg: 8 },
+        ],
       },
       {
         id: 'e-curl',
         name: 'Curl haltères',
         canonicalExerciseId: 'dumbbell_curl',
-        sets: [{ reps: 10, weightKg: 14 }],
+        sets: [
+          { reps: 10, weightKg: 14 },
+          { reps: 10, weightKg: 14 },
+          { reps: 10, weightKg: 12 },
+          { reps: 8, weightKg: 12, rpe: 8 },
+        ],
+      },
+      {
+        id: 'e-row-long',
+        name: 'Rowing barre',
+        canonicalExerciseId: 'barbell_row',
+        sets: [
+          { reps: 8, weightKg: 70 },
+          { reps: 8, weightKg: 70 },
+          { reps: 8, weightKg: 75 },
+          { reps: 6, weightKg: 75, difficulty: 'hard' },
+        ],
       },
     ],
   },
@@ -259,7 +285,11 @@ function Harness() {
       data-history-redesign
       data-history-titles
     >
-      <WorkoutHistory notes={empty ? [] : notes} onDelete={() => undefined} />
+      <WorkoutHistory
+        notes={empty ? [] : notes}
+        onDelete={() => undefined}
+        onEdit={() => undefined}
+      />
     </div>
   )
 }
