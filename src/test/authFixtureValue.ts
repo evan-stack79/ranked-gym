@@ -15,6 +15,8 @@ export const FIXTURE_AUTH_USER: AuthUser = {
 export function buildAuthContextValue(
   overrides: Partial<AuthContextValue> = {},
 ): AuthContextValue {
+  const { bootIssue, retryHydrate, ...restOverrides } = overrides
+
   return {
     user: null,
     profile: null,
@@ -44,8 +46,8 @@ export function buildAuthContextValue(
     updateDiscipline: asyncNoop,
     updateGhostMode: asyncNoop,
     signOut: asyncNoop,
-    ...overrides,
-    bootIssue: overrides.bootIssue ?? null,
-    retryHydrate: overrides.retryHydrate ?? asyncNoop,
+    ...restOverrides,
+    bootIssue: bootIssue ?? null,
+    retryHydrate: retryHydrate ?? asyncNoop,
   }
 }
