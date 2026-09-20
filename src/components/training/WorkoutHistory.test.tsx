@@ -91,4 +91,101 @@ describe('WorkoutHistory — métriques multisport réelles', () => {
     expect(text).toContain('8 reps × 50 kg')
     expect(text).toContain('120 kcal')
   })
+
+  it('carte Squat : titre réel même si stocké « Biceps »', async () => {
+    const text = await renderHistory({
+      id: 'squat-biceps-bug',
+      title: 'Biceps',
+      dateKey: '2026-09-04',
+      createdAt: Date.parse('2026-09-04T15:00:00Z'),
+      estimatedKcal: 210,
+      durationMin: 20,
+      totalVolumeKg: 500,
+      sessionKind: 'strength',
+      exercises: [
+        {
+          id: 'sq',
+          name: 'Squat',
+          canonicalExerciseId: 'back_squat',
+          sets: [{ reps: 5, weightKg: 100 }],
+        },
+      ],
+    })
+    expect(text).toContain('Squat')
+    expect(text).not.toMatch(/\bBiceps\b/)
+    expect(text).toContain('500 kg')
+    expect(text).toContain('20 min')
+    expect(text).toContain('210 kcal')
+  })
+
+  it('carte Développé couché : titre réel même si stocké « Biceps »', async () => {
+    const text = await renderHistory({
+      id: 'bench-biceps-bug',
+      title: 'Biceps',
+      dateKey: '2026-09-04',
+      createdAt: Date.parse('2026-09-04T16:00:00Z'),
+      estimatedKcal: 180,
+      durationMin: 18,
+      totalVolumeKg: 480,
+      sessionKind: 'strength',
+      exercises: [
+        {
+          id: 'dc',
+          name: 'Développé couché',
+          canonicalExerciseId: 'bench_press',
+          sets: [{ reps: 8, weightKg: 60 }],
+        },
+      ],
+    })
+    expect(text).toContain('Développé couché')
+    expect(text).not.toMatch(/\bBiceps\b/)
+  })
+
+  it('plusieurs exercices sans nom perso → Séance musculation', async () => {
+    const text = await renderHistory({
+      id: 'multi',
+      title: 'Biceps',
+      dateKey: '2026-09-04',
+      createdAt: Date.parse('2026-09-04T17:00:00Z'),
+      estimatedKcal: 300,
+      sessionKind: 'strength',
+      exercises: [
+        {
+          id: 'sq',
+          name: 'Squat',
+          canonicalExerciseId: 'back_squat',
+          sets: [{ reps: 5, weightKg: 100 }],
+        },
+        {
+          id: 'dc',
+          name: 'Développé couché',
+          canonicalExerciseId: 'bench_press',
+          sets: [{ reps: 8, weightKg: 60 }],
+        },
+      ],
+    })
+    expect(text).toContain('Séance musculation')
+    expect(text).not.toMatch(/\bBiceps\b/)
+  })
+
+  it('nom personnalisé conservé', async () => {
+    const text = await renderHistory({
+      id: 'custom',
+      title: 'Push du soir',
+      titleSource: 'user',
+      dateKey: '2026-09-04',
+      createdAt: Date.parse('2026-09-04T18:00:00Z'),
+      estimatedKcal: 200,
+      sessionKind: 'strength',
+      exercises: [
+        {
+          id: 'dc',
+          name: 'Développé couché',
+          canonicalExerciseId: 'bench_press',
+          sets: [{ reps: 8, weightKg: 60 }],
+        },
+      ],
+    })
+    expect(text).toContain('Push du soir')
+  })
 })
