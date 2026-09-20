@@ -64,6 +64,39 @@ async function shot(page, name) {
   console.log('  wrote', name)
 }
 
+async function assertWelcomeHero(page) {
+  const proof = await page.evaluate(() => {
+    const root = document.querySelector('[data-welcome-screen]')
+    const imgs = [...document.querySelectorAll('[data-welcome-screen] img')]
+    const hero = document.querySelector('[data-welcome-hero]')
+    const cs = hero ? getComputedStyle(hero) : null
+    const rootCs = root ? getComputedStyle(root) : null
+    return {
+      imgCount: imgs.length,
+      srcs: imgs.map((img) => img.getAttribute('src')),
+      hasLogoClass: !!document.querySelector('.welcome-screen__logo'),
+      hasTextureClass: !!document.querySelector('.welcome-screen__texture'),
+      objectFit: cs?.objectFit ?? null,
+      objectPosition: cs?.objectPosition ?? null,
+      fallbackBg: rootCs?.backgroundColor ?? null,
+    }
+  })
+  if (proof.imgCount !== 1) {
+    throw new Error(`expected a single hero img, got ${proof.imgCount}: ${JSON.stringify(proof.srcs)}`)
+  }
+  if (proof.hasLogoClass || proof.hasTextureClass) {
+    throw new Error('second logo or generated texture still in DOM')
+  }
+  if (proof.objectFit !== 'cover') {
+    throw new Error(`object-fit should be cover, got ${proof.objectFit}`)
+  }
+  const position = (proof.objectPosition || '').toLowerCase()
+  if (position !== 'top center' && position !== '50% 0%' && position !== 'center top') {
+    throw new Error(`object-position should be top center, got ${proof.objectPosition}`)
+  }
+  return proof
+}
+
 async function withPage(browser, viewport, css, fn) {
   const context = await browser.newContext({
     viewport,
@@ -118,6 +151,9 @@ async function main() {
       await page.goto(`${origin}/`, { waitUntil: 'networkidle' })
       await page.addStyleTag({ content: SAFE.island })
       await page.waitForSelector('[data-welcome-screen]')
+      const proof = await assertWelcomeHero(page)
+      await writeFile(join(outDir, 'welcome-hero-dom-proof.json'), `${JSON.stringify(proof, null, 2)}\n`)
+      console.log('  wrote welcome-hero-dom-proof.json', proof)
       await shot(page, 'welcome-iphone-dynamic-island-393.png')
       await page.click('[data-welcome-cta]')
       await page.waitForSelector('[role="dialog"]')
@@ -139,6 +175,7 @@ async function main() {
       await page.goto(`${origin}/`, { waitUntil: 'networkidle' })
       await page.addStyleTag({ content: SAFE.android })
       await page.waitForSelector('[data-welcome-screen]')
+      await assertWelcomeHero(page)
       await shot(page, 'welcome-android-narrow-360.png')
     })
 

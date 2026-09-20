@@ -11,9 +11,4 @@ describe('official calm panther assets', () => {
     const buf = readFileSync('src/assets/brand/panther-calm-crowned.png')
     expect(pngHasAlpha(buf)).toBe(true)
   })
-
-  it('logo welcome overlay a un canal alpha réel', () => {
-    const buf = readFileSync('public/auth-welcome-logo.png')
-    expect(pngHasAlpha(buf)).toBe(true)
-  })
 })

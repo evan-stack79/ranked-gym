@@ -6,10 +6,8 @@ import { WelcomeScreen } from './WelcomeScreen'
 import {
   WELCOME_BETA,
   WELCOME_CTA,
-  WELCOME_FABRIC_AVIF,
-  WELCOME_FABRIC_WEBP,
-  WELCOME_LOGO_ALT,
-  WELCOME_LOGO_WEBP,
+  WELCOME_HERO_PNG,
+  WELCOME_HERO_WEBP,
   WELCOME_SUBTITLE,
   WELCOME_TITLE,
 } from './welcomeCopy'
@@ -35,7 +33,7 @@ async function renderWelcome(onConnect = vi.fn()) {
 }
 
 describe('WelcomeScreen', () => {
-  it('affiche le copy français exact et le logo overlay (pas la texture)', async () => {
+  it('affiche le copy français exact sur la photo hero, sans second logo', async () => {
     const { host, cleanup } = await renderWelcome()
     expect(host.querySelector('[data-welcome-screen]')).toBeTruthy()
     expect(host.textContent).toContain('Ranked')
@@ -50,14 +48,15 @@ describe('WelcomeScreen', () => {
     expect(host.textContent).not.toContain('Récupération des données')
     expect(host.textContent).not.toContain('Chargement')
 
-    const texture = host.querySelector('.welcome-screen__texture') as HTMLImageElement
-    expect(texture.src).toContain(WELCOME_FABRIC_WEBP)
-    expect(host.querySelector(`source[srcset="${WELCOME_FABRIC_AVIF}"]`)).toBeTruthy()
+    const imgs = [...host.querySelectorAll('img')]
+    expect(imgs).toHaveLength(1)
+    expect(host.querySelector('.welcome-screen__logo')).toBeNull()
+    expect(host.querySelector('.welcome-screen__texture')).toBeNull()
 
-    const logo = host.querySelector('.welcome-screen__logo') as HTMLImageElement
-    expect(logo.alt).toBe(WELCOME_LOGO_ALT)
-    expect(logo.src).toContain(WELCOME_LOGO_WEBP)
-    expect(logo.src).not.toContain('auth-welcome-fabric')
+    const hero = host.querySelector('[data-welcome-hero]') as HTMLImageElement
+    expect(hero.className).toContain('welcome-screen__hero')
+    expect(hero.src).toContain(WELCOME_HERO_PNG)
+    expect(host.querySelector(`source[srcset="${WELCOME_HERO_WEBP}"]`)).toBeTruthy()
 
     await cleanup()
   })
