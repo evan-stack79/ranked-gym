@@ -14,24 +14,26 @@
     "square": true,
     "min_1024": true,
     "canonical_id": "incline_bench_press",
-    "label": "D\u00e9velopp\u00e9 inclin\u00e9"
+    "label": "Développé incliné",
+    "imagemagick": "srgba false 1024x1024"
   },
   {
     "file": "dumbbell-bench-press.png",
     "width": 1024,
     "height": 1024,
     "mode": "RGBA",
-    "bytes": 210123,
+    "bytes": 253521,
     "has_alpha": true,
     "fully_opaque": false,
-    "transparent_ratio": 0.8122930526733398,
+    "transparent_ratio": 0.742218017578125,
     "min_alpha": 0,
     "max_alpha": 255,
     "has_saturated_red": false,
     "square": true,
     "min_1024": true,
     "canonical_id": "dumbbell_bench_press",
-    "label": "D\u00e9velopp\u00e9 couch\u00e9 halt\u00e8res"
+    "label": "Développé couché haltères",
+    "imagemagick": "srgba false 1024x1024"
   },
   {
     "file": "overhead-press.png",
@@ -48,7 +50,8 @@
     "square": true,
     "min_1024": true,
     "canonical_id": "overhead_press",
-    "label": "D\u00e9velopp\u00e9 militaire"
+    "label": "Développé militaire",
+    "imagemagick": "srgba false 1024x1024"
   },
   {
     "file": "back-squat.png",
@@ -65,24 +68,26 @@
     "square": true,
     "min_1024": true,
     "canonical_id": "back_squat",
-    "label": "Squat barre"
+    "label": "Squat barre",
+    "imagemagick": "srgba false 1024x1024"
   },
   {
     "file": "deadlift.png",
     "width": 1024,
     "height": 1024,
     "mode": "RGBA",
-    "bytes": 249836,
+    "bytes": 252496,
     "has_alpha": true,
     "fully_opaque": false,
-    "transparent_ratio": 0.8087882995605469,
+    "transparent_ratio": 0.7852144241333008,
     "min_alpha": 0,
     "max_alpha": 255,
     "has_saturated_red": false,
     "square": true,
     "min_1024": true,
     "canonical_id": "deadlift",
-    "label": "Soulev\u00e9 de terre"
+    "label": "Soulevé de terre",
+    "imagemagick": "srgba false 1024x1024"
   },
   {
     "file": "leg-press.png",
@@ -99,41 +104,44 @@
     "square": true,
     "min_1024": true,
     "canonical_id": "leg_press",
-    "label": "Presse \u00e0 cuisses"
+    "label": "Presse à cuisses",
+    "imagemagick": "srgba false 1024x1024"
   },
   {
     "file": "barbell-row.png",
     "width": 1024,
     "height": 1024,
     "mode": "RGBA",
-    "bytes": 228307,
+    "bytes": 211599,
     "has_alpha": true,
     "fully_opaque": false,
-    "transparent_ratio": 0.8120317459106445,
+    "transparent_ratio": 0.8136653900146484,
     "min_alpha": 0,
     "max_alpha": 255,
     "has_saturated_red": false,
     "square": true,
     "min_1024": true,
     "canonical_id": "barbell_row",
-    "label": "Rowing barre"
+    "label": "Rowing barre",
+    "imagemagick": "srgba false 1024x1024"
   },
   {
     "file": "pull-up.png",
     "width": 1024,
     "height": 1024,
     "mode": "RGBA",
-    "bytes": 121209,
+    "bytes": 164913,
     "has_alpha": true,
     "fully_opaque": false,
-    "transparent_ratio": 0.8927888870239258,
+    "transparent_ratio": 0.8482980728149414,
     "min_alpha": 0,
     "max_alpha": 255,
     "has_saturated_red": false,
     "square": true,
     "min_1024": true,
     "canonical_id": "pull_up",
-    "label": "Tractions pronation"
+    "label": "Tractions pronation",
+    "imagemagick": "srgba false 1024x1024"
   },
   {
     "file": "lat-pulldown.png",
@@ -150,7 +158,8 @@
     "square": true,
     "min_1024": true,
     "canonical_id": "lat_pulldown",
-    "label": "Tirage vertical"
+    "label": "Tirage vertical",
+    "imagemagick": "srgba false 1024x1024"
   },
   {
     "file": "dumbbell-curl.png",
@@ -167,7 +176,8 @@
     "square": true,
     "min_1024": true,
     "canonical_id": "dumbbell_curl",
-    "label": "Curl halt\u00e8res"
+    "label": "Curl haltères",
+    "imagemagick": "srgba false 1024x1024"
   },
   {
     "file": "triceps-pushdown.png",
@@ -184,7 +194,8 @@
     "square": true,
     "min_1024": true,
     "canonical_id": "triceps_pushdown",
-    "label": "Extension triceps poulie"
+    "label": "Extension triceps poulie",
+    "imagemagick": "srgba false 1024x1024"
   },
   {
     "file": "lateral-raise.png",
@@ -201,6 +212,7 @@
     "square": true,
     "min_1024": true,
     "canonical_id": "lateral_raise",
-    "label": "\u00c9l\u00e9vations lat\u00e9rales"
+    "label": "Élévations latérales",
+    "imagemagick": "srgba false 1024x1024"
   }
 ]

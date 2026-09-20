@@ -3,6 +3,27 @@
   "wave": 1,
   "status": "assets_only_pending_evan_approval",
   "wired_to_ui": false,
+  "audit": {
+    "round": 2,
+    "parent_sha": "f068667c2ebcda1da9a927e79c11c9e839e801ff",
+    "corrected": [
+      "dumbbell_bench_press",
+      "deadlift",
+      "pull_up",
+      "barbell_row"
+    ],
+    "validated_unchanged": [
+      "incline_bench_press",
+      "overhead_press",
+      "back_squat",
+      "leg_press",
+      "lat_pulldown",
+      "dumbbell_curl",
+      "triceps_pushdown",
+      "lateral_raise"
+    ],
+    "note": "Ids unchanged. dumbbell_bench_press fully regenerated (3-arm bug). No UI wiring."
+  },
   "base_sha": "e176f42a08be90a4678a7a1f0715cc2f2c474738",
   "base_branch": "origin/bot/migrate-supabase-to-convex",
   "directory": "assets/exercises/illustrations/wave1/",
