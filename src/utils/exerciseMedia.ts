@@ -26,7 +26,10 @@ type AssetEntry = {
   imageAlt: string
 }
 
-/** Known local assets keyed by canonical exercise id. Missing → neutral fallback. */
+/**
+ * Immersive session hero only. Picker thumbnails live in `exercisePickerIllustrations`
+ * so wave1 PNGs never leak into the séance hero.
+ */
 const CANONICAL_ASSETS: Record<string, AssetEntry> = {
   bench_press: {
     imageSrc: developpeCoucheWebp,
