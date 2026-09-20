@@ -93,6 +93,11 @@ scripts/screenshots/**
 !scripts/screenshots/brand-scroll/accueil_brand_scroll_A_top_brand_visible.png
 !scripts/screenshots/brand-scroll/accueil_brand_scroll_B_scrolled_brand_gone.png
 !scripts/screenshots/brand-scroll/accueil_brand_scroll_C_back_top_brand_visible.png
+# Exception: preuves titres historique (Squat / Développé couché)
+!scripts/screenshots/history-titles/
+!scripts/screenshots/history-titles/history_cards_squat_bench_390x844.png
+!scripts/screenshots/history-titles/history_sheet_squat_390x844.png
+!scripts/screenshots/history-titles/history_sheet_bench_390x844.png
 # Exception: preuves soft-leave séance immersive → Train Reprendre
 !scripts/screenshots/session-soft-leave/
 !scripts/screenshots/session-soft-leave/CAUSE.md
