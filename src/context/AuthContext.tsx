@@ -10,8 +10,7 @@ import {
 } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import type { ProfileRow } from '../types/database'
-import { getSupabaseConfigError, isSupabaseConfigured, getSupabase } from '../lib/supabase'
-import { getConvexConfigError } from '../lib/convex'
+import { isSupabaseConfigured, getSupabase } from '../lib/supabase'
 import { getActiveAuthBackend } from '../backend/authFeatureFlag'
 import { isConvexDomainActive } from '../backend/adapter'
 import {
@@ -25,7 +24,13 @@ import {
   updateProfileProgress,
   type AuthUser,
 } from '../services/authService'
-import { getCurrentSessionUser as getConvexSessionUser } from '../services/convexAuthService'
+import { getCurrentSessionUser as getConvexSessionUser, getConvexSessionToken, clearStoredSessionToken as clearConvexSessionToken } from '../services/convexAuthService'
+import {
+  clearCachedSessionUser,
+  readCachedSessionUser,
+  writeCachedSessionUser,
+} from '../services/sessionUserCache'
+import { decideAuthRestore } from '../utils/sessionRestore'
 import {
   friendlyAuthError,
   isAccountEnumerationError,
@@ -296,20 +301,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isConvexAuthRuntime()) {
       let cancelled = false
       setIsLoading(true)
-      void getConvexSessionUser()
-        .then((existing) => {
+      void (async () => {
+        const token = await getConvexSessionToken()
+        const cachedUser = await readCachedSessionUser()
+        try {
+          const existing = await getConvexSessionUser()
           if (cancelled) return
-          if (existing) {
-            setUser(existing)
-            void hydrateUser(existing)
+          const decision = decideAuthRestore({
+            token,
+            remoteUser: existing,
+            remoteError: null,
+            cachedUser,
+          })
+          if (decision.kind === 'authenticated') {
+            if (decision.source === 'network') {
+              await writeCachedSessionUser(decision.user)
+            }
+            setUser(decision.user)
+            void hydrateUser(decision.user)
+            return
+          }
+          if (token) await clearConvexSessionToken()
+          await clearCachedSessionUser()
+          setIsLoading(false)
+        } catch (error) {
+          safeError('[auth] convex getCurrentSessionUser failed', error)
+          if (cancelled) return
+          const decision = decideAuthRestore({
+            token,
+            remoteUser: null,
+            remoteError: error,
+            cachedUser,
+          })
+          if (decision.kind === 'authenticated') {
+            setUser(decision.user)
+            void hydrateUser(decision.user)
             return
           }
           setIsLoading(false)
-        })
-        .catch((error) => {
-          safeError('[auth] convex getCurrentSessionUser failed', error)
-          if (!cancelled) setIsLoading(false)
-        })
+        }
+      })()
 
       return () => {
         cancelled = true
@@ -391,22 +422,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const openAuth = useCallback((onSuccess?: AuthSuccessCallback) => {
-    setAuthError(isConvexAuthRuntime() ? getConvexConfigError() : getSupabaseConfigError())
+    setAuthError(null)
+    setAuthInfo(null)
     pendingRef.current = onSuccess ?? null
     setIsAuthOpen(true)
   }, [])
 
   const closeAuth = useCallback(() => {
-    // Bêta privée : pas de fermeture tant qu’il n’y a pas de session active.
-    if (!user) return
-    // Recovery : il faut enregistrer le nouveau mot de passe.
     if (isPasswordRecovery) return
     setIsAuthOpen(false)
     setAuthError(null)
     setAuthInfo(null)
     pendingRef.current = null
     setAuthLoading(false)
-  }, [user, isPasswordRecovery])
+  }, [isPasswordRecovery])
 
   const requireAuth = useCallback(
     (onSuccess: AuthSuccessCallback) => {
@@ -422,7 +451,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithEmail = useCallback(
     async (email: string, password: string) => {
       if (!isConvexAuthRuntime() && !isSupabaseConfigured()) {
-        setAuthError(getSupabaseConfigError())
+        setAuthError(
+          friendlyAuthError(
+            new Error('AUTH_SERVICE_UNAVAILABLE'),
+            'Service indisponible. Réessaie plus tard.',
+          ),
+        )
         return
       }
       setAuthLoading(true)
@@ -435,6 +469,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (!sessionUser) {
             throw new Error('AUTH_SESSION_MISSING')
           }
+          await writeCachedSessionUser(sessionUser)
           void hydrateUser(sessionUser)
         }
         completePending()
@@ -464,7 +499,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const requestPasswordReset = useCallback(async (email: string) => {
     if (!isConvexAuthRuntime() && !isSupabaseConfigured()) {
-      setAuthError(getSupabaseConfigError())
+      setAuthError(
+        friendlyAuthError(
+          new Error('AUTH_SERVICE_UNAVAILABLE'),
+          'Service indisponible. Réessaie plus tard.',
+        ),
+      )
       return
     }
     setAuthLoading(true)
@@ -488,7 +528,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const confirmPasswordRecovery = useCallback(
     async (password: string, confirmPassword: string) => {
       if (!isConvexAuthRuntime() && !isSupabaseConfigured()) {
-        setAuthError(getSupabaseConfigError())
+        setAuthError(
+          friendlyAuthError(
+            new Error('AUTH_SERVICE_UNAVAILABLE'),
+            'Service indisponible. Réessaie plus tard.',
+          ),
+        )
         return
       }
       const validationError = validateNewPassword(password, confirmPassword)
@@ -557,6 +602,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     hydrateGenRef.current += 1
     resetCloudBackupHydration()
+    void clearCachedSessionUser()
     setSession(null)
     setUser(null)
     setProfile(null)

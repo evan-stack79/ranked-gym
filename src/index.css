@@ -1761,4 +1761,109 @@ body {
   .ios-press:active {
     transform: none;
   }
+
+  .welcome-screen .ios-press {
+    transition: none;
+  }
+}
+
+/* Accueil déconnecté — textile haut, copy bas, sans scroll mobile standard */
+.welcome-screen {
+  --welcome-pad-x: max(1.25rem, var(--app-safe-area-left, env(safe-area-inset-left, 0px)));
+}
+
+.welcome-screen__visual {
+  display: flex;
+  height: 42%;
+  min-height: 11.5rem;
+  align-items: center;
+  justify-content: center;
+  padding-top: var(--app-safe-area-top, env(safe-area-inset-top, 0px));
+}
+
+.welcome-screen__fade {
+  height: 46%;
+  background: linear-gradient(to bottom, rgb(7 7 8 / 0) 0%, #070708 88%);
+}
+
+.welcome-screen__logo {
+  width: min(46vw, 11.75rem);
+  height: min(46vw, 11.75rem);
+}
+
+.welcome-screen__body {
+  padding:
+    0.15rem
+    max(1.25rem, var(--app-safe-area-right, env(safe-area-inset-right, 0px)))
+    max(1.15rem, var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px)))
+    max(1.25rem, var(--app-safe-area-left, env(safe-area-inset-left, 0px)));
+}
+
+.welcome-screen__brand {
+  font-size: 1.75rem;
+  line-height: 1.15;
+  margin-bottom: 0.7rem;
+}
+
+.welcome-screen__title {
+  font-size: 1.375rem;
+  line-height: 1.25;
+  margin-bottom: 0.55rem;
+}
+
+.welcome-screen__subtitle {
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+
+.welcome-screen__cta {
+  margin-top: auto;
+}
+
+.welcome-screen__legal {
+  margin-top: 1.35rem;
+}
+
+@media (max-height: 740px) {
+  .welcome-screen__visual {
+    height: 38%;
+    min-height: 9.5rem;
+  }
+
+  .welcome-screen__logo {
+    width: min(40vw, 9.75rem);
+    height: min(40vw, 9.75rem);
+  }
+
+  .welcome-screen__brand {
+    font-size: 1.5rem;
+    margin-bottom: 0.45rem;
+  }
+
+  .welcome-screen__title {
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-height: 620px) {
+  .welcome-screen__visual {
+    height: 34%;
+    min-height: 7.75rem;
+  }
+
+  .welcome-screen__logo {
+    width: min(34vw, 7.75rem);
+    height: min(34vw, 7.75rem);
+  }
+
+  .welcome-screen__legal {
+    margin-top: 0.85rem;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .welcome-screen__visual {
+    height: 30%;
+    min-height: 6.5rem;
+  }
 }

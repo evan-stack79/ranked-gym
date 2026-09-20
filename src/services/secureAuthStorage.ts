@@ -19,8 +19,9 @@ import {
 
 export const AUTH_STORAGE_KEY = 'ranked-gym-auth-v2'
 export const CONVEX_AUTH_STORAGE_KEY = 'ranked-gym-convex-auth-v1'
+export const CONVEX_AUTH_USER_CACHE_KEY = 'ranked-gym-convex-auth-user-v1'
 
-const AUTH_KEYS = [AUTH_STORAGE_KEY, CONVEX_AUTH_STORAGE_KEY] as const
+const AUTH_KEYS = [AUTH_STORAGE_KEY, CONVEX_AUTH_STORAGE_KEY, CONVEX_AUTH_USER_CACHE_KEY] as const
 
 let adapter: SupportedStorage | null = null
 let nativePreferred = false

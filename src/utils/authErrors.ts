@@ -65,9 +65,32 @@ export function friendlyAuthError(err: unknown, fallback: string): string {
     lower.includes('rate_limited') ||
     lower.includes('rate limited') ||
     lower.includes('email rate') ||
-    lower.includes('over_email_send_rate_limit')
+    lower.includes('over_email_send_rate_limit') ||
+    lower.includes('too many') ||
+    lower.includes('429')
   ) {
     return 'Trop de tentatives. Réessaie dans quelques minutes.'
+  }
+  if (
+    lower.includes('jwt expired') ||
+    lower.includes('session expired') ||
+    lower.includes('invalid jwt') ||
+    lower.includes('refresh token') ||
+    lower.includes('auth_session_missing')
+  ) {
+    return 'Session expirée. Reconnecte-toi.'
+  }
+  if (
+    lower.includes('auth_service_unavailable') ||
+    lower.includes('service unavailable') ||
+    lower.includes('503') ||
+    lower.includes('502') ||
+    lower.includes('504') ||
+    /\b500\b/.test(lower) ||
+    lower.includes('convex auth unavailable') ||
+    lower.includes('supabase non configuré')
+  ) {
+    return 'Service indisponible. Réessaie plus tard.'
   }
   if (lower.includes('email')) {
     return fallback
