@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "findings", "required_fixes", "risks", "tests_required"],
+  "properties": {
+    "verdict": { "type": "string", "enum": ["GO", "FIX", "BLOCKED"] },
+    "findings": { "type": "array", "items": { "type": "string" } },
+    "required_fixes": { "type": "array", "items": { "type": "string" } },
+    "risks": { "type": "array", "items": { "type": "string" } },
+    "tests_required": { "type": "array", "items": { "type": "string" } }
+  }
+}

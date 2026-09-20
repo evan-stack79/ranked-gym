@@ -1,0 +1,20 @@
+{
+  "fixture": "real-developper",
+  "hero": "fallback",
+  "slug": "developper",
+  "canonical": "",
+  "title": "DÉVELOPPER",
+  "progress": "Exercice 1 sur 1",
+  "networkHits": [
+    {
+      "url": "http://127.0.0.1:4187/@fs/workspace/src/assets/exercises/developpe-couche.webp?import",
+      "status": 200,
+      "type": "text/javascript"
+    },
+    {
+      "url": "http://127.0.0.1:4187/brand-header-mark.png",
+      "status": 200,
+      "type": "image/png"
+    }
+  ]
+}

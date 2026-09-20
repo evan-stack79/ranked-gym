@@ -1,0 +1,26 @@
+/* Ces sélecteurs ne s'appliquent que tant que Train est monté. */
+.mesh-bg:has(.train-view) {
+  background: #0b0b0d;
+}
+
+.mesh-bg:has(.train-view--history) {
+  background: #070708;
+}
+
+.mesh-bg:has(.train-view--history) [data-app-brand-header] {
+  background: #070708;
+  border-color: #161618;
+}
+
+.mesh-bg:has(.train-view) > .pointer-events-none[aria-hidden="true"] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .train-view, .train-view *, .train-sheet, .train-sheet * {
+    animation: none !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}

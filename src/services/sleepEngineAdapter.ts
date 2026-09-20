@@ -1,9 +1,11 @@
 /**
  * Adaptateur Accueil — Sleep Storage → Sleep Engine (pur) → vue produit.
- * N’invente aucune nuit ; n’ajoute aucun Sleep Score médical.
+ * N’invente aucune nuit ni aucun TST ; n’ajoute aucun Sleep Score médical.
  */
 
 import {
+  computeRegularityMetrics,
+  computeTibHours,
   minutesOfDay,
   parseTimeToMinutes,
   runSleepEngine,
@@ -22,8 +24,12 @@ export interface SleepHomeViewModel {
   hasData: boolean
   latest: SleepNightEntry | null
   engine: SleepEngineSuccess | null
+  /** false si l’utilisateur a choisi « Je ne sais pas » (ou pas de HealthKit). */
+  tstKnown: boolean
   tstHours: number | null
   tstLabel: string | null
+  tibHours: number | null
+  tibLabel: string | null
   statusKey: SleepQuantityStatus | null
   statusLabel: string | null
   tonightBedtimeHm: string | null
@@ -80,16 +86,18 @@ export function circularMeanBedtimeHm(times: string[]): string | null {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-function suggestTonightBedtime(nights: SleepNightEntry[], engine: SleepEngineSuccess): string | null {
+function suggestTonightBedtimeFromHistory(
+  nights: SleepNightEntry[],
+  engine: SleepEngineSuccess | null,
+): string | null {
   const bedtimes = nights.map((n) => n.bedtime)
   const mean = circularMeanBedtimeHm(bedtimes)
   const last = nights[0]?.bedtime ?? null
   const base = mean ?? last
   if (!base) return null
 
-  // Si déficit / catch-up : avancer légèrement le coucher (−30 min) pour la régularité.
   const shiftEarlier =
-    engine.status === 'deficit' || engine.metrics.catchUp.recoveryNeeded
+    engine != null && (engine.status === 'deficit' || engine.metrics.catchUp.recoveryNeeded)
 
   if (!shiftEarlier) return base
 
@@ -103,10 +111,13 @@ function suggestTonightBedtime(nights: SleepNightEntry[], engine: SleepEngineSuc
 
 function tonightHintFor(
   bedtimeHm: string | null,
-  engine: SleepEngineSuccess,
+  engine: SleepEngineSuccess | null,
 ): string | null {
   if (!bedtimeHm) return null
   const label = formatBedtimeLabel(bedtimeHm)
+  if (!engine) {
+    return `Couche-toi vers ${label} pour maintenir ton rythme.`
+  }
   if (engine.metrics.catchUp.recoveryNeeded || engine.status === 'deficit') {
     return `Couche-toi vers ${label} pour récupérer tout en gardant un rythme stable.`
   }
@@ -118,15 +129,18 @@ function tonightHintFor(
 
 /**
  * Construit la vue Accueil à partir du stockage local + moteur existant.
- * Sans nuit → hasData false (aucun faux résultat).
+ * Sans nuit → hasData false. Sans TST → pas de faux nombre d’heures dormies.
  */
 export function getSleepHomeSnapshot(): SleepHomeViewModel {
   const empty: SleepHomeViewModel = {
     hasData: false,
     latest: null,
     engine: null,
+    tstKnown: false,
     tstHours: null,
     tstLabel: null,
+    tibHours: null,
+    tibLabel: null,
     statusKey: null,
     statusLabel: null,
     tonightBedtimeHm: null,
@@ -142,6 +156,41 @@ export function getSleepHomeSnapshot(): SleepHomeViewModel {
 
   const recent = getRecentSleepNights(HISTORY_WINDOW)
   const older = recent.slice(1)
+  const tibHours = computeTibHours(latest.bedtime, latest.waketime)
+  const tibLabel = tibHours != null && tibHours > 0 ? formatTstHoursLabel(tibHours) : null
+
+  // TST inconnu : on n’appelle pas le moteur quantité (pas de faux TST = TIB).
+  if (latest.tstHours == null) {
+    const regularity = computeRegularityMetrics(
+      latest.bedtime,
+      latest.waketime,
+      older.map((n) => n.bedtime),
+      older.map((n) => n.waketime),
+    )
+    const tonightHm = suggestTonightBedtimeFromHistory(recent, null)
+    return {
+      hasData: true,
+      latest,
+      engine: null,
+      tstKnown: false,
+      tstHours: null,
+      tstLabel: null,
+      tibHours,
+      tibLabel,
+      statusKey: null,
+      statusLabel: null,
+      tonightBedtimeHm: tonightHm,
+      tonightBedtimeLabel: tonightHm ? formatBedtimeLabel(tonightHm) : null,
+      tonightHint: tonightHintFor(tonightHm, null),
+      insufficientHistory: regularity.insufficientHistory,
+      recommendations: [
+        'Tu n’as pas indiqué combien tu as dormi — le temps passé au lit seul ne suffit pas pour estimer ta récupération.',
+      ],
+      warnings: [],
+    }
+  }
+
+  const knownTstNights = recent.filter((n): n is SleepNightEntry & { tstHours: number } => n.tstHours != null)
 
   const result = runSleepEngine({
     bedtime: latest.bedtime,
@@ -149,8 +198,8 @@ export function getSleepHomeSnapshot(): SleepHomeViewModel {
     tstHours: latest.tstHours,
     historicalBedtimes: older.map((n) => n.bedtime),
     historicalWaketimes: older.map((n) => n.waketime),
-    workdayTstHours: recent.map((n) => n.tstHours),
-    currentTibHours: undefined,
+    workdayTstHours: knownTstNights.map((n) => n.tstHours),
+    currentTibHours: tibHours ?? undefined,
   })
 
   if (!result.ok) {
@@ -158,21 +207,27 @@ export function getSleepHomeSnapshot(): SleepHomeViewModel {
       ...empty,
       hasData: true,
       latest,
+      tstKnown: true,
       tstHours: latest.tstHours,
       tstLabel: formatTstHoursLabel(latest.tstHours),
+      tibHours,
+      tibLabel,
       recommendations: [],
       warnings: [result.message],
     }
   }
 
-  const tonightHm = suggestTonightBedtime(recent, result)
+  const tonightHm = suggestTonightBedtimeFromHistory(recent, result)
 
   return {
     hasData: true,
     latest,
     engine: result,
+    tstKnown: true,
     tstHours: result.metrics.quantity.tstHours,
     tstLabel: formatTstHoursLabel(result.metrics.quantity.tstHours),
+    tibHours,
+    tibLabel,
     statusKey: result.status,
     statusLabel: quantityStatusLabel(result.status),
     tonightBedtimeHm: tonightHm,

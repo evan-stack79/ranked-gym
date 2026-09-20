@@ -1,10 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { RestTimerProvider } from './context/RestTimerContext'
 import { AuthBottomSheet } from './components/auth/AuthBottomSheet'
+import { WelcomeScreen } from './components/auth/WelcomeScreen'
 import { AppLayout } from './components/layout/AppLayout'
 import { AppBootScreen } from './components/ui/AppBootScreen'
+import { BootIssueScreen, RecoverableRetryBar } from './components/ui/BootIssueScreen'
+import { OfflineBanner } from './components/ui/OfflineBanner'
 import { SupabaseConfigBanner } from './components/ui/SupabaseConfigBanner'
+import { useOnlineStatus } from './hooks/useOnlineStatus'
 import { GlobalOnboardingScreen } from './components/onboarding/GlobalOnboardingScreen'
 import { HomeView } from './components/home/HomeView'
 import { TrainingView } from './components/training/TrainingView'
@@ -29,13 +33,20 @@ function renderActiveView(
   tab: TabId,
   onStartTraining: (routineId: string) => void,
   onOpenTraining: () => void,
+  onOpenNutrition: () => void,
   launchRoutineId: string | null,
   onLaunchConsumed: () => void,
   onAfterSession: () => void,
 ) {
   switch (tab) {
     case 'home':
-      return <HomeView onStartTraining={onStartTraining} onOpenTraining={onOpenTraining} />
+      return (
+        <HomeView
+          onStartTraining={onStartTraining}
+          onOpenTraining={onOpenTraining}
+          onOpenNutrition={onOpenNutrition}
+        />
+      )
     case 'training':
       return (
         <TrainingView
@@ -51,34 +62,53 @@ function renderActiveView(
   }
 }
 
-function AuthGateShell() {
+/** Shell minimal (boot / gate). `showBrandHeader` défaut = comportement historique. */
+function SessionChrome({
+  showBrandHeader = true,
+  children,
+}: {
+  showBrandHeader?: boolean
+  children: ReactNode
+}) {
   return (
-    <div className="relative flex min-h-[100dvh] flex-col mesh-bg font-sans">
-      <header
-        className="glass-bar sticky top-0 z-40 border-b border-white/5"
-        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
-      >
-        <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-3">
-          <span className="text-[17px] font-semibold tracking-tight text-white">
-            Ranked <span className="text-[#FF2B2B]">Gym</span>
-          </span>
+    <div className="relative flex h-[100dvh] min-h-0 flex-col mesh-bg font-sans">
+      <main className="relative z-10 mx-auto min-h-0 w-full max-w-lg flex-1 overflow-y-auto">
+        {showBrandHeader ? (
+          <header
+            className="border-b border-white/5 bg-[#0C0C0E]"
+            data-app-brand-header="1"
+            style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+          >
+            <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-3">
+              <span className="text-[17px] font-semibold tracking-tight text-white">
+                Ranked <span className="text-[#FF2B2B]">Gym</span>
+              </span>
+            </div>
+          </header>
+        ) : null}
+        <div
+          className="px-5 py-8"
+          style={
+            showBrandHeader
+              ? undefined
+              : {
+                  paddingTop: 'max(2rem, calc(env(safe-area-inset-top, 0px) + 1rem))',
+                }
+          }
+        >
+          {children}
         </div>
-      </header>
-      <main className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center gap-3 px-5 py-8 text-center">
-        <p className="text-[22px] font-bold tracking-tight text-white">Bêta privée</p>
-        <p className="max-w-sm text-[15px] leading-relaxed text-[#8E8E93]">
-          Connexion requise. Accès sur invitation uniquement.
-        </p>
       </main>
     </div>
   )
 }
 
-function AppShell() {
+export function AppShell() {
   const [phase, setPhase] = useState<AppPhase>('loading')
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [launchRoutineId, setLaunchRoutineId] = useState<string | null>(null)
-  const { openAuth, isAuthenticated, isLoading, isAuthOpen } = useAuth()
+  const { openAuth, isAuthenticated, isLoading, bootIssue, retryHydrate } = useAuth()
+  const online = useOnlineStatus()
 
   useEffect(() => {
     if (isLoading) {
@@ -86,7 +116,6 @@ function AppShell() {
       return
     }
 
-    // Pas de session Supabase → bloquer toute l’app (Accueil / Train / Nutri / Profil).
     if (!isAuthenticated) {
       setPhase('loading')
       return
@@ -94,11 +123,6 @@ function AppShell() {
 
     setPhase(resolveLaunchPhase())
   }, [isLoading, isAuthenticated])
-
-  useEffect(() => {
-    if (isLoading || isAuthenticated) return
-    if (!isAuthOpen) openAuth()
-  }, [isLoading, isAuthenticated, isAuthOpen, openAuth])
 
   useEffect(() => {
     const syncOnboardingPhase = () => {
@@ -153,6 +177,14 @@ function AppShell() {
     setActiveTab('training')
   }
 
+  const handleOpenNutrition = () => {
+    if (!isAuthenticated) {
+      openAuth()
+      return
+    }
+    setActiveTab('nutrition')
+  }
+
   const handleLaunchConsumed = () => {
     setLaunchRoutineId(null)
   }
@@ -166,21 +198,10 @@ function AppShell() {
     return (
       <>
         <SupabaseConfigBanner />
-        <div className="relative flex min-h-[100dvh] flex-col mesh-bg font-sans">
-          <header
-            className="glass-bar sticky top-0 z-40 border-b border-white/5"
-            style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
-          >
-            <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-3">
-              <span className="text-[17px] font-semibold tracking-tight text-white">
-                Ranked <span className="text-[#FF2B2B]">Gym</span>
-              </span>
-            </div>
-          </header>
-          <main className="relative z-10 mx-auto w-full max-w-lg flex-1 px-5 py-8">
-            <AppBootScreen />
-          </main>
-        </div>
+        {!online ? <OfflineBanner /> : null}
+        <SessionChrome showBrandHeader={false}>
+          <AppBootScreen />
+        </SessionChrome>
         <AuthBottomSheet />
       </>
     )
@@ -190,7 +211,21 @@ function AppShell() {
     return (
       <>
         <SupabaseConfigBanner />
-        <AuthGateShell />
+        {!online ? <OfflineBanner /> : null}
+        <WelcomeScreen onConnect={() => openAuth()} />
+        <AuthBottomSheet />
+      </>
+    )
+  }
+
+  if (bootIssue === 'blocking') {
+    return (
+      <>
+        <SupabaseConfigBanner />
+        {!online ? <OfflineBanner /> : null}
+        <SessionChrome showBrandHeader={false}>
+          <BootIssueScreen kind="blocking" onRetry={() => void retryHydrate()} />
+        </SessionChrome>
         <AuthBottomSheet />
       </>
     )
@@ -200,6 +235,7 @@ function AppShell() {
     return (
       <>
         <SupabaseConfigBanner />
+        {!online ? <OfflineBanner /> : null}
         <GlobalOnboardingScreen onComplete={handleOnboardingComplete} />
         <AuthBottomSheet />
       </>
@@ -209,11 +245,16 @@ function AppShell() {
   return (
     <>
       <SupabaseConfigBanner />
+      {!online ? <OfflineBanner /> : null}
       <AppLayout activeTab={activeTab} onTabChange={handleTabChange}>
+        {bootIssue === 'recoverable' ? (
+          <RecoverableRetryBar onRetry={() => void retryHydrate()} />
+        ) : null}
         {renderActiveView(
           activeTab,
           handleStartTraining,
           handleOpenTraining,
+          handleOpenNutrition,
           launchRoutineId,
           handleLaunchConsumed,
           () => setActiveTab('home'),

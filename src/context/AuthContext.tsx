@@ -10,22 +10,50 @@ import {
 } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import type { ProfileRow } from '../types/database'
-import { getSupabaseConfigError, isSupabaseConfigured, getSupabase } from '../lib/supabase'
+import { isSupabaseConfigured, getSupabase } from '../lib/supabase'
+import { getActiveAuthBackend } from '../backend/authFeatureFlag'
+import { isConvexDomainActive } from '../backend/adapter'
 import {
   ensureProfile,
   fetchProfile,
   mapSessionUser,
+  requestPasswordReset as apiRequestPasswordReset,
   signInWithEmail as apiSignInWithEmail,
   signOut as apiSignOut,
+  updatePassword as apiUpdatePassword,
   updateProfileProgress,
   type AuthUser,
 } from '../services/authService'
+import { getCurrentSessionUser as getConvexSessionUser, getConvexSessionToken, clearStoredSessionToken as clearConvexSessionToken } from '../services/convexAuthService'
+import {
+  clearCachedSessionUser,
+  readCachedSessionUser,
+  writeCachedSessionUser,
+} from '../services/sessionUserCache'
+import { decideAuthRestore } from '../utils/sessionRestore'
+import {
+  friendlyAuthError,
+  isAccountEnumerationError,
+  validateNewPassword,
+} from '../utils/authErrors'
+import {
+  getPasswordRecoveryRedirectTo,
+  PASSWORD_RESET_SENT_MESSAGE,
+} from '../utils/authRedirect'
 import {
   hydrateCloudBackupForUser,
   resetCloudBackupHydration,
   setCloudBackupUserId,
 } from '../services/cloudBackup'
-import { applyDailyLoginStreak } from '../services/streakService'
+import { classifyHydrateFailure, type BootIssueKind } from '../boot/bootStatus'
+import { hasUsableLocalCache } from '../boot/localCache'
+import { USER_BACKEND_UNAVAILABLE } from '../boot/bootUiCopy'
+import {
+  applyDailyLoginStreak,
+  hasCelebratedStreak,
+  markStreakCelebrated,
+  localDateKey,
+} from '../services/streakService'
 import {
   disciplineFromLabel,
   getDiscipline,
@@ -50,7 +78,14 @@ export type StreakWeekBonus = {
   bonusXp: number
 }
 
-interface AuthContextValue {
+/** Payload for the premium Daily Streak celebration overlay. */
+export type StreakCelebration = {
+  previousStreak: number
+  currentStreak: number
+  dateKey: string
+}
+
+export interface AuthContextValue {
   user: AuthUser | null
   profile: ProfileRow | null
   isAuthenticated: boolean
@@ -60,12 +95,21 @@ interface AuthContextValue {
    * Prevents Flash of Stale Data on refresh.
    */
   isLoading: boolean
+  /**
+   * Échec de hydrate après tentative réelle (fetch toujours exécuté).
+   * `recoverable` = cache local conservé ; `blocking` = aucune donnée affichable.
+   */
+  bootIssue: BootIssueKind | null
+  retryHydrate: () => Promise<void>
   isAuthOpen: boolean
   authLoading: boolean
   authError: string | null
   /** Fired when daily streak hits a multiple of 7 (show Accueil celebration). */
   streakWeekBonus: StreakWeekBonus | null
   clearStreakWeekBonus: () => void
+  /** Set only when streak actually increments N → N+1 (first open of local day). */
+  streakCelebration: StreakCelebration | null
+  clearStreakCelebration: () => void
   refreshProfile: () => Promise<void>
   /** Met à jour localement le profil (ex. avatar) sans refetch. */
   patchProfile: (patch: Partial<ProfileRow>) => void
@@ -74,6 +118,12 @@ interface AuthContextValue {
   requireAuth: (onSuccess: AuthSuccessCallback) => void
   signInWithEmail: (email: string, password: string) => Promise<void>
   signUpWithEmail: (email: string, password: string, pseudo?: string, discipline?: string) => Promise<void>
+  /** True after PASSWORD_RECOVERY until the new password is saved. */
+  isPasswordRecovery: boolean
+  authInfo: string | null
+  clearAuthMessages: () => void
+  requestPasswordReset: (email: string) => Promise<void>
+  confirmPasswordRecovery: (password: string, confirmPassword: string) => Promise<void>
   updateDiscipline: (disciplineLabel: string) => Promise<void>
   updateGhostMode: (enabled: boolean) => Promise<void>
   signOut: () => Promise<void>
@@ -81,24 +131,6 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-function friendlyAuthError(err: unknown, fallback: string): string {
-  const raw = err instanceof Error ? err.message : String(err)
-  const lower = raw.toLowerCase()
-
-  if (lower.includes('invalid login credentials')) {
-    return 'Email ou mot de passe incorrect.'
-  }
-  if (lower.includes('user already registered')) {
-    return 'Cet email est déjà utilisé. Passe sur Connexion.'
-  }
-  if (lower.includes('password') && lower.includes('6')) {
-    return 'Le mot de passe doit contenir au moins 6 caractères.'
-  }
-  if (lower.includes('email')) {
-    return raw
-  }
-  return raw || fallback
-}
 
 const HYDRATE_TIMEOUT_MS = 20_000
 
@@ -125,19 +157,86 @@ function metaDisciplineOf(user: { user_metadata?: Record<string, unknown> }): st
     : undefined
 }
 
+function isConvexAuthRuntime(): boolean {
+  return getActiveAuthBackend() === 'convex'
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<AuthUser | null>(null)
   const [profile, setProfile] = useState<ProfileRow | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [bootIssue, setBootIssue] = useState<BootIssueKind | null>(null)
   const [isAuthOpen, setIsAuthOpen] = useState(false)
   const [authLoading, setAuthLoading] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
+  const [authInfo, setAuthInfo] = useState<string | null>(null)
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
   const [streakWeekBonus, setStreakWeekBonus] = useState<StreakWeekBonus | null>(null)
+  const [streakCelebration, setStreakCelebration] = useState<StreakCelebration | null>(null)
   const pendingRef = useRef<AuthSuccessCallback | null>(null)
   const hydrateGenRef = useRef(0)
+  const streakInFlightRef = useRef(false)
+  const profileRef = useRef<ProfileRow | null>(null)
+  const userRef = useRef<AuthUser | null>(null)
 
   const clearStreakWeekBonus = useCallback(() => setStreakWeekBonus(null), [])
+  const clearStreakCelebration = useCallback(() => setStreakCelebration(null), [])
+
+  useEffect(() => {
+    profileRef.current = profile
+  }, [profile])
+
+  useEffect(() => {
+    userRef.current = user
+  }, [user])
+
+  const applyStreakForProfile = useCallback(
+    async (authUser: AuthUser, row: ProfileRow): Promise<ProfileRow> => {
+      if (streakInFlightRef.current) return row
+      streakInFlightRef.current = true
+      try {
+        const streakResult = await applyDailyLoginStreak(row)
+        setProfile(streakResult.profile)
+        setUser({
+          ...authUser,
+          displayName: streakResult.profile.pseudo || authUser.displayName,
+        })
+
+        if (streakResult.weekBonus && streakResult.bonusXp > 0) {
+          setStreakWeekBonus({
+            streak: streakResult.profile.current_streak,
+            bonusXp: streakResult.bonusXp,
+          })
+        }
+
+        const dateKey = localDateKey()
+        const currentStreak = streakResult.profile.current_streak
+        const previousStreak = streakResult.previousStreak
+        const isIncrement = streakResult.didUpdate && currentStreak === previousStreak + 1
+
+        if (
+          isIncrement &&
+          !hasCelebratedStreak(authUser.id, dateKey, currentStreak)
+        ) {
+          markStreakCelebrated(authUser.id, dateKey, currentStreak)
+          setStreakCelebration({
+            previousStreak,
+            currentStreak,
+            dateKey,
+          })
+        }
+
+        return streakResult.profile
+      } catch {
+        // Columns may be missing until SQL migration — keep base profile.
+        return row
+      } finally {
+        streakInFlightRef.current = false
+      }
+    },
+    [],
+  )
 
   const loadProfile = useCallback(async (authUser: AuthUser, metaDiscipline?: string) => {
     setCloudBackupUserId(authUser.id)
@@ -163,22 +262,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (row) {
-      try {
-        const streakResult = await applyDailyLoginStreak(row)
-        setProfile(streakResult.profile)
-        setUser({
-          ...authUser,
-          displayName: streakResult.profile.pseudo || authUser.displayName,
-        })
-        if (streakResult.weekBonus && streakResult.bonusXp > 0) {
-          setStreakWeekBonus({
-            streak: streakResult.profile.current_streak,
-            bonusXp: streakResult.bonusXp,
-          })
-        }
-      } catch {
-        // Columns may be missing until SQL migration — keep base profile.
-      }
+      await applyStreakForProfile(authUser, row)
     }
 
     try {
@@ -187,15 +271,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         HYDRATE_TIMEOUT_MS,
         'hydrateCloudBackupForUser',
       )
+      setBootIssue(null)
     } catch (e) {
       safeError('[auth] hydrateCloudBackupForUser failed', e)
+      setBootIssue(
+        classifyHydrateFailure({
+          hasProfile: Boolean(profileRef.current),
+          hasLocalCache: hasUsableLocalCache(),
+        }),
+      )
     }
-  }, [])
+  }, [applyStreakForProfile])
 
   const hydrateUser = useCallback(
     async (authUser: AuthUser, metaDiscipline?: string) => {
       const gen = ++hydrateGenRef.current
       setIsLoading(true)
+      setBootIssue(null)
       try {
         await withTimeout(
           loadProfile(authUser, metaDiscipline),
@@ -204,6 +296,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         )
       } catch (error) {
         safeError('[auth] hydrateUser failed', error)
+        if (hydrateGenRef.current === gen) {
+          setBootIssue(
+            classifyHydrateFailure({
+              hasProfile: Boolean(profileRef.current),
+              hasLocalCache: hasUsableLocalCache(),
+            }),
+          )
+        }
       } finally {
         if (hydrateGenRef.current === gen) {
           setIsLoading(false)
@@ -212,6 +312,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [loadProfile],
   )
+
+  const retryHydrate = useCallback(async () => {
+    const authUser = userRef.current
+    if (!authUser) return
+    await hydrateUser(authUser)
+  }, [hydrateUser])
 
   const refreshProfile = useCallback(async () => {
     if (!user) return
@@ -224,6 +330,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
+    if (isConvexAuthRuntime()) {
+      let cancelled = false
+      setIsLoading(true)
+      void (async () => {
+        const token = await getConvexSessionToken()
+        const cachedUser = await readCachedSessionUser()
+        try {
+          const existing = await getConvexSessionUser()
+          if (cancelled) return
+          const decision = decideAuthRestore({
+            token,
+            remoteUser: existing,
+            remoteError: null,
+            cachedUser,
+          })
+          if (decision.kind === 'authenticated') {
+            if (decision.source === 'network') {
+              await writeCachedSessionUser(decision.user)
+            }
+            setUser(decision.user)
+            void hydrateUser(decision.user)
+            return
+          }
+          if (token) await clearConvexSessionToken()
+          await clearCachedSessionUser()
+          setIsLoading(false)
+        } catch (error) {
+          safeError('[auth] convex getCurrentSessionUser failed', error)
+          if (cancelled) return
+          const decision = decideAuthRestore({
+            token,
+            remoteUser: null,
+            remoteError: error,
+            cachedUser,
+          })
+          if (decision.kind === 'authenticated') {
+            setUser(decision.user)
+            void hydrateUser(decision.user)
+            return
+          }
+          setIsLoading(false)
+        }
+      })()
+
+      return () => {
+        cancelled = true
+      }
+    }
+
     if (!isSupabaseConfigured()) {
       setIsLoading(false)
       return
@@ -264,14 +419,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (nextSession?.user) {
         const mapped = mapSessionUser(nextSession.user)
         setUser(mapped)
-        if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'PASSWORD_RECOVERY') {
+        if (event === 'PASSWORD_RECOVERY') {
+          setIsPasswordRecovery(true)
+          setAuthError(null)
+          setAuthInfo(null)
+          setIsAuthOpen(true)
+          void hydrateUser(mapped, metaDisciplineOf(nextSession.user))
+        } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
           void hydrateUser(mapped, metaDisciplineOf(nextSession.user))
         }
       } else {
         hydrateGenRef.current += 1
         setUser(null)
         setProfile(null)
+        setIsPasswordRecovery(false)
         resetCloudBackupHydration()
+        setBootIssue(null)
         setIsLoading(false)
       }
     })
@@ -292,48 +455,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const openAuth = useCallback((onSuccess?: AuthSuccessCallback) => {
-    setAuthError(getSupabaseConfigError())
+    const technical = isConvexAuthRuntime() ? getConvexConfigError() : getSupabaseConfigError()
+    if (technical) {
+      safeError('[auth] backend config', technical)
+      setAuthError(USER_BACKEND_UNAVAILABLE)
+    } else {
+      setAuthError(null)
+    }
+    setAuthInfo(null)
     pendingRef.current = onSuccess ?? null
     setIsAuthOpen(true)
   }, [])
 
   const closeAuth = useCallback(() => {
-    // Bêta privée : pas de fermeture tant qu’il n’y a pas de session Supabase.
-    if (!session?.user) return
+    if (isPasswordRecovery) return
     setIsAuthOpen(false)
     setAuthError(null)
+    setAuthInfo(null)
     pendingRef.current = null
     setAuthLoading(false)
-  }, [session])
+  }, [isPasswordRecovery])
 
   const requireAuth = useCallback(
     (onSuccess: AuthSuccessCallback) => {
-      if (session?.user) {
+      if (user) {
         onSuccess()
         return
       }
       openAuth(onSuccess)
     },
-    [session, openAuth],
+    [user, openAuth],
   )
 
   const signInWithEmail = useCallback(
     async (email: string, password: string) => {
-      if (!isSupabaseConfigured()) {
-        setAuthError(getSupabaseConfigError())
+      if (!isConvexAuthRuntime() && !isSupabaseConfigured()) {
+        const technical = getSupabaseConfigError()
+        if (technical) safeError('[auth] backend config', technical)
+        setAuthError(USER_BACKEND_UNAVAILABLE)
         return
       }
       setAuthLoading(true)
       setAuthError(null)
       try {
-        await apiSignInWithEmail(email, password)
+        const signedIn = await apiSignInWithEmail(email, password)
+        if (isConvexAuthRuntime()) {
+          const candidate = (signedIn as { user?: AuthUser } | undefined)?.user
+          const sessionUser = candidate ?? (await getConvexSessionUser())
+          if (!sessionUser) {
+            throw new Error('AUTH_SESSION_MISSING')
+          }
+          await writeCachedSessionUser(sessionUser)
+          void hydrateUser(sessionUser)
+        }
         completePending()
       } catch (err) {
         setAuthError(friendlyAuthError(err, 'Connexion impossible.'))
         setAuthLoading(false)
       }
     },
-    [completePending],
+    [completePending, hydrateUser],
   )
 
   /** Inscriptions publiques désactivées (bêta fermée / invitation uniquement). */
@@ -347,10 +528,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const clearAuthMessages = useCallback(() => {
+    setAuthError(null)
+    setAuthInfo(null)
+  }, [])
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    if (!isConvexAuthRuntime() && !isSupabaseConfigured()) {
+      const technical = getSupabaseConfigError()
+      if (technical) safeError('[auth] backend config', technical)
+      setAuthError(USER_BACKEND_UNAVAILABLE)
+      return
+    }
+    setAuthLoading(true)
+    setAuthError(null)
+    setAuthInfo(null)
+    try {
+      const redirectTo = getPasswordRecoveryRedirectTo()
+      await apiRequestPasswordReset(email, redirectTo)
+      setAuthInfo(PASSWORD_RESET_SENT_MESSAGE)
+    } catch (err) {
+      if (isAccountEnumerationError(err)) {
+        setAuthInfo(PASSWORD_RESET_SENT_MESSAGE)
+      } else {
+        setAuthError(friendlyAuthError(err, 'Envoi impossible. Réessaie plus tard.'))
+      }
+    } finally {
+      setAuthLoading(false)
+    }
+  }, [])
+
+  const confirmPasswordRecovery = useCallback(
+    async (password: string, confirmPassword: string) => {
+      if (!isConvexAuthRuntime() && !isSupabaseConfigured()) {
+        const technical = getSupabaseConfigError()
+        if (technical) safeError('[auth] backend config', technical)
+        setAuthError(USER_BACKEND_UNAVAILABLE)
+        return
+      }
+      const validationError = validateNewPassword(password, confirmPassword)
+      if (validationError) {
+        setAuthError(validationError)
+        return
+      }
+      setAuthLoading(true)
+      setAuthError(null)
+      setAuthInfo(null)
+      try {
+        await apiUpdatePassword(password)
+        setIsPasswordRecovery(false)
+        setAuthInfo('Mot de passe mis à jour. Tu es connecté.')
+        window.setTimeout(() => {
+          setIsAuthOpen(false)
+          setAuthInfo(null)
+          pendingRef.current = null
+        }, 900)
+      } catch (err) {
+        setAuthError(friendlyAuthError(err, 'Impossible d’enregistrer le mot de passe.'))
+      } finally {
+        setAuthLoading(false)
+      }
+    },
+    [],
+  )
+
   const updateDiscipline = useCallback(
     async (disciplineLabel: string) => {
       syncLocalDiscipline(disciplineLabel)
-      if (!user || !isSupabaseConfigured()) return
+      if (!user || (!isConvexDomainActive() && !isSupabaseConfigured())) return
       try {
         const row = await updateProfileProgress(user.id, { discipline: disciplineLabel })
         setProfile(row)
@@ -365,7 +610,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (enabled: boolean) => {
       setLocalGhostModeEnabled(enabled)
       patchProfile({ is_ghost_mode_enabled: enabled })
-      if (!user || !isSupabaseConfigured()) return
+      if (!user || (!isConvexDomainActive() && !isSupabaseConfigured())) return
       try {
         const row = await updateProfileProgress(user.id, { is_ghost_mode_enabled: enabled })
         setProfile(row)
@@ -382,29 +627,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const signOut = useCallback(async () => {
-    if (isSupabaseConfigured()) {
+    if (isConvexAuthRuntime() || isSupabaseConfigured()) {
       await apiSignOut()
     }
     hydrateGenRef.current += 1
     resetCloudBackupHydration()
+    void clearCachedSessionUser()
     setSession(null)
     setUser(null)
     setProfile(null)
     setStreakWeekBonus(null)
+    setStreakCelebration(null)
+    setIsPasswordRecovery(false)
+    setAuthInfo(null)
+    setAuthError(null)
+    setBootIssue(null)
     setIsLoading(false)
   }, [])
+
+  // Retour au premier plan après minuit local → nouvelle journée validée (idempotent).
+  useEffect(() => {
+    const recheck = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      if (isLoading) return
+      const authUser = userRef.current
+      const row = profileRef.current
+      if (!authUser || !row) return
+      void applyStreakForProfile(authUser, row)
+    }
+    document.addEventListener('visibilitychange', recheck)
+    window.addEventListener('focus', recheck)
+    return () => {
+      document.removeEventListener('visibilitychange', recheck)
+      window.removeEventListener('focus', recheck)
+    }
+  }, [isLoading, applyStreakForProfile])
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       profile,
-      isAuthenticated: Boolean(session?.user),
+      isAuthenticated: Boolean(user),
       isLoading,
+      bootIssue,
+      retryHydrate,
       isAuthOpen,
       authLoading,
       authError,
       streakWeekBonus,
       clearStreakWeekBonus,
+      streakCelebration,
+      clearStreakCelebration,
       refreshProfile,
       patchProfile,
       openAuth,
@@ -412,6 +685,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requireAuth,
       signInWithEmail,
       signUpWithEmail: signUpEmail,
+      isPasswordRecovery,
+      authInfo,
+      clearAuthMessages,
+      requestPasswordReset,
+      confirmPasswordRecovery,
       updateDiscipline,
       updateGhostMode,
       signOut,
@@ -421,11 +699,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       session,
       isLoading,
+      bootIssue,
+      retryHydrate,
       isAuthOpen,
       authLoading,
       authError,
       streakWeekBonus,
       clearStreakWeekBonus,
+      streakCelebration,
+      clearStreakCelebration,
       refreshProfile,
       patchProfile,
       openAuth,
@@ -433,12 +715,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requireAuth,
       signInWithEmail,
       signUpEmail,
+      isPasswordRecovery,
+      authInfo,
+      clearAuthMessages,
+      requestPasswordReset,
+      confirmPasswordRecovery,
       updateDiscipline,
       updateGhostMode,
       signOut,
     ],
   )
 
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+/** Provider injectable pour tests intégrés et captures (valeur AuthContext complète). */
+export function AuthStateProvider({
+  value,
+  children,
+}: {
+  value: AuthContextValue
+  children: ReactNode
+}) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

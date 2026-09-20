@@ -1,0 +1,11 @@
+{
+  "imgCount": 1,
+  "srcs": [
+    "/auth-welcome-hero.png"
+  ],
+  "hasLogoClass": false,
+  "hasTextureClass": false,
+  "objectFit": "cover",
+  "objectPosition": "50% 0%",
+  "fallbackBg": "rgb(7, 7, 8)"
+}

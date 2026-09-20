@@ -35,6 +35,7 @@ import { MealBudgetsCard } from './MealBudgetsCard'
 import { EditMealSheet } from './EditMealSheet'
 import { MealPhotoAnalyzer } from './MealPhotoAnalyzer'
 import { AddFoodScreen } from './AddFoodScreen'
+import { SectionSkeleton } from '../ui/AppBootScreen'
 
 interface MealJournalProps {
   targetCalories: number
@@ -285,7 +286,9 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     setEditingMeal(null)
   }
 
-  if (!hydrated) return null
+  if (!hydrated) {
+    return <SectionSkeleton tall label="Journal" />
+  }
 
   return (
     <section className="space-y-4 pb-6">
@@ -351,9 +354,9 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
             </div>
             <div className="h-2 overflow-hidden rounded-full border border-white/10 bg-black/40">
               <div
-                className="h-full rounded-full transition-all duration-500"
+                className="motion-progress-fill h-full rounded-full"
                 style={{
-                  width: `${Math.min(progress * 100, 100)}%`,
+                  transform: `scaleX(${Math.max(0, Math.min(progress, 1))})`,
                   background:
                     progress > 1
                       ? 'linear-gradient(90deg, #FF2B2B, #FF0055)'

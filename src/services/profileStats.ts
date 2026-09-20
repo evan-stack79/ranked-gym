@@ -3,7 +3,7 @@ import { dedupeWorkoutNotes } from '../utils/workoutHistory'
 import { getTrainingState } from './trainingStorage'
 import { getPinnedPr } from './profileStorage'
 import { countCheckins } from './checkinService'
-import { isSupabaseConfigured } from '../lib/supabase'
+import { isActiveCloudBackendConfigured } from '../backend/adapter'
 
 export type ExercisePr = {
   exerciseName: string
@@ -190,7 +190,7 @@ export async function loadProfileStats(input: {
   const notes = dedupeWorkoutNotes(getTrainingState().workoutNotes)
   const workoutCount = notes.length
   let checkinCount = 0
-  if (input.userId && isSupabaseConfigured()) {
+  if (input.userId && isActiveCloudBackendConfigured()) {
     try {
       checkinCount = await countCheckins(input.userId)
     } catch {

@@ -1,112 +1,123 @@
-import { useMemo, useState } from 'react'
-import { ChevronRight, Clock, Dumbbell, Flame, Pencil, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ChevronRight } from 'lucide-react'
 import type { WorkoutNote } from '../../types/training'
 import {
-  DIFF_LABELS,
   formatClock,
+  formatHistoryMetricsLine,
   groupNotesByDate,
-  noteDurationMin,
-  noteVolumeKg,
 } from '../../utils/workoutHistory'
-import { IosSheet } from '../ui/IosSheet'
+import { historySessionMetrics } from '../../utils/historySessionDetail'
+import {
+  deriveSessionDisplayTitle,
+  formatHistoryExerciseSummary,
+} from '../../utils/sessionDisplayTitle'
+import { HistorySessionThumb } from './HistorySessionThumb'
+import { HistorySessionSheet } from './HistorySessionSheet'
 
 interface WorkoutHistoryProps {
   notes: WorkoutNote[]
-  onDelete: (id: string) => void
+  onDelete: (id: string) => void | Promise<void>
   onEdit?: (note: WorkoutNote) => void
+  /** Filtre optionnel — masque l’action Éditer si false. */
+  canEdit?: (note: WorkoutNote) => boolean
+  /** Ouvre le détail d’une séance (hub « Dernières séances »). */
+  focusNoteId?: string | null
+  onFocusConsumed?: () => void
 }
 
-export function WorkoutHistory({ notes, onDelete, onEdit }: WorkoutHistoryProps) {
+export function WorkoutHistory({
+  notes,
+  onDelete,
+  onEdit,
+  canEdit,
+  focusNoteId = null,
+  onFocusConsumed,
+}: WorkoutHistoryProps) {
   const [selected, setSelected] = useState<WorkoutNote | null>(null)
   const groups = useMemo(() => groupNotesByDate(notes), [notes])
 
+  useEffect(() => {
+    if (!focusNoteId) return
+    const hit = notes.find((n) => n.id === focusNoteId) ?? null
+    setSelected(hit)
+    onFocusConsumed?.()
+  }, [focusNoteId, notes, onFocusConsumed])
+
+  const pageTitle = (
+    <h2 className="text-left text-[22px] font-extrabold tracking-tight text-white">
+      Historique
+    </h2>
+  )
+
   if (groups.length === 0) {
     return (
-      <section className="space-y-2">
-        <div className="px-1">
-          <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-            Historique
-          </p>
-          <h2 className="text-[20px] font-bold text-white">Journal d’athlète</h2>
-          <p className="mt-1 text-[12px] text-[#AEAEB2]">
-            Tes séances passées apparaîtront ici, groupées par jour.
-          </p>
-        </div>
+      <section className="history-page" data-history-page="empty">
+        {pageTitle}
+        <p className="mt-2 text-left text-[13px] leading-5 text-[#8E8E93]">
+          Aucune séance enregistrée. Termine une séance pour la retrouver ici, groupée par
+          jour.
+        </p>
       </section>
     )
   }
 
   return (
-    <section className="space-y-4">
-      <div className="px-1">
-        <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-          Historique
-        </p>
-        <h2 className="text-[20px] font-bold text-white">Journal d’athlète</h2>
-        <p className="mt-1 text-[12px] text-[#AEAEB2]">
-          Chronologique · volume · durée · détail des séries.
-        </p>
-      </div>
+    <section className="history-page" data-history-page="list">
+      {pageTitle}
 
       {groups.map((group) => (
-        <div key={group.dateKey} className="space-y-2">
-          <p className="px-1 text-[13px] font-bold text-white">{group.label}</p>
-          <ul className="space-y-2">
+        <div key={group.dateKey} className="mt-5 first:mt-4">
+          <p className="text-left text-[12px] font-semibold text-[#8E8E93]">{group.label}</p>
+          <ul>
             {group.sessions.map((note) => {
-              const volume = noteVolumeKg(note)
-              const duration = noteDurationMin(note)
-              const exerciseCount = note.exercises.length
+              const metrics = historySessionMetrics(note)
+              const displayTitle = deriveSessionDisplayTitle(note)
+              const metricsLine = formatHistoryMetricsLine(metrics)
+              const exerciseLine = formatHistoryExerciseSummary(note)
+              const isSelected = selected?.id === note.id
               return (
                 <li key={note.id}>
                   <button
                     type="button"
-                    onClick={() => setSelected(note)}
-                    className="ios-press glass-card flex w-full items-center gap-3 rounded-2xl p-3.5 text-left"
+                    onClick={(event) => {
+                      event.currentTarget.focus()
+                      setSelected(note)
+                    }}
+                    aria-label={`Voir ${displayTitle}`}
+                    data-history-row={note.id}
+                    data-history-selected={isSelected ? 'true' : undefined}
+                    className={`history-row ios-press flex w-full items-start gap-3 py-2.5 text-left ${
+                      isSelected ? 'history-row--active' : ''
+                    }`}
                   >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#FF2B2B]/15 text-[#FF6961]">
-                      <Dumbbell className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate font-semibold text-white">{note.title}</p>
-                        <span className="shrink-0 text-[11px] text-[#636366]">
+                    <HistorySessionThumb note={note} />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-start gap-2">
+                        <span className="min-w-0 flex-1 truncate text-[16px] font-extrabold leading-5 text-white">
+                          {displayTitle}
+                        </span>
+                        <time
+                          className="shrink-0 pt-0.5 text-[12px] font-medium tabular-nums text-[#8E8E93]"
+                          dateTime={new Date(note.createdAt).toISOString()}
+                        >
                           {formatClock(note.createdAt)}
+                        </time>
+                      </span>
+                      {metricsLine ? (
+                        <span className="mt-0.5 block truncate text-[12px] leading-4 text-[#AEAEB2]">
+                          {metricsLine}
                         </span>
-                        {onEdit ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onEdit(note)
-                            }}
-                            className="ios-press ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-[#AEAEB2]"
-                            aria-label={`Modifier ${note.title}`}
-                          >
-                            <Pencil className="h-3.5 w-3.5" strokeWidth={2.25} />
-                          </button>
-                        ) : null}
-                      </div>
-                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-[#8E8E93]">
-                        <span className="inline-flex items-center gap-1">
-                          <Dumbbell className="h-3 w-3" />
-                          {volume.toLocaleString('fr-FR')} kg
+                      ) : null}
+                      {exerciseLine ? (
+                        <span className="mt-0.5 block truncate text-[11px] leading-4 text-[#636366]">
+                          {exerciseLine}
                         </span>
-                        <span className="inline-flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {duration} min
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <Flame className="h-3 w-3 text-[#FF9F0A]" />
-                          {note.estimatedKcal} kcal
-                        </span>
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-[#636366]">
-                        {exerciseCount} exercice{exerciseCount > 1 ? 's' : ''}
-                        {note.exercises[0]?.name ? ` · ${note.exercises[0].name}` : ''}
-                        {exerciseCount > 1 ? '…' : ''}
-                      </p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-[#636366]" />
+                      ) : null}
+                    </span>
+                    <ChevronRight
+                      className="mt-0.5 h-4 w-4 shrink-0 text-[#3A3A3C]"
+                      aria-hidden="true"
+                    />
                   </button>
                 </li>
               )
@@ -115,74 +126,13 @@ export function WorkoutHistory({ notes, onDelete, onEdit }: WorkoutHistoryProps)
         </div>
       ))}
 
-      <IosSheet
-        open={selected != null}
+      <HistorySessionSheet
+        note={selected}
         onClose={() => setSelected(null)}
-        title={selected?.title ?? 'Séance'}
-        subtitle={
-          selected
-            ? `${formatClock(selected.createdAt)} · ${noteDurationMin(selected)} min · ${noteVolumeKg(selected).toLocaleString('fr-FR')} kg · ${selected.estimatedKcal} kcal`
-            : undefined
-        }
-        leading={<Dumbbell className="mt-0.5 h-5 w-5 text-[#FF6961]" />}
-      >
-        {selected && (
-          <div className="space-y-4 pb-2">
-            {selected.exercises.map((ex) => (
-              <div
-                key={ex.id}
-                className="rounded-2xl border border-white/10 bg-black/30 p-3.5"
-              >
-                <p className="text-[15px] font-semibold text-white">{ex.name || 'Exercice'}</p>
-                <ul className="mt-2 space-y-1.5">
-                  {ex.sets.map((set, idx) => (
-                    <li
-                      key={idx}
-                      className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 px-3 py-2 text-[13px]"
-                    >
-                      <span className="font-semibold text-[#8E8E93]">Série {idx + 1}</span>
-                      <span className="text-white">
-                        {set.reps} reps × {set.weightKg} kg
-                      </span>
-                      <span className="text-[11px] font-semibold text-[#AEAEB2]">
-                        {DIFF_LABELS[set.difficulty ?? 'ok'] ?? 'OK'}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-
-            {onEdit ? (
-              <button
-                type="button"
-                onClick={() => {
-                  const note = selected
-                  setSelected(null)
-                  onEdit(note)
-                }}
-                className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-[#FF2B2B]/35 bg-[#FF2B2B]/12 py-3.5 text-[14px] font-semibold text-[#FF6961]"
-              >
-                <Pencil className="h-4 w-4" />
-                Modifier cette séance
-              </button>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={() => {
-                const id = selected.id
-                setSelected(null)
-                onDelete(id)
-              }}
-              className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-[#FF453A]/30 bg-[#FF453A]/12 py-3.5 text-[14px] font-semibold text-[#FF453A]"
-            >
-              <Trash2 className="h-4 w-4" />
-              Supprimer cette séance
-            </button>
-          </div>
-        )}
-      </IosSheet>
+        onDelete={onDelete}
+        onEdit={onEdit}
+        canEdit={canEdit}
+      />
     </section>
   )
 }

@@ -19,7 +19,15 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'icon.png', 'pwa-192x192.png', 'pwa-512x512.png'],
+      includeAssets: [
+        'favicon.svg',
+        'favicon.png',
+        'icon.png',
+        'apple-touch-icon.png',
+        'pwa-192x192.png',
+        'pwa-512x512.png',
+        'pwa-maskable-512x512.png',
+      ],
       manifest: {
         id: '/',
         name: 'Ranked Gym',
@@ -53,7 +61,7 @@ export default defineConfig({
             purpose: 'any',
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'pwa-maskable-512x512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
@@ -61,7 +69,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webp,avif}'],
+        // PNG source kept as <picture> fallback; 2.85 MB exceeds the default precache cap.
+        globIgnores: ['**/auth-welcome-hero.png'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/assets\//, /^\/workbox-/, /^\/sw\.js$/, /^\/registerSW\.js$/],
       },

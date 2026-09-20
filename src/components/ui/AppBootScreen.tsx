@@ -1,42 +1,62 @@
+import { BrandMark } from '../brand/BrandMark'
+import { USER_BOOT_ARIA_LABEL } from '../../boot/bootUiCopy'
+
 /**
- * Full-screen boot UI — shown until auth session + Supabase profile/cloud hydrate finish.
- * Prevents flash of empty / default stats.
+ * Splash Ranked Gym sobre — affiché tant que session + hydrate n’ont pas fini.
+ * Aucun libellé technique. Les fetches continuent en arrière-plan.
  */
 export function AppBootScreen() {
   return (
     <div
-      className="flex min-h-[70vh] flex-col gap-6 ios-fade-up"
+      className="flex min-h-[70vh] flex-col gap-8"
       role="status"
       aria-live="polite"
       aria-busy="true"
-      aria-label="Chargement des données"
+      aria-label={USER_BOOT_ARIA_LABEL}
+      data-app-boot-screen="1"
     >
-      <div className="flex flex-col items-center gap-4 pt-10 pb-2">
-        <div className="relative flex h-14 w-14 items-center justify-center">
-          <span
-            className="absolute inset-0 rounded-full border-2 border-[#FF2B2B]/25"
-            aria-hidden
-          />
-          <span
-            className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[#FF2B2B]"
-            aria-hidden
-          />
-          <span className="text-[11px] font-black tracking-tight text-white">RG</span>
-        </div>
-        <div className="text-center">
-          <p className="text-[17px] font-semibold text-white">Chargement Ranked Gym</p>
-          <p className="mt-1 text-[13px] text-[#8E8E93]">Récupération de ton profil…</p>
-        </div>
+      <div className="flex flex-col items-center gap-3 pt-6 pb-1">
+        <BrandMark variant="hero" showWordmark={false} />
+        <BrandMark variant="hero" showMark={false} />
       </div>
 
-      <SkeletonCard tall />
-      <div className="grid grid-cols-3 gap-2">
-        <SkeletonBlock className="h-16" />
-        <SkeletonBlock className="h-16" />
-        <SkeletonBlock className="h-16" />
+      <HomeBootSkeleton />
+    </div>
+  )
+}
+
+export function HomeBootSkeleton() {
+  return (
+    <div className="flex flex-col gap-8" aria-hidden data-home-boot-skeleton="1">
+      <div>
+        <SkeletonBlock className="h-8 w-56" />
       </div>
+      <SkeletonCard tall />
       <SkeletonCard />
       <SkeletonCard />
+      <SkeletonCard />
+    </div>
+  )
+}
+
+export function SectionSkeleton({
+  tall = false,
+  label,
+}: {
+  tall?: boolean
+  label?: string
+}) {
+  return (
+    <div
+      className="glass-card rounded-2xl p-4"
+      aria-busy="true"
+      aria-label={label}
+      data-section-skeleton="1"
+    >
+      <SkeletonBlock className="mb-3 h-3 w-20" />
+      <SkeletonBlock className={`mb-2 ${tall ? 'h-8 w-40' : 'h-5 w-36'}`} />
+      <SkeletonBlock className="h-2.5 w-full" />
+      <SkeletonBlock className="mt-2 h-2.5 w-2/3" />
     </div>
   )
 }
@@ -44,12 +64,12 @@ export function AppBootScreen() {
 function SkeletonCard({ tall = false }: { tall?: boolean }) {
   return (
     <div
-      className={`overflow-hidden rounded-3xl border border-white/10 bg-[#1C1C1E]/90 p-5 ${
-        tall ? 'min-h-[180px]' : 'min-h-[110px]'
+      className={`overflow-hidden rounded-2xl border border-white/10 bg-[#1C1C1E]/90 p-4 ${
+        tall ? 'min-h-[160px]' : 'min-h-[96px]'
       }`}
     >
-      <SkeletonBlock className="mb-4 h-3 w-24" />
-      <SkeletonBlock className={`mb-3 ${tall ? 'h-10 w-40' : 'h-7 w-36'}`} />
+      <SkeletonBlock className="mb-3 h-3 w-20" />
+      <SkeletonBlock className={`mb-2 ${tall ? 'h-8 w-40' : 'h-5 w-36'}`} />
       <SkeletonBlock className="h-2.5 w-full" />
       <SkeletonBlock className="mt-2 h-2.5 w-3/4" />
     </div>

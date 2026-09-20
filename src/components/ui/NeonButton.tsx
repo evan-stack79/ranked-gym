@@ -31,7 +31,7 @@ export function NeonButton({
       type="button"
       onClick={onClick}
       disabled={disabled || loading}
-      className={`w-full rounded-2xl px-6 py-4 text-[17px] font-semibold tracking-tight transition-opacity disabled:cursor-not-allowed disabled:opacity-40 ${variantClass} ${className}`}
+      className={`w-full rounded-2xl px-6 py-4 text-[17px] font-semibold tracking-tight transition-[transform,opacity] duration-150 ease-out active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${variantClass} ${className}`}
     >
       {loading ? (
         <span className="flex items-center justify-center gap-2">

@@ -4,6 +4,7 @@ import type { Json } from '../types/database'
 import type { CalorieProfile, DayJournal } from '../types/nutrition'
 import type { TrainingState } from '../types/training'
 import type { NearbyGym } from '../types'
+import { isActiveCloudBackendConfigured, isConvexDomainActive } from '../backend/adapter'
 import {
   getCalorieProfile,
   getMealJournal,
@@ -24,12 +25,17 @@ import {
   clearCheckIn,
   type StoredCheckIn,
 } from './lobbyStorage'
+import {
+  getSleepLog,
+  replaceSleepLog,
+  type SleepNightEntry,
+} from './sleepStorage'
 import { getActiveCloudUserId as readCloudUserId, setActiveCloudUserId } from './cloudSession'
 
-export const BACKUP_VERSION = 3 as const
+export const BACKUP_VERSION = 4 as const
 
 export type CloudBackupPayload = {
-  version: typeof BACKUP_VERSION
+  version: number
   updatedAt: string
   nutrition: {
     profile: CalorieProfile | null
@@ -41,6 +47,8 @@ export type CloudBackupPayload = {
     customGyms: NearbyGym[]
     checkIn: StoredCheckIn | null
   }
+  /** First-class sleep nights (gap fix vs backup v3). */
+  sleep?: SleepNightEntry[]
 }
 
 const LOCAL_META_KEY = 'ranked-gym:cloud-backup-meta'
@@ -138,13 +146,21 @@ export function setCloudBackupUserId(userId: string | null) {
 
 /** Called after every local write — auto cloud save, no user action. */
 export function notifyLocalDataChanged() {
-  if (!activeUserId || !isSupabaseConfigured()) return
+  let userId: string | null = null
+  try {
+    userId = readCloudUserId()
+  } catch (error) {
+    if (error instanceof ReferenceError) return
+    throw error
+  }
+  if (!userId) return
+  if (!isActiveCloudBackendConfigured()) return
   if (!cloudSyncReady) {
     deferredPush = true
     setMeta({ pending: true })
     return
   }
-  scheduleCloudPush(activeUserId)
+  scheduleCloudPush(userId)
 }
 
 export function collectLocalBackup(): CloudBackupPayload {
@@ -161,6 +177,7 @@ export function collectLocalBackup(): CloudBackupPayload {
       customGyms: getCustomGyms(),
       checkIn: getActiveCheckIn(),
     },
+    sleep: getSleepLog(),
   }
 }
 
@@ -188,6 +205,14 @@ function applyBackup(payload: CloudBackupPayload) {
       clearCheckIn({ skipCloud: true })
     }
   }
+  if (payload.sleep) {
+    replaceSleepLog(payload.sleep, { skipCloud: true })
+  }
+}
+
+/** Test/helper alias — hydrate uses the private applyBackup path. */
+export function applyCloudBackupPayload(payload: CloudBackupPayload) {
+  applyBackup(payload)
 }
 
 /** True only for missing-relation errors — never RLS / permission / network. */
@@ -289,7 +314,7 @@ function payloadFromTables(input: {
   }
 }
 
-function hasMeaningfulCloudData(payload: CloudBackupPayload): boolean {
+export function hasMeaningfulCloudData(payload: CloudBackupPayload): boolean {
   const meals = Object.values(payload.nutrition.journal ?? {}).some((d) => d.meals?.length > 0)
   const notes = (payload.training?.workoutNotes?.length ?? 0) > 0
   const completed = (payload.training?.completed?.length ?? 0) > 0
@@ -298,13 +323,49 @@ function hasMeaningfulCloudData(payload: CloudBackupPayload): boolean {
   const onboarded = Boolean(payload.nutrition.profile?.onboardingComplete)
   const spots = (payload.lobby?.customGyms?.length ?? 0) > 0
   const checkIn = Boolean(payload.lobby?.checkIn?.gym)
-  return meals || notes || completed || schedule || routines || onboarded || spots || checkIn
+  const sleep = (payload.sleep?.length ?? 0) > 0
+  return meals || notes || completed || schedule || routines || onboarded || spots || checkIn || sleep
+}
+
+export function isCloudSyncReady(): boolean {
+  return cloudSyncReady
+}
+
+function extractSleepFromUnknown(value: unknown): SleepNightEntry[] | undefined {
+  const record = asObject(value)
+  const sleep = record?.sleep
+  if (!Array.isArray(sleep) || sleep.length === 0) return undefined
+  return sleep as SleepNightEntry[]
+}
+
+async function mergeSleepFromUserBackups(
+  userId: string,
+  payload: CloudBackupPayload | null,
+): Promise<CloudBackupPayload | null> {
+  if (!payload || (payload.sleep && payload.sleep.length > 0)) return payload
+  if (!isSupabaseConfigured()) return payload
+  const supabase = getSupabase()
+  const { data } = await supabase
+    .from('user_backups')
+    .select('payload')
+    .eq('user_id', userId)
+    .maybeSingle()
+  const sleep = extractSleepFromUnknown(data?.payload)
+  if (!sleep) return payload
+  return { ...payload, sleep }
 }
 
 async function fetchRemotePayload(userId: string): Promise<{
   payload: CloudBackupPayload | null
   error?: string
 }> {
+  if (isConvexDomainActive()) {
+    const { fetchConvexBackupPayload } = await import('./convexCloudBackup')
+    const result = await fetchConvexBackupPayload(getTrainingState())
+    if (result.error) return { payload: null, error: result.error }
+    return { payload: result.payload }
+  }
+
   const supabase = getSupabase()
 
   const [nutritionRes, workoutsRes, profileRes] = await Promise.all([
@@ -357,7 +418,7 @@ async function fetchRemotePayload(userId: string): Promise<{
   })
 
   if (fromTables && hasMeaningfulCloudData(fromTables)) {
-    return { payload: fromTables }
+    return { payload: await mergeSleepFromUserBackups(userId, fromTables) }
   }
 
   // Migrate legacy user_backups → new tables if tables are empty
@@ -374,10 +435,17 @@ async function fetchRemotePayload(userId: string): Promise<{
     }
   }
 
-  return { payload: fromTables }
+  return { payload: await mergeSleepFromUserBackups(userId, fromTables) }
 }
 
 async function upsertTables(userId: string, payload: CloudBackupPayload): Promise<{ error?: string }> {
+  if (isConvexDomainActive()) {
+    const { pushConvexBackupPayload } = await import('./convexCloudBackup')
+    const result = await pushConvexBackupPayload(payload)
+    if (result.skippedEmptyOverwrite) return {}
+    return { error: result.error }
+  }
+
   const supabase = getSupabase()
   const now = payload.updatedAt || new Date().toISOString()
   const json = (v: unknown) => v as Json
@@ -490,7 +558,7 @@ export async function pushCloudBackup(
   userId?: string | null,
 ): Promise<{ ok: boolean; error?: string }> {
   const uid = userId ?? activeUserId
-  if (!uid || !isSupabaseConfigured()) {
+  if (!uid || !isActiveCloudBackendConfigured()) {
     return { ok: false, error: 'Connecte-toi pour activer la sauvegarde cloud.' }
   }
   if (pushInFlight) {
@@ -544,7 +612,7 @@ export async function pullCloudBackup(
   options?: { preferRemote?: boolean },
 ): Promise<{ ok: boolean; applied: boolean; error?: string }> {
   const uid = userId ?? activeUserId
-  if (!uid || !isSupabaseConfigured()) {
+  if (!uid || !isActiveCloudBackendConfigured()) {
     return { ok: false, applied: false, error: 'Connexion requise.' }
   }
 
@@ -585,7 +653,7 @@ export async function pullCloudBackup(
 }
 
 export function scheduleCloudPush(userId: string | null | undefined) {
-  if (!userId || !isSupabaseConfigured()) return
+  if (!userId || !isActiveCloudBackendConfigured()) return
   setMeta({ pending: true })
   if (pushTimer) clearTimeout(pushTimer)
   pushTimer = setTimeout(() => {
@@ -601,12 +669,14 @@ export function flushCloudPush() {
 /** Flush immédiat — retourne le résultat (pour toasts Train / Sauver). */
 export async function flushCloudPushAsync(): Promise<{ ok: boolean; error?: string }> {
   if (!activeUserId) {
-    const error = 'Connecte-toi pour sauvegarder dans Supabase.'
+    const error = 'Connecte-toi pour sauvegarder dans le cloud.'
     safeError('[cloudBackup] flush', error)
     return { ok: false, error }
   }
-  if (!isSupabaseConfigured()) {
-    const error = 'Supabase non configuré (VITE_SUPABASE_URL / ANON_KEY).'
+  if (!isActiveCloudBackendConfigured()) {
+    const error = isConvexDomainActive()
+      ? 'Convex non configuré (VITE_CONVEX_URL).'
+      : 'Supabase non configuré (VITE_SUPABASE_URL / ANON_KEY).'
     safeError('[cloudBackup] flush', error)
     return { ok: false, error }
   }
@@ -634,7 +704,7 @@ function wireLifecycleOnce() {
 }
 
 export async function hydrateCloudBackupForUser(userId: string) {
-  if (!userId || !isSupabaseConfigured()) return
+  if (!userId || !isActiveCloudBackendConfigured()) return
   setCloudBackupUserId(userId)
   wireLifecycleOnce()
   if (hydratedUserId === userId && cloudSyncReady) {

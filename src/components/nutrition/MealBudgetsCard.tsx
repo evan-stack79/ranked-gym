@@ -54,9 +54,9 @@ export function MealBudgetsCard({ targetCalories, morphology, meals }: MealBudge
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
                 <div
-                  className="h-full rounded-full transition-all duration-500"
+                  className="motion-progress-fill h-full rounded-full"
                   style={{
-                    width: `${Math.max(progress * 100, row.used > 0 ? 6 : 0)}%`,
+                    transform: `scaleX(${Math.max(progress, row.used > 0 ? 0.06 : 0)})`,
                     background:
                       progress > 1.05
                         ? 'linear-gradient(90deg, #FF2B2B, #FF9F0A)'

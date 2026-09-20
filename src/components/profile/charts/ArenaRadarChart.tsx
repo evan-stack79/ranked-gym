@@ -56,7 +56,7 @@ export function ArenaRadarChart({
   if (loading) {
     return (
       <div className={`flex min-h-[260px] items-center justify-center ${className}`}>
-        <div className="avatar-spinner h-8 w-8 rounded-full border-2 border-white/20 border-t-[#FF2B2B]" aria-label="Chargement du radar" />
+        <div className="avatar-spinner h-8 w-8 rounded-full border-2 border-white/20 border-t-[#FF2B2B]" aria-hidden />
       </div>
     )
   }
@@ -79,7 +79,7 @@ export function ArenaRadarChart({
         viewBox={`0 0 ${SIZE} ${SIZE}`}
         className="mx-auto h-auto w-full max-w-[280px]"
         role="img"
-        aria-label="Bilan de l'arène — graphique radar"
+        aria-label="Bilan athlète — graphique radar"
       >
         <defs>
           <linearGradient id="arena-radar-fill" x1="0%" y1="0%" x2="100%" y2="100%">

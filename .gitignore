@@ -30,6 +30,99 @@ dist-ssr
 # Supabase CLI cache (local)
 supabase/.temp/
 
+# Convex CLI local backend / cache (never commit)
+.convex/
+
 # Build
 dist
 dist-ssr
+
+# Capacitor / native (artefacts locaux — projets ios/ et android/ versionnés)
+.capacitor
+android/app/build
+android/.gradle
+android/local.properties
+android/captures
+android/.idea
+ios/App/Pods
+ios/App/Podfile.lock
+ios/App/App.xcworkspace/xcuserdata
+ios/App/App.xcodeproj/xcuserdata
+ios/DerivedData
+*.jks
+*.keystore
+.android-sdk/
+
+# Autonomous agent runs (reports, logs and detached worktrees)
+.agent-runs/
+
+!scripts/screenshots/auth-welcome/
+!scripts/screenshots/auth-welcome/**
+!scripts/screenshots/workout-immersive/
+!scripts/screenshots/workout-immersive/DIAGNOSTIC.md
+!scripts/screenshots/workout-immersive/real-developper-iphone-390.png
+!scripts/screenshots/workout-immersive/real-developper-android-360.png
+!scripts/screenshots/workout-immersive/real-developper-diag.json
+!scripts/screenshots/workout-immersive/canonical-bench-iphone-390.png
+!scripts/screenshots/workout-immersive/canonical-bench-android-360.png
+!scripts/screenshots/workout-immersive/canonical-bench-diag.json
+!scripts/screenshots/workout-immersive/prod-preview-canonical-bench-390.png
+!scripts/screenshots/workout-immersive/prod-hero-diag.json
+!scripts/screenshots/workout-immersive/load-real-developper.webm
+!scripts/screenshots/workout-immersive/load-canonical-bench-refresh.webm
+!scripts/screenshots/exercise-picker/
+!scripts/screenshots/exercise-picker/VALIDATION.md
+!scripts/screenshots/exercise-picker/picker-before-query-390.png
+!scripts/screenshots/exercise-picker/picker-search-developpe-390.png
+!scripts/screenshots/exercise-picker/picker-search-focused-390.png
+!scripts/screenshots/exercise-picker/immersive-after-select-390.png
+!scripts/screenshots/exercise-picker/picker_select_to_immersive_demo.mp4
+!scripts/screenshots/exercise-picker/picker_wave1_thumbs_default.png
+!scripts/screenshots/exercise-picker/picker_wave1_search_developpe.png
+!scripts/screenshots/exercise-picker/picker_search_fallback.png
+!scripts/screenshots/exercise-picker/immersive_after_select.png
+!scripts/screenshots/exercise-picker/immersive_incline_no_wave1_hero.png
+!scripts/screenshots/nutrition-ux/
+!scripts/screenshots/nutrition-ux/nutrition-390x844.png
+# Exception: preuves scroll marque (header en flux)
+!scripts/screenshots/brand-scroll/
+!scripts/screenshots/brand-scroll/nutrition_brand_scroll_A_top_brand_visible.png
+!scripts/screenshots/brand-scroll/nutrition_brand_scroll_B_scrolled_brand_gone.png
+!scripts/screenshots/brand-scroll/nutrition_brand_scroll_C_back_top_brand_visible.png
+!scripts/screenshots/brand-scroll/accueil_brand_scroll_A_top_brand_visible.png
+!scripts/screenshots/brand-scroll/accueil_brand_scroll_B_scrolled_brand_gone.png
+!scripts/screenshots/brand-scroll/accueil_brand_scroll_C_back_top_brand_visible.png
+# Exception: preuves soft-leave séance immersive → Train Reprendre
+!scripts/screenshots/session-soft-leave/
+!scripts/screenshots/session-soft-leave/CAUSE.md
+!scripts/screenshots/session-soft-leave/soft_leave_01_hub_reprendre.png
+!scripts/screenshots/session-soft-leave/soft_leave_02_session_edited.png
+!scripts/screenshots/session-soft-leave/soft_leave_03_hub_after_back.png
+!scripts/screenshots/session-soft-leave/soft_leave_04_restored.png
+!scripts/screenshots/session-soft-leave/soft_leave_session_back_to_reprendre.mp4
+# Exception: preuves redesign Historique
+!scripts/screenshots/history-redesign/
+!scripts/screenshots/history-redesign/history_page_iphone_390x844.png
+!scripts/screenshots/history-redesign/history_list_iphone_390x844.png
+!scripts/screenshots/history-redesign/history_page_android_360x800.png
+!scripts/screenshots/history-redesign/history_empty_390x844.png
+!scripts/screenshots/history-redesign/history_detail_squat_390x844.png
+!scripts/screenshots/history-redesign/history_detail_small_squat_390x844.png
+!scripts/screenshots/history-redesign/history_detail_long_session_390x844.png
+!scripts/screenshots/history-redesign/history_detail_delete_confirm_390x844.png
+!scripts/screenshots/history-redesign/history_scroll_open_detail.webm
+!scripts/screenshots/history-redesign/history_scroll_open_detail.mp4
+!scripts/screenshots/history-redesign/history_detail_open_scroll_close_delete_confirm.webm
+!scripts/screenshots/history-redesign/history_detail_open_scroll_close_delete_confirm.mp4
+
+# Exception: preuves boot UX sans copies techniques
+!scripts/screenshots/boot-ux/
+!scripts/screenshots/boot-ux/report.txt
+!scripts/screenshots/boot-ux/boot_ux_launch.mp4
+!scripts/screenshots/boot-ux/boot_ux_launch_splash.png
+!scripts/screenshots/boot-ux/boot_ux_after_splash.png
+!scripts/screenshots/boot-ux/boot_ux_offline_banner.png
+!scripts/screenshots/boot-ux/boot_ux_slow_network.png
+
+# Migration artifacts can contain sensitive export metadata.
+scripts/migrations/artifacts/

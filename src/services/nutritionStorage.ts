@@ -7,10 +7,16 @@ import type {
   WaterEntryType,
   WaterPresetsCount,
 } from '../types/nutrition'
+import {
+  clampBottleRemainingMl,
+  isBottleCalibrated,
+  remainingMlToConsumedOnBottle,
+} from '../utils/deriveBottleProgress'
 import { todayKey } from '../utils/calories'
 import { getDailyWaterGoalMl, isTrainingDayToday } from '../utils/waterGoal'
 import { getActiveCloudUserId } from './cloudSession'
 import { safeWarn } from '../utils/safeLog'
+import { readLocal, writeLocal } from './secureLocalStore'
 
 const PROFILE_BASE = 'ranked-gym:nutrition-profile'
 const JOURNAL_BASE = 'ranked-gym:nutrition-journal'
@@ -47,7 +53,7 @@ const VALID_GOALS: NutritionGoal[] = ['cut', 'maintain', 'bulk']
 
 function readJson<T>(key: string, fallback: T): T {
   try {
-    const raw = localStorage.getItem(key)
+    const raw = readLocal(key)
     if (!raw) return fallback
     return JSON.parse(raw) as T
   } catch {
@@ -56,7 +62,7 @@ function readJson<T>(key: string, fallback: T): T {
 }
 
 function writeJson<T>(key: string, value: T): void {
-  localStorage.setItem(key, JSON.stringify(value))
+  writeLocal(key, JSON.stringify(value))
 }
 
 function asFiniteNumber(value: unknown, fallback: number): number {
@@ -261,12 +267,60 @@ function readBottleLevelFromJournal(journal: DayJournal): number {
   return bottleVisualFromTotal(Math.max(0, Math.round(journal.waterMl ?? 0)))
 }
 
+function shouldBumpBottleLevel(journal: DayJournal): boolean {
+  return !isBottleCalibrated(journal.waterBottleCalibrationTotalMl)
+}
+
+/** True si le jour courant utilise un calibrage manuel explicite. */
+export function isTodayWaterBottleCalibrated(): boolean {
+  return isBottleCalibrated(getTodayJournal().waterBottleCalibrationTotalMl)
+}
+
+/**
+ * Calibre l’affichage de la grande bouteille sans modifier le journal d’eau.
+ *
+ * @param remainingMl liquide physiquement restant (UI). Converti en
+ *   `waterBottleLevelMl` (ml déjà bus = capacity − remaining) pour le stockage legacy.
+ * Ne crée aucune `waterEntry` et ne modifie pas `waterMl`.
+ */
+export function setTodayWaterBottleCalibration(
+  remainingMl: number,
+  opts?: StorageSaveOptions,
+): DayJournal {
+  const journal = getTodayJournal()
+  const remaining = clampBottleRemainingMl(remainingMl, WATER_BOTTLE_CAPACITY_ML)
+  // Stockage technique : phase « déjà bu », pas les ml restants UI.
+  const levelMl = remainingMlToConsumedOnBottle(remaining, WATER_BOTTLE_CAPACITY_ML)
+  const next: DayJournal = {
+    ...journal,
+    waterBottleLevelMl: levelMl,
+    waterBottleCalibrationTotalMl: Math.max(0, Math.round(journal.waterMl ?? 0)),
+  }
+  saveTodayJournal(next, opts)
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('ranked-gym:water-changed'))
+  }
+  return next
+}
+
+/** Désactive le calibrage et revient au suivi automatique (`deriveBottleProgress`). */
+export function clearTodayWaterBottleCalibration(opts?: StorageSaveOptions): DayJournal {
+  const journal = getTodayJournal()
+  const { waterBottleLevelMl: _l, waterBottleCalibrationTotalMl: _c, ...rest } = journal
+  const next = { ...rest }
+  saveTodayJournal(next, opts)
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('ranked-gym:water-changed'))
+  }
+  return next
+}
+
 /** Niveau visuel courant de la bouteille (ml déjà bus sur celle-ci). */
 export function getTodayWaterBottleLevel(): number {
   return readBottleLevelFromJournal(getTodayJournal())
 }
 
-/** Enregistre le point de départ visuel (calibration ou fin de drag). */
+/** Enregistre le point de départ visuel (legacy — préférer setTodayWaterBottleCalibration). */
 export function setTodayWaterBottleLevel(
   levelMl: number,
   opts?: StorageSaveOptions,
@@ -479,10 +533,13 @@ export function addWaterEntry(
   }
   const prevLevel = readBottleLevelFromJournal(getTodayJournal())
   const journal = persistWaterJournal([entry, ...entries], opts)
-  const nextLevel = bumpBottleLevelMl(prevLevel, entry.amountMl)
-  const nextJournal = { ...journal, waterBottleLevelMl: nextLevel }
-  if (nextLevel !== prevLevel) {
-    saveTodayJournal(nextJournal, { ...opts, skipCloud: true })
+  let nextJournal = journal
+  if (shouldBumpBottleLevel(journal)) {
+    const nextLevel = bumpBottleLevelMl(prevLevel, entry.amountMl)
+    nextJournal = { ...journal, waterBottleLevelMl: nextLevel }
+    if (nextLevel !== prevLevel) {
+      saveTodayJournal(nextJournal, { ...opts, skipCloud: true })
+    }
   }
   return { journal: nextJournal, entry, waterMl: journal.waterMl ?? 0 }
 }
@@ -497,7 +554,7 @@ export function removeWaterEntry(
   const nextEntries = entries.filter((e) => e.id !== entryId)
   const journal = persistWaterJournal(nextEntries, opts)
   let nextJournal = journal
-  if (removed) {
+  if (removed && shouldBumpBottleLevel(journal)) {
     const prevLevel = readBottleLevelFromJournal(journal)
     const nextLevel = bumpBottleLevelMl(prevLevel, -removed.amountMl)
     nextJournal = { ...journal, waterBottleLevelMl: nextLevel }
@@ -552,7 +609,7 @@ export function setWaterTotalFromGauge(
   }
 
   const journal = persistWaterJournal(entries, opts)
-  if (deltaBefore !== 0) {
+  if (deltaBefore !== 0 && shouldBumpBottleLevel(journal)) {
     const prevLevel = readBottleLevelFromJournal(journal)
     const nextLevel = bumpBottleLevelMl(prevLevel, deltaBefore)
     const nextJournal = { ...journal, waterBottleLevelMl: nextLevel }

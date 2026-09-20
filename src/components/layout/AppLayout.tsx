@@ -1,5 +1,8 @@
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
+import { useAuth } from '../../context/AuthContext'
+import { BrandMark } from '../brand/BrandMark'
 import { BottomNav } from './BottomNav'
+import { StreakCelebrationHost } from '../streak/StreakCelebrationHost'
 import { RestTimerOverlay, REST_BAR_CONTENT_PAD } from '../training/RestTimerOverlay'
 import {
   useRestTimerContext,
@@ -14,73 +17,75 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) {
+  const shellRef = useRef<HTMLDivElement>(null)
+  const { streakCelebration } = useAuth()
   const {
     state,
     isBarVisible,
     readyBarEnabled,
     chromeHidden,
     start,
+    pause,
+    resume,
     skip,
     dismiss,
   } = useRestTimerContext()
 
+  const streakCelebrationActive = Boolean(streakCelebration)
+  const showHeader = !chromeHidden
+  const showBottomNav = !chromeHidden
+  const bottomNavObscured = streakCelebrationActive
   const showReadyBar = !chromeHidden && activeTab === 'training' && readyBarEnabled
 
   return (
-    <div className="relative flex min-h-full flex-col mesh-bg font-sans">
-      <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
-        <div
-          className="arena-glow absolute -left-[30%] -top-[20%] h-[70vh] w-[90vw] rounded-full blur-[90px]"
-          style={{ background: 'radial-gradient(circle, #5C1018 0%, #FF2B2B33 35%, transparent 70%)' }}
-        />
-        <div
-          className="arena-glow absolute -right-[25%] top-[-5%] h-[60vh] w-[75vw] rounded-full blur-[100px]"
-          style={{
-            background: 'radial-gradient(circle, #0A1A40 0%, #00B4FF28 40%, transparent 72%)',
-            animationDelay: '3s',
-          }}
-        />
-        <div
-          className="arena-glow absolute -left-[10%] bottom-[10%] h-[45vh] w-[60vw] rounded-full blur-[110px]"
-          style={{
-            background: 'radial-gradient(circle, #3B0A20 0%, #FF2B2B22 45%, transparent 70%)',
-            animationDelay: '6s',
-          }}
-        />
-        <div
-          className="absolute right-[-5%] bottom-[25%] h-[40vh] w-[50vw] rounded-full opacity-40 blur-[100px]"
-          style={{ background: 'radial-gradient(circle, #1A0A38 0%, transparent 68%)' }}
-        />
-      </div>
-
-      {!chromeHidden ? (
-        <header className="glass-bar sticky top-0 z-40 border-b border-white/5">
-          <div
-            className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"
-            style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
-          >
-            <span className="text-[17px] font-semibold tracking-tight text-white">
-              Ranked <span className="text-[#FF2B2B]">Gym</span>
-            </span>
-          </div>
-        </header>
-      ) : null}
-
+    <div
+      ref={shellRef}
+      className="relative flex h-full min-h-0 flex-col mesh-bg font-sans"
+      data-streak-celebration-active={streakCelebrationActive ? '' : undefined}
+      inert={streakCelebrationActive ? true : undefined}
+    >
       <main
-        className={`relative z-10 mx-auto w-full flex-1 overflow-y-auto ${
-          chromeHidden ? 'max-w-none px-0 py-0' : 'max-w-lg px-5 py-8'
+        className={`relative z-10 min-h-0 w-full flex-1 overflow-y-auto ${
+          chromeHidden ? 'max-w-none' : ''
         }`}
         style={
           chromeHidden
             ? { paddingBottom: 0 }
             : {
-                paddingBottom: isBarVisible
-                  ? `calc(var(--app-bottom-nav) + ${REST_BAR_CONTENT_PAD} + env(safe-area-inset-bottom, 0px) + 1.5rem)`
-                  : 'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 1.5rem)',
+                paddingBottom:
+                  bottomNavObscured
+                    ? '1.5rem'
+                    : isBarVisible
+                      ? `calc(var(--app-bottom-nav) + ${REST_BAR_CONTENT_PAD} + env(safe-area-inset-bottom, 0px) + 1.5rem)`
+                      : 'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 1.5rem)',
               }
         }
+        aria-hidden={streakCelebrationActive ? true : undefined}
       >
-        {children}
+        {showHeader ? (
+          <header
+            className="border-b border-white/5 bg-[#0C0C0E]"
+            data-app-brand-header="1"
+            aria-hidden={streakCelebrationActive ? true : undefined}
+          >
+            <div
+              className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"
+              style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+            >
+              <div data-cold-launch-target="compact">
+                <BrandMark variant="compact" />
+              </div>
+            </div>
+          </header>
+        ) : null}
+
+        <div
+          className={
+            chromeHidden ? undefined : 'mx-auto w-full max-w-lg px-5 py-8'
+          }
+        >
+          {children}
+        </div>
       </main>
 
       {!chromeHidden ? (
@@ -102,10 +107,22 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
             }}
             onSkip={skip}
             onDismiss={dismiss}
+            onPause={pause}
+            onResume={resume}
           />
-          <BottomNav activeTab={activeTab} onTabChange={onTabChange} />
+          {showBottomNav ? (
+            <div
+              data-bottom-nav-host
+              className={bottomNavObscured ? 'pointer-events-none invisible' : undefined}
+              inert={bottomNavObscured ? true : undefined}
+              aria-hidden={bottomNavObscured ? true : undefined}
+            >
+              <BottomNav activeTab={activeTab} onTabChange={onTabChange} />
+            </div>
+          ) : null}
         </>
       ) : null}
+      <StreakCelebrationHost shellRef={shellRef} />
     </div>
   )
 }

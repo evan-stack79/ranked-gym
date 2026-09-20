@@ -47,6 +47,10 @@ export interface ScheduledSession {
   enabled: boolean
   /** Notify X minutes before */
   remindBeforeMin?: number
+  /** Sport planifié, figé à la création. Absent sur les créneaux legacy. */
+  sportId?: string
+  /** Parcours Train à ouvrir. Absent sur les créneaux legacy. */
+  sessionKind?: SessionKind
 }
 
 export interface CompletedSession {
@@ -79,7 +83,19 @@ export interface ExerciseEntry {
   name: string
   sets: WorkoutSet[]
   note?: string
+  /**
+   * Stable exercise type for media / catalog (e.g. `bench_press`).
+   * Additive — free-text-only entries (legacy / user-typed) omit this field.
+   * Never infer from ambiguous titles like « DÉVELOPPER ».
+   */
+  canonicalExerciseId?: string
 }
+
+/** Famille de séance — additive ; absente sur les notes legacy. */
+export type SessionKind = 'strength' | 'endurance' | 'team' | 'generic'
+
+/** Provenance de la saisie — additive ; absente sur les notes legacy. */
+export type SessionSource = 'manual' | 'import'
 
 export interface WorkoutNote {
   id: string
@@ -94,7 +110,52 @@ export interface WorkoutNote {
   totalVolumeKg?: number
   /** Links to a saved focus routine (Upper, Legs, Pecs…) */
   routineId?: string
+  /**
+   * Sport réellement pratiqué au moment de la séance (figé à l’écriture).
+   * Optionnel : notes legacy sans ce champ restent valides.
+   */
+  sportId?: string
+  /**
+   * Famille de module Train utilisée pour saisir la séance.
+   * Optionnel : notes legacy sans ce champ restent valides.
+   */
+  sessionKind?: SessionKind
+  /**
+   * Source de la saisie (`manual` pour toutes les saisies UI actuelles).
+   * Optionnel : notes legacy sans ce champ restent valides.
+   */
+  source?: SessionSource
+  /**
+   * Détails structurés selon le module (ex. distance endurance).
+   * Optionnel : notes legacy et séances non-endurance restent valides sans ce champ.
+   */
+  details?: SessionDetails
+  /**
+   * Origine du titre : `user` = nom saisi explicitement ; `derived` = calculé
+   * depuis les exercices. Absent sur les notes legacy — ne pas inventer à la lecture.
+   */
+  titleSource?: 'user' | 'derived'
 }
+
+/** Détails typés par module — extensible (endurance, team, …). */
+export type EnduranceSessionDetails = {
+  kind: 'endurance'
+  /** Distance en km — nombre fini strictement positif. */
+  distanceKm: number
+}
+
+export type TeamSessionType = 'training' | 'match'
+
+export type TeamSessionDetails = {
+  kind: 'team'
+  sessionType: TeamSessionType
+  /** Minutes effectivement jouées — facultatif, ≤ durée de séance. */
+  minutesPlayed?: number
+  /** Poste libre — facultatif. */
+  position?: string
+}
+
+export type SessionDetails = EnduranceSessionDetails | TeamSessionDetails
 
 /** Persistent “bloc” — opens last exercises for that focus. */
 export interface WorkoutRoutine {
@@ -105,6 +166,59 @@ export interface WorkoutRoutine {
   exercises: ExerciseEntry[]
   updatedAt: number
 }
+
+/**
+ * Identité explicite de l'unique séance de musculation en cours.
+ * Additive : les états legacy sans ce champ restent valides et ne sont jamais
+ * assimilés automatiquement à une séance active à partir de seuls marqueurs `done`.
+ */
+export interface ActiveWorkoutDraft {
+  routineId: string
+  sportId: string
+  startedAt: number
+  updatedAt: number
+  /**
+   * Millisecondes chronométrées hors pause (durée réelle).
+   * Absent sur les brouillons legacy → la mesure démarre à la reprise (pas startedAt).
+   */
+  elapsedActiveMs?: number
+  /**
+   * Horodatage du début du segment courant. `null` si en pause.
+   * Absent sur legacy.
+   */
+  runningSince?: number | null
+  /** true = chronomètre en pause. Absent/false = en cours. */
+  paused?: boolean
+  /**
+   * Estimation figée (legacy) : wall-clock startedAt→reprise.
+   * Ne compte jamais comme durée réellement chronométrée.
+   */
+  estimatedElapsedMs?: number
+  /**
+   * Snapshot minuteur de repos (optionnel).
+   * Persiste décompte / pause à travers refresh. Absent = pas de repos actif.
+   */
+  restTimer?: {
+    totalSec: number
+    remainingSec: number
+    endsAt: number
+    paused: boolean
+    target: {
+      exerciseId: string
+      setIndex: number
+      exerciseName: string
+      setLabel: string
+    }
+  } | null
+  /**
+   * Index d’exercice affiché sur l’écran immersif.
+   * Restauré à la reprise ; absent = 0.
+   */
+  activeExerciseIndex?: number
+}
+
+/** Dernière route quittée volontairement (soft-leave séance → hub). */
+export type LastVoluntaryRoute = 'train-hub'
 
 export interface TrainingState {
   primarySportId: string | null
@@ -118,4 +232,19 @@ export interface TrainingState {
   completed: CompletedSession[]
   workoutNotes: WorkoutNote[]
   routines: WorkoutRoutine[]
+  /**
+   * Dernière routine sélectionnée dans le carnet Train (reprise type YouTube).
+   * Persistée immédiatement au changement — ne dépend pas d’un événement de fermeture.
+   */
+  lastSelectedRoutineId: string | null
+  /** Sport associé à la dernière sélection (évite une reprise incompatible). */
+  lastSelectedSportId: string | null
+  /** Brouillon réellement actif ; absent/null pour les états legacy ou terminés. */
+  activeWorkoutDraft?: ActiveWorkoutDraft | null
+  /**
+   * Soft-leave volontaire vers le hub Train.
+   * Si `train-hub` + brouillon actif → rester sur hub (« Reprendre »), ne pas rouvrir auto.
+   * Absent/null → reprise inattendue (cold start / OS) peut rouvrir la séance.
+   */
+  lastVoluntaryRoute?: LastVoluntaryRoute | null
 }

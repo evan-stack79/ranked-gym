@@ -1,27 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Leaf, Droplets, RotateCcw } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import { NutritionOnboarding } from './NutritionOnboarding'
-import { NutritionPlanCard } from './NutritionPlanCard'
-import { MealJournal } from './MealJournal'
-import { WeightPaceCard } from './WeightPaceCard'
-import { SmartWaterGauge } from './SmartWaterGauge'
-import { IconBadge } from '../ui/IconBadge'
+import { NutritionDashboard } from './NutritionDashboard'
 import {
   getCalorieProfile,
   saveCalorieProfile,
 } from '../../services/nutritionStorage'
-import { getNutritionTarget } from '../../services/nutritionActivity'
 import { useAuth } from '../../context/AuthContext'
 import type { CalorieProfile } from '../../types/nutrition'
+import { HomeBootSkeleton } from '../ui/AppBootScreen'
 
 export function NutritionView() {
   const { isLoading: isBootLoading } = useAuth()
   const [profile, setProfile] = useState<CalorieProfile>(() => getCalorieProfile())
   const [showSetupEditor, setShowSetupEditor] = useState(false)
-
-  const [trainingTick, setTrainingTick] = useState(0)
-  const nutrition = useMemo(() => getNutritionTarget(profile), [profile, trainingTick])
-  const targetCalories = nutrition.targetCalories
 
   useEffect(() => {
     if (isBootLoading) return
@@ -30,16 +21,13 @@ export function NutritionView() {
 
   useEffect(() => {
     const sync = () => setProfile(getCalorieProfile())
-    const syncTraining = () => setTrainingTick((n) => n + 1)
     window.addEventListener('ranked-gym:backup-restored', sync)
     window.addEventListener('ranked-gym:profile-changed', sync)
-    window.addEventListener('ranked-gym:training-changed', syncTraining)
     window.addEventListener('focus', sync)
     document.addEventListener('visibilitychange', sync)
     return () => {
       window.removeEventListener('ranked-gym:backup-restored', sync)
       window.removeEventListener('ranked-gym:profile-changed', sync)
-      window.removeEventListener('ranked-gym:training-changed', syncTraining)
       window.removeEventListener('focus', sync)
       document.removeEventListener('visibilitychange', sync)
     }
@@ -58,69 +46,27 @@ export function NutritionView() {
     [handleProfileChange],
   )
 
-  const openSetupEditor = () => {
-    setShowSetupEditor(true)
+  if (isBootLoading) return <HomeBootSkeleton />
+
+  if (showSetupEditor) {
+    return (
+      <div className="flex flex-col gap-6 pb-2">
+        <header>
+          <h1 className="text-[34px] font-bold tracking-tight text-white">Nutrition</h1>
+          <p className="mt-2 text-[15px] text-[#AEAEB2]">
+            Ajuste ton objectif et ton plan calorique.
+          </p>
+        </header>
+        <NutritionOnboarding initial={profile} onComplete={handleSetupComplete} />
+      </div>
+    )
   }
 
-  if (isBootLoading) return null
-
   return (
-    <div className="flex flex-col gap-8 pb-2">
-      <header className="relative ios-fade-up">
-        <div
-          className="pointer-events-none absolute -left-8 -top-6 h-28 w-40 rounded-full blur-3xl"
-          style={{ background: 'radial-gradient(circle, #34C75944 0%, transparent 70%)' }}
-          aria-hidden="true"
-        />
-        <div className="relative flex items-start justify-between gap-3">
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <IconBadge icon={Leaf} variant="green" size="sm" />
-              <span className="rounded-full border border-[#34C759]/30 bg-[#34C759]/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#30D158]">
-                Fuel
-              </span>
-            </div>
-            <h1 className="text-[34px] font-bold tracking-tight text-white">Nutrition</h1>
-            <p className="mt-2 text-[17px] text-[#8E8E93]">
-              {showSetupEditor
-                ? 'Ajuste ton objectif et ton plan calorique.'
-                : 'Plan IOM adapté à ton objectif, ton niveau d’activité et ton sport.'}
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-2">
-            <IconBadge icon={Droplets} variant="blue" />
-            {!showSetupEditor && (
-              <button
-                type="button"
-                onClick={openSetupEditor}
-                className="ios-press inline-flex items-center gap-1 text-[11px] font-medium text-[#636366]"
-              >
-                <RotateCcw className="h-3 w-3" />
-                Refaire le setup
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {showSetupEditor ? (
-        <NutritionOnboarding initial={profile} onComplete={handleSetupComplete} />
-      ) : (
-        <>
-          <div className="ios-fade-up ios-fade-up-delay-1">
-            <NutritionPlanCard profile={profile} onChange={handleProfileChange} />
-          </div>
-          <div className="ios-fade-up ios-fade-up-delay-1">
-            <WeightPaceCard profile={profile} />
-          </div>
-          <div className="ios-fade-up ios-fade-up-delay-2">
-            <SmartWaterGauge weightKg={profile.weightKg} />
-          </div>
-          <div className="ios-fade-up ios-fade-up-delay-2">
-            <MealJournal targetCalories={targetCalories} morphology={profile.morphology} />
-          </div>
-        </>
-      )}
-    </div>
+    <NutritionDashboard
+      profile={profile}
+      onChangeProfile={handleProfileChange}
+      onOpenSetup={() => setShowSetupEditor(true)}
+    />
   )
 }

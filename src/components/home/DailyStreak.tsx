@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Check, Flame, Sparkles } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { SectionSkeleton } from '../ui/AppBootScreen'
 import {
   isStreakActiveToday,
   STREAK_WEEK_BONUS_XP,
@@ -9,6 +10,7 @@ import {
 /**
  * DailyStreak — série connectée à Supabase (`profiles.current_streak`, `last_login_date`).
  * Le compteur est mis à jour automatiquement à chaque ouverture / login (AuthContext).
+ * La célébration premium ne s’affiche qu’après une vraie incrémentation N → N+1.
  */
 export function DailyStreak() {
   const {
@@ -57,14 +59,13 @@ export function DailyStreak() {
           onClick={() => requireAuth(() => undefined)}
           className="streak-card relative flex w-full items-center gap-3.5 overflow-hidden rounded-2xl border border-white/10 px-4 py-3.5 text-left"
           style={{
-            background: 'rgb(28 28 30 / 0.72)',
-            backdropFilter: 'blur(16px)',
-            boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.06)',
+            background: 'var(--color-card)',
+            boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.04)',
           }}
         >
           <Flame className="h-7 w-7 shrink-0 text-[#636366]" strokeWidth={2.25} />
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#8E8E93]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#AEAEB2]">
               Série quotidienne
             </p>
             <p className="mt-0.5 text-[15px] font-semibold text-[#AEAEB2]">
@@ -74,6 +75,10 @@ export function DailyStreak() {
         </button>
       </section>
     )
+  }
+
+  if (!profile) {
+    return <SectionSkeleton label="Série quotidienne" />
   }
 
   const lit = isTodayDone && currentStreak > 0
@@ -90,32 +95,22 @@ export function DailyStreak() {
         style={
           lit
             ? {
-                background:
-                  'radial-gradient(ellipse 90% 120% at 8% 40%, rgb(255 43 43 / 0.32) 0%, transparent 55%), rgb(28 28 30 / 0.82)',
+                background: 'var(--color-card)',
                 boxShadow: weekGlow
-                  ? 'inset 0 1px 0 rgb(255 255 255 / 0.1), 0 0 42px rgb(255 43 43 / 0.45), 0 0 80px rgb(255 159 10 / 0.2)'
-                  : 'inset 0 1px 0 rgb(255 255 255 / 0.08), 0 0 28px rgb(255 43 43 / 0.22)',
+                  ? 'inset 0 1px 0 rgb(255 255 255 / 0.08), 0 0 0 1px rgb(255 43 43 / 0.28)'
+                  : 'inset 0 1px 0 rgb(255 255 255 / 0.04)',
               }
             : {
-                background: 'rgb(28 28 30 / 0.72)',
-                backdropFilter: 'blur(16px)',
-                boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.06)',
+                background: 'var(--color-card)',
+                boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.04)',
               }
         }
       >
-        {lit && (
-          <div
-            className="pointer-events-none absolute -left-4 top-1/2 h-24 w-24 -translate-y-1/2 rounded-full blur-2xl"
-            style={{ background: 'radial-gradient(circle, #FF2B2B77 0%, transparent 70%)' }}
-            aria-hidden
-          />
-        )}
-
         <div className="relative flex items-center gap-3">
           <Flame
-            className={`h-8 w-8 shrink-0 transition-all duration-500 ${
+            className={`h-8 w-8 shrink-0 transition-colors duration-300 ${
               lit
-                ? `text-[#FF2B2B] drop-shadow-[0_0_14px_rgba(255,43,43,0.95)] ${bump ? 'streak-flame--pop' : ''}`
+                ? `text-[#FF2B2B] ${bump ? 'streak-flame--pop' : ''}`
                 : 'text-[#636366]'
             }`}
             strokeWidth={2.25}
@@ -133,7 +128,6 @@ export function DailyStreak() {
                   className={`mt-0.5 text-[22px] font-black tracking-tight text-white ${
                     bump ? 'streak-count--bump' : ''
                   }`}
-                  style={{ textShadow: '0 0 18px rgb(255 43 43 / 0.45)' }}
                 >
                   {displayStreak}{' '}
                   <span className="text-[18px] font-bold text-[#FF2B2B]">
@@ -143,7 +137,7 @@ export function DailyStreak() {
               </>
             ) : (
               <>
-                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#8E8E93]">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#AEAEB2]">
                   Série · {currentStreak} j
                 </p>
                 <p className="mt-0.5 text-[16px] font-semibold leading-snug text-[#AEAEB2]">

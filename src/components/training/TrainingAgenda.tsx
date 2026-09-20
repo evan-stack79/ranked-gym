@@ -1,27 +1,31 @@
 import { useMemo, useState } from 'react'
 import { Bell, CalendarDays, Plus, Trash2 } from 'lucide-react'
-import type { ScheduledSession, Weekday } from '../../types/training'
-import { IosSheet } from '../ui/IosSheet'
+import type { ScheduledSession, Weekday, WorkoutRoutine } from '../../types/training'
+import { getSportById, SPORTS } from '../../data/sports'
+import { sessionKindForSport } from '../../utils/sessionMeta'
+import { TrainSheet as IosSheet } from './TrainSheet'
 import {
   notificationPermission,
   requestReminderPermission,
   sendTestNotification,
 } from '../../services/reminderService'
 
-const DAY_LABELS: { day: Weekday; short: string }[] = [
-  { day: 1, short: 'L' },
-  { day: 2, short: 'M' },
-  { day: 3, short: 'M' },
-  { day: 4, short: 'J' },
-  { day: 5, short: 'V' },
-  { day: 6, short: 'S' },
-  { day: 0, short: 'D' },
+const DAY_LABELS: { day: Weekday; short: string; name: string }[] = [
+  { day: 1, short: 'L', name: 'Lundi' },
+  { day: 2, short: 'M', name: 'Mardi' },
+  { day: 3, short: 'M', name: 'Mercredi' },
+  { day: 4, short: 'J', name: 'Jeudi' },
+  { day: 5, short: 'V', name: 'Vendredi' },
+  { day: 6, short: 'S', name: 'Samedi' },
+  { day: 0, short: 'D', name: 'Dimanche' },
 ]
 
 const DAY_NAMES = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
 
 interface TrainingAgendaProps {
   schedule: ScheduledSession[]
+  routines: WorkoutRoutine[]
+  primarySportId: string
   notificationsEnabled: boolean
   onSave: (entry: Omit<ScheduledSession, 'id'> & { id?: string }) => void
   onRemove: (id: string) => void
@@ -31,6 +35,8 @@ interface TrainingAgendaProps {
 
 export function TrainingAgenda({
   schedule,
+  routines,
+  primarySportId,
   notificationsEnabled,
   onSave,
   onRemove,
@@ -42,6 +48,14 @@ export function TrainingAgenda({
   const [days, setDays] = useState<Weekday[]>([1, 4])
   const [time, setTime] = useState('18:30')
   const [remindBefore, setRemindBefore] = useState(10)
+  const [sportId, setSportId] = useState(() =>
+    getSportById(primarySportId) ? primarySportId : 'musculation',
+  )
+  const [routineId, setRoutineId] = useState(
+    () => routines.find((routine) => routine.exercises.length > 0)?.id ?? 'notebook',
+  )
+
+  const sessionKind = sessionKindForSport(sportId)
 
   const sorted = useMemo(
     () =>
@@ -72,19 +86,21 @@ export function TrainingAgenda({
       await enableNotifs()
     }
     onSave({
-      templateId: 'notebook',
+      templateId: sessionKind === 'strength' ? routineId : 'notebook',
       title: title.trim(),
       days,
       time,
       enabled: true,
       remindBeforeMin: remindBefore,
+      sportId,
+      sessionKind,
     })
     setOpen(false)
     onToast(`Rappel « ${title.trim()} » · ${time} (−${remindBefore} min)`)
   }
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-3" data-agenda-root>
       <div className="flex items-center justify-between px-1">
         <div>
           <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
@@ -95,7 +111,8 @@ export function TrainingAgenda({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="ios-press inline-flex items-center gap-1 rounded-full border border-[#FF2B2B]/35 bg-[#FF2B2B]/15 px-3 py-1.5 text-[12px] font-semibold text-[#FF6961]"
+          data-agenda-control="create"
+          className="ios-press inline-flex min-h-11 items-center gap-1 rounded-full border border-[#FF2B2B]/35 bg-[#FF2B2B]/15 px-3 py-2 text-[12px] font-semibold text-[#FF6961] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E]"
         >
           <Plus className="h-3.5 w-3.5" />
           Créneau
@@ -107,7 +124,8 @@ export function TrainingAgenda({
         onClick={() => {
           void enableNotifs()
         }}
-        className={`ios-press flex w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left ${
+        data-agenda-control="notifications"
+        className={`ios-press flex min-h-11 w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E] ${
           notificationsEnabled && perm === 'granted'
             ? 'border-[#30D158]/35 bg-[#30D158]/10'
             : 'border-white/10 bg-black/25'
@@ -157,12 +175,18 @@ export function TrainingAgenda({
                   {' · '}-
                   {item.remindBeforeMin ?? 10} min
                 </p>
+                <p className="text-[11px] text-[#636366]">
+                  {item.sportId
+                    ? getSportById(item.sportId)?.name ?? item.title
+                    : 'Sport non précisé · ancien créneau'}
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => onRemove(item.id)}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 text-[#8E8E93]"
-                aria-label="Supprimer"
+                data-agenda-control="delete"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/5 text-[#8E8E93] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E]"
+                aria-label={`Supprimer ${item.title}`}
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -182,21 +206,76 @@ export function TrainingAgenda({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ex. Upper, Pecs, Course…"
-              className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none"
+              data-agenda-control="title"
+              className="min-h-11 w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/70"
             />
           </label>
 
+          <label className="block">
+            <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+              Sport
+            </span>
+            <select
+              value={sportId}
+              onChange={(event) => {
+                const nextSportId = event.target.value
+                setSportId(nextSportId)
+                if (sessionKindForSport(nextSportId) === 'strength') {
+                  setRoutineId((current) =>
+                    routines.some((routine) => routine.id === current && routine.exercises.length > 0)
+                      ? current
+                      : routines.find((routine) => routine.exercises.length > 0)?.id ?? 'notebook',
+                  )
+                }
+              }}
+              data-agenda-control="sport"
+              className="min-h-11 w-full rounded-xl border border-white/10 bg-[#141416] px-3.5 py-3 text-[15px] text-white outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/70"
+            >
+              {[...SPORTS]
+                .sort((a, b) => b.popularity - a.popularity)
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+
+          {sessionKind === 'strength' ? (
+            <label className="block">
+              <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                Routine
+              </span>
+              <select
+                value={routineId}
+                onChange={(event) => setRoutineId(event.target.value)}
+                data-agenda-control="routine"
+                className="min-h-11 w-full rounded-xl border border-white/10 bg-[#141416] px-3.5 py-3 text-[15px] text-white outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/70"
+              >
+                <option value="notebook">Choisir dans le carnet</option>
+                {routines.map((routine) => (
+                  <option key={routine.id} value={routine.id}>
+                    {routine.label}{routine.exercises.length === 0 ? ' · vide' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
           <div>
             <p className="mb-2 text-[12px] font-semibold text-[#8E8E93]">Jours</p>
-            <div className="flex gap-1.5">
-              {DAY_LABELS.map(({ day, short }) => {
+            <div className="flex flex-wrap gap-1.5">
+              {DAY_LABELS.map(({ day, short, name }) => {
                 const on = days.includes(day)
                 return (
                   <button
                     key={day}
                     type="button"
                     onClick={() => toggleDay(day)}
-                    className={`flex h-10 w-10 items-center justify-center rounded-full text-[13px] font-bold ${
+                    data-agenda-control="day"
+                    aria-label={name}
+                    aria-pressed={on}
+                    className={`flex h-11 w-11 items-center justify-center rounded-full text-[13px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1C1C1E] ${
                       on ? 'bg-[#FF2B2B] text-white' : 'bg-white/5 text-[#8E8E93]'
                     }`}
                   >
@@ -213,7 +292,8 @@ export function TrainingAgenda({
               type="time"
               value={time}
               onChange={(e) => setTime(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
+              data-agenda-control="time"
+              className="min-h-11 w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/70"
             />
           </label>
 
@@ -225,7 +305,9 @@ export function TrainingAgenda({
                   key={m}
                   type="button"
                   onClick={() => setRemindBefore(m)}
-                  className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
+                  data-agenda-control="reminder"
+                  aria-pressed={remindBefore === m}
+                  className={`min-h-11 rounded-full border px-3 py-2 text-[12px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1C1C1E] ${
                     remindBefore === m
                       ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-[#FF6961]'
                       : 'border-white/10 text-[#8E8E93]'
@@ -242,7 +324,8 @@ export function TrainingAgenda({
             onClick={() => {
               void handleAdd()
             }}
-            className="btn-brand ios-press w-full rounded-2xl py-3.5 text-[15px] font-semibold text-white"
+            data-agenda-control="save"
+            className="btn-brand ios-press min-h-11 w-full rounded-2xl py-3.5 text-[15px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1C1C1E]"
           >
             Enregistrer + activer rappel
           </button>
