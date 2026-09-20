@@ -100,6 +100,19 @@ export function formatClock(createdAt: number): string {
   })
 }
 
+/** Ligne secondaire volume · durée · kcal — omet les absents / 0. */
+export function formatHistoryMetricsLine(metrics: {
+  volume: number | null
+  duration: number | null
+  kcal: number | null
+}): string {
+  const parts: string[] = []
+  if (metrics.volume != null) parts.push(`${metrics.volume.toLocaleString('fr-FR')} kg`)
+  if (metrics.duration != null) parts.push(`${metrics.duration} min`)
+  if (metrics.kcal != null) parts.push(`${metrics.kcal} kcal`)
+  return parts.join(' · ')
+}
+
 export const DIFF_LABELS: Record<string, string> = {
   easy: 'Facile',
   ok: 'OK',
@@ -128,7 +141,20 @@ export function findLastExerciseSets(
   return null
 }
 
+export function formatKgValue(weightKg: number): string {
+  return Number.isInteger(weightKg) ? String(weightKg) : weightKg.toFixed(1).replace(/\.0$/, '')
+}
+
 export function formatSetLoadLabel(weightKg: number, reps: number): string {
-  const w = Number.isInteger(weightKg) ? String(weightKg) : weightKg.toFixed(1).replace(/\.0$/, '')
-  return `${w} kg × ${reps}`
+  return `${formatKgValue(weightKg)} kg × ${reps}`
+}
+
+/** Date d’historique (Aujourd’hui / Hier / date FR) + heure réelle. */
+export function formatHistoryDateTimeLine(
+  note: Pick<WorkoutNote, 'dateKey' | 'createdAt'>,
+  now = new Date(),
+): string {
+  const day = formatHistoryDayLabel(note.dateKey, now)
+  if (!Number.isFinite(note.createdAt)) return day
+  return `${day} · ${formatClock(note.createdAt)}`
 }

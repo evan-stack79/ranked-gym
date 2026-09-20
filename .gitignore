@@ -101,6 +101,20 @@ scripts/screenshots/**
 !scripts/screenshots/session-soft-leave/soft_leave_03_hub_after_back.png
 !scripts/screenshots/session-soft-leave/soft_leave_04_restored.png
 !scripts/screenshots/session-soft-leave/soft_leave_session_back_to_reprendre.mp4
+# Exception: preuves redesign Historique
+!scripts/screenshots/history-redesign/
+!scripts/screenshots/history-redesign/history_page_iphone_390x844.png
+!scripts/screenshots/history-redesign/history_list_iphone_390x844.png
+!scripts/screenshots/history-redesign/history_page_android_360x800.png
+!scripts/screenshots/history-redesign/history_empty_390x844.png
+!scripts/screenshots/history-redesign/history_detail_squat_390x844.png
+!scripts/screenshots/history-redesign/history_detail_small_squat_390x844.png
+!scripts/screenshots/history-redesign/history_detail_long_session_390x844.png
+!scripts/screenshots/history-redesign/history_detail_delete_confirm_390x844.png
+!scripts/screenshots/history-redesign/history_scroll_open_detail.webm
+!scripts/screenshots/history-redesign/history_scroll_open_detail.mp4
+!scripts/screenshots/history-redesign/history_detail_open_scroll_close_delete_confirm.webm
+!scripts/screenshots/history-redesign/history_detail_open_scroll_close_delete_confirm.mp4
 
 # Exception: preuves boot UX sans copies techniques
 !scripts/screenshots/boot-ux/

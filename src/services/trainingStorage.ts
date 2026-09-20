@@ -26,6 +26,7 @@ import {
 } from '../utils/sessionClock'
 import { normalizePersistedRestTimer } from '../utils/restTimerPersist'
 import { readLocal, writeLocal } from './secureLocalStore'
+import { resolvePersistedSessionTitle } from '../utils/sessionDisplayTitle'
 
 const KEY_BASE = 'ranked-gym:training'
 
@@ -577,9 +578,11 @@ export function saveWorkoutNote(
     estimatedKcal = note.estimatedKcal > 0 ? note.estimatedKcal : 0
   }
 
+  const persistedTitle = resolvePersistedSessionTitle(note, existing)
+
   const entry: WorkoutNote = {
     id: note.id ?? `note-${Date.now()}`,
-    title: note.title,
+    title: persistedTitle.title,
     exercises: note.exercises,
     estimatedKcal,
     durationMin,
@@ -592,6 +595,9 @@ export function saveWorkoutNote(
     sessionKind: note.sessionKind ?? existing?.sessionKind,
     source: note.source ?? existing?.source,
     details: note.details ?? existing?.details,
+    ...(persistedTitle.titleSource
+      ? { titleSource: persistedTitle.titleSource }
+      : {}),
   }
   const workoutNotes = [entry, ...state.workoutNotes.filter((n) => n.id !== entry.id)].slice(
     0,
