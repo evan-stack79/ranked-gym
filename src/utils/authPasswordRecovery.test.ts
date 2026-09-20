@@ -45,6 +45,30 @@ describe('friendlyAuthError', () => {
       /trop de tentatives/i,
     )
   })
+
+  it('distingue credentials, session, service et ne mappe pas tout vers service indisponible', () => {
+    expect(friendlyAuthError(new Error('Invalid login credentials'), 'fallback')).toBe(
+      'Email ou mot de passe incorrect.',
+    )
+    expect(friendlyAuthError(new Error('AUTH_INVALID_CREDENTIALS'), 'fallback')).toBe(
+      'Email ou mot de passe incorrect.',
+    )
+    expect(friendlyAuthError(new Error('jwt expired'), 'fallback')).toBe(
+      'Session expirée. Reconnecte-toi.',
+    )
+    expect(friendlyAuthError(new Error('AUTH_SERVICE_UNAVAILABLE'), 'fallback')).toBe(
+      'Service indisponible. Réessaie plus tard.',
+    )
+    expect(friendlyAuthError(new Error('503'), 'fallback')).toBe(
+      'Service indisponible. Réessaie plus tard.',
+    )
+    expect(friendlyAuthError(new Error('Quelque chose d’imprévu'), 'Connexion impossible.')).toBe(
+      'Connexion impossible.',
+    )
+    expect(friendlyAuthError(new Error('Quelque chose d’imprévu'), 'Connexion impossible.')).not.toMatch(
+      /indisponible/i,
+    )
+  })
 })
 
 describe('authRedirect', () => {

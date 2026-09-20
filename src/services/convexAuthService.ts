@@ -33,7 +33,7 @@ async function setStoredSessionToken(token: string): Promise<void> {
   await Promise.resolve(getSecureAuthStorage().setItem(CONVEX_AUTH_STORAGE_KEY, token))
 }
 
-async function clearStoredSessionToken(): Promise<void> {
+export async function clearStoredSessionToken(): Promise<void> {
   await Promise.resolve(getSecureAuthStorage().removeItem(CONVEX_AUTH_STORAGE_KEY))
 }
 

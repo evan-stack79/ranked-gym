@@ -1,0 +1,32 @@
+Auth welcome visual follow-up (prod preview after `npm run build`)
+origin=http://127.0.0.1:4188 mode=preview
+branch=bot/auth-welcome-redesign
+
+Hero
+- Exact Evan photo bytes: public/auth-welcome-hero.png (sha256 1856bf7fee42) + .webp (sha256 c5715a63401c)
+- Full-viewport <picture>/<img>, object-fit:cover, object-position:top center (computed 50% 0%)
+- Fallback background #070708 / rgb(7, 7, 8)
+- No second logo: imgCount=1, no .welcome-screen__logo / .welcome-screen__texture
+- Removed generated fabric + overlay logo assets
+- PWA: auth-welcome-hero.png excluded from SW precache (2.85 MB > 2 MiB default); WebP is precached; PNG remains a static fallback
+
+DOM proof: welcome-hero-dom-proof.json
+
+Captures (prod preview)
+- welcome-iphone-dynamic-island-393.png
+- welcome-android-narrow-360.png
+- welcome-iphone-se-320.png
+- welcome-landscape-844x390.png
+- welcome-login-sheet-393.png / welcome-after-dismiss-393.png
+- welcome-bad-credentials-393.png / welcome-forgot-password-393.png
+- legal-conditions-393.png / legal-privacy-393.png
+- logged-in-skips-welcome-393.png
+
+Verify
+- tests: 63 files, 489 passed
+- lint: oxlint warnings only (pre-existing)
+- build: tsc + vite green
+
+Limits
+- PNG fallback is not service-worker precached (size). Picture prefers WebP.
+- Auth logic / AuthBottomSheet / routes / Convex-Supabase untouched.

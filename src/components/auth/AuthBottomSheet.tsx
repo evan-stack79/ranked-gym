@@ -17,7 +17,6 @@ export function AuthBottomSheet() {
     authError,
     authInfo,
     signInWithEmail,
-    isAuthenticated,
     isPasswordRecovery,
     requestPasswordReset,
     confirmPasswordRecovery,
@@ -31,8 +30,8 @@ export function AuthBottomSheet() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
-  /** Gate bêta / recovery : pas de fermeture tant que non connecté ou MDP non enregistré. */
-  const dismissible = !authLoading && isAuthenticated && !isPasswordRecovery
+  /** Recovery : pas de fermeture tant que le mot de passe n’est pas enregistré. */
+  const dismissible = !authLoading && !isPasswordRecovery
 
   useEffect(() => {
     if (isPasswordRecovery) {
@@ -144,7 +143,7 @@ export function AuthBottomSheet() {
               </label>
 
               {authError && (
-                <p className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]">
+                <p className="px-0.5 text-[13px] leading-snug text-[#FF6961]" role="alert" data-auth-error="1">
                   {authError}
                 </p>
               )}
@@ -207,12 +206,12 @@ export function AuthBottomSheet() {
               </label>
 
               {authError && (
-                <p className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]">
+                <p className="px-0.5 text-[13px] leading-snug text-[#FF6961]" role="alert" data-auth-error="1">
                   {authError}
                 </p>
               )}
               {authInfo && (
-                <p className="rounded-xl border border-[#30D158]/30 bg-[#30D158]/10 px-3 py-2 text-[13px] text-[#30D158]">
+                <p className="px-0.5 text-[13px] leading-snug text-[#30D158]" role="status">
                   {authInfo}
                 </p>
               )}
@@ -315,12 +314,12 @@ export function AuthBottomSheet() {
               </label>
 
               {authError && (
-                <p className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]">
+                <p className="px-0.5 text-[13px] leading-snug text-[#FF6961]" role="alert" data-auth-error="1">
                   {authError}
                 </p>
               )}
               {authInfo && (
-                <p className="rounded-xl border border-[#30D158]/30 bg-[#30D158]/10 px-3 py-2 text-[13px] text-[#30D158]">
+                <p className="px-0.5 text-[13px] leading-snug text-[#30D158]" role="status">
                   {authInfo}
                 </p>
               )}

@@ -56,9 +56,8 @@ ios/DerivedData
 # Autonomous agent runs (reports, logs and detached worktrees)
 .agent-runs/
 
-# Captures navigateur locales (preuves — jamais versionnées)
-# Ignore le contenu, pas le dossier, pour pouvoir ré-inclure des preuves ciblées.
-scripts/screenshots/**
+!scripts/screenshots/auth-welcome/
+!scripts/screenshots/auth-welcome/**
 !scripts/screenshots/workout-immersive/
 !scripts/screenshots/workout-immersive/DIAGNOSTIC.md
 !scripts/screenshots/workout-immersive/real-developper-iphone-390.png

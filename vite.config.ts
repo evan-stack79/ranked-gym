@@ -67,7 +67,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webp,avif}'],
+        // PNG source kept as <picture> fallback; 2.85 MB exceeds the default precache cap.
+        globIgnores: ['**/auth-welcome-hero.png'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/assets\//, /^\/workbox-/, /^\/sw\.js$/, /^\/registerSW\.js$/],
       },

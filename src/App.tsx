@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { RestTimerProvider } from './context/RestTimerContext'
 import { AuthBottomSheet } from './components/auth/AuthBottomSheet'
+import { WelcomeScreen } from './components/auth/WelcomeScreen'
 import { AppLayout } from './components/layout/AppLayout'
 import { AppBootScreen } from './components/ui/AppBootScreen'
 import { BootIssueScreen, RecoverableRetryBar } from './components/ui/BootIssueScreen'
@@ -91,7 +92,6 @@ function SessionChrome({
             showBrandHeader
               ? undefined
               : {
-                  // Compense le header masqué : safe area + air, sans bandeau vide.
                   paddingTop: 'max(2rem, calc(env(safe-area-inset-top, 0px) + 1rem))',
                 }
           }
@@ -103,24 +103,11 @@ function SessionChrome({
   )
 }
 
-function AuthGateShell() {
-  return (
-    <SessionChrome showBrandHeader>
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-        <p className="text-[22px] font-bold tracking-tight text-white">Bêta privée</p>
-        <p className="max-w-sm text-[15px] leading-relaxed text-[#8E8E93]">
-          Connexion requise. Accès sur invitation uniquement.
-        </p>
-      </div>
-    </SessionChrome>
-  )
-}
-
-function AppShell() {
+export function AppShell() {
   const [phase, setPhase] = useState<AppPhase>('loading')
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [launchRoutineId, setLaunchRoutineId] = useState<string | null>(null)
-  const { openAuth, isAuthenticated, isLoading, isAuthOpen, bootIssue, retryHydrate } = useAuth()
+  const { openAuth, isAuthenticated, isLoading, bootIssue, retryHydrate } = useAuth()
   const online = useOnlineStatus()
 
   useEffect(() => {
@@ -129,7 +116,6 @@ function AppShell() {
       return
     }
 
-    // Pas de session Supabase → bloquer toute l’app (Accueil / Train / Nutri / Profil).
     if (!isAuthenticated) {
       setPhase('loading')
       return
@@ -137,11 +123,6 @@ function AppShell() {
 
     setPhase(resolveLaunchPhase())
   }, [isLoading, isAuthenticated])
-
-  useEffect(() => {
-    if (isLoading || isAuthenticated) return
-    if (!isAuthOpen) openAuth()
-  }, [isLoading, isAuthenticated, isAuthOpen, openAuth])
 
   useEffect(() => {
     const syncOnboardingPhase = () => {
@@ -231,7 +212,7 @@ function AppShell() {
       <>
         <SupabaseConfigBanner />
         {!online ? <OfflineBanner /> : null}
-        <AuthGateShell />
+        <WelcomeScreen onConnect={() => openAuth()} />
         <AuthBottomSheet />
       </>
     )
