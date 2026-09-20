@@ -68,13 +68,18 @@ async function main() {
   let browser
   try {
     browser = await chromium.launch(chromiumLaunchOptions)
+    const videoSearchDir = join(outDir, 'video-search')
+    const videoInclineDir = join(outDir, 'video-incline')
+    await mkdir(videoSearchDir, { recursive: true })
+    await mkdir(videoInclineDir, { recursive: true })
+
     const context = await browser.newContext({
       viewport: { width: 390, height: 844 },
       deviceScaleFactor: 2,
       isMobile: true,
       hasTouch: true,
       recordVideo: {
-        dir: join(outDir, 'video-tmp'),
+        dir: videoSearchDir,
         size: { width: 390, height: 844 },
       },
     })
@@ -195,8 +200,29 @@ async function main() {
       throw new Error(`immersive hero must stay validated webp, got ${heroSrc}`)
     }
 
+    await context.close()
+    const { readdir } = await import('node:fs/promises')
+    const searchVideos = (await readdir(videoSearchDir)).filter((f) => f.endsWith('.webm'))
+    if (searchVideos[0]) {
+      const src = join(videoSearchDir, searchVideos[0])
+      const dest = join(artifactsDir, 'picker_search_select_wave1.webm')
+      await copyFile(src, dest)
+      await copyFile(src, join(artifactsDir, 'picker_select_to_immersive.webm'))
+      console.log('wrote', dest)
+    }
+
     // No-reg : une illu wave1 du picker ne devient pas le hero immersif
-    const page2 = await context.newPage()
+    const context2 = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: 2,
+      isMobile: true,
+      hasTouch: true,
+      recordVideo: {
+        dir: videoInclineDir,
+        size: { width: 390, height: 844 },
+      },
+    })
+    const page2 = await context2.newPage()
     await page2.emulateMedia({ reducedMotion: 'reduce' })
     await page2.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'networkidle' })
     await page2.waitForSelector('[data-exercise-id="incline_bench_press"]')
@@ -219,17 +245,11 @@ async function main() {
     const inclineImmersivePath = join(outDir, 'immersive-incline-no-wave1-hero-390.png')
     await page2.screenshot({ path: inclineImmersivePath, fullPage: false })
     await copyFile(inclineImmersivePath, join(artifactsDir, 'immersive_incline_no_wave1_hero.png'))
-    await page2.close()
-
-    await context.close()
-    // Playwright writes video after context close
-    const { readdir } = await import('node:fs/promises')
-    const videoTmp = join(outDir, 'video-tmp')
-    const videos = (await readdir(videoTmp)).filter((f) => f.endsWith('.webm'))
-    if (videos[0]) {
-      const src = join(videoTmp, videos[0])
-      const dest = join(artifactsDir, 'picker_select_to_immersive.webm')
-      await copyFile(src, dest)
+    await context2.close()
+    const inclineVideos = (await readdir(videoInclineDir)).filter((f) => f.endsWith('.webm'))
+    if (inclineVideos[0]) {
+      const dest = join(artifactsDir, 'picker_incline_no_wave1_hero.webm')
+      await copyFile(join(videoInclineDir, inclineVideos[0]), dest)
       console.log('wrote', dest)
     }
   } finally {
