@@ -1,14 +1,18 @@
 /**
  * Génère les icônes web/PWA Ranked Gym à partir du master raster
- * `src/assets/brand/panther-calm-crowned.png` (PNG, non vectoriel).
+ * `src/assets/brand/panther-calm-crowned.png` (PNG, non vectoriel)
+ * et de la plaque d’icône `src/assets/brand/panther-icon-opaque.png`.
  *
  * Les masters dans `src/assets/brand/` ne sont jamais modifiés.
- * Les rouges du logo principal sont normalisés à la génération vers la
- * palette produit (#B91C1C → #FF2B2B), fond #0C0C0E.
+ * Les rouges du logo principal (header / splash) sont normalisés à la
+ * génération vers la palette produit (#B91C1C → #FF2B2B), fond #0C0C0E.
+ * Les icônes home-screen / PWA / native copient les pixels exacts de la
+ * plaque panthère (bouche fermée, couronne rouge, glow).
  *
  * Usage: npm run brand:assets
+ *        node scripts/generate-brand-assets.mjs --icons-only
  */
-import { mkdir, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -35,10 +39,15 @@ const NATIVE_EXPORT_SIZE = 1024
 /** Splash Capacitor — minimum 2732×2732, fond noir + panthère calme (D96BABC8). */
 const SPLASH_EXPORT_SIZE = 2732
 const SPLASH_LOGO_SCALE = 0.42
-/** icon-only : panthère ~72–78 % du canvas. */
-const ICON_ONLY_SCALE = 0.75
-/** icon-foreground : sujet ~58–61 %, dans la safe zone 66/108. */
-const ICON_FOREGROUND_SCALE = 0.6
+/** icon-only : plaque officielle en pixels exacts (pas de padding supplémentaire). */
+const ICON_ONLY_SCALE = 1
+/**
+ * Adaptive foreground : plaque pleine.
+ * L’inset XML Capacitor (16.7 %) mappe le PNG dans la safe zone Android 66/108.
+ */
+const ICON_FOREGROUND_SCALE = 1
+/** Maskable PWA : sujet centré ~72 % pour que le crop circulaire n’entame pas couronne/oreilles. */
+const MASKABLE_CONTENT_SCALE = 0.72
 /** Marque header compacte — fond transparent, cadrage serré (BrandMark compact uniquement). */
 const HEADER_MARK_FILENAME = 'brand-header-mark.png'
 /** Export raster header — affiché en CSS à 38×38 px. */
@@ -215,15 +224,6 @@ async function loadProcessedMasterPixels({ opaqueProductBackground = true } = {}
   }
 
   return { data, info }
-}
-
-async function loadProcessedMasterBuffer() {
-  const { data, info } = await loadProcessedMasterPixels({ opaqueProductBackground: true })
-  return sharp(data, {
-    raw: { width: info.width, height: info.height, channels: 4 },
-  })
-    .png(PNG_OPTS)
-    .toBuffer()
 }
 
 /**
@@ -568,12 +568,11 @@ async function writeNativeSplash() {
   }
 }
 
-/** Favicon raster depuis A5A15C62 (icône opaque). */
+/** Favicon raster depuis la plaque panthère (pixels exacts, redimensionnés). */
 async function writeFaviconFromIcon(iconMasterBuffer) {
   const faviconPath = path.join(PUBLIC_DIR, 'favicon.png')
-  await writeSquareIcon(iconMasterBuffer, 64, faviconPath, { contentScale: 0.92 })
+  await writeExactIcon(iconMasterBuffer, 64, faviconPath)
   await assertNoVisibleGreen(faviconPath, 'public/favicon.png')
-  // Conserve un favicon.svg minimal pointant l’identité (fallback) — PNG est la source index.html.
   const faviconSvg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Ranked Gym">
   <rect width="64" height="64" rx="14" fill="#0C0C0E"/>
@@ -581,17 +580,21 @@ async function writeFaviconFromIcon(iconMasterBuffer) {
 </svg>
 `
   await writeFile(path.join(PUBLIC_DIR, 'favicon.svg'), faviconSvg, 'utf8')
-  console.log('  ✓ public/favicon.png (A5A15C62) + favicon.svg wrapper')
+  console.log('  ✓ public/favicon.png + favicon.svg wrapper')
 }
 
-/** Sources natives Capacitor : icon-only / icon-foreground / icon-background (A5A15C62). */
-async function writeNativeSources(iconMasterBuffer, _headerMasterPixels) {
+/** Sources natives Capacitor : icon-only / icon-foreground / icon-background. */
+async function writeNativeSources(iconMasterBuffer) {
   await mkdir(NATIVE_DIR, { recursive: true })
 
   const iconOnlyPath = path.join(NATIVE_DIR, 'icon-only.png')
-  await writeSquareIcon(iconMasterBuffer, NATIVE_EXPORT_SIZE, iconOnlyPath, {
-    contentScale: ICON_ONLY_SCALE,
-  })
+  if (ICON_ONLY_SCALE === 1) {
+    await writeExactIcon(iconMasterBuffer, NATIVE_EXPORT_SIZE, iconOnlyPath)
+  } else {
+    await writeSquareIcon(iconMasterBuffer, NATIVE_EXPORT_SIZE, iconOnlyPath, {
+      contentScale: ICON_ONLY_SCALE,
+    })
+  }
   const iconOnlyOpaque = await sharp(iconOnlyPath).removeAlpha().png(PNG_OPTS).toBuffer()
   await writeFile(iconOnlyPath, iconOnlyOpaque)
   await assertNoVisibleGreen(iconOnlyPath, 'assets/icon-only.png')
@@ -611,7 +614,6 @@ async function writeNativeSources(iconMasterBuffer, _headerMasterPixels) {
     `  ✓ ${path.relative(root, iconBackgroundPath)} (${NATIVE_EXPORT_SIZE}×${NATIVE_EXPORT_SIZE}, #0C0C0E opaque)`,
   )
 
-  // Adaptive foreground : A5A15C62 centré (safe zone), pas le master calme.
   const subjectSize = Math.round(NATIVE_EXPORT_SIZE * ICON_FOREGROUND_SCALE)
   const offset = Math.round((NATIVE_EXPORT_SIZE - subjectSize) / 2)
   const subject = await sharp(iconMasterBuffer)
@@ -631,7 +633,7 @@ async function writeNativeSources(iconMasterBuffer, _headerMasterPixels) {
     .png(PNG_OPTS)
     .toFile(fgPath)
   await assertNoVisibleGreen(fgPath, 'assets/icon-foreground.png')
-  console.log(`  ✓ ${path.relative(root, fgPath)} (A5A15C62 adaptive foreground)`)
+  console.log(`  ✓ ${path.relative(root, fgPath)} (adaptive foreground, scale ${ICON_FOREGROUND_SCALE})`)
 }
 
 async function writeSquareIcon(masterBuffer, size, outPath, { contentScale = 1 } = {}) {
@@ -661,50 +663,85 @@ async function writeSquareIcon(masterBuffer, size, outPath, { contentScale = 1 }
   console.log(`  ✓ ${path.relative(root, outPath)} (${meta.width}×${meta.height})`)
 }
 
-async function main() {
-  await mkdir(PUBLIC_DIR, { recursive: true })
+/** Redimensionne la plaque sans padding produit supplémentaire (pixels exacts). */
+async function writeExactIcon(masterBuffer, size, outPath) {
+  const metaIn = await sharp(masterBuffer).metadata()
+  if (metaIn.width === size && metaIn.height === size) {
+    await writeFile(outPath, masterBuffer)
+  } else {
+    await sharp(masterBuffer)
+      .resize(size, size, { fit: 'cover', kernel: sharp.kernel.lanczos3 })
+      .png(PNG_OPTS)
+      .toFile(outPath)
+  }
+  const meta = await sharp(outPath).metadata()
+  console.log(`  ✓ ${path.relative(root, outPath)} (${meta.width}×${meta.height}, exact)`)
+}
 
+async function copyIconMasters() {
+  const brandDir = path.join(PUBLIC_DIR, 'brand')
+  const resourcesDir = path.join(root, 'resources')
+  await mkdir(brandDir, { recursive: true })
+  await mkdir(resourcesDir, { recursive: true })
+  const publicMaster = path.join(brandDir, 'app-icon-master.png')
+  const resourcesIcon = path.join(resourcesDir, 'icon.png')
+  await copyFile(MASTER_ICON, publicMaster)
+  await copyFile(MASTER_ICON, resourcesIcon)
+  console.log(`  ✓ ${path.relative(root, publicMaster)} (master copy, exact bytes)`)
+  console.log(`  ✓ ${path.relative(root, resourcesIcon)} (Capacitor/cordova master)`)
+}
+
+async function generateAppIconsFromMaster() {
+  const iconMasterBuffer = await readFile(MASTER_ICON)
+  const meta = await sharp(iconMasterBuffer).metadata()
+  if (!meta.width || meta.width !== meta.height) {
+    throw new Error(`Master icône non carré : ${MASTER_ICON} (${meta.width}×${meta.height})`)
+  }
   console.log(
-    'Brand assets — masters intactes, rouges → #B91C1C…#FF2B2B, fond #0C0C0E ; icônes PWA via panther-icon-opaque',
+    `App icons — exact pixels from ${path.relative(root, MASTER_ICON)} (${meta.width}×${meta.height}, bouche fermée)`,
   )
-  const masterBuffer = await loadProcessedMasterBuffer()
-  const headerMasterPixels = await loadProcessedMasterPixels({ opaqueProductBackground: false })
 
-  await writeHeaderMark(headerMasterPixels)
+  await copyIconMasters()
+  await writeNativeSources(iconMasterBuffer)
 
-  // Icônes PWA / store : source propriétaire opaque (pas le fond vert détouré).
-  const iconMasterBuffer = await sharp(MASTER_ICON)
-    .resize(1024, 1024, { fit: 'cover', kernel: sharp.kernel.lanczos3 })
-    .png(PNG_OPTS)
-    .toBuffer()
-
-  await writeNativeSources(iconMasterBuffer, headerMasterPixels)
-  await writeNativeSplash()
-
-  await writeSquareIcon(iconMasterBuffer, 180, path.join(PUBLIC_DIR, 'icon.png'), {
-    contentScale: 0.92,
-  })
-  await writeSquareIcon(iconMasterBuffer, 192, path.join(PUBLIC_DIR, 'pwa-192x192.png'), {
-    contentScale: 0.92,
-  })
-  await writeSquareIcon(iconMasterBuffer, 512, path.join(PUBLIC_DIR, 'pwa-512x512.png'), {
-    contentScale: 0.92,
-  })
+  await writeExactIcon(iconMasterBuffer, 180, path.join(PUBLIC_DIR, 'icon.png'))
+  await writeExactIcon(iconMasterBuffer, 180, path.join(PUBLIC_DIR, 'apple-touch-icon.png'))
+  await writeExactIcon(iconMasterBuffer, 192, path.join(PUBLIC_DIR, 'pwa-192x192.png'))
+  await writeExactIcon(iconMasterBuffer, 512, path.join(PUBLIC_DIR, 'pwa-512x512.png'))
   await writeSquareIcon(
     iconMasterBuffer,
     512,
     path.join(PUBLIC_DIR, 'pwa-maskable-512x512.png'),
-    { contentScale: 0.7 },
+    { contentScale: MASKABLE_CONTENT_SCALE },
   )
+  await writeFaviconFromIcon(iconMasterBuffer)
 
-  for (const name of ['icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'pwa-maskable-512x512.png']) {
+  for (const name of [
+    'icon.png',
+    'apple-touch-icon.png',
+    'pwa-192x192.png',
+    'pwa-512x512.png',
+    'pwa-maskable-512x512.png',
+    'favicon.png',
+  ]) {
     await assertNoVisibleGreen(path.join(PUBLIC_DIR, name), `public/${name}`)
   }
+}
 
-  // Conservé pour composites hero éventuels (panthère calme détourée).
-  void masterBuffer
+async function main() {
+  await mkdir(PUBLIC_DIR, { recursive: true })
+  const iconsOnly = process.argv.includes('--icons-only')
 
-  await writeFaviconFromIcon(iconMasterBuffer)
+  if (!iconsOnly) {
+    console.log(
+      'Brand assets — masters intactes, rouges → #B91C1C…#FF2B2B, fond #0C0C0E ; icônes PWA via panther-icon-opaque',
+    )
+    const headerMasterPixels = await loadProcessedMasterPixels({ opaqueProductBackground: false })
+    await writeHeaderMark(headerMasterPixels)
+    await writeNativeSplash()
+  }
+
+  await generateAppIconsFromMaster()
 
   console.log('Done.')
 }
