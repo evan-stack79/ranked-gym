@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Check, Flame, Sparkles } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { SectionSkeleton } from '../ui/AppBootScreen'
 import {
   isStreakActiveToday,
   STREAK_WEEK_BONUS_XP,
@@ -74,6 +75,10 @@ export function DailyStreak() {
         </button>
       </section>
     )
+  }
+
+  if (!profile) {
+    return <SectionSkeleton label="Série quotidienne" />
   }
 
   const lit = isTodayDone && currentStreak > 0

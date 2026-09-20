@@ -45,6 +45,9 @@ import {
   resetCloudBackupHydration,
   setCloudBackupUserId,
 } from '../services/cloudBackup'
+import { classifyHydrateFailure, type BootIssueKind } from '../boot/bootStatus'
+import { hasUsableLocalCache } from '../boot/localCache'
+import { USER_BACKEND_UNAVAILABLE } from '../boot/bootUiCopy'
 import {
   applyDailyLoginStreak,
   hasCelebratedStreak,
@@ -92,6 +95,12 @@ export interface AuthContextValue {
    * Prevents Flash of Stale Data on refresh.
    */
   isLoading: boolean
+  /**
+   * Échec de hydrate après tentative réelle (fetch toujours exécuté).
+   * `recoverable` = cache local conservé ; `blocking` = aucune donnée affichable.
+   */
+  bootIssue: BootIssueKind | null
+  retryHydrate: () => Promise<void>
   isAuthOpen: boolean
   authLoading: boolean
   authError: string | null
@@ -157,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [profile, setProfile] = useState<ProfileRow | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [bootIssue, setBootIssue] = useState<BootIssueKind | null>(null)
   const [isAuthOpen, setIsAuthOpen] = useState(false)
   const [authLoading, setAuthLoading] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
@@ -261,15 +271,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         HYDRATE_TIMEOUT_MS,
         'hydrateCloudBackupForUser',
       )
+      setBootIssue(null)
     } catch (e) {
       safeError('[auth] hydrateCloudBackupForUser failed', e)
+      setBootIssue(
+        classifyHydrateFailure({
+          hasProfile: Boolean(profileRef.current),
+          hasLocalCache: hasUsableLocalCache(),
+        }),
+      )
     }
-  }, [])
+  }, [applyStreakForProfile])
 
   const hydrateUser = useCallback(
     async (authUser: AuthUser, metaDiscipline?: string) => {
       const gen = ++hydrateGenRef.current
       setIsLoading(true)
+      setBootIssue(null)
       try {
         await withTimeout(
           loadProfile(authUser, metaDiscipline),
@@ -278,6 +296,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         )
       } catch (error) {
         safeError('[auth] hydrateUser failed', error)
+        if (hydrateGenRef.current === gen) {
+          setBootIssue(
+            classifyHydrateFailure({
+              hasProfile: Boolean(profileRef.current),
+              hasLocalCache: hasUsableLocalCache(),
+            }),
+          )
+        }
       } finally {
         if (hydrateGenRef.current === gen) {
           setIsLoading(false)
@@ -286,6 +312,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [loadProfile],
   )
+
+  const retryHydrate = useCallback(async () => {
+    const authUser = userRef.current
+    if (!authUser) return
+    await hydrateUser(authUser)
+  }, [hydrateUser])
 
   const refreshProfile = useCallback(async () => {
     if (!user) return
@@ -402,6 +434,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(null)
         setIsPasswordRecovery(false)
         resetCloudBackupHydration()
+        setBootIssue(null)
         setIsLoading(false)
       }
     })
@@ -422,7 +455,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const openAuth = useCallback((onSuccess?: AuthSuccessCallback) => {
-    setAuthError(null)
+    const technical = isConvexAuthRuntime() ? getConvexConfigError() : getSupabaseConfigError()
+    if (technical) {
+      safeError('[auth] backend config', technical)
+      setAuthError(USER_BACKEND_UNAVAILABLE)
+    } else {
+      setAuthError(null)
+    }
     setAuthInfo(null)
     pendingRef.current = onSuccess ?? null
     setIsAuthOpen(true)
@@ -451,12 +490,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithEmail = useCallback(
     async (email: string, password: string) => {
       if (!isConvexAuthRuntime() && !isSupabaseConfigured()) {
-        setAuthError(
-          friendlyAuthError(
-            new Error('AUTH_SERVICE_UNAVAILABLE'),
-            'Service indisponible. Réessaie plus tard.',
-          ),
-        )
+        const technical = getSupabaseConfigError()
+        if (technical) safeError('[auth] backend config', technical)
+        setAuthError(USER_BACKEND_UNAVAILABLE)
         return
       }
       setAuthLoading(true)
@@ -499,12 +535,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const requestPasswordReset = useCallback(async (email: string) => {
     if (!isConvexAuthRuntime() && !isSupabaseConfigured()) {
-      setAuthError(
-        friendlyAuthError(
-          new Error('AUTH_SERVICE_UNAVAILABLE'),
-          'Service indisponible. Réessaie plus tard.',
-        ),
-      )
+      const technical = getSupabaseConfigError()
+      if (technical) safeError('[auth] backend config', technical)
+      setAuthError(USER_BACKEND_UNAVAILABLE)
       return
     }
     setAuthLoading(true)
@@ -528,12 +561,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const confirmPasswordRecovery = useCallback(
     async (password: string, confirmPassword: string) => {
       if (!isConvexAuthRuntime() && !isSupabaseConfigured()) {
-        setAuthError(
-          friendlyAuthError(
-            new Error('AUTH_SERVICE_UNAVAILABLE'),
-            'Service indisponible. Réessaie plus tard.',
-          ),
-        )
+        const technical = getSupabaseConfigError()
+        if (technical) safeError('[auth] backend config', technical)
+        setAuthError(USER_BACKEND_UNAVAILABLE)
         return
       }
       const validationError = validateNewPassword(password, confirmPassword)
@@ -611,6 +641,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsPasswordRecovery(false)
     setAuthInfo(null)
     setAuthError(null)
+    setBootIssue(null)
     setIsLoading(false)
   }, [])
 
@@ -638,6 +669,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       isAuthenticated: Boolean(user),
       isLoading,
+      bootIssue,
+      retryHydrate,
       isAuthOpen,
       authLoading,
       authError,
@@ -666,6 +699,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       session,
       isLoading,
+      bootIssue,
+      retryHydrate,
       isAuthOpen,
       authLoading,
       authError,

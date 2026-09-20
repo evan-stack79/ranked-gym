@@ -11,6 +11,7 @@ export default defineConfig({
       ['src/components/auth/**', 'jsdom'],
       ['src/components/legal/**', 'jsdom'],
       ['src/components/ui/AppBootScreen.test.tsx', 'jsdom'],
+      ['src/components/ui/BootIssueScreen.test.tsx', 'jsdom'],
       ['src/App.test.tsx', 'jsdom'],
       ['src/utils/streakCelebrationFocus.test.ts', 'jsdom'],
       ['src/utils/streakCelebrationSession.test.tsx', 'jsdom'],

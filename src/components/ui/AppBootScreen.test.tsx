@@ -1,28 +1,45 @@
 /** @vitest-environment jsdom */
-import { createRoot } from 'react-dom/client'
+import { StrictMode } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
 import { act } from 'react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { AppBootScreen } from './AppBootScreen'
+import { containsForbiddenBootCopy, USER_BOOT_ARIA_LABEL } from '../../boot/bootUiCopy'
 
 describe('AppBootScreen', () => {
-  it('n’affiche aucun copy technique pendant la restauration', async () => {
-    const host = document.createElement('div')
+  let host: HTMLDivElement
+  let root: Root
+
+  beforeEach(() => {
+    host = document.createElement('div')
     document.body.appendChild(host)
-    const root = createRoot(host)
-    await act(async () => {
-      root.render(<AppBootScreen />)
-    })
-    expect(host.querySelector('[data-session-restore]')).toBeTruthy()
-    expect(host.getAttribute('aria-label') || host.querySelector('[aria-label]')?.getAttribute('aria-label')).toBe(
-      'Ranked Gym',
-    )
-    expect(host.textContent).not.toContain('Chargement')
-    expect(host.textContent).not.toContain('Récupération')
-    expect(host.textContent).not.toContain('VITE_')
-    expect(host.textContent).not.toContain('Supabase')
-    await act(async () => {
+    root = createRoot(host)
+  })
+
+  afterEach(() => {
+    act(() => {
       root.unmount()
     })
     host.remove()
+  })
+
+  it('affiche un splash Ranked Gym sobre sans texte technique ni spinner central', () => {
+    act(() => {
+      root.render(
+        <StrictMode>
+          <AppBootScreen />
+        </StrictMode>,
+      )
+    })
+
+    const screen = host.querySelector('[data-app-boot-screen="1"]')
+    expect(screen).not.toBeNull()
+    expect(screen?.getAttribute('aria-label')).toBe(USER_BOOT_ARIA_LABEL)
+    expect(host.querySelector('[data-home-boot-skeleton="1"]')).not.toBeNull()
+    expect(host.querySelector('.animate-spin')).toBeNull()
+    expect(containsForbiddenBootCopy(host.textContent ?? '')).toBeNull()
+    expect(host.textContent).toContain('Ranked')
+    expect(host.textContent).toContain('Gym')
+    expect(host.textContent ?? '').not.toMatch(/Convex|Supabase|storage|hydrat/i)
   })
 })

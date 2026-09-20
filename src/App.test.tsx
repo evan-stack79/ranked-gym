@@ -44,7 +44,9 @@ async function renderShell(overrides: Parameters<typeof buildAuthContextValue>[0
 describe('AppShell auth welcome', () => {
   it('ne montre pas l’accueil pendant la restauration de session', async () => {
     const { host, cleanup } = await renderShell({ isLoading: true, isAuthenticated: false })
-    expect(host.querySelector('[data-session-restore]')).toBeTruthy()
+    expect(
+      host.querySelector('[data-app-boot-screen="1"]') || host.querySelector('[data-session-restore]'),
+    ).toBeTruthy()
     expect(host.querySelector('[data-welcome-screen]')).toBeNull()
     expect(host.textContent).not.toContain(WELCOME_TITLE)
     expect(host.textContent).not.toContain('Récupération des données')

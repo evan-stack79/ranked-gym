@@ -35,6 +35,7 @@ import { MealBudgetsCard } from './MealBudgetsCard'
 import { EditMealSheet } from './EditMealSheet'
 import { MealPhotoAnalyzer } from './MealPhotoAnalyzer'
 import { AddFoodScreen } from './AddFoodScreen'
+import { SectionSkeleton } from '../ui/AppBootScreen'
 
 interface MealJournalProps {
   targetCalories: number
@@ -285,7 +286,9 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     setEditingMeal(null)
   }
 
-  if (!hydrated) return null
+  if (!hydrated) {
+    return <SectionSkeleton tall label="Journal" />
+  }
 
   return (
     <section className="space-y-4 pb-6">

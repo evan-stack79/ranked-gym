@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { USER_CRASH_BODY, USER_CRASH_TITLE, USER_RELOAD_LABEL } from '../../boot/bootUiCopy'
 import { safeError } from '../../utils/safeLog'
 
 interface Props {
@@ -31,25 +32,11 @@ export class RootErrorBoundary extends Component<Props, State> {
             fontFamily: 'system-ui, sans-serif',
             padding: '2rem 1.25rem',
           }}
+          data-boot-crash="1"
         >
           <h1 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Ranked Gym</h1>
-          <p style={{ marginTop: '0.75rem', color: '#FF6961', fontSize: '0.9375rem' }}>
-            Erreur au démarrage — recharge la page.
-          </p>
-          <pre
-            style={{
-              marginTop: '1rem',
-              padding: '0.75rem',
-              borderRadius: '12px',
-              background: '#1C1C1E',
-              color: '#8E8E93',
-              fontSize: '0.75rem',
-              overflow: 'auto',
-              whiteSpace: 'pre-wrap',
-            }}
-          >
-            {this.state.error.message}
-          </pre>
+          <p style={{ marginTop: '0.75rem', fontSize: '1.05rem', fontWeight: 600 }}>{USER_CRASH_TITLE}</p>
+          <p style={{ marginTop: '0.5rem', color: '#AEAEB2', fontSize: '0.9375rem' }}>{USER_CRASH_BODY}</p>
           <button
             type="button"
             onClick={() => window.location.reload()}
@@ -64,7 +51,7 @@ export class RootErrorBoundary extends Component<Props, State> {
               fontSize: '0.875rem',
             }}
           >
-            Recharger
+            {USER_RELOAD_LABEL}
           </button>
         </div>
       )

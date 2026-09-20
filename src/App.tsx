@@ -1,10 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { RestTimerProvider } from './context/RestTimerContext'
 import { AuthBottomSheet } from './components/auth/AuthBottomSheet'
 import { WelcomeScreen } from './components/auth/WelcomeScreen'
 import { AppLayout } from './components/layout/AppLayout'
 import { AppBootScreen } from './components/ui/AppBootScreen'
+import { BootIssueScreen, RecoverableRetryBar } from './components/ui/BootIssueScreen'
+import { OfflineBanner } from './components/ui/OfflineBanner'
+import { SupabaseConfigBanner } from './components/ui/SupabaseConfigBanner'
+import { useOnlineStatus } from './hooks/useOnlineStatus'
 import { GlobalOnboardingScreen } from './components/onboarding/GlobalOnboardingScreen'
 import { HomeView } from './components/home/HomeView'
 import { TrainingView } from './components/training/TrainingView'
@@ -58,11 +62,53 @@ function renderActiveView(
   }
 }
 
+/** Shell minimal (boot / gate). `showBrandHeader` défaut = comportement historique. */
+function SessionChrome({
+  showBrandHeader = true,
+  children,
+}: {
+  showBrandHeader?: boolean
+  children: ReactNode
+}) {
+  return (
+    <div className="relative flex h-[100dvh] min-h-0 flex-col mesh-bg font-sans">
+      <main className="relative z-10 mx-auto min-h-0 w-full max-w-lg flex-1 overflow-y-auto">
+        {showBrandHeader ? (
+          <header
+            className="border-b border-white/5 bg-[#0C0C0E]"
+            data-app-brand-header="1"
+            style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+          >
+            <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-3">
+              <span className="text-[17px] font-semibold tracking-tight text-white">
+                Ranked <span className="text-[#FF2B2B]">Gym</span>
+              </span>
+            </div>
+          </header>
+        ) : null}
+        <div
+          className="px-5 py-8"
+          style={
+            showBrandHeader
+              ? undefined
+              : {
+                  paddingTop: 'max(2rem, calc(env(safe-area-inset-top, 0px) + 1rem))',
+                }
+          }
+        >
+          {children}
+        </div>
+      </main>
+    </div>
+  )
+}
+
 export function AppShell() {
   const [phase, setPhase] = useState<AppPhase>('loading')
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [launchRoutineId, setLaunchRoutineId] = useState<string | null>(null)
-  const { openAuth, isAuthenticated, isLoading } = useAuth()
+  const { openAuth, isAuthenticated, isLoading, bootIssue, retryHydrate } = useAuth()
+  const online = useOnlineStatus()
 
   useEffect(() => {
     if (isLoading) {
@@ -151,7 +197,11 @@ export function AppShell() {
   if (isLoading) {
     return (
       <>
-        <AppBootScreen />
+        <SupabaseConfigBanner />
+        {!online ? <OfflineBanner /> : null}
+        <SessionChrome showBrandHeader={false}>
+          <AppBootScreen />
+        </SessionChrome>
         <AuthBottomSheet />
       </>
     )
@@ -160,7 +210,22 @@ export function AppShell() {
   if (!isAuthenticated) {
     return (
       <>
+        <SupabaseConfigBanner />
+        {!online ? <OfflineBanner /> : null}
         <WelcomeScreen onConnect={() => openAuth()} />
+        <AuthBottomSheet />
+      </>
+    )
+  }
+
+  if (bootIssue === 'blocking') {
+    return (
+      <>
+        <SupabaseConfigBanner />
+        {!online ? <OfflineBanner /> : null}
+        <SessionChrome showBrandHeader={false}>
+          <BootIssueScreen kind="blocking" onRetry={() => void retryHydrate()} />
+        </SessionChrome>
         <AuthBottomSheet />
       </>
     )
@@ -169,6 +234,8 @@ export function AppShell() {
   if (phase === 'onboarding') {
     return (
       <>
+        <SupabaseConfigBanner />
+        {!online ? <OfflineBanner /> : null}
         <GlobalOnboardingScreen onComplete={handleOnboardingComplete} />
         <AuthBottomSheet />
       </>
@@ -177,7 +244,12 @@ export function AppShell() {
 
   return (
     <>
+      <SupabaseConfigBanner />
+      {!online ? <OfflineBanner /> : null}
       <AppLayout activeTab={activeTab} onTabChange={handleTabChange}>
+        {bootIssue === 'recoverable' ? (
+          <RecoverableRetryBar onRetry={() => void retryHydrate()} />
+        ) : null}
         {renderActiveView(
           activeTab,
           handleStartTraining,
