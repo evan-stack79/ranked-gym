@@ -10,6 +10,7 @@ export default defineConfig({
       ['src/components/brand/**', 'jsdom'],
       ['src/components/auth/**', 'jsdom'],
       ['src/components/legal/**', 'jsdom'],
+      ['src/components/training/**/*.test.tsx', 'jsdom'],
       ['src/components/ui/AppBootScreen.test.tsx', 'jsdom'],
       ['src/components/ui/BootIssueScreen.test.tsx', 'jsdom'],
       ['src/App.test.tsx', 'jsdom'],

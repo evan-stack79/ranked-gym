@@ -329,6 +329,17 @@ body {
   will-change: transform;
 }
 
+.train-sheet--graphite .ios-sheet-backdrop {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgb(0 0 0 / 0.5);
+}
+
+.train-sheet--graphite .ios-sheet-panel {
+  background-color: #070708;
+  box-shadow: none;
+}
+
 .ios-sheet-panel--open {
   transform: translate3d(0, 0, 0);
 }
@@ -373,6 +384,35 @@ body {
 .ios-press:focus-visible {
   outline: 2px solid rgb(255 43 43 / 0.7);
   outline-offset: 2px;
+}
+
+/* Historique — lignes compactes, rouge seulement press / selected / focus */
+.history-page {
+  background: #070708;
+}
+
+.history-row {
+  border-bottom: 1px solid #161618;
+  background: transparent;
+}
+
+.history-row:last-child {
+  border-bottom: 1px solid #161618;
+}
+
+.history-row:active,
+.history-row.history-row--active,
+.history-row:focus-visible {
+  background: rgb(255 43 43 / 0.12);
+}
+
+.history-row:focus-visible {
+  outline: 2px solid #ff2b2b;
+  outline-offset: -2px;
+}
+
+.history-thumb {
+  background: transparent;
 }
 
 @keyframes ios-fade-up {
