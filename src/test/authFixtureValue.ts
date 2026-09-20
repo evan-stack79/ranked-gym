@@ -20,6 +20,8 @@ export function buildAuthContextValue(
     profile: null,
     isAuthenticated: false,
     isLoading: false,
+    bootIssue: null,
+    retryHydrate: asyncNoop,
     isAuthOpen: false,
     authLoading: false,
     authError: null,
@@ -43,5 +45,7 @@ export function buildAuthContextValue(
     updateGhostMode: asyncNoop,
     signOut: asyncNoop,
     ...overrides,
+    bootIssue: overrides.bootIssue ?? null,
+    retryHydrate: overrides.retryHydrate ?? asyncNoop,
   }
 }

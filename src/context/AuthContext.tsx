@@ -10,9 +10,10 @@ import {
 } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import type { ProfileRow } from '../types/database'
-import { isSupabaseConfigured, getSupabase } from '../lib/supabase'
+import { getSupabaseConfigError, isSupabaseConfigured, getSupabase } from '../lib/supabase'
 import { getActiveAuthBackend } from '../backend/authFeatureFlag'
 import { isConvexDomainActive } from '../backend/adapter'
+import { getConvexConfigError } from '../lib/convex'
 import {
   ensureProfile,
   fetchProfile,
