@@ -213,6 +213,13 @@ async function main() {
     })
     await videoPage.waitForTimeout(900)
 
+    await videoPage.locator('.ios-sheet-panel button[aria-label="Fermer"]').click()
+    await videoPage.waitForSelector('[data-history-detail="n-long"]', { state: 'detached' })
+    await videoPage.waitForTimeout(400)
+
+    await videoPage.locator('[data-history-row="n-squat"]').click()
+    await videoPage.waitForSelector('[data-history-detail="n-squat"]')
+    await videoPage.waitForTimeout(400)
     await videoPage.locator('[data-history-delete]').click()
     await videoPage.waitForSelector('[data-history-delete-confirm]')
     await videoPage.waitForTimeout(500)
@@ -221,14 +228,6 @@ async function main() {
     await copyFile(confirmShot, join(artifactsDir, 'history_detail_delete_confirm_390x844.png'))
     await videoPage.locator('[data-history-confirm-cancel]').click()
     await videoPage.waitForSelector('[data-history-delete-confirm]', { state: 'detached' })
-    await videoPage.waitForTimeout(400)
-
-    await videoPage.locator('.ios-sheet-panel button[aria-label="Fermer"]').click()
-    await videoPage.waitForSelector('[data-history-detail="n-long"]', { state: 'detached' })
-    await videoPage.waitForTimeout(400)
-
-    await videoPage.locator('[data-history-row="n-squat"]').click()
-    await videoPage.waitForSelector('[data-history-detail="n-squat"]')
     await videoPage.waitForTimeout(400)
     await videoPage.keyboard.press('Escape')
     await videoPage.waitForSelector('[data-history-detail="n-squat"]', { state: 'detached' })

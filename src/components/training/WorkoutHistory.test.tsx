@@ -537,7 +537,7 @@ describe('WorkoutHistory — fiche détail bottom sheet', () => {
     expect(document.body.querySelector('[data-history-delete-confirm]')).toBeNull()
 
     await act(async () => {
-      del.click()
+      ;(document.body.querySelector('[data-history-delete]') as HTMLButtonElement).click()
     })
     await act(async () => {
       ;(document.body.querySelector('[data-history-confirm-delete]') as HTMLButtonElement).click()

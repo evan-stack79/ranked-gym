@@ -106,46 +106,6 @@ export function HistorySessionSheet({
       subtitle={current ? formatHistoryDetailDateLine(current) : undefined}
       tone="graphite"
       dismissible={!deleting}
-      overlay={
-        confirmOpen && current ? (
-          <div
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby={confirmTitleId}
-            aria-describedby={confirmDescId}
-            data-history-delete-confirm
-            className="flex min-h-full flex-col justify-end bg-[#070708] pb-2 pt-8"
-          >
-            <p id={confirmTitleId} className="text-[16px] font-semibold text-white">
-              Supprimer cette séance ?
-            </p>
-            <p id={confirmDescId} className="mt-1.5 text-[13px] leading-5 text-[#AEAEB2]">
-              Cette action est définitive et supprimera cette séance de ton historique.
-            </p>
-            <div className="mt-4 flex gap-2">
-              <button
-                ref={cancelRef}
-                type="button"
-                data-history-confirm-cancel
-                disabled={deleting}
-                onClick={() => setConfirmOpen(false)}
-                className="ios-press flex min-h-11 flex-1 items-center justify-center rounded-xl text-[14px] font-medium text-[#AEAEB2]"
-              >
-                Annuler
-              </button>
-              <button
-                type="button"
-                data-history-confirm-delete
-                disabled={deleting}
-                onClick={() => void handleConfirmDelete()}
-                className="ios-press flex min-h-11 flex-1 items-center justify-center rounded-xl text-[14px] font-semibold text-[#FF453A]"
-              >
-                {deleting ? 'Suppression…' : 'Supprimer'}
-              </button>
-            </div>
-          </div>
-        ) : null
-      }
       headerActions={
         <div className="relative">
           <button
@@ -186,6 +146,50 @@ export function HistorySessionSheet({
     >
       {note && current && metrics ? (
         <div className="relative flex min-h-full flex-col pb-2" data-history-detail={current.id}>
+          {confirmOpen ? (
+            <div
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby={confirmTitleId}
+              aria-describedby={confirmDescId}
+              data-history-delete-confirm
+              className="flex flex-1 flex-col pt-2"
+            >
+              <p id={confirmTitleId} className="text-[16px] font-semibold text-white">
+                Supprimer cette séance ?
+              </p>
+              <p id={confirmDescId} className="mt-1.5 text-[13px] leading-5 text-[#AEAEB2]">
+                Cette action est définitive et supprimera cette séance de ton historique.
+              </p>
+              {deleteError ? (
+                <p className="mt-3 text-[12px] text-[#FF453A]" data-history-delete-error>
+                  {deleteError}
+                </p>
+              ) : null}
+              <div className="mt-4 flex gap-2">
+                <button
+                  ref={cancelRef}
+                  type="button"
+                  data-history-confirm-cancel
+                  disabled={deleting}
+                  onClick={() => setConfirmOpen(false)}
+                  className="ios-press flex min-h-11 flex-1 items-center justify-center text-[14px] font-medium text-[#AEAEB2]"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  data-history-confirm-delete
+                  disabled={deleting}
+                  onClick={() => void handleConfirmDelete()}
+                  className="ios-press flex min-h-11 flex-1 items-center justify-center text-[14px] font-semibold text-[#FF453A]"
+                >
+                  {deleting ? 'Suppression…' : 'Supprimer'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
           <div
             className="grid grid-cols-3 gap-2 border-b border-[#161618] pb-3"
             data-history-detail-summary
@@ -311,6 +315,8 @@ export function HistorySessionSheet({
             <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
             Supprimer la séance
           </button>
+            </>
+          )}
         </div>
       ) : null}
     </TrainSheet>

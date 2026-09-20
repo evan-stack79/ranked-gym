@@ -108,8 +108,13 @@ scripts/screenshots/**
 !scripts/screenshots/history-redesign/history_page_android_360x800.png
 !scripts/screenshots/history-redesign/history_empty_390x844.png
 !scripts/screenshots/history-redesign/history_detail_squat_390x844.png
+!scripts/screenshots/history-redesign/history_detail_small_squat_390x844.png
+!scripts/screenshots/history-redesign/history_detail_long_session_390x844.png
+!scripts/screenshots/history-redesign/history_detail_delete_confirm_390x844.png
 !scripts/screenshots/history-redesign/history_scroll_open_detail.webm
 !scripts/screenshots/history-redesign/history_scroll_open_detail.mp4
+!scripts/screenshots/history-redesign/history_detail_open_scroll_close_delete_confirm.webm
+!scripts/screenshots/history-redesign/history_detail_open_scroll_close_delete_confirm.mp4
 
 # Migration artifacts can contain sensitive export metadata.
 scripts/migrations/artifacts/

@@ -19,7 +19,6 @@ export function TrainSheet({
   leading,
   headerActions,
   tone = 'default',
-  overlay,
 }: {
   open: boolean
   onClose: () => void
@@ -30,7 +29,6 @@ export function TrainSheet({
   leading?: ReactNode
   headerActions?: ReactNode
   tone?: 'default' | 'graphite'
-  overlay?: ReactNode
 }) {
   const titleId = useId()
   const panelRef = useRef<HTMLDivElement>(null)
@@ -209,18 +207,9 @@ export function TrainSheet({
             </div>
           </div>
         </div>
-        <div
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-2 pt-1"
-          data-sheet-scroll
-          inert={overlay ? true : undefined}
-        >
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-2 pt-1" data-sheet-scroll>
           {children}
         </div>
-        {overlay ? (
-          <div className={`absolute inset-0 z-20 overflow-y-auto overscroll-contain px-5 ${graphite ? 'bg-[#070708]' : 'bg-[var(--color-card)]'}`}>
-            {overlay}
-          </div>
-        ) : null}
       </div>
     </div>, document.body,
   )
