@@ -6,6 +6,7 @@ const fetchOpenFoodFactsViaConvex = vi.fn()
 const searchOpenFoodFactsViaConvex = vi.fn()
 const listConvexFoodCatalog = vi.fn()
 const upsertConvexFoodSelection = vi.fn()
+const setConvexFoodFavorite = vi.fn()
 const isSupabaseConfigured = vi.fn()
 const getSupabase = vi.fn()
 const safeWarn = vi.fn()
@@ -19,6 +20,7 @@ vi.mock('./convexNutritionService', () => ({
   searchOpenFoodFactsViaConvex,
   listConvexFoodCatalog,
   upsertConvexFoodSelection,
+  setConvexFoodFavorite,
 }))
 
 vi.mock('../lib/supabase', () => ({
@@ -79,6 +81,8 @@ describe('alimentsService Convex primary migration', () => {
     expect(hits.length).toBe(2)
     expect(hits[0]?.nom).toBe('Poulet Maison')
     expect(hits[0]?.brands).toBe('Meal Prep')
+    expect(hits[0]?.foodKey).toBe('barcode:999')
+    expect(hits[0]?.isFavorite).toBe(true)
     expect(hits[1]?.nom).toBe('Poulet Grille')
   })
 
@@ -168,6 +172,35 @@ describe('alimentsService Convex primary migration', () => {
     expect(upsertConvexFoodSelection).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps nullable nutrients when saving Convex selections', async () => {
+    isConvexDomainActive.mockReturnValue(true)
+    upsertConvexFoodSelection.mockResolvedValue({ applied: true, foodKey: 'barcode:222', selectedCount: 1 })
+
+    const { saveAliment } = await import('./alimentsService')
+    await saveAliment(
+      {
+        barcode: '222',
+        nom: 'Produit ND',
+        calories: null,
+        proteines: null,
+        glucides: 12,
+        lipides: null,
+        provenance: 'open_food_facts',
+        fetchedAt: Date.now(),
+      },
+      'user-3',
+    )
+
+    expect(upsertConvexFoodSelection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        caloriesPer100g: null,
+        proteinPer100g: null,
+        carbsPer100g: 12,
+        fatPer100g: null,
+      }),
+    )
+  })
+
   it('skips Supabase fallback write when nutrients are missing', async () => {
     isConvexDomainActive.mockReturnValue(false)
     isSupabaseConfigured.mockReturnValue(true)
@@ -219,5 +252,16 @@ describe('alimentsService Convex primary migration', () => {
     expect(rows[0]?.nom).toBe('Skyr Nature')
     expect(rows[0]?.isFavorite).toBe(true)
     expect(rows[0]?.selectedCount).toBe(9)
+  })
+
+  it('updates favorite flag through Convex when domain is active', async () => {
+    isConvexDomainActive.mockReturnValue(true)
+    setConvexFoodFavorite.mockResolvedValue({ applied: true })
+
+    const { setPersonalFoodFavorite } = await import('./alimentsService')
+    const ok = await setPersonalFoodFavorite('barcode:321', true)
+
+    expect(ok).toBe(true)
+    expect(setConvexFoodFavorite).toHaveBeenCalledWith('barcode:321', true)
   })
 })
