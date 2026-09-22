@@ -94,10 +94,12 @@ type TrainPanel = 'hub' | 'notebook' | 'endurance' | 'agenda' | 'history' | 'ste
 
 export function TrainingView({
   launchRoutineId = null,
+  resumeActiveWorkout = false,
   onLaunchConsumed,
   onGoToLobby,
 }: {
   launchRoutineId?: string | null
+  resumeActiveWorkout?: boolean
   onLaunchConsumed?: () => void
   onGoToLobby?: () => void
 }) {
@@ -291,9 +293,9 @@ export function TrainingView({
 
   useEffect(() => {
     if (!launchRoutineId || !showStrengthTools) return
-    openNotebook(launchRoutineId)
+    openNotebook(launchRoutineId, null, resumeActiveWorkout)
     onLaunchConsumed?.()
-  }, [launchRoutineId, showStrengthTools, onLaunchConsumed, openNotebook])
+  }, [launchRoutineId, resumeActiveWorkout, showStrengthTools, onLaunchConsumed, openNotebook])
 
   /** Cold start / remount OS : rouvrir la séance sauf soft-leave volontaire. */
   useEffect(() => {

@@ -29,7 +29,7 @@ export function NutritionDayMealsCard({ meals, onAddMeal }: NutritionDayMealsCar
   return (
     <section aria-label="Repas du jour">
       <h2 className="mb-3 text-[20px] font-bold tracking-tight text-white">Repas du jour</h2>
-      <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#141416]/92">
+      <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#141416]">
         <ul>
           {MEAL_ORDER.map((type, index) => {
             const kcal = kcalByType[type]
