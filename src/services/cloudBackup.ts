@@ -30,7 +30,7 @@ import {
   replaceSleepLog,
   type SleepNightEntry,
 } from './sleepStorage'
-import { getActiveCloudUserId as readCloudUserId, setActiveCloudUserId } from './cloudSession'
+import * as cloudSession from './cloudSession'
 
 export const BACKUP_VERSION = 4 as const
 
@@ -73,6 +73,10 @@ let hydratedUserId: string | null = null
 let cloudSyncReady = false
 let deferredPush = false
 let lifecycleWired = false
+
+function readCloudUserId(): string | null {
+  return cloudSession.getActiveCloudUserId()
+}
 
 function loadMeta(): CloudBackupMeta {
   try {
@@ -130,7 +134,7 @@ export function getActiveCloudUserId(): string | null {
 }
 
 export function setCloudBackupUserId(userId: string | null) {
-  setActiveCloudUserId(userId)
+  cloudSession.setActiveCloudUserId(userId)
   activeUserId = userId
   if (!userId) {
     hydratedUserId = null

@@ -84,6 +84,12 @@ function writeQueue(userId: string, entries: StoredQueueOp[]): void {
   }
 }
 
+function removeQueueOpById(entries: StoredQueueOp[], opId: string): StoredQueueOp[] {
+  const index = entries.findIndex((entry) => entry.id === opId)
+  if (index < 0) return entries
+  return [...entries.slice(0, index), ...entries.slice(index + 1)]
+}
+
 function isConvexTemporaryFailure(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error ?? '')
   const lower = message.toLowerCase()
@@ -157,16 +163,17 @@ export async function flushConvexNutritionQueue(): Promise<void> {
   if (flushInFlight) return flushInFlight
   const userId = getActiveCloudUserId()
   if (!userId) return
+  let flushAbortedForFailure = false
   flushInFlight = (async () => {
-    let queue = readQueue(userId)
-    if (queue.length === 0) return
-
-    while (queue.length > 0) {
+    while (true) {
+      const queue = readQueue(userId)
+      if (queue.length === 0) return
       const current = queue[0]
       try {
         await applyQueueOperation(current)
-        queue = queue.slice(1)
-        writeQueue(userId, queue)
+        const latestQueue = readQueue(userId)
+        const nextQueue = removeQueueOpById(latestQueue, current.id)
+        writeQueue(userId, nextQueue)
       } catch (error) {
         safeError('[nutrition-sync] convex op failed', {
           kind: current.kind,
@@ -175,6 +182,7 @@ export async function flushConvexNutritionQueue(): Promise<void> {
         if (isConvexTemporaryFailure(error)) {
           await requestSupabaseFallbackPush()
         }
+        flushAbortedForFailure = true
         break
       }
     }
@@ -183,6 +191,11 @@ export async function flushConvexNutritionQueue(): Promise<void> {
     await flushInFlight
   } finally {
     flushInFlight = null
+  }
+
+  // A new enqueue can happen while a flush is unwinding; run once more if needed.
+  if (!flushAbortedForFailure && readQueue(userId).length > 0) {
+    await flushConvexNutritionQueue()
   }
 }
 

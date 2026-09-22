@@ -509,7 +509,7 @@ export function ScannedProductSheet({
                     ? `Pour finir le repas avec les ~${remaining} kcal restantes — ça fait un bon combo.`
                     : `Pour atteindre ~${remaining} kcal avec uniquement ce produit.`
                   : `Portion pour laisser de la place à l’accompagnement.`}
-                {isCalorieDense(product.calories) && mode === 'with_sides'
+                {product.calories != null && isCalorieDense(product.calories) && mode === 'with_sides'
                   ? ' Aliment dense : une petite part + accompagnement, c’est top.'
                   : ''}
               </p>
