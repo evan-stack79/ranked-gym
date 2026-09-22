@@ -178,9 +178,9 @@ export function NutritionDashboard({
   }, [meals])
 
   const targetCalories = nutrition.targetCalories
-  const remainingCalories = Math.max(0, targetCalories - totals.calories)
+  const remainingCalories = targetCalories > 0 ? targetCalories - totals.calories : 0
   const calorieProgress =
-    targetCalories > 0 ? Math.min(totals.calories / targetCalories, 1.15) : 0
+    targetCalories > 0 ? totals.calories / targetCalories : 0
 
   const hydration = useMemo(() => {
     void tick
@@ -389,6 +389,7 @@ export function NutritionDashboard({
           consumedCalories={totals.calories}
           targetCalories={targetCalories}
           progress={calorieProgress}
+          onOpenSetup={onOpenSetup}
         />
 
         <NutritionMacrosRow
