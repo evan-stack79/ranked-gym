@@ -177,35 +177,67 @@ export function saveMealJournal(
   if (!opts?.skipCloud) triggerCloudBackup()
 }
 
-export function getTodayJournal(): DayJournal {
-  const key = todayKey()
+export function getJournalForDate(dateKey: string): DayJournal {
   const all = getAllJournals()
-  return all[key] ?? { dateKey: key, meals: [] }
+  return all[dateKey] ?? { dateKey, meals: [] }
 }
 
-export function saveTodayJournal(journal: DayJournal, opts?: StorageSaveOptions): void {
+export function getTodayJournal(): DayJournal {
+  return getJournalForDate(todayKey())
+}
+
+export function saveJournalForDate(journal: DayJournal, opts?: StorageSaveOptions): void {
   const all = getAllJournals()
   all[journal.dateKey] = journal
   writeJson(scopedKey(JOURNAL_BASE), all)
   if (!opts?.skipCloud) triggerCloudBackup()
 }
 
-export function addMealToToday(meal: Omit<MealEntry, 'id' | 'createdAt'>): DayJournal {
-  const journal = getTodayJournal()
+export function saveTodayJournal(journal: DayJournal, opts?: StorageSaveOptions): void {
+  saveJournalForDate(journal, opts)
+}
+
+export function addMealToDate(
+  dateKey: string,
+  meal: Omit<MealEntry, 'id' | 'createdAt'>,
+): DayJournal {
+  const journal = getJournalForDate(dateKey)
   const entry: MealEntry = {
     ...meal,
     id: `meal-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     createdAt: Date.now(),
   }
   const next = { ...journal, meals: [entry, ...journal.meals] }
-  saveTodayJournal(next)
+  saveJournalForDate(next)
+  return next
+}
+
+export function addMealToToday(meal: Omit<MealEntry, 'id' | 'createdAt'>): DayJournal {
+  return addMealToDate(todayKey(), meal)
+}
+
+export function removeMealFromDate(dateKey: string, mealId: string): DayJournal {
+  const journal = getJournalForDate(dateKey)
+  const next = { ...journal, meals: journal.meals.filter((m) => m.id !== mealId) }
+  saveJournalForDate(next)
   return next
 }
 
 export function removeMealFromToday(mealId: string): DayJournal {
-  const journal = getTodayJournal()
-  const next = { ...journal, meals: journal.meals.filter((m) => m.id !== mealId) }
-  saveTodayJournal(next)
+  return removeMealFromDate(todayKey(), mealId)
+}
+
+export function updateMealOnDate(
+  dateKey: string,
+  mealId: string,
+  patch: Partial<Omit<MealEntry, 'id' | 'createdAt'>>,
+): DayJournal {
+  const journal = getJournalForDate(dateKey)
+  const next = {
+    ...journal,
+    meals: journal.meals.map((meal) => (meal.id === mealId ? { ...meal, ...patch } : meal)),
+  }
+  saveJournalForDate(next)
   return next
 }
 
@@ -213,13 +245,7 @@ export function updateMealInToday(
   mealId: string,
   patch: Partial<Omit<MealEntry, 'id' | 'createdAt'>>,
 ): DayJournal {
-  const journal = getTodayJournal()
-  const next = {
-    ...journal,
-    meals: journal.meals.map((meal) => (meal.id === mealId ? { ...meal, ...patch } : meal)),
-  }
-  saveTodayJournal(next)
-  return next
+  return updateMealOnDate(todayKey(), mealId, patch)
 }
 
 /** Default bottle capacity used by SmartWaterGauge (ml). */
@@ -436,8 +462,20 @@ export function resolveTodayWaterEntries(journal: DayJournal = getTodayJournal()
   return []
 }
 
+export function getWaterEntriesForDate(dateKey: string): WaterEntry[] {
+  return resolveTodayWaterEntries(getJournalForDate(dateKey))
+}
+
 function persistWaterJournal(
   entries: WaterEntry[],
+  opts?: StorageSaveOptions,
+): DayJournal {
+  return persistWaterJournalForDate(entries, todayKey(), opts)
+}
+
+function persistWaterJournalForDate(
+  entries: WaterEntry[],
+  dateKey: string,
   opts?: StorageSaveOptions,
 ): DayJournal {
   const normalized = entries
@@ -453,14 +491,14 @@ function persistWaterJournal(
     waterMl += entry.amountMl
   }
 
-  const journal = getTodayJournal()
+  const journal = getJournalForDate(dateKey)
   const next: DayJournal = {
     ...journal,
     waterMl,
     waterEntries: cleaned.length > 0 ? cleaned : undefined,
     waterPresetsCount: countsFromEntries(cleaned),
   }
-  saveTodayJournal(next, opts)
+  saveJournalForDate(next, opts)
   emitWaterChanged()
   return next
 }
@@ -477,8 +515,12 @@ export function suggestedWaterGoalMl(weightKg?: number): number {
 }
 
 export function getTodayWaterMl(): number {
-  const journal = getTodayJournal()
-  const entries = resolveTodayWaterEntries(journal)
+  return getWaterMlForDate(todayKey())
+}
+
+export function getWaterMlForDate(dateKey: string): number {
+  const journal = getJournalForDate(dateKey)
+  const entries = getWaterEntriesForDate(dateKey)
   if (entries.length > 0) return sumEntries(entries)
   return Math.max(0, Math.round(journal.waterMl ?? 0))
 }
@@ -507,10 +549,23 @@ export function addWaterEntry(
   },
   opts?: StorageSaveOptions,
 ): { journal: DayJournal; entry: WaterEntry; waterMl: number } {
+  return addWaterEntryForDate(todayKey(), input, opts)
+}
+
+export function addWaterEntryForDate(
+  dateKey: string,
+  input: {
+    amountMl: number
+    type: WaterEntryType
+    label?: string
+    createdAt?: number
+  },
+  opts?: StorageSaveOptions,
+): { journal: DayJournal; entry: WaterEntry; waterMl: number } {
   const amountMl = Math.max(0, Math.round(input.amountMl))
-  const entries = resolveTodayWaterEntries()
+  const entries = getWaterEntriesForDate(dateKey)
   if (amountMl <= 0) {
-    const journal = persistWaterJournal(entries, opts)
+    const journal = persistWaterJournalForDate(entries, dateKey, opts)
     return {
       journal,
       entry: {
@@ -531,14 +586,14 @@ export function addWaterEntry(
     type: input.type,
     label: input.label ?? PRESET_LABELS[input.type] ?? 'Eau',
   }
-  const prevLevel = readBottleLevelFromJournal(getTodayJournal())
-  const journal = persistWaterJournal([entry, ...entries], opts)
+  const prevLevel = readBottleLevelFromJournal(getJournalForDate(dateKey))
+  const journal = persistWaterJournalForDate([entry, ...entries], dateKey, opts)
   let nextJournal = journal
   if (shouldBumpBottleLevel(journal)) {
     const nextLevel = bumpBottleLevelMl(prevLevel, entry.amountMl)
     nextJournal = { ...journal, waterBottleLevelMl: nextLevel }
     if (nextLevel !== prevLevel) {
-      saveTodayJournal(nextJournal, { ...opts, skipCloud: true })
+      saveJournalForDate(nextJournal, { ...opts, skipCloud: true })
     }
   }
   return { journal: nextJournal, entry, waterMl: journal.waterMl ?? 0 }

@@ -1,9 +1,13 @@
-import { Home, Dumbbell, Salad, User } from 'lucide-react'
+import { Dumbbell, Home, Play, Salad, User } from 'lucide-react'
 import type { TabId } from '../../types'
 
 interface BottomNavProps {
   activeTab: TabId
   onTabChange: (tab: TabId) => void
+  onStartTraining?: () => void
+  hasActiveWorkout?: boolean
+  compact?: boolean
+  onExpand?: () => void
 }
 
 const tabs: { id: TabId; label: string; icon: typeof Home }[] = [
@@ -13,33 +17,61 @@ const tabs: { id: TabId; label: string; icon: typeof Home }[] = [
   { id: 'profile', label: 'Profil', icon: User },
 ]
 
-export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
+export function BottomNav({
+  activeTab,
+  onTabChange,
+  onStartTraining = () => onTabChange('training'),
+  hasActiveWorkout = false,
+  compact = false,
+  onExpand,
+}: BottomNavProps) {
+  const labelClass = `text-[11px] leading-tight transition-opacity duration-180 motion-reduce:transition-none ${compact ? 'invisible absolute opacity-0' : 'opacity-100'}`
+  const centralAction = (
+    <button
+      type="button"
+      onClick={onStartTraining}
+      className="ios-press flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[#AEAEB2] transition-colors duration-150"
+      aria-label={hasActiveWorkout ? 'Reprendre la séance en cours' : 'Démarrer une séance'}
+    >
+      <span className={`flex items-center justify-center rounded-full border-4 border-[#171719] bg-[#FF2B2B] text-white transition-[height,width] duration-180 motion-reduce:transition-none ${compact ? 'h-12 w-12 -mt-1' : 'h-14 w-14 -mt-5'}`}>
+        <Play className="ml-0.5 h-5 w-5 fill-current" strokeWidth={2.25} aria-hidden="true" />
+      </span>
+      <span className={labelClass}>{hasActiveWorkout ? 'Reprendre' : 'Démarrer'}</span>
+    </button>
+  )
+
   return (
     <nav
-      className="glass-bar fixed bottom-0 left-0 right-0 z-50 border-t border-white/5"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      className={`fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-3 right-3 z-50 mx-auto rounded-[22px] border border-[#38383D] bg-[#171719] px-1.5 py-1.5 transition-[max-width,padding] duration-180 ease-out motion-reduce:transition-none ${compact ? 'max-w-[22rem]' : 'max-w-lg'}`}
       aria-label="Navigation principale"
+      data-bottom-nav-mode={compact ? 'compact' : 'expanded'}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onExpand?.()
+      }}
+      onFocusCapture={onExpand}
     >
-      <div className="mx-auto flex max-w-lg items-stretch justify-around px-0.5 py-1.5">
+      <div className="flex items-end justify-between gap-0.5">
         {tabs.map(({ id, label, icon: Icon }) => {
           const isActive = activeTab === id
-          return (
+          const item = (
             <button
               key={id}
               type="button"
               onClick={() => onTabChange(id)}
-              className={`ios-press flex min-h-11 flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-2 transition-colors ${
-                isActive ? 'text-[#FF2B2B]' : 'text-[#AEAEB2]'
-              }`}
+              className={`ios-press flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 transition-colors duration-150 ${isActive ? 'text-[#FF2B2B]' : 'text-[#AEAEB2]'}`}
               aria-current={isActive ? 'page' : undefined}
+              aria-label={label}
             >
-              <Icon
-                className={`h-[22px] w-[22px] transition-transform duration-150 ease-out ${isActive ? 'ios-tab-active-icon' : ''}`}
-                strokeWidth={isActive ? 2.25 : 1.75}
-              />
-              <span className="text-[11px] font-medium leading-tight">{label}</span>
+              <Icon className="h-[22px] w-[22px]" strokeWidth={isActive ? 2.25 : 1.75} aria-hidden="true" />
+              <span className={labelClass}>{label}</span>
             </button>
           )
+          return id === 'nutrition' ? (
+            <div key="nutrition-group" className="contents">
+              {centralAction}
+              {item}
+            </div>
+          ) : item
         })}
       </div>
     </nav>

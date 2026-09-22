@@ -1,21 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Ellipsis, Pencil, RotateCcw, Trash2, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type TouchEvent } from 'react'
+import { ChevronLeft, ChevronRight, Ellipsis, Pencil, RotateCcw, Trash2, X } from 'lucide-react'
 import type { BodyMorphology, CalorieProfile, MealEntry, MealType } from '../../types/nutrition'
 import { MEAL_TYPE_LABELS } from '../../utils/calories'
 import { remainingMealBudget } from '../../utils/portionGuide'
 import type { PortionMode } from '../../utils/morphology'
 import {
-  addMealToToday,
-  getTodayJournal,
-  getTodayWaterMl,
-  removeMealFromToday,
-  updateMealInToday,
+  addMealToDate,
+  getJournalForDate,
+  getMealJournal,
+  getWaterMlForDate,
+  addWaterEntryForDate,
+  removeMealFromDate,
+  updateMealOnDate,
 } from '../../services/nutritionStorage'
 import { getNutritionTarget } from '../../services/nutritionActivity'
 import { getDailyWaterGoalMl, isTrainingDayToday } from '../../utils/waterGoal'
 import {
   canSubmitHomeQuickWater,
-  tryAddHomeQuickWater,
 } from '../../utils/homeNutritionQuickActions'
 import {
   saveAliment,
@@ -25,6 +26,7 @@ import {
 } from '../../services/alimentsService'
 import { useAuth } from '../../context/AuthContext'
 import { NutritionCalorieRing } from './NutritionCalorieRing'
+import { NutritionCalendarSheet } from './NutritionCalendarSheet'
 import { NutritionMacrosRow } from './NutritionMacrosRow'
 import { NutritionHydrationCard } from './NutritionHydrationCard'
 import {
@@ -46,6 +48,8 @@ import {
 import { AddFoodScreen } from './AddFoodScreen'
 import { IosSheet } from '../ui/IosSheet'
 import { SectionSkeleton } from '../ui/AppBootScreen'
+import { dateFromKey, nutritionDateLabel, shiftDateKey } from '../../utils/nutritionDate'
+import { todayKey } from '../../utils/calories'
 
 interface NutritionDashboardProps {
   profile: CalorieProfile
@@ -66,6 +70,8 @@ export function NutritionDashboard({
   const [menuOpen, setMenuOpen] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [journalDetailOpen, setJournalDetailOpen] = useState(false)
+  const [selectedDateKey, setSelectedDateKey] = useState(todayKey)
+  const [calendarOpen, setCalendarOpen] = useState(false)
 
   const [showForm, setShowForm] = useState(false)
   const [scannerOpen, setScannerOpen] = useState(false)
@@ -87,6 +93,7 @@ export function NutritionDashboard({
   )
   const photoRef = useRef<MealPhotoAnalyzerHandle>(null)
   const journalRef = useRef<HTMLDivElement>(null)
+  const swipeStart = useRef<{ x: number; y: number } | null>(null)
 
   const showToast = useCallback((message: string, variant: 'success' | 'error' = 'success') => {
     setToast({ message, variant })
@@ -94,13 +101,13 @@ export function NutritionDashboard({
   }, [])
 
   useEffect(() => {
-    setMeals(getTodayJournal().meals)
+    setMeals(getJournalForDate(selectedDateKey).meals)
     setHydrated(true)
-  }, [])
+  }, [selectedDateKey])
 
   useEffect(() => {
     const sync = () => {
-      setMeals(getTodayJournal().meals)
+      setMeals(getJournalForDate(selectedDateKey).meals)
       setTick((n) => n + 1)
     }
     window.addEventListener('ranked-gym:backup-restored', sync)
@@ -115,7 +122,7 @@ export function NutritionDashboard({
       window.removeEventListener('ranked-gym:training-changed', sync)
       window.removeEventListener('focus', sync)
     }
-  }, [])
+  }, [selectedDateKey])
 
   useEffect(() => {
     if (!showForm) {
@@ -178,18 +185,20 @@ export function NutritionDashboard({
   }, [meals])
 
   const targetCalories = nutrition.targetCalories
-  const remainingCalories = Math.max(0, targetCalories - totals.calories)
+  const remainingCalories = targetCalories > 0 ? targetCalories - totals.calories : 0
   const calorieProgress =
-    targetCalories > 0 ? Math.min(totals.calories / targetCalories, 1.15) : 0
+    targetCalories > 0 ? totals.calories / targetCalories : 0
 
   const hydration = useMemo(() => {
     void tick
-    const isTrainingDay = isTrainingDayToday()
+    const isTrainingDay = isTrainingDayToday(undefined, dateFromKey(selectedDateKey))
     return {
-      consumedMl: getTodayWaterMl(),
+      consumedMl: getWaterMlForDate(selectedDateKey),
       goalMl: getDailyWaterGoalMl(profile.weightKg, isTrainingDay),
     }
-  }, [tick, profile.weightKg])
+  }, [tick, profile.weightKg, selectedDateKey])
+
+  const dataDateKeys = useMemo(() => Object.keys(getMealJournal()), [tick])
 
   const resetForm = () => {
     setName('')
@@ -210,6 +219,27 @@ export function NutritionDashboard({
       setPendingMealType(type)
     }
     setShowForm(true)
+  }
+
+  const selectDate = (dateKey: string) => {
+    setSelectedDateKey(dateKey)
+    setJournalDetailOpen(false)
+  }
+
+  const handleDaySwipeStart = (event: TouchEvent<HTMLDivElement>) => {
+    const touch = event.changedTouches[0]
+    swipeStart.current = { x: touch.clientX, y: touch.clientY }
+  }
+
+  const handleDaySwipeEnd = (event: TouchEvent<HTMLDivElement>) => {
+    const start = swipeStart.current
+    swipeStart.current = null
+    if (!start) return
+    const touch = event.changedTouches[0]
+    const dx = touch.clientX - start.x
+    const dy = touch.clientY - start.y
+    if (Math.abs(dx) < 56 || Math.abs(dx) <= Math.abs(dy) * 1.2) return
+    selectDate(shiftDateKey(selectedDateKey, dx < 0 ? 1 : -1))
   }
 
   const openScanner = (forMeal?: MealType) => {
@@ -244,7 +274,7 @@ export function NutritionDashboard({
     pieces?: number
     portionMode: PortionMode
   }) => {
-    const journal = addMealToToday({
+    const journal = addMealToDate(selectedDateKey, {
       name: entry.name,
       mealType: entry.mealType,
       calories: entry.calories,
@@ -256,6 +286,7 @@ export function NutritionDashboard({
       portionMode: entry.portionMode,
     })
     setMeals(journal.meals)
+    setTick((n) => n + 1)
     setScannedProduct(null)
     resetForm()
 
@@ -277,7 +308,7 @@ export function NutritionDashboard({
     const trimmed = name.trim()
     if (!trimmed || calories <= 0) return
 
-    const journal = addMealToToday({
+    const journal = addMealToDate(selectedDateKey, {
       name: trimmed,
       mealType,
       calories: Math.round(calories),
@@ -286,32 +317,47 @@ export function NutritionDashboard({
       fatG: fatG === '' ? undefined : Number(fatG),
     })
     setMeals(journal.meals)
+    setTick((n) => n + 1)
     resetForm()
   }
 
   const handleRemove = (id: string) => {
-    const journal = removeMealFromToday(id)
+    const journal = removeMealFromDate(selectedDateKey, id)
     setMeals(journal.meals)
+    setTick((n) => n + 1)
     setEditingMeal(null)
   }
 
   const handleEditSave = (mealId: string, patch: Partial<MealEntry>) => {
-    const journal = updateMealInToday(mealId, patch)
+    const journal = updateMealOnDate(selectedDateKey, mealId, patch)
     setMeals(journal.meals)
+    setTick((n) => n + 1)
     setEditingMeal(null)
   }
 
   const handleQuickWater = () => {
     if (!canSubmitHomeQuickWater(waterSaving)) return
     setWaterSaving(true)
-    const result = tryAddHomeQuickWater()
-    setWaterSaving(false)
-    if (result.ok) {
-      setTick((n) => n + 1)
-      showToast('+250 ml ajoutés')
-      return
+    let added = false
+    try {
+      const before = getWaterMlForDate(selectedDateKey)
+      const result = addWaterEntryForDate(selectedDateKey, {
+        amountMl: 250,
+        type: 'glass',
+        label: 'Verre',
+      })
+      if (result.waterMl >= before) {
+        added = true
+        setTick((n) => n + 1)
+        showToast('+250 ml ajoutés')
+        return
+      }
+    } catch {
+    } finally {
+      setWaterSaving(false)
     }
-    showToast(result.message, 'error')
+    if (added) return
+    showToast("Impossible d'ajouter l'eau", 'error')
   }
 
   const handleQuickAction = (id: NutritionQuickActionId) => {
@@ -345,33 +391,8 @@ export function NutritionDashboard({
   }
 
   return (
-    <div className="relative isolate -mx-5 -mt-8 min-h-[70vh] overflow-hidden pb-2">
-      {/* Fond salle B&W flouté (asset local) + surcouches lisibilité */}
-      <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{
-            backgroundImage: 'url(/nutrition-gym-bg.webp), url(/nutrition-gym-bg.jpg)',
-            filter: 'saturate(0.2)',
-          }}
-        />
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              'linear-gradient(180deg, rgba(8,8,10,0.72) 0%, rgba(8,8,10,0.88) 42%, rgba(12,8,8,0.96) 78%, rgba(18,6,6,0.98) 100%)',
-          }}
-        />
-        <div
-          className="absolute inset-x-0 bottom-0 h-48"
-          style={{
-            background:
-              'radial-gradient(ellipse 90% 80% at 50% 100%, rgba(120,16,16,0.28) 0%, transparent 70%)',
-          }}
-        />
-      </div>
-
-      <div className="relative flex flex-col gap-4 px-5 pt-1">
+    <div className="-mx-5 min-h-[70vh] overflow-hidden bg-[#0C0C0E] pb-2">
+      <div className="flex flex-col gap-4 px-5 pt-1">
         <header className="flex items-center justify-between gap-3">
           <h1 className="text-[32px] font-bold tracking-tight text-white">Nutrition</h1>
           <button
@@ -384,12 +405,45 @@ export function NutritionDashboard({
           </button>
         </header>
 
-        <NutritionCalorieRing
-          remainingCalories={remainingCalories}
-          consumedCalories={totals.calories}
-          targetCalories={targetCalories}
-          progress={calorieProgress}
-        />
+        <div
+          onTouchStart={handleDaySwipeStart}
+          onTouchEnd={handleDaySwipeEnd}
+          className="touch-pan-y"
+        >
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => selectDate(shiftDateKey(selectedDateKey, -1))}
+              className="ios-press flex h-10 w-10 items-center justify-center rounded-full text-[#AEAEB2]"
+              aria-label="Jour précédent"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setCalendarOpen(true)}
+              className="ios-press min-h-10 flex-1 text-center text-[14px] font-semibold text-white"
+              aria-label="Choisir une date"
+            >
+              {nutritionDateLabel(selectedDateKey)} <span className="text-[#8E8E93]">⌄</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => selectDate(shiftDateKey(selectedDateKey, 1))}
+              className="ios-press flex h-10 w-10 items-center justify-center rounded-full text-[#AEAEB2]"
+              aria-label="Jour suivant"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+          <NutritionCalorieRing
+            remainingCalories={remainingCalories}
+            consumedCalories={totals.calories}
+            targetCalories={targetCalories}
+            progress={calorieProgress}
+            onOpenSetup={onOpenSetup}
+          />
+        </div>
 
         <NutritionMacrosRow
           protein={{
@@ -494,7 +548,7 @@ export function NutritionDashboard({
         variant="headless"
         onToast={showToast}
         onAnalyzed={(result) => {
-          const journal = addMealToToday({
+          const journal = addMealToDate(selectedDateKey, {
             name: result.name,
             mealType: result.mealType,
             calories: result.calories,
@@ -503,6 +557,7 @@ export function NutritionDashboard({
             fatG: result.lipides,
           })
           setMeals(journal.meals)
+            setTick((n) => n + 1)
           setJournalDetailOpen(true)
         }}
       />
@@ -537,7 +592,7 @@ export function NutritionDashboard({
           }
           onToast={showToast}
           onPhotoAnalyzed={(result) => {
-            const journal = addMealToToday({
+            const journal = addMealToDate(selectedDateKey, {
               name: result.name,
               mealType: result.mealType,
               calories: result.calories,
@@ -546,6 +601,7 @@ export function NutritionDashboard({
               fatG: result.fatG,
             })
             setMeals(journal.meals)
+            setTick((n) => n + 1)
             resetForm()
             setJournalDetailOpen(true)
           }}
@@ -583,6 +639,15 @@ export function NutritionDashboard({
         onClose={() => setEditingMeal(null)}
         onSave={handleEditSave}
         onDelete={handleRemove}
+      />
+
+      <NutritionCalendarSheet
+        open={calendarOpen}
+        selectedDateKey={selectedDateKey}
+        dataDateKeys={dataDateKeys}
+        onClose={() => setCalendarOpen(false)}
+        onSelect={selectDate}
+        onToday={() => selectDate(todayKey())}
       />
 
       <IosSheet

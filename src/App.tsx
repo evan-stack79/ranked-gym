@@ -17,6 +17,7 @@ import { ProfileView } from './components/profile/ProfileView'
 import { hasCompletedNutritionOnboarding } from './services/nutritionStorage'
 import type { TabId } from './types'
 import { safeWarn } from './utils/safeLog'
+import { getTrainingState } from './services/trainingStorage'
 
 type AppPhase = 'loading' | 'onboarding' | 'main'
 
@@ -35,6 +36,7 @@ function renderActiveView(
   onOpenTraining: () => void,
   onOpenNutrition: () => void,
   launchRoutineId: string | null,
+  resumeActiveWorkout: boolean,
   onLaunchConsumed: () => void,
   onAfterSession: () => void,
 ) {
@@ -51,6 +53,7 @@ function renderActiveView(
       return (
         <TrainingView
           launchRoutineId={launchRoutineId}
+          resumeActiveWorkout={resumeActiveWorkout}
           onLaunchConsumed={onLaunchConsumed}
           onGoToLobby={onAfterSession}
         />
@@ -107,6 +110,8 @@ export function AppShell() {
   const [phase, setPhase] = useState<AppPhase>('loading')
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [launchRoutineId, setLaunchRoutineId] = useState<string | null>(null)
+  const [resumeActiveWorkout, setResumeActiveWorkout] = useState(false)
+  const [hasActiveWorkout, setHasActiveWorkout] = useState(() => Boolean(getTrainingState().activeWorkoutDraft))
   const { openAuth, isAuthenticated, isLoading, bootIssue, retryHydrate } = useAuth()
   const online = useOnlineStatus()
 
@@ -148,8 +153,19 @@ export function AppShell() {
     if (!isAuthenticated) {
       setActiveTab('home')
       setLaunchRoutineId(null)
+      setResumeActiveWorkout(false)
     }
   }, [isAuthenticated])
+
+  useEffect(() => {
+    const syncActiveWorkout = () => setHasActiveWorkout(Boolean(getTrainingState().activeWorkoutDraft))
+    window.addEventListener('ranked-gym:training-changed', syncActiveWorkout)
+    window.addEventListener('focus', syncActiveWorkout)
+    return () => {
+      window.removeEventListener('ranked-gym:training-changed', syncActiveWorkout)
+      window.removeEventListener('focus', syncActiveWorkout)
+    }
+  }, [])
 
   const handleTabChange = (tab: TabId) => {
     if (!isAuthenticated) {
@@ -165,6 +181,7 @@ export function AppShell() {
       return
     }
     setLaunchRoutineId(routineId)
+    setResumeActiveWorkout(false)
     setActiveTab('training')
   }
 
@@ -174,6 +191,18 @@ export function AppShell() {
       return
     }
     setLaunchRoutineId(null)
+    setResumeActiveWorkout(false)
+    setActiveTab('training')
+  }
+
+  const handleStartFromNav = () => {
+    if (!isAuthenticated) {
+      openAuth()
+      return
+    }
+    const activeDraft = getTrainingState().activeWorkoutDraft
+    setLaunchRoutineId(activeDraft?.routineId ?? null)
+    setResumeActiveWorkout(Boolean(activeDraft))
     setActiveTab('training')
   }
 
@@ -187,6 +216,7 @@ export function AppShell() {
 
   const handleLaunchConsumed = () => {
     setLaunchRoutineId(null)
+    setResumeActiveWorkout(false)
   }
 
   const handleOnboardingComplete = () => {
@@ -246,7 +276,12 @@ export function AppShell() {
     <>
       <SupabaseConfigBanner />
       {!online ? <OfflineBanner /> : null}
-      <AppLayout activeTab={activeTab} onTabChange={handleTabChange}>
+      <AppLayout
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        onStartTraining={handleStartFromNav}
+        hasActiveWorkout={hasActiveWorkout}
+      >
         {bootIssue === 'recoverable' ? (
           <RecoverableRetryBar onRetry={() => void retryHydrate()} />
         ) : null}
@@ -256,6 +291,7 @@ export function AppShell() {
           handleOpenTraining,
           handleOpenNutrition,
           launchRoutineId,
+          resumeActiveWorkout,
           handleLaunchConsumed,
           () => setActiveTab('home'),
         )}

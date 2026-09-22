@@ -4,20 +4,29 @@ import { BrandMark } from '../brand/BrandMark'
 import { BottomNav } from './BottomNav'
 import { StreakCelebrationHost } from '../streak/StreakCelebrationHost'
 import { RestTimerOverlay, REST_BAR_CONTENT_PAD } from '../training/RestTimerOverlay'
-import {
-  useRestTimerContext,
-  type RestPresetSec,
-} from '../../context/RestTimerContext'
+import { useRestTimerContext, type RestPresetSec } from '../../context/RestTimerContext'
 import type { TabId } from '../../types'
+import { useAdaptiveBottomNav } from '../../hooks/useAdaptiveBottomNav'
 
 interface AppLayoutProps {
   activeTab: TabId
   onTabChange: (tab: TabId) => void
+  onStartTraining?: () => void
+  hasActiveWorkout?: boolean
+  hideBottomNav?: boolean
   children: ReactNode
 }
 
-export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) {
+export function AppLayout({
+  activeTab,
+  onTabChange,
+  onStartTraining = () => onTabChange('training'),
+  hasActiveWorkout = false,
+  hideBottomNav = false,
+  children,
+}: AppLayoutProps) {
   const shellRef = useRef<HTMLDivElement>(null)
+  const mainRef = useRef<HTMLElement>(null)
   const { streakCelebration } = useAuth()
   const {
     state,
@@ -33,7 +42,8 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
 
   const streakCelebrationActive = Boolean(streakCelebration)
   const showHeader = !chromeHidden
-  const showBottomNav = !chromeHidden
+  const { mode: bottomNavMode, keyboardOpen, expand } = useAdaptiveBottomNav({ mainRef, resetKey: activeTab })
+  const showBottomNav = !chromeHidden && !hideBottomNav && !keyboardOpen
   const bottomNavObscured = streakCelebrationActive
   const showReadyBar = !chromeHidden && activeTab === 'training' && readyBarEnabled
 
@@ -45,6 +55,7 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
       inert={streakCelebrationActive ? true : undefined}
     >
       <main
+        ref={mainRef}
         className={`relative z-10 min-h-0 w-full flex-1 overflow-y-auto ${
           chromeHidden ? 'max-w-none' : ''
         }`}
@@ -117,7 +128,14 @@ export function AppLayout({ activeTab, onTabChange, children }: AppLayoutProps) 
               inert={bottomNavObscured ? true : undefined}
               aria-hidden={bottomNavObscured ? true : undefined}
             >
-              <BottomNav activeTab={activeTab} onTabChange={onTabChange} />
+              <BottomNav
+                activeTab={activeTab}
+                onTabChange={onTabChange}
+                onStartTraining={onStartTraining}
+                hasActiveWorkout={hasActiveWorkout}
+                compact={bottomNavMode === 'compact'}
+                onExpand={expand}
+              />
             </div>
           ) : null}
         </>
