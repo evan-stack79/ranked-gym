@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const getActiveCloudUserId = vi.fn()
 const pushConvexMeal = vi.fn()
@@ -32,11 +32,28 @@ vi.mock('../utils/safeLog', () => ({
 }))
 
 describe('convexNutritionQueue', () => {
+  const store = new Map<string, string>()
+
   beforeEach(() => {
+    store.clear()
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v)
+      },
+      removeItem: (k: string) => {
+        store.delete(k)
+      },
+      clear: () => store.clear(),
+    })
     vi.resetModules()
     vi.clearAllMocks()
     getActiveCloudUserId.mockReturnValue('user-a')
     localStorage.clear()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('queues + flushes meal upsert operations', async () => {
