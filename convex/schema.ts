@@ -7,7 +7,10 @@ import { v } from 'convex/values'
  * Maps plan domains:
  * - Profil: profiles, checkins, custom_spots, active_checkins
  * - Train: workouts_state
- * - Nutrition + Hydratation: nutrition_state (journalJson nests waterEntries)
+ * - Nutrition + Hydratation:
+ *   - compatibility snapshot: nutrition_state
+ *   - granular sync: nutrition_meals, nutrition_water_entries, nutrition_day_state
+ *   - personal/recent/favorites cache: nutrition_food_catalog
  * - Sommeil: sleep_nights (currently local-only in the app)
  * - Streak: streak_state
  * - Files: user_files
@@ -134,6 +137,86 @@ export const convexTables = {
   })
     .index('by_userId', ['userId'])
     .index('by_updatedAt', ['updatedAt']),
+
+  nutrition_meals: defineTable({
+    userId: v.string(),
+    mealId: v.string(),
+    dateKey: v.string(),
+    mealType: v.string(),
+    name: v.string(),
+    calories: v.union(v.number(), v.null()),
+    proteinG: v.optional(v.union(v.number(), v.null())),
+    carbsG: v.optional(v.union(v.number(), v.null())),
+    fatG: v.optional(v.union(v.number(), v.null())),
+    grams: v.optional(v.number()),
+    pieces: v.optional(v.number()),
+    portionMode: v.optional(v.union(v.literal('solo'), v.literal('with_sides'))),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    deletedAt: v.optional(v.number()),
+    schemaVersion: v.number(),
+  })
+    .index('by_userId_mealId', ['userId', 'mealId'])
+    .index('by_userId_dateKey', ['userId', 'dateKey'])
+    .index('by_userId_updatedAt', ['userId', 'updatedAt']),
+
+  nutrition_water_entries: defineTable({
+    userId: v.string(),
+    entryId: v.string(),
+    dateKey: v.string(),
+    amountMl: v.number(),
+    type: v.string(),
+    label: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    deletedAt: v.optional(v.number()),
+    schemaVersion: v.number(),
+  })
+    .index('by_userId_entryId', ['userId', 'entryId'])
+    .index('by_userId_dateKey', ['userId', 'dateKey'])
+    .index('by_userId_updatedAt', ['userId', 'updatedAt']),
+
+  nutrition_day_state: defineTable({
+    userId: v.string(),
+    dateKey: v.string(),
+    waterBottleLevelMl: v.optional(v.union(v.number(), v.null())),
+    waterBottleCalibrationTotalMl: v.optional(v.union(v.number(), v.null())),
+    updatedAt: v.number(),
+    schemaVersion: v.number(),
+  })
+    .index('by_userId_dateKey', ['userId', 'dateKey'])
+    .index('by_userId_updatedAt', ['userId', 'updatedAt']),
+
+  nutrition_food_catalog: defineTable({
+    userId: v.string(),
+    foodKey: v.string(),
+    barcode: v.optional(v.string()),
+    name: v.string(),
+    brand: v.optional(v.string()),
+    caloriesPer100g: v.union(v.number(), v.null()),
+    proteinPer100g: v.union(v.number(), v.null()),
+    carbsPer100g: v.union(v.number(), v.null()),
+    fatPer100g: v.union(v.number(), v.null()),
+    imageUrl: v.optional(v.string()),
+    source: v.union(
+      v.literal('open_food_facts'),
+      v.literal('manual'),
+      v.literal('ai_photo'),
+      v.literal('supabase_import'),
+    ),
+    lastFetchedAt: v.number(),
+    lastSelectedAt: v.number(),
+    selectedCount: v.number(),
+    isFavorite: v.boolean(),
+    lastUsedMealType: v.optional(v.string()),
+    lastSelectionEventId: v.optional(v.string()),
+    updatedAt: v.number(),
+    schemaVersion: v.number(),
+  })
+    .index('by_userId_foodKey', ['userId', 'foodKey'])
+    .index('by_userId_lastSelectedAt', ['userId', 'lastSelectedAt'])
+    .index('by_userId_favorite', ['userId', 'isFavorite'])
+    .index('by_userId_barcode', ['userId', 'barcode']),
 
   sleep_nights: defineTable({
     userId: v.string(),

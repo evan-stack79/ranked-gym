@@ -28,7 +28,7 @@ export function FoodTextSearchResults({
         fill ? 'h-full' : ''
       }`}
     >
-      {idle ? (
+      {idle && hits.length === 0 ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-6 py-10 text-center">
           <Search className="h-6 w-6 text-[#636366]" strokeWidth={1.75} aria-hidden />
           <p className="text-[14px] font-medium text-[#8E8E93]">
@@ -59,7 +59,7 @@ export function FoodTextSearchResults({
         </p>
       ) : null}
 
-      {!idle && hits.length > 0 ? (
+      {hits.length > 0 ? (
         <ul
           className={`min-h-0 divide-y divide-white/8 overflow-y-auto overscroll-contain ${
             fill ? 'flex-1' : 'max-h-72'
@@ -81,7 +81,7 @@ export function FoodTextSearchResults({
                   </p>
                 </div>
                 <span className="shrink-0 text-[13px] font-semibold tabular-nums text-[#FF9F0A]">
-                  {hit.calories}
+                  {hit.calories == null ? 'ND' : hit.calories}
                   <span className="ml-0.5 text-[11px] font-medium text-[#8E8E93]">kcal/100g</span>
                 </span>
               </button>

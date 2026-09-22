@@ -2,7 +2,7 @@ import { FunctionsHttpError } from '@supabase/supabase-js'
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 import { compressMealImage } from '../utils/compressMealImage'
 import { safeError } from '../utils/safeLog'
-import { isConvexDomainActive } from '../backend/adapter'
+import { runWithDomainBackend } from '../backend/domainBackend'
 import { api as generatedApi } from '../../convex/_generated/api'
 import { getConvex } from '../lib/convex'
 import { getConvexSessionToken } from './convexAuthService'
@@ -111,56 +111,72 @@ function friendlyInvokeMessage(error: unknown, payload: InvokePayload | null): s
 
 /** Lecture du compteur du jour (Europe/Paris côté SQL). */
 export async function getAiMealUsageToday(userId: string): Promise<AiUsageToday> {
-  if (isConvexDomainActive()) {
-    try {
-      const sessionToken = await getConvexSessionToken()
-      if (!sessionToken) {
-        return { scanCount: 0, dailyLimit: AI_MEAL_DAILY_LIMIT, scansRemaining: AI_MEAL_DAILY_LIMIT }
-      }
-      const row = (await getConvex().query(api.rpc.getAiMealUsageToday, {
-        sessionToken,
-      })) as { scan_count: number; daily_limit: number }
-      const scanCount = Number(row.scan_count ?? 0)
-      const dailyLimit = Number(row.daily_limit ?? AI_MEAL_DAILY_LIMIT)
-      return {
-        scanCount,
-        dailyLimit,
-        scansRemaining: Math.max(0, dailyLimit - scanCount),
-      }
-    } catch (error) {
-      safeError('[mealPhotoAi] convex usage', error)
-      return { scanCount: 0, dailyLimit: AI_MEAL_DAILY_LIMIT, scansRemaining: AI_MEAL_DAILY_LIMIT }
-    }
-  }
+  try {
+    return await runWithDomainBackend<AiUsageToday>({
+      operation: 'mealPhotoAi.usage',
+      convex: async () => {
+        const sessionToken = await getConvexSessionToken()
+        if (!sessionToken) {
+          return {
+            scanCount: 0,
+            dailyLimit: AI_MEAL_DAILY_LIMIT,
+            scansRemaining: AI_MEAL_DAILY_LIMIT,
+          }
+        }
+        const row = (await getConvex().query(api.rpc.getAiMealUsageToday, {
+          sessionToken,
+        })) as { scan_count: number; daily_limit: number }
+        const scanCount = Number(row.scan_count ?? 0)
+        const dailyLimit = Number(row.daily_limit ?? AI_MEAL_DAILY_LIMIT)
+        return {
+          scanCount,
+          dailyLimit,
+          scansRemaining: Math.max(0, dailyLimit - scanCount),
+        }
+      },
+      supabase: async () => {
+        if (!isSupabaseConfigured()) {
+          return {
+            scanCount: 0,
+            dailyLimit: AI_MEAL_DAILY_LIMIT,
+            scansRemaining: AI_MEAL_DAILY_LIMIT,
+          }
+        }
+        const supabase = getSupabase()
+        const { data, error } = await supabase
+          .from('ai_usage_limits')
+          .select('scan_count')
+          .eq('user_id', userId)
+          .eq('date_of_scan', parisTodayKey())
+          .maybeSingle()
 
-  void userId
-  if (!isSupabaseConfigured()) {
+        if (error) {
+          safeError('[mealPhotoAi] getAiMealUsageToday', error.message)
+          return {
+            scanCount: 0,
+            dailyLimit: AI_MEAL_DAILY_LIMIT,
+            scansRemaining: AI_MEAL_DAILY_LIMIT,
+          }
+        }
+
+        const scanCount = Number(data?.scan_count ?? 0)
+        return {
+          scanCount,
+          dailyLimit: AI_MEAL_DAILY_LIMIT,
+          scansRemaining: Math.max(0, AI_MEAL_DAILY_LIMIT - scanCount),
+        }
+      },
+    })
+  } catch (error) {
+    safeError('[mealPhotoAi] usage backend failure', error)
     return { scanCount: 0, dailyLimit: AI_MEAL_DAILY_LIMIT, scansRemaining: AI_MEAL_DAILY_LIMIT }
-  }
-
-  const supabase = getSupabase()
-  const { data, error } = await supabase
-    .from('ai_usage_limits')
-    .select('scan_count')
-    .eq('user_id', userId)
-    .eq('date_of_scan', parisTodayKey())
-    .maybeSingle()
-
-  if (error) {
-    safeError('[mealPhotoAi] getAiMealUsageToday', error.message)
-    return { scanCount: 0, dailyLimit: AI_MEAL_DAILY_LIMIT, scansRemaining: AI_MEAL_DAILY_LIMIT }
-  }
-
-  const scanCount = Number(data?.scan_count ?? 0)
-  return {
-    scanCount,
-    dailyLimit: AI_MEAL_DAILY_LIMIT,
-    scansRemaining: Math.max(0, AI_MEAL_DAILY_LIMIT - scanCount),
   }
 }
 
 /**
  * Compresse la photo puis appelle l’Edge Function `analyze-meal-photo`.
+ * Technical exception during migration: AI inference provider remains Supabase Edge.
+ * Durable meal data is still stored through the app nutrition journal sync layer.
  */
 export async function analyzeMealPhoto(file: File | Blob): Promise<MealPhotoMacros> {
   if (!isSupabaseConfigured()) {
