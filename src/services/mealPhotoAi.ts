@@ -109,6 +109,16 @@ function friendlyInvokeMessage(error: unknown, payload: InvokePayload | null): s
   return 'Échec analyse photo.'
 }
 
+function invokeFailureSummary(error: unknown, payload: InvokePayload | null) {
+  const status =
+    error instanceof FunctionsHttpError ? error.context.status : undefined
+  return {
+    status,
+    code: payload?.code ?? null,
+    hasPayloadError: Boolean(payload?.error),
+  }
+}
+
 /** Lecture du compteur du jour (Europe/Paris côté SQL). */
 export async function getAiMealUsageToday(userId: string): Promise<AiUsageToday> {
   try {
@@ -206,7 +216,7 @@ export async function analyzeMealPhoto(file: File | Blob): Promise<MealPhotoMacr
   if (error) {
     const errorBody = await readFunctionErrorBody(error)
     if (errorBody) payload = { ...payload, ...errorBody }
-    safeError('[mealPhotoAi] invoke failed', { error, payload })
+    safeError('[mealPhotoAi] invoke failed', invokeFailureSummary(error, payload))
 
     throw new MealPhotoAiError(friendlyInvokeMessage(error, payload), {
       code: payload?.code,

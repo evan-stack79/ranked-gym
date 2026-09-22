@@ -1,5 +1,13 @@
 import { v } from 'convex/values'
-import { action, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
+import { api } from './_generated/api'
+import {
+  action,
+  mutation,
+  query,
+  type ActionCtx,
+  type MutationCtx,
+  type QueryCtx,
+} from './_generated/server'
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
 
 const NUTRITION_SCHEMA_VERSION = 1
@@ -62,6 +70,11 @@ function withinDateRange(dateKey: string, startDateKey?: string, endDateKey?: st
 async function sessionUserId(ctx: SessionCtx, sessionToken: string): Promise<string> {
   const user = await requireSessionUser(ctx, sessionToken)
   return user.userId
+}
+
+async function assertActionSession(ctx: ActionCtx, sessionToken: string): Promise<void> {
+  const session = await ctx.runQuery(api.auth.getSession, { sessionToken })
+  if (!session) throw new Error('Not authenticated')
 }
 
 async function findMealRow(ctx: SessionCtx, userId: string, mealId: string) {
@@ -695,6 +708,7 @@ export const listFoodCatalog = query({
 
 export const fetchOpenFoodFactsByBarcode = action({
   args: {
+    sessionToken: v.string(),
     barcode: v.string(),
   },
   returns: v.object({
@@ -709,7 +723,8 @@ export const fetchOpenFoodFactsByBarcode = action({
     provenance: v.literal('open_food_facts'),
     fetchedAt: v.number(),
   }),
-  handler: async (_ctx, args) => {
+  handler: async (ctx, args) => {
+    await assertActionSession(ctx, args.sessionToken)
     const code = args.barcode.trim()
     if (!code) throw new Error('OFF_BARCODE_REQUIRED')
     const data = (await fetchOffJson(
@@ -724,6 +739,7 @@ export const fetchOpenFoodFactsByBarcode = action({
 
 export const searchOpenFoodFacts = action({
   args: {
+    sessionToken: v.string(),
     term: v.string(),
     limit: v.optional(v.number()),
   },
@@ -741,7 +757,8 @@ export const searchOpenFoodFacts = action({
       fetchedAt: v.number(),
     }),
   ),
-  handler: async (_ctx, args) => {
+  handler: async (ctx, args) => {
+    await assertActionSession(ctx, args.sessionToken)
     const term = args.term.trim()
     if (term.length < 2) return []
     const limit = Math.max(1, Math.min(OFF_MAX_RESULTS, Math.floor(args.limit ?? OFF_MAX_RESULTS)))

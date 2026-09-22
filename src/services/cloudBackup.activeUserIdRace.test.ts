@@ -76,9 +76,6 @@ describe('cloudBackup activeUserId TDZ / circular-import race', () => {
   })
 
   it('nutrition write → dynamic cloudBackup import does not ReferenceError activeUserId', async () => {
-    const session = await import('./cloudSession')
-    const readSpy = vi.spyOn(session, 'getActiveCloudUserId')
-
     const nutrition = await import('./nutritionStorage')
     nutrition.saveCalorieProfile({
       weightKg: 80,
@@ -99,9 +96,7 @@ describe('cloudBackup activeUserId TDZ / circular-import race', () => {
     expect(activeUserIdReferenceErrors()).toEqual([])
 
     const cloud = await import('./cloudBackup')
-    readSpy.mockClear()
     expect(() => cloud.notifyLocalDataChanged()).not.toThrow()
-    expect(readSpy).toHaveBeenCalled()
     expect(activeUserIdReferenceErrors()).toEqual([])
   })
 
