@@ -1,4 +1,4 @@
-import { Loader2, Search } from 'lucide-react'
+import { Loader2, Search, Star } from 'lucide-react'
 import type { OpenFoodFactsSearchHit } from '../../services/alimentsService'
 
 interface FoodTextSearchResultsProps {
@@ -7,6 +7,7 @@ interface FoodTextSearchResultsProps {
   error: string | null
   hits: OpenFoodFactsSearchHit[]
   onSelect: (hit: OpenFoodFactsSearchHit) => void
+  onToggleFavorite?: (hit: OpenFoodFactsSearchHit) => void
   /** Liste en flex-1 : occupe tout l’espace restant sous la barre de recherche. */
   fill?: boolean
 }
@@ -17,6 +18,7 @@ export function FoodTextSearchResults({
   error,
   hits,
   onSelect,
+  onToggleFavorite,
   fill = false,
 }: FoodTextSearchResultsProps) {
   const trimmed = query.trim()
@@ -69,22 +71,39 @@ export function FoodTextSearchResults({
         >
           {hits.map((hit) => (
             <li key={`${hit.barcode}-${hit.nom}`}>
-              <button
-                type="button"
-                onClick={() => onSelect(hit)}
-                className="ios-press flex w-full items-start gap-3 px-3.5 py-3 text-left"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[14px] font-semibold text-white">{hit.nom}</p>
-                  <p className="mt-0.5 truncate text-[12px] text-[#8E8E93]">
-                    {hit.brands || 'Marque inconnue'}
-                  </p>
-                </div>
-                <span className="shrink-0 text-[13px] font-semibold tabular-nums text-[#FF9F0A]">
-                  {hit.calories == null ? 'ND' : hit.calories}
-                  <span className="ml-0.5 text-[11px] font-medium text-[#8E8E93]">kcal/100g</span>
-                </span>
-              </button>
+              <div className="flex items-center gap-1 px-2.5 py-2">
+                <button
+                  type="button"
+                  onClick={() => onSelect(hit)}
+                  className="ios-press flex min-w-0 flex-1 items-start gap-3 rounded-lg px-1 py-1 text-left"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[14px] font-semibold text-white">{hit.nom}</p>
+                    <p className="mt-0.5 truncate text-[12px] text-[#8E8E93]">
+                      {hit.brands || 'Marque inconnue'}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-[13px] font-semibold tabular-nums text-[#FF9F0A]">
+                    {hit.calories == null ? 'ND' : hit.calories}
+                    <span className="ml-0.5 text-[11px] font-medium text-[#8E8E93]">kcal/100g</span>
+                  </span>
+                </button>
+
+                {onToggleFavorite && hit.foodKey ? (
+                  <button
+                    type="button"
+                    onClick={() => onToggleFavorite(hit)}
+                    aria-label={hit.isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                    className={`ios-press flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
+                      hit.isFavorite
+                        ? 'border-[#FFD60A]/40 bg-[#FFD60A]/20 text-[#FFD60A]'
+                        : 'border-white/10 bg-black/20 text-[#8E8E93]'
+                    }`}
+                  >
+                    <Star className="h-4 w-4" fill={hit.isFavorite ? 'currentColor' : 'none'} />
+                  </button>
+                ) : null}
+              </div>
             </li>
           ))}
         </ul>

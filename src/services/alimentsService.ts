@@ -6,6 +6,7 @@ import {
   fetchOpenFoodFactsViaConvex,
   listConvexFoodCatalog,
   searchOpenFoodFactsViaConvex,
+  setConvexFoodFavorite,
   upsertConvexFoodSelection,
   type CloudFoodRecord,
   type OpenFoodFactsProductCloud,
@@ -26,6 +27,8 @@ export interface OpenFoodFactsProduct {
 
 export interface OpenFoodFactsSearchHit extends OpenFoodFactsProduct {
   brands: string
+  foodKey?: string
+  isFavorite?: boolean
 }
 
 export interface PersonalFoodItem {
@@ -318,6 +321,8 @@ function mapCatalogToHit(row: CloudFoodRecord): OpenFoodFactsSearchHit {
     imageUrl: row.imageUrl,
     provenance: 'open_food_facts',
     fetchedAt: row.lastFetchedAt,
+    foodKey: row.foodKey,
+    isFavorite: row.isFavorite,
   }
 }
 
@@ -345,4 +350,15 @@ export async function listPersonalFoods(options?: {
   }
 
   return []
+}
+
+export async function setPersonalFoodFavorite(foodKey: string, isFavorite: boolean): Promise<boolean> {
+  if (!isConvexDomainActive()) return false
+  try {
+    const result = await setConvexFoodFavorite(foodKey, isFavorite)
+    return result.applied
+  } catch (error) {
+    safeWarn('[aliments] set favorite failed', error)
+    return false
+  }
 }

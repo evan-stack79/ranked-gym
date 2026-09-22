@@ -20,6 +20,7 @@ import {
 } from '../../utils/homeNutritionQuickActions'
 import {
   listPersonalFoods,
+  setPersonalFoodFavorite,
   saveAliment,
   searchOpenFoodFacts,
   type OpenFoodFactsProduct,
@@ -153,6 +154,8 @@ export function NutritionDashboard({
               imageUrl: item.imageUrl,
               provenance: item.provenance,
               fetchedAt: item.fetchedAt,
+              foodKey: item.foodKey,
+              isFavorite: item.isFavorite,
             })),
           )
         })
@@ -327,6 +330,32 @@ export function NutritionDashboard({
       setPendingMealType(null)
     }
   }
+
+  const handleToggleFavorite = useCallback(
+    (hit: OpenFoodFactsSearchHit) => {
+      if (!hit.foodKey) return
+      requireAuth(() => {
+        const next = !hit.isFavorite
+        void setPersonalFoodFavorite(hit.foodKey!, next)
+          .then((applied) => {
+            if (!applied) {
+              showToast('Impossible de mettre à jour le favori.', 'error')
+              return
+            }
+            setSearchHits((prev) =>
+              prev.map((item) =>
+                item.foodKey === hit.foodKey ? { ...item, isFavorite: next } : item,
+              ),
+            )
+            showToast(next ? 'Ajouté aux favoris.' : 'Retiré des favoris.')
+          })
+          .catch(() => {
+            showToast('Impossible de mettre à jour le favori.', 'error')
+          })
+      })
+    },
+    [requireAuth, showToast],
+  )
 
   const handleAdd = (event: FormEvent) => {
     event.preventDefault()
@@ -605,6 +634,7 @@ export function NutritionDashboard({
             setSearchQuery('')
             setSearchHits([])
           }}
+          onToggleFavorite={handleToggleFavorite}
           onOpenScanner={() => openScanner()}
           scannerSlot={
             scannerOpen ? (
