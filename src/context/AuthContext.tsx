@@ -20,6 +20,7 @@ import {
   mapSessionUser,
   requestPasswordReset as apiRequestPasswordReset,
   signInWithEmail as apiSignInWithEmail,
+  signUpWithEmail as apiSignUpWithEmail,
   signOut as apiSignOut,
   updatePassword as apiUpdatePassword,
   updateProfileProgress,
@@ -518,15 +519,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [completePending, hydrateUser],
   )
 
-  /** Inscriptions publiques désactivées (bêta fermée / invitation uniquement). */
   const signUpEmail = useCallback(
-    async (_email: string, _password: string, _pseudo?: string, _discipline?: string) => {
-      setAuthError(
-        'Bêta fermée. Les inscriptions publiques sont actuellement désactivées.',
-      )
-      setAuthLoading(false)
+    async (email: string, password: string, pseudo?: string, discipline?: string) => {
+      if (!isConvexAuthRuntime() && !isSupabaseConfigured()) {
+        const technical = getSupabaseConfigError()
+        if (technical) safeError('[auth] backend config', technical)
+        setAuthError(USER_BACKEND_UNAVAILABLE)
+        return
+      }
+      setAuthLoading(true)
+      setAuthError(null)
+      setAuthInfo(null)
+      try {
+        const signedUp = await apiSignUpWithEmail(email, password, pseudo, discipline)
+        if (isConvexAuthRuntime()) {
+          const candidate = (signedUp as { user?: AuthUser } | undefined)?.user
+          const sessionUser = candidate ?? (await getConvexSessionUser())
+          if (!sessionUser) {
+            throw new Error('AUTH_SESSION_MISSING')
+          }
+          await writeCachedSessionUser(sessionUser)
+          void hydrateUser(sessionUser, discipline)
+          completePending()
+          return
+        }
+        setAuthInfo('Compte créé. Vérifie ta boîte mail pour confirmer ton inscription.')
+      } catch (err) {
+        setAuthError(friendlyAuthError(err, 'Inscription impossible.'))
+      } finally {
+        setAuthLoading(false)
+      }
     },
-    [],
+    [completePending, hydrateUser],
   )
 
   const clearAuthMessages = useCallback(() => {
