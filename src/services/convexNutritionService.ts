@@ -180,7 +180,9 @@ export async function fetchConvexJournalSnapshot(options?: {
 export async function fetchOpenFoodFactsViaConvex(
   barcode: string,
 ): Promise<OpenFoodFactsProductCloud> {
+  const sessionToken = await requireToken()
   return getConvex().action(api.nutrition.fetchOpenFoodFactsByBarcode, {
+    sessionToken,
     barcode,
   }) as Promise<OpenFoodFactsProductCloud>
 }
@@ -189,7 +191,9 @@ export async function searchOpenFoodFactsViaConvex(
   term: string,
   limit?: number,
 ): Promise<OpenFoodFactsProductCloud[]> {
+  const sessionToken = await requireToken()
   return getConvex().action(api.nutrition.searchOpenFoodFacts, {
+    sessionToken,
     term,
     limit,
   }) as Promise<OpenFoodFactsProductCloud[]>
