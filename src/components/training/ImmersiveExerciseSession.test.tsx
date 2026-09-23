@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ImmersiveExerciseSession } from './ImmersiveExerciseSession'
 import type { ExerciseEntry } from '../../types/training'
-import { RestTimerProvider } from '../../context/RestTimerContext'
+import { RestTimerProvider, useRestTimerContext } from '../../context/RestTimerContext'
 
 vi.mock('../../services/trainingStorage', () => ({
   getTrainingState: () => ({ activeWorkoutDraft: null }),
@@ -183,5 +183,69 @@ describe('ImmersiveExerciseSession', () => {
     expect(onUpdate).toHaveBeenCalledWith('ex-1', 0, { difficulty: 'hard' })
     expect(onValidate).toHaveBeenCalledTimes(1)
     expect(onValidate.mock.calls[0][1]).toBe(0)
+  })
+
+  it('minuteur : série suivante = série 2 du même exo (pas l’exo suivant)', async () => {
+    function StartRest() {
+      const rest = useRestTimerContext()
+      return (
+        <button
+          type="button"
+          onClick={() =>
+            rest.start(90, {
+              exerciseId: 'ex-bench',
+              setIndex: 0,
+              exerciseName: 'Développé couché',
+              setLabel: 'S1',
+            })
+          }
+        >
+          arm
+        </button>
+      )
+    }
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <StartRest />
+          <ImmersiveExerciseSession
+            exercises={[
+              {
+                id: 'ex-bench',
+                name: 'Développé couché',
+                canonicalExerciseId: 'bench_press',
+                sets: [
+                  { reps: 8, weightKg: 60, done: true, difficulty: 'ok' },
+                  { reps: 0, weightKg: 0 },
+                ],
+              },
+              {
+                id: 'ex-row',
+                name: 'Row barre',
+                canonicalExerciseId: 'barbell_row',
+                sets: [{ reps: 0, weightKg: 0 }],
+              },
+            ]}
+            activeIndex={0}
+            onActiveIndexChange={vi.fn()}
+            sessionClockLabel="00:46"
+            sessionPaused={false}
+            onBack={vi.fn()}
+            onUpdateSet={vi.fn()}
+            onAddSet={vi.fn()}
+            onValidateSet={vi.fn()}
+            onFinishSession={vi.fn()}
+            autoValidate
+          />
+        </RestTimerProvider>,
+      )
+    })
+    await act(async () => {
+      const arm = [...host.querySelectorAll('button')].find((b) => b.textContent === 'arm')
+      arm?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(host.querySelector('[data-recovery-timer]')).toBeTruthy()
+    expect(host.textContent).toContain('Série suivante : Série 2 · Développé couché')
+    expect(host.textContent).not.toContain('Row barre')
   })
 })

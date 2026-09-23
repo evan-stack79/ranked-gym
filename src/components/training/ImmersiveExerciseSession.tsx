@@ -114,7 +114,10 @@ export function ImmersiveExerciseSession({
       ? rest.state.remainingSec
       : restSecResolved
   const showRecovery = autoValidate && restActive
-  const recoveryHint = nextSetHint(exercises, exercise.id, validateIdx)
+  /** Index de la série *terminée* (cible du timer), pas le prochain pending — sinon on saute une série. */
+  const hintAfterSetIndex = rest.state.target?.setIndex ?? validateIdx
+  const hintExerciseId = rest.state.target?.exerciseId ?? exercise.id
+  const recoveryHint = nextSetHint(exercises, hintExerciseId, hintAfterSetIndex)
 
   const patchSet = (idx: number, patch: Partial<WorkoutSet>) => {
     const current = exercise.sets[idx]

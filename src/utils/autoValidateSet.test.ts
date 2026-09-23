@@ -53,4 +53,24 @@ describe('nextSetHint', () => {
     )
     expect(hint).toEqual({ exerciseName: 'Développé couché', setLabel: 'Série 2' })
   })
+
+  it('n’avance pas à l’exercice suivant tant qu’il reste une série', () => {
+    const hint = nextSetHint(
+      [
+        {
+          id: 'ex-1',
+          name: 'Développé couché',
+          sets: [{ done: true }, { done: false }],
+        },
+        {
+          id: 'ex-2',
+          name: 'Row barre',
+          sets: [{ done: false }],
+        },
+      ],
+      'ex-1',
+      0,
+    )
+    expect(hint).toEqual({ exerciseName: 'Développé couché', setLabel: 'Série 2' })
+  })
 })
