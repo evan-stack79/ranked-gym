@@ -3,6 +3,7 @@ import './trainView.css'
 import { BookOpen, CalendarDays, ChevronLeft, Footprints, History, Settings2 } from 'lucide-react'
 import type { TrainingState, WorkoutNote } from '../../types/training'
 import { getSportById } from '../../data/sports'
+import { getCatalogExercise } from '../../data/exerciseCatalog'
 import {
   getTrainingState,
   removeSchedule,
@@ -23,6 +24,8 @@ import {
   upsertSchedule,
   markVoluntaryLeaveToTrainHub,
   clearLastVoluntaryRoute,
+  dismissRecommendedExercise,
+  appendExerciseToActiveRoutine,
 } from '../../services/trainingStorage'
 import { saveAndSyncWorkoutSession } from '../../services/trainingSyncService'
 import { safeError } from '../../utils/safeLog'
@@ -77,6 +80,13 @@ import { TrainWeekStrip } from './TrainWeekStrip'
 import { TrainWeeklySummary } from './TrainWeeklySummary'
 import { TrainRecentSessions } from './TrainRecentSessions'
 import { TrainActivitySheet, type QuickActivityId } from './TrainActivitySheet'
+import { TrainingRecommendationCard } from './TrainingRecommendationCard'
+import { isTrainingRecommendationsEnabled } from '../../backend/trainingFeatureFlags'
+import {
+  recommendExercises,
+  recommendationProfileFromState,
+  type TrainingRecommendation,
+} from '../../training-engine'
 import {
   formatSessionClock,
   liveElapsedMs,
@@ -212,6 +222,16 @@ export function TrainingView({
     () => deriveRecentSessions(state.workoutNotes, now, 2),
     [state.workoutNotes, now],
   )
+  const recsEnabled = isTrainingRecommendationsEnabled()
+  const recommendations = useMemo(() => {
+    if (!recsEnabled) return []
+    return recommendExercises(
+      recommendationProfileFromState(state, {
+        goal: profile.goal,
+        nowMs: nowTick,
+      }),
+    ).items
+  }, [recsEnabled, state, profile.goal, nowTick])
 
   const resetCardioSheet = useCallback(() => {
     setDurationMin(40)
@@ -378,6 +398,31 @@ export function TrainingView({
     saveTrainingState(next)
     setState(next)
   }
+
+  const applyRecommendation = useCallback(
+    (rec: TrainingRecommendation) => {
+      const catalog = getCatalogExercise(rec.canonicalExerciseId)
+      if (!catalog) return
+      const entry = {
+        id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name: catalog.name,
+        canonicalExerciseId: catalog.id,
+        sets: [{ reps: 8, weightKg: 20 }],
+      }
+      if (!getTrainingState().activeWorkoutDraft) {
+        setState(startFreeWorkoutSession(activeSportId || 'musculation'))
+      }
+      const next = appendExerciseToActiveRoutine(entry)
+      setState(next)
+      const draft = next.activeWorkoutDraft
+      if (draft) openNotebook(draft.routineId, null, true)
+    },
+    [activeSportId, openNotebook],
+  )
+
+  const refuseRecommendation = useCallback((rec: TrainingRecommendation) => {
+    setState(dismissRecommendedExercise(rec.canonicalExerciseId))
+  }, [])
 
   useEffect(() => {
     const stop = startReminderWatcher(
@@ -702,6 +747,16 @@ export function TrainingView({
       {panel === 'hub' ? (
         <>
           <TrainTodayCard card={todayCard} onPrimary={handleTodayPrimary} />
+
+          {recommendations.map((rec) => (
+            <TrainingRecommendationCard
+              key={`${rec.slot}-${rec.canonicalExerciseId}`}
+              recommendation={rec}
+              primaryLabel={state.activeWorkoutDraft ? 'add' : 'start'}
+              onPrimary={() => applyRecommendation(rec)}
+              onDismiss={() => refuseRecommendation(rec)}
+            />
+          ))}
 
           <TrainWeekStrip days={weekStrip} />
 

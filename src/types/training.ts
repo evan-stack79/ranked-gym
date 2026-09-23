@@ -1,3 +1,5 @@
+import type { ExerciseEquipment, ExerciseLevel } from '../data/exerciseCatalog'
+
 export type SportCategory =
   | 'popular'
   | 'strength'
@@ -247,4 +249,23 @@ export interface TrainingState {
    * Absent/null → reprise inattendue (cold start / OS) peut rouvrir la séance.
    */
   lastVoluntaryRoute?: LastVoluntaryRoute | null
+  /** Exercices refusés via « Pas pour moi » — persisté, jamais deviné. */
+  dismissedExerciseIds?: string[]
+  /**
+   * Matériel déclaré. Absent / vide = non renseigné (aucun filtre matériel).
+   * Ne pas inventer un inventaire à l’exécution.
+   */
+  availableEquipment?: ExerciseEquipment[]
+  /** Exercices exclus pour limitation déclarée. */
+  limitedExerciseIds?: string[]
+  /** Groupes musculaires à éviter (libellés canoniques du catalogue). */
+  limitedMuscles?: string[]
+  /** Niveau d’entraînement déclaré. Absent = non renseigné. */
+  trainingLevel?: ExerciseLevel
+  /** Préférence de repos (secondes). Absent = défaut canonique 90 s. */
+  preferredRestSec?: number
+  /** Onboarding sports terminé (y compris « je ne sais pas encore »). */
+  sportsOnboardingComplete?: boolean
+  /** L’utilisateur a choisi « Je ne sais pas encore ». */
+  sportsUndecided?: boolean
 }

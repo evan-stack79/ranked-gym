@@ -13,6 +13,12 @@ interface ImportMetaEnv {
   readonly VITE_ENABLE_CONVEX_PRIMARY?: string
   /** Dedicated auth migration flag: enable Convex auth adapter. */
   readonly VITE_ENABLE_CONVEX_AUTH?: string
+  /** Reco Training personnalisées. Unset = ON en DEV/test, OFF en prod. */
+  readonly VITE_ENABLE_TRAINING_RECOMMENDATIONS?: string
+  /** Validation auto de série + minuteur. Unset = ON en DEV/test, OFF en prod. */
+  readonly VITE_ENABLE_AUTO_SET_VALIDATION?: string
+  /** Onboarding multisport. Unset = ON en DEV/test, OFF en prod. */
+  readonly VITE_ENABLE_SPORTS_ONBOARDING?: string
 }
 
 interface ImportMeta {

@@ -181,6 +181,40 @@ export function sanitizeStoredId(value: unknown): string | null {
   return trimmed
 }
 
+const EQUIPMENT_VALUES = new Set([
+  'Barre',
+  'Haltères',
+  'Machine',
+  'Poids du corps',
+  'Câble',
+  'Kettlebell',
+  'Autre',
+])
+
+function sanitizeIdList(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const item of value) {
+    const id = sanitizeStoredId(item)
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    out.push(id)
+  }
+  return out
+}
+
+function sanitizeEquipmentList(value: unknown): TrainingState['availableEquipment'] {
+  if (!Array.isArray(value)) return undefined
+  const out: NonNullable<TrainingState['availableEquipment']> = []
+  for (const item of value) {
+    if (typeof item === 'string' && EQUIPMENT_VALUES.has(item)) {
+      if (!out.includes(item as (typeof out)[number])) out.push(item as (typeof out)[number])
+    }
+  }
+  return out
+}
+
 function isSessionKind(value: unknown): value is SessionKind {
   return value === 'strength' || value === 'endurance' || value === 'team' || value === 'generic'
 }
@@ -290,6 +324,27 @@ function read(): TrainingState {
       lastSelectedSportId: sanitizeStoredId(parsed.lastSelectedSportId),
       activeWorkoutDraft: normalizeActiveWorkoutDraft(parsed.activeWorkoutDraft, routines),
       lastVoluntaryRoute: normalizeLastVoluntaryRoute(parsed.lastVoluntaryRoute),
+      dismissedExerciseIds: sanitizeIdList(parsed.dismissedExerciseIds),
+      availableEquipment: sanitizeEquipmentList(parsed.availableEquipment),
+      limitedExerciseIds: sanitizeIdList(parsed.limitedExerciseIds),
+      limitedMuscles: sanitizeIdList(parsed.limitedMuscles),
+      trainingLevel:
+        parsed.trainingLevel === 'beginner' ||
+        parsed.trainingLevel === 'intermediate' ||
+        parsed.trainingLevel === 'advanced'
+          ? parsed.trainingLevel
+          : undefined,
+      preferredRestSec:
+        Number.isFinite(parsed.preferredRestSec) && (parsed.preferredRestSec as number) > 0
+          ? Math.round(parsed.preferredRestSec as number)
+          : undefined,
+      sportsOnboardingComplete:
+        parsed.sportsOnboardingComplete === true
+          ? true
+          : parsed.sportsOnboardingComplete === false
+            ? false
+            : undefined,
+      sportsUndecided: parsed.sportsUndecided === true ? true : undefined,
     }
     if (merged.stepsDateKey !== todayKey()) {
       merged.stepsToday = 0
@@ -884,6 +939,48 @@ export function persistActiveExerciseIndex(index: number): TrainingState {
       activeExerciseIndex: safe,
       updatedAt: Date.now(),
     },
+  }
+  write(next)
+  return next
+}
+
+export function dismissRecommendedExercise(canonicalId: string): TrainingState {
+  const state = read()
+  const id = sanitizeStoredId(canonicalId)
+  if (!id) return state
+  const current = state.dismissedExerciseIds ?? []
+  if (current.includes(id)) return state
+  const next = { ...state, dismissedExerciseIds: [...current, id] }
+  write(next)
+  return next
+}
+
+export function appendExerciseToActiveRoutine(entry: ExerciseEntry): TrainingState {
+  const state = read()
+  const draft = state.activeWorkoutDraft
+  if (!draft) return state
+  const canonical = sanitizeStoredId(entry.canonicalExerciseId)
+  const routines = state.routines.map((routine) => {
+    if (routine.id !== draft.routineId) return routine
+    if (
+      canonical &&
+      (routine.exercises ?? []).some((ex) => ex.canonicalExerciseId === canonical)
+    ) {
+      return routine
+    }
+    return {
+      ...routine,
+      exercises: [
+        ...(routine.exercises ?? []),
+        { ...entry, sets: entry.sets.map((s) => ({ ...s })) },
+      ],
+      updatedAt: Date.now(),
+    }
+  })
+  const next = {
+    ...state,
+    routines,
+    activeWorkoutDraft: { ...draft, updatedAt: Date.now() },
   }
   write(next)
   return next

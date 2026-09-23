@@ -1,6 +1,6 @@
 /**
- * Bibliothèque locale d’exercices (musculation).
- * Source de vérité pour le sélecteur : noms, muscles, équipement, alias.
+ * Bibliothèque locale d’exercices.
+ * Source de vérité : noms, muscles, équipement, alias, sport, mouvement, niveau, effort.
  * Les assets visuels restent câblés via `canonicalExerciseId` → `exerciseMedia`.
  */
 
@@ -12,6 +12,12 @@ export type ExerciseEquipment =
   | 'Câble'
   | 'Kettlebell'
   | 'Autre'
+
+export type ExerciseMovement = 'push' | 'pull' | 'legs' | 'core'
+
+export type ExerciseEffortType = 'strength' | 'hypertrophy' | 'endurance'
+
+export type ExerciseLevel = 'beginner' | 'intermediate' | 'advanced'
 
 export type CatalogExercise = {
   /** Identifiant canonique stable (ex. bench_press). */
@@ -26,9 +32,17 @@ export type CatalogExercise = {
   aliases: string[]
   /** Popularité pour le tri par défaut (plus haut = plus visible). */
   popularity: number
+  /** Sports du catalogue `SPORTS` auxquels cet exercice appartient. */
+  sportIds: string[]
+  /** Famille de mouvement (jamais déduite du nom libre). */
+  movement: ExerciseMovement
+  /** Type d’effort canonique. */
+  effortType: ExerciseEffortType
+  /** Niveau technique déclaré. */
+  level: ExerciseLevel
 }
 
-export const EXERCISE_CATALOG: CatalogExercise[] = [
+const CATALOG_SEED: Omit<CatalogExercise, 'movement' | 'effortType' | 'level' | 'sportIds'>[] = [
   // —— Poussée / pecs ——
   {
     id: 'bench_press',
@@ -277,6 +291,54 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
     popularity: 68,
   },
 ]
+
+const MUSCU = ['musculation', 'bodybuilding', 'functional'] as const
+const POWER = ['musculation', 'bodybuilding', 'powerlifting'] as const
+const CALI = ['musculation', 'bodybuilding', 'calisthenics'] as const
+const CROSS = ['musculation', 'bodybuilding', 'crossfit', 'functional'] as const
+
+type CatalogMeta = Pick<CatalogExercise, 'movement' | 'effortType' | 'level' | 'sportIds'>
+
+const CATALOG_META: Record<string, CatalogMeta> = {
+  bench_press: { movement: 'push', effortType: 'strength', level: 'intermediate', sportIds: [...POWER] },
+  incline_bench_press: { movement: 'push', effortType: 'hypertrophy', level: 'intermediate', sportIds: [...MUSCU] },
+  overhead_press: { movement: 'push', effortType: 'strength', level: 'intermediate', sportIds: [...POWER, 'halterophilie'] },
+  dumbbell_bench_press: { movement: 'push', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  dumbbell_incline_press: { movement: 'push', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  dumbbell_fly: { movement: 'push', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  cable_crossover: { movement: 'push', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  push_up: { movement: 'push', effortType: 'endurance', level: 'beginner', sportIds: [...CALI, 'crossfit'] },
+  dip: { movement: 'push', effortType: 'strength', level: 'intermediate', sportIds: [...CALI, 'crossfit'] },
+  barbell_row: { movement: 'pull', effortType: 'strength', level: 'intermediate', sportIds: [...POWER] },
+  lat_pulldown: { movement: 'pull', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  pull_up: { movement: 'pull', effortType: 'strength', level: 'intermediate', sportIds: [...CALI, 'crossfit'] },
+  seated_cable_row: { movement: 'pull', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  deadlift: { movement: 'pull', effortType: 'strength', level: 'intermediate', sportIds: [...POWER, 'crossfit'] },
+  back_squat: { movement: 'legs', effortType: 'strength', level: 'intermediate', sportIds: [...POWER, 'crossfit'] },
+  front_squat: { movement: 'legs', effortType: 'strength', level: 'advanced', sportIds: [...POWER, 'halterophilie'] },
+  leg_press: { movement: 'legs', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  romanian_deadlift: { movement: 'legs', effortType: 'strength', level: 'intermediate', sportIds: [...MUSCU, 'powerlifting'] },
+  leg_curl: { movement: 'legs', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  leg_extension: { movement: 'legs', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  walking_lunge: { movement: 'legs', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU, 'functional'] },
+  hip_thrust: { movement: 'legs', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  calf_raise: { movement: 'legs', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  lateral_raise: { movement: 'push', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  face_pull: { movement: 'pull', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  barbell_curl: { movement: 'pull', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  dumbbell_curl: { movement: 'pull', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  triceps_pushdown: { movement: 'push', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  skull_crusher: { movement: 'push', effortType: 'hypertrophy', level: 'intermediate', sportIds: [...MUSCU] },
+  plank: { movement: 'core', effortType: 'endurance', level: 'beginner', sportIds: [...CALI, ...CROSS] },
+}
+
+export const EXERCISE_CATALOG: CatalogExercise[] = CATALOG_SEED.map((ex) => {
+  const extra = CATALOG_META[ex.id]
+  if (!extra) {
+    throw new Error(`Métadonnées canoniques manquantes pour ${ex.id}`)
+  }
+  return { ...ex, ...extra, sportIds: [...new Set(extra.sportIds)] }
+})
 
 const BY_ID = new Map(EXERCISE_CATALOG.map((ex) => [ex.id, ex]))
 
