@@ -4,6 +4,7 @@ import {
   recommendExercises,
   resolveCanonicalExerciseId,
   scoreCatalogCandidates,
+  lastLoggedSetCount,
 } from './recommendations'
 import type { RecommendationHistoryEntry, RecommendationProfile } from './types'
 
@@ -186,5 +187,85 @@ describe('recommendExercises', () => {
       expect(['complete_pull', 'complete_legs']).toContain(top.reasonCode)
       expect(result.discover?.reasonText.startsWith('Pour compléter ton entraînement')).toBe(true)
     }
+  })
+})
+
+describe('lastLoggedSetCount', () => {
+  it('lit le nombre de séries du dernier log canonique, sinon null', () => {
+    expect(lastLoggedSetCount([], 'bench_press')).toBeNull()
+    expect(
+      lastLoggedSetCount(
+        [
+          {
+            id: 'n',
+            title: 'Push',
+            dateKey: '2026-09-20',
+            createdAt: NOW,
+            estimatedKcal: 0,
+            exercises: [
+              {
+                id: 'e',
+                name: 'Développé couché',
+                canonicalExerciseId: 'bench_press',
+                sets: [{ reps: 8, weightKg: 60 }, { reps: 6, weightKg: 60 }, { reps: 6, weightKg: 55 }],
+              },
+            ],
+          },
+        ],
+        'bench_press',
+      ),
+    ).toBe(3)
+    expect(
+      lastLoggedSetCount(
+        [
+          {
+            id: 'n',
+            title: 'Push',
+            dateKey: '2026-09-20',
+            createdAt: NOW,
+            estimatedKcal: 0,
+            exercises: [{ id: 'e', name: 'DÉVELOPPER', sets: [{ reps: 8, weightKg: 20 }] }],
+          },
+        ],
+        'bench_press',
+      ),
+    ).toBeNull()
+    expect(
+      lastLoggedSetCount(
+        [
+          {
+            id: 'old',
+            title: 'Push',
+            dateKey: '2026-09-10',
+            createdAt: NOW - 10 * 86400000,
+            estimatedKcal: 0,
+            exercises: [
+              {
+                id: 'e1',
+                name: 'Développé couché',
+                canonicalExerciseId: 'bench_press',
+                sets: [{ reps: 8, weightKg: 40 }, { reps: 8, weightKg: 40 }, { reps: 8, weightKg: 40 }],
+              },
+            ],
+          },
+          {
+            id: 'new',
+            title: 'Push',
+            dateKey: '2026-09-22',
+            createdAt: NOW - 86400000,
+            estimatedKcal: 0,
+            exercises: [
+              {
+                id: 'e2',
+                name: 'Développé couché',
+                canonicalExerciseId: 'bench_press',
+                sets: [{ reps: 8, weightKg: 60 }, { reps: 6, weightKg: 60 }],
+              },
+            ],
+          },
+        ],
+        'bench_press',
+      ),
+    ).toBe(2)
   })
 })

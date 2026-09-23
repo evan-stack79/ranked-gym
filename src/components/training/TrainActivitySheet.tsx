@@ -21,21 +21,21 @@ const QUICK_ACTIVITIES: {
   {
     id: 'course',
     disciplineId: 'course',
-    label: 'Course / Endurance',
+    label: 'Course',
     hint: 'Distance & durée',
     icon: Footprints,
   },
   {
     id: 'football',
     disciplineId: 'football',
-    label: 'Football / Sport collectif',
+    label: 'Football',
     hint: 'Entraînement ou match',
     icon: Users,
   },
   {
     id: 'autre',
     disciplineId: null,
-    label: 'Autre sport',
+    label: 'Autre activité',
     hint: 'Catalogue complet',
     icon: MoreHorizontal,
   },
@@ -48,12 +48,12 @@ interface TrainActivitySheetProps {
 }
 
 /**
- * Bottom sheet multisport — 4 choix prioritaires, catalogue via « Autre ».
+ * Bottom sheet sobre — Musculation / Course / Football / Autre activité.
  */
 export function TrainActivitySheet({ open, onClose, onSelect }: TrainActivitySheetProps) {
   return (
-    <IosSheet open={open} onClose={onClose} title="Choisir une activité" subtitle="Multisport">
-      <ul className="space-y-2 pb-2">
+    <IosSheet open={open} onClose={onClose} title="Nouvelle séance">
+      <ul className="space-y-2 pb-2" data-new-session-sheet>
         {QUICK_ACTIVITIES.map((activity) => {
           const Icon = activity.icon
           return (
@@ -64,9 +64,9 @@ export function TrainActivitySheet({ open, onClose, onSelect }: TrainActivityShe
                   onSelect(activity.id)
                   onClose()
                 }}
-                className="ios-press flex min-h-11 w-full items-center gap-3 rounded-2xl border border-white/10 bg-black/30 px-3.5 py-3.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/40"
+                className="ios-press flex min-h-11 w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#141416] px-3.5 py-3.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/40"
               >
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#FF2B2B]/15 text-[#FF6961]">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#1c1c1e] text-white">
                   <Icon className="h-5 w-5" aria-hidden="true" />
                 </span>
                 <span className="min-w-0">

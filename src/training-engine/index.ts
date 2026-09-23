@@ -4,6 +4,7 @@ export {
   historyFromNotes,
   recommendExercises,
   recommendationProfileFromState,
+  lastLoggedSetCount,
   resolveCanonicalExerciseId,
   scoreCatalogCandidates,
   REC_SCORE,

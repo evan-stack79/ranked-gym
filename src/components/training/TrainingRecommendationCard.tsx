@@ -1,4 +1,6 @@
-import { ExercisePickerThumb } from './ExercisePickerThumb'
+import { resolvePickerIllustrationSrc } from '../../utils/exercisePickerIllustrations'
+import { formatExerciseMuscles } from '../../utils/exerciseMedia'
+import { getCatalogExercise } from '../../data/exerciseCatalog'
 import type { TrainingRecommendation } from '../../training-engine'
 
 interface TrainingRecommendationCardProps {
@@ -6,64 +8,93 @@ interface TrainingRecommendationCardProps {
   primaryLabel: 'add' | 'start'
   onPrimary: () => void
   onDismiss: () => void
-}
-
-const SLOT_LABEL: Record<TrainingRecommendation['slot'], string> = {
-  redo: 'À refaire',
-  discover: 'À découvrir',
+  /** Nombre de séries du dernier log réel — null si non calculable. */
+  setCount?: number | null
 }
 
 /**
- * Carte reco accueil Training — visuel local, justification réelle, CTA unique.
- * Pas de stats inventées, pas d’URL distante.
+ * Hero reco unique — photo locale par id canonique, texte 100 % dynamique.
+ * Fondu noir inférieur uniquement (lisibilité), pas de glass / glow.
  */
 export function TrainingRecommendationCard({
   recommendation,
   primaryLabel,
   onPrimary,
   onDismiss,
+  setCount = null,
 }: TrainingRecommendationCardProps) {
-  const cta = primaryLabel === 'start' ? 'Commencer' : 'Ajouter à ma séance'
+  const catalog = getCatalogExercise(recommendation.canonicalExerciseId)
+  const imageSrc = resolvePickerIllustrationSrc(recommendation.canonicalExerciseId)
+  const muscleLine = formatExerciseMuscles(catalog?.muscles ?? [])
+  const cta =
+    primaryLabel === 'start' ? 'Commencer avec cet exercice' : 'Ajouter à ma séance'
+  const metaParts: string[] = []
+  if (typeof setCount === 'number' && setCount > 0) {
+    metaParts.push(`${setCount} série${setCount > 1 ? 's' : ''}`)
+  }
+  if (recommendation.durationMin != null) {
+    metaParts.push(`${recommendation.durationMin} min`)
+  }
 
   return (
     <section
-      className="rounded-3xl border border-white/10 bg-[#141416] p-4"
+      className="overflow-hidden rounded-3xl border border-white/10 bg-[#141416]"
       data-training-reco
       data-training-reco-slot={recommendation.slot}
       data-canonical-exercise={recommendation.canonicalExerciseId}
-      aria-label={`${SLOT_LABEL[recommendation.slot]} : ${recommendation.name}`}
+      data-reco-name={recommendation.name}
+      data-reco-reason={recommendation.reasonText}
+      data-hero-image={imageSrc ? 'ready' : 'fallback'}
+      aria-label={recommendation.name}
     >
-      <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8E8E93]">
-        {SLOT_LABEL[recommendation.slot]}
-      </p>
-
-      <div className="mt-3 flex items-start gap-3">
-        <ExercisePickerThumb canonicalExerciseId={recommendation.canonicalExerciseId} />
-        <div className="min-w-0 flex-1">
-          <h3 className="text-[18px] font-bold leading-tight tracking-tight text-white">
+      <div className="relative isolate min-h-[220px] bg-[#1c1c1e]">
+        {imageSrc ? (
+          <img
+            src={imageSrc}
+            alt=""
+            draggable={false}
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover object-center"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-[#1c1c1e]" data-picker-thumb-fallback />
+        )}
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3"
+          style={{ background: 'linear-gradient(to top, #000 0%, transparent 100%)' }}
+          aria-hidden="true"
+        />
+        <div className="relative z-[1] flex min-h-[220px] flex-col justify-end px-4 pb-4 pt-16">
+          <h2 className="text-[26px] font-bold leading-tight tracking-tight text-white">
             {recommendation.name}
-          </h3>
-          <p className="mt-1 text-[13px] leading-snug text-[#AEAEB2]">{recommendation.reasonText}</p>
-          {recommendation.durationMin != null ? (
-            <p className="mt-1 text-[12px] tabular-nums text-[#8E8E93]">
-              {recommendation.durationMin} min
-            </p>
+          </h2>
+          {muscleLine ? (
+            <p className="mt-1 text-[13px] font-medium text-[#AEAEB2]">{muscleLine}</p>
+          ) : null}
+          <p className="mt-2 text-[14px] leading-snug text-[#E5E5EA]">{recommendation.reasonText}</p>
+          {metaParts.length > 0 ? (
+            <p className="mt-1 text-[12px] tabular-nums text-[#8E8E93]">{metaParts.join(' · ')}</p>
           ) : null}
         </div>
       </div>
 
-      <div className="mt-4 flex flex-col gap-2">
+      <div className="px-4 pb-4 pt-3">
         <button
           type="button"
           onClick={onPrimary}
-          className="btn-brand ios-press flex min-h-11 w-full items-center justify-center rounded-2xl px-4 text-[15px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/60"
+          className="ios-press flex min-h-11 w-full items-center justify-center rounded-2xl bg-[#FF2B2B] px-4 text-[16px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/60"
         >
           {cta}
         </button>
+        {primaryLabel === 'start' ? (
+          <p className="mt-2 text-center text-[12px] leading-snug text-[#8E8E93]">
+            Tu pourras compléter ta séance ensuite
+          </p>
+        ) : null}
         <button
           type="button"
           onClick={onDismiss}
-          className="ios-press flex min-h-11 w-full items-center justify-center rounded-2xl px-4 text-[13px] font-medium text-[#8E8E93] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+          className="ios-press mt-1 flex min-h-11 w-full items-center justify-center rounded-2xl px-4 text-[13px] font-medium text-[#8E8E93] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
         >
           Pas pour moi
         </button>

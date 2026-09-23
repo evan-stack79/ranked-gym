@@ -42,28 +42,50 @@ describe('TrainingRecommendationCard', () => {
         />,
       )
     })
-    expect(host.textContent).toContain('À refaire')
     expect(host.textContent).toContain('Développé couché')
     expect(host.textContent).toContain('Parce que tu réalises souvent ce mouvement')
     expect(host.textContent).toContain('Ajouter à ma séance')
     expect(host.textContent).toContain('Pas pour moi')
     expect(host.textContent).not.toMatch(/%/)
     expect(host.textContent).not.toContain('kcal')
-    expect(host.querySelector('[data-training-reco-slot="redo"]')).toBeTruthy()
+    expect(host.querySelector('[data-canonical-exercise="bench_press"]')).toBeTruthy()
+    expect(host.querySelector('[data-reco-name]')?.getAttribute('data-reco-name')).toBe(
+      'Développé couché',
+    )
   })
 
-  it('CTA Commencer quand aucune séance n’est en cours', async () => {
+  it('CTA Commencer avec cet exercice + aide, séries seulement si fournies', async () => {
     await act(async () => {
       root.render(
         <TrainingRecommendationCard
-          recommendation={{ ...rec, slot: 'discover' }}
+          recommendation={{ ...rec, slot: 'discover', durationMin: null }}
+          primaryLabel="start"
+          setCount={3}
+          onPrimary={vi.fn()}
+          onDismiss={vi.fn()}
+        />,
+      )
+    })
+    expect(host.textContent).toContain('Commencer avec cet exercice')
+    expect(host.textContent).toContain('Tu pourras compléter ta séance ensuite')
+    expect(host.textContent).toContain('3 séries')
+    expect(host.textContent).not.toContain('12 min')
+  })
+
+  it('n’affiche pas de durée ni séries inventées', async () => {
+    await act(async () => {
+      root.render(
+        <TrainingRecommendationCard
+          recommendation={{ ...rec, canonicalExerciseId: 'incline_bench_press', name: 'Développé incliné' }}
           primaryLabel="start"
           onPrimary={vi.fn()}
           onDismiss={vi.fn()}
         />,
       )
     })
-    expect(host.textContent).toContain('Commencer')
-    expect(host.textContent).toContain('À découvrir')
+    expect(host.textContent).toContain('Développé incliné')
+    expect(host.querySelector('[data-canonical-exercise="incline_bench_press"]')).toBeTruthy()
+    expect(host.textContent).not.toContain('série')
+    expect(host.textContent).not.toContain(' min')
   })
 })

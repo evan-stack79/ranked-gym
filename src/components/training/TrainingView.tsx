@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './trainView.css'
-import { BookOpen, CalendarDays, ChevronLeft, Footprints, History, Settings2 } from 'lucide-react'
+import { ChevronLeft, Settings2 } from 'lucide-react'
 import type { TrainingState, WorkoutNote } from '../../types/training'
 import { getSportById } from '../../data/sports'
 import { getCatalogExercise } from '../../data/exerciseCatalog'
@@ -11,7 +11,6 @@ import {
   saveTrainingState,
   saveWorkoutNote,
   saveRoutineDraft,
-  startRoutineDraft,
   startFreeWorkoutSession,
   setActiveWorkoutPaused,
   ensureActiveWorkoutClock,
@@ -26,6 +25,7 @@ import {
   clearLastVoluntaryRoute,
   dismissRecommendedExercise,
   appendExerciseToActiveRoutine,
+  persistActiveExerciseIndex,
 } from '../../services/trainingStorage'
 import { saveAndSyncWorkoutSession } from '../../services/trainingSyncService'
 import { safeError } from '../../utils/safeLog'
@@ -67,15 +67,12 @@ import {
 import type { TeamSessionType } from '../../types/training'
 import {
   deriveRecentSessions,
-  deriveTodayHubCard,
   deriveWeekStrip,
   deriveWeeklySummary,
-  launchableRoutineId,
   trainSessionKindForSport,
   resolveSessionKind,
   type SportSummaryFilter,
 } from '../../utils/trainHub'
-import { TrainTodayCard } from './TrainTodayCard'
 import { TrainWeekStrip } from './TrainWeekStrip'
 import { TrainWeeklySummary } from './TrainWeeklySummary'
 import { TrainRecentSessions } from './TrainRecentSessions'
@@ -85,6 +82,7 @@ import { isTrainingRecommendationsEnabled } from '../../backend/trainingFeatureF
 import {
   recommendExercises,
   recommendationProfileFromState,
+  lastLoggedSetCount,
   type TrainingRecommendation,
 } from '../../training-engine'
 import {
@@ -107,11 +105,14 @@ export function TrainingView({
   resumeActiveWorkout = false,
   onLaunchConsumed,
   onGoToLobby,
+  openActivitySheet = false,
 }: {
   launchRoutineId?: string | null
   resumeActiveWorkout?: boolean
   onLaunchConsumed?: () => void
   onGoToLobby?: () => void
+  /** Navbar « Nouvelle séance » — ouvre le sheet, sans créer de 2e brouillon. */
+  openActivitySheet?: boolean
 }) {
   const { isLoading: isBootLoading, isAuthenticated, requireAuth } = useAuth()
   const [state, setState] = useState<TrainingState>(() => getTrainingState())
@@ -212,14 +213,13 @@ export function TrainingView({
   const isTeamSheet = activeSessionKind === 'team'
 
   const now = useMemo(() => new Date(nowTick), [nowTick])
-  const todayCard = useMemo(() => deriveTodayHubCard(state, now), [state, now])
   const weekStrip = useMemo(() => deriveWeekStrip(state.workoutNotes, now), [state.workoutNotes, now])
   const weeklySummary = useMemo(
     () => deriveWeeklySummary(state.workoutNotes, summaryFilter, now),
     [state.workoutNotes, summaryFilter, now],
   )
   const recentSessions = useMemo(
-    () => deriveRecentSessions(state.workoutNotes, now, 2),
+    () => deriveRecentSessions(state.workoutNotes, now, 1),
     [state.workoutNotes, now],
   )
   const recsEnabled = isTrainingRecommendationsEnabled()
@@ -232,6 +232,10 @@ export function TrainingView({
       }),
     ).items
   }, [recsEnabled, state, profile.goal, nowTick])
+  const heroRec = recommendations[0] ?? null
+  const heroSetCount = heroRec
+    ? lastLoggedSetCount(state.workoutNotes, heroRec.canonicalExerciseId)
+    : null
 
   const resetCardioSheet = useCallback(() => {
     setDurationMin(40)
@@ -316,6 +320,18 @@ export function TrainingView({
     openNotebook(launchRoutineId, null, resumeActiveWorkout)
     onLaunchConsumed?.()
   }, [launchRoutineId, resumeActiveWorkout, showStrengthTools, onLaunchConsumed, openNotebook])
+
+  useEffect(() => {
+    if (!openActivitySheet) return
+    const draft = getTrainingState().activeWorkoutDraft
+    if (draft) {
+      setState(ensureActiveWorkoutClock())
+      openNotebook(draft.routineId, null, true)
+    } else {
+      setActivityOpen(true)
+    }
+    onLaunchConsumed?.()
+  }, [openActivitySheet, onLaunchConsumed, openNotebook])
 
   /** Cold start / remount OS : rouvrir la séance sauf soft-leave volontaire. */
   useEffect(() => {
@@ -403,21 +419,36 @@ export function TrainingView({
     (rec: TrainingRecommendation) => {
       const catalog = getCatalogExercise(rec.canonicalExerciseId)
       if (!catalog) return
+      const hadDraft = Boolean(getTrainingState().activeWorkoutDraft)
+      if (!hadDraft) {
+        setState(startFreeWorkoutSession('musculation'))
+      }
       const entry = {
         id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         name: catalog.name,
         canonicalExerciseId: catalog.id,
-        sets: [{ reps: 8, weightKg: 20 }],
+        sets: [{ reps: 0, weightKg: 0 }],
       }
-      if (!getTrainingState().activeWorkoutDraft) {
-        setState(startFreeWorkoutSession(activeSportId || 'musculation'))
-      }
+      const before = getTrainingState()
+      const draftRoutine = before.routines.find((r) => r.id === before.activeWorkoutDraft?.routineId)
+      const already = Boolean(
+        catalog.id &&
+          draftRoutine?.exercises?.some((ex) => ex.canonicalExerciseId === catalog.id),
+      )
       const next = appendExerciseToActiveRoutine(entry)
-      setState(next)
-      const draft = next.activeWorkoutDraft
+      const live = next.routines.find((r) => r.id === next.activeWorkoutDraft?.routineId)
+      const focus = live?.exercises?.findIndex((ex) => ex.canonicalExerciseId === catalog.id) ?? 0
+      const focused = persistActiveExerciseIndex(focus >= 0 ? focus : 0)
+      setState(focused)
+      const draft = focused.activeWorkoutDraft
+      if (hadDraft && already) {
+        showToast('Déjà dans ta séance')
+      } else if (hadDraft) {
+        showToast('Ajouté à ta séance')
+      }
       if (draft) openNotebook(draft.routineId, null, true)
     },
-    [activeSportId, openNotebook],
+    [openNotebook, showToast],
   )
 
   const refuseRecommendation = useCallback((rec: TrainingRecommendation) => {
@@ -606,63 +637,13 @@ export function TrainingView({
     showToast(`${sport?.name ?? 'Séance'} · ~${estimated} kcal → Nutri`)
   }
 
-  const handleTodayPrimary = () => {
-    const cta = todayCard.cta
-    if (cta === 'resume') {
-      const id = launchableRoutineId(todayCard)
-      if (!id) {
-        showToast('Routine indisponible')
-        return
-      }
-      applySport(todayCard.sportId ?? 'musculation')
-      setState(ensureActiveWorkoutClock())
-      openNotebook(id, null, cta === 'resume')
-      return
-    }
-    if (cta === 'start') {
-      if (!todayCard.sportId || !todayCard.sessionKind) {
-        showToast('Sport planifié indisponible')
-        return
-      }
-      applySport(todayCard.sportId)
-      if (todayCard.openTarget === 'notebook') {
-        const id = launchableRoutineId(todayCard)
-        if (id) {
-          const withRoutine = startRoutineDraft(id, todayCard.sportId)
-          // Routine vide → séance libre (sélecteur premier exo).
-          if (!withRoutine.activeWorkoutDraft) {
-            setState(startFreeWorkoutSession(todayCard.sportId, id))
-            openNotebook(id, null, false, true)
-          } else {
-            setState(withRoutine)
-            openNotebook(id)
-          }
-        } else {
-          setState(startFreeWorkoutSession(todayCard.sportId))
-          openNotebook(null, null, false, true)
-        }
-      } else if (todayCard.openTarget === 'endurance') {
-        setPanel('endurance')
-      } else {
-        setCardioOpen(true)
-      }
-      return
-    }
-    if (cta === 'open_train') {
-      // Cible dérivée de la séance planifiée — pas du sport global courant.
-      if (todayCard.openTarget === 'notebook') {
-        applyDiscipline('musculation')
-        setState(startFreeWorkoutSession('musculation'))
-        openNotebook(null, null, false, true)
-      } else {
-        setActivityOpen(true)
-      }
-      return
-    }
-    setActivityOpen(true)
-  }
-
   const handleQuickActivity = (id: QuickActivityId) => {
+    const live = getTrainingState().activeWorkoutDraft
+    if (live) {
+      setState(ensureActiveWorkoutClock())
+      openNotebook(live.routineId, null, true)
+      return
+    }
     if (id === 'musculation') {
       applyDiscipline('musculation')
       setState(startFreeWorkoutSession('musculation'))
@@ -716,7 +697,7 @@ export function TrainingView({
               type="button"
               onClick={() => setPanel('agenda')}
               className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-[#AEAEB2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/35"
-              aria-label="Programmes"
+              aria-label="Réglages"
             >
               <Settings2 className="h-5 w-5" aria-hidden="true" />
             </button>
@@ -738,80 +719,47 @@ export function TrainingView({
         </header>
       )}
 
-      {dueBanner && !immersiveLiveSession ? (
+      {dueBanner && !immersiveLiveSession && panel !== 'hub' ? (
         <div className="rounded-2xl border border-[#FF2B2B]/40 bg-[#FF2B2B]/15 px-4 py-3 text-[14px] font-semibold text-white">
           {dueBanner}
         </div>
       ) : null}
 
       {panel === 'hub' ? (
-        <>
-          <TrainTodayCard card={todayCard} onPrimary={handleTodayPrimary} />
-
-          {recommendations.map((rec) => (
-            <TrainingRecommendationCard
-              key={`${rec.slot}-${rec.canonicalExerciseId}`}
-              recommendation={rec}
-              primaryLabel={state.activeWorkoutDraft ? 'add' : 'start'}
-              onPrimary={() => applyRecommendation(rec)}
-              onDismiss={() => refuseRecommendation(rec)}
-            />
-          ))}
-
+        <div className="flex flex-col gap-5" data-training-hub>
           <TrainWeekStrip days={weekStrip} />
+
+          {heroRec ? (
+            <TrainingRecommendationCard
+              recommendation={heroRec}
+              primaryLabel={state.activeWorkoutDraft ? 'add' : 'start'}
+              setCount={heroSetCount}
+              onPrimary={() => applyRecommendation(heroRec)}
+              onDismiss={() => refuseRecommendation(heroRec)}
+            />
+          ) : recsEnabled ? (
+            <p className="text-[14px] text-[#8E8E93]" data-training-reco-empty>
+              Aucune suggestion pour l’instant. Lance une séance depuis le bouton central.
+            </p>
+          ) : null}
 
           <TrainWeeklySummary
             summary={weeklySummary}
             filter={summaryFilter}
             onFilterChange={setSummaryFilter}
+            compact
           />
 
           <TrainRecentSessions
             items={recentSessions}
+            single
             onOpen={(id) => {
               setFocusNoteId(id)
               setPanel('history')
             }}
             onSeeAll={() => setPanel('history')}
           />
-
-          <nav aria-label="Accès Train" className="grid grid-cols-2 gap-2">
-            {(
-              [
-                { id: 'notebook' as const, label: 'Carnet', icon: BookOpen },
-                { id: 'agenda' as const, label: 'Programmes', icon: CalendarDays },
-                { id: 'history' as const, label: 'Historique', icon: History },
-                { id: 'steps' as const, label: 'Pas', icon: Footprints },
-              ] as const
-            ).map((item) => {
-              const Icon = item.icon
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    if (item.id === 'notebook') {
-                      if (!showStrengthTools) applyDiscipline('musculation')
-                      if (!state.activeWorkoutDraft) {
-                        setState(startFreeWorkoutSession(activeSportId || 'musculation'))
-                        openNotebook(null, null, false, true)
-                      } else {
-                        setState(ensureActiveWorkoutClock())
-                        openNotebook(state.activeWorkoutDraft.routineId, null, true)
-                      }
-                      return
-                    }
-                    setPanel(item.id)
-                  }}
-                  className="ios-press flex min-h-11 items-center gap-2.5 rounded-2xl border border-white/10 bg-[#141416] px-3.5 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/35"
-                >
-                  <Icon className="h-4 w-4 shrink-0 text-[#FF6961]" aria-hidden="true" />
-                  <span className="text-[14px] font-semibold text-white">{item.label}</span>
-                </button>
-              )
-            })}
-          </nav>
-        </>
+        </div>
       ) : null}
 
       {panel === 'notebook' ? (

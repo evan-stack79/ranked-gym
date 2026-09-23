@@ -296,6 +296,27 @@ export function recommendExercises(profile: RecommendationProfile): Recommendati
   return { redo: redoCard, discover: discoverCard, items }
 }
 
+/** Dernier log réel de cet id — nombre de séries, ou null. */
+export function lastLoggedSetCount(
+  notes: WorkoutNote[] | undefined,
+  canonicalId: string,
+): number | null {
+  if (!canonicalId) return null
+  let best: { createdAt: number; count: number } | null = null
+  for (const note of notes ?? []) {
+    for (const ex of note.exercises ?? []) {
+      if (ex.canonicalExerciseId !== canonicalId) continue
+      const count = ex.sets?.length ?? 0
+      if (count <= 0) continue
+      const createdAt = note.createdAt ?? 0
+      if (!best || createdAt >= best.createdAt) {
+        best = { createdAt, count }
+      }
+    }
+  }
+  return best?.count ?? null
+}
+
 export function recommendationProfileFromState(
   state: TrainingState,
   opts?: {

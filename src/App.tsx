@@ -41,6 +41,7 @@ function renderActiveView(
   resumeActiveWorkout: boolean,
   onLaunchConsumed: () => void,
   onAfterSession: () => void,
+  openActivitySheet: boolean,
 ) {
   switch (tab) {
     case 'home':
@@ -58,6 +59,7 @@ function renderActiveView(
           resumeActiveWorkout={resumeActiveWorkout}
           onLaunchConsumed={onLaunchConsumed}
           onGoToLobby={onAfterSession}
+          openActivitySheet={openActivitySheet}
         />
       )
     case 'nutrition':
@@ -113,6 +115,7 @@ export function AppShell() {
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [launchRoutineId, setLaunchRoutineId] = useState<string | null>(null)
   const [resumeActiveWorkout, setResumeActiveWorkout] = useState(false)
+  const [openActivitySheet, setOpenActivitySheet] = useState(false)
   const [hasActiveWorkout, setHasActiveWorkout] = useState(() => Boolean(getTrainingState().activeWorkoutDraft))
   const { openAuth, isAuthenticated, isLoading, bootIssue, retryHydrate } = useAuth()
   const online = useOnlineStatus()
@@ -203,8 +206,16 @@ export function AppShell() {
       return
     }
     const activeDraft = getTrainingState().activeWorkoutDraft
-    setLaunchRoutineId(activeDraft?.routineId ?? null)
-    setResumeActiveWorkout(Boolean(activeDraft))
+    if (activeDraft) {
+      setLaunchRoutineId(activeDraft.routineId)
+      setResumeActiveWorkout(true)
+      setOpenActivitySheet(false)
+      setActiveTab('training')
+      return
+    }
+    setLaunchRoutineId(null)
+    setResumeActiveWorkout(false)
+    setOpenActivitySheet(true)
     setActiveTab('training')
   }
 
@@ -219,6 +230,7 @@ export function AppShell() {
   const handleLaunchConsumed = () => {
     setLaunchRoutineId(null)
     setResumeActiveWorkout(false)
+    setOpenActivitySheet(false)
   }
 
   const handleOnboardingComplete = () => {
@@ -319,6 +331,7 @@ export function AppShell() {
           resumeActiveWorkout,
           handleLaunchConsumed,
           () => setActiveTab('home'),
+          openActivitySheet,
         )}
       </AppLayout>
       <AuthBottomSheet />

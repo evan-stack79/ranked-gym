@@ -31,12 +31,13 @@ export function BottomNav({
       type="button"
       onClick={onStartTraining}
       className="ios-press flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[#AEAEB2] transition-colors duration-150"
-      aria-label={hasActiveWorkout ? 'Reprendre la séance en cours' : 'Démarrer une séance'}
+      aria-label={hasActiveWorkout ? 'Reprendre' : 'Nouvelle séance'}
+      data-nav-center={hasActiveWorkout ? 'resume' : 'new'}
     >
       <span className={`flex items-center justify-center rounded-full border-4 border-[#171719] bg-[#FF2B2B] text-white transition-[height,width] duration-180 motion-reduce:transition-none ${compact ? 'h-12 w-12 -mt-1' : 'h-14 w-14 -mt-5'}`}>
         <Play className="ml-0.5 h-5 w-5 fill-current" strokeWidth={2.25} aria-hidden="true" />
       </span>
-      <span className={labelClass}>{hasActiveWorkout ? 'Reprendre' : 'Démarrer'}</span>
+      <span className={labelClass}>{hasActiveWorkout ? 'Reprendre' : 'Nouvelle séance'}</span>
     </button>
   )
 
