@@ -47,7 +47,7 @@ export function TrainingRecommendationCard({
       data-hero-image={imageSrc ? 'ready' : 'fallback'}
       aria-label={recommendation.name}
     >
-      <div className="relative isolate min-h-[220px] bg-[#1c1c1e]">
+      <div className="relative isolate min-h-[200px] bg-[#1c1c1e]">
         {imageSrc ? (
           <img
             src={imageSrc}
@@ -64,7 +64,7 @@ export function TrainingRecommendationCard({
           style={{ background: 'linear-gradient(to top, #000 0%, transparent 100%)' }}
           aria-hidden="true"
         />
-        <div className="relative z-[1] flex min-h-[220px] flex-col justify-end px-4 pb-4 pt-16">
+        <div className="relative z-[1] flex min-h-[200px] flex-col justify-end px-4 pb-4 pt-16">
           <h2 className="text-[26px] font-bold leading-tight tracking-tight text-white">
             {recommendation.name}
           </h2>

@@ -683,7 +683,7 @@ export function TrainingView({
   return (
     <div
       className={`train-view flex flex-col ${
-        immersiveLiveSession ? 'gap-0' : panel === 'history' ? 'gap-2' : 'gap-6'
+        immersiveLiveSession ? 'gap-0' : panel === 'history' ? 'gap-2' : panel === 'hub' ? 'gap-4' : 'gap-6'
       }${panel === 'history' ? ' train-view--history' : ''}`}
       style={{
         paddingBottom: immersiveLiveSession ? 0 : 8,
@@ -726,7 +726,7 @@ export function TrainingView({
       ) : null}
 
       {panel === 'hub' ? (
-        <div className="flex flex-col gap-5" data-training-hub>
+        <div className="flex flex-col gap-4" data-training-hub>
           <TrainWeekStrip days={weekStrip} />
 
           {heroRec ? (
