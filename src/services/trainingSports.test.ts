@@ -56,4 +56,17 @@ describe('setTrainingSports', () => {
     const next = setTrainingSports(['musculation', 'not-a-sport'])
     expect(next.favoriteSportIds).toEqual(['musculation'])
   })
+
+  it('onboarding incomplet : ne pas forcer musculation si la liste est vide', () => {
+    store.set(
+      'ranked-gym:training',
+      JSON.stringify({
+        favoriteSportIds: [],
+        sportsOnboardingComplete: false,
+        sportsUndecided: false,
+        primarySportId: null,
+      }),
+    )
+    expect(getTrainingState().favoriteSportIds).toEqual([])
+  })
 })

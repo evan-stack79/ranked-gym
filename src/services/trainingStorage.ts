@@ -319,7 +319,7 @@ function read(): TrainingState {
       schedule: parsed.schedule ?? [],
       completed: parsed.completed ?? [],
       favoriteSportIds:
-        parsed.sportsUndecided === true
+        parsed.sportsUndecided === true || parsed.sportsOnboardingComplete === false
           ? sanitizeIdList(parsed.favoriteSportIds)
           : parsed.favoriteSportIds && parsed.favoriteSportIds.length > 0
             ? parsed.favoriteSportIds

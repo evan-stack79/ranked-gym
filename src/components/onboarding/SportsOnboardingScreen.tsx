@@ -8,9 +8,12 @@ interface SportsOnboardingScreenProps {
 
 export function SportsOnboardingScreen({ onComplete }: SportsOnboardingScreenProps) {
   const initial = getTrainingState()
-  const [selectedIds, setSelectedIds] = useState<string[]>(
-    initial.sportsUndecided ? [] : initial.favoriteSportIds,
-  )
+  const [selectedIds, setSelectedIds] = useState<string[]>(() => {
+    if (initial.sportsOnboardingComplete === true && !initial.sportsUndecided) {
+      return initial.favoriteSportIds
+    }
+    return []
+  })
 
   const persistAndContinue = (ids: string[], undecided = false) => {
     setTrainingSports(ids, { undecided })
