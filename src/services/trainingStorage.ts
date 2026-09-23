@@ -18,6 +18,7 @@ import {
 } from '../utils/strength'
 import { getActiveCloudUserId } from './cloudSession'
 import { sessionKindForSport } from '../utils/sessionMeta'
+import { getSportById } from '../data/sports'
 import {
   ensureDraftClock,
   pauseDraftClock,
@@ -307,7 +308,10 @@ function read(): TrainingState {
     const merged: TrainingState = {
       ...DEFAULT_STATE,
       ...parsed,
-      primarySportId: parsed.primarySportId || 'musculation',
+      primarySportId:
+        parsed.sportsUndecided === true
+          ? sanitizeStoredId(parsed.primarySportId)
+          : parsed.primarySportId || 'musculation',
       templates:
         parsed.templates && parsed.templates.length > 0
           ? parsed.templates
@@ -315,9 +319,11 @@ function read(): TrainingState {
       schedule: parsed.schedule ?? [],
       completed: parsed.completed ?? [],
       favoriteSportIds:
-        parsed.favoriteSportIds && parsed.favoriteSportIds.length > 0
-          ? parsed.favoriteSportIds
-          : ['musculation'],
+        parsed.sportsUndecided === true
+          ? sanitizeIdList(parsed.favoriteSportIds)
+          : parsed.favoriteSportIds && parsed.favoriteSportIds.length > 0
+            ? parsed.favoriteSportIds
+            : ['musculation'],
       workoutNotes: parsed.workoutNotes ?? [],
       routines,
       notificationsEnabled: Boolean(parsed.notificationsEnabled),
@@ -494,6 +500,41 @@ export function setPreferredRestSec(sec: number): TrainingState {
   const nextSec = clampRestSec(sec)
   if (state.preferredRestSec === nextSec) return state
   const next = { ...state, preferredRestSec: nextSec }
+  write(next)
+  return next
+}
+
+export function setTrainingSports(
+  sportIds: string[],
+  opts?: { undecided?: boolean },
+): TrainingState {
+  const state = read()
+  if (opts?.undecided) {
+    const next: TrainingState = {
+      ...state,
+      favoriteSportIds: [],
+      sportsUndecided: true,
+      sportsOnboardingComplete: true,
+    }
+    write(next)
+    return next
+  }
+  const valid: string[] = []
+  const seen = new Set<string>()
+  for (const raw of sportIds) {
+    const id = sanitizeStoredId(raw)
+    if (!id || seen.has(id) || !getSportById(id)) continue
+    seen.add(id)
+    valid.push(id)
+  }
+  if (valid.length === 0) return state
+  const next: TrainingState = {
+    ...state,
+    favoriteSportIds: valid,
+    primarySportId: valid[0],
+    sportsUndecided: false,
+    sportsOnboardingComplete: true,
+  }
   write(next)
   return next
 }

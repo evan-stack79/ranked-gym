@@ -1,5 +1,5 @@
 import {
-  EXERCISE_CATALOG,
+  catalogForSelectedSports,
   type CatalogExercise,
 } from '../data/exerciseCatalog'
 
@@ -36,6 +36,8 @@ function scoreExercise(ex: CatalogExercise, query: string): number {
 export type SearchExercisesOptions = {
   /** Limite d’affichage (défaut 8). */
   limit?: number
+  /** Sports du profil — filtre le catalogue s’il existe des matches. */
+  sportIds?: string[]
 }
 
 /**
@@ -49,7 +51,8 @@ export function searchExercises(
   const limit = options.limit ?? 8
   const query = normalizeSearchText(rawQuery)
 
-  const scored = EXERCISE_CATALOG.map((ex) => ({
+  const catalog = catalogForSelectedSports(options.sportIds)
+  const scored = catalog.map((ex) => ({
     ex,
     score: scoreExercise(ex, query),
   })).filter((row) => row.score >= 0)
@@ -59,8 +62,9 @@ export function searchExercises(
 }
 
 /** Compte total de matches sans limite d’affichage (compteur UI). */
-export function countExerciseMatches(rawQuery: string): number {
+export function countExerciseMatches(rawQuery: string, sportIds?: string[]): number {
+  const catalog = catalogForSelectedSports(sportIds)
   const query = normalizeSearchText(rawQuery)
-  if (!query) return EXERCISE_CATALOG.length
-  return EXERCISE_CATALOG.filter((ex) => scoreExercise(ex, query) >= 0).length
+  if (!query) return catalog.length
+  return catalog.filter((ex) => scoreExercise(ex, query) >= 0).length
 }

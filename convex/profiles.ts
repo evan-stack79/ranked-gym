@@ -15,6 +15,8 @@ export type ConvexProfileView = {
   discipline: string
   isGhostModeEnabled: boolean
   isPrivate: boolean
+  sportIds?: string[]
+  sportsUndecided?: boolean
   avatarFileId?: Id<'user_files'>
   currentStreak: number
   lastLoginDate: string | null
@@ -31,6 +33,8 @@ const profileViewValidator = v.object({
   discipline: v.string(),
   isGhostModeEnabled: v.boolean(),
   isPrivate: v.boolean(),
+  sportIds: v.optional(v.array(v.string())),
+  sportsUndecided: v.optional(v.boolean()),
   avatarFileId: v.optional(v.id('user_files')),
   currentStreak: v.number(),
   lastLoginDate: v.union(v.string(), v.null()),
@@ -75,6 +79,8 @@ export async function toProfileView(
     discipline: profile.discipline,
     isGhostModeEnabled: profile.isGhostModeEnabled,
     isPrivate: Boolean(profile.isPrivate),
+    sportIds: profile.sportIds,
+    sportsUndecided: profile.sportsUndecided,
     avatarFileId: profile.avatarFileId,
     currentStreak: streak?.currentStreak ?? 0,
     lastLoginDate: streak?.lastLoginDate ?? null,
@@ -136,6 +142,8 @@ export async function updateProfileForSession(
     discipline?: string
     isGhostModeEnabled?: boolean
     isPrivate?: boolean
+    sportIds?: string[]
+    sportsUndecided?: boolean
     currentStreak?: number
     lastLoginDate?: string | null
   },
@@ -160,6 +168,8 @@ export async function updateProfileForSession(
       ? { isGhostModeEnabled: patch.isGhostModeEnabled }
       : {}),
     ...(typeof patch.isPrivate === 'boolean' ? { isPrivate: patch.isPrivate } : {}),
+    ...(Array.isArray(patch.sportIds) ? { sportIds: patch.sportIds.slice(0, 32) } : {}),
+    ...(typeof patch.sportsUndecided === 'boolean' ? { sportsUndecided: patch.sportsUndecided } : {}),
   })
 
   if (patch.currentStreak != null || patch.lastLoginDate !== undefined) {

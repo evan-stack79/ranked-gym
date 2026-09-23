@@ -10,6 +10,7 @@ import { OfflineBanner } from './components/ui/OfflineBanner'
 import { SupabaseConfigBanner } from './components/ui/SupabaseConfigBanner'
 import { useOnlineStatus } from './hooks/useOnlineStatus'
 import { GlobalOnboardingScreen } from './components/onboarding/GlobalOnboardingScreen'
+import { SportsOnboardingScreen } from './components/onboarding/SportsOnboardingScreen'
 import { HomeView } from './components/home/HomeView'
 import { TrainingView } from './components/training/TrainingView'
 import { NutritionView } from './components/nutrition/NutritionView'
@@ -18,8 +19,9 @@ import { hasCompletedNutritionOnboarding } from './services/nutritionStorage'
 import type { TabId } from './types'
 import { safeWarn } from './utils/safeLog'
 import { getTrainingState } from './services/trainingStorage'
+import { isSportsOnboardingEnabled } from './backend/trainingFeatureFlags'
 
-type AppPhase = 'loading' | 'onboarding' | 'main'
+type AppPhase = 'loading' | 'onboarding' | 'sports' | 'main'
 
 function resolveLaunchPhase(): AppPhase {
   try {
@@ -220,6 +222,18 @@ export function AppShell() {
   }
 
   const handleOnboardingComplete = () => {
+    if (
+      isSportsOnboardingEnabled() &&
+      getTrainingState().sportsOnboardingComplete !== true
+    ) {
+      setPhase('sports')
+      return
+    }
+    setPhase('main')
+    setActiveTab('home')
+  }
+
+  const handleSportsComplete = () => {
     setPhase('main')
     setActiveTab('home')
   }
@@ -267,6 +281,17 @@ export function AppShell() {
         <SupabaseConfigBanner />
         {!online ? <OfflineBanner /> : null}
         <GlobalOnboardingScreen onComplete={handleOnboardingComplete} />
+        <AuthBottomSheet />
+      </>
+    )
+  }
+
+  if (phase === 'sports') {
+    return (
+      <>
+        <SupabaseConfigBanner />
+        {!online ? <OfflineBanner /> : null}
+        <SportsOnboardingScreen onComplete={handleSportsComplete} />
         <AuthBottomSheet />
       </>
     )

@@ -353,3 +353,11 @@ export function formatCatalogMeta(ex: CatalogExercise): string {
   if (!muscles) return ex.equipment
   return `${muscles} · ${ex.equipment}`
 }
+
+/** Filtre Training par sports choisis. Si aucun match catalogue → catalogue complet (pas de liste vide fake). */
+export function catalogForSelectedSports(sportIds: string[] | undefined): CatalogExercise[] {
+  const ids = (sportIds ?? []).filter(Boolean)
+  if (ids.length === 0) return EXERCISE_CATALOG
+  const filtered = EXERCISE_CATALOG.filter((ex) => ex.sportIds.some((id) => ids.includes(id)))
+  return filtered.length > 0 ? filtered : EXERCISE_CATALOG
+}

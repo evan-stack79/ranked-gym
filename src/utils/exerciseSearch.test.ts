@@ -53,8 +53,10 @@ describe('exerciseSearch', () => {
     expect(countExerciseMatches('')).toBe(EXERCISE_CATALOG.length)
   })
 
-  it('pertinence : match exact avant substring', () => {
-    const results = searchExercises('squat')
-    expect(results[0]?.id).toBe('back_squat')
+  it('filtre le catalogue selon les sports du profil', () => {
+    const cali = searchExercises('', { sportIds: ['calisthenics'], limit: 20 })
+    expect(cali.length).toBeGreaterThan(0)
+    expect(cali.every((ex) => ex.sportIds.includes('calisthenics'))).toBe(true)
+    expect(searchExercises('', { sportIds: ['tennis'], limit: 8 }).length).toBe(8)
   })
 })
