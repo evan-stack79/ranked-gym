@@ -1,19 +1,20 @@
-import type { SetDifficulty, WorkoutSet } from '../types/training'
+import type { WorkoutSet } from '../types/training'
 
 export const AUTO_VALIDATE_UNDO_MS = 5_000
 
-export type AutoValidateFields = Pick<WorkoutSet, 'reps' | 'weightKg' | 'difficulty' | 'done'>
+export type AutoValidateFields = Pick<WorkoutSet, 'reps' | 'weightKg' | 'done'>
 
-export function isValidEffort(value: unknown): value is SetDifficulty {
-  return value === 'easy' || value === 'ok' || value === 'hard'
+/** Effort 1–10 optionnel (champ `rpe`). Ne jamais inventer ni exiger pour auto-validate. */
+export function isValidEffort(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 1 && value <= 10
 }
 
-/** Charge + reps + Effort requis. Série déjà done → pas prêt. */
+/** Charge + reps requis. Effort facultatif. Série déjà done → pas prêt. */
 export function isSetReadyForAutoValidate(set: AutoValidateFields): boolean {
   if (set.done === true) return false
   if (!Number.isFinite(set.weightKg) || set.weightKg < 0) return false
   if (!Number.isFinite(set.reps) || set.reps < 1) return false
-  return isValidEffort(set.difficulty)
+  return true
 }
 
 export function makeAutoValidateKey(
@@ -21,7 +22,7 @@ export function makeAutoValidateKey(
   setIndex: number,
   set: AutoValidateFields,
 ): string {
-  return `${exerciseId}|${setIndex}|${set.weightKg}|${set.reps}|${set.difficulty ?? ''}`
+  return `${exerciseId}|${setIndex}|${set.weightKg}|${set.reps}`
 }
 
 export function shouldCommitAutoValidate(input: {

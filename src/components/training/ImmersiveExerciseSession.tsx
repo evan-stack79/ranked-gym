@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Check, ChevronLeft, Minus, Pause, Play, Plus, Timer } from 'lucide-react'
-import type { ExerciseEntry, SetDifficulty, WorkoutSet } from '../../types/training'
+import type { ExerciseEntry, WorkoutSet } from '../../types/training'
 import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
 import { BRAND_MARK_COMPACT_SRC } from '../brand/BrandMark'
 import {
@@ -49,12 +49,6 @@ function formatEffort(set: WorkoutSet): string | null {
 
 const FIELD =
   'min-h-11 w-full rounded-lg border border-white/12 bg-[#1c1c1e] px-2 text-center text-[15px] font-semibold tabular-nums text-white outline-none focus-visible:border-[#FF2B2B]/55'
-
-const EFFORT_CHIPS: { id: SetDifficulty; label: string }[] = [
-  { id: 'easy', label: 'Facile' },
-  { id: 'ok', label: 'OK' },
-  { id: 'hard', label: 'Dur' },
-]
 
 /**
  * Immersive single-exercise session canvas (bench-press reference layout).
@@ -256,8 +250,8 @@ export function ImmersiveExerciseSession({
           </p>
         </header>
 
-        {/* Sets grid */}
-        <div className={`mb-1 grid items-center gap-x-2 px-0.5 ${autoValidate ? 'grid-cols-[2.25rem_1fr_1fr_2.5rem]' : 'grid-cols-[2.25rem_1fr_1fr_1fr_2.5rem]'}`}>
+        {/* Sets grid — Effort 1–10 (réf. 787e6ed), facultatif, jamais Facile/OK/Dur */}
+        <div className="mb-1 grid grid-cols-[2.25rem_1fr_1fr_1fr_2.5rem] items-center gap-x-2 px-0.5">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-[#636366]">
             Série
           </span>
@@ -267,11 +261,9 @@ export function ImmersiveExerciseSession({
           <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#636366]">
             Reps
           </span>
-          {autoValidate ? null : (
-            <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#636366]">
-              Effort
-            </span>
-          )}
+          <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#636366]">
+            Effort
+          </span>
           <span className="sr-only">Validation</span>
         </div>
 
@@ -281,124 +273,87 @@ export function ImmersiveExerciseSession({
             const active = !done && idx === pendingIdx
             const upcoming = !done && idx !== pendingIdx
             const effortDone = formatEffort(set)
-            const effortLabel =
-              set.difficulty === 'easy'
-                ? 'Facile'
-                : set.difficulty === 'ok'
-                  ? 'OK'
-                  : set.difficulty === 'hard'
-                    ? 'Dur'
-                    : null
 
             return (
-              <div key={idx} role="listitem" data-set-row={done ? 'done' : active ? 'active' : 'upcoming'}>
-                <div
-                  className={`relative grid items-center gap-x-2 ${
-                    autoValidate
-                      ? 'grid-cols-[2.25rem_1fr_1fr_2.5rem]'
-                      : 'grid-cols-[2.25rem_1fr_1fr_1fr_2.5rem]'
-                  } ${upcoming ? 'opacity-45' : ''}`}
-                >
-                  {active ? (
-                    <span
-                      className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#FF2B2B]"
-                      aria-hidden="true"
-                    />
-                  ) : null}
+              <div
+                key={idx}
+                role="listitem"
+                data-set-row={done ? 'done' : active ? 'active' : 'upcoming'}
+                className={`relative grid grid-cols-[2.25rem_1fr_1fr_1fr_2.5rem] items-center gap-x-2 ${
+                  upcoming ? 'opacity-45' : ''
+                }`}
+              >
+                {active ? (
                   <span
-                    className={`text-center text-[13px] font-bold tabular-nums ${
-                      done ? 'text-white' : active ? 'text-white' : 'text-[#8E8E93]'
-                    }`}
-                  >
-                    {idx + 1}
-                  </span>
-                  <ClearableNumberInput
-                    value={set.weightKg}
-                    onChange={(v) => patchSet(idx, { weightKg: v ?? 0 })}
-                    min={0}
-                    max={500}
-                    step={0.5}
-                    aria-label={`Série ${idx + 1} poids`}
-                    className={FIELD}
+                    className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#FF2B2B]"
+                    aria-hidden="true"
                   />
+                ) : null}
+                <span
+                  className={`text-center text-[13px] font-bold tabular-nums ${
+                    done ? 'text-white' : active ? 'text-white' : 'text-[#8E8E93]'
+                  }`}
+                >
+                  {idx + 1}
+                </span>
+                <ClearableNumberInput
+                  value={set.weightKg}
+                  onChange={(v) => patchSet(idx, { weightKg: v ?? 0 })}
+                  min={0}
+                  max={500}
+                  step={0.5}
+                  aria-label={`Série ${idx + 1} poids`}
+                  className={FIELD}
+                />
+                <ClearableNumberInput
+                  value={set.reps}
+                  onChange={(v) =>
+                    patchSet(idx, { reps: v != null ? Math.round(v) : 0 })
+                  }
+                  min={1}
+                  max={50}
+                  aria-label={`Série ${idx + 1} reps`}
+                  className={FIELD}
+                />
+                {done && effortDone ? (
+                  <div
+                    className={`${FIELD} flex items-center justify-center text-[13px] text-[#AEAEB2]`}
+                    aria-label={`Série ${idx + 1} effort ${effortDone}`}
+                  >
+                    {effortDone}
+                  </div>
+                ) : (
                   <ClearableNumberInput
-                    value={set.reps}
+                    value={set.rpe ?? null}
                     onChange={(v) =>
-                      patchSet(idx, { reps: v != null ? Math.round(v) : 0 })
+                      patchSet(idx, {
+                        rpe: v != null ? Math.min(10, Math.max(1, Math.round(v))) : undefined,
+                      })
                     }
                     min={1}
-                    max={50}
-                    aria-label={`Série ${idx + 1} reps`}
-                    className={FIELD}
+                    max={10}
+                    required={false}
+                    placeholder="1–10"
+                    placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#636366]"
+                    aria-label={`Série ${idx + 1} effort facultatif`}
+                    className={`${FIELD} text-[13px] text-[#AEAEB2]`}
                   />
-                  {autoValidate ? null : done && effortDone ? (
-                    <div
-                      className={`${FIELD} flex items-center justify-center text-[13px] text-[#AEAEB2]`}
-                      aria-label={`Série ${idx + 1} effort ${effortDone}`}
+                )}
+                <div className="flex items-center justify-center">
+                  {done ? (
+                    <span
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-white"
+                      aria-label={`Série ${idx + 1} validée`}
                     >
-                      {effortDone}
-                    </div>
-                  ) : autoValidate ? null : (
-                    <ClearableNumberInput
-                      value={set.rpe ?? null}
-                      onChange={(v) =>
-                        patchSet(idx, {
-                          rpe: v != null ? Math.min(10, Math.max(1, Math.round(v))) : undefined,
-                        })
-                      }
-                      min={1}
-                      max={10}
-                      required={false}
-                      placeholder="1–10"
-                      placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#636366]"
-                      aria-label={`Série ${idx + 1} effort facultatif`}
-                      className={`${FIELD} text-[13px] text-[#AEAEB2]`}
+                      <Check className="h-3.5 w-3.5 text-black" strokeWidth={3} />
+                    </span>
+                  ) : (
+                    <span
+                      className="h-7 w-7 rounded-full border border-[#3a3a3c]"
+                      aria-hidden="true"
                     />
                   )}
-                  <div className="flex items-center justify-center">
-                    {done ? (
-                      <span
-                        className="flex h-7 w-7 items-center justify-center rounded-full bg-white"
-                        aria-label={`Série ${idx + 1} validée`}
-                      >
-                        <Check className="h-3.5 w-3.5 text-black" strokeWidth={3} />
-                      </span>
-                    ) : (
-                      <span
-                        className="h-7 w-7 rounded-full border border-[#3a3a3c]"
-                        aria-hidden="true"
-                      />
-                    )}
-                  </div>
                 </div>
-                {autoValidate && done && effortLabel ? (
-                  <p className="pl-11 text-[12px] text-[#8E8E93]">Effort {effortLabel}</p>
-                ) : null}
-                {autoValidate && active && !showRecovery ? (
-                  <div
-                    className="mt-2 grid grid-cols-3 gap-1.5"
-                    role="group"
-                    aria-label={`Effort série ${idx + 1}`}
-                  >
-                    {EFFORT_CHIPS.map((chip) => {
-                      const on = set.difficulty === chip.id
-                      return (
-                        <button
-                          key={chip.id}
-                          type="button"
-                          onClick={() => patchSet(idx, { difficulty: chip.id })}
-                          className={`ios-press flex min-h-11 items-center justify-center rounded-xl border text-[13px] font-semibold ${
-                            on
-                              ? 'border-[#FF2B2B]/50 bg-[#FF2B2B]/18 text-white'
-                              : 'border-white/12 bg-[#1c1c1e] text-[#AEAEB2]'
-                          }`}
-                        >
-                          {chip.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                ) : null}
               </div>
             )
           })}

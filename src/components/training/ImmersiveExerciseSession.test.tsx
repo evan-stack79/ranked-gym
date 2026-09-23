@@ -26,6 +26,14 @@ vi.mock('../../utils/haptics', () => ({
   vibrate: vi.fn(),
 }))
 
+/** React-controlled inputs ignore direct `.value =` — use the native setter. */
+function typeInto(input: HTMLInputElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
+  setter?.call(input, value)
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  input.dispatchEvent(new Event('change', { bubbles: true }))
+}
+
 /** Evan runtime-shaped séance — titre libre, pas d’ID canonique, 20 kg × 8. */
 const realSessionExercises: ExerciseEntry[] = [
   {
@@ -137,7 +145,7 @@ describe('ImmersiveExerciseSession', () => {
     expect(host.textContent).toContain('Pectoraux · Triceps · Épaules')
   })
 
-  it('validation auto : Effort requis, un seul commit, minuteur ensuite', async () => {
+  it('validation auto : Effort 1–10 facultatif, pas Facile/OK/Dur, pas de RPE UI', async () => {
     const onValidate = vi.fn()
     const onUpdate = vi.fn()
     await act(async () => {
@@ -170,19 +178,195 @@ describe('ImmersiveExerciseSession', () => {
       )
     })
 
-    expect(host.textContent).toContain('Facile')
-    expect(host.textContent).toContain('Dur')
+    expect(host.textContent).toContain('Effort')
+    expect(host.textContent).not.toContain('Facile')
+    expect(host.textContent).not.toContain('Dur')
+    expect(host.textContent).not.toMatch(/\bOK\b/)
+    expect(host.textContent).not.toContain('RPE')
     expect(host.textContent).not.toContain('Valider la série')
+
+    const effortInput = host.querySelector(
+      'input[aria-label="Série 1 effort facultatif"]',
+    ) as HTMLInputElement | null
+    expect(effortInput).toBeTruthy()
+    expect(host.textContent).toContain('1–10')
     expect(onValidate).not.toHaveBeenCalled()
 
-    const dur = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Dur')
-    expect(dur).toBeTruthy()
+    // Sans Effort : charge+reps déjà valides → patch poids déclenche auto-validate, rpe non inventé
     await act(async () => {
-      dur!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      const weight = host.querySelector(
+        'input[aria-label="Série 1 poids"]',
+      ) as HTMLInputElement
+      weight.focus()
+      typeInto(weight, '62')
+      weight.blur()
     })
-    expect(onUpdate).toHaveBeenCalledWith('ex-1', 0, { difficulty: 'hard' })
-    expect(onValidate).toHaveBeenCalledTimes(1)
+    expect(onUpdate).toHaveBeenCalled()
+    const weightPatch = onUpdate.mock.calls.find((c) => c[2]?.weightKg != null)
+    expect(weightPatch?.[2]).toEqual({ weightKg: 62 })
+    expect(weightPatch?.[2]).not.toHaveProperty('rpe')
+    expect(onValidate).toHaveBeenCalled()
     expect(onValidate.mock.calls[0][1]).toBe(0)
+  })
+
+  it('Effort 1–10 : sélection persiste rpe, jamais RPE dans le DOM', async () => {
+    const onUpdate = vi.fn()
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <ImmersiveExerciseSession
+            exercises={[
+              {
+                id: 'ex-1',
+                name: 'Squat',
+                sets: [{ reps: 5, weightKg: 100 }],
+              },
+            ]}
+            activeIndex={0}
+            onActiveIndexChange={vi.fn()}
+            sessionClockLabel="00:01"
+            sessionPaused={false}
+            onBack={vi.fn()}
+            onUpdateSet={onUpdate}
+            onAddSet={vi.fn()}
+            onValidateSet={vi.fn()}
+            onFinishSession={vi.fn()}
+            autoValidate
+          />
+        </RestTimerProvider>,
+      )
+    })
+
+    const effortInput = host.querySelector(
+      'input[aria-label="Série 1 effort facultatif"]',
+    ) as HTMLInputElement
+    await act(async () => {
+      effortInput.focus()
+      typeInto(effortInput, '7')
+      effortInput.blur()
+    })
+
+    expect(onUpdate).toHaveBeenCalledWith('ex-1', 0, { rpe: 7 })
+    expect(host.textContent).toContain('Effort')
+    expect(host.textContent).not.toContain('RPE')
+    expect(host.textContent).not.toContain('Facile')
+  })
+
+  it('absence d’Effort : rpe reste undefined (pas inventé à la validation auto)', async () => {
+    const onUpdate = vi.fn()
+    const onValidate = vi.fn()
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <ImmersiveExerciseSession
+            exercises={[{ id: 'ex-1', name: 'Squat', sets: [{ reps: 8, weightKg: 40 }] }]}
+            activeIndex={0}
+            onActiveIndexChange={vi.fn()}
+            sessionClockLabel="00:02"
+            sessionPaused={false}
+            onBack={vi.fn()}
+            onUpdateSet={onUpdate}
+            onAddSet={vi.fn()}
+            onValidateSet={onValidate}
+            onFinishSession={vi.fn()}
+            autoValidate
+          />
+        </RestTimerProvider>,
+      )
+    })
+    await act(async () => {
+      const reps = host.querySelector(
+        'input[aria-label="Série 1 reps"]',
+      ) as HTMLInputElement
+      reps.focus()
+      typeInto(reps, '9')
+      reps.blur()
+    })
+    for (const call of onUpdate.mock.calls) {
+      expect(call[2]).not.toHaveProperty('rpe')
+    }
+    expect(onValidate).toHaveBeenCalled()
+  })
+
+  it('persistance rpe : reload affiche Effort n/10 (pas RPE, pas Facile/OK/Dur)', async () => {
+    const stored: ExerciseEntry[] = [
+      {
+        id: 'ex-reload',
+        name: 'Row',
+        sets: [
+          { reps: 10, weightKg: 50, done: true, rpe: 6 },
+          { reps: 10, weightKg: 50 },
+        ],
+      },
+    ]
+    // Simule un round-trip storage (JSON) comme trainingStorage
+    const reloaded = JSON.parse(JSON.stringify(stored)) as ExerciseEntry[]
+    expect(reloaded[0].sets[0].rpe).toBe(6)
+
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <ImmersiveExerciseSession
+            exercises={reloaded}
+            activeIndex={0}
+            onActiveIndexChange={vi.fn()}
+            sessionClockLabel="01:00"
+            sessionPaused={false}
+            onBack={vi.fn()}
+            onUpdateSet={vi.fn()}
+            onAddSet={vi.fn()}
+            onValidateSet={vi.fn()}
+            onFinishSession={vi.fn()}
+            autoValidate
+          />
+        </RestTimerProvider>,
+      )
+    })
+    expect(host.textContent).toContain('6/10')
+    expect(host.textContent).toContain('Effort')
+    expect(host.textContent).not.toContain('RPE')
+    expect(host.textContent).not.toContain('Facile')
+    expect(host.textContent).not.toContain('Dur')
+  })
+
+  it('lit un rpe 1–10 existant ; difficulté legacy sans rpe n’affiche pas Facile/OK/Dur', async () => {
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <ImmersiveExerciseSession
+            exercises={[
+              {
+                id: 'ex-1',
+                name: 'Squat',
+                sets: [
+                  { reps: 8, weightKg: 60, done: true, rpe: 8, difficulty: 'hard' },
+                  { reps: 8, weightKg: 60, done: true, difficulty: 'easy' },
+                  { reps: 8, weightKg: 60 },
+                ],
+              },
+            ]}
+            activeIndex={0}
+            onActiveIndexChange={vi.fn()}
+            sessionClockLabel="00:20"
+            sessionPaused={false}
+            onBack={vi.fn()}
+            onUpdateSet={vi.fn()}
+            onAddSet={vi.fn()}
+            onValidateSet={vi.fn()}
+            onFinishSession={vi.fn()}
+            autoValidate
+          />
+        </RestTimerProvider>,
+      )
+    })
+
+    expect(host.textContent).toContain('8/10')
+    expect(host.textContent).not.toContain('Facile')
+    expect(host.textContent).not.toContain('Dur')
+    expect(host.textContent).not.toMatch(/\bOK\b/)
+    expect(host.textContent).not.toContain('RPE')
+    // Série 2 done sans rpe : input Effort disponible, pas de libellé difficulty
+    expect(host.querySelector('input[aria-label="Série 2 effort facultatif"]')).toBeTruthy()
   })
 
   it('minuteur : série suivante = série 2 du même exo (pas l’exo suivant)', async () => {
@@ -215,7 +399,7 @@ describe('ImmersiveExerciseSession', () => {
                 name: 'Développé couché',
                 canonicalExerciseId: 'bench_press',
                 sets: [
-                  { reps: 8, weightKg: 60, done: true, difficulty: 'ok' },
+                  { reps: 8, weightKg: 60, done: true, rpe: 7 },
                   { reps: 0, weightKg: 0 },
                 ],
               },

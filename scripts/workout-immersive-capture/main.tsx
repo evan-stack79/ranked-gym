@@ -43,6 +43,8 @@ function HarnessApp() {
   const [activeIndex, setActiveIndex] = useState(0)
   const [restPrefSec, setRestPrefSec] = useState(90)
   const [paused, setPaused] = useState(false)
+  const params = new URLSearchParams(window.location.search)
+  const autoValidate = params.get('autoValidate') === '1'
   const fixtureKind =
     exercises[0]?.canonicalExerciseId === 'bench_press' ? 'bench_press' : 'real-developper'
 
@@ -59,7 +61,7 @@ function HarnessApp() {
   }
 
   return (
-    <div data-harness-ready data-fixture={fixtureKind}>
+    <div data-harness-ready data-fixture={fixtureKind} data-auto-validate={autoValidate ? '1' : '0'}>
       <ImmersiveExerciseSession
         exercises={exercises}
         activeIndex={activeIndex}
@@ -84,6 +86,7 @@ function HarnessApp() {
         onFinishSession={() => undefined}
         restPrefSec={restPrefSec}
         onRestPrefChange={setRestPrefSec}
+        autoValidate={autoValidate}
       />
     </div>
   )
