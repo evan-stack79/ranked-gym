@@ -15,6 +15,7 @@ import {
   setLastSelectedRoutine,
   persistActiveExerciseIndex,
   getTrainingState,
+  setPreferredRestSec,
 } from '../../services/trainingStorage'
 import { computeStrengthSessionStats } from '../../utils/strength'
 import { sanitizeExerciseName } from '../../utils/exerciseName'
@@ -32,6 +33,15 @@ import {
   type ExercisePickerMode,
 } from './ExercisePicker'
 import type { CatalogExercise } from '../../data/exerciseCatalog'
+import { isAutoSetValidationEnabled } from '../../backend/trainingFeatureFlags'
+import {
+  AUTO_VALIDATE_UNDO_MS,
+  isSetReadyForAutoValidate,
+  makeAutoValidateKey,
+  shouldCommitAutoValidate,
+} from '../../utils/autoValidateSet'
+import { CANONICAL_REST_SEC, resolveRestDuration } from '../../utils/restDuration'
+import { vibrate } from '../../utils/haptics'
 
 interface WorkoutNotebookProps {
   id?: string
@@ -80,6 +90,8 @@ interface WorkoutNotebookProps {
     setLabel: string
     restSec?: number
   }) => void
+  /** Annule le minuteur (validation accidentelle). */
+  onRestDismiss?: () => void
   /** Applique restSec / done sur une série (callback parent). */
   restLogRequest?: {
     exerciseId: string
@@ -216,6 +228,7 @@ export function WorkoutNotebook({
   onDeleteNote,
   onAddRoutine,
   onRestStart,
+  onRestDismiss,
   restLogRequest,
   sessionClockLabel = null,
   sessionPaused = false,
@@ -255,7 +268,21 @@ export function WorkoutNotebook({
       return 0
     }
   })
-  const [restPrefSec, setRestPrefSec] = useState(90)
+  const [restPrefSec, setRestPrefSecState] = useState(() => {
+    try {
+      return getTrainingState().preferredRestSec ?? CANONICAL_REST_SEC
+    } catch {
+      return CANONICAL_REST_SEC
+    }
+  })
+  const setRestPrefSec = (sec: number) => {
+    setRestPrefSecState(sec)
+    try {
+      setPreferredRestSec(sec)
+    } catch {
+      // persist error déjà émis
+    }
+  }
   /** `null` = fermé ; `first` / `add` = sélecteur ouvert. */
   const [pickerMode, setPickerMode] = useState<ExercisePickerMode | null>(null)
   const beforeEdit = useRef({
@@ -272,6 +299,14 @@ export function WorkoutNotebook({
   const routineIdRef = useRef(routineId)
   exercisesRef.current = exercises
   routineIdRef.current = routineId
+  const autoValidate = isAutoSetValidationEnabled()
+  const lastAutoKeyRef = useRef<string | null>(null)
+  const [undoSnapshot, setUndoSnapshot] = useState<{
+    exerciseId: string
+    setIndex: number
+    previous: WorkoutSet
+    expiresAt: number
+  } | null>(null)
 
   const visibleRoutines = useMemo(() => {
     const split = detectProgramSplit(schedule, routines)
@@ -428,45 +463,112 @@ export function WorkoutNotebook({
 
   const updateSet = (exerciseId: string, setIndex: number, patch: Partial<WorkoutSet>) => {
     draftDirty.current = true
-    setExercises((prev) =>
-      prev.map((e) => {
-        if (e.id !== exerciseId) return e
-        return {
-          ...e,
-          sets: e.sets.map((s, i) => (i === setIndex ? { ...s, ...patch } : s)),
-        }
-      }),
-    )
+    const next = exercisesRef.current.map((e) => {
+      if (e.id !== exerciseId) return e
+      return {
+        ...e,
+        sets: e.sets.map((s, i) => (i === setIndex ? { ...s, ...patch } : s)),
+      }
+    })
+    exercisesRef.current = next
+    setExercises(next)
+    if (!autoValidate) return
+    const ex = next.find((e) => e.id === exerciseId)
+    const merged = ex?.sets[setIndex]
+    if (ex && merged && isSetReadyForAutoValidate(merged)) {
+      finishSet(ex, setIndex, merged.difficulty, restPrefSec)
+    }
   }
 
   const finishSet = (
     ex: ExerciseEntry,
     setIndex: number,
     difficulty?: SetDifficulty,
-    restSec = 90,
+    restSec = CANONICAL_REST_SEC,
   ) => {
-    draftDirty.current = true
-    setExercises((prev) => {
-      const next = prev.map((e) => {
-        if (e.id !== ex.id) return e
-        const sets = e.sets.map((s, i) =>
-          i === setIndex
-            ? { ...s, done: true, ...(difficulty ? { difficulty } : {}) }
-            : s,
-        )
-        return { ...e, sets }
-      })
-      if (!draftBlocked.current) onDraftSave?.(routineId, next)
-      draftDirty.current = false
-      return next
+    const live = exercisesRef.current.find((item) => item.id === ex.id)
+    const current = live?.sets[setIndex]
+    if (!current || current.done) return
+    const merged = difficulty ? { ...current, difficulty } : current
+    const key = makeAutoValidateKey(ex.id, setIndex, merged)
+    if (autoValidate) {
+      if (!isSetReadyForAutoValidate(merged)) return
+      if (
+        !shouldCommitAutoValidate({
+          ready: true,
+          done: false,
+          key,
+          lastKey: lastAutoKeyRef.current,
+        })
+      ) {
+        return
+      }
+    }
+    lastAutoKeyRef.current = key
+    const previous = { ...current }
+    const duration = resolveRestDuration({
+      exerciseRestSec: live?.targetRestSec ?? ex.targetRestSec,
+      preferredRestSec: restSec,
     })
-    if (!editingNote) onRestStart?.({
+    draftDirty.current = true
+    const next = exercisesRef.current.map((e) => {
+      if (e.id !== ex.id) return e
+      const sets = e.sets.map((s, i) =>
+        i === setIndex ? { ...s, done: true as const, ...(difficulty ? { difficulty } : {}) } : s,
+      )
+      return { ...e, sets }
+    })
+    exercisesRef.current = next
+    setExercises(next)
+    try {
+      if (!draftBlocked.current) onDraftSave?.(routineId, next)
+    } catch {
+      lastAutoKeyRef.current = null
+      exercisesRef.current = exercisesRef.current.map((e) =>
+        e.id === ex.id
+          ? { ...e, sets: e.sets.map((s, i) => (i === setIndex ? previous : s)) }
+          : e,
+      )
+      setExercises(exercisesRef.current)
+      return
+    }
+    draftDirty.current = false
+    vibrate(12)
+    setUndoSnapshot({
       exerciseId: ex.id,
       setIndex,
-      exerciseName: ex.name.trim() || 'Exercice',
-      setLabel: `S${setIndex + 1}`,
-      restSec,
+      previous,
+      expiresAt: Date.now() + AUTO_VALIDATE_UNDO_MS,
     })
+    window.setTimeout(() => {
+      setUndoSnapshot((cur) =>
+        cur && cur.exerciseId === ex.id && cur.setIndex === setIndex ? null : cur,
+      )
+    }, AUTO_VALIDATE_UNDO_MS)
+    if (!editingNote) {
+      onRestStart?.({
+        exerciseId: ex.id,
+        setIndex,
+        exerciseName: ex.name.trim() || 'Exercice',
+        setLabel: `S${setIndex + 1}`,
+        restSec: duration,
+      })
+    }
+  }
+
+  const undoValidation = () => {
+    if (!undoSnapshot) return
+    const { exerciseId, setIndex, previous } = undoSnapshot
+    lastAutoKeyRef.current = null
+    const next = exercisesRef.current.map((e) => {
+      if (e.id !== exerciseId) return e
+      return { ...e, sets: e.sets.map((s, i) => (i === setIndex ? { ...previous, done: false } : s)) }
+    })
+    exercisesRef.current = next
+    setExercises(next)
+    setUndoSnapshot(null)
+    if (!draftBlocked.current) onDraftSave?.(routineId, next)
+    onRestDismiss?.()
   }
 
   /** Séance live chronométrée → canvas immersif (édition historique reste en carnet classique). */
@@ -629,6 +731,11 @@ export function WorkoutNotebook({
         saving={saving}
         restPrefSec={restPrefSec}
         onRestPrefChange={setRestPrefSec}
+        autoValidate={autoValidate}
+        undoVisible={
+          Boolean(undoSnapshot) && Date.now() < (undoSnapshot?.expiresAt ?? 0)
+        }
+        onUndoValidation={undoValidation}
       />
     )
   }

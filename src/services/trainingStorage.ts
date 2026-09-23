@@ -27,6 +27,7 @@ import {
 import { normalizePersistedRestTimer } from '../utils/restTimerPersist'
 import { readLocal, writeLocal } from './secureLocalStore'
 import { resolvePersistedSessionTitle } from '../utils/sessionDisplayTitle'
+import { clampRestSec } from '../utils/restDuration'
 
 const KEY_BASE = 'ranked-gym:training'
 
@@ -484,6 +485,15 @@ export function setPrimarySport(sportId: string): TrainingState {
       ? { lastSelectedRoutineId: null, lastSelectedSportId: null }
       : {}),
   }
+  write(next)
+  return next
+}
+
+export function setPreferredRestSec(sec: number): TrainingState {
+  const state = read()
+  const nextSec = clampRestSec(sec)
+  if (state.preferredRestSec === nextSec) return state
+  const next = { ...state, preferredRestSec: nextSec }
   write(next)
   return next
 }

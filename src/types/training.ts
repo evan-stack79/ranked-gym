@@ -91,6 +91,11 @@ export interface ExerciseEntry {
    * Never infer from ambiguous titles like « DÉVELOPPER ».
    */
   canonicalExerciseId?: string
+  /**
+   * Repos cible de l’exercice (secondes), s’il est configuré.
+   * Distinct de `WorkoutSet.restSec` (repos réellement loggé).
+   */
+  targetRestSec?: number
 }
 
 /** Famille de séance — additive ; absente sur les notes legacy. */

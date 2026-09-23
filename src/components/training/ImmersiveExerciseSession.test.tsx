@@ -136,4 +136,52 @@ describe('ImmersiveExerciseSession', () => {
     expect(host.textContent).toContain('DÉVELOPPER')
     expect(host.textContent).toContain('Pectoraux · Triceps · Épaules')
   })
+
+  it('validation auto : Effort requis, un seul commit, minuteur ensuite', async () => {
+    const onValidate = vi.fn()
+    const onUpdate = vi.fn()
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <ImmersiveExerciseSession
+            exercises={[
+              {
+                id: 'ex-1',
+                name: 'Squat',
+                canonicalExerciseId: 'back_squat',
+                sets: [
+                  { reps: 8, weightKg: 60 },
+                  { reps: 8, weightKg: 60 },
+                ],
+              },
+            ]}
+            activeIndex={0}
+            onActiveIndexChange={vi.fn()}
+            sessionClockLabel="00:10"
+            sessionPaused={false}
+            onBack={vi.fn()}
+            onUpdateSet={onUpdate}
+            onAddSet={vi.fn()}
+            onValidateSet={onValidate}
+            onFinishSession={vi.fn()}
+            autoValidate
+          />
+        </RestTimerProvider>,
+      )
+    })
+
+    expect(host.textContent).toContain('Facile')
+    expect(host.textContent).toContain('Dur')
+    expect(host.textContent).not.toContain('Valider la série')
+    expect(onValidate).not.toHaveBeenCalled()
+
+    const dur = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Dur')
+    expect(dur).toBeTruthy()
+    await act(async () => {
+      dur!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(onUpdate).toHaveBeenCalledWith('ex-1', 0, { difficulty: 'hard' })
+    expect(onValidate).toHaveBeenCalledTimes(1)
+    expect(onValidate.mock.calls[0][1]).toBe(0)
+  })
 })

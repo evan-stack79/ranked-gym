@@ -133,7 +133,7 @@ export function TrainingView({
     nonce: number
   } | null>(null)
 
-  const { start: startRestTimer, setReadyBarEnabled, isBarVisible, setChromeHidden } =
+  const { start: startRestTimer, dismiss: dismissRestTimer, setReadyBarEnabled, isBarVisible, setChromeHidden } =
     useRestTimerContext()
 
   const [disciplineTick, setDisciplineTick] = useState(0)
@@ -845,6 +845,7 @@ export function TrainingView({
             onRestStart={(info) => {
               startRestTimer(info.restSec ?? 90, info)
             }}
+            onRestDismiss={() => dismissRestTimer()}
             onDraftSave={persistDraft}
             onSave={(note) => persistAndSyncNote(note)}
             onDeleteNote={(id) => {
