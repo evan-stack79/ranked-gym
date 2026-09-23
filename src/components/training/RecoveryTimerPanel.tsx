@@ -1,5 +1,3 @@
-import { Pause, Play, SkipForward } from 'lucide-react'
-import { useEffect, useState } from 'react'
 import { useRestTimerContext } from '../../context/RestTimerContext'
 
 function formatClock(totalSec: number): string {
@@ -9,119 +7,118 @@ function formatClock(totalSec: number): string {
   return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`
 }
 
+/** Durée programmée — « 1 min 30 », « 45 s », « 2 min ». */
+export function formatRecoveryDurationLabel(totalSec: number): string {
+  const s = Math.max(0, Math.floor(totalSec))
+  const m = Math.floor(s / 60)
+  const r = s % 60
+  if (m <= 0) return `${r} s`
+  if (r === 0) return m === 1 ? '1 min' : `${m} min`
+  return `${m} min ${r}`
+}
+
 interface RecoveryTimerPanelProps {
-  nextHint: { exerciseName: string; setLabel: string } | null
+  /** Série venant d’être validée — valeurs réelles (maquette). */
+  completedSummary?: { setNumber: number; weightKg: number; reps: number } | null
 }
 
 /**
- * Minuteur récupération immersif — fond opaque, rouge seul accent.
- * Une seule source : RestTimerContext (endsAt persisté).
+ * Overlay récupération (maquette Evan) — pas de carte, pas de barre, pas de glass.
+ * Émerge sur la séance assombrie (opacité gérée par le parent).
+ * Source unique : RestTimerContext (endsAt persisté).
  */
-export function RecoveryTimerPanel({ nextHint }: RecoveryTimerPanelProps) {
+export function RecoveryTimerPanel({ completedSummary = null }: RecoveryTimerPanelProps) {
   const rest = useRestTimerContext()
-  const [reduceMotion, setReduceMotion] = useState(() => {
-    try {
-      return window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    } catch {
-      return false
-    }
-  })
-
-  useEffect(() => {
-    try {
-      const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-      const onChange = () => setReduceMotion(mq.matches)
-      mq.addEventListener('change', onChange)
-      return () => mq.removeEventListener('change', onChange)
-    } catch {
-      return undefined
-    }
-  }, [])
 
   if (!rest.state.active && !rest.state.finished) return null
 
   const total = Math.max(1, rest.state.totalSec)
   const remaining = rest.state.finished ? 0 : rest.state.remainingSec
-  const progress = Math.min(1, Math.max(0, remaining / total))
-  const running = rest.state.active && !rest.state.paused
+  const durationLabel = formatRecoveryDurationLabel(total)
 
   return (
-    <section
-      className="mt-3 rounded-2xl border border-white/10 bg-[#141416] px-4 py-4"
+    <div
+      className="absolute inset-0 z-30 flex flex-col"
       data-recovery-timer
-      data-reduced-motion={reduceMotion ? 'true' : 'false'}
+      data-recovery-overlay
       role="timer"
       aria-label={`Récupération ${formatClock(remaining)}`}
     >
-      <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8E8E93]">
-        Récupération
-      </p>
-      <p
-        className="mt-2 text-[40px] font-bold leading-none tracking-tight tabular-nums text-white"
-        data-recovery-remaining
-      >
-        {formatClock(remaining)}
-      </p>
-
-      <div
-        className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#2c2c2e]"
-        aria-hidden="true"
-      >
-        <div
-          className="h-full rounded-full bg-[#FF2B2B]"
-          style={{
-            width: `${Math.round(progress * 100)}%`,
-            transition: reduceMotion ? 'none' : 'width 0.25s linear',
-          }}
-        />
+      {/* Zone haute : résumé série réelle au-dessus du glow */}
+      <div className="relative flex flex-1 flex-col justify-end px-5 pb-2 pt-[max(3.5rem,env(safe-area-inset-top))]">
+        {completedSummary ? (
+          <p
+            className="flex items-center gap-2.5 text-[15px] font-semibold text-white/70"
+            data-recovery-completed-summary
+          >
+            <span
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#FF2B2B] text-[#FF2B2B]"
+              aria-hidden="true"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path
+                  d="M2.5 6.2L4.8 8.5L9.5 3.5"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+            <span>
+              Série {completedSummary.setNumber} terminée · {formatWeight(completedSummary.weightKg)}{' '}
+              kg × {completedSummary.reps}
+            </span>
+          </p>
+        ) : null}
       </div>
 
-      {nextHint ? (
-        <p className="mt-3 text-[13px] text-[#AEAEB2]" data-recovery-next>
-          Série suivante : {nextHint.setLabel} · {nextHint.exerciseName}
+      {/* Demi-basse : chrono + glow rouge progressif (pas de carte / barre) */}
+      <div
+        className="relative flex flex-col items-center px-6 pb-[max(1.75rem,env(safe-area-inset-bottom))] pt-8"
+        data-recovery-controls
+        style={{
+          background:
+            'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(70,6,8,0.55) 42%, rgba(110,8,12,0.85) 100%)',
+        }}
+      >
+        <p className="text-center text-[15px] font-semibold tracking-tight" data-recovery-label>
+          <span className="text-[#FF2B2B]">Récupération</span>
+          <span className="text-white"> · {durationLabel}</span>
         </p>
-      ) : (
-        <p className="mt-3 text-[13px] text-[#8E8E93]">Dernière série de cet enchaînement</p>
-      )}
 
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <button
-          type="button"
-          onClick={() => rest.addSeconds(30)}
-          className="ios-press flex min-h-11 items-center justify-center rounded-xl border border-white/12 bg-[#1c1c1e] text-[13px] font-semibold text-white"
+        <p
+          className="mt-3 text-[72px] font-bold leading-none tracking-tight tabular-nums text-white sm:text-[80px]"
+          data-recovery-remaining
         >
-          +30 s
-        </button>
-        {running ? (
-          <button
-            type="button"
-            onClick={() => rest.pause()}
-            className="ios-press flex min-h-11 items-center justify-center gap-1 rounded-xl border border-white/12 bg-[#1c1c1e] text-[13px] font-semibold text-white"
-            aria-label="Mettre le repos en pause"
-          >
-            <Pause className="h-3.5 w-3.5" strokeWidth={2.5} />
-            Pause
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => rest.resume()}
-            className="ios-press flex min-h-11 items-center justify-center gap-1 rounded-xl border border-[#FF2B2B]/40 bg-[#FF2B2B]/18 text-[13px] font-semibold text-[#FF2B2B]"
-            aria-label="Reprendre le repos"
-          >
-            <Play className="h-3.5 w-3.5" strokeWidth={2.5} />
-            Reprendre
-          </button>
-        )}
+          {formatClock(remaining)}
+        </p>
+
         <button
           type="button"
           onClick={() => rest.skip()}
-          className="ios-press flex min-h-11 items-center justify-center gap-1 rounded-xl border border-white/12 bg-[#1c1c1e] text-[13px] font-semibold text-white"
+          className="ios-press mt-7 flex min-h-12 w-full max-w-[280px] items-center justify-center rounded-full border border-[#FF2B2B] bg-transparent text-[16px] font-semibold text-white"
+          data-recovery-resume
         >
-          <SkipForward className="h-3.5 w-3.5" strokeWidth={2.5} />
-          Passer
+          Reprendre
+        </button>
+
+        <button
+          type="button"
+          onClick={() => rest.addSeconds(15)}
+          className="ios-press mt-4 min-h-11 px-4 text-[15px] font-medium text-white/85"
+          data-recovery-add-15
+          aria-label="Ajouter 15 secondes de récupération"
+        >
+          +15 s
         </button>
       </div>
-    </section>
+    </div>
   )
+}
+
+function formatWeight(kg: number): string {
+  if (!Number.isFinite(kg)) return '0'
+  const rounded = Math.round(kg * 10) / 10
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded)
 }

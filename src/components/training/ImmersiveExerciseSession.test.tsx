@@ -369,7 +369,7 @@ describe('ImmersiveExerciseSession', () => {
     expect(host.querySelector('input[aria-label="Série 2 effort facultatif"]')).toBeTruthy()
   })
 
-  it('minuteur : série suivante = série 2 du même exo (pas l’exo suivant)', async () => {
+  it('overlay récupération : maquette Evan (Récupération, Reprendre, +15 s, résumé série réelle)', async () => {
     function StartRest() {
       const rest = useRestTimerContext()
       return (
@@ -399,7 +399,7 @@ describe('ImmersiveExerciseSession', () => {
                 name: 'Développé couché',
                 canonicalExerciseId: 'bench_press',
                 sets: [
-                  { reps: 8, weightKg: 60, done: true, rpe: 7 },
+                  { reps: 6, weightKg: 80, done: true, rpe: 7 },
                   { reps: 0, weightKg: 0 },
                 ],
               },
@@ -429,7 +429,19 @@ describe('ImmersiveExerciseSession', () => {
       arm?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     expect(host.querySelector('[data-recovery-timer]')).toBeTruthy()
-    expect(host.textContent).toContain('Série suivante : Série 2 · Développé couché')
-    expect(host.textContent).not.toContain('Row barre')
+    expect(host.querySelector('[data-immersive-session]')?.getAttribute('data-recovery-active')).toBe(
+      'true',
+    )
+    expect(host.querySelector('[data-immersive-session-body]')?.className).toContain('opacity-')
+    expect(host.textContent).toContain('Récupération')
+    expect(host.textContent).toContain('1 min 30')
+    expect(host.textContent).toContain('Reprendre')
+    expect(host.textContent).toContain('+15 s')
+    expect(host.textContent).toContain('Série 1 terminée · 80 kg × 6')
+    expect(host.textContent).not.toContain('Série suivante')
+    expect(host.textContent).not.toContain('+30 s')
+    expect(host.textContent).not.toContain('Passer')
+    expect(host.textContent).not.toContain('RPE')
+    expect(host.querySelector('[data-bottom-nav-host]')).toBeNull()
   })
 })

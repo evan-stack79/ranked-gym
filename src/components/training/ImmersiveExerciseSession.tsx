@@ -8,7 +8,7 @@ import {
   resolveExerciseMedia,
 } from '../../utils/exerciseMedia'
 import { useRestTimerContext } from '../../context/RestTimerContext'
-import { isSetReadyForAutoValidate, nextSetHint } from '../../utils/autoValidateSet'
+import { isSetReadyForAutoValidate } from '../../utils/autoValidateSet'
 import { CANONICAL_REST_SEC, resolveRestDuration } from '../../utils/restDuration'
 import { RecoveryTimerPanel } from './RecoveryTimerPanel'
 
@@ -108,10 +108,18 @@ export function ImmersiveExerciseSession({
       ? rest.state.remainingSec
       : restSecResolved
   const showRecovery = autoValidate && restActive
-  /** Index de la série *terminée* (cible du timer), pas le prochain pending — sinon on saute une série. */
-  const hintAfterSetIndex = rest.state.target?.setIndex ?? validateIdx
-  const hintExerciseId = rest.state.target?.exerciseId ?? exercise.id
-  const recoveryHint = nextSetHint(exercises, hintExerciseId, hintAfterSetIndex)
+  const completedSummary = (() => {
+    const target = rest.state.target
+    if (!target) return null
+    const ex = exercises.find((e) => e.id === target.exerciseId) ?? exercise
+    const set = ex.sets[target.setIndex]
+    if (!set) return null
+    return {
+      setNumber: target.setIndex + 1,
+      weightKg: set.weightKg,
+      reps: set.reps,
+    }
+  })()
 
   const patchSet = (idx: number, patch: Partial<WorkoutSet>) => {
     const current = exercise.sets[idx]
@@ -143,12 +151,20 @@ export function ImmersiveExerciseSession({
 
   return (
     <section
-      className="flex min-h-[100dvh] flex-col bg-black text-white"
+      className="relative flex min-h-[100dvh] flex-col bg-black text-white"
       data-immersive-session
       data-exercise-slug={media.slug}
       data-canonical-exercise={media.canonicalExerciseId ?? ''}
       data-hero-image={showImage ? 'ready' : 'fallback'}
+      data-recovery-active={showRecovery ? 'true' : 'false'}
     >
+      <div
+        className={`flex min-h-[100dvh] flex-col ${
+          showRecovery ? 'pointer-events-none select-none opacity-[0.28]' : ''
+        }`}
+        aria-hidden={showRecovery ? true : undefined}
+        data-immersive-session-body
+      >
       {/* Hero — chrome overlays photo; interactive body stays in flow below */}
       <div className="relative isolate shrink-0 overflow-hidden">
         <div className="relative h-[min(32vh,268px)] w-full overflow-hidden">
@@ -390,9 +406,6 @@ export function ImmersiveExerciseSession({
           )}
         </div>
 
-        {showRecovery ? <RecoveryTimerPanel nextHint={recoveryHint} /> : null}
-
-        {/* Compact rest */}
         {showRecovery ? null : (
         <div
           className="mt-3 flex min-h-11 items-center gap-3 rounded-xl border border-white/10 px-3"
@@ -514,6 +527,9 @@ export function ImmersiveExerciseSession({
           {saving ? 'Synchro…' : 'Terminer la séance'}
         </button>
       </div>
+      </div>
+
+      {showRecovery ? <RecoveryTimerPanel completedSummary={completedSummary} /> : null}
     </section>
   )
 }
