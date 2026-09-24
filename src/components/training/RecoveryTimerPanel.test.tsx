@@ -86,8 +86,9 @@ describe('formatRecoveryClock', () => {
 })
 
 describe('formatRecoveryDurationLabel', () => {
-  it('formate 90 s → 1 min 30', () => {
+  it('formate 90 s → 1 min 30 et 105 s → 1 min 45', () => {
     expect(formatRecoveryDurationLabel(90)).toBe('1 min 30')
+    expect(formatRecoveryDurationLabel(105)).toBe('1 min 45')
     expect(formatRecoveryDurationLabel(45)).toBe('45 s')
     expect(formatRecoveryDurationLabel(60)).toBe('1 min')
   })
@@ -113,7 +114,8 @@ describe('RecoveryTimerPanel', () => {
     expect(panel).toBeTruthy()
     expect(host.querySelector('[data-recovery-veil]')).toBeTruthy()
     expect(host.querySelector('[data-recovery-glow]')).toBeTruthy()
-    expect(host.querySelector('[data-recovery-plate]')).toBeTruthy()
+    expect(host.querySelector('[data-recovery-fade]')).toBeTruthy()
+    expect(host.querySelector('[data-recovery-plate]')).toBeNull()
     expect(host.querySelector('[data-recovery-label]')?.textContent).toBe(
       'Récupération · 1 min 30',
     )
@@ -128,7 +130,7 @@ describe('RecoveryTimerPanel', () => {
     expect(host.textContent).not.toContain('RPE')
   })
 
-  it('+15 s prolonge endsAt ; label reste 1 min 30 ; Reprendre arrête', async () => {
+  it('+15 s prolonge endsAt ; label suit → 1 min 45 ; Reprendre arrête', async () => {
     const box: { api?: ReturnType<typeof useRestTimerContext> } = {}
     const { persistActiveRestTimer } = await import('../../services/trainingStorage')
     const persist = vi.mocked(persistActiveRestTimer)
@@ -161,6 +163,9 @@ describe('RecoveryTimerPanel', () => {
     })
     expect(box.api?.state.active).toBe(true)
     expect(host.querySelector('[data-recovery-remaining]')?.textContent).toBe('01:30')
+    expect(host.querySelector('[data-recovery-label]')?.textContent).toBe(
+      'Récupération · 1 min 30',
+    )
 
     const beforeCalls = persist.mock.calls.length
     await act(async () => {
@@ -169,11 +174,11 @@ describe('RecoveryTimerPanel', () => {
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     expect(persist.mock.calls.length).toBeGreaterThan(beforeCalls)
-    const last = persist.mock.calls.at(-1)?.[0] as { endsAt: number; remainingSec: number }
+    const last = persist.mock.calls.at(-1)?.[0] as { endsAt: number; remainingSec: number; totalSec: number }
     expect(last.remainingSec).toBeGreaterThanOrEqual(100)
-    // Label programmé figé
+    expect(host.querySelector('[data-recovery-remaining]')?.textContent).toBe('01:45')
     expect(host.querySelector('[data-recovery-label]')?.textContent).toBe(
-      'Récupération · 1 min 30',
+      'Récupération · 1 min 45',
     )
 
     await act(async () => {

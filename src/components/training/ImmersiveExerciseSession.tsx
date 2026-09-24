@@ -430,90 +430,94 @@ export function ImmersiveExerciseSession({
 
         <div className="mt-3 h-px w-full bg-white/8" aria-hidden="true" />
 
-        {/* Progress + exercise nav */}
-        <div className="mt-2.5 flex items-center gap-3">
-          <div
-            className="relative flex h-11 w-11 shrink-0 items-center justify-center"
-            aria-label={`Progression ${progressLabel}`}
-          >
-            <svg width={ringSize} height={ringSize} className="-rotate-90" aria-hidden="true">
-              <circle
-                cx={ringSize / 2}
-                cy={ringSize / 2}
-                r={radius}
-                fill="none"
-                stroke="#2c2c2e"
-                strokeWidth={stroke}
-              />
-              <circle
-                cx={ringSize / 2}
-                cy={ringSize / 2}
-                r={radius}
-                fill="none"
-                stroke="#FF2B2B"
-                strokeWidth={stroke}
-                strokeLinecap="round"
-                strokeDasharray={circumference}
-                strokeDashoffset={dashOffset}
-              />
-            </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tabular-nums text-white">
-              {progressLabel}
-            </span>
-          </div>
+        {/* Progress + exercise nav — masqués pendant récup (évite fantômes sous le chrono) */}
+        {showRecovery ? null : (
+          <>
+            <div className="mt-2.5 flex items-center gap-3">
+              <div
+                className="relative flex h-11 w-11 shrink-0 items-center justify-center"
+                aria-label={`Progression ${progressLabel}`}
+              >
+                <svg width={ringSize} height={ringSize} className="-rotate-90" aria-hidden="true">
+                  <circle
+                    cx={ringSize / 2}
+                    cy={ringSize / 2}
+                    r={radius}
+                    fill="none"
+                    stroke="#2c2c2e"
+                    strokeWidth={stroke}
+                  />
+                  <circle
+                    cx={ringSize / 2}
+                    cy={ringSize / 2}
+                    r={radius}
+                    fill="none"
+                    stroke="#FF2B2B"
+                    strokeWidth={stroke}
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={dashOffset}
+                  />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tabular-nums text-white">
+                  {progressLabel}
+                </span>
+              </div>
 
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-semibold text-white">
-              {displayName}
-            </p>
-            <div
-              className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1"
-              role="navigation"
-              aria-label="Exercices de la séance"
-            >
-              {exercises.map((ex, i) => {
-                const current = i === safeIndex
-                return (
-                  <button
-                    key={ex.id}
-                    type="button"
-                    onClick={() => onActiveIndexChange(i)}
-                    className={`ios-press relative min-h-9 min-w-5 px-0.5 text-[13px] font-semibold tabular-nums ${
-                      current ? 'text-white' : 'text-[#636366]'
-                    }`}
-                    aria-current={current ? 'true' : undefined}
-                    aria-label={`Exercice ${i + 1}${ex.name ? ` ${ex.name}` : ''}`}
-                  >
-                    {i + 1}
-                    {current ? (
-                      <span className="absolute inset-x-0 -bottom-0.5 mx-auto h-0.5 w-3 rounded-full bg-[#FF2B2B]" />
-                    ) : null}
-                  </button>
-                )
-              })}
-              {onAddExercise ? (
-                <button
-                  type="button"
-                  onClick={onAddExercise}
-                  className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 text-[#AEAEB2]"
-                  aria-label="Ajouter un exercice"
-                  data-add-exercise
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-semibold text-white">
+                  {displayName}
+                </p>
+                <div
+                  className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1"
+                  role="navigation"
+                  aria-label="Exercices de la séance"
                 >
-                  <Plus className="h-4 w-4" strokeWidth={2.5} />
-                </button>
-              ) : null}
+                  {exercises.map((ex, i) => {
+                    const current = i === safeIndex
+                    return (
+                      <button
+                        key={ex.id}
+                        type="button"
+                        onClick={() => onActiveIndexChange(i)}
+                        className={`ios-press relative min-h-9 min-w-5 px-0.5 text-[13px] font-semibold tabular-nums ${
+                          current ? 'text-white' : 'text-[#636366]'
+                        }`}
+                        aria-current={current ? 'true' : undefined}
+                        aria-label={`Exercice ${i + 1}${ex.name ? ` ${ex.name}` : ''}`}
+                      >
+                        {i + 1}
+                        {current ? (
+                          <span className="absolute inset-x-0 -bottom-0.5 mx-auto h-0.5 w-3 rounded-full bg-[#FF2B2B]" />
+                        ) : null}
+                      </button>
+                    )
+                  })}
+                  {onAddExercise ? (
+                    <button
+                      type="button"
+                      onClick={onAddExercise}
+                      className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 text-[#AEAEB2]"
+                      aria-label="Ajouter un exercice"
+                      data-add-exercise
+                    >
+                      <Plus className="h-4 w-4" strokeWidth={2.5} />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <button
-          type="button"
-          onClick={onFinishSession}
-          disabled={saving}
-          className="ios-press mt-3 mb-0.5 min-h-11 w-full text-center text-[13px] font-medium text-[#636366] disabled:opacity-50"
-        >
-          {saving ? 'Synchro…' : 'Terminer la séance'}
-        </button>
+            <button
+              type="button"
+              onClick={onFinishSession}
+              disabled={saving}
+              className="ios-press mt-3 mb-0.5 min-h-11 w-full text-center text-[13px] font-medium text-[#636366] disabled:opacity-50"
+            >
+              {saving ? 'Synchro…' : 'Terminer la séance'}
+            </button>
+          </>
+        )}
       </div>
       </div>
 

@@ -1,4 +1,3 @@
-import { useRef } from 'react'
 import { useRestTimerContext } from '../../context/RestTimerContext'
 
 /** Compte à rebours MM:SS — 01:30, 00:47, 00:30, 00:05. */
@@ -9,7 +8,7 @@ export function formatRecoveryClock(totalSec: number): string {
   return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`
 }
 
-/** Durée programmée — « 1 min 30 », « 45 s », « 2 min ». */
+/** Durée totale — « 1 min 30 », « 1 min 45 », « 45 s ». */
 export function formatRecoveryDurationLabel(totalSec: number): string {
   const s = Math.max(0, Math.floor(totalSec))
   const m = Math.floor(s / 60)
@@ -21,27 +20,17 @@ export function formatRecoveryDurationLabel(totalSec: number): string {
 
 /**
  * Overlay récupération (maquette Evan).
- * Voile uniforme sur la séance + couche chrono dédiée opaque (rien ne traverse).
- * Glow rouge progressif depuis le bas — pas de carte, pas de barre, pas de bandeau.
- * Source unique : RestTimerContext (endsAt persisté).
+ * Voile uniforme + fondu noir doux (pas de carte) + glow radial bas-centre.
+ * Label = durée totale (suit +15 s). Source : RestTimerContext / endsAt.
  */
 export function RecoveryTimerPanel() {
   const rest = useRestTimerContext()
-  /** Durée affichée dans le label — figée au démarrage (pas gonflée par +15 s). */
-  const programmedSecRef = useRef<number | null>(null)
 
-  if (!rest.state.active && !rest.state.finished) {
-    programmedSecRef.current = null
-    return null
-  }
+  if (!rest.state.active && !rest.state.finished) return null
 
-  if (programmedSecRef.current == null && rest.state.totalSec > 0) {
-    programmedSecRef.current = rest.state.totalSec
-  }
-
-  const programmedSec = programmedSecRef.current ?? Math.max(1, rest.state.totalSec)
+  const totalSec = Math.max(1, rest.state.totalSec)
   const remaining = rest.state.finished ? 0 : rest.state.remainingSec
-  const durationLabel = formatRecoveryDurationLabel(programmedSec)
+  const durationLabel = formatRecoveryDurationLabel(totalSec)
 
   return (
     <div
@@ -51,46 +40,51 @@ export function RecoveryTimerPanel() {
       role="timer"
       aria-label={`Récupération ${formatRecoveryClock(remaining)}`}
     >
-      {/* Voile noir uniforme — séance encore lisible (moins sombre qu’opacity 0.28) */}
+      {/* Voile noir uniforme — séance encore lisible en haut */}
       <div
-        className="pointer-events-none absolute inset-0 bg-black/52"
+        className="pointer-events-none absolute inset-0 bg-black/45"
         aria-hidden="true"
         data-recovery-veil
       />
 
-      {/* Glow rouge progressif (bas → transparent) — pas un rectangle opaque */}
+      {/*
+        Fondu noir : opaque sous le chrono (rien ne traverse),
+        transition douce vers le haut (pas de bord de carte).
+      */}
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-[46%]"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[68%]"
+        aria-hidden="true"
+        data-recovery-fade
+        style={{
+          background:
+            'linear-gradient(to top, #000 0%, #000 55%, rgba(0,0,0,0.92) 70%, rgba(0,0,0,0.45) 88%, transparent 100%)',
+        }}
+      />
+
+      {/*
+        Glow rouge : ellipse centrée SOUS le bas d’écran → seule la queue douce
+        est visible, aucune bande / ligne de coupure.
+      */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[55%]"
         aria-hidden="true"
         data-recovery-glow
         style={{
           background:
-            'linear-gradient(to top, rgba(255,43,43,0.42) 0%, rgba(255,43,43,0.14) 28%, rgba(255,43,43,0.04) 52%, transparent 78%)',
+            'radial-gradient(ellipse 170% 110% at 50% 118%, rgba(255,43,43,0.42) 0%, rgba(255,43,43,0.18) 34%, rgba(255,43,43,0.06) 55%, transparent 72%)',
         }}
       />
 
-      {/* Bloc chrono remonté — couche opaque dédiée, rien de la séance ne traverse */}
+      {/* Bloc chrono remonté + safe area */}
       <div
         className="pointer-events-auto relative z-10 mt-auto flex flex-col items-center px-6"
         data-recovery-controls
         style={{
-          // Remonte le bloc (~8vh) + safe area iPhone sous +15 s
-          marginBottom: 'max(2.75rem, calc(env(safe-area-inset-bottom, 0px) + 1.25rem + 8vh))',
-          paddingTop: '1.75rem',
-          paddingBottom: '0.5rem',
+          marginBottom: 'max(2.5rem, calc(env(safe-area-inset-bottom, 0px) + 1.1rem + 7vh))',
+          paddingTop: '0.5rem',
+          paddingBottom: '0.35rem',
         }}
       >
-        {/* Plaque opaque derrière label / chrono / boutons */}
-        <div
-          className="pointer-events-none absolute inset-x-0 -top-6 bottom-[-0.5rem] -z-10"
-          aria-hidden="true"
-          data-recovery-plate
-          style={{
-            background:
-              'linear-gradient(to top, #000 0%, #000 72%, rgba(0,0,0,0.92) 88%, rgba(0,0,0,0.55) 100%)',
-          }}
-        />
-
         <p className="text-center text-[15px] font-semibold tracking-tight" data-recovery-label>
           <span className="text-[#FF2B2B]">Récupération</span>
           <span className="text-white"> · {durationLabel}</span>
