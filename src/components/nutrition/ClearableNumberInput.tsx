@@ -11,7 +11,25 @@ interface ClearableNumberInputProps {
   placeholderClassName?: string
   /** When true (default), empty blur restores the last known value. */
   required?: boolean
+  /**
+   * Effort 1–10 : ne pas commit le préfixe ambigu « 1 » (vers « 10 ») tant que
+   * l’utilisateur frappe / avant blur — évite l’auto-validate prématuré.
+   */
+  deferAmbiguousIntegerPrefix?: boolean
   'aria-label'?: string
+}
+
+/**
+ * Texte entier encore préfixe d’un autre entier dans [min, max]
+ * (ex. « 1 » → « 10 » pour Effort). Décimaux exclus.
+ */
+export function isAmbiguousIntegerPrefix(raw: string, min: number, max: number): boolean {
+  if (!/^\d+$/.test(raw)) return false
+  for (let d = 0; d <= 9; d += 1) {
+    const candidate = Number.parseInt(`${raw}${d}`, 10)
+    if (candidate >= min && candidate <= max) return true
+  }
+  return false
 }
 
 /**
@@ -28,6 +46,7 @@ export function ClearableNumberInput({
   placeholder,
   placeholderClassName,
   required = true,
+  deferAmbiguousIntegerPrefix = false,
   'aria-label': ariaLabel,
 }: ClearableNumberInputProps) {
   const [text, setText] = useState(() => formatValue(value, step))
@@ -65,6 +84,9 @@ export function ClearableNumberInput({
           setText(raw)
           if (raw === '' || raw === '.') {
             if (!required) onChange(null)
+            return
+          }
+          if (deferAmbiguousIntegerPrefix && isAmbiguousIntegerPrefix(raw, min, max)) {
             return
           }
           const next = parseFloat(raw)

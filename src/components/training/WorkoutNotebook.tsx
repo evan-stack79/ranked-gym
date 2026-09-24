@@ -38,6 +38,7 @@ import {
   AUTO_VALIDATE_UNDO_MS,
   isSetReadyForAutoValidate,
   makeAutoValidateKey,
+  shouldAppendNextSetOnRestSkip,
   shouldCommitAutoValidate,
 } from '../../utils/autoValidateSet'
 import { CANONICAL_REST_SEC, resolveRestDuration } from '../../utils/restDuration'
@@ -375,7 +376,8 @@ export function WorkoutNotebook({
       const next = prev.map((e) => {
         if (e.id !== exerciseId) return e
         let sets = e.sets.map((s, i) => (i === setIndex ? { ...s, restSec, done: true } : s))
-        if (addNextSet) {
+        // Reprendre : append seulement s’il n’existe pas déjà une série suivante !done.
+        if (addNextSet && shouldAppendNextSetOnRestSkip(sets, setIndex)) {
           const last = sets[sets.length - 1]
           sets = [
             ...sets,
@@ -1027,6 +1029,7 @@ export function WorkoutNotebook({
                           min={1}
                           max={10}
                           required={false}
+                          deferAmbiguousIntegerPrefix
                           placeholder="1–10"
                           placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2 text-[12px] font-semibold text-[#636366]"
                           aria-label="Effort facultatif, 1 à 10"
