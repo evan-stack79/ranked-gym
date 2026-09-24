@@ -93,6 +93,29 @@ async function assertName(page) {
   }
 }
 
+/** Série 1 validée 80·6·8 + série 2 active — preuve anti-perte après Reprendre. */
+async function assertValidatedSetIntact(page) {
+  const snap = await page.evaluate(() => {
+    const raw = sessionStorage.getItem('ranked-gym:capture-session-v1')
+    const sets = raw ? JSON.parse(raw).exercises?.[0]?.sets : null
+    const rows = [...document.querySelectorAll('[data-set-row]')].map((r) =>
+      r.getAttribute('data-set-row'),
+    )
+    const body = document.querySelector('[data-immersive-session]')?.textContent ?? ''
+    return { sets, rows, has810: body.includes('8/10'), hasRpe: body.includes('RPE') }
+  })
+  const s0 = snap.sets?.[0]
+  if (!s0 || s0.weightKg !== 80 || s0.reps !== 6 || s0.rpe !== 8 || s0.done !== true) {
+    throw new Error(`Série 1 lost after Reprendre: ${JSON.stringify(s0)}`)
+  }
+  if (snap.rows[0] !== 'done' || snap.rows[1] !== 'active') {
+    throw new Error(`Expected done/active rows, got ${JSON.stringify(snap.rows)}`)
+  }
+  if (!snap.has810) throw new Error('Missing 8/10 after Reprendre')
+  if (snap.hasRpe) throw new Error('RPE leaked into UI')
+  return snap
+}
+
 async function main() {
   await mkdir(outDir, { recursive: true })
   const log = []
@@ -147,7 +170,11 @@ async function main() {
       })
       const page = await context.newPage()
       // Pas de clock.install — temps réel
-      await page.goto(BASE, { waitUntil: 'networkidle' })
+      // effortHoldMs=500 : délai harness-only — chiffre « 8 » visible avant overlay
+      await page.goto(
+        `http://127.0.0.1:${port}/?autoValidate=1&clear=1&effortHoldMs=500`,
+        { waitUntil: 'networkidle' },
+      )
       await page.waitForSelector('[data-harness-ready]')
       await assertName(page)
       await page.waitForTimeout(500)
@@ -159,6 +186,17 @@ async function main() {
         throw new Error('Early validate before Effort in realtime video')
       }
       await typeSlow(page, 'Série 1 effort facultatif', '8')
+      // Frame(s) avec « 8 » / 8/10 avant l’overlay (hold harness)
+      await page.waitForTimeout(350)
+      const effortVisible = await page.evaluate(() => {
+        const body = document.querySelector('[data-immersive-session]')?.textContent ?? ''
+        const input = document.querySelector(
+          'input[aria-label="Série 1 effort facultatif"]',
+        )
+        return body.includes('8/10') || input?.value === '8' || body.includes('8')
+      })
+      if (!effortVisible) throw new Error('Effort 8 not visible before overlay')
+      log.push('effort_8_visible_before_overlay=1')
       await page.waitForSelector('[data-recovery-remaining]')
       const t0 = await page.locator('[data-recovery-remaining]').innerText()
       if (t0 !== '01:30' && t0 !== '01:29') {
@@ -198,7 +236,7 @@ async function main() {
       await page.waitForSelector('[data-recovery-remaining]')
       await page.waitForTimeout(400)
 
-      // +15 s
+      // +15 s — ne doit PAS écraser la séance persistée (bug clear=1 re-render)
       await page.locator('[data-recovery-add-15]').click()
       await page.waitForTimeout(400)
       const afterPlus = await page.locator('[data-recovery-remaining]').innerText()
@@ -207,6 +245,18 @@ async function main() {
       if (!/^01:4[4-5]$/.test(afterPlus)) throw new Error(`+15 clock ${afterPlus}`)
       if (labelPlus !== 'Récupération · 1 min 45') {
         throw new Error(`+15 label expected 1 min 45 got ${labelPlus}`)
+      }
+      const afterPlusSets = await page.evaluate(() => {
+        const raw = sessionStorage.getItem('ranked-gym:capture-session-v1')
+        return raw ? JSON.parse(raw).exercises?.[0]?.sets?.[0] : null
+      })
+      if (
+        !afterPlusSets ||
+        afterPlusSets.rpe !== 8 ||
+        afterPlusSets.done !== true ||
+        afterPlusSets.weightKg !== 80
+      ) {
+        throw new Error(`+15 wiped session storage: ${JSON.stringify(afterPlusSets)}`)
       }
       await page.screenshot({
         path: join(outDir, 'recovery-label-plus15-390.png'),
@@ -282,14 +332,21 @@ async function main() {
         `refresh_before=${beforeRefresh} refresh_after=${afterRefresh} sets=${setsAfter}`,
       )
 
-      // Reprendre
+      // Reprendre — série 1 intacte, série 2 active
       await page.locator('[data-recovery-resume]').click()
-      await page.waitForTimeout(400)
+      await page.waitForTimeout(500)
       if ((await page.locator('[data-recovery-timer]').count()) !== 0) {
         throw new Error('Reprendre failed')
       }
-      log.push('reprendre=ok')
       await assertName(page)
+      const intact = await assertValidatedSetIntact(page)
+      log.push(`reprendre=ok set1=${JSON.stringify(intact.sets[0])} rows=${intact.rows.join(',')}`)
+      await page.screenshot({
+        path: join(outDir, 'after-reprendre-set1-intact-390.png'),
+        fullPage: false,
+      })
+      // Laisse la frame finale visible sur la série 1 cochée
+      await page.waitForTimeout(1200)
 
       await context.close()
       const webm = takeWebm(tmp, join(outDir, 'same-session-plus15-lock-refresh-reprendre.webm'))

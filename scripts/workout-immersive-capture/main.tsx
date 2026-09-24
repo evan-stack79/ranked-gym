@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useState } from 'react'
+import { StrictMode, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import '../../src/index.css'
 import { ImmersiveExerciseSession } from '../../src/components/training/ImmersiveExerciseSession'
@@ -59,6 +59,35 @@ function writeStoredSession(exercises: ExerciseEntry[], activeIndex: number) {
   }
 }
 
+/**
+ * clear=1 ne doit s’exécuter QU’UNE FOIS au boot — jamais pendant un re-render.
+ * Bug précédent : `sessionStorage.removeItem` dans le corps du render avec clear=1
+ * encore dans l’URL → chaque update RestTimer (+15 s) effaçait la séance persistée ;
+ * un refresh rechargeait alors la fixture vierge (0 kg / 0 reps).
+ */
+function consumeClearBoot(): { exercises: ExerciseEntry[]; activeIndex: number } {
+  const params = new URLSearchParams(window.location.search)
+  const clear = params.get('clear') === '1'
+  if (clear) {
+    try {
+      sessionStorage.removeItem(SESSION_KEY)
+    } catch {
+      /* ignore */
+    }
+    // Retire clear de l’URL pour que re-renders / remounts ne re-clear pas.
+    params.delete('clear')
+    const qs = params.toString()
+    const next = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`
+    try {
+      window.history.replaceState(null, '', next)
+    } catch {
+      /* ignore */
+    }
+    return { exercises: SESSION_FIXTURE, activeIndex: 0 }
+  }
+  return readStoredSession() ?? { exercises: SESSION_FIXTURE, activeIndex: 0 }
+}
+
 /** Garantit un brouillon actif (routine connue) pour persistActiveRestTimer / hydrate endsAt. */
 function ensureCaptureDraft() {
   const state = getTrainingState()
@@ -85,23 +114,18 @@ function ensureCaptureDraft() {
 function HarnessApp() {
   const params = new URLSearchParams(window.location.search)
   const autoValidate = params.get('autoValidate') !== '0'
-  const clear = params.get('clear') === '1'
+  /** Délai capture-only avant rest.start — laisse Effort « 8 » visible une frame+ (pas produit). */
+  const effortHoldMs = Math.max(0, Number(params.get('effortHoldMs') || 0) || 0)
   const rest = useRestTimerContext()
 
-  const boot = (() => {
-    if (clear) {
-      try {
-        sessionStorage.removeItem(SESSION_KEY)
-      } catch {
-        /* ignore */
-      }
-      return { exercises: SESSION_FIXTURE, activeIndex: 0 }
-    }
-    return readStoredSession() ?? { exercises: SESSION_FIXTURE, activeIndex: 0 }
-  })()
+  // Boot une seule fois (ref) — jamais re-clear sur re-render RestTimer.
+  const bootRef = useRef<StoredSession | null>(null)
+  if (bootRef.current === null) {
+    bootRef.current = consumeClearBoot()
+  }
 
-  const [exercises, setExercises] = useState(boot.exercises)
-  const [activeIndex, setActiveIndex] = useState(boot.activeIndex)
+  const [exercises, setExercises] = useState(bootRef.current.exercises)
+  const [activeIndex, setActiveIndex] = useState(bootRef.current.activeIndex)
   const [restPrefSec, setRestPrefSec] = useState(CANONICAL_REST_SEC)
   const [paused, setPaused] = useState(false)
 
@@ -153,12 +177,18 @@ function HarnessApp() {
         onValidateSet={(ex, setIndex, restSec) => {
           updateSet(ex.id, setIndex, { done: true })
           ensureCaptureDraft()
-          rest.start(restSec || restPrefSec || CANONICAL_REST_SEC, {
-            exerciseId: ex.id,
-            setIndex,
-            exerciseName: ex.name.trim() || 'Exercice',
-            setLabel: `S${setIndex + 1}`,
-          })
+          const arm = () =>
+            rest.start(restSec || restPrefSec || CANONICAL_REST_SEC, {
+              exerciseId: ex.id,
+              setIndex,
+              exerciseName: ex.name.trim() || 'Exercice',
+              setLabel: `S${setIndex + 1}`,
+            })
+          if (effortHoldMs > 0) {
+            window.setTimeout(arm, effortHoldMs)
+          } else {
+            arm()
+          }
         }}
         onFinishSession={() => undefined}
         restPrefSec={restPrefSec}

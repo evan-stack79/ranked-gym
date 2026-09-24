@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, useState } from 'react'
+import { act, useRef, useState, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ImmersiveExerciseSession } from './ImmersiveExerciseSession'
@@ -513,5 +513,166 @@ describe('ImmersiveExerciseSession', () => {
     expect(host.querySelector('[data-recovery-timer]')).toBeTruthy()
     expect(host.querySelector('[data-recovery-remaining]')?.textContent).toBe('01:30')
     expect(host.textContent).not.toMatch(/Série \d+ terminée/)
+  })
+
+  it('non-régression : série validée survit overlay → réhydratation → Reprendre (rpe=8, série 2 active)', async () => {
+    /**
+     * Simule le parent réel (WorkoutNotebook) : ref live + round-trip JSON
+     * comme trainingStorage. Reprendre = rest.skip() — ne doit PAS reset les séries.
+     */
+    type Snap = { exercises: ExerciseEntry[] }
+    let persisted: Snap = {
+      exercises: [
+        {
+          id: 'ex-bench',
+          name: 'DÉVELOPPÉ COUCHÉ',
+          canonicalExerciseId: 'bench_press',
+          sets: [
+            { reps: 6, weightKg: 80 },
+            { reps: 6, weightKg: 80 },
+          ],
+        },
+      ],
+    }
+
+    function NotebookLike({ initial }: { initial: ExerciseEntry[] }) {
+      const rest = useRestTimerContext()
+      const [exercises, setExercises] = useState(initial)
+      const exercisesRef = useRef(exercises)
+      exercisesRef.current = exercises
+      const save = (next: ExerciseEntry[]) => {
+        exercisesRef.current = next
+        setExercises(next)
+        persisted = JSON.parse(JSON.stringify({ exercises: next })) as Snap
+      }
+      return (
+        <ImmersiveExerciseSession
+          exercises={exercises}
+          activeIndex={0}
+          onActiveIndexChange={vi.fn()}
+          sessionClockLabel="00:42"
+          sessionPaused={false}
+          onBack={vi.fn()}
+          onUpdateSet={(id, idx, patch) => {
+            save(
+              exercisesRef.current.map((e) =>
+                e.id !== id
+                  ? e
+                  : { ...e, sets: e.sets.map((s, i) => (i === idx ? { ...s, ...patch } : s)) },
+              ),
+            )
+          }}
+          onAddSet={vi.fn()}
+          onValidateSet={(ex, setIndex, restSec) => {
+            const live = exercisesRef.current
+            const current = live.find((e) => e.id === ex.id)?.sets[setIndex]
+            if (current?.done) return
+            save(
+              live.map((e) => {
+                if (e.id !== ex.id) return e
+                return {
+                  ...e,
+                  sets: e.sets.map((s, i) =>
+                    i === setIndex ? { ...s, done: true as const } : s,
+                  ),
+                }
+              }),
+            )
+            rest.start(restSec || 90, {
+              exerciseId: ex.id,
+              setIndex,
+              exerciseName: ex.name,
+              setLabel: `S${setIndex + 1}`,
+            })
+          }}
+          onFinishSession={vi.fn()}
+          autoValidate
+        />
+      )
+    }
+
+    function ReArm({ children }: { children: ReactNode }) {
+      const rest = useRestTimerContext()
+      return (
+        <>
+          <button
+            type="button"
+            data-testid="rearm"
+            onClick={() =>
+              rest.start(90, {
+                exerciseId: 'ex-bench',
+                setIndex: 0,
+                exerciseName: 'DÉVELOPPÉ COUCHÉ',
+                setLabel: 'S1',
+              })
+            }
+          >
+            rearm
+          </button>
+          {children}
+        </>
+      )
+    }
+
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <NotebookLike initial={persisted.exercises} />
+        </RestTimerProvider>,
+      )
+    })
+
+    await act(async () => {
+      const effort = host.querySelector(
+        'input[aria-label="Série 1 effort facultatif"]',
+      ) as HTMLInputElement
+      effort.focus()
+      typeInto(effort, '8')
+    })
+    expect(host.querySelector('[data-recovery-timer]')).toBeTruthy()
+    expect(persisted.exercises[0].sets[0].rpe).toBe(8)
+    expect(persisted.exercises[0].sets[0].done).toBe(true)
+    expect(persisted.exercises[0].sets[0].weightKg).toBe(80)
+    expect(persisted.exercises[0].sets[0].reps).toBe(6)
+    expect(host.textContent).toContain('8/10')
+
+    const rehydrated = JSON.parse(JSON.stringify(persisted.exercises)) as ExerciseEntry[]
+    expect(rehydrated[0].sets[0].rpe).toBe(8)
+    expect(rehydrated[0].sets[0].done).toBe(true)
+
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <ReArm>
+            <NotebookLike initial={rehydrated} />
+          </ReArm>
+        </RestTimerProvider>,
+      )
+    })
+    await act(async () => {
+      host
+        .querySelector('[data-testid="rearm"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(host.querySelector('[data-recovery-timer]')).toBeTruthy()
+    expect(host.textContent).toContain('8/10')
+    expect(host.querySelector('[data-set-row="done"]')).toBeTruthy()
+
+    await act(async () => {
+      host
+        .querySelector('[data-recovery-resume]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(host.querySelector('[data-recovery-timer]')).toBeNull()
+    expect(persisted.exercises[0].sets[0].rpe).toBe(8)
+    expect(persisted.exercises[0].sets[0].done).toBe(true)
+    expect(persisted.exercises[0].sets[0].weightKg).toBe(80)
+    expect(persisted.exercises[0].sets[0].reps).toBe(6)
+    expect(host.textContent).toContain('8/10')
+    const rows = [...host.querySelectorAll('[data-set-row]')]
+    expect(rows[0]?.getAttribute('data-set-row')).toBe('done')
+    expect(rows[1]?.getAttribute('data-set-row')).toBe('active')
+    expect(host.textContent).not.toContain('RPE')
   })
 })
