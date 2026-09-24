@@ -3,6 +3,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  formatRecoveryClock,
   formatRecoveryDurationLabel,
   RecoveryTimerPanel,
 } from './RecoveryTimerPanel'
@@ -74,6 +75,16 @@ afterEach(async () => {
   host.remove()
 })
 
+describe('formatRecoveryClock', () => {
+  it('format MM:SS obligatoire (01:30, 00:47, 00:30, 00:05)', () => {
+    expect(formatRecoveryClock(90)).toBe('01:30')
+    expect(formatRecoveryClock(47)).toBe('00:47')
+    expect(formatRecoveryClock(30)).toBe('00:30')
+    expect(formatRecoveryClock(5)).toBe('00:05')
+    expect(formatRecoveryClock(0)).toBe('00:00')
+  })
+})
+
 describe('formatRecoveryDurationLabel', () => {
   it('formate 90 s → 1 min 30', () => {
     expect(formatRecoveryDurationLabel(90)).toBe('1 min 30')
@@ -83,15 +94,13 @@ describe('formatRecoveryDurationLabel', () => {
 })
 
 describe('RecoveryTimerPanel', () => {
-  it('maquette : Récupération rouge, chrono, Reprendre ghost, +15 s, pas de barre/carte', async () => {
+  it('repos 90 s démarre à 01:30 ; label Récupération · 1 min 30 ; pas de bandeau série', async () => {
     await act(async () => {
       root.render(
         <div className="relative min-h-[100dvh]">
           <RestTimerProvider>
-            <Starter />
-            <RecoveryTimerPanel
-              completedSummary={{ setNumber: 1, weightKg: 80, reps: 6 }}
-            />
+            <Starter seconds={90} />
+            <RecoveryTimerPanel />
           </RestTimerProvider>
         </div>,
       )
@@ -102,26 +111,24 @@ describe('RecoveryTimerPanel', () => {
     })
     const panel = host.querySelector('[data-recovery-timer]')
     expect(panel).toBeTruthy()
-    expect(host.querySelector('[data-recovery-overlay]')).toBeTruthy()
-    expect(host.querySelector('[data-recovery-label]')?.textContent).toContain('Récupération')
-    expect(host.querySelector('[data-recovery-label]')?.textContent).toContain('1 min 30')
-    expect(host.querySelector('[data-recovery-remaining]')?.textContent).toMatch(/01:3/)
+    expect(host.querySelector('[data-recovery-veil]')).toBeTruthy()
+    expect(host.querySelector('[data-recovery-glow]')).toBeTruthy()
+    expect(host.querySelector('[data-recovery-plate]')).toBeTruthy()
+    expect(host.querySelector('[data-recovery-label]')?.textContent).toBe(
+      'Récupération · 1 min 30',
+    )
+    expect(host.querySelector('[data-recovery-remaining]')?.textContent).toBe('01:30')
     expect(host.querySelector('[data-recovery-resume]')?.textContent).toContain('Reprendre')
     expect(host.querySelector('[data-recovery-add-15]')?.textContent).toContain('+15 s')
-    expect(host.querySelector('[data-recovery-completed-summary]')?.textContent).toContain(
-      'Série 1 terminée · 80 kg × 6',
-    )
-    // Pas de vestiges ancienne UI
+    // Plus de bandeau « Série N terminée »
+    expect(host.querySelector('[data-recovery-completed-summary]')).toBeNull()
+    expect(host.textContent).not.toMatch(/Série \d+ terminée/)
     expect(host.textContent).not.toContain('+30 s')
     expect(host.textContent).not.toContain('Passer')
-    expect(host.textContent).not.toContain('Série suivante')
     expect(host.textContent).not.toContain('RPE')
-    expect(panel!.querySelector('[aria-hidden="true"] .h-1\\.5')).toBeNull()
-    expect(panel!.className).not.toMatch(/rounded-2xl/)
-    expect(panel!.className).not.toMatch(/border-white/)
   })
 
-  it('+15 s prolonge endsAt ; Reprendre (skip) arrête le timer', async () => {
+  it('+15 s prolonge endsAt ; label reste 1 min 30 ; Reprendre arrête', async () => {
     const box: { api?: ReturnType<typeof useRestTimerContext> } = {}
     const { persistActiveRestTimer } = await import('../../services/trainingStorage')
     const persist = vi.mocked(persistActiveRestTimer)
@@ -137,9 +144,7 @@ describe('RecoveryTimerPanel', () => {
                 box.api = r
               }}
             />
-            <RecoveryTimerPanel
-              completedSummary={{ setNumber: 1, weightKg: 80, reps: 6 }}
-            />
+            <RecoveryTimerPanel />
           </RestTimerProvider>
         </div>,
       )
@@ -155,6 +160,7 @@ describe('RecoveryTimerPanel', () => {
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     expect(box.api?.state.active).toBe(true)
+    expect(host.querySelector('[data-recovery-remaining]')?.textContent).toBe('01:30')
 
     const beforeCalls = persist.mock.calls.length
     await act(async () => {
@@ -165,6 +171,10 @@ describe('RecoveryTimerPanel', () => {
     expect(persist.mock.calls.length).toBeGreaterThan(beforeCalls)
     const last = persist.mock.calls.at(-1)?.[0] as { endsAt: number; remainingSec: number }
     expect(last.remainingSec).toBeGreaterThanOrEqual(100)
+    // Label programmé figé
+    expect(host.querySelector('[data-recovery-label]')?.textContent).toBe(
+      'Récupération · 1 min 30',
+    )
 
     await act(async () => {
       host

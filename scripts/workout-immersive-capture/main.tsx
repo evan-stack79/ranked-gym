@@ -50,9 +50,23 @@ const RECOVERY_FIXTURE: ExerciseEntry[] = [
   },
 ]
 
+/** Fixture flux Evan — charge/reps/effort à saisir (pas pré-rempli). */
+const FLOW_FIXTURE: ExerciseEntry[] = [
+  {
+    id: 'ex-bench-meta',
+    name: 'DÉVELOPPER',
+    canonicalExerciseId: 'bench_press',
+    sets: [
+      { reps: 0, weightKg: 0 },
+      { reps: 6, weightKg: 80 },
+    ],
+  },
+]
+
 function pickFixture(): ExerciseEntry[] {
   const params = new URLSearchParams(window.location.search)
   if (params.get('fixture') === 'recovery') return RECOVERY_FIXTURE
+  if (params.get('fixture') === 'flow') return FLOW_FIXTURE
   return params.get('fixture') === 'bench_press'
     ? CANONICAL_BENCH_FIXTURE
     : REAL_SESSION_FIXTURE

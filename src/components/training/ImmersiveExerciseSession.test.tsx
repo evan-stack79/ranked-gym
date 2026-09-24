@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react'
+import { act, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ImmersiveExerciseSession } from './ImmersiveExerciseSession'
@@ -145,7 +145,7 @@ describe('ImmersiveExerciseSession', () => {
     expect(host.textContent).toContain('Pectoraux · Triceps · Épaules')
   })
 
-  it('validation auto : Effort 1–10 facultatif, pas Facile/OK/Dur, pas de RPE UI', async () => {
+  it('validation auto : Effort requis, pas Facile/OK/Dur, pas de RPE UI', async () => {
     const onValidate = vi.fn()
     const onUpdate = vi.fn()
     await act(async () => {
@@ -184,15 +184,10 @@ describe('ImmersiveExerciseSession', () => {
     expect(host.textContent).not.toMatch(/\bOK\b/)
     expect(host.textContent).not.toContain('RPE')
     expect(host.textContent).not.toContain('Valider la série')
-
-    const effortInput = host.querySelector(
-      'input[aria-label="Série 1 effort facultatif"]',
-    ) as HTMLInputElement | null
-    expect(effortInput).toBeTruthy()
     expect(host.textContent).toContain('1–10')
     expect(onValidate).not.toHaveBeenCalled()
 
-    // Sans Effort : charge+reps déjà valides → patch poids déclenche auto-validate, rpe non inventé
+    // Sans Effort : patch poids ne valide pas
     await act(async () => {
       const weight = host.querySelector(
         'input[aria-label="Série 1 poids"]',
@@ -201,11 +196,18 @@ describe('ImmersiveExerciseSession', () => {
       typeInto(weight, '62')
       weight.blur()
     })
-    expect(onUpdate).toHaveBeenCalled()
-    const weightPatch = onUpdate.mock.calls.find((c) => c[2]?.weightKg != null)
-    expect(weightPatch?.[2]).toEqual({ weightKg: 62 })
-    expect(weightPatch?.[2]).not.toHaveProperty('rpe')
-    expect(onValidate).toHaveBeenCalled()
+    expect(onValidate).not.toHaveBeenCalled()
+
+    // Effort 8 → validation
+    await act(async () => {
+      const effort = host.querySelector(
+        'input[aria-label="Série 1 effort facultatif"]',
+      ) as HTMLInputElement
+      effort.focus()
+      typeInto(effort, '8')
+    })
+    expect(onUpdate).toHaveBeenCalledWith('ex-1', 0, { rpe: 8 })
+    expect(onValidate).toHaveBeenCalledTimes(1)
     expect(onValidate.mock.calls[0][1]).toBe(0)
   })
 
@@ -252,7 +254,7 @@ describe('ImmersiveExerciseSession', () => {
     expect(host.textContent).not.toContain('Facile')
   })
 
-  it('absence d’Effort : rpe reste undefined (pas inventé à la validation auto)', async () => {
+  it('absence d’Effort : pas de validation auto, rpe non inventé', async () => {
     const onUpdate = vi.fn()
     const onValidate = vi.fn()
     await act(async () => {
@@ -285,7 +287,7 @@ describe('ImmersiveExerciseSession', () => {
     for (const call of onUpdate.mock.calls) {
       expect(call[2]).not.toHaveProperty('rpe')
     }
-    expect(onValidate).toHaveBeenCalled()
+    expect(onValidate).not.toHaveBeenCalled()
   })
 
   it('persistance rpe : reload affiche Effort n/10 (pas RPE, pas Facile/OK/Dur)', async () => {
@@ -369,7 +371,7 @@ describe('ImmersiveExerciseSession', () => {
     expect(host.querySelector('input[aria-label="Série 2 effort facultatif"]')).toBeTruthy()
   })
 
-  it('overlay récupération : maquette Evan (Récupération, Reprendre, +15 s, résumé série réelle)', async () => {
+  it('overlay récupération : voile + chrono 01:30, sans bandeau série terminée', async () => {
     function StartRest() {
       const rest = useRestTimerContext()
       return (
@@ -432,16 +434,84 @@ describe('ImmersiveExerciseSession', () => {
     expect(host.querySelector('[data-immersive-session]')?.getAttribute('data-recovery-active')).toBe(
       'true',
     )
-    expect(host.querySelector('[data-immersive-session-body]')?.className).toContain('opacity-')
-    expect(host.textContent).toContain('Récupération')
-    expect(host.textContent).toContain('1 min 30')
+    expect(host.querySelector('[data-recovery-veil]')).toBeTruthy()
+    expect(host.querySelector('[data-recovery-remaining]')?.textContent).toBe('01:30')
+    expect(host.querySelector('[data-recovery-label]')?.textContent).toContain('1 min 30')
     expect(host.textContent).toContain('Reprendre')
     expect(host.textContent).toContain('+15 s')
-    expect(host.textContent).toContain('Série 1 terminée · 80 kg × 6')
-    expect(host.textContent).not.toContain('Série suivante')
+    expect(host.textContent).not.toMatch(/Série \d+ terminée/)
+    expect(host.querySelector('[data-recovery-completed-summary]')).toBeNull()
     expect(host.textContent).not.toContain('+30 s')
     expect(host.textContent).not.toContain('Passer')
     expect(host.textContent).not.toContain('RPE')
-    expect(host.querySelector('[data-bottom-nav-host]')).toBeNull()
+    // Corps séance : pas d’opacity forcée (voile séparé)
+    expect(host.querySelector('[data-immersive-session-body]')?.className).not.toContain('opacity-')
+  })
+
+  it('Effort 8 : validation une seule fois puis chrono à 01:30', async () => {
+    const onValidate = vi.fn()
+    const onUpdate = vi.fn()
+    // Parent simule finishSet + start rest (comme WorkoutNotebook)
+    function Harness() {
+      const rest = useRestTimerContext()
+      const [sets, setSets] = useState([
+        { reps: 6, weightKg: 80 },
+        { reps: 6, weightKg: 80 },
+      ])
+      return (
+        <ImmersiveExerciseSession
+          exercises={[{ id: 'ex-1', name: 'Squat', sets }]}
+          activeIndex={0}
+          onActiveIndexChange={vi.fn()}
+          sessionClockLabel="00:10"
+          sessionPaused={false}
+          onBack={vi.fn()}
+          onUpdateSet={(_id, idx, patch) => {
+            onUpdate(_id, idx, patch)
+            setSets((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)))
+          }}
+          onAddSet={vi.fn()}
+          onValidateSet={(ex, setIndex, restSec) => {
+            onValidate(ex, setIndex, restSec)
+            setSets((prev) =>
+              prev.map((s, i) => (i === setIndex ? { ...s, done: true as const } : s)),
+            )
+            rest.start(restSec || 90, {
+              exerciseId: ex.id,
+              setIndex,
+              exerciseName: ex.name,
+              setLabel: `S${setIndex + 1}`,
+            })
+          }}
+          onFinishSession={vi.fn()}
+          autoValidate
+        />
+      )
+    }
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <Harness />
+        </RestTimerProvider>,
+      )
+    })
+    const effortInput = host.querySelector(
+      'input[aria-label="Série 1 effort facultatif"]',
+    ) as HTMLInputElement
+    await act(async () => {
+      effortInput.focus()
+      const setter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        'value',
+      )?.set
+      setter?.call(effortInput, '8')
+      effortInput.dispatchEvent(new Event('input', { bubbles: true }))
+      effortInput.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    expect(onValidate).toHaveBeenCalledTimes(1)
+    expect(onValidate.mock.calls[0][1]).toBe(0)
+    expect(host.querySelector('[data-recovery-timer]')).toBeTruthy()
+    expect(host.querySelector('[data-recovery-remaining]')?.textContent).toBe('01:30')
+    expect(host.textContent).not.toMatch(/Série \d+ terminée/)
   })
 })

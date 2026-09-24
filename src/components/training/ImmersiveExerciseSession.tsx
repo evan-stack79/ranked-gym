@@ -108,18 +108,6 @@ export function ImmersiveExerciseSession({
       ? rest.state.remainingSec
       : restSecResolved
   const showRecovery = autoValidate && restActive
-  const completedSummary = (() => {
-    const target = rest.state.target
-    if (!target) return null
-    const ex = exercises.find((e) => e.id === target.exerciseId) ?? exercise
-    const set = ex.sets[target.setIndex]
-    if (!set) return null
-    return {
-      setNumber: target.setIndex + 1,
-      weightKg: set.weightKg,
-      reps: set.reps,
-    }
-  })()
 
   const patchSet = (idx: number, patch: Partial<WorkoutSet>) => {
     const current = exercise.sets[idx]
@@ -160,7 +148,7 @@ export function ImmersiveExerciseSession({
     >
       <div
         className={`flex min-h-[100dvh] flex-col ${
-          showRecovery ? 'pointer-events-none select-none opacity-[0.28]' : ''
+          showRecovery ? 'pointer-events-none select-none' : ''
         }`}
         aria-hidden={showRecovery ? true : undefined}
         data-immersive-session-body
@@ -529,7 +517,7 @@ export function ImmersiveExerciseSession({
       </div>
       </div>
 
-      {showRecovery ? <RecoveryTimerPanel completedSummary={completedSummary} /> : null}
+      {showRecovery ? <RecoveryTimerPanel /> : null}
     </section>
   )
 }

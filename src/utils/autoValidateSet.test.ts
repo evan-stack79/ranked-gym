@@ -19,21 +19,23 @@ describe('isValidEffort', () => {
 })
 
 describe('isSetReadyForAutoValidate', () => {
-  it('refuse charge/reps manquantes ou série déjà done (Effort non requis)', () => {
-    expect(isSetReadyForAutoValidate({ reps: 0, weightKg: 20 })).toBe(false)
-    expect(isSetReadyForAutoValidate({ reps: 8, weightKg: Number.NaN })).toBe(false)
-    expect(isSetReadyForAutoValidate({ reps: 8, weightKg: 20, done: true })).toBe(false)
+  it('refuse sans Effort / charge / reps invalides', () => {
+    expect(isSetReadyForAutoValidate({ reps: 8, weightKg: 20 })).toBe(false)
+    expect(isSetReadyForAutoValidate({ reps: 8, weightKg: 20, rpe: undefined })).toBe(false)
+    expect(isSetReadyForAutoValidate({ reps: 0, weightKg: 20, rpe: 8 })).toBe(false)
+    expect(isSetReadyForAutoValidate({ reps: 8, weightKg: Number.NaN, rpe: 8 })).toBe(false)
+    expect(isSetReadyForAutoValidate({ reps: 8, weightKg: 20, rpe: 8, done: true })).toBe(false)
   })
 
-  it('accepte charge+reps valides sans Effort (0 kg autorisé)', () => {
-    expect(isSetReadyForAutoValidate({ reps: 8, weightKg: 20 })).toBe(true)
-    expect(isSetReadyForAutoValidate({ reps: 10, weightKg: 0 })).toBe(true)
-    expect(isSetReadyForAutoValidate({ reps: 6, weightKg: 80 })).toBe(true)
+  it('accepte charge+reps+Effort 1–10 (0 kg autorisé)', () => {
+    expect(isSetReadyForAutoValidate({ reps: 8, weightKg: 20, rpe: 7 })).toBe(true)
+    expect(isSetReadyForAutoValidate({ reps: 10, weightKg: 0, rpe: 1 })).toBe(true)
+    expect(isSetReadyForAutoValidate({ reps: 6, weightKg: 80, rpe: 10 })).toBe(true)
   })
 })
 
 describe('shouldCommitAutoValidate', () => {
-  const key = makeAutoValidateKey('ex-1', 0, { reps: 8, weightKg: 20 })
+  const key = makeAutoValidateKey('ex-1', 0, { reps: 8, weightKg: 20, rpe: 8 })
 
   it('valide une seule fois (anti-doublon re-render)', () => {
     expect(

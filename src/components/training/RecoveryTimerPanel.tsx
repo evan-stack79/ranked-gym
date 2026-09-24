@@ -1,6 +1,8 @@
+import { useRef } from 'react'
 import { useRestTimerContext } from '../../context/RestTimerContext'
 
-function formatClock(totalSec: number): string {
+/** Compte à rebours MM:SS — 01:30, 00:47, 00:30, 00:05. */
+export function formatRecoveryClock(totalSec: number): string {
   const s = Math.max(0, Math.floor(totalSec))
   const m = Math.floor(s / 60)
   const r = s % 60
@@ -17,87 +19,94 @@ export function formatRecoveryDurationLabel(totalSec: number): string {
   return `${m} min ${r}`
 }
 
-interface RecoveryTimerPanelProps {
-  /** Série venant d’être validée — valeurs réelles (maquette). */
-  completedSummary?: { setNumber: number; weightKg: number; reps: number } | null
-}
-
 /**
- * Overlay récupération (maquette Evan) — pas de carte, pas de barre, pas de glass.
- * Émerge sur la séance assombrie (opacité gérée par le parent).
+ * Overlay récupération (maquette Evan).
+ * Voile uniforme sur la séance + couche chrono dédiée opaque (rien ne traverse).
+ * Glow rouge progressif depuis le bas — pas de carte, pas de barre, pas de bandeau.
  * Source unique : RestTimerContext (endsAt persisté).
  */
-export function RecoveryTimerPanel({ completedSummary = null }: RecoveryTimerPanelProps) {
+export function RecoveryTimerPanel() {
   const rest = useRestTimerContext()
+  /** Durée affichée dans le label — figée au démarrage (pas gonflée par +15 s). */
+  const programmedSecRef = useRef<number | null>(null)
 
-  if (!rest.state.active && !rest.state.finished) return null
+  if (!rest.state.active && !rest.state.finished) {
+    programmedSecRef.current = null
+    return null
+  }
 
-  const total = Math.max(1, rest.state.totalSec)
+  if (programmedSecRef.current == null && rest.state.totalSec > 0) {
+    programmedSecRef.current = rest.state.totalSec
+  }
+
+  const programmedSec = programmedSecRef.current ?? Math.max(1, rest.state.totalSec)
   const remaining = rest.state.finished ? 0 : rest.state.remainingSec
-  const durationLabel = formatRecoveryDurationLabel(total)
+  const durationLabel = formatRecoveryDurationLabel(programmedSec)
 
   return (
     <div
-      className="absolute inset-0 z-30 flex flex-col"
+      className="absolute inset-0 z-40 flex flex-col"
       data-recovery-timer
       data-recovery-overlay
       role="timer"
-      aria-label={`Récupération ${formatClock(remaining)}`}
+      aria-label={`Récupération ${formatRecoveryClock(remaining)}`}
     >
-      {/* Zone haute : résumé série réelle au-dessus du glow */}
-      <div className="relative flex flex-1 flex-col justify-end px-5 pb-2 pt-[max(3.5rem,env(safe-area-inset-top))]">
-        {completedSummary ? (
-          <p
-            className="flex items-center gap-2.5 text-[15px] font-semibold text-white/70"
-            data-recovery-completed-summary
-          >
-            <span
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#FF2B2B] text-[#FF2B2B]"
-              aria-hidden="true"
-            >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path
-                  d="M2.5 6.2L4.8 8.5L9.5 3.5"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
-            <span>
-              Série {completedSummary.setNumber} terminée · {formatWeight(completedSummary.weightKg)}{' '}
-              kg × {completedSummary.reps}
-            </span>
-          </p>
-        ) : null}
-      </div>
-
-      {/* Demi-basse : chrono + glow rouge progressif (pas de carte / barre) */}
+      {/* Voile noir uniforme — séance encore lisible (moins sombre qu’opacity 0.28) */}
       <div
-        className="relative flex flex-col items-center px-6 pb-[max(1.75rem,env(safe-area-inset-bottom))] pt-8"
-        data-recovery-controls
+        className="pointer-events-none absolute inset-0 bg-black/52"
+        aria-hidden="true"
+        data-recovery-veil
+      />
+
+      {/* Glow rouge progressif (bas → transparent) — pas un rectangle opaque */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[46%]"
+        aria-hidden="true"
+        data-recovery-glow
         style={{
           background:
-            'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(70,6,8,0.55) 42%, rgba(110,8,12,0.85) 100%)',
+            'linear-gradient(to top, rgba(255,43,43,0.42) 0%, rgba(255,43,43,0.14) 28%, rgba(255,43,43,0.04) 52%, transparent 78%)',
+        }}
+      />
+
+      {/* Bloc chrono remonté — couche opaque dédiée, rien de la séance ne traverse */}
+      <div
+        className="pointer-events-auto relative z-10 mt-auto flex flex-col items-center px-6"
+        data-recovery-controls
+        style={{
+          // Remonte le bloc (~8vh) + safe area iPhone sous +15 s
+          marginBottom: 'max(2.75rem, calc(env(safe-area-inset-bottom, 0px) + 1.25rem + 8vh))',
+          paddingTop: '1.75rem',
+          paddingBottom: '0.5rem',
         }}
       >
+        {/* Plaque opaque derrière label / chrono / boutons */}
+        <div
+          className="pointer-events-none absolute inset-x-0 -top-6 bottom-[-0.5rem] -z-10"
+          aria-hidden="true"
+          data-recovery-plate
+          style={{
+            background:
+              'linear-gradient(to top, #000 0%, #000 72%, rgba(0,0,0,0.92) 88%, rgba(0,0,0,0.55) 100%)',
+          }}
+        />
+
         <p className="text-center text-[15px] font-semibold tracking-tight" data-recovery-label>
           <span className="text-[#FF2B2B]">Récupération</span>
           <span className="text-white"> · {durationLabel}</span>
         </p>
 
         <p
-          className="mt-3 text-[72px] font-bold leading-none tracking-tight tabular-nums text-white sm:text-[80px]"
+          className="mt-3 text-[76px] font-bold leading-none tracking-tight tabular-nums text-white"
           data-recovery-remaining
         >
-          {formatClock(remaining)}
+          {formatRecoveryClock(remaining)}
         </p>
 
         <button
           type="button"
           onClick={() => rest.skip()}
-          className="ios-press mt-7 flex min-h-12 w-full max-w-[280px] items-center justify-center rounded-full border border-[#FF2B2B] bg-transparent text-[16px] font-semibold text-white"
+          className="ios-press mt-6 flex min-h-12 w-[52%] max-w-[200px] items-center justify-center rounded-full border border-[#FF2B2B] bg-transparent text-[16px] font-semibold text-white"
           data-recovery-resume
         >
           Reprendre
@@ -106,7 +115,7 @@ export function RecoveryTimerPanel({ completedSummary = null }: RecoveryTimerPan
         <button
           type="button"
           onClick={() => rest.addSeconds(15)}
-          className="ios-press mt-4 min-h-11 px-4 text-[15px] font-medium text-white/85"
+          className="ios-press mt-3 min-h-10 px-3 text-[14px] font-medium text-white/80"
           data-recovery-add-15
           aria-label="Ajouter 15 secondes de récupération"
         >
@@ -115,10 +124,4 @@ export function RecoveryTimerPanel({ completedSummary = null }: RecoveryTimerPan
       </div>
     </div>
   )
-}
-
-function formatWeight(kg: number): string {
-  if (!Number.isFinite(kg)) return '0'
-  const rounded = Math.round(kg * 10) / 10
-  return Number.isInteger(rounded) ? String(rounded) : String(rounded)
 }
