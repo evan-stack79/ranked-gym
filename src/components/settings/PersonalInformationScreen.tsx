@@ -11,6 +11,8 @@ import {
   normalizeCalorieProfile,
   saveCalorieProfile,
 } from '../../services/nutritionStorage'
+import { getTrainingState, setTrainingSports } from '../../services/trainingStorage'
+import { SportsMultiSelect } from '../onboarding/SportsMultiSelect'
 
 interface PersonalInformationScreenProps {
   onBack: () => void
@@ -33,6 +35,7 @@ export function PersonalInformationScreen({
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [sportIds, setSportIds] = useState<string[]>([])
 
   const displayAvatar = avatarPreview || profile?.avatar_url || null
   const email = user?.email ?? ''
@@ -45,6 +48,8 @@ export function PersonalInformationScreen({
     const calorie = getCalorieProfile()
     setWeightKg(calorie.weightKg > 0 ? calorie.weightKg : null)
     setHeightCm(calorie.heightCm > 0 ? calorie.heightCm : null)
+    const training = getTrainingState()
+    setSportIds(training.sportsUndecided ? [] : training.favoriteSportIds)
   }, [])
 
   const openAvatarPicker = () => {
@@ -106,6 +111,9 @@ export function PersonalInformationScreen({
           onboardingComplete: current.onboardingComplete || true,
         }),
       )
+      if (sportIds.length > 0) {
+        setTrainingSports(sportIds)
+      }
 
       setMessage('Modifications enregistrées.')
       void refreshProfile()
@@ -226,6 +234,19 @@ export function PersonalInformationScreen({
               <span className="pb-0.5 text-[13px] text-[#8E8E93]">cm</span>
             </div>
           </label>
+        </div>
+
+        <div
+          className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80 px-4 py-3"
+          data-profile-sports
+        >
+          <p className="text-[12px] font-semibold text-[#8E8E93]">Sports</p>
+          <p className="mt-1 text-[12px] text-[#636366]">
+            Modifiable à tout moment — alimente les recommandations Training.
+          </p>
+          <div className="mt-3 max-h-72">
+            <SportsMultiSelect selectedIds={sportIds} onChange={setSportIds} idPrefix="profile-sport" />
+          </div>
         </div>
       </div>
 

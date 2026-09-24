@@ -8,6 +8,9 @@ import {
   resolveExerciseMedia,
 } from '../../utils/exerciseMedia'
 import { useRestTimerContext } from '../../context/RestTimerContext'
+import { isSetReadyForAutoValidate } from '../../utils/autoValidateSet'
+import { CANONICAL_REST_SEC, resolveRestDuration } from '../../utils/restDuration'
+import { RecoveryTimerPanel } from './RecoveryTimerPanel'
 
 export interface ImmersiveExerciseSessionProps {
   exercises: ExerciseEntry[]
@@ -27,6 +30,9 @@ export interface ImmersiveExerciseSessionProps {
   /** Preferred rest length when idle (seconds). */
   restPrefSec?: number
   onRestPrefChange?: (sec: number) => void
+  autoValidate?: boolean
+  undoVisible?: boolean
+  onUndoValidation?: () => void
 }
 
 function formatClock(totalSec: number): string {
@@ -62,8 +68,11 @@ export function ImmersiveExerciseSession({
   onValidateSet,
   onFinishSession,
   saving = false,
-  restPrefSec = 90,
+  restPrefSec = CANONICAL_REST_SEC,
   onRestPrefChange,
+  autoValidate = false,
+  undoVisible = false,
+  onUndoValidation,
 }: ImmersiveExerciseSessionProps) {
   const rest = useRestTimerContext()
   const safeIndex = Math.min(Math.max(0, activeIndex), Math.max(0, exercises.length - 1))
@@ -89,11 +98,27 @@ export function ImmersiveExerciseSession({
     exercises.length > 0 ? Math.min(1, (safeIndex + 1) / exercises.length) : 0
 
   const restActive = rest.state.active || rest.state.finished
+  const restSecResolved = resolveRestDuration({
+    exerciseRestSec: exercise.targetRestSec,
+    preferredRestSec: restPrefSec,
+  })
   const restDisplaySec = rest.state.finished
     ? 0
     : rest.state.active
       ? rest.state.remainingSec
-      : restPrefSec
+      : restSecResolved
+  const showRecovery = autoValidate && restActive
+
+  const patchSet = (idx: number, patch: Partial<WorkoutSet>) => {
+    const current = exercise.sets[idx]
+    if (!current) return
+    onUpdateSet(exercise.id, idx, patch)
+    if (!autoValidate) return
+    const merged = { ...current, ...patch }
+    if (isSetReadyForAutoValidate(merged)) {
+      onValidateSet(exercise, idx, restSecResolved)
+    }
+  }
 
   const nudgeRest = (delta: number) => {
     if (rest.state.active && rest.state.target && !rest.state.finished) {
@@ -114,12 +139,20 @@ export function ImmersiveExerciseSession({
 
   return (
     <section
-      className="flex min-h-[100dvh] flex-col bg-black text-white"
+      className="relative flex min-h-[100dvh] flex-col bg-black text-white"
       data-immersive-session
       data-exercise-slug={media.slug}
       data-canonical-exercise={media.canonicalExerciseId ?? ''}
       data-hero-image={showImage ? 'ready' : 'fallback'}
+      data-recovery-active={showRecovery ? 'true' : 'false'}
     >
+      <div
+        className={`flex min-h-[100dvh] flex-col ${
+          showRecovery ? 'pointer-events-none select-none' : ''
+        }`}
+        aria-hidden={showRecovery ? true : undefined}
+        data-immersive-session-body
+      >
       {/* Hero — chrome overlays photo; interactive body stays in flow below */}
       <div className="relative isolate shrink-0 overflow-hidden">
         <div className="relative h-[min(32vh,268px)] w-full overflow-hidden">
@@ -221,7 +254,7 @@ export function ImmersiveExerciseSession({
           </p>
         </header>
 
-        {/* Sets grid */}
+        {/* Sets grid — Effort 1–10 (réf. 787e6ed), facultatif, jamais Facile/OK/Dur */}
         <div className="mb-1 grid grid-cols-[2.25rem_1fr_1fr_1fr_2.5rem] items-center gap-x-2 px-0.5">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-[#636366]">
             Série
@@ -269,7 +302,7 @@ export function ImmersiveExerciseSession({
                 </span>
                 <ClearableNumberInput
                   value={set.weightKg}
-                  onChange={(v) => onUpdateSet(exercise.id, idx, { weightKg: v ?? 0 })}
+                  onChange={(v) => patchSet(idx, { weightKg: v ?? 0 })}
                   min={0}
                   max={500}
                   step={0.5}
@@ -279,7 +312,7 @@ export function ImmersiveExerciseSession({
                 <ClearableNumberInput
                   value={set.reps}
                   onChange={(v) =>
-                    onUpdateSet(exercise.id, idx, { reps: v != null ? Math.round(v) : 0 })
+                    patchSet(idx, { reps: v != null ? Math.round(v) : 0 })
                   }
                   min={1}
                   max={50}
@@ -297,7 +330,7 @@ export function ImmersiveExerciseSession({
                   <ClearableNumberInput
                     value={set.rpe ?? null}
                     onChange={(v) =>
-                      onUpdateSet(exercise.id, idx, {
+                      patchSet(idx, {
                         rpe: v != null ? Math.min(10, Math.max(1, Math.round(v))) : undefined,
                       })
                     }
@@ -330,6 +363,17 @@ export function ImmersiveExerciseSession({
           })}
         </div>
 
+        {undoVisible && onUndoValidation ? (
+          <button
+            type="button"
+            onClick={onUndoValidation}
+            className="ios-press mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-white/12 text-[13px] font-semibold text-[#AEAEB2]"
+            data-undo-validation
+          >
+            Annuler
+          </button>
+        ) : null}
+
         <div className="mt-3 flex gap-2.5">
           <button
             type="button"
@@ -338,17 +382,19 @@ export function ImmersiveExerciseSession({
           >
             + Ajouter une série
           </button>
-          <button
-            type="button"
-            onClick={() => onValidateSet(exercise, validateIdx, restPrefSec)}
-            disabled={Boolean(exercise.sets[validateIdx]?.done) && pendingIdx < 0}
-            className="ios-press flex min-h-11 flex-[1.35] items-center justify-center rounded-xl bg-[#FF2B2B] px-3 text-[14px] font-semibold text-white disabled:opacity-40"
-          >
-            Valider la série
-          </button>
+          {autoValidate ? null : (
+            <button
+              type="button"
+              onClick={() => onValidateSet(exercise, validateIdx, restSecResolved)}
+              disabled={Boolean(exercise.sets[validateIdx]?.done) && pendingIdx < 0}
+              className="ios-press flex min-h-11 flex-[1.35] items-center justify-center rounded-xl bg-[#FF2B2B] px-3 text-[14px] font-semibold text-white disabled:opacity-40"
+            >
+              Valider la série
+            </button>
+          )}
         </div>
 
-        {/* Compact rest */}
+        {showRecovery ? null : (
         <div
           className="mt-3 flex min-h-11 items-center gap-3 rounded-xl border border-white/10 px-3"
           role="timer"
@@ -380,94 +426,102 @@ export function ImmersiveExerciseSession({
             <Plus className="h-4 w-4" strokeWidth={2.5} />
           </button>
         </div>
+        )}
 
         <div className="mt-3 h-px w-full bg-white/8" aria-hidden="true" />
 
-        {/* Progress + exercise nav */}
-        <div className="mt-2.5 flex items-center gap-3">
-          <div
-            className="relative flex h-11 w-11 shrink-0 items-center justify-center"
-            aria-label={`Progression ${progressLabel}`}
-          >
-            <svg width={ringSize} height={ringSize} className="-rotate-90" aria-hidden="true">
-              <circle
-                cx={ringSize / 2}
-                cy={ringSize / 2}
-                r={radius}
-                fill="none"
-                stroke="#2c2c2e"
-                strokeWidth={stroke}
-              />
-              <circle
-                cx={ringSize / 2}
-                cy={ringSize / 2}
-                r={radius}
-                fill="none"
-                stroke="#FF2B2B"
-                strokeWidth={stroke}
-                strokeLinecap="round"
-                strokeDasharray={circumference}
-                strokeDashoffset={dashOffset}
-              />
-            </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tabular-nums text-white">
-              {progressLabel}
-            </span>
-          </div>
+        {/* Progress + exercise nav — masqués pendant récup (évite fantômes sous le chrono) */}
+        {showRecovery ? null : (
+          <>
+            <div className="mt-2.5 flex items-center gap-3">
+              <div
+                className="relative flex h-11 w-11 shrink-0 items-center justify-center"
+                aria-label={`Progression ${progressLabel}`}
+              >
+                <svg width={ringSize} height={ringSize} className="-rotate-90" aria-hidden="true">
+                  <circle
+                    cx={ringSize / 2}
+                    cy={ringSize / 2}
+                    r={radius}
+                    fill="none"
+                    stroke="#2c2c2e"
+                    strokeWidth={stroke}
+                  />
+                  <circle
+                    cx={ringSize / 2}
+                    cy={ringSize / 2}
+                    r={radius}
+                    fill="none"
+                    stroke="#FF2B2B"
+                    strokeWidth={stroke}
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={dashOffset}
+                  />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tabular-nums text-white">
+                  {progressLabel}
+                </span>
+              </div>
 
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-semibold text-white">
-              {displayName}
-            </p>
-            <div
-              className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1"
-              role="navigation"
-              aria-label="Exercices de la séance"
-            >
-              {exercises.map((ex, i) => {
-                const current = i === safeIndex
-                return (
-                  <button
-                    key={ex.id}
-                    type="button"
-                    onClick={() => onActiveIndexChange(i)}
-                    className={`ios-press relative min-h-9 min-w-5 px-0.5 text-[13px] font-semibold tabular-nums ${
-                      current ? 'text-white' : 'text-[#636366]'
-                    }`}
-                    aria-current={current ? 'true' : undefined}
-                    aria-label={`Exercice ${i + 1}${ex.name ? ` ${ex.name}` : ''}`}
-                  >
-                    {i + 1}
-                    {current ? (
-                      <span className="absolute inset-x-0 -bottom-0.5 mx-auto h-0.5 w-3 rounded-full bg-[#FF2B2B]" />
-                    ) : null}
-                  </button>
-                )
-              })}
-              {onAddExercise ? (
-                <button
-                  type="button"
-                  onClick={onAddExercise}
-                  className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 text-[#AEAEB2]"
-                  aria-label="Ajouter un exercice"
-                  data-add-exercise
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-semibold text-white">
+                  {displayName}
+                </p>
+                <div
+                  className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1"
+                  role="navigation"
+                  aria-label="Exercices de la séance"
                 >
-                  <Plus className="h-4 w-4" strokeWidth={2.5} />
-                </button>
-              ) : null}
+                  {exercises.map((ex, i) => {
+                    const current = i === safeIndex
+                    return (
+                      <button
+                        key={ex.id}
+                        type="button"
+                        onClick={() => onActiveIndexChange(i)}
+                        className={`ios-press relative min-h-9 min-w-5 px-0.5 text-[13px] font-semibold tabular-nums ${
+                          current ? 'text-white' : 'text-[#636366]'
+                        }`}
+                        aria-current={current ? 'true' : undefined}
+                        aria-label={`Exercice ${i + 1}${ex.name ? ` ${ex.name}` : ''}`}
+                      >
+                        {i + 1}
+                        {current ? (
+                          <span className="absolute inset-x-0 -bottom-0.5 mx-auto h-0.5 w-3 rounded-full bg-[#FF2B2B]" />
+                        ) : null}
+                      </button>
+                    )
+                  })}
+                  {onAddExercise ? (
+                    <button
+                      type="button"
+                      onClick={onAddExercise}
+                      className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 text-[#AEAEB2]"
+                      aria-label="Ajouter un exercice"
+                      data-add-exercise
+                    >
+                      <Plus className="h-4 w-4" strokeWidth={2.5} />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <button
-          type="button"
-          onClick={onFinishSession}
-          disabled={saving}
-          className="ios-press mt-3 mb-0.5 min-h-11 w-full text-center text-[13px] font-medium text-[#636366] disabled:opacity-50"
-        >
-          {saving ? 'Synchro…' : 'Terminer la séance'}
-        </button>
+            <button
+              type="button"
+              onClick={onFinishSession}
+              disabled={saving}
+              className="ios-press mt-3 mb-0.5 min-h-11 w-full text-center text-[13px] font-medium text-[#636366] disabled:opacity-50"
+            >
+              {saving ? 'Synchro…' : 'Terminer la séance'}
+            </button>
+          </>
+        )}
       </div>
+      </div>
+
+      {showRecovery ? <RecoveryTimerPanel /> : null}
     </section>
   )
 }

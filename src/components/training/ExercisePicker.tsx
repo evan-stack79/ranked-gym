@@ -8,6 +8,7 @@ import {
 } from '../../utils/exerciseSearch'
 import { BRAND_MARK_COMPACT_SRC } from '../brand/BrandMark'
 import { ExercisePickerThumb } from './ExercisePickerThumb'
+import { getTrainingState } from '../../services/trainingStorage'
 
 export type ExercisePickerMode = 'first' | 'add'
 
@@ -36,11 +37,21 @@ export function ExercisePicker({
   const searchRef = useRef<HTMLInputElement>(null)
   const listId = useId()
 
+  const sportIds = useMemo(() => {
+    try {
+      const state = getTrainingState()
+      if (state.sportsUndecided) return undefined
+      return state.favoriteSportIds
+    } catch {
+      return undefined
+    }
+  }, [])
+
   const results = useMemo(
-    () => searchExercises(query, { limit: INITIAL_LIMIT }),
-    [query],
+    () => searchExercises(query, { limit: INITIAL_LIMIT, sportIds }),
+    [query, sportIds],
   )
-  const totalMatches = useMemo(() => countExerciseMatches(query), [query])
+  const totalMatches = useMemo(() => countExerciseMatches(query, sportIds), [query, sportIds])
 
   useEffect(() => {
     // Focus search after paint — clavier web OK, résultats visibles au-dessus.

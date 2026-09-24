@@ -12,13 +12,37 @@ interface TrainWeeklySummaryProps {
   summary: WeeklySummary
   filter: SportSummaryFilter
   onFilterChange: (filter: SportSummaryFilter) => void
+  /** Accueil maquette : une ligne, sans filtres ni cartes stats. */
+  compact?: boolean
 }
 
 export function TrainWeeklySummary({
   summary,
   filter,
   onFilterChange,
+  compact = false,
 }: TrainWeeklySummaryProps) {
+  if (compact) {
+    const sessions = summary.sessionCount
+    const timeMetric = summary.metrics.find((m) => m.id === 'active_min' || m.id === 'duration')
+    const timeLabel = timeMetric?.display
+    const line =
+      sessions <= 0
+        ? 'Aucune séance cette semaine'
+        : timeLabel
+          ? `${sessions} séance${sessions > 1 ? 's' : ''} · ${timeLabel}`
+          : `${sessions} séance${sessions > 1 ? 's' : ''}`
+    return (
+      <p
+        className="text-[13px] text-[#8E8E93]"
+        aria-label="Résumé de la semaine"
+        data-week-summary
+      >
+        {line}
+      </p>
+    )
+  }
+
   return (
     <section aria-label="Résumé de la semaine">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

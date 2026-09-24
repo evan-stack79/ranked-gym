@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { playRestCompleteChime } from '../utils/restTimerSound'
 import { vibrate } from '../utils/haptics'
+import { CANONICAL_REST_SEC, clampRestSec } from '../utils/restDuration'
 import {
   endRestLiveActivity,
   startRestLiveActivity,
@@ -25,7 +26,7 @@ import {
   type PersistedRestTimer,
 } from '../utils/restTimerPersist'
 
-export const REST_PRESETS_SEC = [45, 90, 180] as const
+export const REST_PRESETS_SEC = [45, CANONICAL_REST_SEC, 180] as const
 export type RestPresetSec = (typeof REST_PRESETS_SEC)[number]
 
 export type RestTimerTarget = {
@@ -52,8 +53,8 @@ export type RestLoggedPayload = {
 
 const IDLE: RestTimerState = {
   active: false,
-  totalSec: 90,
-  remainingSec: 90,
+  totalSec: CANONICAL_REST_SEC,
+  remainingSec: CANONICAL_REST_SEC,
   target: null,
   finished: false,
   paused: false,
@@ -79,6 +80,7 @@ type RestTimerContextValue = {
   resume: () => void
   skip: () => void
   dismiss: () => void
+  addSeconds: (delta: number) => void
   presets: typeof REST_PRESETS_SEC
 }
 
@@ -108,9 +110,9 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
   const [hydrateEpoch, setHydrateEpoch] = useState(0)
 
   const targetRef = useRef<RestTimerTarget | null>(null)
-  const totalRef = useRef(90)
+  const totalRef = useRef(CANONICAL_REST_SEC)
   const endsAtRef = useRef(0)
-  const remainingRef = useRef(90)
+  const remainingRef = useRef(CANONICAL_REST_SEC)
   const pausedRef = useRef(false)
   const finishedRef = useRef(false)
   /** Portée sous laquelle le timer mémoire a été armé — anti copie invité→compte. */
@@ -133,9 +135,9 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
   const resetMemory = useCallback(() => {
     clearTick()
     targetRef.current = null
-    totalRef.current = 90
+    totalRef.current = CANONICAL_REST_SEC
     endsAtRef.current = 0
-    remainingRef.current = 90
+    remainingRef.current = CANONICAL_REST_SEC
     pausedRef.current = false
     finishedRef.current = false
     lastPersistKeyRef.current = ''
@@ -341,6 +343,38 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     void endRestLiveActivity(true)
   }, [clearTick, persistSnap])
 
+  const addSeconds = useCallback(
+    (delta: number) => {
+      if (!targetRef.current || finishedRef.current) return
+      const current = pausedRef.current
+        ? remainingRef.current
+        : Math.max(0, Math.ceil((endsAtRef.current - Date.now()) / 1000))
+      const nextRemaining = clampRestSec(current + delta)
+      remainingRef.current = nextRemaining
+      totalRef.current = Math.max(totalRef.current, nextRemaining)
+      if (!pausedRef.current) {
+        endsAtRef.current = Date.now() + nextRemaining * 1000
+        if (tickIdRef.current == null) armTick()
+      }
+      setState((s) => ({
+        ...s,
+        remainingSec: nextRemaining,
+        totalSec: totalRef.current,
+        active: true,
+        paused: pausedRef.current,
+        finished: false,
+      }))
+      persistSnap({
+        totalSec: totalRef.current,
+        remainingSec: nextRemaining,
+        endsAt: pausedRef.current ? Date.now() + nextRemaining * 1000 : endsAtRef.current,
+        paused: pausedRef.current,
+        target: targetRef.current,
+      })
+    },
+    [armTick, persistSnap],
+  )
+
   const armTickRef = useRef(armTick)
   const clearTickRef = useRef(clearTick)
   const resetMemoryRef = useRef(resetMemory)
@@ -491,6 +525,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       resume,
       skip,
       dismiss,
+      addSeconds,
       presets: REST_PRESETS_SEC,
     }),
     [
@@ -505,6 +540,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       resume,
       skip,
       dismiss,
+      addSeconds,
     ],
   )
 

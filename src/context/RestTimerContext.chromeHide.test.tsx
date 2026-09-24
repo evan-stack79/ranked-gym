@@ -90,4 +90,34 @@ describe('RestTimerContext — chrome hide ne wipe pas le repos', () => {
     })
     expect(api!.state.active).toBe(true)
   })
+
+  it('+30 s ajuste endsAt ; Passer arrête le timer', async () => {
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <Probe onReady={(a) => { api = a }} />
+        </RestTimerProvider>,
+      )
+    })
+    await act(async () => {
+      api!.start(90, {
+        exerciseId: 'ex-1',
+        setIndex: 0,
+        exerciseName: 'Squat',
+        setLabel: 'S1',
+      })
+    })
+    const before = persistActiveRestTimer.mock.calls.at(-1)?.[0] as { endsAt: number }
+    await act(async () => {
+      api!.addSeconds(30)
+    })
+    expect(api!.state.remainingSec).toBeGreaterThanOrEqual(115)
+    const after = persistActiveRestTimer.mock.calls.at(-1)?.[0] as { endsAt: number }
+    expect(after.endsAt).toBeGreaterThan(before.endsAt)
+    await act(async () => {
+      api!.skip()
+    })
+    expect(api!.state.active).toBe(false)
+    expect(persistActiveRestTimer.mock.calls.at(-1)?.[0]).toBeNull()
+  })
 })

@@ -12,6 +12,7 @@ vi.mock('../../services/trainingStorage', () => ({
   setLastSelectedRoutine: vi.fn(),
   getTrainingState: () => ({ activeWorkoutDraft: null }),
   persistActiveExerciseIndex: vi.fn(),
+  setPreferredRestSec: vi.fn(),
 }))
 
 const squat: ExerciseEntry = {

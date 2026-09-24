@@ -111,6 +111,9 @@ export const convexTables = {
     isGhostModeEnabled: v.boolean(),
     /** Private accounts are only visible to self and accepted followers. Missing = public. */
     isPrivate: v.optional(v.boolean()),
+    /** Sports du profil (ids catalogue). Absent = non renseigné. */
+    sportIds: v.optional(v.array(v.string())),
+    sportsUndecided: v.optional(v.boolean()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

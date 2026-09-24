@@ -1,3 +1,5 @@
+import type { ExerciseEquipment, ExerciseLevel } from '../data/exerciseCatalog'
+
 export type SportCategory =
   | 'popular'
   | 'strength'
@@ -68,9 +70,9 @@ export type SetDifficulty = 'easy' | 'ok' | 'hard'
 export interface WorkoutSet {
   reps: number
   weightKg: number
-  /** Ressenti optionnel (Facile / OK / Dur) — informatif uniquement, ne prescrit plus la charge. */
+  /** Legacy easy/ok/hard — conservé pour lecture ancienne data ; UI immersive n’affiche plus ces libellés. */
   difficulty?: SetDifficulty
-  /** RPE optionnel (1–10) — informatif, jamais obligatoire, jamais auto-progression. */
+  /** Effort optionnel 1–10 (stocké en `rpe`) — informatif, jamais obligatoire, jamais auto-inventé. */
   rpe?: number
   /** Set marked done via « Terminer la série ». */
   done?: boolean
@@ -89,6 +91,11 @@ export interface ExerciseEntry {
    * Never infer from ambiguous titles like « DÉVELOPPER ».
    */
   canonicalExerciseId?: string
+  /**
+   * Repos cible de l’exercice (secondes), s’il est configuré.
+   * Distinct de `WorkoutSet.restSec` (repos réellement loggé).
+   */
+  targetRestSec?: number
 }
 
 /** Famille de séance — additive ; absente sur les notes legacy. */
@@ -247,4 +254,23 @@ export interface TrainingState {
    * Absent/null → reprise inattendue (cold start / OS) peut rouvrir la séance.
    */
   lastVoluntaryRoute?: LastVoluntaryRoute | null
+  /** Exercices refusés via « Pas pour moi » — persisté, jamais deviné. */
+  dismissedExerciseIds?: string[]
+  /**
+   * Matériel déclaré. Absent / vide = non renseigné (aucun filtre matériel).
+   * Ne pas inventer un inventaire à l’exécution.
+   */
+  availableEquipment?: ExerciseEquipment[]
+  /** Exercices exclus pour limitation déclarée. */
+  limitedExerciseIds?: string[]
+  /** Groupes musculaires à éviter (libellés canoniques du catalogue). */
+  limitedMuscles?: string[]
+  /** Niveau d’entraînement déclaré. Absent = non renseigné. */
+  trainingLevel?: ExerciseLevel
+  /** Préférence de repos (secondes). Absent = défaut canonique 90 s. */
+  preferredRestSec?: number
+  /** Onboarding sports terminé (y compris « je ne sais pas encore »). */
+  sportsOnboardingComplete?: boolean
+  /** L’utilisateur a choisi « Je ne sais pas encore ». */
+  sportsUndecided?: boolean
 }

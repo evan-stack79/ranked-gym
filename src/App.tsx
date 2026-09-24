@@ -10,6 +10,7 @@ import { OfflineBanner } from './components/ui/OfflineBanner'
 import { SupabaseConfigBanner } from './components/ui/SupabaseConfigBanner'
 import { useOnlineStatus } from './hooks/useOnlineStatus'
 import { GlobalOnboardingScreen } from './components/onboarding/GlobalOnboardingScreen'
+import { SportsOnboardingScreen } from './components/onboarding/SportsOnboardingScreen'
 import { HomeView } from './components/home/HomeView'
 import { TrainingView } from './components/training/TrainingView'
 import { NutritionView } from './components/nutrition/NutritionView'
@@ -18,8 +19,9 @@ import { hasCompletedNutritionOnboarding } from './services/nutritionStorage'
 import type { TabId } from './types'
 import { safeWarn } from './utils/safeLog'
 import { getTrainingState } from './services/trainingStorage'
+import { isSportsOnboardingEnabled } from './backend/trainingFeatureFlags'
 
-type AppPhase = 'loading' | 'onboarding' | 'main'
+type AppPhase = 'loading' | 'onboarding' | 'sports' | 'main'
 
 function resolveLaunchPhase(): AppPhase {
   try {
@@ -39,6 +41,7 @@ function renderActiveView(
   resumeActiveWorkout: boolean,
   onLaunchConsumed: () => void,
   onAfterSession: () => void,
+  openActivitySheet: boolean,
 ) {
   switch (tab) {
     case 'home':
@@ -56,6 +59,7 @@ function renderActiveView(
           resumeActiveWorkout={resumeActiveWorkout}
           onLaunchConsumed={onLaunchConsumed}
           onGoToLobby={onAfterSession}
+          openActivitySheet={openActivitySheet}
         />
       )
     case 'nutrition':
@@ -111,6 +115,7 @@ export function AppShell() {
   const [activeTab, setActiveTab] = useState<TabId>('home')
   const [launchRoutineId, setLaunchRoutineId] = useState<string | null>(null)
   const [resumeActiveWorkout, setResumeActiveWorkout] = useState(false)
+  const [openActivitySheet, setOpenActivitySheet] = useState(false)
   const [hasActiveWorkout, setHasActiveWorkout] = useState(() => Boolean(getTrainingState().activeWorkoutDraft))
   const { openAuth, isAuthenticated, isLoading, bootIssue, retryHydrate } = useAuth()
   const online = useOnlineStatus()
@@ -201,8 +206,16 @@ export function AppShell() {
       return
     }
     const activeDraft = getTrainingState().activeWorkoutDraft
-    setLaunchRoutineId(activeDraft?.routineId ?? null)
-    setResumeActiveWorkout(Boolean(activeDraft))
+    if (activeDraft) {
+      setLaunchRoutineId(activeDraft.routineId)
+      setResumeActiveWorkout(true)
+      setOpenActivitySheet(false)
+      setActiveTab('training')
+      return
+    }
+    setLaunchRoutineId(null)
+    setResumeActiveWorkout(false)
+    setOpenActivitySheet(true)
     setActiveTab('training')
   }
 
@@ -217,9 +230,22 @@ export function AppShell() {
   const handleLaunchConsumed = () => {
     setLaunchRoutineId(null)
     setResumeActiveWorkout(false)
+    setOpenActivitySheet(false)
   }
 
   const handleOnboardingComplete = () => {
+    if (
+      isSportsOnboardingEnabled() &&
+      getTrainingState().sportsOnboardingComplete !== true
+    ) {
+      setPhase('sports')
+      return
+    }
+    setPhase('main')
+    setActiveTab('home')
+  }
+
+  const handleSportsComplete = () => {
     setPhase('main')
     setActiveTab('home')
   }
@@ -272,6 +298,17 @@ export function AppShell() {
     )
   }
 
+  if (phase === 'sports') {
+    return (
+      <>
+        <SupabaseConfigBanner />
+        {!online ? <OfflineBanner /> : null}
+        <SportsOnboardingScreen onComplete={handleSportsComplete} />
+        <AuthBottomSheet />
+      </>
+    )
+  }
+
   return (
     <>
       <SupabaseConfigBanner />
@@ -294,6 +331,7 @@ export function AppShell() {
           resumeActiveWorkout,
           handleLaunchConsumed,
           () => setActiveTab('home'),
+          openActivitySheet,
         )}
       </AppLayout>
       <AuthBottomSheet />
