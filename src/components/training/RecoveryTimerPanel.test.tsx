@@ -2,7 +2,11 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { RecoveryTimerPanel } from './RecoveryTimerPanel'
+import {
+  formatRecoveryClock,
+  formatRecoveryDurationLabel,
+  RecoveryTimerPanel,
+} from './RecoveryTimerPanel'
 import { RestTimerProvider, useRestTimerContext } from '../../context/RestTimerContext'
 
 vi.mock('../../services/trainingStorage', () => ({
@@ -25,13 +29,13 @@ vi.mock('../../utils/haptics', () => ({
   vibrate: vi.fn(),
 }))
 
-function Starter() {
+function Starter({ seconds = 90 }: { seconds?: number }) {
   const rest = useRestTimerContext()
   return (
     <button
       type="button"
       onClick={() =>
-        rest.start(90, {
+        rest.start(seconds, {
           exerciseId: 'ex-1',
           setIndex: 0,
           exerciseName: 'Squat',
@@ -40,6 +44,19 @@ function Starter() {
       }
     >
       go
+    </button>
+  )
+}
+
+function ApiProbe({
+  onReady,
+}: {
+  onReady: (api: ReturnType<typeof useRestTimerContext>) => void
+}) {
+  const rest = useRestTimerContext()
+  return (
+    <button type="button" onClick={() => onReady(rest)}>
+      probe
     </button>
   )
 }
@@ -58,27 +75,117 @@ afterEach(async () => {
   host.remove()
 })
 
+describe('formatRecoveryClock', () => {
+  it('format MM:SS obligatoire (01:30, 00:47, 00:30, 00:05)', () => {
+    expect(formatRecoveryClock(90)).toBe('01:30')
+    expect(formatRecoveryClock(47)).toBe('00:47')
+    expect(formatRecoveryClock(30)).toBe('00:30')
+    expect(formatRecoveryClock(5)).toBe('00:05')
+    expect(formatRecoveryClock(0)).toBe('00:00')
+  })
+})
+
+describe('formatRecoveryDurationLabel', () => {
+  it('formate 90 s → 1 min 30 et 105 s → 1 min 45', () => {
+    expect(formatRecoveryDurationLabel(90)).toBe('1 min 30')
+    expect(formatRecoveryDurationLabel(105)).toBe('1 min 45')
+    expect(formatRecoveryDurationLabel(45)).toBe('45 s')
+    expect(formatRecoveryDurationLabel(60)).toBe('1 min')
+  })
+})
+
 describe('RecoveryTimerPanel', () => {
-  it('affiche Récupération, +30 s, Passer et la série suivante', async () => {
+  it('repos 90 s démarre à 01:30 ; label Récupération · 1 min 30 ; pas de bandeau série', async () => {
     await act(async () => {
       root.render(
-        <RestTimerProvider>
-          <Starter />
-          <RecoveryTimerPanel
-            nextHint={{ exerciseName: 'Squat', setLabel: 'Série 2' }}
-          />
-        </RestTimerProvider>,
+        <div className="relative min-h-[100dvh]">
+          <RestTimerProvider>
+            <Starter seconds={90} />
+            <RecoveryTimerPanel />
+          </RestTimerProvider>
+        </div>,
       )
     })
     expect(host.querySelector('[data-recovery-timer]')).toBeNull()
     await act(async () => {
       host.querySelector('button')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-    expect(host.querySelector('[data-recovery-timer]')).toBeTruthy()
-    expect(host.textContent).toContain('Récupération')
-    expect(host.textContent).toContain('+30 s')
-    expect(host.textContent).toContain('Passer')
-    expect(host.textContent).toContain('Série suivante : Série 2 · Squat')
-    expect(host.querySelector('[data-recovery-remaining]')?.textContent).toMatch(/01:3/)
+    const panel = host.querySelector('[data-recovery-timer]')
+    expect(panel).toBeTruthy()
+    expect(host.querySelector('[data-recovery-veil]')).toBeTruthy()
+    expect(host.querySelector('[data-recovery-glow]')).toBeTruthy()
+    expect(host.querySelector('[data-recovery-fade]')).toBeTruthy()
+    expect(host.querySelector('[data-recovery-plate]')).toBeNull()
+    expect(host.querySelector('[data-recovery-label]')?.textContent).toBe(
+      'Récupération · 1 min 30',
+    )
+    expect(host.querySelector('[data-recovery-remaining]')?.textContent).toBe('01:30')
+    expect(host.querySelector('[data-recovery-resume]')?.textContent).toContain('Reprendre')
+    expect(host.querySelector('[data-recovery-add-15]')?.textContent).toContain('+15 s')
+    // Plus de bandeau « Série N terminée »
+    expect(host.querySelector('[data-recovery-completed-summary]')).toBeNull()
+    expect(host.textContent).not.toMatch(/Série \d+ terminée/)
+    expect(host.textContent).not.toContain('+30 s')
+    expect(host.textContent).not.toContain('Passer')
+    expect(host.textContent).not.toContain('RPE')
+  })
+
+  it('+15 s prolonge endsAt ; label suit → 1 min 45 ; Reprendre arrête', async () => {
+    const box: { api?: ReturnType<typeof useRestTimerContext> } = {}
+    const { persistActiveRestTimer } = await import('../../services/trainingStorage')
+    const persist = vi.mocked(persistActiveRestTimer)
+    persist.mockClear()
+
+    await act(async () => {
+      root.render(
+        <div className="relative min-h-[100dvh]">
+          <RestTimerProvider>
+            <Starter seconds={90} />
+            <ApiProbe
+              onReady={(r) => {
+                box.api = r
+              }}
+            />
+            <RecoveryTimerPanel />
+          </RestTimerProvider>
+        </div>,
+      )
+    })
+    await act(async () => {
+      ;[...host.querySelectorAll('button')]
+        .find((b) => b.textContent === 'go')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await act(async () => {
+      ;[...host.querySelectorAll('button')]
+        .find((b) => b.textContent === 'probe')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(box.api?.state.active).toBe(true)
+    expect(host.querySelector('[data-recovery-remaining]')?.textContent).toBe('01:30')
+    expect(host.querySelector('[data-recovery-label]')?.textContent).toBe(
+      'Récupération · 1 min 30',
+    )
+
+    const beforeCalls = persist.mock.calls.length
+    await act(async () => {
+      host
+        .querySelector('[data-recovery-add-15]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(persist.mock.calls.length).toBeGreaterThan(beforeCalls)
+    const last = persist.mock.calls.at(-1)?.[0] as { endsAt: number; remainingSec: number; totalSec: number }
+    expect(last.remainingSec).toBeGreaterThanOrEqual(100)
+    expect(host.querySelector('[data-recovery-remaining]')?.textContent).toBe('01:45')
+    expect(host.querySelector('[data-recovery-label]')?.textContent).toBe(
+      'Récupération · 1 min 45',
+    )
+
+    await act(async () => {
+      host
+        .querySelector('[data-recovery-resume]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(host.querySelector('[data-recovery-timer]')).toBeNull()
   })
 })

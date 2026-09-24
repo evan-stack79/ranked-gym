@@ -1,29 +1,41 @@
 import { describe, expect, it } from 'vitest'
 import {
   isSetReadyForAutoValidate,
+  isValidEffort,
   makeAutoValidateKey,
   nextSetHint,
   shouldCommitAutoValidate,
 } from './autoValidateSet'
 
+describe('isValidEffort', () => {
+  it('accepte uniquement 1–10', () => {
+    expect(isValidEffort(1)).toBe(true)
+    expect(isValidEffort(10)).toBe(true)
+    expect(isValidEffort(0)).toBe(false)
+    expect(isValidEffort(11)).toBe(false)
+    expect(isValidEffort('ok')).toBe(false)
+    expect(isValidEffort(undefined)).toBe(false)
+  })
+})
+
 describe('isSetReadyForAutoValidate', () => {
-  it('refuse charge/reps manquantes ou Effort absent', () => {
+  it('refuse sans Effort / charge / reps invalides', () => {
     expect(isSetReadyForAutoValidate({ reps: 8, weightKg: 20 })).toBe(false)
-    expect(isSetReadyForAutoValidate({ reps: 0, weightKg: 20, difficulty: 'ok' })).toBe(false)
-    expect(isSetReadyForAutoValidate({ reps: 8, weightKg: Number.NaN, difficulty: 'ok' })).toBe(false)
-    expect(isSetReadyForAutoValidate({ reps: 8, weightKg: 20, difficulty: 'ok', done: true })).toBe(
-      false,
-    )
+    expect(isSetReadyForAutoValidate({ reps: 8, weightKg: 20, rpe: undefined })).toBe(false)
+    expect(isSetReadyForAutoValidate({ reps: 0, weightKg: 20, rpe: 8 })).toBe(false)
+    expect(isSetReadyForAutoValidate({ reps: 8, weightKg: Number.NaN, rpe: 8 })).toBe(false)
+    expect(isSetReadyForAutoValidate({ reps: 8, weightKg: 20, rpe: 8, done: true })).toBe(false)
   })
 
-  it('accepte Effort sélectionné avec charge/reps valides (0 kg autorisé)', () => {
-    expect(isSetReadyForAutoValidate({ reps: 10, weightKg: 0, difficulty: 'easy' })).toBe(true)
-    expect(isSetReadyForAutoValidate({ reps: 6, weightKg: 80, difficulty: 'hard' })).toBe(true)
+  it('accepte charge+reps+Effort 1–10 (0 kg autorisé)', () => {
+    expect(isSetReadyForAutoValidate({ reps: 8, weightKg: 20, rpe: 7 })).toBe(true)
+    expect(isSetReadyForAutoValidate({ reps: 10, weightKg: 0, rpe: 1 })).toBe(true)
+    expect(isSetReadyForAutoValidate({ reps: 6, weightKg: 80, rpe: 10 })).toBe(true)
   })
 })
 
 describe('shouldCommitAutoValidate', () => {
-  const key = makeAutoValidateKey('ex-1', 0, { reps: 8, weightKg: 20, difficulty: 'ok' })
+  const key = makeAutoValidateKey('ex-1', 0, { reps: 8, weightKg: 20, rpe: 8 })
 
   it('valide une seule fois (anti-doublon re-render)', () => {
     expect(

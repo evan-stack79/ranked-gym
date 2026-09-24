@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Check, ChevronLeft, Minus, Pause, Play, Plus, Timer } from 'lucide-react'
-import type { ExerciseEntry, SetDifficulty, WorkoutSet } from '../../types/training'
+import type { ExerciseEntry, WorkoutSet } from '../../types/training'
 import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
 import { BRAND_MARK_COMPACT_SRC } from '../brand/BrandMark'
 import {
@@ -8,7 +8,7 @@ import {
   resolveExerciseMedia,
 } from '../../utils/exerciseMedia'
 import { useRestTimerContext } from '../../context/RestTimerContext'
-import { isSetReadyForAutoValidate, nextSetHint } from '../../utils/autoValidateSet'
+import { isSetReadyForAutoValidate } from '../../utils/autoValidateSet'
 import { CANONICAL_REST_SEC, resolveRestDuration } from '../../utils/restDuration'
 import { RecoveryTimerPanel } from './RecoveryTimerPanel'
 
@@ -49,12 +49,6 @@ function formatEffort(set: WorkoutSet): string | null {
 
 const FIELD =
   'min-h-11 w-full rounded-lg border border-white/12 bg-[#1c1c1e] px-2 text-center text-[15px] font-semibold tabular-nums text-white outline-none focus-visible:border-[#FF2B2B]/55'
-
-const EFFORT_CHIPS: { id: SetDifficulty; label: string }[] = [
-  { id: 'easy', label: 'Facile' },
-  { id: 'ok', label: 'OK' },
-  { id: 'hard', label: 'Dur' },
-]
 
 /**
  * Immersive single-exercise session canvas (bench-press reference layout).
@@ -114,10 +108,6 @@ export function ImmersiveExerciseSession({
       ? rest.state.remainingSec
       : restSecResolved
   const showRecovery = autoValidate && restActive
-  /** Index de la série *terminée* (cible du timer), pas le prochain pending — sinon on saute une série. */
-  const hintAfterSetIndex = rest.state.target?.setIndex ?? validateIdx
-  const hintExerciseId = rest.state.target?.exerciseId ?? exercise.id
-  const recoveryHint = nextSetHint(exercises, hintExerciseId, hintAfterSetIndex)
 
   const patchSet = (idx: number, patch: Partial<WorkoutSet>) => {
     const current = exercise.sets[idx]
@@ -149,12 +139,20 @@ export function ImmersiveExerciseSession({
 
   return (
     <section
-      className="flex min-h-[100dvh] flex-col bg-black text-white"
+      className="relative flex min-h-[100dvh] flex-col bg-black text-white"
       data-immersive-session
       data-exercise-slug={media.slug}
       data-canonical-exercise={media.canonicalExerciseId ?? ''}
       data-hero-image={showImage ? 'ready' : 'fallback'}
+      data-recovery-active={showRecovery ? 'true' : 'false'}
     >
+      <div
+        className={`flex min-h-[100dvh] flex-col ${
+          showRecovery ? 'pointer-events-none select-none' : ''
+        }`}
+        aria-hidden={showRecovery ? true : undefined}
+        data-immersive-session-body
+      >
       {/* Hero — chrome overlays photo; interactive body stays in flow below */}
       <div className="relative isolate shrink-0 overflow-hidden">
         <div className="relative h-[min(32vh,268px)] w-full overflow-hidden">
@@ -256,8 +254,8 @@ export function ImmersiveExerciseSession({
           </p>
         </header>
 
-        {/* Sets grid */}
-        <div className={`mb-1 grid items-center gap-x-2 px-0.5 ${autoValidate ? 'grid-cols-[2.25rem_1fr_1fr_2.5rem]' : 'grid-cols-[2.25rem_1fr_1fr_1fr_2.5rem]'}`}>
+        {/* Sets grid — Effort 1–10 (réf. 787e6ed), facultatif, jamais Facile/OK/Dur */}
+        <div className="mb-1 grid grid-cols-[2.25rem_1fr_1fr_1fr_2.5rem] items-center gap-x-2 px-0.5">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-[#636366]">
             Série
           </span>
@@ -267,11 +265,9 @@ export function ImmersiveExerciseSession({
           <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#636366]">
             Reps
           </span>
-          {autoValidate ? null : (
-            <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#636366]">
-              Effort
-            </span>
-          )}
+          <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#636366]">
+            Effort
+          </span>
           <span className="sr-only">Validation</span>
         </div>
 
@@ -281,124 +277,87 @@ export function ImmersiveExerciseSession({
             const active = !done && idx === pendingIdx
             const upcoming = !done && idx !== pendingIdx
             const effortDone = formatEffort(set)
-            const effortLabel =
-              set.difficulty === 'easy'
-                ? 'Facile'
-                : set.difficulty === 'ok'
-                  ? 'OK'
-                  : set.difficulty === 'hard'
-                    ? 'Dur'
-                    : null
 
             return (
-              <div key={idx} role="listitem" data-set-row={done ? 'done' : active ? 'active' : 'upcoming'}>
-                <div
-                  className={`relative grid items-center gap-x-2 ${
-                    autoValidate
-                      ? 'grid-cols-[2.25rem_1fr_1fr_2.5rem]'
-                      : 'grid-cols-[2.25rem_1fr_1fr_1fr_2.5rem]'
-                  } ${upcoming ? 'opacity-45' : ''}`}
-                >
-                  {active ? (
-                    <span
-                      className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#FF2B2B]"
-                      aria-hidden="true"
-                    />
-                  ) : null}
+              <div
+                key={idx}
+                role="listitem"
+                data-set-row={done ? 'done' : active ? 'active' : 'upcoming'}
+                className={`relative grid grid-cols-[2.25rem_1fr_1fr_1fr_2.5rem] items-center gap-x-2 ${
+                  upcoming ? 'opacity-45' : ''
+                }`}
+              >
+                {active ? (
                   <span
-                    className={`text-center text-[13px] font-bold tabular-nums ${
-                      done ? 'text-white' : active ? 'text-white' : 'text-[#8E8E93]'
-                    }`}
-                  >
-                    {idx + 1}
-                  </span>
-                  <ClearableNumberInput
-                    value={set.weightKg}
-                    onChange={(v) => patchSet(idx, { weightKg: v ?? 0 })}
-                    min={0}
-                    max={500}
-                    step={0.5}
-                    aria-label={`Série ${idx + 1} poids`}
-                    className={FIELD}
+                    className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#FF2B2B]"
+                    aria-hidden="true"
                   />
+                ) : null}
+                <span
+                  className={`text-center text-[13px] font-bold tabular-nums ${
+                    done ? 'text-white' : active ? 'text-white' : 'text-[#8E8E93]'
+                  }`}
+                >
+                  {idx + 1}
+                </span>
+                <ClearableNumberInput
+                  value={set.weightKg}
+                  onChange={(v) => patchSet(idx, { weightKg: v ?? 0 })}
+                  min={0}
+                  max={500}
+                  step={0.5}
+                  aria-label={`Série ${idx + 1} poids`}
+                  className={FIELD}
+                />
+                <ClearableNumberInput
+                  value={set.reps}
+                  onChange={(v) =>
+                    patchSet(idx, { reps: v != null ? Math.round(v) : 0 })
+                  }
+                  min={1}
+                  max={50}
+                  aria-label={`Série ${idx + 1} reps`}
+                  className={FIELD}
+                />
+                {done && effortDone ? (
+                  <div
+                    className={`${FIELD} flex items-center justify-center text-[13px] text-[#AEAEB2]`}
+                    aria-label={`Série ${idx + 1} effort ${effortDone}`}
+                  >
+                    {effortDone}
+                  </div>
+                ) : (
                   <ClearableNumberInput
-                    value={set.reps}
+                    value={set.rpe ?? null}
                     onChange={(v) =>
-                      patchSet(idx, { reps: v != null ? Math.round(v) : 0 })
+                      patchSet(idx, {
+                        rpe: v != null ? Math.min(10, Math.max(1, Math.round(v))) : undefined,
+                      })
                     }
                     min={1}
-                    max={50}
-                    aria-label={`Série ${idx + 1} reps`}
-                    className={FIELD}
+                    max={10}
+                    required={false}
+                    placeholder="1–10"
+                    placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#636366]"
+                    aria-label={`Série ${idx + 1} effort facultatif`}
+                    className={`${FIELD} text-[13px] text-[#AEAEB2]`}
                   />
-                  {autoValidate ? null : done && effortDone ? (
-                    <div
-                      className={`${FIELD} flex items-center justify-center text-[13px] text-[#AEAEB2]`}
-                      aria-label={`Série ${idx + 1} effort ${effortDone}`}
+                )}
+                <div className="flex items-center justify-center">
+                  {done ? (
+                    <span
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-white"
+                      aria-label={`Série ${idx + 1} validée`}
                     >
-                      {effortDone}
-                    </div>
-                  ) : autoValidate ? null : (
-                    <ClearableNumberInput
-                      value={set.rpe ?? null}
-                      onChange={(v) =>
-                        patchSet(idx, {
-                          rpe: v != null ? Math.min(10, Math.max(1, Math.round(v))) : undefined,
-                        })
-                      }
-                      min={1}
-                      max={10}
-                      required={false}
-                      placeholder="1–10"
-                      placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#636366]"
-                      aria-label={`Série ${idx + 1} effort facultatif`}
-                      className={`${FIELD} text-[13px] text-[#AEAEB2]`}
+                      <Check className="h-3.5 w-3.5 text-black" strokeWidth={3} />
+                    </span>
+                  ) : (
+                    <span
+                      className="h-7 w-7 rounded-full border border-[#3a3a3c]"
+                      aria-hidden="true"
                     />
                   )}
-                  <div className="flex items-center justify-center">
-                    {done ? (
-                      <span
-                        className="flex h-7 w-7 items-center justify-center rounded-full bg-white"
-                        aria-label={`Série ${idx + 1} validée`}
-                      >
-                        <Check className="h-3.5 w-3.5 text-black" strokeWidth={3} />
-                      </span>
-                    ) : (
-                      <span
-                        className="h-7 w-7 rounded-full border border-[#3a3a3c]"
-                        aria-hidden="true"
-                      />
-                    )}
-                  </div>
                 </div>
-                {autoValidate && done && effortLabel ? (
-                  <p className="pl-11 text-[12px] text-[#8E8E93]">Effort {effortLabel}</p>
-                ) : null}
-                {autoValidate && active && !showRecovery ? (
-                  <div
-                    className="mt-2 grid grid-cols-3 gap-1.5"
-                    role="group"
-                    aria-label={`Effort série ${idx + 1}`}
-                  >
-                    {EFFORT_CHIPS.map((chip) => {
-                      const on = set.difficulty === chip.id
-                      return (
-                        <button
-                          key={chip.id}
-                          type="button"
-                          onClick={() => patchSet(idx, { difficulty: chip.id })}
-                          className={`ios-press flex min-h-11 items-center justify-center rounded-xl border text-[13px] font-semibold ${
-                            on
-                              ? 'border-[#FF2B2B]/50 bg-[#FF2B2B]/18 text-white'
-                              : 'border-white/12 bg-[#1c1c1e] text-[#AEAEB2]'
-                          }`}
-                        >
-                          {chip.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                ) : null}
               </div>
             )
           })}
@@ -435,9 +394,6 @@ export function ImmersiveExerciseSession({
           )}
         </div>
 
-        {showRecovery ? <RecoveryTimerPanel nextHint={recoveryHint} /> : null}
-
-        {/* Compact rest */}
         {showRecovery ? null : (
         <div
           className="mt-3 flex min-h-11 items-center gap-3 rounded-xl border border-white/10 px-3"
@@ -474,91 +430,98 @@ export function ImmersiveExerciseSession({
 
         <div className="mt-3 h-px w-full bg-white/8" aria-hidden="true" />
 
-        {/* Progress + exercise nav */}
-        <div className="mt-2.5 flex items-center gap-3">
-          <div
-            className="relative flex h-11 w-11 shrink-0 items-center justify-center"
-            aria-label={`Progression ${progressLabel}`}
-          >
-            <svg width={ringSize} height={ringSize} className="-rotate-90" aria-hidden="true">
-              <circle
-                cx={ringSize / 2}
-                cy={ringSize / 2}
-                r={radius}
-                fill="none"
-                stroke="#2c2c2e"
-                strokeWidth={stroke}
-              />
-              <circle
-                cx={ringSize / 2}
-                cy={ringSize / 2}
-                r={radius}
-                fill="none"
-                stroke="#FF2B2B"
-                strokeWidth={stroke}
-                strokeLinecap="round"
-                strokeDasharray={circumference}
-                strokeDashoffset={dashOffset}
-              />
-            </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tabular-nums text-white">
-              {progressLabel}
-            </span>
-          </div>
+        {/* Progress + exercise nav — masqués pendant récup (évite fantômes sous le chrono) */}
+        {showRecovery ? null : (
+          <>
+            <div className="mt-2.5 flex items-center gap-3">
+              <div
+                className="relative flex h-11 w-11 shrink-0 items-center justify-center"
+                aria-label={`Progression ${progressLabel}`}
+              >
+                <svg width={ringSize} height={ringSize} className="-rotate-90" aria-hidden="true">
+                  <circle
+                    cx={ringSize / 2}
+                    cy={ringSize / 2}
+                    r={radius}
+                    fill="none"
+                    stroke="#2c2c2e"
+                    strokeWidth={stroke}
+                  />
+                  <circle
+                    cx={ringSize / 2}
+                    cy={ringSize / 2}
+                    r={radius}
+                    fill="none"
+                    stroke="#FF2B2B"
+                    strokeWidth={stroke}
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={dashOffset}
+                  />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tabular-nums text-white">
+                  {progressLabel}
+                </span>
+              </div>
 
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-semibold text-white">
-              {displayName}
-            </p>
-            <div
-              className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1"
-              role="navigation"
-              aria-label="Exercices de la séance"
-            >
-              {exercises.map((ex, i) => {
-                const current = i === safeIndex
-                return (
-                  <button
-                    key={ex.id}
-                    type="button"
-                    onClick={() => onActiveIndexChange(i)}
-                    className={`ios-press relative min-h-9 min-w-5 px-0.5 text-[13px] font-semibold tabular-nums ${
-                      current ? 'text-white' : 'text-[#636366]'
-                    }`}
-                    aria-current={current ? 'true' : undefined}
-                    aria-label={`Exercice ${i + 1}${ex.name ? ` ${ex.name}` : ''}`}
-                  >
-                    {i + 1}
-                    {current ? (
-                      <span className="absolute inset-x-0 -bottom-0.5 mx-auto h-0.5 w-3 rounded-full bg-[#FF2B2B]" />
-                    ) : null}
-                  </button>
-                )
-              })}
-              {onAddExercise ? (
-                <button
-                  type="button"
-                  onClick={onAddExercise}
-                  className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 text-[#AEAEB2]"
-                  aria-label="Ajouter un exercice"
-                  data-add-exercise
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-semibold text-white">
+                  {displayName}
+                </p>
+                <div
+                  className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1"
+                  role="navigation"
+                  aria-label="Exercices de la séance"
                 >
-                  <Plus className="h-4 w-4" strokeWidth={2.5} />
-                </button>
-              ) : null}
+                  {exercises.map((ex, i) => {
+                    const current = i === safeIndex
+                    return (
+                      <button
+                        key={ex.id}
+                        type="button"
+                        onClick={() => onActiveIndexChange(i)}
+                        className={`ios-press relative min-h-9 min-w-5 px-0.5 text-[13px] font-semibold tabular-nums ${
+                          current ? 'text-white' : 'text-[#636366]'
+                        }`}
+                        aria-current={current ? 'true' : undefined}
+                        aria-label={`Exercice ${i + 1}${ex.name ? ` ${ex.name}` : ''}`}
+                      >
+                        {i + 1}
+                        {current ? (
+                          <span className="absolute inset-x-0 -bottom-0.5 mx-auto h-0.5 w-3 rounded-full bg-[#FF2B2B]" />
+                        ) : null}
+                      </button>
+                    )
+                  })}
+                  {onAddExercise ? (
+                    <button
+                      type="button"
+                      onClick={onAddExercise}
+                      className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 text-[#AEAEB2]"
+                      aria-label="Ajouter un exercice"
+                      data-add-exercise
+                    >
+                      <Plus className="h-4 w-4" strokeWidth={2.5} />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <button
-          type="button"
-          onClick={onFinishSession}
-          disabled={saving}
-          className="ios-press mt-3 mb-0.5 min-h-11 w-full text-center text-[13px] font-medium text-[#636366] disabled:opacity-50"
-        >
-          {saving ? 'Synchro…' : 'Terminer la séance'}
-        </button>
+            <button
+              type="button"
+              onClick={onFinishSession}
+              disabled={saving}
+              className="ios-press mt-3 mb-0.5 min-h-11 w-full text-center text-[13px] font-medium text-[#636366] disabled:opacity-50"
+            >
+              {saving ? 'Synchro…' : 'Terminer la séance'}
+            </button>
+          </>
+        )}
       </div>
+      </div>
+
+      {showRecovery ? <RecoveryTimerPanel /> : null}
     </section>
   )
 }

@@ -70,9 +70,9 @@ export type SetDifficulty = 'easy' | 'ok' | 'hard'
 export interface WorkoutSet {
   reps: number
   weightKg: number
-  /** Ressenti optionnel (Facile / OK / Dur) — informatif uniquement, ne prescrit plus la charge. */
+  /** Legacy easy/ok/hard — conservé pour lecture ancienne data ; UI immersive n’affiche plus ces libellés. */
   difficulty?: SetDifficulty
-  /** RPE optionnel (1–10) — informatif, jamais obligatoire, jamais auto-progression. */
+  /** Effort optionnel 1–10 (stocké en `rpe`) — informatif, jamais obligatoire, jamais auto-inventé. */
   rpe?: number
   /** Set marked done via « Terminer la série ». */
   done?: boolean

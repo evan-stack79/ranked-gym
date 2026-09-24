@@ -1,127 +1,121 @@
-import { Pause, Play, SkipForward } from 'lucide-react'
-import { useEffect, useState } from 'react'
 import { useRestTimerContext } from '../../context/RestTimerContext'
 
-function formatClock(totalSec: number): string {
+/** Compte à rebours MM:SS — 01:30, 00:47, 00:30, 00:05. */
+export function formatRecoveryClock(totalSec: number): string {
   const s = Math.max(0, Math.floor(totalSec))
   const m = Math.floor(s / 60)
   const r = s % 60
   return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`
 }
 
-interface RecoveryTimerPanelProps {
-  nextHint: { exerciseName: string; setLabel: string } | null
+/** Durée totale — « 1 min 30 », « 1 min 45 », « 45 s ». */
+export function formatRecoveryDurationLabel(totalSec: number): string {
+  const s = Math.max(0, Math.floor(totalSec))
+  const m = Math.floor(s / 60)
+  const r = s % 60
+  if (m <= 0) return `${r} s`
+  if (r === 0) return m === 1 ? '1 min' : `${m} min`
+  return `${m} min ${r}`
 }
 
 /**
- * Minuteur récupération immersif — fond opaque, rouge seul accent.
- * Une seule source : RestTimerContext (endsAt persisté).
+ * Overlay récupération (maquette Evan).
+ * Voile uniforme + fondu noir doux (pas de carte) + glow radial bas-centre.
+ * Label = durée totale (suit +15 s). Source : RestTimerContext / endsAt.
  */
-export function RecoveryTimerPanel({ nextHint }: RecoveryTimerPanelProps) {
+export function RecoveryTimerPanel() {
   const rest = useRestTimerContext()
-  const [reduceMotion, setReduceMotion] = useState(() => {
-    try {
-      return window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    } catch {
-      return false
-    }
-  })
-
-  useEffect(() => {
-    try {
-      const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-      const onChange = () => setReduceMotion(mq.matches)
-      mq.addEventListener('change', onChange)
-      return () => mq.removeEventListener('change', onChange)
-    } catch {
-      return undefined
-    }
-  }, [])
 
   if (!rest.state.active && !rest.state.finished) return null
 
-  const total = Math.max(1, rest.state.totalSec)
+  const totalSec = Math.max(1, rest.state.totalSec)
   const remaining = rest.state.finished ? 0 : rest.state.remainingSec
-  const progress = Math.min(1, Math.max(0, remaining / total))
-  const running = rest.state.active && !rest.state.paused
+  const durationLabel = formatRecoveryDurationLabel(totalSec)
 
   return (
-    <section
-      className="mt-3 rounded-2xl border border-white/10 bg-[#141416] px-4 py-4"
+    <div
+      className="absolute inset-0 z-40 flex flex-col"
       data-recovery-timer
-      data-reduced-motion={reduceMotion ? 'true' : 'false'}
+      data-recovery-overlay
       role="timer"
-      aria-label={`Récupération ${formatClock(remaining)}`}
+      aria-label={`Récupération ${formatRecoveryClock(remaining)}`}
     >
-      <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8E8E93]">
-        Récupération
-      </p>
-      <p
-        className="mt-2 text-[40px] font-bold leading-none tracking-tight tabular-nums text-white"
-        data-recovery-remaining
-      >
-        {formatClock(remaining)}
-      </p>
-
+      {/* Voile noir uniforme — séance encore lisible en haut */}
       <div
-        className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#2c2c2e]"
+        className="pointer-events-none absolute inset-0 bg-black/45"
         aria-hidden="true"
+        data-recovery-veil
+      />
+
+      {/*
+        Fondu noir : opaque sous le chrono (rien ne traverse),
+        transition douce vers le haut (pas de bord de carte).
+      */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[68%]"
+        aria-hidden="true"
+        data-recovery-fade
+        style={{
+          background:
+            'linear-gradient(to top, #000 0%, #000 55%, rgba(0,0,0,0.92) 70%, rgba(0,0,0,0.45) 88%, transparent 100%)',
+        }}
+      />
+
+      {/*
+        Glow rouge : ellipse centrée SOUS le bas d’écran → seule la queue douce
+        est visible, aucune bande / ligne de coupure.
+      */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[55%]"
+        aria-hidden="true"
+        data-recovery-glow
+        style={{
+          background:
+            'radial-gradient(ellipse 170% 110% at 50% 118%, rgba(255,43,43,0.42) 0%, rgba(255,43,43,0.18) 34%, rgba(255,43,43,0.06) 55%, transparent 72%)',
+        }}
+      />
+
+      {/* Bloc chrono remonté + safe area */}
+      <div
+        className="pointer-events-auto relative z-10 mt-auto flex flex-col items-center px-6"
+        data-recovery-controls
+        style={{
+          marginBottom: 'max(2.5rem, calc(env(safe-area-inset-bottom, 0px) + 1.1rem + 7vh))',
+          paddingTop: '0.5rem',
+          paddingBottom: '0.35rem',
+        }}
       >
-        <div
-          className="h-full rounded-full bg-[#FF2B2B]"
-          style={{
-            width: `${Math.round(progress * 100)}%`,
-            transition: reduceMotion ? 'none' : 'width 0.25s linear',
-          }}
-        />
-      </div>
-
-      {nextHint ? (
-        <p className="mt-3 text-[13px] text-[#AEAEB2]" data-recovery-next>
-          Série suivante : {nextHint.setLabel} · {nextHint.exerciseName}
+        <p className="text-center text-[15px] font-semibold tracking-tight" data-recovery-label>
+          <span className="text-[#FF2B2B]">Récupération</span>
+          <span className="text-white"> · {durationLabel}</span>
         </p>
-      ) : (
-        <p className="mt-3 text-[13px] text-[#8E8E93]">Dernière série de cet enchaînement</p>
-      )}
 
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <button
-          type="button"
-          onClick={() => rest.addSeconds(30)}
-          className="ios-press flex min-h-11 items-center justify-center rounded-xl border border-white/12 bg-[#1c1c1e] text-[13px] font-semibold text-white"
+        <p
+          className="mt-3 text-[76px] font-bold leading-none tracking-tight tabular-nums text-white"
+          data-recovery-remaining
         >
-          +30 s
-        </button>
-        {running ? (
-          <button
-            type="button"
-            onClick={() => rest.pause()}
-            className="ios-press flex min-h-11 items-center justify-center gap-1 rounded-xl border border-white/12 bg-[#1c1c1e] text-[13px] font-semibold text-white"
-            aria-label="Mettre le repos en pause"
-          >
-            <Pause className="h-3.5 w-3.5" strokeWidth={2.5} />
-            Pause
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => rest.resume()}
-            className="ios-press flex min-h-11 items-center justify-center gap-1 rounded-xl border border-[#FF2B2B]/40 bg-[#FF2B2B]/18 text-[13px] font-semibold text-[#FF2B2B]"
-            aria-label="Reprendre le repos"
-          >
-            <Play className="h-3.5 w-3.5" strokeWidth={2.5} />
-            Reprendre
-          </button>
-        )}
+          {formatRecoveryClock(remaining)}
+        </p>
+
         <button
           type="button"
           onClick={() => rest.skip()}
-          className="ios-press flex min-h-11 items-center justify-center gap-1 rounded-xl border border-white/12 bg-[#1c1c1e] text-[13px] font-semibold text-white"
+          className="ios-press mt-6 flex min-h-12 w-[52%] max-w-[200px] items-center justify-center rounded-full border border-[#FF2B2B] bg-transparent text-[16px] font-semibold text-white"
+          data-recovery-resume
         >
-          <SkipForward className="h-3.5 w-3.5" strokeWidth={2.5} />
-          Passer
+          Reprendre
+        </button>
+
+        <button
+          type="button"
+          onClick={() => rest.addSeconds(15)}
+          className="ios-press mt-3 min-h-10 px-3 text-[14px] font-medium text-white/80"
+          data-recovery-add-15
+          aria-label="Ajouter 15 secondes de récupération"
+        >
+          +15 s
         </button>
       </div>
-    </section>
+    </div>
   )
 }
