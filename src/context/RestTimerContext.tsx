@@ -178,25 +178,36 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     [emitRestLogged],
   )
 
+  const goIdle = useCallback(() => {
+    clearTick()
+    finishedRef.current = false
+    pausedRef.current = false
+    targetRef.current = null
+    remainingRef.current = CANONICAL_REST_SEC
+    totalRef.current = CANONICAL_REST_SEC
+    endsAtRef.current = 0
+    setState(IDLE)
+    persistSnap(null)
+  }, [clearTick, persistSnap])
+
+  /**
+   * Fin naturelle à 0:00 — log skipped:false + son/vibration, puis IDLE
+   * (ferme overlay récup sans passer par skip / addNextSet).
+   */
   const complete = useCallback(() => {
     if (finishedRef.current) return
     finishedRef.current = true
     clearTick()
     pausedRef.current = false
     remainingRef.current = 0
-    setState((s) => ({
-      ...s,
-      remainingSec: 0,
-      active: false,
-      finished: true,
-      paused: false,
-    }))
     persistSnap(null)
     logRest(false)
     void endRestLiveActivity(true)
     vibrate([40, 60, 40, 60, 80])
     playRestCompleteChime()
-  }, [clearTick, logRest, persistSnap])
+    // Auto-fermeture : pas d’état « finished » bloquant ni second log via skip.
+    goIdle()
+  }, [clearTick, goIdle, logRest, persistSnap])
 
   const tickOnce = useCallback(() => {
     if (pausedRef.current || finishedRef.current) return
@@ -315,33 +326,28 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
   }, [armTick, complete, persistSnap])
 
   const skip = useCallback(() => {
-    if (!targetRef.current) {
-      clearTick()
-      setState(IDLE)
-      persistSnap(null)
+    // Déjà terminé (course avec auto-fermeture) : fermer sans 2ᵉ rest-logged / append.
+    if (finishedRef.current) {
       void endRestLiveActivity(true)
+      goIdle()
+      return
+    }
+    if (!targetRef.current) {
+      void endRestLiveActivity(true)
+      goIdle()
       return
     }
     clearTick()
     logRest(true)
-    finishedRef.current = false
-    pausedRef.current = false
-    targetRef.current = null
-    setState(IDLE)
-    persistSnap(null)
     void endRestLiveActivity(true)
     vibrate(16)
-  }, [clearTick, logRest, persistSnap])
+    goIdle()
+  }, [clearTick, goIdle, logRest])
 
   const dismiss = useCallback(() => {
-    clearTick()
-    finishedRef.current = false
-    pausedRef.current = false
-    targetRef.current = null
-    setState(IDLE)
-    persistSnap(null)
     void endRestLiveActivity(true)
-  }, [clearTick, persistSnap])
+    goIdle()
+  }, [goIdle])
 
   const addSeconds = useCallback(
     (delta: number) => {
@@ -434,8 +440,8 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     if (remaining <= 0 && !snap.paused) {
       if (expiredHandledKeyRef.current !== expireKey) {
         expiredHandledKeyRef.current = expireKey
-        // Expiration hydratée : une seule fois — état final observable, journalisation unique,
-        // nettoyage snapshot + activité native, sans son ni double sauvegarde.
+        // Expiration hydratée : une seule fois — journalisation unique (skipped:false),
+        // sans son, puis IDLE (ferme overlay, pas d’état finished bloquant).
         persistEnabledRef.current = true
         scopeRef.current = nextScope
         clearTickRef.current()
@@ -443,15 +449,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
         totalRef.current = snap.totalSec
         remainingRef.current = 0
         pausedRef.current = false
-        finishedRef.current = true
-        setState({
-          active: false,
-          totalSec: snap.totalSec,
-          remainingSec: 0,
-          target: snap.target,
-          finished: true,
-          paused: false,
-        })
+        finishedRef.current = false
         writePersistedRest(null)
         lastPersistKeyRef.current = 'null'
         emitRestLogged({
@@ -460,6 +458,8 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
           skipped: false,
         })
         void endRestLiveActivity(true)
+        targetRef.current = null
+        setState(IDLE)
       }
       return () => {
         cancelled = true
