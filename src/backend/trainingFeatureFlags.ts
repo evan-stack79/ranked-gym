@@ -5,6 +5,10 @@ import { parseBooleanFlag } from './featureFlag'
  * Unset : ON en DEV / test (`import.meta.env.DEV` ou `MODE === 'test'`),
  * OFF en production pour rester respectueux du runtime existant.
  * Valeur explicite (`true` / `false`) toujours honorée.
+ *
+ * Exception : `isAutoSetValidationEnabled` — unset/vide ⇒ toujours ON
+ * (y compris production) pour permettre le test sur l’app déployée sans
+ * variable Cloudflare. `false` explicite coupe toujours.
  */
 export function resolveTrainingUxFlag(raw: string | undefined): boolean {
   if (typeof raw === 'string' && raw.trim() !== '') {
@@ -23,10 +27,14 @@ export function isTrainingRecommendationsEnabled(
   return resolveTrainingUxFlag(raw)
 }
 
+/** Unset/vide ⇒ ON (prod inclus). Valeur explicite toujours honorée. */
 export function isAutoSetValidationEnabled(
   raw: string | undefined = import.meta.env.VITE_ENABLE_AUTO_SET_VALIDATION,
 ): boolean {
-  return resolveTrainingUxFlag(raw)
+  if (typeof raw === 'string' && raw.trim() !== '') {
+    return parseBooleanFlag(raw)
+  }
+  return true
 }
 
 export function isSportsOnboardingEnabled(
