@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { isAmbiguousIntegerPrefix } from '../components/nutrition/ClearableNumberInput'
 import {
   isSetReadyForAutoValidate,
   isValidEffort,
   makeAutoValidateKey,
   nextSetHint,
+  shouldAppendNextSetOnRestSkip,
   shouldCommitAutoValidate,
 } from './autoValidateSet'
 
@@ -15,6 +17,29 @@ describe('isValidEffort', () => {
     expect(isValidEffort(11)).toBe(false)
     expect(isValidEffort('ok')).toBe(false)
     expect(isValidEffort(undefined)).toBe(false)
+  })
+})
+
+describe('isAmbiguousIntegerPrefix (Effort 1–10)', () => {
+  it('« 1 » est ambigu vers 10 ; 2–9 et 10 ne le sont pas', () => {
+    expect(isAmbiguousIntegerPrefix('1', 1, 10)).toBe(true)
+    expect(isAmbiguousIntegerPrefix('2', 1, 10)).toBe(false)
+    expect(isAmbiguousIntegerPrefix('9', 1, 10)).toBe(false)
+    expect(isAmbiguousIntegerPrefix('10', 1, 10)).toBe(false)
+    expect(isAmbiguousIntegerPrefix('1.0', 1, 10)).toBe(false)
+  })
+})
+
+describe('shouldAppendNextSetOnRestSkip', () => {
+  it('n’append pas si une série suivante !done existe déjà', () => {
+    expect(
+      shouldAppendNextSetOnRestSkip([{ done: true }, { done: false }, { done: false }], 0),
+    ).toBe(false)
+  })
+
+  it('append seulement s’il n’existe pas de série suivante !done', () => {
+    expect(shouldAppendNextSetOnRestSkip([{ done: true }], 0)).toBe(true)
+    expect(shouldAppendNextSetOnRestSkip([{ done: true }, { done: true }], 0)).toBe(true)
   })
 })
 

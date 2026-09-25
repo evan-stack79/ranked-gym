@@ -337,6 +337,7 @@ export function ImmersiveExerciseSession({
                     min={1}
                     max={10}
                     required={false}
+                    deferAmbiguousIntegerPrefix
                     placeholder="1–10"
                     placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#636366]"
                     aria-label={`Série ${idx + 1} effort facultatif`}

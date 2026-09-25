@@ -69,3 +69,14 @@ export function nextSetHint(
   }
   return null
 }
+
+/**
+ * Reprendre (skip repos) : n’append une série que s’il n’existe pas
+ * déjà une série suivante `!done` après `setIndex`.
+ */
+export function shouldAppendNextSetOnRestSkip(
+  sets: Array<{ done?: boolean }>,
+  setIndex: number,
+): boolean {
+  return !sets.some((s, i) => i > setIndex && s.done !== true)
+}

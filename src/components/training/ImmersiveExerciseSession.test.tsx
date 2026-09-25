@@ -675,4 +675,311 @@ describe('ImmersiveExerciseSession', () => {
     expect(rows[1]?.getAttribute('data-set-row')).toBe('active')
     expect(host.textContent).not.toContain('RPE')
   })
+
+  it('Effort 10 : frappe « 1 » ne valide pas ; « 10 » valide une fois', async () => {
+    const onValidate = vi.fn()
+    const onUpdate = vi.fn()
+    const onAddSet = vi.fn()
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <ImmersiveExerciseSession
+            exercises={[
+              {
+                id: 'ex-1',
+                name: 'Squat',
+                sets: [
+                  { reps: 5, weightKg: 100 },
+                  { reps: 5, weightKg: 100 },
+                ],
+              },
+            ]}
+            activeIndex={0}
+            onActiveIndexChange={vi.fn()}
+            sessionClockLabel="00:10"
+            sessionPaused={false}
+            onBack={vi.fn()}
+            onUpdateSet={onUpdate}
+            onAddSet={onAddSet}
+            onValidateSet={onValidate}
+            onFinishSession={vi.fn()}
+            autoValidate
+          />
+        </RestTimerProvider>,
+      )
+    })
+
+    const effort = host.querySelector(
+      'input[aria-label="Série 1 effort facultatif"]',
+    ) as HTMLInputElement
+
+    await act(async () => {
+      effort.focus()
+      typeInto(effort, '1')
+    })
+    expect(onValidate).not.toHaveBeenCalled()
+    expect(onUpdate).not.toHaveBeenCalled()
+
+    await act(async () => {
+      typeInto(effort, '10')
+    })
+    expect(onUpdate).toHaveBeenCalledWith('ex-1', 0, { rpe: 10 })
+    expect(onValidate).toHaveBeenCalledTimes(1)
+    expect(onValidate.mock.calls[0][1]).toBe(0)
+    expect(onAddSet).not.toHaveBeenCalled()
+    expect(host.textContent).not.toContain('RPE')
+  })
+
+  it('Effort 1 : commit au blur (préfixe différé) puis validate', async () => {
+    const onValidate = vi.fn()
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <ImmersiveExerciseSession
+            exercises={[
+              {
+                id: 'ex-1',
+                name: 'Squat',
+                sets: [{ reps: 8, weightKg: 60 }],
+              },
+            ]}
+            activeIndex={0}
+            onActiveIndexChange={vi.fn()}
+            sessionClockLabel="00:10"
+            sessionPaused={false}
+            onBack={vi.fn()}
+            onUpdateSet={vi.fn()}
+            onAddSet={vi.fn()}
+            onValidateSet={onValidate}
+            onFinishSession={vi.fn()}
+            autoValidate
+          />
+        </RestTimerProvider>,
+      )
+    })
+
+    const effort = host.querySelector(
+      'input[aria-label="Série 1 effort facultatif"]',
+    ) as HTMLInputElement
+    await act(async () => {
+      effort.focus()
+      typeInto(effort, '1')
+    })
+    expect(onValidate).not.toHaveBeenCalled()
+    await act(async () => {
+      effort.blur()
+    })
+    expect(onValidate).toHaveBeenCalledTimes(1)
+  })
+
+  it('dernière série : validate sans onAddSet', async () => {
+    const onValidate = vi.fn()
+    const onAddSet = vi.fn()
+
+    function Harness() {
+      const rest = useRestTimerContext()
+      const [sets, setSets] = useState([{ reps: 6, weightKg: 80 }])
+      return (
+        <ImmersiveExerciseSession
+          exercises={[{ id: 'ex-1', name: 'Squat', sets }]}
+          activeIndex={0}
+          onActiveIndexChange={vi.fn()}
+          sessionClockLabel="00:10"
+          sessionPaused={false}
+          onBack={vi.fn()}
+          onUpdateSet={(_id, idx, patch) => {
+            setSets((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)))
+          }}
+          onAddSet={onAddSet}
+          onValidateSet={(ex, setIndex, restSec) => {
+            onValidate(ex, setIndex, restSec)
+            setSets((prev) =>
+              prev.map((s, i) => (i === setIndex ? { ...s, done: true as const } : s)),
+            )
+            rest.start(restSec || 90, {
+              exerciseId: ex.id,
+              setIndex,
+              exerciseName: ex.name,
+              setLabel: `S${setIndex + 1}`,
+            })
+          }}
+          onFinishSession={vi.fn()}
+          autoValidate
+        />
+      )
+    }
+
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <Harness />
+        </RestTimerProvider>,
+      )
+    })
+    await act(async () => {
+      const effort = host.querySelector(
+        'input[aria-label="Série 1 effort facultatif"]',
+      ) as HTMLInputElement
+      effort.focus()
+      typeInto(effort, '7')
+    })
+    expect(onValidate).toHaveBeenCalledTimes(1)
+    expect(onAddSet).not.toHaveBeenCalled()
+    expect(host.querySelectorAll('[data-set-row]')).toHaveLength(1)
+  })
+
+  it('série suivante préexistante devient active après validate + Reprendre', async () => {
+    const onValidate = vi.fn()
+    const onAddSet = vi.fn()
+
+    function Harness() {
+      const rest = useRestTimerContext()
+      const [sets, setSets] = useState([
+        { reps: 6, weightKg: 80 },
+        { reps: 6, weightKg: 80 },
+      ])
+      return (
+        <ImmersiveExerciseSession
+          exercises={[{ id: 'ex-1', name: 'Squat', sets }]}
+          activeIndex={0}
+          onActiveIndexChange={vi.fn()}
+          sessionClockLabel="00:10"
+          sessionPaused={false}
+          onBack={vi.fn()}
+          onUpdateSet={(_id, idx, patch) => {
+            setSets((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)))
+          }}
+          onAddSet={onAddSet}
+          onValidateSet={(ex, setIndex, restSec) => {
+            onValidate(ex, setIndex, restSec)
+            setSets((prev) =>
+              prev.map((s, i) => (i === setIndex ? { ...s, done: true as const } : s)),
+            )
+            rest.start(restSec || 90, {
+              exerciseId: ex.id,
+              setIndex,
+              exerciseName: ex.name,
+              setLabel: `S${setIndex + 1}`,
+            })
+          }}
+          onFinishSession={vi.fn()}
+          autoValidate
+        />
+      )
+    }
+
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <Harness />
+        </RestTimerProvider>,
+      )
+    })
+    await act(async () => {
+      const effort = host.querySelector(
+        'input[aria-label="Série 1 effort facultatif"]',
+      ) as HTMLInputElement
+      effort.focus()
+      typeInto(effort, '8')
+    })
+    expect(onValidate).toHaveBeenCalledTimes(1)
+    expect(onAddSet).not.toHaveBeenCalled()
+    expect(host.querySelector('[data-recovery-timer]')).toBeTruthy()
+
+    await act(async () => {
+      host
+        .querySelector('[data-recovery-resume]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    const rows = [...host.querySelectorAll('[data-set-row]')]
+    expect(rows).toHaveLength(2)
+    expect(rows[0]?.getAttribute('data-set-row')).toBe('done')
+    expect(rows[1]?.getAttribute('data-set-row')).toBe('active')
+    expect(onAddSet).not.toHaveBeenCalled()
+  })
+
+  it('Reprendre : n’append pas si une série !done existe déjà (restLog guard)', async () => {
+    const { shouldAppendNextSetOnRestSkip } = await import('../../utils/autoValidateSet')
+
+    // Simule l’effet WorkoutNotebook après validate série 0 + skip
+    const afterValidate = [
+      { reps: 6, weightKg: 80, done: true as const, restSec: 12, rpe: 8 },
+      { reps: 6, weightKg: 80, done: false as const },
+    ]
+    expect(shouldAppendNextSetOnRestSkip(afterValidate, 0)).toBe(false)
+
+    const lastOnly = [{ reps: 6, weightKg: 80, done: true as const, restSec: 12, rpe: 9 }]
+    expect(shouldAppendNextSetOnRestSkip(lastOnly, 0)).toBe(true)
+
+    // Harness UI : 2 séries, Reprendre ne crée pas de 3ᵉ via onAddSet
+    const onAddSet = vi.fn()
+    function Harness() {
+      const rest = useRestTimerContext()
+      const [sets, setSets] = useState([
+        { reps: 6, weightKg: 80 },
+        { reps: 6, weightKg: 80 },
+      ])
+      return (
+        <ImmersiveExerciseSession
+          exercises={[{ id: 'ex-1', name: 'Squat', sets }]}
+          activeIndex={0}
+          onActiveIndexChange={vi.fn()}
+          sessionClockLabel="00:10"
+          sessionPaused={false}
+          onBack={vi.fn()}
+          onUpdateSet={(_id, idx, patch) => {
+            setSets((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)))
+          }}
+          onAddSet={onAddSet}
+          onValidateSet={(ex, setIndex, restSec) => {
+            setSets((prev) => {
+              const next: Array<{ reps: number; weightKg: number; done?: boolean }> = prev.map(
+                (s, i) => (i === setIndex ? { ...s, done: true as const } : s),
+              )
+              // Miroir restLogRequest addNextSet:skipped + guard
+              if (shouldAppendNextSetOnRestSkip(next, setIndex)) {
+                const last = next[next.length - 1]
+                next.push({
+                  reps: last?.reps ?? 8,
+                  weightKg: last?.weightKg ?? 20,
+                })
+                onAddSet(ex.id)
+              }
+              return next
+            })
+            rest.start(restSec || 90, {
+              exerciseId: ex.id,
+              setIndex,
+              exerciseName: ex.name,
+              setLabel: `S${setIndex + 1}`,
+            })
+          }}
+          onFinishSession={vi.fn()}
+          autoValidate
+        />
+      )
+    }
+
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <Harness />
+        </RestTimerProvider>,
+      )
+    })
+    await act(async () => {
+      const effort = host.querySelector(
+        'input[aria-label="Série 1 effort facultatif"]',
+      ) as HTMLInputElement
+      effort.focus()
+      typeInto(effort, '8')
+    })
+    await act(async () => {
+      host
+        .querySelector('[data-recovery-resume]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(onAddSet).not.toHaveBeenCalled()
+    expect(host.querySelectorAll('[data-set-row]')).toHaveLength(2)
+  })
 })
