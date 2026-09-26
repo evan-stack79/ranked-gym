@@ -1,7 +1,7 @@
 import { getSupabase } from '../lib/supabase'
 import type { ProfileRow } from '../types/database'
 import { getRankFromLevel } from '../utils/rank'
-import { isConvexDomainActive } from '../backend/adapter'
+import { runWithDomainBackend } from '../backend/domainBackend'
 import { applyConvexDailyLoginStreak } from './convexProfileService'
 
 export const STREAK_WEEK_BONUS_XP = 500
@@ -182,77 +182,78 @@ export async function applyDailyLoginStreak(
   const progress = addXpToProfile(profile.level, profile.xp, transition.bonusXp)
   const expectedLastLogin = asDateKey(profile.last_login_date)
 
-  if (isConvexDomainActive()) {
-    const convex = await applyConvexDailyLoginStreak({
-      expectedLastLoginDate: expectedLastLogin,
-      today: transition.today,
-      nextStreak: transition.nextStreak,
-      nextLevel: progress.level,
-      nextXp: progress.xp,
-      nextRank: progress.rank,
-    })
-    return {
-      profile: convex.profile,
-      didUpdate: convex.didUpdate,
-      weekBonus: convex.didUpdate ? transition.weekBonus : false,
-      bonusXp: convex.didUpdate ? transition.bonusXp : 0,
-      previousStreak: convex.didUpdate
-        ? transition.previousStreak
-        : (convex.profile.current_streak ?? transition.previousStreak),
-    }
-  }
+  const result = await runWithDomainBackend<StreakApplyResult>({
+    operation: 'streak.applyDaily',
+    convex: async () => {
+      const convex = await applyConvexDailyLoginStreak({
+        expectedLastLoginDate: expectedLastLogin,
+        today: transition.today,
+        nextStreak: transition.nextStreak,
+        nextLevel: progress.level,
+        nextXp: progress.xp,
+        nextRank: progress.rank,
+      })
+      return {
+        profile: convex.profile,
+        didUpdate: convex.didUpdate,
+        weekBonus: convex.didUpdate ? transition.weekBonus : false,
+        bonusXp: convex.didUpdate ? transition.bonusXp : 0,
+        previousStreak: convex.didUpdate
+          ? transition.previousStreak
+          : (convex.profile.current_streak ?? transition.previousStreak),
+      }
+    },
+    supabase: async () => {
+      const supabase = getSupabase()
+      let updateQuery = supabase
+        .from('profiles')
+        .update({
+          current_streak: transition.nextStreak,
+          last_login_date: transition.today,
+          level: progress.level,
+          xp: progress.xp,
+          rank: progress.rank,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', profile.id)
 
-  const supabase = getSupabase()
+      // Optimistic lock on last_login_date — null must use `.is()`, not `.eq(null)`.
+      if (expectedLastLogin === null) {
+        updateQuery = updateQuery.is('last_login_date', null)
+      } else {
+        updateQuery = updateQuery.eq('last_login_date', expectedLastLogin)
+      }
 
-  let updateQuery = supabase
-    .from('profiles')
-    .update({
-      current_streak: transition.nextStreak,
-      last_login_date: transition.today,
-      level: progress.level,
-      xp: progress.xp,
-      rank: progress.rank,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', profile.id)
+      const { data, error } = await updateQuery.select('*').maybeSingle()
+      if (error) throw error
+      if (!data) {
+        // Lost the race: another call already wrote today's date (or changed it).
+        const { data: fresh, error: refetchError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', profile.id)
+          .single()
+        if (refetchError) throw refetchError
+        return {
+          profile: fresh,
+          didUpdate: false,
+          weekBonus: false,
+          bonusXp: 0,
+          previousStreak: fresh.current_streak ?? transition.previousStreak,
+        }
+      }
 
-  // Optimistic lock on last_login_date — null must use `.is()`, not `.eq(null)`.
-  if (expectedLastLogin === null) {
-    updateQuery = updateQuery.is('last_login_date', null)
-  } else {
-    updateQuery = updateQuery.eq('last_login_date', expectedLastLogin)
-  }
+      return {
+        profile: data,
+        didUpdate: true,
+        weekBonus: transition.weekBonus,
+        bonusXp: transition.bonusXp,
+        previousStreak: transition.previousStreak,
+      }
+    },
+  })
 
-  const { data, error } = await updateQuery.select('*').maybeSingle()
-
-  if (error) throw error
-
-  if (!data) {
-    // Lost the race: another call already wrote today's date (or changed it).
-    const { data: fresh, error: refetchError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', profile.id)
-      .single()
-
-    if (refetchError) throw refetchError
-
-    return {
-      profile: fresh,
-      didUpdate: false,
-      weekBonus: false,
-      bonusXp: 0,
-      previousStreak: fresh.current_streak ?? transition.previousStreak,
-    }
-  }
-
-  return {
-    profile: data,
-    didUpdate: true,
-    weekBonus: transition.weekBonus,
-    bonusXp: transition.bonusXp,
-    previousStreak: transition.previousStreak,
-  }
+  return result
 }
 
 export function isStreakActiveToday(

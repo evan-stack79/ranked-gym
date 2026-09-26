@@ -1,17 +1,32 @@
 import { USER_BACKEND_UNAVAILABLE } from '../../boot/bootUiCopy'
 import { getSupabaseConfigError, isSupabaseConfigured } from '../../lib/supabase'
+import { getActiveAuthBackend } from '../../backend/authFeatureFlag'
+import { getConvexConfigError, isConvexConfigured } from '../../lib/convex'
 import { safeError } from '../../utils/safeLog'
 
 let loggedConfigError = false
 
 /** Erreur bloquante de configuration — libellé utilisateur, détail technique en console. */
 export function SupabaseConfigBanner() {
-  if (isSupabaseConfigured()) return null
+  const authBackend = getActiveAuthBackend()
 
-  const technical = getSupabaseConfigError()
-  if (technical && !loggedConfigError) {
-    loggedConfigError = true
-    safeError('[boot] backend config', technical)
+  // Check the appropriate backend based on which auth adapter is active.
+  if (authBackend === 'convex') {
+    if (isConvexConfigured()) return null
+
+    const technical = getConvexConfigError()
+    if (technical && !loggedConfigError) {
+      loggedConfigError = true
+      safeError('[boot] backend config', technical)
+    }
+  } else {
+    if (isSupabaseConfigured()) return null
+
+    const technical = getSupabaseConfigError()
+    if (technical && !loggedConfigError) {
+      loggedConfigError = true
+      safeError('[boot] backend config', technical)
+    }
   }
 
   return (

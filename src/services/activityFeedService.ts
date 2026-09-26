@@ -2,7 +2,7 @@ import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 import type { LocalActivityItem } from '../data/localActivityFeed'
 import { buildLocalActivityFeed } from '../data/localActivityFeed'
 import { safeWarn } from '../utils/safeLog'
-import { isConvexDomainActive } from '../backend/adapter'
+import { runWithDomainBackend } from '../backend/domainBackend'
 import {
   fetchConvexSocialActivityFeed,
   recordConvexActivityEvent,
@@ -56,38 +56,36 @@ export async function fetchSocialActivityFeed(input: {
   areaName: string
   viewer?: { username: string; isGhostModeEnabled: boolean } | null
 }): Promise<LocalActivityItem[]> {
-  if (isConvexDomainActive()) {
-    const rows = await fetchConvexSocialActivityFeed({
-      viewerLat: input.viewerLat,
-      viewerLng: input.viewerLng,
-      radiusKm: input.radiusKm,
-      limit: input.limit,
+  try {
+    const rows = await runWithDomainBackend<LocalActivityItem[]>({
+      operation: 'activityFeed.fetch',
+      convex: async () => {
+        const convexRows = await fetchConvexSocialActivityFeed({
+          viewerLat: input.viewerLat,
+          viewerLng: input.viewerLng,
+          radiusKm: input.radiusKm,
+          limit: input.limit,
+        })
+        return convexRows
+      },
+      supabase: async () => {
+        if (!isSupabaseConfigured()) return []
+        const supabase = getSupabase()
+        const { data, error } = await supabase.rpc('get_social_activity_feed', {
+          p_viewer_lat: input.viewerLat ?? null,
+          p_viewer_lng: input.viewerLng ?? null,
+          p_radius_km: input.radiusKm ?? 25,
+          p_limit: input.limit ?? 20,
+        })
+
+        if (error) throw error
+        return ((data ?? []) as SocialActivityRow[]).map(mapRow)
+      },
     })
     if (rows.length === 0) {
       return buildLocalActivityFeed(input.areaName, input.viewer ?? null)
     }
     return rows
-  }
-
-  if (!isSupabaseConfigured()) {
-    return buildLocalActivityFeed(input.areaName, input.viewer ?? null)
-  }
-
-  try {
-    const supabase = getSupabase()
-    const { data, error } = await supabase.rpc('get_social_activity_feed', {
-      p_viewer_lat: input.viewerLat ?? null,
-      p_viewer_lng: input.viewerLng ?? null,
-      p_radius_km: input.radiusKm ?? 25,
-      p_limit: input.limit ?? 20,
-    })
-
-    if (error) throw error
-    const rows = (data ?? []) as SocialActivityRow[]
-    if (rows.length === 0) {
-      return buildLocalActivityFeed(input.areaName, input.viewer ?? null)
-    }
-    return rows.map(mapRow)
   } catch (error) {
     safeWarn('[activityFeed]', error)
     return buildLocalActivityFeed(input.areaName, input.viewer ?? null)
@@ -101,23 +99,24 @@ export async function recordActivityEvent(input: {
   originLat?: number | null
   originLng?: number | null
 }): Promise<string | null> {
-  if (isConvexDomainActive()) {
-    return recordConvexActivityEvent(input)
-  }
-
-  if (!isSupabaseConfigured()) return null
-
   try {
-    const supabase = getSupabase()
-    const { data, error } = await supabase.rpc('record_activity', {
-      p_activity_type: input.activityType,
-      p_action_text: input.actionText,
-      p_xp_earned: input.xpEarned ?? 0,
-      p_origin_lat: input.originLat ?? null,
-      p_origin_lng: input.originLng ?? null,
+    return runWithDomainBackend<string | null>({
+      operation: 'activityFeed.record',
+      convex: () => recordConvexActivityEvent(input),
+      supabase: async () => {
+        if (!isSupabaseConfigured()) return null
+        const supabase = getSupabase()
+        const { data, error } = await supabase.rpc('record_activity', {
+          p_activity_type: input.activityType,
+          p_action_text: input.actionText,
+          p_xp_earned: input.xpEarned ?? 0,
+          p_origin_lat: input.originLat ?? null,
+          p_origin_lng: input.originLng ?? null,
+        })
+        if (error) throw error
+        return typeof data === 'string' ? data : null
+      },
     })
-    if (error) throw error
-    return typeof data === 'string' ? data : null
   } catch (error) {
     safeWarn('[activityFeed] record', error)
     return null

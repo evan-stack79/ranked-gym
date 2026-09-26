@@ -40,6 +40,7 @@ interface AddFoodScreenProps {
   searchError: string | null
   searchHits: OpenFoodFactsSearchHit[]
   onSelectHit: (hit: OpenFoodFactsSearchHit) => void
+  onToggleFavorite: (hit: OpenFoodFactsSearchHit) => void
   onOpenScanner: () => void
   scannerSlot?: ReactNode
   onToast: (message: string, variant?: 'success' | 'error') => void
@@ -78,6 +79,7 @@ export function AddFoodScreen({
   searchError,
   searchHits,
   onSelectHit,
+  onToggleFavorite,
   onOpenScanner,
   scannerSlot,
   onToast,
@@ -201,6 +203,7 @@ export function AddFoodScreen({
           error={searchError}
           hits={searchHits}
           onSelect={onSelectHit}
+          onToggleFavorite={onToggleFavorite}
           fill
         />
         {scannerSlot ? (
