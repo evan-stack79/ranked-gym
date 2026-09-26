@@ -472,7 +472,11 @@ export function NutritionDashboard({
 
         <NutritionQuickActions onAction={handleQuickAction} />
 
-        <NutritionDayMealsCard meals={meals} onAddMeal={openAddFood} />
+        <NutritionDayMealsCard
+          meals={meals}
+          onAddMeal={openAddFood}
+          onEditMeal={setEditingMeal}
+        />
 
         <div ref={journalRef} className="scroll-mt-4">
           {journalDetailOpen ? (
