@@ -265,7 +265,7 @@ describe('supabase -> convex migration scripts', () => {
   })
 
   it('lists avatar storage objects through Supabase Storage API folders', async () => {
-    const mod = (await import('../../scripts/migrations/supabase/avatar-storage.mjs')) as {
+    const mod = (await import('../../scripts/migrations/supabase/avatar-storage.mjs')) as unknown as {
       listSupabaseAvatarObjects: (supabase: unknown) => Promise<
         Array<{ userId: string | null; path: string }>
       >

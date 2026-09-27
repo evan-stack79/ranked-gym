@@ -312,6 +312,10 @@ async function upsertNutrition(
     const mealId = String(meal.mealId ?? '').trim()
     if (!mealId || incomingMealIds.has(mealId)) continue
     incomingMealIds.add(mealId)
+    const portionMode: 'solo' | 'with_sides' | undefined =
+      meal.portionMode === 'solo' || meal.portionMode === 'with_sides'
+        ? (meal.portionMode as 'solo' | 'with_sides')
+        : undefined
     const fields = {
       dateKey: String(meal.dateKey ?? '').trim(),
       mealType: String(meal.mealType ?? 'snack').trim().slice(0, 24) || 'snack',
@@ -322,10 +326,7 @@ async function upsertNutrition(
       fatG: meal.fatG == null ? undefined : toNullableFiniteNumber(meal.fatG),
       grams: meal.grams == null ? undefined : toFiniteNumber(meal.grams, 0),
       pieces: meal.pieces == null ? undefined : toFiniteNumber(meal.pieces, 0),
-      portionMode:
-        meal.portionMode === 'solo' || meal.portionMode === 'with_sides'
-          ? meal.portionMode
-          : undefined,
+      portionMode,
       createdAt: toFiniteNumber(meal.createdAt, updatedAt),
       updatedAt: toFiniteNumber(meal.updatedAt, updatedAt),
       deletedAt: meal.deletedAt == null ? undefined : toFiniteNumber(meal.deletedAt, updatedAt),
