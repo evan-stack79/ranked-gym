@@ -8,6 +8,7 @@ import {
 } from './ProfileSubScreenChrome'
 import { changePassword, deleteOwnAccount, signInWithEmail } from '../../services/authService'
 import { useAuth } from '../../context/AuthContext'
+import { toUserFacingError } from '../../utils/userFacingError'
 
 interface SecurityScreenProps {
   onBack: () => void
@@ -75,7 +76,7 @@ export function SecurityScreen({
         setPasswordOk(null)
       }, 1200)
     } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err)
+      const raw = toUserFacingError(err, 'Impossible de changer le mot de passe.')
       setPasswordError(
         raw.toLowerCase().includes('invalid login')
           ? 'Ancien mot de passe incorrect.'
@@ -105,7 +106,7 @@ export function SecurityScreen({
       await signOut()
       onSignOut()
     } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err)
+      const raw = toUserFacingError(err, 'Suppression impossible.')
       setDeleteError(
         raw.toLowerCase().includes('invalid login')
           ? 'Mot de passe incorrect.'

@@ -26,8 +26,7 @@ export function isAccountEnumerationError(err: unknown): boolean {
     lower.includes('user not found') ||
     lower.includes('unable to find user') ||
     lower.includes('email not found') ||
-    lower.includes('for security purposes') ||
-    lower.includes('signup is disabled')
+    lower.includes('for security purposes')
   )
 }
 
@@ -63,6 +62,13 @@ export function friendlyAuthError(err: unknown, fallback: string): string {
   }
   if (lower.includes('user already registered')) {
     return 'Cet email est déjà utilisé. Passe sur Connexion.'
+  }
+  if (
+    lower.includes('auth_signup_disabled') ||
+    lower.includes('signup is disabled') ||
+    lower.includes('signups not allowed')
+  ) {
+    return 'Les inscriptions sont fermées pour le moment. Contacte le support Ranked Gym.'
   }
   if (lower.includes('password') && (lower.includes('6') || lower.includes('least'))) {
     return `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caractères.`

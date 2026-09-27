@@ -31,7 +31,10 @@ import {
 } from './lib/authConfig'
 import { requireAdminCaller } from './lib/migrationAdmin'
 import { consumeRateLimit } from './lib/rateLimit'
-import { sendPasswordResetEmail } from './lib/passwordResetMailer'
+import {
+  isPasswordResetEmailConfigured,
+  sendPasswordResetEmail,
+} from './lib/passwordResetMailer'
 
 const RESET_ROUTE_PATH = '/auth/reset-password'
 const RESET_LINK_PURGE_GRACE_MS = 5 * 60 * 1000
@@ -675,14 +678,17 @@ export const getSession = query({
 export async function requestPasswordResetForEmail(
   ctx: MutationCtx,
   args: { email: string; redirectTo?: string },
-): Promise<{ accepted: boolean }> {
+): Promise<{ accepted: boolean; delivery: 'email' | 'manual' }> {
   const emailNorm = normalizeEmail(args.email)
   await consumeRateLimit(ctx, 'passwordResetRequest', { kind: 'email', value: emailNorm })
+  if (!isPasswordResetEmailConfigured()) {
+    return { accepted: true, delivery: 'manual' }
+  }
   const user = await findUserByEmailNorm(ctx, emailNorm)
   if (user && !user.deletedAt) {
     await issuePasswordResetToken(ctx, user.userId, user.email, user.emailNorm, args.redirectTo)
   }
-  return { accepted: true }
+  return { accepted: true, delivery: 'email' }
 }
 
 export const requestPasswordReset = mutation({
@@ -692,6 +698,7 @@ export const requestPasswordReset = mutation({
   },
   returns: v.object({
     accepted: v.boolean(),
+    delivery: v.union(v.literal('email'), v.literal('manual')),
   }),
   handler: (ctx, args) => requestPasswordResetForEmail(ctx, args),
 })

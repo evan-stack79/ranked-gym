@@ -23,17 +23,19 @@ describe('authService — récupération mot de passe', () => {
   it('envoie le lien via resetPasswordForEmail (avec redirectTo)', async () => {
     resetPasswordForEmail.mockResolvedValue({ data: {}, error: null })
     const { requestPasswordReset } = await import('./authService')
-    await requestPasswordReset('User@Email.COM', 'https://app.example.com/')
+    const result = await requestPasswordReset('User@Email.COM', 'https://app.example.com/')
     expect(resetPasswordForEmail).toHaveBeenCalledWith('user@email.com', {
       redirectTo: 'https://app.example.com/',
     })
+    expect(result).toEqual({ accepted: true, delivery: 'email' })
   })
 
   it('envoie le lien sans options si pas de redirectTo', async () => {
     resetPasswordForEmail.mockResolvedValue({ data: {}, error: null })
     const { requestPasswordReset } = await import('./authService')
-    await requestPasswordReset('a@b.co')
+    const result = await requestPasswordReset('a@b.co')
     expect(resetPasswordForEmail).toHaveBeenCalledWith('a@b.co', undefined)
+    expect(result).toEqual({ accepted: true, delivery: 'email' })
   })
 
   it('propage une erreur réseau à l’appelant', async () => {

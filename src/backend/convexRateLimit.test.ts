@@ -235,17 +235,18 @@ describe('Password reset enumeration parity', () => {
     const unknown = await requestPasswordResetForEmail(ctx as never, {
       email: 'missing@example.com',
     })
-    expect(known).toEqual({ accepted: true })
+    expect(known.accepted).toBe(true)
+    expect(['email', 'manual']).toContain(known.delivery)
     expect(unknown).toEqual(known)
 
     const remaining = RATE_LIMIT_POLICIES.passwordResetRequest.limit - 1
     for (let i = 0; i < remaining; i += 1) {
       await expect(
         requestPasswordResetForEmail(ctx as never, { email: 'known@example.com' }),
-      ).resolves.toEqual({ accepted: true })
+      ).resolves.toEqual(known)
       await expect(
         requestPasswordResetForEmail(ctx as never, { email: 'missing@example.com' }),
-      ).resolves.toEqual({ accepted: true })
+      ).resolves.toEqual(known)
     }
 
     const knownThrottle = requestPasswordResetForEmail(ctx as never, {

@@ -105,9 +105,21 @@ export async function signOut(): Promise<void> {
   await clearStoredSessionToken()
 }
 
-export async function requestPasswordReset(email: string, redirectTo?: string): Promise<void> {
+export type PasswordResetDelivery = 'email' | 'manual'
+
+export async function requestPasswordReset(
+  email: string,
+  redirectTo?: string,
+): Promise<{ accepted: boolean; delivery: PasswordResetDelivery }> {
   const client = requireConvexClient()
-  await client.mutation(api.auth.requestPasswordReset, { email, redirectTo })
+  const result = (await client.mutation(api.auth.requestPasswordReset, {
+    email,
+    redirectTo,
+  })) as { accepted: boolean; delivery?: 'email' | 'manual' }
+  return {
+    accepted: Boolean(result?.accepted),
+    delivery: result?.delivery === 'manual' ? 'manual' : 'email',
+  }
 }
 
 export async function updatePassword(newPassword: string, resetToken?: string): Promise<void> {
