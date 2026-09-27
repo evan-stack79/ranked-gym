@@ -13,6 +13,8 @@ import { legalKindFromPath } from './components/legal/legalRoutes.ts'
 import { ConvexClientProvider } from './lib/ConvexClientProvider.tsx'
 import { initSecureAuthStorage } from './services/secureAuthStorage'
 import { initSecureLocalStore } from './services/secureLocalStore'
+import { getActiveAuthBackend } from './backend/authFeatureFlag.ts'
+import { ConvexResetPasswordScreen } from './components/auth/ConvexResetPasswordScreen.tsx'
 
 function requireRoot(): HTMLElement {
   const el = document.getElementById('root')
@@ -27,6 +29,9 @@ const rootEl = requireRoot()
 function resolveBootTree() {
   if (typeof window === 'undefined') return <App />
   const path = window.location.pathname
+  if (path === '/auth/reset-password' && getActiveAuthBackend() === 'convex') {
+    return <ConvexResetPasswordScreen />
+  }
   const legal = legalKindFromPath(path)
   if (legal) return <LegalDocumentScreen kind={legal} />
   if (path === '/accueil-fixture') return <ColdLaunchAccueilFixture />

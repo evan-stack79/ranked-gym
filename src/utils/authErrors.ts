@@ -52,6 +52,15 @@ export function friendlyAuthError(err: unknown, fallback: string): string {
   if (lower.includes('invalid login credentials') || lower.includes('auth_invalid_credentials')) {
     return 'Email ou mot de passe incorrect.'
   }
+  if (lower.includes('auth_password_reset_required')) {
+    return 'Réinitialisation obligatoire : un lien de réinitialisation va t’être envoyé par email.'
+  }
+  if (lower.includes('auth_reset_token_missing')) {
+    return 'Lien de réinitialisation invalide. Redemande un nouveau lien.'
+  }
+  if (lower.includes('auth_reset_token_invalid')) {
+    return 'Lien expiré ou déjà utilisé. Redemande un nouveau lien.'
+  }
   if (lower.includes('user already registered')) {
     return 'Cet email est déjà utilisé. Passe sur Connexion.'
   }

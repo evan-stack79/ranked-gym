@@ -31,6 +31,7 @@ const SOURCE_SHA = 'sha-lock-1'
 
 type TableName =
   | 'auth_users'
+  | 'auth_password_credentials'
   | 'auth_sessions'
   | 'auth_password_reset_outbox'
   | 'auth_password_reset_tokens'
@@ -53,6 +54,7 @@ class FakeDb {
   private idCounter = 1
   private rows: Record<TableName, StoredRow[]> = {
     auth_users: [],
+    auth_password_credentials: [],
     auth_sessions: [],
     auth_password_reset_outbox: [],
     auth_password_reset_tokens: [],
@@ -331,6 +333,55 @@ describe('Convex admin/migration endpoint lock (C1-C3)', () => {
     })
     expect(preview).toHaveLength(1)
     expect(preview[0]?.email).toBe('legacy@example.com')
+  })
+
+  it('keeps mustResetPassword=false and existing hash on auth_users re-import', async () => {
+    const db = new FakeDb()
+    const ctx = createCtx(db)
+    const now = Date.now()
+    await startRunForAdmin(ctx as never, {
+      runId: 'run-auth-upsert',
+      sourceSha: SOURCE_SHA,
+      runSecret: RUN_SECRET,
+      adminSecret: ADMIN_SECRET,
+    })
+
+    await db.insert('auth_users', {
+      userId: 'legacy-user',
+      email: 'legacy@example.com',
+      emailNorm: 'legacy@example.com',
+      displayName: 'Legacy',
+      mustResetPassword: false,
+      createdAt: now,
+      updatedAt: now,
+    })
+    await db.insert('auth_password_credentials', {
+      userId: 'legacy-user',
+      passwordHash: 'pbkdf2$hash-before',
+      updatedAt: now,
+    })
+
+    await importEntityForRun(ctx as never, {
+      runId: 'run-auth-upsert',
+      sourceSha: SOURCE_SHA,
+      runSecret: RUN_SECRET,
+      adminSecret: ADMIN_SECRET,
+      entityType: 'auth_users',
+      supabaseId: 'legacy-user',
+      checksum: 'checksum-auth-upsert-1',
+      payload: {
+        userId: 'legacy-user',
+        email: 'legacy@example.com',
+        emailNorm: 'legacy@example.com',
+        displayName: 'Legacy Updated',
+        mustResetPassword: true,
+      },
+    })
+
+    const user = db.table('auth_users')[0]
+    expect(user.mustResetPassword).toBe(false)
+    expect(user.displayName).toBe('Legacy Updated')
+    expect(db.table('auth_password_credentials')[0]?.passwordHash).toBe('pbkdf2$hash-before')
   })
 
   it('cannot create or import a migration without the admin/run secret', async () => {

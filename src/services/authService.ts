@@ -120,10 +120,10 @@ export async function requestPasswordReset(email: string, redirectTo?: string) {
   if (error) throw error
 }
 
-/** Définit le nouveau mot de passe après l’événement PASSWORD_RECOVERY. */
-export async function updatePassword(newPassword: string) {
+/** Définit le nouveau mot de passe après récupération (Supabase ou Convex). */
+export async function updatePassword(newPassword: string, resetToken?: string) {
   if (isConvexAuthActive()) {
-    await convexAuth.updatePassword(newPassword)
+    await convexAuth.updatePassword(newPassword, resetToken)
     return
   }
   const supabase = getSupabase()

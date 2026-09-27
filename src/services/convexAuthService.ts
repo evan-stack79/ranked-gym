@@ -19,6 +19,10 @@ function readTokenFromLocation(): string | null {
   }
 }
 
+export function readPasswordResetTokenFromLocation(): string | null {
+  return readTokenFromLocation()
+}
+
 export async function getConvexSessionToken(): Promise<string | null> {
   const value = await Promise.resolve(getSecureAuthStorage().getItem(CONVEX_AUTH_STORAGE_KEY))
   if (!value || typeof value !== 'string') return null
@@ -106,11 +110,14 @@ export async function requestPasswordReset(email: string, redirectTo?: string): 
   await client.mutation(api.auth.requestPasswordReset, { email, redirectTo })
 }
 
-export async function updatePassword(newPassword: string): Promise<void> {
+export async function updatePassword(newPassword: string, resetToken?: string): Promise<void> {
   const client = requireConvexClient()
-  const token = readTokenFromLocation()
+  const token = resetToken?.trim() || readTokenFromLocation()
   if (!token) {
     throw new Error('AUTH_RESET_TOKEN_MISSING')
+  }
+  if (token.length < 16) {
+    throw new Error('AUTH_RESET_TOKEN_INVALID')
   }
   const result = await client.mutation(api.auth.consumePasswordReset, { token, newPassword })
   await setStoredSessionToken(result.sessionToken)

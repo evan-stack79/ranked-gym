@@ -15,6 +15,7 @@ export function AuthBottomSheet() {
     closeAuth,
     authLoading,
     authError,
+    authErrorCode,
     authInfo,
     signInWithEmail,
     signUpWithEmail,
@@ -156,6 +157,21 @@ export function AuthBottomSheet() {
               {authError && (
                 <p className="px-0.5 text-[13px] leading-snug text-[#FF6961]" role="alert" data-auth-error="1">
                   {authError}
+                </p>
+              )}
+              {authErrorCode === 'AUTH_PASSWORD_RESET_REQUIRED' && email.trim().length > 3 ? (
+                <button
+                  type="button"
+                  className="w-full text-left text-[13px] font-medium text-[#AEAEB2] underline-offset-2 hover:text-white hover:underline"
+                  disabled={authLoading}
+                  onClick={() => void requestPasswordReset(email)}
+                >
+                  Renvoyer le lien de réinitialisation
+                </button>
+              ) : null}
+              {authInfo && (
+                <p className="px-0.5 text-[13px] leading-snug text-[#30D158]" role="status">
+                  {authInfo}
                 </p>
               )}
 

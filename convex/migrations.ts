@@ -65,11 +65,18 @@ async function upsertAuthUser(
     .query('auth_users')
     .withIndex('by_userId', (q) => q.eq('userId', userId))
     .first()
+  const incomingMustReset =
+    typeof payload.mustResetPassword === 'boolean' ? payload.mustResetPassword : true
+  const mustResetPassword = existing
+    ? existing.mustResetPassword
+      ? incomingMustReset
+      : false
+    : incomingMustReset
   const patch = {
     email: String(payload.email ?? ''),
     emailNorm: String(payload.emailNorm ?? String(payload.email ?? '').trim().toLowerCase()),
     displayName: String(payload.displayName ?? 'Athlete'),
-    mustResetPassword: true,
+    mustResetPassword,
     updatedAt: Number(payload.updatedAt ?? now),
   }
   if (existing) {

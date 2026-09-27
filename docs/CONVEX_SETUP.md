@@ -35,7 +35,8 @@ Convex CLI / backend (local `.env.local` only, never git):
 | `CONVEX_DEPLOYMENT` | CLI selected deployment |
 | `CONVEX_DEPLOY_KEY` | Deploy key |
 | `CONVEX_AUTH_SECRET` | Auth signing secret (later phase) |
-| `CONVEX_AUTH_EMAIL_FROM` | Reset-mail sender (later phase) |
+| `RESEND_API_KEY` | API key for reset emails (Resend HTTP API) |
+| `AUTH_EMAIL_FROM` | Sender address for reset emails (ex: Ranked Gym <no-reply@...>) |
 | `CONVEX_AUTH_RESET_REDIRECT_URL` | Reset-mail redirect (later phase) |
 | `CONVEX_AUTH_RESET_TOKEN_TTL_MIN` | Reset token TTL (later phase) |
 | `CONVEX_AUTH_SESSION_TTL_HOURS` | Session lifetime (optional override) |
