@@ -170,8 +170,8 @@ describe('runGeminiWithRetryFallback', () => {
     expect(out.modelUsed).toBe('gemini-a')
     expect(attempt).toHaveBeenCalledTimes(3)
     expect(sleep).toHaveBeenCalledTimes(2)
-    expect(sleep.mock.calls[0]?.[0]).toBe(computeBackoffMs(700, () => 0.5))
-    expect(sleep.mock.calls[1]?.[0]).toBe(computeBackoffMs(1500, () => 0.5))
+    expect(sleep).toHaveBeenNthCalledWith(1, computeBackoffMs(700, () => 0.5))
+    expect(sleep).toHaveBeenNthCalledWith(2, computeBackoffMs(1500, () => 0.5))
   })
 
   it('après retries 503 épuisés : bascule au modèle suivant (sans dupliquer)', async () => {
