@@ -38,10 +38,17 @@ type TableName =
   | 'profiles'
   | 'workouts_state'
   | 'nutrition_state'
+  | 'nutrition_meals'
+  | 'nutrition_water_entries'
+  | 'nutrition_day_state'
+  | 'nutrition_food_catalog'
   | 'checkins'
+  | 'custom_spots'
+  | 'active_checkins'
   | 'aliments'
   | 'activities'
   | 'ai_usage_limits'
+  | 'streak_state'
   | 'legacy_supabase_backups'
   | 'user_files'
   | 'migration_runs'
@@ -61,10 +68,17 @@ class FakeDb {
     profiles: [],
     workouts_state: [],
     nutrition_state: [],
+    nutrition_meals: [],
+    nutrition_water_entries: [],
+    nutrition_day_state: [],
+    nutrition_food_catalog: [],
     checkins: [],
+    custom_spots: [],
+    active_checkins: [],
     aliments: [],
     activities: [],
     ai_usage_limits: [],
+    streak_state: [],
     legacy_supabase_backups: [],
     user_files: [],
     migration_runs: [],
@@ -302,6 +316,231 @@ describe('Convex admin/migration endpoint lock (C1-C3)', () => {
     })
     expect(imported.operation).toBe('inserted')
     expect(imported.convexId).toBeTruthy()
+  })
+
+  it('keeps original mapping runId when a row is skipped on a later run', async () => {
+    const db = new FakeDb()
+    const ctx = createCtx(db)
+
+    await startRunForAdmin(ctx as never, {
+      runId: 'run-first',
+      sourceSha: SOURCE_SHA,
+      runSecret: RUN_SECRET,
+      adminSecret: ADMIN_SECRET,
+    })
+    await importEntityForRun(ctx as never, {
+      runId: 'run-first',
+      sourceSha: SOURCE_SHA,
+      runSecret: RUN_SECRET,
+      adminSecret: ADMIN_SECRET,
+      entityType: 'profiles',
+      supabaseId: 'user-skip',
+      checksum: 'checksum-skip',
+      payload: { userId: 'user-skip', pseudo: 'Skip', level: 1, xp: 0, rank: 'Bronze' },
+    })
+    const before = db.table('migration_entity_map')[0]
+    expect(before.runId).toBe('run-first')
+
+    await startRunForAdmin(ctx as never, {
+      runId: 'run-second',
+      sourceSha: SOURCE_SHA,
+      runSecret: RUN_SECRET,
+      adminSecret: ADMIN_SECRET,
+    })
+    const skipped = await importEntityForRun(ctx as never, {
+      runId: 'run-second',
+      sourceSha: SOURCE_SHA,
+      runSecret: RUN_SECRET,
+      adminSecret: ADMIN_SECRET,
+      entityType: 'profiles',
+      supabaseId: 'user-skip',
+      checksum: 'checksum-skip',
+      payload: { userId: 'user-skip', pseudo: 'Skip', level: 1, xp: 0, rank: 'Bronze' },
+    })
+    expect(skipped.operation).toBe('skipped')
+
+    const after = db.table('migration_entity_map')[0]
+    expect(after.runId).toBe('run-first')
+  })
+
+  it('upserts streak/lobby/nutrition-derived/catalog tables without duplicates on re-import', async () => {
+    const db = new FakeDb()
+    const ctx = createCtx(db)
+    await startRunForAdmin(ctx as never, {
+      runId: 'run-derived',
+      sourceSha: SOURCE_SHA,
+      runSecret: RUN_SECRET,
+      adminSecret: ADMIN_SECRET,
+    })
+
+    await importEntityForRun(ctx as never, {
+      runId: 'run-derived',
+      sourceSha: SOURCE_SHA,
+      runSecret: RUN_SECRET,
+      adminSecret: ADMIN_SECRET,
+      entityType: 'profiles',
+      supabaseId: 'user-derived',
+      checksum: 'profile-checksum-1',
+      payload: {
+        userId: 'user-derived',
+        pseudo: 'Derived',
+        level: 3,
+        xp: 120,
+        rank: 'Silver',
+        currentStreak: 6,
+        lastLoginDate: '2026-09-27',
+        customSpotsJson: [
+          { id: 'spot-1', name: 'One', lat: 1, lng: 1 },
+          { id: 'spot-2', name: 'Two', lat: 2, lng: 2 },
+        ],
+        activeCheckinJson: { gym: { id: 'gym-1' } },
+      },
+    })
+
+    await importEntityForRun(ctx as never, {
+      runId: 'run-derived',
+      sourceSha: SOURCE_SHA,
+      runSecret: RUN_SECRET,
+      adminSecret: ADMIN_SECRET,
+      entityType: 'nutrition',
+      supabaseId: 'user-derived',
+      checksum: 'nutrition-checksum-1',
+      payload: {
+        userId: 'user-derived',
+        profileJson: {},
+        journalJson: {},
+        normalizedMeals: [
+          {
+            mealId: 'meal-1',
+            dateKey: '2026-09-27',
+            mealType: 'lunch',
+            name: 'Meal',
+            calories: 500,
+            createdAt: 1,
+            updatedAt: 1,
+            schemaVersion: 1,
+          },
+        ],
+        normalizedWaterEntries: [
+          {
+            entryId: 'water-1',
+            dateKey: '2026-09-27',
+            amountMl: 300,
+            type: 'glass',
+            label: 'Verre',
+            createdAt: 1,
+            updatedAt: 1,
+            schemaVersion: 1,
+          },
+        ],
+        normalizedDayStates: [
+          {
+            dateKey: '2026-09-27',
+            waterBottleLevelMl: 700,
+            waterBottleCalibrationTotalMl: 1200,
+            updatedAt: 1,
+            schemaVersion: 1,
+          },
+        ],
+      },
+    })
+
+    await importEntityForRun(ctx as never, {
+      runId: 'run-derived',
+      sourceSha: SOURCE_SHA,
+      runSecret: RUN_SECRET,
+      adminSecret: ADMIN_SECRET,
+      entityType: 'aliments',
+      supabaseId: 'food-derived',
+      checksum: 'aliment-checksum-1',
+      payload: {
+        userId: 'user-derived',
+        nom: 'Skyr',
+        calories: 63,
+        proteines: 11,
+        glucides: 4,
+        lipides: 1,
+        barcode: '3274080005003',
+        createdAt: 1,
+      },
+    })
+
+    await importEntityForRun(ctx as never, {
+      runId: 'run-derived',
+      sourceSha: SOURCE_SHA,
+      runSecret: RUN_SECRET,
+      adminSecret: ADMIN_SECRET,
+      entityType: 'nutrition',
+      supabaseId: 'user-derived',
+      checksum: 'nutrition-checksum-2',
+      payload: {
+        userId: 'user-derived',
+        profileJson: {},
+        journalJson: {},
+        normalizedMeals: [
+          {
+            mealId: 'meal-1',
+            dateKey: '2026-09-27',
+            mealType: 'lunch',
+            name: 'Meal updated',
+            calories: 510,
+            createdAt: 1,
+            updatedAt: 2,
+            schemaVersion: 1,
+          },
+        ],
+        normalizedWaterEntries: [
+          {
+            entryId: 'water-1',
+            dateKey: '2026-09-27',
+            amountMl: 320,
+            type: 'glass',
+            label: 'Verre',
+            createdAt: 1,
+            updatedAt: 2,
+            schemaVersion: 1,
+          },
+        ],
+        normalizedDayStates: [
+          {
+            dateKey: '2026-09-27',
+            waterBottleLevelMl: 750,
+            waterBottleCalibrationTotalMl: 1200,
+            updatedAt: 2,
+            schemaVersion: 1,
+          },
+        ],
+      },
+    })
+
+    await importEntityForRun(ctx as never, {
+      runId: 'run-derived',
+      sourceSha: SOURCE_SHA,
+      runSecret: RUN_SECRET,
+      adminSecret: ADMIN_SECRET,
+      entityType: 'aliments',
+      supabaseId: 'food-derived',
+      checksum: 'aliment-checksum-2',
+      payload: {
+        userId: 'user-derived',
+        nom: 'Skyr',
+        calories: 64,
+        proteines: 11,
+        glucides: 4,
+        lipides: 1,
+        barcode: '3274080005003',
+        createdAt: 1,
+      },
+    })
+
+    expect(db.table('streak_state')).toHaveLength(1)
+    expect(db.table('custom_spots')).toHaveLength(2)
+    expect(db.table('active_checkins')).toHaveLength(1)
+    expect(db.table('nutrition_meals')).toHaveLength(1)
+    expect(db.table('nutrition_water_entries')).toHaveLength(1)
+    expect(db.table('nutrition_day_state')).toHaveLength(1)
+    expect(db.table('nutrition_food_catalog')).toHaveLength(1)
+    expect(db.table('nutrition_meals')[0]?.name).toBe('Meal updated')
   })
 
   it('allows an explicit admin-role session path', async () => {

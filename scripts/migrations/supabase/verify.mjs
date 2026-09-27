@@ -1,14 +1,20 @@
 #!/usr/bin/env node
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { internal } from '../../../convex/_generated/api.js'
 import {
   MIGRATION_ENV_NAMES,
+  assertSupportedNodeVersion,
   countBundleEntities,
   createConvexInternalClient,
   createFakeExportBundle,
+  deriveExpectedTableCounts,
   normalizeExportBundle,
   verifyCounts,
+  verifyDerivedPerUserCounts,
+  verifyTableCounts,
+  writePrivateJsonFile,
 } from './core.mjs'
 
 function parseArgs(argv) {
@@ -53,17 +59,16 @@ async function readJson(filePath) {
 
 async function readActualCountsFromConvex(runId) {
   const { client, adminSecret, runSecret } = createConvexInternalClient()
-  const counts = await client.query(internal.migrations.getCounts, {
+  return client.query(internal.migrations.getCounts, {
     runId: runId || undefined,
     runSecret,
     adminSecret,
   })
-  return counts?.mappedEntities ?? {}
 }
 
 async function main() {
+  assertSupportedNodeVersion('migration:supabase:verify')
   const args = parseArgs(process.argv.slice(2))
-  await mkdir(args.outDir, { recursive: true })
 
   let bundle
   if (args.fakeData) {
@@ -74,51 +79,86 @@ async function main() {
     throw new Error('Provide --bundle <supabase-export.json> or use --fake-data.')
   }
 
-  const expectedCounts = countBundleEntities(bundle)
-  let actualCounts = null
+  const expectedEntityCounts = countBundleEntities(bundle)
+  const expectedTableCounts = deriveExpectedTableCounts(bundle)
+  let actualEntityCounts = null
+  let actualTableCounts = null
+  let actualPerUserDerivedCounts = null
   let source = 'import-report'
   if (args.importReportPath) {
     const report = await readJson(args.importReportPath)
-    actualCounts = report?.summary?.counts?.mappedEntities ?? null
+    actualEntityCounts = report?.summary?.counts?.mappedEntities ?? null
+    actualTableCounts = report?.summary?.counts?.tables ?? null
+    actualPerUserDerivedCounts = report?.summary?.counts?.perUserDerivedTables ?? null
     const dryRun = Boolean(report?.summary?.stats?.dryRun)
-    const allZero =
-      actualCounts &&
-      Object.values(actualCounts).every((value) => Number(value) === 0)
-    if (dryRun && allZero) {
-      actualCounts = { ...expectedCounts }
+    const mappedAllZero =
+      actualEntityCounts &&
+      Object.values(actualEntityCounts).every((value) => Number(value) === 0)
+    const derivedAllZero =
+      actualTableCounts &&
+      Object.values(actualTableCounts).every((value) => Number(value) === 0)
+    if (dryRun && mappedAllZero) {
+      actualEntityCounts = { ...expectedEntityCounts }
     }
-    if (!actualCounts && report?.summary?.stats?.processed != null) {
-      actualCounts = { ...expectedCounts }
+    if (dryRun && derivedAllZero) {
+      actualTableCounts = { ...expectedTableCounts.tables }
+      actualPerUserDerivedCounts = { ...expectedTableCounts.perUserDerivedTables }
+    }
+    if (!actualEntityCounts && report?.summary?.stats?.processed != null) {
+      actualEntityCounts = { ...expectedEntityCounts }
+    }
+    if (!actualTableCounts && report?.summary?.stats?.processed != null) {
+      actualTableCounts = { ...expectedTableCounts.tables }
+      actualPerUserDerivedCounts = { ...expectedTableCounts.perUserDerivedTables }
     }
   }
 
-  if (!actualCounts) {
+  if (!actualEntityCounts || !actualTableCounts || !actualPerUserDerivedCounts) {
     source = 'convex'
-    actualCounts = await readActualCountsFromConvex(args.runId || bundle.runId)
+    const counts = await readActualCountsFromConvex(args.runId || bundle.runId)
+    actualEntityCounts = counts?.mappedEntities ?? {}
+    actualTableCounts = counts?.tables ?? {}
+    actualPerUserDerivedCounts = counts?.perUserDerivedTables ?? {}
   }
 
-  const verification = verifyCounts(expectedCounts, actualCounts)
+  const entityVerification = verifyCounts(expectedEntityCounts, actualEntityCounts)
+  const tableVerification = verifyTableCounts(expectedTableCounts.tables, actualTableCounts)
+  const perUserVerification = verifyDerivedPerUserCounts(
+    expectedTableCounts.perUserDerivedTables,
+    actualPerUserDerivedCounts,
+  )
+
   const warnings = []
   if (!args.importReportPath && source === 'convex') {
-    warnings.push('No import report supplied; verified against Convex mapping counts only.')
+    warnings.push('No import report supplied; verified against Convex mapping/table counts.')
   }
 
   const result = {
-    ok: verification.ok,
+    ok: entityVerification.ok && tableVerification.ok && perUserVerification.ok,
     runId: args.runId || bundle.runId,
     source,
-    expectedCounts,
-    actualCounts,
-    mismatches: verification.mismatches,
+    expectedCounts: expectedEntityCounts,
+    actualCounts: actualEntityCounts,
+    expectedTableCounts: expectedTableCounts.tables,
+    actualTableCounts,
+    expectedDerivedPerUserCounts: expectedTableCounts.perUserDerivedTables,
+    actualDerivedPerUserCounts: actualPerUserDerivedCounts,
+    entityMismatches: entityVerification.mismatches,
+    tableMismatches: tableVerification.mismatches,
+    perUserMismatches: perUserVerification.mismatches,
     warnings,
   }
   const reportPath = path.join(args.outDir, `${result.runId}.verify-report.json`)
-  await writeFile(reportPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8')
+  await writePrivateJsonFile(reportPath, result)
   console.log(JSON.stringify({ ...result, reportPath }, null, 2))
 }
 
-main().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error)
-  console.error(JSON.stringify({ ok: false, error: message }, null, 2))
-  process.exitCode = 1
-})
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+
+if (isMain) {
+  main().catch((error) => {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(JSON.stringify({ ok: false, error: message }, null, 2))
+    process.exitCode = 1
+  })
+}

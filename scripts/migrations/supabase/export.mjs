@@ -1,14 +1,16 @@
 #!/usr/bin/env node
-import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 import {
   MIGRATION_ENTITY_ORDER,
   MIGRATION_ENV_NAMES,
+  assertSupportedNodeVersion,
   checksumFor,
   countBundleEntities,
   createFakeExportBundle,
   normalizeExportBundle,
+  writePrivateJsonFile,
 } from './core.mjs'
 
 function parseArgs(argv) {
@@ -94,6 +96,7 @@ function buildManifest(bundle) {
 }
 
 async function main() {
+  assertSupportedNodeVersion('migration:supabase:export')
   const args = parseArgs(process.argv.slice(2))
 
   let bundle
@@ -150,11 +153,10 @@ async function main() {
   }
 
   const manifest = buildManifest(bundle)
-  await mkdir(args.outDir, { recursive: true })
   const bundlePath = path.join(args.outDir, `${bundle.runId}.supabase-export.json`)
   const manifestPath = path.join(args.outDir, `${bundle.runId}.manifest.json`)
-  await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`, 'utf8')
-  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+  await writePrivateJsonFile(bundlePath, bundle)
+  await writePrivateJsonFile(manifestPath, manifest)
 
   const response = {
     ok: true,
@@ -167,8 +169,12 @@ async function main() {
   console.log(JSON.stringify(response, null, 2))
 }
 
-main().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error)
-  console.error(JSON.stringify({ ok: false, error: message }, null, 2))
-  process.exitCode = 1
-})
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+
+if (isMain) {
+  main().catch((error) => {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(JSON.stringify({ ok: false, error: message }, null, 2))
+    process.exitCode = 1
+  })
+}

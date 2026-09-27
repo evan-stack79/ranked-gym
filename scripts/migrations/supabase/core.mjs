@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import { chmod, mkdir, writeFile } from 'node:fs/promises'
+import path from 'node:path'
 import { ConvexHttpClient } from 'convex/browser'
 
 export const MIGRATION_ENTITY_ORDER = [
@@ -13,6 +15,37 @@ export const MIGRATION_ENTITY_ORDER = [
   'user_backups',
 ]
 
+export const MIGRATION_VERIFY_TABLE_ORDER = [
+  'auth_users',
+  'profiles',
+  'workouts',
+  'nutrition',
+  'checkins',
+  'aliments',
+  'activities',
+  'ai_usage_limits',
+  'user_backups',
+  'streak_state',
+  'custom_spots',
+  'active_checkins',
+  'nutrition_meals',
+  'nutrition_water_entries',
+  'nutrition_day_state',
+  'nutrition_food_catalog',
+]
+
+export const MIGRATION_DERIVED_TABLE_ORDER = [
+  'streak_state',
+  'custom_spots',
+  'active_checkins',
+  'nutrition_meals',
+  'nutrition_water_entries',
+  'nutrition_day_state',
+  'nutrition_food_catalog',
+]
+
+export const MIGRATION_NODE_MIN_MAJOR = 22
+
 export const MIGRATION_ENV_NAMES = {
   supabaseUrl: 'MIGRATION_SUPABASE_URL',
   supabaseServiceRoleKey: 'MIGRATION_SUPABASE_SERVICE_ROLE_KEY',
@@ -21,6 +54,36 @@ export const MIGRATION_ENV_NAMES = {
   adminSecret: 'MIGRATION_ADMIN_SECRET',
   runSecret: 'MIGRATION_RUN_SECRET',
   runId: 'MIGRATION_RUN_ID',
+}
+
+function parseNodeMajor(version) {
+  const [major] = String(version ?? '').split('.')
+  const parsed = Number(major)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+export function assertSupportedNodeVersion(context = 'migration script', version = process.versions.node) {
+  const major = parseNodeMajor(version)
+  if (major >= MIGRATION_NODE_MIN_MAJOR) return
+  throw new Error(
+    `[${context}] Node.js ${MIGRATION_NODE_MIN_MAJOR}+ required (detected ${version}). Upgrade Node before running Supabase -> Convex migration scripts.`,
+  )
+}
+
+export async function ensurePrivateArtifactsDir(dirPath) {
+  await mkdir(dirPath, { recursive: true, mode: 0o700 })
+  await chmod(dirPath, 0o700)
+}
+
+export async function writePrivateTextFile(filePath, text) {
+  const dirPath = path.dirname(filePath)
+  await ensurePrivateArtifactsDir(dirPath)
+  await writeFile(filePath, text, { encoding: 'utf8', mode: 0o600 })
+  await chmod(filePath, 0o600)
+}
+
+export async function writePrivateJsonFile(filePath, value) {
+  await writePrivateTextFile(filePath, `${JSON.stringify(value, null, 2)}\n`)
 }
 
 export function requireMigrationSecrets() {
@@ -72,6 +135,84 @@ function toUnixMs(value) {
     if (!Number.isNaN(ms)) return ms
   }
   return Date.now()
+}
+
+function toDateKey(value) {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+    return value.trim()
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const ms = Date.parse(value)
+    if (!Number.isNaN(ms)) return new Date(ms).toISOString().slice(0, 10)
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return new Date(value).toISOString().slice(0, 10)
+  }
+  return null
+}
+
+function asRecord(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value
+  }
+  return null
+}
+
+function asArrayOfObjects(value) {
+  if (!Array.isArray(value)) return []
+  return value.map((item) => asRecord(item)).filter(Boolean)
+}
+
+function asNullableNumber(value) {
+  if (value == null) return null
+  const parsed = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(parsed)) return null
+  return parsed
+}
+
+function asOptionalNumber(value) {
+  const parsed = asNullableNumber(value)
+  return parsed == null ? undefined : parsed
+}
+
+function normalizeMealType(value) {
+  const mealType = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  if (mealType === 'breakfast') return mealType
+  if (mealType === 'lunch') return mealType
+  if (mealType === 'dinner') return mealType
+  if (mealType === 'snack') return mealType
+  return 'snack'
+}
+
+function normalizePortionMode(value) {
+  const mode = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  if (mode === 'solo') return 'solo'
+  if (mode === 'with_sides') return 'with_sides'
+  return undefined
+}
+
+function normalizeWaterEntryType(value) {
+  const type = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  if (type === 'glass') return 'glass'
+  if (type === 'shaker') return 'shaker'
+  if (type === 'bottle') return 'bottle'
+  if (type === 'manual') return 'manual'
+  if (type === 'legacy') return 'legacy'
+  return 'manual'
+}
+
+function normalizeWaterEntryLabel(type, value) {
+  if (typeof value === 'string' && value.trim()) return value.trim().slice(0, 64)
+  if (type === 'glass') return 'Verre'
+  if (type === 'shaker') return 'Shaker'
+  if (type === 'bottle') return 'Bouteille'
+  if (type === 'legacy') return 'Eau'
+  return 'Ajustement'
+}
+
+function normalizeMealName(value) {
+  if (typeof value === 'string' && value.trim()) return value.trim().slice(0, 120)
+  return 'Repas'
 }
 
 function toDisplayName(authUser) {
@@ -132,6 +273,224 @@ export function countBundleEntities(bundle) {
     counts[key] = normalized.entities[key].length
   }
   return counts
+}
+
+export function foodCatalogKeyFromInput(input) {
+  const barcode = typeof input?.barcode === 'string' ? input.barcode.trim() : ''
+  if (barcode) return `barcode:${barcode}`
+  const name = typeof input?.name === 'string' ? input.name.trim().toLowerCase().slice(0, 140) : ''
+  const brand =
+    typeof input?.brand === 'string' ? input.brand.trim().toLowerCase().slice(0, 80) : ''
+  return `name:${name}|brand:${brand}`
+}
+
+function foodCatalogRowFromAliment(row) {
+  const userId = String(row.user_id ?? '').trim()
+  const name = String(row.nom ?? 'Aliment').trim().slice(0, 120) || 'Aliment'
+  const barcode = row.barcode == null ? undefined : String(row.barcode).trim() || undefined
+  const createdAt = toUnixMs(row.created_at)
+  return {
+    userId,
+    foodKey: foodCatalogKeyFromInput({ barcode, name, brand: '' }),
+    barcode,
+    name,
+    brand: undefined,
+    caloriesPer100g: asNullableNumber(row.calories),
+    proteinPer100g: asNullableNumber(row.proteines),
+    carbsPer100g: asNullableNumber(row.glucides),
+    fatPer100g: asNullableNumber(row.lipides),
+    imageUrl: undefined,
+    source: 'supabase_import',
+    lastFetchedAt: createdAt,
+    lastSelectedAt: createdAt,
+    selectedCount: 1,
+    isFavorite: false,
+    lastUsedMealType: undefined,
+    updatedAt: createdAt,
+    schemaVersion: 1,
+  }
+}
+
+function toNutritionDerivedRows(row) {
+  const userId = String(row.user_id ?? '').trim()
+  const updatedAt = toUnixMs(row.updated_at)
+  const journal = asRecord(row.journal) ?? {}
+  const meals = []
+  const waterEntries = []
+  const dayStates = []
+  const seenMealIds = new Set()
+  const seenWaterIds = new Set()
+  const seenDayKeys = new Set()
+
+  for (const [rawDateKey, dayRaw] of Object.entries(journal)) {
+    const dateKey = toDateKey(rawDateKey)
+    if (!dateKey) continue
+    const day = asRecord(dayRaw) ?? {}
+    const dayUpdatedAt = toUnixMs(day.updatedAt ?? day.updated_at ?? row.updated_at)
+
+    const mealRows = asArrayOfObjects(day.meals)
+    for (let index = 0; index < mealRows.length; index += 1) {
+      const meal = mealRows[index]
+      const mealId = String(meal.id ?? `${dateKey}:meal:${index}`).trim()
+      if (!mealId || seenMealIds.has(mealId)) continue
+      seenMealIds.add(mealId)
+      meals.push({
+        userId,
+        mealId,
+        dateKey,
+        mealType: normalizeMealType(meal.mealType),
+        name: normalizeMealName(meal.name),
+        calories: asNullableNumber(meal.calories),
+        proteinG: Object.hasOwn(meal, 'proteinG') ? asNullableNumber(meal.proteinG) : undefined,
+        carbsG: Object.hasOwn(meal, 'carbsG') ? asNullableNumber(meal.carbsG) : undefined,
+        fatG: Object.hasOwn(meal, 'fatG') ? asNullableNumber(meal.fatG) : undefined,
+        grams: asOptionalNumber(meal.grams),
+        pieces: asOptionalNumber(meal.pieces),
+        portionMode: normalizePortionMode(meal.portionMode),
+        createdAt: toUnixMs(meal.createdAt ?? meal.created_at ?? dayUpdatedAt),
+        updatedAt: toUnixMs(meal.updatedAt ?? meal.updated_at ?? dayUpdatedAt),
+        deletedAt: undefined,
+        schemaVersion: 1,
+      })
+    }
+
+    const waterRows = asArrayOfObjects(day.waterEntries)
+    for (let index = 0; index < waterRows.length; index += 1) {
+      const entry = waterRows[index]
+      const entryId = String(entry.id ?? `${dateKey}:water:${index}`).trim()
+      if (!entryId || seenWaterIds.has(entryId)) continue
+      seenWaterIds.add(entryId)
+      const type = normalizeWaterEntryType(entry.type)
+      waterEntries.push({
+        userId,
+        entryId,
+        dateKey,
+        amountMl: Math.max(0, Math.round(asNullableNumber(entry.amountMl ?? entry.amount) ?? 0)),
+        type,
+        label: normalizeWaterEntryLabel(type, entry.label),
+        createdAt: toUnixMs(entry.createdAt ?? entry.created_at ?? dayUpdatedAt),
+        updatedAt: toUnixMs(entry.updatedAt ?? entry.updated_at ?? dayUpdatedAt),
+        deletedAt: undefined,
+        schemaVersion: 1,
+      })
+    }
+
+    const hasBottleLevel = Object.hasOwn(day, 'waterBottleLevelMl')
+    const hasBottleCalibration = Object.hasOwn(day, 'waterBottleCalibrationTotalMl')
+    if ((hasBottleLevel || hasBottleCalibration) && !seenDayKeys.has(dateKey)) {
+      seenDayKeys.add(dateKey)
+      dayStates.push({
+        userId,
+        dateKey,
+        waterBottleLevelMl: hasBottleLevel ? asNullableNumber(day.waterBottleLevelMl) : undefined,
+        waterBottleCalibrationTotalMl: hasBottleCalibration
+          ? asNullableNumber(day.waterBottleCalibrationTotalMl)
+          : undefined,
+        updatedAt: dayUpdatedAt,
+        schemaVersion: 1,
+      })
+    }
+  }
+
+  return { meals, waterEntries, dayStates }
+}
+
+function addToPerUserCounter(counter, table, userId, delta = 1) {
+  if (!counter[table]) counter[table] = {}
+  counter[table][userId] = (counter[table][userId] ?? 0) + delta
+}
+
+function createEmptyVerifyTableCounts() {
+  const counts = {}
+  for (const key of MIGRATION_VERIFY_TABLE_ORDER) counts[key] = 0
+  return counts
+}
+
+function createEmptyDerivedPerUserCounts() {
+  const perUser = {}
+  for (const key of MIGRATION_DERIVED_TABLE_ORDER) perUser[key] = {}
+  return perUser
+}
+
+export function deriveExpectedTableCounts(rawBundle) {
+  const bundle = normalizeExportBundle(rawBundle)
+  const baseCounts = countBundleEntities(bundle)
+  const tables = createEmptyVerifyTableCounts()
+  const perUser = createEmptyDerivedPerUserCounts()
+  tables.auth_users = baseCounts.auth_users
+  tables.profiles = baseCounts.profiles
+  tables.workouts = baseCounts.workouts
+  tables.nutrition = baseCounts.nutrition
+  tables.checkins = baseCounts.checkins
+  tables.aliments = baseCounts.aliments
+  tables.activities = baseCounts.activities
+  tables.ai_usage_limits = baseCounts.ai_usage_limits
+  tables.user_backups = baseCounts.user_backups
+
+  const seenSpots = new Set()
+  for (const row of bundle.entities.profiles) {
+    const userId = String(row.id ?? '').trim()
+    if (!userId) continue
+    tables.streak_state += 1
+    addToPerUserCounter(perUser, 'streak_state', userId, 1)
+
+    const customSpots = asArrayOfObjects(row.custom_spots)
+    for (let index = 0; index < customSpots.length; index += 1) {
+      const spot = customSpots[index]
+      const spotId = String(spot.id ?? spot.spotId ?? `spot-${index}`).trim()
+      const key = `${userId}:${spotId}`
+      if (seenSpots.has(key)) continue
+      seenSpots.add(key)
+      tables.custom_spots += 1
+      addToPerUserCounter(perUser, 'custom_spots', userId, 1)
+    }
+
+    if (row.active_checkin != null) {
+      tables.active_checkins += 1
+      addToPerUserCounter(perUser, 'active_checkins', userId, 1)
+    }
+  }
+
+  const seenMeals = new Set()
+  const seenWaters = new Set()
+  const seenDays = new Set()
+  for (const row of bundle.entities.nutrition) {
+    const derived = toNutritionDerivedRows(row)
+    for (const meal of derived.meals) {
+      const key = `${meal.userId}:${meal.mealId}`
+      if (seenMeals.has(key)) continue
+      seenMeals.add(key)
+      tables.nutrition_meals += 1
+      addToPerUserCounter(perUser, 'nutrition_meals', meal.userId, 1)
+    }
+    for (const entry of derived.waterEntries) {
+      const key = `${entry.userId}:${entry.entryId}`
+      if (seenWaters.has(key)) continue
+      seenWaters.add(key)
+      tables.nutrition_water_entries += 1
+      addToPerUserCounter(perUser, 'nutrition_water_entries', entry.userId, 1)
+    }
+    for (const day of derived.dayStates) {
+      const key = `${day.userId}:${day.dateKey}`
+      if (seenDays.has(key)) continue
+      seenDays.add(key)
+      tables.nutrition_day_state += 1
+      addToPerUserCounter(perUser, 'nutrition_day_state', day.userId, 1)
+    }
+  }
+
+  const seenFoods = new Set()
+  for (const row of bundle.entities.aliments) {
+    const catalogRow = foodCatalogRowFromAliment(row)
+    if (!catalogRow.userId || !catalogRow.foodKey) continue
+    const key = `${catalogRow.userId}:${catalogRow.foodKey}`
+    if (seenFoods.has(key)) continue
+    seenFoods.add(key)
+    tables.nutrition_food_catalog += 1
+    addToPerUserCounter(perUser, 'nutrition_food_catalog', catalogRow.userId, 1)
+  }
+
+  return { tables, perUserDerivedTables: perUser }
 }
 
 export function createFakeExportBundle(runId = 'dry-run-fake') {
@@ -311,6 +670,10 @@ function mapProfileRow(row) {
       rank: String(row.rank ?? 'Bronze'),
       discipline: String(row.discipline ?? 'Musculation'),
       isGhostModeEnabled: Boolean(row.is_ghost_mode_enabled),
+      currentStreak: Math.max(0, Number(row.current_streak ?? 0)),
+      lastLoginDate: toDateKey(row.last_login_date),
+      customSpotsJson: row.custom_spots ?? [],
+      activeCheckinJson: row.active_checkin ?? null,
       createdAt: toUnixMs(row.created_at),
       updatedAt: toUnixMs(row.updated_at),
     },
@@ -330,12 +693,16 @@ function mapWorkoutRow(row) {
 }
 
 function mapNutritionRow(row) {
+  const derived = toNutritionDerivedRows(row)
   return {
     supabaseId: String(row.user_id ?? ''),
     payload: {
       userId: String(row.user_id ?? ''),
       profileJson: row.profile ?? {},
       journalJson: row.journal ?? {},
+      normalizedMeals: derived.meals,
+      normalizedWaterEntries: derived.waterEntries,
+      normalizedDayStates: derived.dayStates,
       updatedAt: toUnixMs(row.updated_at),
     },
   }
@@ -356,6 +723,7 @@ function mapCheckinRow(row) {
 }
 
 function mapAlimentRow(row) {
+  const catalogRow = foodCatalogRowFromAliment(row)
   return {
     supabaseId: String(row.id ?? ''),
     payload: {
@@ -367,6 +735,7 @@ function mapAlimentRow(row) {
       lipides: Number(row.lipides ?? 0),
       barcode: row.barcode == null ? null : String(row.barcode),
       createdAt: toUnixMs(row.created_at),
+      catalogRow,
     },
   }
 }
@@ -571,4 +940,33 @@ export function verifyCounts(expectedCounts, actualCounts) {
     ok: mismatches.length === 0,
     mismatches,
   }
+}
+
+export function verifyTableCounts(expectedCounts, actualCounts) {
+  const mismatches = []
+  for (const tableName of MIGRATION_VERIFY_TABLE_ORDER) {
+    const expected = Number(expectedCounts?.[tableName] ?? 0)
+    const actual = Number(actualCounts?.[tableName] ?? 0)
+    if (expected !== actual) {
+      mismatches.push({ tableName, expected, actual })
+    }
+  }
+  return { ok: mismatches.length === 0, mismatches }
+}
+
+export function verifyDerivedPerUserCounts(expectedPerUser, actualPerUser) {
+  const mismatches = []
+  for (const tableName of MIGRATION_DERIVED_TABLE_ORDER) {
+    const expectedUsers = expectedPerUser?.[tableName] ?? {}
+    const actualUsers = actualPerUser?.[tableName] ?? {}
+    const userIds = new Set([...Object.keys(expectedUsers), ...Object.keys(actualUsers)])
+    for (const userId of userIds) {
+      const expected = Number(expectedUsers[userId] ?? 0)
+      const actual = Number(actualUsers[userId] ?? 0)
+      if (expected !== actual) {
+        mismatches.push({ tableName, userId, expected, actual })
+      }
+    }
+  }
+  return { ok: mismatches.length === 0, mismatches }
 }

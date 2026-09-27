@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { assertSupportedNodeVersion } from './core.mjs'
 
 const outDir = path.resolve(process.cwd(), 'scripts/migrations/artifacts')
 const runId = process.env.MIGRATION_RUN_ID || `dry-run-${Date.now()}`
@@ -20,6 +22,7 @@ function runNode(script, args) {
 }
 
 function main() {
+  assertSupportedNodeVersion('migration:supabase:dry-run')
   const exportResult = runNode('scripts/migrations/supabase/export.mjs', [
     '--fake-data',
     '--dry-run',
@@ -60,10 +63,14 @@ function main() {
   console.log(JSON.stringify(result, null, 2))
 }
 
-try {
-  main()
-} catch (error) {
-  const message = error instanceof Error ? error.message : String(error)
-  console.error(JSON.stringify({ ok: false, error: message }, null, 2))
-  process.exitCode = 1
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+
+if (isMain) {
+  try {
+    main()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(JSON.stringify({ ok: false, error: message }, null, 2))
+    process.exitCode = 1
+  }
 }

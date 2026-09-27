@@ -53,6 +53,10 @@ Migration scripts (runtime env only):
 - `MIGRATION_RUN_SECRET` (optional; defaults to `MIGRATION_ADMIN_SECRET`)
 - `MIGRATION_RUN_ID`
 
+Runtime requirement:
+
+- Node.js `>= 22` (scripts fail early with a clear error under older runtimes).
+
 Copy names from `.env.example`. Leave values empty in git.
 
 ## Migration scripts (PR-I)
@@ -70,6 +74,53 @@ npm run migration:supabase:export -- --run-id <run-id>
 npm run migration:supabase:import -- --input scripts/migrations/artifacts/<run-id>.supabase-export.json --source-sha <git-sha>
 npm run migration:supabase:verify -- --bundle scripts/migrations/artifacts/<run-id>.supabase-export.json --import-report scripts/migrations/artifacts/<run-id>.convex-import-report.json
 ```
+
+Notes:
+
+- `migration:supabase:import` now honors `--run-id` as an explicit override of the bundle run id.
+- Artifacts are written with private permissions (`700` dir, `600` files) to reduce exposure of personal data.
+
+## Production runbook (server-side migration, no client backfill dependency)
+
+1. **Freeze writes on the app** (maintenance mode) so Supabase source data is stable during export/import.
+2. **Deploy Convex production code first** (required before migration import):
+
+   ```bash
+   npx convex deploy --prod
+   ```
+
+3. **Set migration-only runtime env** (outside git):
+   - `MIGRATION_SUPABASE_URL`
+   - `MIGRATION_SUPABASE_SERVICE_ROLE_KEY`
+   - `MIGRATION_CONVEX_URL`
+   - `MIGRATION_CONVEX_ADMIN_KEY`
+   - `MIGRATION_ADMIN_SECRET` (**dedicated value**, distinct from other app secrets)
+   - `MIGRATION_RUN_SECRET` (optional; set a distinct run secret when desired)
+4. **Export Supabase snapshot**:
+
+   ```bash
+   npm run migration:supabase:export -- --run-id <run-id>
+   ```
+
+5. **Import bundle into Convex**:
+
+   ```bash
+   npm run migration:supabase:import -- --input scripts/migrations/artifacts/<run-id>.supabase-export.json --run-id <run-id> --source-sha <git-sha>
+   ```
+
+6. **Migrate avatars bucket**:
+
+   ```bash
+   npm run migration:supabase:avatars -- --execute --run-id <run-id> --source-sha <git-sha>
+   ```
+
+7. **Verify counts and per-user derived tables**:
+
+   ```bash
+   npm run migration:supabase:verify -- --bundle scripts/migrations/artifacts/<run-id>.supabase-export.json --import-report scripts/migrations/artifacts/<run-id>.convex-import-report.json --run-id <run-id>
+   ```
+
+8. **Only after clean verification**: unfreeze writes and continue validation.
 
 Safety constraints:
 - no script deletes Supabase data
@@ -91,7 +142,7 @@ npm run migration:supabase:avatars -- --execute --run-id <run-id> --source-sha <
 ```
 
 What it does:
-- reads `storage.objects` entries from Supabase bucket `avatars`
+- reads Supabase Storage API listing from bucket `avatars` (recursive by user folders)
 - derives owning `userId` from object path prefix (`<userId>/...`)
 - uploads binaries into Convex storage
 - writes `user_files` metadata + `profiles.avatarFileId` pointer through `convex/files.ts`
