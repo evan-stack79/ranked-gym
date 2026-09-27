@@ -14,7 +14,9 @@ import {
 } from '../utils/deriveBottleProgress'
 import { todayKey } from '../utils/calories'
 import { getDailyWaterGoalMl, isTrainingDayToday } from '../utils/waterGoal'
+import { isConvexDomainActive } from '../backend/adapter'
 import { getActiveCloudUserId } from './cloudSession'
+import { enqueueConvexNutritionOp } from './convexNutritionQueue'
 import { safeWarn } from '../utils/safeLog'
 import { readLocal, writeLocal } from './secureLocalStore'
 
@@ -23,8 +25,77 @@ const JOURNAL_BASE = 'ranked-gym:nutrition-journal'
 
 export type StorageSaveOptions = { skipCloud?: boolean }
 
-function triggerCloudBackup() {
+function triggerCloudBackup(mode: 'profile' | 'journal' = 'journal') {
+  if (mode === 'journal' && isConvexDomainActive()) {
+    return
+  }
   void import('./cloudBackup').then((m) => m.notifyLocalDataChanged())
+}
+
+function toMealMap(meals: MealEntry[] | undefined): Map<string, MealEntry> {
+  return new Map((meals ?? []).map((meal) => [meal.id, meal] as const))
+}
+
+function toWaterMap(entries: WaterEntry[] | undefined): Map<string, WaterEntry> {
+  return new Map((entries ?? []).map((entry) => [entry.id, entry] as const))
+}
+
+function queueJournalDayDiff(dateKey: string, prev: DayJournal | undefined, next: DayJournal): void {
+  const now = Date.now()
+  const prevMeals = toMealMap(prev?.meals)
+  const nextMeals = toMealMap(next.meals)
+  for (const meal of nextMeals.values()) {
+    enqueueConvexNutritionOp({
+      kind: 'meal-upsert',
+      dateKey,
+      meal,
+      updatedAt: now,
+    })
+  }
+  for (const prevMealId of prevMeals.keys()) {
+    if (nextMeals.has(prevMealId)) continue
+    enqueueConvexNutritionOp({
+      kind: 'meal-delete',
+      dateKey,
+      mealId: prevMealId,
+      deletedAt: now,
+    })
+  }
+
+  const prevWater = toWaterMap(prev?.waterEntries)
+  const nextWater = toWaterMap(next.waterEntries)
+  for (const entry of nextWater.values()) {
+    enqueueConvexNutritionOp({
+      kind: 'water-upsert',
+      dateKey,
+      entry,
+      updatedAt: now,
+    })
+  }
+  for (const prevEntryId of prevWater.keys()) {
+    if (nextWater.has(prevEntryId)) continue
+    enqueueConvexNutritionOp({
+      kind: 'water-delete',
+      dateKey,
+      entryId: prevEntryId,
+      deletedAt: now,
+    })
+  }
+
+  if (
+    prev?.waterBottleLevelMl !== next.waterBottleLevelMl ||
+    prev?.waterBottleCalibrationTotalMl !== next.waterBottleCalibrationTotalMl
+  ) {
+    enqueueConvexNutritionOp({
+      kind: 'day-state-upsert',
+      dateKey,
+      dayState: {
+        waterBottleLevelMl: next.waterBottleLevelMl,
+        waterBottleCalibrationTotalMl: next.waterBottleCalibrationTotalMl,
+      },
+      updatedAt: now,
+    })
+  }
 }
 
 function scopedKey(base: string): string {
@@ -142,7 +213,7 @@ export function saveCalorieProfile(
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('ranked-gym:profile-changed'))
   }
-  if (!opts?.skipCloud) triggerCloudBackup()
+  if (!opts?.skipCloud) triggerCloudBackup('profile')
 }
 
 export function isNutritionOnboarded(): boolean {
@@ -173,8 +244,26 @@ export function saveMealJournal(
   journal: Record<string, DayJournal>,
   opts?: StorageSaveOptions,
 ): void {
+  const previous = getAllJournals()
   writeJson(scopedKey(JOURNAL_BASE), journal)
-  if (!opts?.skipCloud) triggerCloudBackup()
+  if (opts?.skipCloud) return
+  if (isConvexDomainActive()) {
+    const dateKeys = new Set([...Object.keys(previous), ...Object.keys(journal)])
+    for (const dateKey of dateKeys) {
+      queueJournalDayDiff(
+        dateKey,
+        previous[dateKey],
+        journal[dateKey] ?? {
+          dateKey,
+          meals: [],
+          waterEntries: undefined,
+          waterMl: 0,
+        },
+      )
+    }
+    return
+  }
+  triggerCloudBackup('journal')
 }
 
 export function getJournalForDate(dateKey: string): DayJournal {
@@ -188,9 +277,15 @@ export function getTodayJournal(): DayJournal {
 
 export function saveJournalForDate(journal: DayJournal, opts?: StorageSaveOptions): void {
   const all = getAllJournals()
+  const previous = all[journal.dateKey]
   all[journal.dateKey] = journal
   writeJson(scopedKey(JOURNAL_BASE), all)
-  if (!opts?.skipCloud) triggerCloudBackup()
+  if (opts?.skipCloud) return
+  if (isConvexDomainActive()) {
+    queueJournalDayDiff(journal.dateKey, previous, journal)
+    return
+  }
+  triggerCloudBackup('journal')
 }
 
 export function saveTodayJournal(journal: DayJournal, opts?: StorageSaveOptions): void {
@@ -593,7 +688,7 @@ export function addWaterEntryForDate(
     const nextLevel = bumpBottleLevelMl(prevLevel, entry.amountMl)
     nextJournal = { ...journal, waterBottleLevelMl: nextLevel }
     if (nextLevel !== prevLevel) {
-      saveJournalForDate(nextJournal, { ...opts, skipCloud: true })
+      saveJournalForDate(nextJournal, opts)
     }
   }
   return { journal: nextJournal, entry, waterMl: journal.waterMl ?? 0 }
@@ -613,7 +708,7 @@ export function removeWaterEntry(
     const prevLevel = readBottleLevelFromJournal(journal)
     const nextLevel = bumpBottleLevelMl(prevLevel, -removed.amountMl)
     nextJournal = { ...journal, waterBottleLevelMl: nextLevel }
-    saveTodayJournal(nextJournal, { ...opts, skipCloud: true })
+    saveTodayJournal(nextJournal, opts)
   }
   return { journal: nextJournal, waterMl: nextJournal.waterMl ?? 0, removed }
 }

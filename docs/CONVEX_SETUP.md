@@ -10,6 +10,7 @@ Inventory: `docs/migrations/supabase-to-convex-inventory.md`
 - `convex/schema.ts` — compatibility schema for Profil, Train, Nutrition, Hydratation (nested in nutrition journal), Sommeil, Streak, file metadata, and migration bookkeeping.
 - `convex/auth.ts` + `convex/authPrivateData.ts` — PR-E auth behind `VITE_ENABLE_CONVEX_AUTH` (global password reset, no legacy hash bridge).
 - `convex/sync.ts` + `convex/profiles.ts` — PR-F backup/sync + profile/streak read/write behind `VITE_ENABLE_CONVEX_PRIMARY`.
+- `convex/nutrition.ts` + `src/services/convexNutritionQueue.ts` — granular meals/water mutations, OFF intermediary, per-user recent/favorite foods; avoids whole-day JSON overwrite during Convex-primary runs.
 - `convex/rpc.ts` — PR-G checkins/feed/stats and AI usage reserve/release equivalents with session-based user isolation.
 - `convex/files.ts` — private avatar lifecycle on Convex storage (`upload` / `signed download` / `delete`) with owner checks + migration helpers.
 - `scripts/migrations/supabase/*.mjs` — PR-I export/import/verify scripts with dry-run fake-data workflow and deterministic id mapping.

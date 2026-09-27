@@ -25,7 +25,14 @@ import {
 } from '../../services/nutritionStorage'
 import { getDailyWaterGoalMl, isTrainingDayToday } from '../../utils/waterGoal'
 import { HydrationProgressBar } from './HydrationProgressBar'
-import { saveAliment, searchOpenFoodFacts, type OpenFoodFactsProduct, type OpenFoodFactsSearchHit } from '../../services/alimentsService'
+import {
+  listPersonalFoods,
+  setPersonalFoodFavorite,
+  saveAliment,
+  searchOpenFoodFacts,
+  type OpenFoodFactsProduct,
+  type OpenFoodFactsSearchHit,
+} from '../../services/alimentsService'
 import { useAuth } from '../../context/AuthContext'
 import { IconBadge } from '../ui/IconBadge'
 import { MacroRing } from './MacroRing'
@@ -116,10 +123,36 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
 
     const term = searchQuery.trim()
     if (term.length < 2) {
-      setSearchHits([])
       setSearchError(null)
       setSearchLoading(false)
-      return
+      let cancelled = false
+      void listPersonalFoods({ limit: 12 })
+        .then((items) => {
+          if (cancelled) return
+          setSearchHits(
+            items.map((item) => ({
+              barcode: item.barcode || item.foodKey,
+              nom: item.nom,
+              brands: item.brands ?? '',
+              calories: item.calories,
+              proteines: item.proteines,
+              glucides: item.glucides,
+              lipides: item.lipides,
+              imageUrl: item.imageUrl,
+              provenance: item.provenance,
+              fetchedAt: item.fetchedAt,
+              foodKey: item.foodKey,
+              isFavorite: item.isFavorite,
+            })),
+          )
+        })
+        .catch(() => {
+          if (cancelled) return
+          setSearchHits([])
+        })
+      return () => {
+        cancelled = true
+      }
     }
 
     const controller = new AbortController()
@@ -182,9 +215,9 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     name: string
     mealType: MealType
     calories: number
-    proteinG: number
-    carbsG: number
-    fatG: number
+    proteinG: number | null
+    carbsG: number | null
+    fatG: number | null
     grams: number
     pieces?: number
     portionMode: PortionMode
@@ -193,9 +226,9 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
       name: entry.name,
       mealType: entry.mealType,
       calories: entry.calories,
-      proteinG: entry.proteinG,
-      carbsG: entry.carbsG,
-      fatG: entry.fatG,
+      proteinG: entry.proteinG ?? undefined,
+      carbsG: entry.carbsG ?? undefined,
+      fatG: entry.fatG ?? undefined,
       grams: entry.grams,
       pieces: entry.pieces,
       portionMode: entry.portionMode,
@@ -216,6 +249,32 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
       setPendingMealType(null)
     }
   }
+
+  const handleToggleFavorite = useCallback(
+    (hit: OpenFoodFactsSearchHit) => {
+      if (!hit.foodKey) return
+      requireAuth(() => {
+        const next = !hit.isFavorite
+        void setPersonalFoodFavorite(hit.foodKey!, next)
+          .then((applied) => {
+            if (!applied) {
+              showToast('Impossible de mettre à jour le favori.', 'error')
+              return
+            }
+            setSearchHits((prev) =>
+              prev.map((item) =>
+                item.foodKey === hit.foodKey ? { ...item, isFavorite: next } : item,
+              ),
+            )
+            showToast(next ? 'Ajouté aux favoris.' : 'Retiré des favoris.')
+          })
+          .catch(() => {
+            showToast('Impossible de mettre à jour le favori.', 'error')
+          })
+      })
+    },
+    [requireAuth, showToast],
+  )
 
   const openScanner = (forMeal?: MealType) => {
     if (forMeal) setPendingMealType(forMeal)
@@ -467,6 +526,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
             setSearchQuery('')
             setSearchHits([])
           }}
+          onToggleFavorite={handleToggleFavorite}
           onOpenScanner={() => openScanner()}
           scannerSlot={
             scannerOpen ? (

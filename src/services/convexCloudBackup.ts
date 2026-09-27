@@ -122,11 +122,15 @@ export function snapshotToBackupPayload(
   }
 }
 
-export function backupPayloadToPushArgs(payload: ConvexBackupPayload) {
+export function backupPayloadToPushArgs(
+  payload: ConvexBackupPayload,
+  options?: { includeNutritionJournal?: boolean },
+) {
+  const includeNutritionJournal = options?.includeNutritionJournal ?? true
   return {
     nutrition: {
       profileJson: payload.nutrition.profile ?? {},
-      journalJson: payload.nutrition.journal ?? {},
+      ...(includeNutritionJournal ? { journalJson: payload.nutrition.journal ?? {} } : {}),
     },
     workouts: {
       stateJson: payload.training ?? {},
@@ -166,7 +170,7 @@ export async function fetchConvexBackupPayload(
 
 export async function pushConvexBackupPayload(
   payload: ConvexBackupPayload,
-  options?: { baseUpdatedAt?: number; clientMutationId?: string },
+  options?: { baseUpdatedAt?: number; clientMutationId?: string; includeNutritionJournal?: boolean },
 ): Promise<{ error?: string; skippedEmptyOverwrite?: boolean; stale?: boolean }> {
   try {
     const sessionToken = await requireToken()
@@ -174,7 +178,9 @@ export async function pushConvexBackupPayload(
       sessionToken,
       clientMutationId: options?.clientMutationId,
       baseUpdatedAt: options?.baseUpdatedAt,
-      ...backupPayloadToPushArgs(payload),
+      ...backupPayloadToPushArgs(payload, {
+        includeNutritionJournal: options?.includeNutritionJournal,
+      }),
     })) as ConvexPushResult
     if (result.skippedEmptyOverwrite) {
       return { skippedEmptyOverwrite: true }

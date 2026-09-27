@@ -3,11 +3,11 @@ import { Eye, EyeOff, Loader2, Mail } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { IosSheet } from '../ui/IosSheet'
 
-type AuthPanel = 'login' | 'forgot' | 'recovery'
+type AuthPanel = 'login' | 'signup' | 'forgot' | 'recovery'
 
 /**
- * Bêta privée — connexion email/mot de passe.
- * Inscription publique désactivée. Récupération de mot de passe disponible.
+ * Auth email/mot de passe.
+ * L’inscription reste gouvernée par la configuration backend.
  */
 export function AuthBottomSheet() {
   const {
@@ -17,6 +17,7 @@ export function AuthBottomSheet() {
     authError,
     authInfo,
     signInWithEmail,
+    signUpWithEmail,
     isPasswordRecovery,
     requestPasswordReset,
     confirmPasswordRecovery,
@@ -59,6 +60,8 @@ export function AuthBottomSheet() {
       ? 'Mot de passe oublié'
       : panel === 'recovery'
         ? 'Nouveau mot de passe'
+        : panel === 'signup'
+          ? 'Créer un compte'
         : 'Ranked Gym'
 
   const subtitle =
@@ -66,6 +69,8 @@ export function AuthBottomSheet() {
       ? 'Reçois un lien par email'
       : panel === 'recovery'
         ? 'Choisis un mot de passe sécurisé'
+        : panel === 'signup'
+          ? 'Inscription email + mot de passe'
         : 'Bon retour à la salle'
 
   const handleLogin = (event: FormEvent) => {
@@ -76,6 +81,12 @@ export function AuthBottomSheet() {
   const handleForgot = (event: FormEvent) => {
     event.preventDefault()
     void requestPasswordReset(email)
+  }
+
+  const handleSignup = (event: FormEvent) => {
+    event.preventDefault()
+    const pseudo = email.split('@')[0]?.trim()
+    void signUpWithEmail(email, password, pseudo || undefined)
   }
 
   const handleRecovery = (event: FormEvent) => {
@@ -97,7 +108,7 @@ export function AuthBottomSheet() {
           <>
             <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3.5 py-3">
               <Mail className="h-4 w-4 shrink-0 text-[#FF2B2B]" />
-              <p className="text-[13px] text-[#AEAEB2]">Connexion par email — bêta privée</p>
+              <p className="text-[13px] text-[#AEAEB2]">Connexion par email</p>
             </div>
 
             <form onSubmit={handleLogin} className="space-y-3">
@@ -177,9 +188,107 @@ export function AuthBottomSheet() {
               Mot de passe oublié ?
             </button>
 
-            <p className="pt-1 text-center text-[11px] leading-relaxed text-[#636366]">
-              Bêta fermée. Les inscriptions publiques sont actuellement désactivées.
+            <button
+              type="button"
+              className="w-full text-center text-[13px] font-medium text-[#AEAEB2] underline-offset-2 hover:text-white hover:underline"
+              disabled={authLoading}
+              onClick={() => {
+                clearAuthMessages()
+                setPanel('signup')
+                setPassword('')
+              }}
+            >
+              Créer un compte
+            </button>
+          </>
+        )}
+
+        {panel === 'signup' && (
+          <>
+            <p className="text-[13px] leading-relaxed text-[#AEAEB2]">
+              Crée un compte test. L’inscription peut être limitée par la configuration backend.
             </p>
+
+            <form onSubmit={handleSignup} className="space-y-3">
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Email</span>
+                <input
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="toi@email.com"
+                  disabled={authLoading}
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                  Mot de passe
+                </span>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    required
+                    minLength={6}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Au moins 6 caractères"
+                    disabled={authLoading}
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8E8E93]"
+                    aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                    onClick={() => setShowPassword((v) => !v)}
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+              </label>
+
+              {authError && (
+                <p className="px-0.5 text-[13px] leading-snug text-[#FF6961]" role="alert" data-auth-error="1">
+                  {authError}
+                </p>
+              )}
+              {authInfo && (
+                <p className="px-0.5 text-[13px] leading-snug text-[#30D158]" role="status">
+                  {authInfo}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="btn-brand ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 py-3.5 text-[16px] font-semibold text-white disabled:opacity-50"
+              >
+                {authLoading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Création…
+                  </>
+                ) : (
+                  'Créer le compte'
+                )}
+              </button>
+            </form>
+
+            <button
+              type="button"
+              className="w-full text-center text-[13px] font-medium text-[#AEAEB2] underline-offset-2 hover:text-white hover:underline"
+              disabled={authLoading}
+              onClick={() => {
+                clearAuthMessages()
+                setPanel('login')
+              }}
+            >
+              Retour à la connexion
+            </button>
           </>
         )}
 

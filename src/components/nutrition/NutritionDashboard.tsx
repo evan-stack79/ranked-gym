@@ -19,6 +19,8 @@ import {
   canSubmitHomeQuickWater,
 } from '../../utils/homeNutritionQuickActions'
 import {
+  listPersonalFoods,
+  setPersonalFoodFavorite,
   saveAliment,
   searchOpenFoodFacts,
   type OpenFoodFactsProduct,
@@ -134,10 +136,36 @@ export function NutritionDashboard({
 
     const term = searchQuery.trim()
     if (term.length < 2) {
-      setSearchHits([])
       setSearchError(null)
       setSearchLoading(false)
-      return
+      let cancelled = false
+      void listPersonalFoods({ limit: 12 })
+        .then((items) => {
+          if (cancelled) return
+          setSearchHits(
+            items.map((item) => ({
+              barcode: item.barcode || item.foodKey,
+              nom: item.nom,
+              brands: item.brands ?? '',
+              calories: item.calories,
+              proteines: item.proteines,
+              glucides: item.glucides,
+              lipides: item.lipides,
+              imageUrl: item.imageUrl,
+              provenance: item.provenance,
+              fetchedAt: item.fetchedAt,
+              foodKey: item.foodKey,
+              isFavorite: item.isFavorite,
+            })),
+          )
+        })
+        .catch(() => {
+          if (cancelled) return
+          setSearchHits([])
+        })
+      return () => {
+        cancelled = true
+      }
     }
 
     const controller = new AbortController()
@@ -267,9 +295,9 @@ export function NutritionDashboard({
     name: string
     mealType: MealType
     calories: number
-    proteinG: number
-    carbsG: number
-    fatG: number
+    proteinG: number | null
+    carbsG: number | null
+    fatG: number | null
     grams: number
     pieces?: number
     portionMode: PortionMode
@@ -278,9 +306,9 @@ export function NutritionDashboard({
       name: entry.name,
       mealType: entry.mealType,
       calories: entry.calories,
-      proteinG: entry.proteinG,
-      carbsG: entry.carbsG,
-      fatG: entry.fatG,
+      proteinG: entry.proteinG ?? undefined,
+      carbsG: entry.carbsG ?? undefined,
+      fatG: entry.fatG ?? undefined,
       grams: entry.grams,
       pieces: entry.pieces,
       portionMode: entry.portionMode,
@@ -302,6 +330,32 @@ export function NutritionDashboard({
       setPendingMealType(null)
     }
   }
+
+  const handleToggleFavorite = useCallback(
+    (hit: OpenFoodFactsSearchHit) => {
+      if (!hit.foodKey) return
+      requireAuth(() => {
+        const next = !hit.isFavorite
+        void setPersonalFoodFavorite(hit.foodKey!, next)
+          .then((applied) => {
+            if (!applied) {
+              showToast('Impossible de mettre à jour le favori.', 'error')
+              return
+            }
+            setSearchHits((prev) =>
+              prev.map((item) =>
+                item.foodKey === hit.foodKey ? { ...item, isFavorite: next } : item,
+              ),
+            )
+            showToast(next ? 'Ajouté aux favoris.' : 'Retiré des favoris.')
+          })
+          .catch(() => {
+            showToast('Impossible de mettre à jour le favori.', 'error')
+          })
+      })
+    },
+    [requireAuth, showToast],
+  )
 
   const handleAdd = (event: FormEvent) => {
     event.preventDefault()
@@ -584,6 +638,7 @@ export function NutritionDashboard({
             setSearchQuery('')
             setSearchHits([])
           }}
+          onToggleFavorite={handleToggleFavorite}
           onOpenScanner={() => openScanner()}
           scannerSlot={
             scannerOpen ? (

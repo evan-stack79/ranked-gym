@@ -57,7 +57,7 @@ async function findActiveAvatar(ctx: QueryCtx | MutationCtx, userId: string) {
     rows
       .filter((row) => !row.replacedAt)
       .sort((a, b) => b.createdAt - a.createdAt)
-      .at(0) ?? null
+      [0] ?? null
   )
 }
 
