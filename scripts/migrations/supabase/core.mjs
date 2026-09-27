@@ -313,7 +313,6 @@ function foodCatalogRowFromAliment(row) {
 
 function toNutritionDerivedRows(row) {
   const userId = String(row.user_id ?? '').trim()
-  const updatedAt = toUnixMs(row.updated_at)
   const journal = asRecord(row.journal) ?? {}
   const meals = []
   const waterEntries = []
