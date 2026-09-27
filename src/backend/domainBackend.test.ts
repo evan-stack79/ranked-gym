@@ -1,19 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const isConvexDomainActive = vi.fn()
-const isSupabaseConfigured = vi.fn()
-const safeWarn = vi.fn()
 
 vi.mock('./adapter', () => ({
   isConvexDomainActive,
-}))
-
-vi.mock('../lib/supabase', () => ({
-  isSupabaseConfigured,
-}))
-
-vi.mock('../utils/safeLog', () => ({
-  safeWarn,
 }))
 
 describe('runWithDomainBackend', () => {
@@ -44,18 +34,17 @@ describe('runWithDomainBackend', () => {
     expect(value).toBe('convex-ok')
   })
 
-  it('falls back to supabase when convex fails and fallback is available', async () => {
+  it('throws a french Convex error when convex fails in convex-primary mode', async () => {
     isConvexDomainActive.mockReturnValue(true)
-    isSupabaseConfigured.mockReturnValue(true)
     const { runWithDomainBackend } = await import('./domainBackend')
-    const value = await runWithDomainBackend({
-      operation: 'test.route',
-      convex: async () => {
-        throw new Error('convex outage')
-      },
-      supabase: async () => 'supabase-fallback',
-    })
-    expect(value).toBe('supabase-fallback')
-    expect(safeWarn).toHaveBeenCalled()
+    await expect(
+      runWithDomainBackend({
+        operation: 'test.route',
+        convex: async () => {
+          throw new Error('convex outage')
+        },
+        supabase: async () => 'supabase-fallback',
+      }),
+    ).rejects.toThrow('Service Convex temporairement indisponible')
   })
 })

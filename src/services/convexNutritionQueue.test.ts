@@ -6,7 +6,6 @@ const deleteConvexMeal = vi.fn()
 const pushConvexWaterEntry = vi.fn()
 const deleteConvexWaterEntry = vi.fn()
 const pushConvexDayState = vi.fn()
-const notifyLocalDataChanged = vi.fn()
 const safeError = vi.fn()
 const safeWarn = vi.fn()
 
@@ -20,10 +19,6 @@ vi.mock('./convexNutritionService', () => ({
   pushConvexWaterEntry,
   deleteConvexWaterEntry,
   pushConvexDayState,
-}))
-
-vi.mock('./cloudBackup', () => ({
-  notifyLocalDataChanged,
 }))
 
 vi.mock('../utils/safeLog', () => ({
@@ -77,7 +72,7 @@ describe('convexNutritionQueue', () => {
     expect(queue.getQueuedConvexNutritionOpCount()).toBe(0)
   })
 
-  it('keeps operations queued and triggers fallback push on convex outage', async () => {
+  it('keeps operations queued on convex outage without Supabase fallback write', async () => {
     pushConvexMeal.mockRejectedValue(new Error('network timeout'))
     const queue = await import('./convexNutritionQueue')
     queue.enqueueConvexNutritionOp({
@@ -96,7 +91,6 @@ describe('convexNutritionQueue', () => {
     await queue.flushConvexNutritionQueue()
 
     expect(queue.getQueuedConvexNutritionOpCount()).toBe(1)
-    expect(notifyLocalDataChanged).toHaveBeenCalledTimes(1)
     expect(safeError).toHaveBeenCalled()
   })
 

@@ -172,6 +172,30 @@ describe('alimentsService Convex primary migration', () => {
     expect(upsertConvexFoodSelection).toHaveBeenCalledTimes(1)
   })
 
+  it('does not fallback to Supabase when Convex save fails in convex-primary mode', async () => {
+    isConvexDomainActive.mockReturnValue(true)
+    isSupabaseConfigured.mockReturnValue(true)
+    upsertConvexFoodSelection.mockRejectedValue(new Error('convex outage'))
+
+    const { saveAliment } = await import('./alimentsService')
+    await expect(
+      saveAliment(
+        {
+          barcode: '333',
+          nom: 'Quinoa',
+          calories: 350,
+          proteines: 12,
+          glucides: 64,
+          lipides: 6,
+          provenance: 'open_food_facts',
+          fetchedAt: Date.now(),
+        },
+        'user-4',
+      ),
+    ).rejects.toThrow('Impossible d’enregistrer cet aliment sur Convex')
+    expect(getSupabase).not.toHaveBeenCalled()
+  })
+
   it('keeps nullable nutrients when saving Convex selections', async () => {
     isConvexDomainActive.mockReturnValue(true)
     upsertConvexFoodSelection.mockResolvedValue({ applied: true, foodKey: 'barcode:222', selectedCount: 1 })

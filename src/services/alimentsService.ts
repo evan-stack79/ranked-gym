@@ -227,7 +227,8 @@ export async function saveAliment(
       })
       return null
     } catch (error) {
-      safeWarn('[aliments] convex save failed, fallback supabase if available', error)
+      safeWarn('[aliments] convex save failed', error)
+      throw new Error('Impossible d’enregistrer cet aliment sur Convex. Réessaie.')
     }
   }
   if (!isSupabaseConfigured() || !userId) return null

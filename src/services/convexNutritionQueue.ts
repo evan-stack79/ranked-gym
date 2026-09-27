@@ -90,19 +90,6 @@ function removeQueueOpById(entries: StoredQueueOp[], opId: string): StoredQueueO
   return [...entries.slice(0, index), ...entries.slice(index + 1)]
 }
 
-function isConvexTemporaryFailure(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error ?? '')
-  const lower = message.toLowerCase()
-  return (
-    lower.includes('network') ||
-    lower.includes('fetch') ||
-    lower.includes('timeout') ||
-    lower.includes('temporarily') ||
-    lower.includes('convex') ||
-    lower.includes('connection')
-  )
-}
-
 async function applyQueueOperation(op: StoredQueueOp): Promise<void> {
   switch (op.kind) {
     case 'meal-upsert':
@@ -120,15 +107,6 @@ async function applyQueueOperation(op: StoredQueueOp): Promise<void> {
     case 'day-state-upsert':
       await pushConvexDayState(op.dateKey, op.dayState, op.updatedAt)
       return
-  }
-}
-
-async function requestSupabaseFallbackPush() {
-  try {
-    const { notifyLocalDataChanged } = await import('./cloudBackup')
-    notifyLocalDataChanged()
-  } catch (error) {
-    safeWarn('[nutrition-sync] fallback push unavailable', error)
   }
 }
 
@@ -179,9 +157,7 @@ export async function flushConvexNutritionQueue(): Promise<void> {
           kind: current.kind,
           message: error instanceof Error ? error.message : String(error),
         })
-        if (isConvexTemporaryFailure(error)) {
-          await requestSupabaseFallbackPush()
-        }
+        // Convex primary mode must never dual-write to Supabase on runtime failure.
         flushAbortedForFailure = true
         break
       }

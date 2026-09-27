@@ -1,12 +1,9 @@
-import { isSupabaseConfigured } from '../lib/supabase'
-import { safeWarn } from '../utils/safeLog'
 import { isConvexDomainActive } from './adapter'
 
 type DomainBackendPlan<T> = {
   operation: string
   convex: () => Promise<T>
   supabase: () => Promise<T>
-  allowSupabaseFallback?: boolean
 }
 
 type BackendFailureCode =
@@ -52,10 +49,28 @@ function logBackendDiagnostic(event: {
   console.info('[backend-diagnostic]', event)
 }
 
+function convexFailureMessage(code: BackendFailureCode): string {
+  switch (code) {
+    case 'network':
+    case 'timeout':
+      return 'Service Convex temporairement indisponible — réessaie dans quelques instants.'
+    case 'auth':
+      return 'Session expirée côté Convex — reconnecte-toi puis réessaie.'
+    case 'config':
+      return 'Configuration Convex invalide — contacte le support.'
+    case 'forbidden':
+      return 'Accès Convex refusé pour cette action.'
+    case 'not_found':
+      return 'Service Convex introuvable pour cette action.'
+    default:
+      return 'Erreur Convex inattendue — réessaie dans quelques instants.'
+  }
+}
+
 /**
  * Centralized backend routing for business services:
  * - Convex primary when enabled/configured.
- * - Controlled Supabase fallback during migration on Convex runtime failure.
+ * - No Supabase fallback when Convex is active (avoids dual-write divergence).
  */
 export async function runWithDomainBackend<T>(plan: DomainBackendPlan<T>): Promise<T> {
   if (!isConvexDomainActive()) {
@@ -89,38 +104,18 @@ export async function runWithDomainBackend<T>(plan: DomainBackendPlan<T>): Promi
     })
     return result
   } catch (error) {
-    const canFallback = plan.allowSupabaseFallback !== false && isSupabaseConfigured()
     const fallbackCause = classifyFailure(error)
-    if (!canFallback) {
-      logBackendDiagnostic({
-        domain: plan.operation,
-        firstBackend: 'convex',
-        convexSucceeded: false,
-        fallbackActivated: false,
-        fallbackCause,
-      })
-      throw error
-    }
-    safeWarn(`[backend:${plan.operation}] convex failed, fallback supabase`, error)
-    try {
-      const result = await plan.supabase()
-      logBackendDiagnostic({
-        domain: plan.operation,
-        firstBackend: 'convex',
-        convexSucceeded: false,
-        fallbackActivated: true,
-        fallbackCause,
-      })
-      return result
-    } catch (fallbackError) {
-      logBackendDiagnostic({
-        domain: plan.operation,
-        firstBackend: 'convex',
-        convexSucceeded: false,
-        fallbackActivated: true,
-        fallbackCause: classifyFailure(fallbackError),
-      })
-      throw fallbackError
-    }
+    logBackendDiagnostic({
+      domain: plan.operation,
+      firstBackend: 'convex',
+      convexSucceeded: false,
+      fallbackActivated: false,
+      fallbackCause,
+    })
+
+    const wrapped = new Error(convexFailureMessage(fallbackCause))
+    wrapped.name = 'ConvexPrimaryError'
+    ;(wrapped as Error & { cause?: unknown }).cause = error
+    throw wrapped
   }
 }
