@@ -1,5 +1,6 @@
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 import { safeError, safeWarn } from '../utils/safeLog'
+import { toUserFacingError } from '../utils/userFacingError'
 import type { Json } from '../types/database'
 import type { CalorieProfile, DayJournal } from '../types/nutrition'
 import type { TrainingState } from '../types/training'
@@ -73,6 +74,17 @@ let hydratedUserId: string | null = null
 let cloudSyncReady = false
 let deferredPush = false
 let lifecycleWired = false
+
+function mapCloudBackupError(
+  error: unknown,
+  operation: 'pull' | 'push',
+): string {
+  const fallback =
+    operation === 'pull'
+      ? 'Restauration cloud indisponible pour le moment. Réessaie.'
+      : 'Sauvegarde cloud indisponible pour le moment. Réessaie.'
+  return toUserFacingError(error, fallback)
+}
 
 function readCloudUserId(): string | null {
   return cloudSession.getActiveCloudUserId()
@@ -372,8 +384,8 @@ async function fetchRemotePayload(userId: string): Promise<{
     const { fetchConvexBackupPayload } = await import('./convexCloudBackup')
     const result = await fetchConvexBackupPayload(getTrainingState())
     if (!result.error) return { payload: result.payload, source: 'convex' }
-    if (!isSupabaseConfigured()) return { payload: null, source: 'convex', error: result.error }
-    safeWarn('[cloudBackup] convex read failed, fallback to supabase', result.error)
+    // Convex primary: never silently fallback to Supabase.
+    throw new Error(result.error || 'CONVEX_CLOUD_BACKUP_READ_FAILED')
   }
 
   const supabase = getSupabase()
@@ -455,8 +467,8 @@ async function upsertTables(userId: string, payload: CloudBackupPayload): Promis
     const result = await pushConvexBackupPayload(payload, { includeNutritionJournal: false })
     if (result.skippedEmptyOverwrite) return {}
     if (!result.error) return {}
-    if (!isSupabaseConfigured()) return { error: result.error }
-    safeWarn('[cloudBackup] convex write failed, fallback to supabase', result.error)
+    // Convex primary: never silently fallback to Supabase writes.
+    throw new Error(result.error || 'CONVEX_CLOUD_BACKUP_WRITE_FAILED')
   }
 
   const supabase = getSupabase()
@@ -586,9 +598,10 @@ export async function pushCloudBackup(
       const { error } = await upsertTables(uid, payload)
       if (error) {
         safeError('[cloudBackup] pushCloudBackup failed', error)
-        setMeta({ pending: false, lastError: error })
-        emitBackupEvent('ranked-gym:backup-error', { error, source: 'push' })
-        return { ok: false, error }
+        const userError = mapCloudBackupError(error, 'push')
+        setMeta({ pending: isConvexDomainActive(), lastError: userError })
+        emitBackupEvent('ranked-gym:backup-error', { error: userError, source: 'push' })
+        return { ok: false, error: userError }
       }
       setMeta({
         pending: false,
@@ -598,9 +611,9 @@ export async function pushCloudBackup(
       emitBackupEvent('ranked-gym:backup-saved', { source: 'push' })
       return { ok: true }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Erreur de sauvegarde'
+      const msg = mapCloudBackupError(e, 'push')
       safeError('[cloudBackup] pushCloudBackup exception', e)
-      setMeta({ pending: false, lastError: msg })
+      setMeta({ pending: isConvexDomainActive(), lastError: msg })
       emitBackupEvent('ranked-gym:backup-error', { error: msg, source: 'push' })
       return { ok: false, error: msg }
     } finally {
@@ -634,10 +647,11 @@ export async function pullCloudBackup(
   try {
     const { payload: remote, source, error } = await fetchRemotePayload(uid)
     if (error) {
+      const userError = mapCloudBackupError(error, 'pull')
       safeError('[cloudBackup] pullCloudBackup failed', error)
-      setMeta({ lastError: error })
-      emitBackupEvent('ranked-gym:backup-error', { error, source: 'pull' })
-      return { ok: false, applied: false, error }
+      setMeta({ lastError: userError })
+      emitBackupEvent('ranked-gym:backup-error', { error: userError, source: 'pull' })
+      return { ok: false, applied: false, error: userError }
     }
 
     if (!remote || (!hasMeaningfulCloudData(remote) && !remote.nutrition.profile)) {
@@ -659,7 +673,7 @@ export async function pullCloudBackup(
     setMeta({ lastPullAt: new Date().toISOString(), lastError: null })
     return { ok: true, applied: false }
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Erreur de restauration'
+    const msg = mapCloudBackupError(e, 'pull')
     safeError('[cloudBackup] pullCloudBackup exception', e)
     setMeta({ lastError: msg })
     emitBackupEvent('ranked-gym:backup-error', { error: msg, source: 'pull' })
