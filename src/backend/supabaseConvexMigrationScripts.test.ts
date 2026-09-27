@@ -200,18 +200,22 @@ describe('supabase -> convex migration scripts', () => {
     const profile = rows.find((row) => row.entityType === 'profiles')
     const nutrition = rows.find((row) => row.entityType === 'nutrition')
     const aliment = rows.find((row) => row.entityType === 'aliments')
+    const customSpots = (profile?.payload.customSpotsJson as unknown[]) ?? []
+    const normalizedMeals = (nutrition?.payload.normalizedMeals as unknown[]) ?? []
+    const normalizedWaterEntries = (nutrition?.payload.normalizedWaterEntries as unknown[]) ?? []
+    const normalizedDayStates = (nutrition?.payload.normalizedDayStates as unknown[]) ?? []
     expect(profile?.payload.currentStreak).toBe(11)
     expect(profile?.payload.lastLoginDate).toBe('2026-09-26')
     expect(Array.isArray(profile?.payload.customSpotsJson)).toBe(true)
-    expect((profile?.payload.customSpotsJson as unknown[])?.length).toBe(2)
+    expect(customSpots.length).toBe(2)
     expect(profile?.payload.activeCheckinJson).toBeTruthy()
 
     expect(Array.isArray(nutrition?.payload.normalizedMeals)).toBe(true)
-    expect((nutrition?.payload.normalizedMeals as unknown[])?.length).toBe(1)
+    expect(normalizedMeals.length).toBe(1)
     expect(Array.isArray(nutrition?.payload.normalizedWaterEntries)).toBe(true)
-    expect((nutrition?.payload.normalizedWaterEntries as unknown[])?.length).toBe(1)
+    expect(normalizedWaterEntries.length).toBe(1)
     expect(Array.isArray(nutrition?.payload.normalizedDayStates)).toBe(true)
-    expect((nutrition?.payload.normalizedDayStates as unknown[])?.length).toBe(1)
+    expect(normalizedDayStates.length).toBe(1)
 
     expect((aliment?.payload.catalogRow as { foodKey: string }).foodKey).toBe(
       'barcode:3274080005003',
