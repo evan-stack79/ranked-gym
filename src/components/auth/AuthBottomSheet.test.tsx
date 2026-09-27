@@ -35,7 +35,7 @@ async function renderSheet(overrides: Parameters<typeof buildAuthContextValue>[0
 }
 
 describe('AuthBottomSheet', () => {
-  it('reste dismissible hors recovery et garde mot de passe oublié', async () => {
+  it('reste dismissible hors recovery avec actions login/signup', async () => {
     const closeAuth = vi.fn()
     const { cleanup } = await renderSheet({
       isAuthenticated: false,
@@ -45,7 +45,8 @@ describe('AuthBottomSheet', () => {
     const dialog = document.querySelector('[role="dialog"]')
     expect(dialog).toBeTruthy()
     expect(document.body.textContent).toContain('Mot de passe oublié ?')
-    expect(document.body.textContent).not.toMatch(/créer un compte|inscription publique/i)
+    expect(document.body.textContent).toMatch(/créer un compte/i)
+    expect(document.body.textContent).not.toMatch(/inscription publique désactivée/i)
     const close = document.querySelector(
       '[role="dialog"] button[aria-label="Fermer"]',
     ) as HTMLButtonElement

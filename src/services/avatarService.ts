@@ -7,6 +7,7 @@ import {
 } from './convexAvatarService'
 import { isConvexAvatarStorageActive } from '../backend/avatarFeatureFlag'
 import type { ProfileRow } from '../types/database'
+import { toUserFacingError } from '../utils/userFacingError'
 
 const MAX_EDGE_PX = 512
 const JPEG_QUALITY = 0.85
@@ -78,23 +79,27 @@ export async function uploadUserAvatar(
   userId: string,
   file: File,
 ): Promise<{ profile: ProfileRow; publicUrl: string }> {
-  const blob = await resizeImageForAvatar(file)
-  if (isConvexAvatarStorageActive()) {
-    return uploadConvexUserAvatar(userId, blob)
+  try {
+    const blob = await resizeImageForAvatar(file)
+    if (isConvexAvatarStorageActive()) {
+      return uploadConvexUserAvatar(userId, blob)
+    }
+    const path = `${userId}/avatar.jpg`
+    const supabase = getSupabase()
+
+    const { error: uploadError } = await supabase.storage.from('avatars').upload(path, blob, {
+      upsert: true,
+      contentType: 'image/jpeg',
+      cacheControl: '3600',
+    })
+    if (uploadError) throw uploadError
+
+    const publicUrl = publicAvatarUrl(path)
+    const profile = await updateProfileProgress(userId, { avatar_url: publicUrl })
+    return { profile, publicUrl }
+  } catch (error) {
+    throw new Error(toUserFacingError(error, 'Upload impossible.'))
   }
-  const path = `${userId}/avatar.jpg`
-  const supabase = getSupabase()
-
-  const { error: uploadError } = await supabase.storage.from('avatars').upload(path, blob, {
-    upsert: true,
-    contentType: 'image/jpeg',
-    cacheControl: '3600',
-  })
-  if (uploadError) throw uploadError
-
-  const publicUrl = publicAvatarUrl(path)
-  const profile = await updateProfileProgress(userId, { avatar_url: publicUrl })
-  return { profile, publicUrl }
 }
 
 export async function getOwnAvatarUrl(userId: string): Promise<string | null> {
@@ -108,14 +113,18 @@ export async function getOwnAvatarUrl(userId: string): Promise<string | null> {
 export async function deleteUserAvatar(
   userId: string,
 ): Promise<{ profile: ProfileRow; publicUrl: null; deleted: boolean }> {
-  if (isConvexAvatarStorageActive()) {
-    const profile = await deleteConvexOwnAvatar(userId)
+  try {
+    if (isConvexAvatarStorageActive()) {
+      const profile = await deleteConvexOwnAvatar(userId)
+      return { profile, publicUrl: null, deleted: true }
+    }
+    const path = `${userId}/avatar.jpg`
+    const supabase = getSupabase()
+    const { error } = await supabase.storage.from('avatars').remove([path])
+    if (error) throw error
+    const profile = await updateProfileProgress(userId, { avatar_url: null })
     return { profile, publicUrl: null, deleted: true }
+  } catch (error) {
+    throw new Error(toUserFacingError(error, 'Suppression de la photo impossible.'))
   }
-  const path = `${userId}/avatar.jpg`
-  const supabase = getSupabase()
-  const { error } = await supabase.storage.from('avatars').remove([path])
-  if (error) throw error
-  const profile = await updateProfileProgress(userId, { avatar_url: null })
-  return { profile, publicUrl: null, deleted: true }
 }

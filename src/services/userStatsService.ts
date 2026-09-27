@@ -9,7 +9,7 @@ import {
   isTimestampInLocalWeek,
   workoutValidationMs,
 } from '../utils/weekBounds'
-import { isConvexDomainActive } from '../backend/adapter'
+import { runWithDomainBackend } from '../backend/domainBackend'
 import { fetchConvexUserStatsRaw } from './convexUserStatsService'
 
 export type UserStatsRadar = {
@@ -118,7 +118,7 @@ function parseRpcPayload(raw: unknown): UserStatsPayload {
 export async function fetchUserStats(userId: string): Promise<UserStatsPayload> {
   const localCompleted = countLocalWeekSessions()
 
-  if (!userId || (!isSupabaseConfigured() && !isConvexDomainActive())) {
+  if (!userId) {
     return {
       ...emptyStats(),
       weeklySessions: { completed: localCompleted, target: WEEKLY_TARGET },
@@ -126,30 +126,28 @@ export async function fetchUserStats(userId: string): Promise<UserStatsPayload> 
   }
 
   try {
-    if (isConvexDomainActive()) {
-      const data = await fetchConvexUserStatsRaw()
-      const parsed = parseRpcPayload(data)
-      return {
-        ...parsed,
-        weeklySessions: {
-          completed: Math.max(parsed.weeklySessions.completed, localCompleted),
-          target: parsed.weeklySessions.target || WEEKLY_TARGET,
-        },
-      }
-    }
-
-    const supabase = getSupabase()
-    const { data, error } = await supabase.rpc('get_user_stats', { p_user_id: userId })
-
-    if (error) {
-      safeError('[userStats] get_user_stats failed', error.message)
-      return {
-        ...emptyStats(),
-        weeklySessions: { completed: localCompleted, target: WEEKLY_TARGET },
-      }
-    }
-
-    const parsed = parseRpcPayload(data)
+    const parsed = await runWithDomainBackend<UserStatsPayload>({
+      operation: 'userStats.fetch',
+      convex: async () => parseRpcPayload(await fetchConvexUserStatsRaw()),
+      supabase: async () => {
+        if (!isSupabaseConfigured()) {
+          return {
+            ...emptyStats(),
+            weeklySessions: { completed: localCompleted, target: WEEKLY_TARGET },
+          }
+        }
+        const supabase = getSupabase()
+        const { data, error } = await supabase.rpc('get_user_stats', { p_user_id: userId })
+        if (error) {
+          safeError('[userStats] get_user_stats failed', error.message)
+          return {
+            ...emptyStats(),
+            weeklySessions: { completed: localCompleted, target: WEEKLY_TARGET },
+          }
+        }
+        return parseRpcPayload(data)
+      },
+    })
     return {
       ...parsed,
       weeklySessions: {

@@ -50,9 +50,9 @@ interface ScannedProductSheetProps {
     name: string
     mealType: MealType
     calories: number
-    proteinG: number
-    carbsG: number
-    fatG: number
+    proteinG: number | null
+    carbsG: number | null
+    fatG: number | null
     grams: number
     pieces?: number
     portionMode: PortionMode
@@ -154,7 +154,7 @@ export function ScannedProductSheet({
   )
 
   const suggested = useMemo(() => {
-    if (!product) return null
+    if (!product || product.calories == null || product.calories <= 0) return null
     return suggestedGramsForScan({
       kcalPer100g: product.calories,
       remainingKcal: remaining,
@@ -165,15 +165,22 @@ export function ScannedProductSheet({
 
   const nutrition = useMemo(() => {
     if (!product || effectiveGrams == null || effectiveGrams <= 0) return null
-    return scaleNutrition(
+    if (product.calories == null || product.calories <= 0) return null
+    const scaled = scaleNutrition(
       {
         calories: product.calories,
-        proteines: product.proteines,
-        glucides: product.glucides,
-        lipides: product.lipides,
+        proteines: product.proteines ?? 0,
+        glucides: product.glucides ?? 0,
+        lipides: product.lipides ?? 0,
       },
       effectiveGrams,
     )
+    return {
+      calories: scaled.calories,
+      proteines: product.proteines == null ? null : scaled.proteines,
+      glucides: product.glucides == null ? null : scaled.glucides,
+      lipides: product.lipides == null ? null : scaled.lipides,
+    }
   }, [product, effectiveGrams])
 
   const afterAddRemaining = nutrition
@@ -187,7 +194,11 @@ export function ScannedProductSheet({
 
   if (!product) return null
 
+  const hasCalories =
+    product.calories != null && Number.isFinite(product.calories) && product.calories > 0
+
   const canSave =
+    hasCalories &&
     effectiveGrams != null &&
     effectiveGrams > 0 &&
     nutrition != null &&
@@ -224,10 +235,19 @@ export function ScannedProductSheet({
       open={open}
       onClose={onClose}
       title={product.nom}
-      subtitle={`Open Food Facts · ${product.calories} kcal / 100 g`}
+      subtitle={`Open Food Facts · ${
+        product.calories == null ? 'kcal non fournies' : `${product.calories} kcal / 100 g`
+      }`}
       leading={<UtensilsCrossed className="mt-0.5 h-5 w-5 text-[#30D158]" />}
     >
       <div className="space-y-5 pb-2">
+        {!hasCalories ? (
+          <div className="rounded-2xl border border-[#FF453A]/35 bg-[#2C1014]/80 px-3.5 py-3 text-[12px] text-[#FF9FA3]">
+            Open Food Facts ne fournit pas les kcal/100 g pour ce produit. Tu peux le logger en
+            saisie manuelle pour éviter une valeur inventée.
+          </div>
+        ) : null}
+
         <div className="rounded-2xl border border-white/10 bg-black/25 px-3.5 py-3">
           <p className="text-[12px] font-semibold text-white">
             {MEAL_TYPE_LABELS[mealType]} · budget {budget} kcal (zone {range.min}–{range.max})
@@ -489,7 +509,7 @@ export function ScannedProductSheet({
                     ? `Pour finir le repas avec les ~${remaining} kcal restantes — ça fait un bon combo.`
                     : `Pour atteindre ~${remaining} kcal avec uniquement ce produit.`
                   : `Portion pour laisser de la place à l’accompagnement.`}
-                {isCalorieDense(product.calories) && mode === 'with_sides'
+                {product.calories != null && isCalorieDense(product.calories) && mode === 'with_sides'
                   ? ' Aliment dense : une petite part + accompagnement, c’est top.'
                   : ''}
               </p>
@@ -501,7 +521,9 @@ export function ScannedProductSheet({
               <p className="text-[13px] text-[#8E8E93]">
                 Cet aliment ≈{' '}
                 <span className="font-semibold text-white">{nutrition.calories} kcal</span>
-                {' · '}P {nutrition.proteines}g · G {nutrition.glucides}g · L {nutrition.lipides}g
+                {' · '}P {nutrition.proteines == null ? 'ND' : `${nutrition.proteines}g`} · G{' '}
+                {nutrition.glucides == null ? 'ND' : `${nutrition.glucides}g`} · L{' '}
+                {nutrition.lipides == null ? 'ND' : `${nutrition.lipides}g`}
               </p>
               <p className="mt-1 text-[12px] text-[#AEAEB2]">
                 {afterAddRemaining > 40

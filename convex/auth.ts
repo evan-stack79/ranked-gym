@@ -1,5 +1,15 @@
 import { v } from 'convex/values'
-import { mutation, query, internalMutation, internalQuery, type MutationCtx, type QueryCtx } from './_generated/server'
+import { makeFunctionReference } from 'convex/server'
+import type { Id } from './_generated/dataModel'
+import {
+  mutation,
+  query,
+  internalMutation,
+  internalQuery,
+  internalAction,
+  type MutationCtx,
+  type QueryCtx,
+} from './_generated/server'
 import {
   assertPasswordPolicy,
   createOpaqueToken,
@@ -21,8 +31,55 @@ import {
 } from './lib/authConfig'
 import { requireAdminCaller } from './lib/migrationAdmin'
 import { consumeRateLimit } from './lib/rateLimit'
+import {
+  isPasswordResetEmailConfigured,
+  sendPasswordResetEmail,
+} from './lib/passwordResetMailer'
 
 const RESET_ROUTE_PATH = '/auth/reset-password'
+const RESET_LINK_PURGE_GRACE_MS = 5 * 60 * 1000
+const OUTBOX_STATUS = {
+  queued: 'queued',
+  sending: 'sending',
+  sent: 'sent',
+  failed: 'failed',
+  purged: 'purged',
+} as const
+const processPasswordResetOutboxEmailRef = makeFunctionReference<
+  'action',
+  { outboxId: Id<'auth_password_reset_outbox'> },
+  { delivered: boolean }
+>('auth:processPasswordResetOutboxEmail')
+const purgePasswordResetOutboxLinkRef = makeFunctionReference<
+  'mutation',
+  { outboxId: Id<'auth_password_reset_outbox'> },
+  null
+>('auth:purgePasswordResetOutboxLink')
+const beginPasswordResetOutboxAttemptRef = makeFunctionReference<
+  'mutation',
+  { outboxId: Id<'auth_password_reset_outbox'> },
+  BeginOutboxAttemptResult
+>('auth:beginPasswordResetOutboxAttempt')
+const markPasswordResetOutboxSentRef = makeFunctionReference<
+  'mutation',
+  { outboxId: Id<'auth_password_reset_outbox'>; providerMessageId?: string },
+  null
+>('auth:markPasswordResetOutboxSent')
+const markPasswordResetOutboxFailedRef = makeFunctionReference<
+  'mutation',
+  { outboxId: Id<'auth_password_reset_outbox'>; errorCode: string },
+  null
+>('auth:markPasswordResetOutboxFailed')
+const createAdminPasswordResetLinkRef = makeFunctionReference<
+  'mutation',
+  {
+    email: string
+    redirectTo?: string
+    adminSecret?: string
+    sessionToken?: string
+  },
+  { accepted: boolean; email?: string; resetLink?: string }
+>('auth:createAdminPasswordResetLink')
 
 function toDisplayName(emailNorm: string, displayName?: string): string {
   const trimmed = displayName?.trim()
@@ -82,12 +139,41 @@ async function deleteRows(
   }
 }
 
+type IssuePasswordResetOptions = {
+  persistOutbox?: boolean
+  scheduleDelivery?: boolean
+}
+
+type SchedulerLike = {
+  runAfter: MutationCtx['scheduler']['runAfter']
+}
+
+function hasScheduler(ctx: MutationCtx): ctx is MutationCtx & { scheduler: SchedulerLike } {
+  const candidate = ctx as MutationCtx & { scheduler?: SchedulerLike }
+  return typeof candidate.scheduler?.runAfter === 'function'
+}
+
+async function schedulePasswordResetEmailJobs(
+  ctx: MutationCtx,
+  outboxId: Id<'auth_password_reset_outbox'>,
+  expiresAt: number,
+): Promise<void> {
+  if (!hasScheduler(ctx)) return
+  const now = Date.now()
+  const purgeDelayMs = Math.max(0, expiresAt - now + RESET_LINK_PURGE_GRACE_MS)
+  await ctx.scheduler.runAfter(0, processPasswordResetOutboxEmailRef, { outboxId })
+  await ctx.scheduler.runAfter(purgeDelayMs, purgePasswordResetOutboxLinkRef, {
+    outboxId,
+  })
+}
+
 export async function issuePasswordResetToken(
   ctx: MutationCtx,
   userId: string,
   email: string,
   emailNorm: string,
   redirectTo?: string,
+  options: IssuePasswordResetOptions = {},
 ): Promise<{ rawToken: string; tokenHash: string; expiresAt: number }> {
   const now = Date.now()
   const rawToken = createOpaqueToken()
@@ -99,15 +185,29 @@ export async function issuePasswordResetToken(
     createdAt: now,
     expiresAt,
   })
-  await ctx.db.insert('auth_password_reset_outbox', {
-    userId,
-    email,
-    emailNorm,
-    tokenHash,
-    resetLink: createResetLink(redirectTo || getResetRedirectBaseUrl(), rawToken),
-    createdAt: now,
-    attemptCount: 0,
-  })
+  if (options.persistOutbox !== false) {
+    const outboxId = await ctx.db.insert('auth_password_reset_outbox', {
+      userId,
+      email,
+      emailNorm,
+      tokenHash,
+      resetLink: createResetLink(redirectTo || getResetRedirectBaseUrl(), rawToken),
+      createdAt: now,
+      expiresAt,
+      attemptCount: 0,
+      status: OUTBOX_STATUS.queued,
+    })
+    if (options.scheduleDelivery !== false) {
+      try {
+        await schedulePasswordResetEmailJobs(ctx, outboxId, expiresAt)
+      } catch {
+        await ctx.db.patch(outboxId, {
+          status: OUTBOX_STATUS.failed,
+          lastError: 'EMAIL_JOB_SCHEDULE_FAILED',
+        })
+      }
+    }
+  }
   return { rawToken, tokenHash, expiresAt }
 }
 
@@ -578,14 +678,17 @@ export const getSession = query({
 export async function requestPasswordResetForEmail(
   ctx: MutationCtx,
   args: { email: string; redirectTo?: string },
-): Promise<{ accepted: boolean }> {
+): Promise<{ accepted: boolean; delivery: 'email' | 'manual' }> {
   const emailNorm = normalizeEmail(args.email)
   await consumeRateLimit(ctx, 'passwordResetRequest', { kind: 'email', value: emailNorm })
+  if (!isPasswordResetEmailConfigured()) {
+    return { accepted: true, delivery: 'manual' }
+  }
   const user = await findUserByEmailNorm(ctx, emailNorm)
   if (user && !user.deletedAt) {
     await issuePasswordResetToken(ctx, user.userId, user.email, user.emailNorm, args.redirectTo)
   }
-  return { accepted: true }
+  return { accepted: true, delivery: 'email' }
 }
 
 export const requestPasswordReset = mutation({
@@ -595,6 +698,7 @@ export const requestPasswordReset = mutation({
   },
   returns: v.object({
     accepted: v.boolean(),
+    delivery: v.union(v.literal('email'), v.literal('manual')),
   }),
   handler: (ctx, args) => requestPasswordResetForEmail(ctx, args),
 })
@@ -614,6 +718,260 @@ export const consumePasswordReset = mutation({
     }),
   }),
   handler: (ctx, args) => consumePasswordResetToken(ctx, args.token, args.newPassword),
+})
+
+const outboxStatusValidator = v.union(
+  v.literal(OUTBOX_STATUS.queued),
+  v.literal(OUTBOX_STATUS.sending),
+  v.literal(OUTBOX_STATUS.sent),
+  v.literal(OUTBOX_STATUS.failed),
+  v.literal(OUTBOX_STATUS.purged),
+)
+
+const outboxLifecycleMutationArgs = {
+  outboxId: v.id('auth_password_reset_outbox'),
+}
+
+type BeginOutboxAttemptResult =
+  | { ok: false; reason: 'missing' | 'already_processed' | 'link_unavailable' | 'expired' }
+  | { ok: true; email: string; resetLink: string }
+
+export const beginPasswordResetOutboxAttempt = internalMutation({
+  args: outboxLifecycleMutationArgs,
+  returns: v.union(
+    v.object({
+      ok: v.literal(false),
+      reason: v.union(
+        v.literal('missing'),
+        v.literal('already_processed'),
+        v.literal('link_unavailable'),
+        v.literal('expired'),
+      ),
+    }),
+    v.object({
+      ok: v.literal(true),
+      email: v.string(),
+      resetLink: v.string(),
+    }),
+  ),
+  handler: async (ctx, args): Promise<BeginOutboxAttemptResult> => {
+    const row = await ctx.db.get(args.outboxId)
+    if (!row) return { ok: false, reason: 'missing' }
+    if (row.sentAt || row.status === OUTBOX_STATUS.sent || row.status === OUTBOX_STATUS.purged) {
+      return { ok: false, reason: 'already_processed' }
+    }
+    if (!row.resetLink || row.resetLink.trim().length === 0) {
+      return { ok: false, reason: 'link_unavailable' }
+    }
+    if (typeof row.expiresAt === 'number' && row.expiresAt <= Date.now()) {
+      await ctx.db.patch(args.outboxId, {
+        resetLink: '',
+        status: OUTBOX_STATUS.purged,
+        purgedAt: Date.now(),
+      })
+      return { ok: false, reason: 'expired' }
+    }
+
+    await ctx.db.patch(args.outboxId, {
+      attemptCount: row.attemptCount + 1,
+      lastAttemptAt: Date.now(),
+      status: OUTBOX_STATUS.sending,
+      lastError: undefined,
+    })
+    return {
+      ok: true,
+      email: row.email,
+      resetLink: row.resetLink,
+    }
+  },
+})
+
+export const markPasswordResetOutboxSent = internalMutation({
+  args: {
+    ...outboxLifecycleMutationArgs,
+    providerMessageId: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const now = Date.now()
+    const row = await ctx.db.get(args.outboxId)
+    if (!row) return null
+    await ctx.db.patch(args.outboxId, {
+      status: OUTBOX_STATUS.sent,
+      sentAt: now,
+      resetLink: '',
+      purgedAt: now,
+      providerMessageId: args.providerMessageId,
+      lastError: undefined,
+    })
+    return null
+  },
+})
+
+export const markPasswordResetOutboxFailed = internalMutation({
+  args: {
+    ...outboxLifecycleMutationArgs,
+    errorCode: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.outboxId)
+    if (!row) return null
+    await ctx.db.patch(args.outboxId, {
+      status: OUTBOX_STATUS.failed,
+      lastError: args.errorCode.slice(0, 120),
+    })
+    return null
+  },
+})
+
+export const purgePasswordResetOutboxLink = internalMutation({
+  args: outboxLifecycleMutationArgs,
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.outboxId)
+    if (!row) return null
+    if (!row.resetLink || row.resetLink.trim().length === 0) return null
+    await ctx.db.patch(args.outboxId, {
+      resetLink: '',
+      status: row.sentAt ? OUTBOX_STATUS.sent : OUTBOX_STATUS.purged,
+      purgedAt: Date.now(),
+    })
+    return null
+  },
+})
+
+export const processPasswordResetOutboxEmail = internalAction({
+  args: outboxLifecycleMutationArgs,
+  returns: v.object({
+    delivered: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const begin = await ctx.runMutation(beginPasswordResetOutboxAttemptRef, {
+      outboxId: args.outboxId,
+    })
+    if (!begin.ok) {
+      return { delivered: false }
+    }
+    const delivery = await sendPasswordResetEmail({
+      toEmail: begin.email,
+      resetLink: begin.resetLink,
+    })
+    if (delivery.ok) {
+      await ctx.runMutation(markPasswordResetOutboxSentRef, {
+        outboxId: args.outboxId,
+        providerMessageId: delivery.messageId,
+      })
+      return { delivered: true }
+    }
+    await ctx.runMutation(markPasswordResetOutboxFailedRef, {
+      outboxId: args.outboxId,
+      errorCode: delivery.code,
+    })
+    return { delivered: false }
+  },
+})
+
+export async function createAdminPasswordResetLinkForAdmin(
+  ctx: MutationCtx,
+  args: {
+    email: string
+    redirectTo?: string
+    adminSecret?: string
+    sessionToken?: string
+  },
+): Promise<{ accepted: boolean; email?: string; resetLink?: string }> {
+  await requireAdminCaller(ctx, args)
+  const emailNorm = normalizeEmail(args.email)
+  const user = await findUserByEmailNorm(ctx, emailNorm)
+  if (!user || user.deletedAt) {
+    return { accepted: true }
+  }
+  const issued = await issuePasswordResetToken(
+    ctx,
+    user.userId,
+    user.email,
+    user.emailNorm,
+    args.redirectTo,
+    { persistOutbox: false, scheduleDelivery: false },
+  )
+  return {
+    accepted: true,
+    email: user.email,
+    resetLink: createResetLink(args.redirectTo || getResetRedirectBaseUrl(), issued.rawToken),
+  }
+}
+
+export const createAdminPasswordResetLink = internalMutation({
+  args: {
+    email: v.string(),
+    redirectTo: v.optional(v.string()),
+    adminSecret: v.optional(v.string()),
+    sessionToken: v.optional(v.string()),
+  },
+  returns: v.object({
+    accepted: v.boolean(),
+    email: v.optional(v.string()),
+    resetLink: v.optional(v.string()),
+  }),
+  handler: (ctx, args) => createAdminPasswordResetLinkForAdmin(ctx, args),
+})
+
+export const generateAdminPasswordResetLink = internalAction({
+  args: {
+    email: v.string(),
+    redirectTo: v.optional(v.string()),
+    sendEmail: v.optional(v.boolean()),
+    adminSecret: v.optional(v.string()),
+    sessionToken: v.optional(v.string()),
+  },
+  returns: v.object({
+    accepted: v.boolean(),
+    email: v.optional(v.string()),
+    resetLink: v.optional(v.string()),
+    emailStatus: v.union(v.literal('skipped'), v.literal('sent'), v.literal('failed')),
+    emailErrorCode: v.optional(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    const created = await ctx.runMutation(createAdminPasswordResetLinkRef, {
+      email: args.email,
+      redirectTo: args.redirectTo,
+      adminSecret: args.adminSecret,
+      sessionToken: args.sessionToken,
+    })
+    if (!created.resetLink || !created.email) {
+      return { accepted: true, emailStatus: 'skipped' as const }
+    }
+
+    if (!args.sendEmail) {
+      return {
+        accepted: true,
+        email: created.email,
+        resetLink: created.resetLink,
+        emailStatus: 'skipped' as const,
+      }
+    }
+
+    const delivery = await sendPasswordResetEmail({
+      toEmail: created.email,
+      resetLink: created.resetLink,
+    })
+    if (delivery.ok) {
+      return {
+        accepted: true,
+        email: created.email,
+        resetLink: created.resetLink,
+        emailStatus: 'sent' as const,
+      }
+    }
+    return {
+      accepted: true,
+      email: created.email,
+      resetLink: created.resetLink,
+      emailStatus: 'failed' as const,
+      emailErrorCode: delivery.code,
+    }
+  },
 })
 
 export async function changePasswordForSession(
@@ -731,8 +1089,11 @@ export async function getPasswordResetOutboxPreviewForAdmin(
   return rows.map((row) => ({
     email: row.email,
     createdAt: row.createdAt,
+    expiresAt: row.expiresAt,
     sentAt: row.sentAt,
+    lastAttemptAt: row.lastAttemptAt,
     attemptCount: row.attemptCount,
+    status: row.status,
     lastError: row.lastError,
   }))
 }
@@ -779,8 +1140,11 @@ export const getPasswordResetOutboxPreview = internalQuery({
     v.object({
       email: v.string(),
       createdAt: v.number(),
+      expiresAt: v.optional(v.number()),
       sentAt: v.optional(v.number()),
+      lastAttemptAt: v.optional(v.number()),
       attemptCount: v.number(),
+      status: v.optional(outboxStatusValidator),
       lastError: v.optional(v.string()),
     }),
   ),

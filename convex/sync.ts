@@ -385,17 +385,25 @@ async function upsertWorkouts(
 async function upsertNutrition(
   ctx: MutationCtx,
   userId: string,
-  profileJson: unknown,
-  journalJson: unknown,
+  nutrition: { profileJson?: unknown; journalJson?: unknown },
   now: number,
 ) {
   const existing = await findNutritionDoc(ctx, userId)
   if (existing) {
     assertUserOwnership(existing.userId, userId)
-    await ctx.db.patch(existing._id, { profileJson, journalJson, updatedAt: now })
+    await ctx.db.patch(existing._id, {
+      ...(nutrition.profileJson !== undefined ? { profileJson: nutrition.profileJson } : {}),
+      ...(nutrition.journalJson !== undefined ? { journalJson: nutrition.journalJson } : {}),
+      updatedAt: now,
+    })
     return
   }
-  await ctx.db.insert('nutrition_state', { userId, profileJson, journalJson, updatedAt: now })
+  await ctx.db.insert('nutrition_state', {
+    userId,
+    profileJson: nutrition.profileJson ?? {},
+    journalJson: nutrition.journalJson ?? {},
+    updatedAt: now,
+  })
 }
 
 async function replaceSleepNights(
@@ -558,13 +566,7 @@ export async function pushSyncForSession(
 
   const now = Date.now()
   if (input.nutrition) {
-    await upsertNutrition(
-      ctx,
-      user.userId,
-      input.nutrition.profileJson ?? {},
-      input.nutrition.journalJson ?? {},
-      now,
-    )
+    await upsertNutrition(ctx, user.userId, input.nutrition, now)
   }
   if (input.workouts) {
     await upsertWorkouts(
@@ -622,8 +624,8 @@ export const pushSync = mutation({
     baseUpdatedAt: v.optional(v.number()),
     nutrition: v.optional(
       v.object({
-        profileJson: v.any(),
-        journalJson: v.any(),
+        profileJson: v.optional(v.any()),
+        journalJson: v.optional(v.any()),
       }),
     ),
     workouts: v.optional(

@@ -1,5 +1,6 @@
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 import { safeError, safeWarn } from '../utils/safeLog'
+import { toUserFacingError } from '../utils/userFacingError'
 import type { Json } from '../types/database'
 import type { CalorieProfile, DayJournal } from '../types/nutrition'
 import type { TrainingState } from '../types/training'
@@ -30,7 +31,7 @@ import {
   replaceSleepLog,
   type SleepNightEntry,
 } from './sleepStorage'
-import { getActiveCloudUserId as readCloudUserId, setActiveCloudUserId } from './cloudSession'
+import * as cloudSession from './cloudSession'
 
 export const BACKUP_VERSION = 4 as const
 
@@ -73,6 +74,21 @@ let hydratedUserId: string | null = null
 let cloudSyncReady = false
 let deferredPush = false
 let lifecycleWired = false
+
+function mapCloudBackupError(
+  error: unknown,
+  operation: 'pull' | 'push',
+): string {
+  const fallback =
+    operation === 'pull'
+      ? 'Restauration cloud indisponible pour le moment. Réessaie.'
+      : 'Sauvegarde cloud indisponible pour le moment. Réessaie.'
+  return toUserFacingError(error, fallback)
+}
+
+function readCloudUserId(): string | null {
+  return cloudSession.getActiveCloudUserId()
+}
 
 function loadMeta(): CloudBackupMeta {
   try {
@@ -130,7 +146,7 @@ export function getActiveCloudUserId(): string | null {
 }
 
 export function setCloudBackupUserId(userId: string | null) {
-  setActiveCloudUserId(userId)
+  cloudSession.setActiveCloudUserId(userId)
   activeUserId = userId
   if (!userId) {
     hydratedUserId = null
@@ -181,11 +197,15 @@ export function collectLocalBackup(): CloudBackupPayload {
   }
 }
 
-function applyBackup(payload: CloudBackupPayload) {
+function applyBackup(
+  payload: CloudBackupPayload,
+  options?: { skipNutritionJournal?: boolean },
+) {
+  const skipNutritionJournal = Boolean(options?.skipNutritionJournal)
   if (payload.nutrition?.profile) {
     saveCalorieProfile(payload.nutrition.profile, { skipCloud: true })
   }
-  if (payload.nutrition?.journal) {
+  if (!skipNutritionJournal && payload.nutrition?.journal) {
     saveMealJournal(payload.nutrition.journal, { skipCloud: true })
   }
   if (payload.training) {
@@ -357,13 +377,15 @@ async function mergeSleepFromUserBackups(
 
 async function fetchRemotePayload(userId: string): Promise<{
   payload: CloudBackupPayload | null
+  source: 'convex' | 'supabase'
   error?: string
 }> {
   if (isConvexDomainActive()) {
     const { fetchConvexBackupPayload } = await import('./convexCloudBackup')
     const result = await fetchConvexBackupPayload(getTrainingState())
-    if (result.error) return { payload: null, error: result.error }
-    return { payload: result.payload }
+    if (!result.error) return { payload: result.payload, source: 'convex' }
+    // Convex primary: never silently fallback to Supabase.
+    throw new Error(result.error || 'CONVEX_CLOUD_BACKUP_READ_FAILED')
   }
 
   const supabase = getSupabase()
@@ -391,23 +413,24 @@ async function fetchRemotePayload(userId: string): Promise<{
     if (error) {
       return {
         payload: null,
+        source: 'supabase',
         error: isMissingTableError(error.message)
           ? 'Tables manquantes : exécute supabase/schema.sql dans le SQL Editor Supabase.'
           : error.message,
       }
     }
-    if (!data?.payload) return { payload: null }
+    if (!data?.payload) return { payload: null, source: 'supabase' }
     const legacy = data.payload as unknown as CloudBackupPayload
-    return { payload: legacy }
+    return { payload: legacy, source: 'supabase' }
   }
 
   if (tableError && !isMissingTableError(tableError)) {
     // nutrition/workouts may 404 if not created; profiles always exists
     if (nutritionRes.error && !isMissingTableError(nutritionRes.error.message)) {
-      return { payload: null, error: nutritionRes.error.message }
+      return { payload: null, source: 'supabase', error: nutritionRes.error.message }
     }
     if (workoutsRes.error && !isMissingTableError(workoutsRes.error.message)) {
-      return { payload: null, error: workoutsRes.error.message }
+      return { payload: null, source: 'supabase', error: workoutsRes.error.message }
     }
   }
 
@@ -418,7 +441,7 @@ async function fetchRemotePayload(userId: string): Promise<{
   })
 
   if (fromTables && hasMeaningfulCloudData(fromTables)) {
-    return { payload: await mergeSleepFromUserBackups(userId, fromTables) }
+    return { payload: await mergeSleepFromUserBackups(userId, fromTables), source: 'supabase' }
   }
 
   // Migrate legacy user_backups → new tables if tables are empty
@@ -431,19 +454,21 @@ async function fetchRemotePayload(userId: string): Promise<{
   if (legacy?.payload) {
     const payload = legacy.payload as unknown as CloudBackupPayload
     if (hasMeaningfulCloudData(payload) || payload.nutrition?.profile) {
-      return { payload }
+      return { payload, source: 'supabase' }
     }
   }
 
-  return { payload: await mergeSleepFromUserBackups(userId, fromTables) }
+  return { payload: await mergeSleepFromUserBackups(userId, fromTables), source: 'supabase' }
 }
 
 async function upsertTables(userId: string, payload: CloudBackupPayload): Promise<{ error?: string }> {
   if (isConvexDomainActive()) {
     const { pushConvexBackupPayload } = await import('./convexCloudBackup')
-    const result = await pushConvexBackupPayload(payload)
+    const result = await pushConvexBackupPayload(payload, { includeNutritionJournal: false })
     if (result.skippedEmptyOverwrite) return {}
-    return { error: result.error }
+    if (!result.error) return {}
+    // Convex primary: never silently fallback to Supabase writes.
+    throw new Error(result.error || 'CONVEX_CLOUD_BACKUP_WRITE_FAILED')
   }
 
   const supabase = getSupabase()
@@ -573,9 +598,10 @@ export async function pushCloudBackup(
       const { error } = await upsertTables(uid, payload)
       if (error) {
         safeError('[cloudBackup] pushCloudBackup failed', error)
-        setMeta({ pending: false, lastError: error })
-        emitBackupEvent('ranked-gym:backup-error', { error, source: 'push' })
-        return { ok: false, error }
+        const userError = mapCloudBackupError(error, 'push')
+        setMeta({ pending: isConvexDomainActive(), lastError: userError })
+        emitBackupEvent('ranked-gym:backup-error', { error: userError, source: 'push' })
+        return { ok: false, error: userError }
       }
       setMeta({
         pending: false,
@@ -585,9 +611,9 @@ export async function pushCloudBackup(
       emitBackupEvent('ranked-gym:backup-saved', { source: 'push' })
       return { ok: true }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Erreur de sauvegarde'
+      const msg = mapCloudBackupError(e, 'push')
       safeError('[cloudBackup] pushCloudBackup exception', e)
-      setMeta({ pending: false, lastError: msg })
+      setMeta({ pending: isConvexDomainActive(), lastError: msg })
       emitBackupEvent('ranked-gym:backup-error', { error: msg, source: 'push' })
       return { ok: false, error: msg }
     } finally {
@@ -619,12 +645,13 @@ export async function pullCloudBackup(
   const preferRemote = options?.preferRemote ?? true
 
   try {
-    const { payload: remote, error } = await fetchRemotePayload(uid)
+    const { payload: remote, source, error } = await fetchRemotePayload(uid)
     if (error) {
+      const userError = mapCloudBackupError(error, 'pull')
       safeError('[cloudBackup] pullCloudBackup failed', error)
-      setMeta({ lastError: error })
-      emitBackupEvent('ranked-gym:backup-error', { error, source: 'pull' })
-      return { ok: false, applied: false, error }
+      setMeta({ lastError: userError })
+      emitBackupEvent('ranked-gym:backup-error', { error: userError, source: 'pull' })
+      return { ok: false, applied: false, error: userError }
     }
 
     if (!remote || (!hasMeaningfulCloudData(remote) && !remote.nutrition.profile)) {
@@ -635,7 +662,9 @@ export async function pullCloudBackup(
     }
 
     if (preferRemote || hasMeaningfulCloudData(remote)) {
-      applyBackup(remote)
+      applyBackup(remote, {
+        skipNutritionJournal: isConvexDomainActive() && source === 'convex',
+      })
       setMeta({ lastPullAt: new Date().toISOString(), lastError: null })
       window.dispatchEvent(new Event('ranked-gym:backup-restored'))
       return { ok: true, applied: true }
@@ -644,7 +673,7 @@ export async function pullCloudBackup(
     setMeta({ lastPullAt: new Date().toISOString(), lastError: null })
     return { ok: true, applied: false }
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Erreur de restauration'
+    const msg = mapCloudBackupError(e, 'pull')
     safeError('[cloudBackup] pullCloudBackup exception', e)
     setMeta({ lastError: msg })
     emitBackupEvent('ranked-gym:backup-error', { error: msg, source: 'pull' })
@@ -713,6 +742,14 @@ export async function hydrateCloudBackupForUser(userId: string) {
   hydratedUserId = userId
   // Cloud is source of truth after login (survives tunnel URL changes)
   await pullCloudBackup(userId, { preferRemote: true })
+  if (isConvexDomainActive()) {
+    try {
+      const { hydrateConvexNutritionJournal } = await import('./convexNutritionHydration')
+      await hydrateConvexNutritionJournal()
+    } catch (error) {
+      safeWarn('[cloudBackup] convex nutrition hydrate failed', error)
+    }
+  }
   cloudSyncReady = true
   if (deferredPush) {
     deferredPush = false

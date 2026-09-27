@@ -10,6 +10,7 @@ Inventory: `docs/migrations/supabase-to-convex-inventory.md`
 - `convex/schema.ts` — compatibility schema for Profil, Train, Nutrition, Hydratation (nested in nutrition journal), Sommeil, Streak, file metadata, and migration bookkeeping.
 - `convex/auth.ts` + `convex/authPrivateData.ts` — PR-E auth behind `VITE_ENABLE_CONVEX_AUTH` (global password reset, no legacy hash bridge).
 - `convex/sync.ts` + `convex/profiles.ts` — PR-F backup/sync + profile/streak read/write behind `VITE_ENABLE_CONVEX_PRIMARY`.
+- `convex/nutrition.ts` + `src/services/convexNutritionQueue.ts` — granular meals/water mutations, OFF intermediary, per-user recent/favorite foods; avoids whole-day JSON overwrite during Convex-primary runs.
 - `convex/rpc.ts` — PR-G checkins/feed/stats and AI usage reserve/release equivalents with session-based user isolation.
 - `convex/files.ts` — private avatar lifecycle on Convex storage (`upload` / `signed download` / `delete`) with owner checks + migration helpers.
 - `scripts/migrations/supabase/*.mjs` — PR-I export/import/verify scripts with dry-run fake-data workflow and deterministic id mapping.
@@ -34,7 +35,8 @@ Convex CLI / backend (local `.env.local` only, never git):
 | `CONVEX_DEPLOYMENT` | CLI selected deployment |
 | `CONVEX_DEPLOY_KEY` | Deploy key |
 | `CONVEX_AUTH_SECRET` | Auth signing secret (later phase) |
-| `CONVEX_AUTH_EMAIL_FROM` | Reset-mail sender (later phase) |
+| `RESEND_API_KEY` | API key for reset emails (Resend HTTP API) |
+| `AUTH_EMAIL_FROM` | Sender address for reset emails (ex: Ranked Gym <no-reply@...>) |
 | `CONVEX_AUTH_RESET_REDIRECT_URL` | Reset-mail redirect (later phase) |
 | `CONVEX_AUTH_RESET_TOKEN_TTL_MIN` | Reset token TTL (later phase) |
 | `CONVEX_AUTH_SESSION_TTL_HOURS` | Session lifetime (optional override) |
@@ -50,6 +52,10 @@ Migration scripts (runtime env only):
 - `MIGRATION_ADMIN_SECRET`
 - `MIGRATION_RUN_SECRET` (optional; defaults to `MIGRATION_ADMIN_SECRET`)
 - `MIGRATION_RUN_ID`
+
+Runtime requirement:
+
+- Node.js `>= 22` (scripts fail early with a clear error under older runtimes).
 
 Copy names from `.env.example`. Leave values empty in git.
 
@@ -68,6 +74,55 @@ npm run migration:supabase:export -- --run-id <run-id>
 npm run migration:supabase:import -- --input scripts/migrations/artifacts/<run-id>.supabase-export.json --source-sha <git-sha>
 npm run migration:supabase:verify -- --bundle scripts/migrations/artifacts/<run-id>.supabase-export.json --import-report scripts/migrations/artifacts/<run-id>.convex-import-report.json
 ```
+
+Notes:
+
+- `migration:supabase:import` now honors `--run-id` as an explicit override of the bundle run id.
+- Artifacts are written with private permissions (`700` dir, `600` files) to reduce exposure of personal data.
+
+## Production runbook (server-side migration, no client backfill dependency)
+
+1. **Freeze writes on the app** (maintenance mode) so Supabase source data is stable during export/import.
+2. **Deploy Convex production code first** (required before migration import):
+
+   ```bash
+   npx convex deploy
+   ```
+
+3. **Set migration-only runtime env** (outside git):
+   - `MIGRATION_SUPABASE_URL`
+   - `MIGRATION_SUPABASE_SERVICE_ROLE_KEY`
+   - `MIGRATION_CONVEX_URL`
+   - `MIGRATION_CONVEX_ADMIN_KEY`
+   - `MIGRATION_ADMIN_SECRET` (**dedicated value**, distinct from other app secrets)
+   - `MIGRATION_RUN_SECRET` (optional; set a distinct run secret when desired)
+4. **Export Supabase snapshot**:
+
+   ```bash
+   npm run migration:supabase:export -- --run-id <run-id>
+   ```
+
+5. **Import bundle into Convex**:
+
+   ```bash
+   npm run migration:supabase:import -- --input scripts/migrations/artifacts/<run-id>.supabase-export.json --run-id <run-id> --source-sha <git-sha>
+   ```
+
+   Default behavior is **upsert-only** (no deletions). Use `--prune` only during a full write-freeze migration window when destructive reconciliation is explicitly intended.
+
+6. **Migrate avatars bucket**:
+
+   ```bash
+   npm run migration:supabase:avatars -- --execute --run-id <run-id> --source-sha <git-sha>
+   ```
+
+7. **Verify counts and per-user derived tables**:
+
+   ```bash
+   npm run migration:supabase:verify -- --bundle scripts/migrations/artifacts/<run-id>.supabase-export.json --import-report scripts/migrations/artifacts/<run-id>.convex-import-report.json --run-id <run-id>
+   ```
+
+8. **Only after clean verification**: unfreeze writes and continue validation.
 
 Safety constraints:
 - no script deletes Supabase data
@@ -89,7 +144,7 @@ npm run migration:supabase:avatars -- --execute --run-id <run-id> --source-sha <
 ```
 
 What it does:
-- reads `storage.objects` entries from Supabase bucket `avatars`
+- reads Supabase Storage API listing from bucket `avatars` (recursive by user folders)
 - derives owning `userId` from object path prefix (`<userId>/...`)
 - uploads binaries into Convex storage
 - writes `user_files` metadata + `profiles.avatarFileId` pointer through `convex/files.ts`
@@ -121,10 +176,31 @@ If Supabase password hashes are not safely portable to Convex: **global password
 
 ## PR-E auth migration flow (global reset policy)
 
-1. Import legacy users without password hashes into `auth_users` (internal Convex mutation `internal.auth.importUsersWithoutPasswords`, admin secret or admin-role session).
+1. Import legacy users without password hashes into `auth_users` (internal mutation `auth:importUsersWithoutPasswords`, admin secret or admin-role session).
 2. Imported users are flagged `mustResetPassword=true`; password login is denied until reset.
-3. Queue reset campaign emails with `internal.auth.queueGlobalPasswordResetCampaign`.
+3. Queue reset campaign emails with internal mutation `auth:queueGlobalPasswordResetCampaign`.
 4. Complete reset via tokenized link to `/auth/reset-password?token=...` then `auth.consumePasswordReset`.
+
+CLI form for internal functions (`convex@1.45.0`):
+
+```bash
+npx convex run auth:importUsersWithoutPasswords '{...}'
+npx convex run auth:queueGlobalPasswordResetCampaign '{...}'
+npx convex run auth:generateAdminPasswordResetLink '{...}'
+```
+
+With `CONVEX_DEPLOY_KEY` set for production, `npx convex run` targets production without `--prod` (Convex 1.45).
+
+Admin one-shot reset link command:
+
+```bash
+npx convex run auth:generateAdminPasswordResetLink '{
+  "email":"user@example.com",
+  "redirectTo":"<APP_PUBLIC_URL>",
+  "sendEmail": false,
+  "adminSecret":"<MIGRATION_ADMIN_SECRET>"
+}'
+```
 
 This preserves the locked policy: no hash portability shortcuts and no legacy password bridge.
 

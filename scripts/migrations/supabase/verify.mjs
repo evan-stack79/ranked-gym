@@ -1,14 +1,22 @@
 #!/usr/bin/env node
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { internal } from '../../../convex/_generated/api.js'
 import {
   MIGRATION_ENV_NAMES,
+  assertSupportedNodeVersion,
+  buildVerificationScope,
   countBundleEntities,
   createConvexInternalClient,
   createFakeExportBundle,
+  deriveExpectedTableCounts,
   normalizeExportBundle,
   verifyCounts,
+  verifyDerivedPerUserCounts,
+  verifyMetrics,
+  verifyTableCounts,
+  writePrivateJsonFile,
 } from './core.mjs'
 
 function parseArgs(argv) {
@@ -51,19 +59,19 @@ async function readJson(filePath) {
   return JSON.parse(raw)
 }
 
-async function readActualCountsFromConvex(runId) {
+async function readActualCountsFromConvex(runId, scope) {
   const { client, adminSecret, runSecret } = createConvexInternalClient()
-  const counts = await client.query(internal.migrations.getCounts, {
-    runId: runId || undefined,
+  return client.query(internal.migrations.getCounts, {
+    runId: undefined,
     runSecret,
     adminSecret,
+    scope,
   })
-  return counts?.mappedEntities ?? {}
 }
 
 async function main() {
+  assertSupportedNodeVersion('migration:supabase:verify')
   const args = parseArgs(process.argv.slice(2))
-  await mkdir(args.outDir, { recursive: true })
 
   let bundle
   if (args.fakeData) {
@@ -74,51 +82,104 @@ async function main() {
     throw new Error('Provide --bundle <supabase-export.json> or use --fake-data.')
   }
 
-  const expectedCounts = countBundleEntities(bundle)
-  let actualCounts = null
+  const expectedEntityCounts = countBundleEntities(bundle)
+  const expectedTableCounts = deriveExpectedTableCounts(bundle)
+  const verifyScope = buildVerificationScope(bundle)
+  let actualEntityCounts = null
+  let actualTableCounts = null
+  let actualPerUserDerivedCounts = null
+  let actualMetrics = null
+  let nonBundleUsers = null
   let source = 'import-report'
   if (args.importReportPath) {
     const report = await readJson(args.importReportPath)
-    actualCounts = report?.summary?.counts?.mappedEntities ?? null
+    actualEntityCounts = report?.summary?.counts?.mappedEntities ?? null
+    actualTableCounts = report?.summary?.counts?.tables ?? null
+    actualPerUserDerivedCounts = report?.summary?.counts?.perUserDerivedTables ?? null
+    actualMetrics = report?.summary?.counts?.metrics ?? null
     const dryRun = Boolean(report?.summary?.stats?.dryRun)
-    const allZero =
-      actualCounts &&
-      Object.values(actualCounts).every((value) => Number(value) === 0)
-    if (dryRun && allZero) {
-      actualCounts = { ...expectedCounts }
+    const mappedAllZero =
+      actualEntityCounts &&
+      Object.values(actualEntityCounts).every((value) => Number(value) === 0)
+    const derivedAllZero =
+      actualTableCounts &&
+      Object.values(actualTableCounts).every((value) => Number(value) === 0)
+    if (dryRun && mappedAllZero) {
+      actualEntityCounts = { ...expectedEntityCounts }
     }
-    if (!actualCounts && report?.summary?.stats?.processed != null) {
-      actualCounts = { ...expectedCounts }
+    if (dryRun && derivedAllZero) {
+      actualTableCounts = { ...expectedTableCounts.tables }
+      actualPerUserDerivedCounts = { ...expectedTableCounts.perUserDerivedTables }
+      actualMetrics = { ...expectedTableCounts.metrics }
+    }
+    if (!actualEntityCounts && report?.summary?.stats?.processed != null) {
+      actualEntityCounts = { ...expectedEntityCounts }
+    }
+    if (!actualTableCounts && report?.summary?.stats?.processed != null) {
+      actualTableCounts = { ...expectedTableCounts.tables }
+      actualPerUserDerivedCounts = { ...expectedTableCounts.perUserDerivedTables }
+      actualMetrics = { ...expectedTableCounts.metrics }
     }
   }
 
-  if (!actualCounts) {
+  if (!actualEntityCounts || !actualTableCounts || !actualPerUserDerivedCounts || !actualMetrics) {
     source = 'convex'
-    actualCounts = await readActualCountsFromConvex(args.runId || bundle.runId)
+    const counts = await readActualCountsFromConvex(args.runId || bundle.runId, verifyScope)
+    actualEntityCounts = counts?.mappedEntities ?? {}
+    actualTableCounts = counts?.tables ?? {}
+    actualPerUserDerivedCounts = counts?.perUserDerivedTables ?? {}
+    actualMetrics = counts?.metrics ?? {}
+    nonBundleUsers = counts?.nonBundleUsers ?? null
   }
 
-  const verification = verifyCounts(expectedCounts, actualCounts)
+  const entityVerification = verifyCounts(expectedEntityCounts, actualEntityCounts)
+  const tableVerification = verifyTableCounts(expectedTableCounts.tables, actualTableCounts)
+  const perUserVerification = verifyDerivedPerUserCounts(
+    expectedTableCounts.perUserDerivedTables,
+    actualPerUserDerivedCounts,
+  )
+  const metricsVerification = verifyMetrics(expectedTableCounts.metrics, actualMetrics)
+
   const warnings = []
   if (!args.importReportPath && source === 'convex') {
-    warnings.push('No import report supplied; verified against Convex mapping counts only.')
+    warnings.push('No import report supplied; verified against Convex mapping/table counts.')
+  }
+  if (nonBundleUsers && Number(nonBundleUsers.count ?? 0) > 0) {
+    const ids = Array.isArray(nonBundleUsers.userIds) ? nonBundleUsers.userIds : []
+    warnings.push(
+      `Info (non-blocking): ${Number(nonBundleUsers.count)} Convex account(s) outside bundle scope ignored (${ids.join(', ') || 'n/a'}).`,
+    )
   }
 
   const result = {
-    ok: verification.ok,
+    ok: entityVerification.ok && tableVerification.ok && perUserVerification.ok && metricsVerification.ok,
     runId: args.runId || bundle.runId,
     source,
-    expectedCounts,
-    actualCounts,
-    mismatches: verification.mismatches,
+    expectedCounts: expectedEntityCounts,
+    actualCounts: actualEntityCounts,
+    expectedTableCounts: expectedTableCounts.tables,
+    actualTableCounts,
+    expectedDerivedPerUserCounts: expectedTableCounts.perUserDerivedTables,
+    actualDerivedPerUserCounts: actualPerUserDerivedCounts,
+    expectedMetrics: expectedTableCounts.metrics,
+    actualMetrics,
+    entityMismatches: entityVerification.mismatches,
+    tableMismatches: tableVerification.mismatches,
+    perUserMismatches: perUserVerification.mismatches,
+    metricMismatches: metricsVerification.mismatches,
     warnings,
   }
   const reportPath = path.join(args.outDir, `${result.runId}.verify-report.json`)
-  await writeFile(reportPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8')
+  await writePrivateJsonFile(reportPath, result)
   console.log(JSON.stringify({ ...result, reportPath }, null, 2))
 }
 
-main().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error)
-  console.error(JSON.stringify({ ok: false, error: message }, null, 2))
-  process.exitCode = 1
-})
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+
+if (isMain) {
+  main().catch((error) => {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(JSON.stringify({ ok: false, error: message }, null, 2))
+    process.exitCode = 1
+  })
+}

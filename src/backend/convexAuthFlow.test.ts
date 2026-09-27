@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   consumePasswordResetToken,
+  createAdminPasswordResetLinkForAdmin,
   createResetLink,
   deleteAccountAndUserData,
   issuePasswordResetToken,
@@ -243,6 +244,36 @@ describe('Convex auth password reset flow', () => {
   it('builds a safe https reset link', () => {
     const url = createResetLink('https://ranked-gym.pages.dev', 'token-123')
     expect(url).toContain('https://ranked-gym.pages.dev/auth/reset-password?token=token-123')
+  })
+
+  it('admin one-shot can generate a reset link without clear-link outbox storage', async () => {
+    const db = new FakeDb()
+    const ctx = createCtx(db)
+    const now = Date.now()
+    await db.insert('auth_users', {
+      userId: 'user-admin-link',
+      email: 'admin-link@example.com',
+      emailNorm: 'admin-link@example.com',
+      displayName: 'Admin Link',
+      mustResetPassword: true,
+      createdAt: now,
+      updatedAt: now,
+    })
+    const previous = process.env.MIGRATION_ADMIN_SECRET
+    process.env.MIGRATION_ADMIN_SECRET = 'admin-secret-for-tests'
+    try {
+      const generated = await createAdminPasswordResetLinkForAdmin(ctx as never, {
+        email: 'admin-link@example.com',
+        adminSecret: 'admin-secret-for-tests',
+      })
+      expect(generated.accepted).toBe(true)
+      expect(generated.resetLink).toContain('/auth/reset-password?token=')
+      expect(db.table('auth_password_reset_outbox')).toHaveLength(0)
+      expect(db.table('auth_password_reset_tokens')).toHaveLength(1)
+    } finally {
+      if (previous === undefined) delete process.env.MIGRATION_ADMIN_SECRET
+      else process.env.MIGRATION_ADMIN_SECRET = previous
+    }
   })
 })
 

@@ -2,7 +2,7 @@ import { getSupabase } from '../lib/supabase'
 import type { ProfileRow } from '../types/database'
 import { getRankFromLevel } from '../utils/rank'
 import { getActiveAuthBackend } from '../backend/authFeatureFlag'
-import { isConvexDomainActive } from '../backend/adapter'
+import { runWithDomainBackend } from '../backend/domainBackend'
 import * as convexAuth from './convexAuthService'
 import {
   ensureConvexProfile,
@@ -20,6 +20,11 @@ export type AuthUser = {
   /** Prénom propre depuis user_metadata (first_name / display_name). */
   firstName?: string
   provider: AuthMethod
+}
+
+export type PasswordResetRequestResult = {
+  accepted: boolean
+  delivery: 'email' | 'manual'
 }
 
 function isConvexAuthActive(): boolean {
@@ -111,19 +116,19 @@ export async function signOut() {
  */
 export async function requestPasswordReset(email: string, redirectTo?: string) {
   if (isConvexAuthActive()) {
-    await convexAuth.requestPasswordReset(email, redirectTo)
-    return
+    return convexAuth.requestPasswordReset(email, redirectTo)
   }
   const supabase = getSupabase()
   const options = redirectTo ? { redirectTo } : undefined
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), options)
   if (error) throw error
+  return { accepted: true, delivery: 'email' } satisfies PasswordResetRequestResult
 }
 
-/** Définit le nouveau mot de passe après l’événement PASSWORD_RECOVERY. */
-export async function updatePassword(newPassword: string) {
+/** Définit le nouveau mot de passe après récupération (Supabase ou Convex). */
+export async function updatePassword(newPassword: string, resetToken?: string) {
   if (isConvexAuthActive()) {
-    await convexAuth.updatePassword(newPassword)
+    await convexAuth.updatePassword(newPassword, resetToken)
     return
   }
   const supabase = getSupabase()
@@ -164,18 +169,21 @@ export async function deleteOwnAccount(password?: string) {
 }
 
 export async function fetchProfile(userId: string): Promise<ProfileRow | null> {
-  if (isConvexDomainActive()) {
-    return fetchConvexProfile(userId)
-  }
-  const supabase = getSupabase()
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .maybeSingle()
+  return runWithDomainBackend<ProfileRow | null>({
+    operation: 'profile.fetch',
+    convex: () => fetchConvexProfile(userId),
+    supabase: async () => {
+      const supabase = getSupabase()
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle()
 
-  if (error) throw error
-  return data
+      if (error) throw error
+      return data
+    },
+  })
 }
 
 /** Fallback if the DB trigger did not run yet (race on first login). */
@@ -184,32 +192,40 @@ export async function ensureProfile(
   pseudo: string,
   disciplineLabel = 'Musculation',
 ): Promise<ProfileRow> {
-  if (isConvexDomainActive()) {
-    return ensureConvexProfile(userId, pseudo, disciplineLabel)
-  }
-  const existing = await fetchProfile(userId)
-  if (existing) return existing
+  return runWithDomainBackend<ProfileRow>({
+    operation: 'profile.ensure',
+    convex: () => ensureConvexProfile(userId, pseudo, disciplineLabel),
+    supabase: async () => {
+      const supabase = getSupabase()
+      const { data: existing, error: existingError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle()
+      if (existingError) throw existingError
+      if (existing) return existing
 
-  const rank = getRankFromLevel(1)
-  const supabase = getSupabase()
-  const { data, error } = await supabase
-    .from('profiles')
-    .upsert(
-      {
-        id: userId,
-        pseudo: pseudo.slice(0, 24) || 'Athlete',
-        level: 1,
-        xp: 0,
-        rank: rank.tier,
-        discipline: disciplineLabel.slice(0, 40) || 'Musculation',
-      },
-      { onConflict: 'id' },
-    )
-    .select('*')
-    .single()
+      const rank = getRankFromLevel(1)
+      const { data, error } = await supabase
+        .from('profiles')
+        .upsert(
+          {
+            id: userId,
+            pseudo: pseudo.slice(0, 24) || 'Athlete',
+            level: 1,
+            xp: 0,
+            rank: rank.tier,
+            discipline: disciplineLabel.slice(0, 40) || 'Musculation',
+          },
+          { onConflict: 'id' },
+        )
+        .select('*')
+        .single()
 
-  if (error) throw error
-  return data
+      if (error) throw error
+      return data
+    },
+  })
 }
 
 export async function updateProfileProgress(
@@ -226,17 +242,20 @@ export async function updateProfileProgress(
     is_ghost_mode_enabled?: boolean
   },
 ): Promise<ProfileRow> {
-  if (isConvexDomainActive()) {
-    return updateConvexProfileProgress(userId, patch)
-  }
-  const supabase = getSupabase()
-  const { data, error } = await supabase
-    .from('profiles')
-    .update({ ...patch, updated_at: new Date().toISOString() })
-    .eq('id', userId)
-    .select('*')
-    .single()
+  return runWithDomainBackend<ProfileRow>({
+    operation: 'profile.update',
+    convex: () => updateConvexProfileProgress(userId, patch),
+    supabase: async () => {
+      const supabase = getSupabase()
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq('id', userId)
+        .select('*')
+        .single()
 
-  if (error) throw error
-  return data
+      if (error) throw error
+      return data
+    },
+  })
 }

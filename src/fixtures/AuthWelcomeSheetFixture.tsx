@@ -17,9 +17,16 @@ export function AuthWelcomeSheetFixture() {
           ? 'Session expirée. Reconnecte-toi.'
           : errorKey === 'offline'
             ? 'Connexion réseau impossible. Vérifie ta connexion puis réessaie.'
+          : errorKey === 'signup-disabled'
+            ? 'Les inscriptions sont fermées pour le moment. Contacte le support Ranked Gym.'
             : errorKey === 'throttle'
               ? 'Trop de tentatives. Réessaie dans quelques minutes.'
               : null
+  const infoKey = params.get('info')
+  const authInfo =
+    infoKey === 'manual-reset'
+      ? 'Réinitialisation par email indisponible pour le moment. Contacte le support pour recevoir un lien.'
+      : null
   const [isAuthOpen, setAuthOpen] = useState(params.get('open') !== '0')
 
   const value = useMemo(
@@ -29,10 +36,11 @@ export function AuthWelcomeSheetFixture() {
         isLoading: false,
         isAuthOpen,
         authError,
+        authInfo,
         openAuth: () => setAuthOpen(true),
         closeAuth: () => setAuthOpen(false),
       }),
-    [isAuthOpen, authError],
+    [isAuthOpen, authError, authInfo],
   )
 
   return (
