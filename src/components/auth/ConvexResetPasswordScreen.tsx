@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
-import { updatePassword } from '../../services/authService'
+import { requestPasswordReset, updatePassword } from '../../services/authService'
 import { friendlyAuthError, validateNewPassword } from '../../utils/authErrors'
+import {
+  getPasswordRecoveryRedirectTo,
+  PASSWORD_RESET_MANUAL_MESSAGE,
+  PASSWORD_RESET_SENT_MESSAGE,
+} from '../../utils/authRedirect'
 import {
   WELCOME_HERO_HEIGHT,
   WELCOME_HERO_PNG,
@@ -58,6 +63,8 @@ export function ConvexResetPasswordScreen() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
+  const [resendEmail, setResendEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
 
@@ -73,6 +80,13 @@ export function ConvexResetPasswordScreen() {
   }, [])
 
   const missingToken = useMemo(() => !token || token.length < 12, [token])
+  const canResend = useMemo(
+    () =>
+      missingToken ||
+      (error != null &&
+        /(lien de réinitialisation|lien expiré|lien invalide)/i.test(error)),
+    [error, missingToken],
+  )
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -98,6 +112,27 @@ export function ConvexResetPasswordScreen() {
       setError(friendlyAuthError(err, 'Impossible de réinitialiser le mot de passe.'))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleResend = async () => {
+    const email = resendEmail.trim()
+    if (!email || !email.includes('@')) {
+      setError('Indique un email valide pour recevoir un nouveau lien.')
+      setInfo(null)
+      return
+    }
+    setResendLoading(true)
+    setError(null)
+    setInfo(null)
+    try {
+      const redirectTo = getPasswordRecoveryRedirectTo()
+      const reset = await requestPasswordReset(email, redirectTo)
+      setInfo(reset.delivery === 'manual' ? PASSWORD_RESET_MANUAL_MESSAGE : PASSWORD_RESET_SENT_MESSAGE)
+    } catch (err) {
+      setError(friendlyAuthError(err, 'Envoi impossible. Réessaie plus tard.'))
+    } finally {
+      setResendLoading(false)
     }
   }
 
@@ -200,9 +235,34 @@ export function ConvexResetPasswordScreen() {
               ) : null}
             </div>
 
+            {canResend ? (
+              <div className="space-y-2">
+                <label className="block">
+                  <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Email</span>
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    value={resendEmail}
+                    onChange={(event) => setResendEmail(event.target.value)}
+                    placeholder="toi@email.com"
+                    disabled={loading || resendLoading}
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void handleResend()}
+                  disabled={loading || resendLoading}
+                  className="ios-press w-full rounded-2xl border border-white/15 py-3 text-[14px] font-semibold text-[#F2F2F7] disabled:opacity-50"
+                >
+                  {resendLoading ? 'Envoi…' : 'Renvoyer le lien'}
+                </button>
+              </div>
+            ) : null}
+
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || resendLoading}
               className="btn-brand ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 py-3.5 text-[16px] font-semibold text-white disabled:opacity-50"
             >
               {loading ? (
@@ -220,7 +280,7 @@ export function ConvexResetPasswordScreen() {
             type="button"
             className="mt-3 w-full text-center text-[13px] font-medium text-[#AEAEB2] underline-offset-2 hover:text-white hover:underline"
             onClick={() => window.location.replace('/')}
-            disabled={loading}
+            disabled={loading || resendLoading}
           >
             Retour à la connexion
           </button>

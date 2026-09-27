@@ -120,6 +120,35 @@ describe('mealPhotoAi service', () => {
     expect((thrown as { scansRemaining?: number }).scansRemaining).toBe(0)
   })
 
+  it('uses dedicated overload FR message for convex ai_unavailable errors', async () => {
+    isConvexDomainActive.mockReturnValue(true)
+    getConvexSessionToken.mockResolvedValue('convex-session-token')
+    compressMealImage.mockResolvedValue({
+      base64: 'a'.repeat(1200),
+      mimeType: 'image/jpeg',
+    })
+    convexAction.mockResolvedValue({
+      ok: false,
+      code: 'ai_unavailable',
+      error: 'technical 503 from upstream',
+      scansRemaining: 4,
+      scanCount: 1,
+      dailyLimit: 5,
+    })
+
+    const { analyzeMealPhoto, MealPhotoAiError } = await import('./mealPhotoAi')
+    let thrown: unknown
+    try {
+      await analyzeMealPhoto(new Blob(['fake'], { type: 'image/jpeg' }))
+    } catch (error) {
+      thrown = error
+    }
+    expect(thrown).toBeInstanceOf(MealPhotoAiError)
+    expect((thrown as Error).message).toMatch(
+      /IA surchargée, réessaie dans un instant ; le quota n’est pas consommé\./,
+    )
+  })
+
   it('keeps the Supabase edge-function path when convex-primary is disabled', async () => {
     isConvexDomainActive.mockReturnValue(false)
     compressMealImage.mockResolvedValue({

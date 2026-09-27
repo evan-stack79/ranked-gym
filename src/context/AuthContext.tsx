@@ -40,6 +40,7 @@ import {
 } from '../utils/authErrors'
 import {
   getPasswordRecoveryRedirectTo,
+  PASSWORD_RESET_MANUAL_MESSAGE,
   PASSWORD_RESET_SENT_MESSAGE,
 } from '../utils/authRedirect'
 import {
@@ -544,14 +545,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         const code = authErrorCodeOf(err)
         if (code === 'AUTH_PASSWORD_RESET_REQUIRED') {
-          setAuthError(
-            'Réinitialisation obligatoire : un lien de réinitialisation va t’être envoyé par email.',
-          )
+          setAuthError('Réinitialisation obligatoire : demande un nouveau lien pour continuer.')
           setAuthErrorCode(code)
           try {
             const redirectTo = getPasswordRecoveryRedirectTo()
-            await apiRequestPasswordReset(email, redirectTo)
-            setAuthInfo('Un lien de réinitialisation vient d’être envoyé.')
+            const reset = await apiRequestPasswordReset(email, redirectTo)
+            setAuthInfo(
+              reset.delivery === 'manual' ? PASSWORD_RESET_MANUAL_MESSAGE : PASSWORD_RESET_SENT_MESSAGE,
+            )
           } catch (resetErr) {
             if (isRateLimitedAuthError(resetErr)) {
               setAuthInfo('Un lien a déjà été demandé récemment. Réessaie dans quelques minutes.')
@@ -626,8 +627,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthInfo(null)
     try {
       const redirectTo = getPasswordRecoveryRedirectTo()
-      await apiRequestPasswordReset(email, redirectTo)
-      setAuthInfo(PASSWORD_RESET_SENT_MESSAGE)
+      const reset = await apiRequestPasswordReset(email, redirectTo)
+      setAuthInfo(
+        reset.delivery === 'manual' ? PASSWORD_RESET_MANUAL_MESSAGE : PASSWORD_RESET_SENT_MESSAGE,
+      )
     } catch (err) {
       if (isAccountEnumerationError(err)) {
         setAuthInfo(PASSWORD_RESET_SENT_MESSAGE)

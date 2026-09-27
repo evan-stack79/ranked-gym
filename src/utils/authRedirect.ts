@@ -14,6 +14,9 @@ import { isSafeExternalNavigationUrl } from './safeExternalNavigation'
 export const PASSWORD_RESET_SENT_MESSAGE =
   'Si un compte existe avec cette adresse, un lien vient d’être envoyé.'
 
+export const PASSWORD_RESET_MANUAL_MESSAGE =
+  'Réinitialisation par email indisponible pour le moment. Contacte le support pour recevoir un lien.'
+
 function isNativeCapacitorShell(): boolean {
   if (typeof window === 'undefined') return false
   const cap = (

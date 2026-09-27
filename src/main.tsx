@@ -8,6 +8,7 @@ import { ColdLaunchAccueilFixture } from './fixtures/ColdLaunchAccueilFixture.ts
 import { NutritionUxFixture } from './fixtures/NutritionUxFixture.tsx'
 import { AuthWelcomeLoggedInFixture } from './fixtures/AuthWelcomeLoggedInFixture.tsx'
 import { AuthWelcomeSheetFixture } from './fixtures/AuthWelcomeSheetFixture.tsx'
+import { NutritionAiErrorFixture } from './fixtures/NutritionAiErrorFixture.tsx'
 import { LegalDocumentScreen } from './components/legal/LegalDocumentScreen.tsx'
 import { legalKindFromPath } from './components/legal/legalRoutes.ts'
 import { ConvexClientProvider } from './lib/ConvexClientProvider.tsx'
@@ -25,6 +26,8 @@ function requireRoot(): HTMLElement {
 }
 
 const rootEl = requireRoot()
+const QA_FIXTURES_ENABLED =
+  import.meta.env.DEV || import.meta.env.VITE_ENABLE_QA_FIXTURES === 'true'
 
 function resolveBootTree() {
   if (typeof window === 'undefined') return <App />
@@ -32,12 +35,15 @@ function resolveBootTree() {
   if (path === '/auth/reset-password' && getActiveAuthBackend() === 'convex') {
     return <ConvexResetPasswordScreen />
   }
+  if (QA_FIXTURES_ENABLED && path === '/auth-reset-fixture') return <ConvexResetPasswordScreen />
   const legal = legalKindFromPath(path)
   if (legal) return <LegalDocumentScreen kind={legal} />
-  if (path === '/accueil-fixture') return <ColdLaunchAccueilFixture />
-  if (path === '/nutrition-fixture') return <NutritionUxFixture />
-  if (path === '/auth-welcome-logged-in-fixture') return <AuthWelcomeLoggedInFixture />
-  if (path === '/auth-welcome-sheet-fixture') return <AuthWelcomeSheetFixture />
+  if (QA_FIXTURES_ENABLED && path === '/accueil-fixture') return <ColdLaunchAccueilFixture />
+  if (QA_FIXTURES_ENABLED && path === '/nutrition-fixture') return <NutritionUxFixture />
+  if (QA_FIXTURES_ENABLED && path === '/nutrition-ai-error-fixture') return <NutritionAiErrorFixture />
+  if (QA_FIXTURES_ENABLED && path === '/auth-welcome-logged-in-fixture')
+    return <AuthWelcomeLoggedInFixture />
+  if (QA_FIXTURES_ENABLED && path === '/auth-welcome-sheet-fixture') return <AuthWelcomeSheetFixture />
   return <App />
 }
 
@@ -46,7 +52,9 @@ function isColdLaunchPath() {
   const path = window.location.pathname
   if (legalKindFromPath(path)) return false
   if (path === '/auth/reset-password') return false
-  if (path === '/auth-welcome-sheet-fixture') return false
+  if (QA_FIXTURES_ENABLED && path === '/auth-reset-fixture') return false
+  if (QA_FIXTURES_ENABLED && path === '/nutrition-ai-error-fixture') return false
+  if (QA_FIXTURES_ENABLED && path === '/auth-welcome-sheet-fixture') return false
   return true
 }
 

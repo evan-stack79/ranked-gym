@@ -23,6 +23,12 @@ function readEnv(name: string): string | undefined {
   return proc?.env?.[name]
 }
 
+export function isPasswordResetEmailConfigured(): boolean {
+  const apiKey = readEnv('RESEND_API_KEY')?.trim()
+  const from = readEnv('AUTH_EMAIL_FROM')?.trim()
+  return Boolean(apiKey && from)
+}
+
 function classifyEmailError(error: unknown): PasswordResetEmailResult {
   const message = error instanceof Error ? error.message.toLowerCase() : String(error ?? '').toLowerCase()
   if (

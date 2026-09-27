@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto'
-import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 import { internal } from '../../../convex/_generated/api.js'
-import { MIGRATION_ENV_NAMES, createConvexInternalClient } from './core.mjs'
+import {
+  MIGRATION_ENV_NAMES,
+  assertSupportedNodeVersion,
+  createConvexInternalClient,
+  writePrivateJsonFile,
+} from './core.mjs'
 
 function parseArgs(argv) {
   const args = {
@@ -103,25 +108,48 @@ function fakeAvatarObjects() {
   ]
 }
 
-async function listSupabaseAvatarObjects(supabase) {
-  const pageSize = 1000
+async function listStorageFolder(supabase, folder) {
+  const pageSize = 100
+  const allRows = []
   let offset = 0
-  const collected = []
   while (true) {
-    const { data, error } = await supabase
-      .schema('storage')
-      .from('objects')
-      .select('id,name,bucket_id,created_at,updated_at,metadata')
-      .eq('bucket_id', 'avatars')
-      .order('name', { ascending: true })
-      .range(offset, offset + pageSize - 1)
+    const { data, error } = await supabase.storage.from('avatars').list(folder, {
+      limit: pageSize,
+      offset,
+      sortBy: { column: 'name', order: 'asc' },
+    })
     if (error) throw new Error(`[avatars:export] ${error.message}`)
     const page = Array.isArray(data) ? data : []
-    collected.push(...page.map(normalizeAvatarObject))
+    allRows.push(...page)
     if (page.length < pageSize) break
     offset += pageSize
   }
-  return collected
+  return allRows
+}
+
+export async function listSupabaseAvatarObjects(supabase) {
+  const queue = ['']
+  const collected = []
+  while (queue.length > 0) {
+    const folder = queue.shift() ?? ''
+    const rows = await listStorageFolder(supabase, folder)
+    for (const row of rows) {
+      const name = String(row?.name ?? '').trim()
+      if (!name) continue
+      const fullPath = folder ? `${folder.replace(/\/+$/, '')}/${name}` : name
+      if (row?.id == null) {
+        queue.push(fullPath)
+        continue
+      }
+      collected.push(
+        normalizeAvatarObject({
+          ...row,
+          name: fullPath,
+        }),
+      )
+    }
+  }
+  return collected.sort((a, b) => a.path.localeCompare(b.path))
 }
 
 function sha256Hex(buffer) {
@@ -187,8 +215,8 @@ function createReportSkeleton(args, avatars) {
 }
 
 async function main() {
+  assertSupportedNodeVersion('migration:supabase:avatars')
   const args = parseArgs(process.argv.slice(2))
-  await mkdir(args.outDir, { recursive: true })
 
   let avatars
   let supabase = null
@@ -299,7 +327,7 @@ async function main() {
   }
 
   const reportPath = path.join(args.outDir, `${args.runId}.avatar-storage-report.json`)
-  await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8')
+  await writePrivateJsonFile(reportPath, report)
   console.log(
     JSON.stringify(
       {
@@ -319,8 +347,12 @@ async function main() {
   )
 }
 
-main().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error)
-  console.error(JSON.stringify({ ok: false, error: message }, null, 2))
-  process.exitCode = 1
-})
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+
+if (isMain) {
+  main().catch((error) => {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(JSON.stringify({ ok: false, error: message }, null, 2))
+    process.exitCode = 1
+  })
+}
