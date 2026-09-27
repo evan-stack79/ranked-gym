@@ -79,12 +79,18 @@ describe('clientFacingGeminiFailure / messages FR', () => {
       expect(facing.error).not.toMatch(/https?:\/\//i)
       expect(facing.error).not.toMatch(/gemini/i)
       expect(facing.error).not.toMatch(/AIza|API_KEY|GoogleGenerativeAI/i)
-      expect(facing.error).toMatch(/Analyse/)
+      expect(facing.error.length).toBeGreaterThan(12)
     }
     expect(unavailable.error).toBe(AI_UNAVAILABLE_FR)
     expect(overload.code).toBe('ai_unavailable')
     expect(fatal.code).toBe('ai_error')
     expect(fatal.error).toBe(AI_ERROR_FR)
+  })
+
+  it('mappe GeminiRetryBudgetExceededError vers le message surcharge FR', () => {
+    const facing = clientFacingFromGeminiError(new GeminiRetryBudgetExceededError())
+    expect(facing.code).toBe('ai_unavailable')
+    expect(facing.error).toBe(AI_UNAVAILABLE_FR)
   })
 })
 

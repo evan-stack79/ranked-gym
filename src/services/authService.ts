@@ -22,6 +22,11 @@ export type AuthUser = {
   provider: AuthMethod
 }
 
+export type PasswordResetRequestResult = {
+  accepted: boolean
+  delivery: 'email' | 'manual'
+}
+
 function isConvexAuthActive(): boolean {
   return getActiveAuthBackend() === 'convex'
 }
@@ -111,19 +116,19 @@ export async function signOut() {
  */
 export async function requestPasswordReset(email: string, redirectTo?: string) {
   if (isConvexAuthActive()) {
-    await convexAuth.requestPasswordReset(email, redirectTo)
-    return
+    return convexAuth.requestPasswordReset(email, redirectTo)
   }
   const supabase = getSupabase()
   const options = redirectTo ? { redirectTo } : undefined
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), options)
   if (error) throw error
+  return { accepted: true, delivery: 'email' } satisfies PasswordResetRequestResult
 }
 
-/** Définit le nouveau mot de passe après l’événement PASSWORD_RECOVERY. */
-export async function updatePassword(newPassword: string) {
+/** Définit le nouveau mot de passe après récupération (Supabase ou Convex). */
+export async function updatePassword(newPassword: string, resetToken?: string) {
   if (isConvexAuthActive()) {
-    await convexAuth.updatePassword(newPassword)
+    await convexAuth.updatePassword(newPassword, resetToken)
     return
   }
   const supabase = getSupabase()

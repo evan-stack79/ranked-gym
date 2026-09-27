@@ -23,6 +23,8 @@ interface MealPhotoAnalyzerProps {
   onToast?: (message: string, variant?: 'success' | 'error') => void
   /** Affichage compact (bouton) — même logique état / réseau que la carte. */
   variant?: 'card' | 'button' | 'headless'
+  /** Fixture/debug only: force a visible error message. */
+  forcedErrorMessage?: string | null
 }
 
 export type MealPhotoAnalyzerHandle = {
@@ -40,7 +42,7 @@ function defaultMealType(): MealType {
 }
 
 export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAnalyzerProps>(
-  function MealPhotoAnalyzer({ onAnalyzed, onToast, variant = 'card' }, ref) {
+  function MealPhotoAnalyzer({ onAnalyzed, onToast, variant = 'card', forcedErrorMessage = null }, ref) {
   const { user, isAuthenticated, requireAuth } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
@@ -48,6 +50,7 @@ export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAn
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [mealType, setMealType] = useState<MealType>(() => defaultMealType())
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const visibleErrorMessage = forcedErrorMessage ?? errorMessage
 
   const refreshQuota = useCallback(async () => {
     if (!user?.id) {
@@ -176,9 +179,9 @@ export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAn
             )}
             {busy ? 'Analyse…' : 'Photo IA'}
           </button>
-          {errorMessage ? (
+          {visibleErrorMessage ? (
             <p className="mt-2 text-[11px] leading-snug text-[#FF6961]" role="alert">
-              {errorMessage}
+              {visibleErrorMessage}
             </p>
           ) : null}
         </>
@@ -244,13 +247,13 @@ export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAn
         </div>
       )}
 
-      {variant === 'card' && errorMessage ? (
+      {variant === 'card' && visibleErrorMessage ? (
         <div
           className="mt-3 flex items-start gap-2 rounded-xl border border-[#FF453A]/35 bg-[#FF453A]/10 px-3 py-2.5"
           role="alert"
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#FF6961]" />
-          <p className="text-[12px] leading-snug text-[#FF6961]">{errorMessage}</p>
+          <p className="text-[12px] leading-snug text-[#FF6961]">{visibleErrorMessage}</p>
         </div>
       ) : null}
 

@@ -15,7 +15,7 @@ export type MealPhotoAiClientCode = 'ai_unavailable' | 'ai_error'
 
 /** Surcharge / erreur transitoire après retries épuisés. */
 export const AI_UNAVAILABLE_FR =
-  'Analyse indisponible pour le moment, réessaie dans un instant.'
+  'IA surchargée, réessaie dans un instant ; le quota n’est pas consommé.'
 
 /** Erreur non retryable ou échec générique (jamais de détail technique). */
 export const AI_ERROR_FR = 'Analyse impossible pour le moment — réessaie plus tard.'
@@ -162,6 +162,17 @@ export function clientFacingGeminiFailure(
 
 /** Mappe l’erreur finale (après retries) vers un message client sûr. */
 export function clientFacingFromGeminiError(error: unknown): ClientFacingFailure {
+  const code =
+    error && typeof error === 'object' && 'code' in error
+      ? String((error as { code?: unknown }).code ?? '')
+      : ''
+  const name =
+    error && typeof error === 'object' && 'name' in error
+      ? String((error as { name?: unknown }).name ?? '')
+      : ''
+  if (code === 'ai_unavailable' || name === 'GeminiRetryBudgetExceededError') {
+    return clientFacingGeminiFailure('unavailable')
+  }
   const kind = classifyGeminiError(error)
   if (kind === 'retryable' || kind === 'model_not_found') {
     return clientFacingGeminiFailure('unavailable')

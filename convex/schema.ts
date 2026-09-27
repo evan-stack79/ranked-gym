@@ -74,8 +74,21 @@ export const convexTables = {
     resetLink: v.string(),
     tokenHash: v.string(),
     createdAt: v.number(),
+    expiresAt: v.optional(v.number()),
     sentAt: v.optional(v.number()),
+    purgedAt: v.optional(v.number()),
+    lastAttemptAt: v.optional(v.number()),
     attemptCount: v.number(),
+    status: v.optional(
+      v.union(
+        v.literal('queued'),
+        v.literal('sending'),
+        v.literal('sent'),
+        v.literal('failed'),
+        v.literal('purged'),
+      ),
+    ),
+    providerMessageId: v.optional(v.string()),
     lastError: v.optional(v.string()),
   })
     .index('by_userId', ['userId'])

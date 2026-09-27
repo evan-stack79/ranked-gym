@@ -53,6 +53,12 @@ describe('friendlyAuthError', () => {
     expect(friendlyAuthError(new Error('AUTH_INVALID_CREDENTIALS'), 'fallback')).toBe(
       'Email ou mot de passe incorrect.',
     )
+    expect(friendlyAuthError(new Error('AUTH_PASSWORD_RESET_REQUIRED'), 'fallback')).toMatch(
+      /réinitialisation obligatoire/i,
+    )
+    expect(friendlyAuthError(new Error('AUTH_RESET_TOKEN_INVALID'), 'fallback')).toMatch(
+      /expiré|déjà utilisé/i,
+    )
     expect(friendlyAuthError(new Error('jwt expired'), 'fallback')).toBe(
       'Session expirée. Reconnecte-toi.',
     )

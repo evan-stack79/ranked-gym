@@ -53,17 +53,17 @@ function convexFailureMessage(code: BackendFailureCode): string {
   switch (code) {
     case 'network':
     case 'timeout':
-      return 'Service Convex temporairement indisponible — réessaie dans quelques instants.'
+      return 'Service temporairement indisponible — réessaie dans quelques instants.'
     case 'auth':
-      return 'Session expirée côté Convex — reconnecte-toi puis réessaie.'
+      return 'Session expirée — reconnecte-toi puis réessaie.'
     case 'config':
-      return 'Configuration Convex invalide — contacte le support.'
+      return 'Configuration service invalide — contacte le support.'
     case 'forbidden':
-      return 'Accès Convex refusé pour cette action.'
+      return 'Accès refusé pour cette action.'
     case 'not_found':
-      return 'Service Convex introuvable pour cette action.'
+      return 'Service introuvable pour cette action.'
     default:
-      return 'Erreur Convex inattendue — réessaie dans quelques instants.'
+      return 'Erreur de service — réessaie dans quelques instants.'
   }
 }
 

@@ -71,6 +71,7 @@ function buildMinimalAuthValue(
     isAuthOpen: false,
     authLoading: false,
     authError: null,
+    authErrorCode: null,
     streakWeekBonus: null,
     clearStreakWeekBonus: vi.fn(),
     streakCelebration,

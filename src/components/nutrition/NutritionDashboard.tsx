@@ -21,7 +21,6 @@ import {
 import {
   listPersonalFoods,
   setPersonalFoodFavorite,
-  saveAliment,
   searchOpenFoodFacts,
   type OpenFoodFactsProduct,
   type OpenFoodFactsSearchHit,
@@ -52,6 +51,7 @@ import { IosSheet } from '../ui/IosSheet'
 import { SectionSkeleton } from '../ui/AppBootScreen'
 import { dateFromKey, nutritionDateLabel, shiftDateKey } from '../../utils/nutritionDate'
 import { todayKey } from '../../utils/calories'
+import { persistScannedProductSelection } from './persistScannedProductSelection'
 
 interface NutritionDashboardProps {
   profile: CalorieProfile
@@ -285,10 +285,12 @@ export function NutritionDashboard({
       setScannerOpen(false)
       setScannedProduct(product)
       if (user) {
-        void saveAliment(product, user.id).catch(() => undefined)
+        void persistScannedProductSelection(product, user.id, (message) => {
+          showToast(message, 'error')
+        })
       }
     },
-    [user],
+    [showToast, user],
   )
 
   const handleScanSave = (entry: {
