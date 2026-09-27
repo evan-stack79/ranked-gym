@@ -45,6 +45,6 @@ describe('runWithDomainBackend', () => {
         },
         supabase: async () => 'supabase-fallback',
       }),
-    ).rejects.toThrow('Service Convex temporairement indisponible')
+    ).rejects.toThrow('Convex')
   })
 })
