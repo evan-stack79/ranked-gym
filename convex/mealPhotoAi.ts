@@ -100,7 +100,8 @@ function parseMacros(raw: unknown): {
 }
 
 function geminiModelCandidates(): string[] {
-  const fromEnv = typeof env.GEMINI_MODEL === 'string' ? env.GEMINI_MODEL.trim() : ''
+  const envMap = env as Record<string, string | undefined>
+  const fromEnv = typeof envMap.GEMINI_MODEL === 'string' ? envMap.GEMINI_MODEL.trim() : ''
   const ordered = fromEnv
     ? [fromEnv, ...GEMINI_MODEL_FALLBACKS.filter((m) => m !== fromEnv)]
     : [...GEMINI_MODEL_FALLBACKS]
@@ -113,7 +114,7 @@ function scansRemainingAfterRelease(scanCount: number, dailyLimit: number): numb
 
 async function releaseReservedScan(ctx: ActionCtx, userId: string) {
   try {
-    await ctx.runMutation((internal as any).rpc.releaseAiMealScanInternal, { userId })
+    await ctx.runMutation(internal.rpc.releaseAiMealScanInternal, { userId })
   } catch (error) {
     console.error('[meal-photo-ai] release quota failed', error)
   }
@@ -266,15 +267,17 @@ export const analyzeMealPhoto = action({
       return failure('Photo trop volumineuse — recadre puis réessaie.', 'IMAGE_TOO_LARGE')
     }
 
-    const geminiKey = typeof env.GEMINI_API_KEY === 'string' ? env.GEMINI_API_KEY.trim() : ''
+    const envMap = env as Record<string, string | undefined>
+    const geminiKey =
+      typeof envMap.GEMINI_API_KEY === 'string' ? envMap.GEMINI_API_KEY.trim() : ''
     if (!geminiKey) {
       const unavailable = clientFacingGeminiFailure('unavailable')
       return failure(unavailable.error, unavailable.code)
     }
 
-    const reserve = (await ctx.runMutation((internal as any).rpc.reserveAiMealScanInternal, {
+    const reserve = await ctx.runMutation(internal.rpc.reserveAiMealScanInternal, {
       userId: session.userId,
-    })) as { allowed: boolean; scan_count: number; daily_limit: number }
+    })
 
     if (!reserve.allowed) {
       return failure(
