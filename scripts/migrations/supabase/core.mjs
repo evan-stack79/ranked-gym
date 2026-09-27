@@ -411,11 +411,18 @@ function createEmptyDerivedPerUserCounts() {
   return perUser
 }
 
+function createEmptyMetrics() {
+  return {
+    nutrition_food_catalog_selected_count_total: 0,
+  }
+}
+
 export function deriveExpectedTableCounts(rawBundle) {
   const bundle = normalizeExportBundle(rawBundle)
   const baseCounts = countBundleEntities(bundle)
   const tables = createEmptyVerifyTableCounts()
   const perUser = createEmptyDerivedPerUserCounts()
+  const metrics = createEmptyMetrics()
   tables.auth_users = baseCounts.auth_users
   tables.profiles = baseCounts.profiles
   tables.workouts = baseCounts.workouts
@@ -479,17 +486,100 @@ export function deriveExpectedTableCounts(rawBundle) {
   }
 
   const seenFoods = new Set()
+  const selectedCountByCatalogKey = new Map()
   for (const row of bundle.entities.aliments) {
     const catalogRow = foodCatalogRowFromAliment(row)
     if (!catalogRow.userId || !catalogRow.foodKey) continue
     const key = `${catalogRow.userId}:${catalogRow.foodKey}`
+    selectedCountByCatalogKey.set(key, (selectedCountByCatalogKey.get(key) ?? 0) + 1)
     if (seenFoods.has(key)) continue
     seenFoods.add(key)
     tables.nutrition_food_catalog += 1
     addToPerUserCounter(perUser, 'nutrition_food_catalog', catalogRow.userId, 1)
   }
 
-  return { tables, perUserDerivedTables: perUser }
+  metrics.nutrition_food_catalog_selected_count_total = [...selectedCountByCatalogKey.values()].reduce(
+    (sum, value) => sum + value,
+    0,
+  )
+
+  return { tables, perUserDerivedTables: perUser, metrics }
+}
+
+function dedupe(values) {
+  return [...new Set(values.filter((value) => typeof value === 'string' && value.trim()).map((v) => v.trim()))]
+}
+
+export function buildVerificationScope(rawBundle) {
+  const bundle = normalizeExportBundle(rawBundle)
+  const rows = buildImportRows(bundle)
+  const entitySupabaseIds = {}
+  for (const entityType of MIGRATION_ENTITY_ORDER) {
+    entitySupabaseIds[entityType] = []
+  }
+  for (const row of rows) {
+    entitySupabaseIds[row.entityType].push(row.supabaseId)
+  }
+  for (const entityType of MIGRATION_ENTITY_ORDER) {
+    entitySupabaseIds[entityType] = dedupe(entitySupabaseIds[entityType])
+  }
+
+  const migratedUserIds = dedupe([
+    ...bundle.entities.auth_users.map((row) => String(row.id ?? '')),
+    ...bundle.entities.profiles.map((row) => String(row.id ?? '')),
+    ...bundle.entities.workouts.map((row) => String(row.user_id ?? '')),
+    ...bundle.entities.nutrition.map((row) => String(row.user_id ?? '')),
+    ...bundle.entities.checkins.map((row) => String(row.user_id ?? '')),
+    ...bundle.entities.aliments.map((row) => String(row.user_id ?? '')),
+    ...bundle.entities.activities.map((row) => String(row.user_id ?? '')),
+    ...bundle.entities.ai_usage_limits.map((row) => String(row.user_id ?? '')),
+    ...bundle.entities.user_backups.map((row) => String(row.user_id ?? '')),
+  ])
+
+  const customSpotKeys = []
+  const activeCheckinUserIds = []
+  for (const row of bundle.entities.profiles) {
+    const userId = String(row.id ?? '').trim()
+    if (!userId) continue
+    const customSpots = asArrayOfObjects(row.custom_spots)
+    for (let index = 0; index < customSpots.length; index += 1) {
+      const spot = customSpots[index]
+      const spotId = String(spot.id ?? spot.spotId ?? `spot-${index}`).trim()
+      if (!spotId) continue
+      customSpotKeys.push(`${userId}:${spotId}`)
+    }
+    if (row.active_checkin != null) {
+      activeCheckinUserIds.push(userId)
+    }
+  }
+
+  const mealKeys = []
+  const waterEntryKeys = []
+  const dayStateKeys = []
+  for (const row of bundle.entities.nutrition) {
+    const derived = toNutritionDerivedRows(row)
+    for (const meal of derived.meals) mealKeys.push(`${meal.userId}:${meal.mealId}`)
+    for (const entry of derived.waterEntries) waterEntryKeys.push(`${entry.userId}:${entry.entryId}`)
+    for (const dayState of derived.dayStates) dayStateKeys.push(`${dayState.userId}:${dayState.dateKey}`)
+  }
+
+  const foodCatalogKeys = []
+  for (const row of bundle.entities.aliments) {
+    const catalogRow = foodCatalogRowFromAliment(row)
+    if (!catalogRow.userId || !catalogRow.foodKey) continue
+    foodCatalogKeys.push(`${catalogRow.userId}:${catalogRow.foodKey}`)
+  }
+
+  return {
+    migratedUserIds,
+    entitySupabaseIds,
+    customSpotKeys: dedupe(customSpotKeys),
+    activeCheckinUserIds: dedupe(activeCheckinUserIds),
+    mealKeys: dedupe(mealKeys),
+    waterEntryKeys: dedupe(waterEntryKeys),
+    dayStateKeys: dedupe(dayStateKeys),
+    foodCatalogKeys: dedupe(foodCatalogKeys),
+  }
 }
 
 export function createFakeExportBundle(runId = 'dry-run-fake') {
@@ -966,6 +1056,24 @@ export function verifyDerivedPerUserCounts(expectedPerUser, actualPerUser) {
         mismatches.push({ tableName, userId, expected, actual })
       }
     }
+  }
+  return { ok: mismatches.length === 0, mismatches }
+}
+
+export function verifyMetrics(expectedMetrics, actualMetrics) {
+  const mismatches = []
+  const expectedSelectedTotal = Number(
+    expectedMetrics?.nutrition_food_catalog_selected_count_total ?? 0,
+  )
+  const actualSelectedTotal = Number(
+    actualMetrics?.nutrition_food_catalog_selected_count_total ?? 0,
+  )
+  if (expectedSelectedTotal !== actualSelectedTotal) {
+    mismatches.push({
+      metric: 'nutrition_food_catalog_selected_count_total',
+      expected: expectedSelectedTotal,
+      actual: actualSelectedTotal,
+    })
   }
   return { ok: mismatches.length === 0, mismatches }
 }

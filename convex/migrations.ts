@@ -32,6 +32,17 @@ type DerivedPerUserCounts = {
   nutrition_food_catalog: Record<string, number>
 }
 
+type MigrationCountScope = {
+  migratedUserIds?: string[]
+  entitySupabaseIds?: Partial<Record<MigrationEntityType, string[]>>
+  customSpotKeys?: string[]
+  activeCheckinUserIds?: string[]
+  mealKeys?: string[]
+  waterEntryKeys?: string[]
+  dayStateKeys?: string[]
+  foodCatalogKeys?: string[]
+}
+
 type ImportOperation = 'inserted' | 'updated' | 'skipped'
 
 function entityTypeValidator() {
@@ -54,6 +65,31 @@ async function findMap(ctx: QueryCtx | MutationCtx, entityType: string, supabase
 const adminAuthArgs = {
   adminSecret: v.optional(v.string()),
   sessionToken: v.optional(v.string()),
+}
+
+function migrationScopeValidator() {
+  return v.object({
+    migratedUserIds: v.optional(v.array(v.string())),
+    entitySupabaseIds: v.optional(
+      v.object({
+        auth_users: v.optional(v.array(v.string())),
+        profiles: v.optional(v.array(v.string())),
+        workouts: v.optional(v.array(v.string())),
+        nutrition: v.optional(v.array(v.string())),
+        checkins: v.optional(v.array(v.string())),
+        aliments: v.optional(v.array(v.string())),
+        activities: v.optional(v.array(v.string())),
+        ai_usage_limits: v.optional(v.array(v.string())),
+        user_backups: v.optional(v.array(v.string())),
+      }),
+    ),
+    customSpotKeys: v.optional(v.array(v.string())),
+    activeCheckinUserIds: v.optional(v.array(v.string())),
+    mealKeys: v.optional(v.array(v.string())),
+    waterEntryKeys: v.optional(v.array(v.string())),
+    dayStateKeys: v.optional(v.array(v.string())),
+    foodCatalogKeys: v.optional(v.array(v.string())),
+  })
 }
 
 function toAdminAuthz(args: AdminAuthz): AdminAuthz {
@@ -87,6 +123,47 @@ function normalizeFoodCatalogKey(input: { barcode?: string; name: string; brand?
   const name = input.name.trim().toLowerCase().slice(0, 140)
   const brand = input.brand?.trim().toLowerCase().slice(0, 80) ?? ''
   return `name:${name}|brand:${brand}`
+}
+
+function toStringSet(values: unknown): Set<string> {
+  if (!Array.isArray(values)) return new Set()
+  return new Set(
+    values
+      .map((value) => (typeof value === 'string' ? value.trim() : ''))
+      .filter((value) => value.length > 0),
+  )
+}
+
+function asMigrationScope(scope: unknown): MigrationCountScope {
+  const raw = asRecord(scope) ?? {}
+  const rawEntity = asRecord(raw.entitySupabaseIds) ?? {}
+  const entitySupabaseIds: Partial<Record<MigrationEntityType, string[]>> = {}
+  for (const entityType of MIGRATION_ENTITY_TYPES) {
+    const set = toStringSet(rawEntity[entityType])
+    entitySupabaseIds[entityType] = [...set]
+  }
+  return {
+    migratedUserIds: [...toStringSet(raw.migratedUserIds)],
+    entitySupabaseIds,
+    customSpotKeys: [...toStringSet(raw.customSpotKeys)],
+    activeCheckinUserIds: [...toStringSet(raw.activeCheckinUserIds)],
+    mealKeys: [...toStringSet(raw.mealKeys)],
+    waterEntryKeys: [...toStringSet(raw.waterEntryKeys)],
+    dayStateKeys: [...toStringSet(raw.dayStateKeys)],
+    foodCatalogKeys: [...toStringSet(raw.foodCatalogKeys)],
+  }
+}
+
+function mergeSummaryJson(existing: unknown, incoming: unknown): unknown {
+  const existingRecord = asRecord(existing)
+  const incomingRecord = asRecord(incoming)
+  if (!existingRecord || !incomingRecord) {
+    return incoming ?? {}
+  }
+  return {
+    ...existingRecord,
+    ...incomingRecord,
+  }
 }
 
 async function upsertAuthUser(
@@ -129,6 +206,7 @@ async function upsertAuthUser(
 async function upsertProfile(
   ctx: MutationCtx,
   payload: Record<string, unknown>,
+  options: { prune: boolean },
 ): Promise<{ convexId: string; operation: Exclude<ImportOperation, 'skipped'> }> {
   const userId = String(payload.userId ?? '')
   if (!userId) throw new Error('MIGRATION_INVALID_PROFILE_USER_ID')
@@ -214,9 +292,11 @@ async function upsertProfile(
       })
     }
   }
-  for (const row of existingSpots) {
-    if (incomingIds.has(row.spotId)) continue
-    await ctx.db.delete(row._id)
+  if (options.prune) {
+    for (const row of existingSpots) {
+      if (incomingIds.has(row.spotId)) continue
+      await ctx.db.delete(row._id)
+    }
   }
 
   const existingActive = await ctx.db
@@ -224,7 +304,7 @@ async function upsertProfile(
     .withIndex('by_userId', (q) => q.eq('userId', userId))
     .first()
   if (payload.activeCheckinJson == null) {
-    if (existingActive) await ctx.db.delete(existingActive._id)
+    if (options.prune && existingActive) await ctx.db.delete(existingActive._id)
   } else if (existingActive) {
     await ctx.db.patch(existingActive._id, {
       checkinJson: payload.activeCheckinJson,
@@ -270,6 +350,7 @@ async function upsertWorkouts(
 async function upsertNutrition(
   ctx: MutationCtx,
   payload: Record<string, unknown>,
+  options: { prune: boolean },
 ): Promise<{ convexId: string; operation: Exclude<ImportOperation, 'skipped'> }> {
   const userId = String(payload.userId ?? '')
   if (!userId) throw new Error('MIGRATION_INVALID_NUTRITION_USER_ID')
@@ -343,9 +424,11 @@ async function upsertNutrition(
       })
     }
   }
-  for (const row of existingMeals) {
-    if (incomingMealIds.has(row.mealId)) continue
-    await ctx.db.delete(row._id)
+  if (options.prune) {
+    for (const row of existingMeals) {
+      if (incomingMealIds.has(row.mealId)) continue
+      await ctx.db.delete(row._id)
+    }
   }
 
   const incomingWaterEntries = (Array.isArray(payload.normalizedWaterEntries)
@@ -384,9 +467,11 @@ async function upsertNutrition(
       })
     }
   }
-  for (const row of existingWaterEntries) {
-    if (incomingWaterIds.has(row.entryId)) continue
-    await ctx.db.delete(row._id)
+  if (options.prune) {
+    for (const row of existingWaterEntries) {
+      if (incomingWaterIds.has(row.entryId)) continue
+      await ctx.db.delete(row._id)
+    }
   }
 
   const incomingDayStates = (Array.isArray(payload.normalizedDayStates) ? payload.normalizedDayStates : [])
@@ -425,9 +510,11 @@ async function upsertNutrition(
       })
     }
   }
-  for (const row of existingDays) {
-    if (incomingDayKeys.has(row.dateKey)) continue
-    await ctx.db.delete(row._id)
+  if (options.prune) {
+    for (const row of existingDays) {
+      if (incomingDayKeys.has(row.dateKey)) continue
+      await ctx.db.delete(row._id)
+    }
   }
 
   return { convexId, operation }
@@ -507,6 +594,13 @@ async function upsertAliment(
     .query('nutrition_food_catalog')
     .withIndex('by_userId_foodKey', (q) => q.eq('userId', userId).eq('foodKey', foodKey))
     .first()
+  const incomingSelectedCount = Math.max(1, Math.round(toFiniteNumber(catalogInput.selectedCount, 1)))
+  const nextSelectedCount =
+    existingCatalog && result.operation === 'inserted'
+      ? Math.max(0, Number(existingCatalog.selectedCount ?? 0)) + incomingSelectedCount
+      : existingCatalog
+        ? Math.max(Math.max(0, Number(existingCatalog.selectedCount ?? 0)), incomingSelectedCount)
+        : incomingSelectedCount
   const catalogPatch = {
     barcode,
     name,
@@ -534,7 +628,7 @@ async function upsertAliment(
     source: 'supabase_import' as const,
     lastFetchedAt: toFiniteNumber(catalogInput.lastFetchedAt, patchDoc.createdAt),
     lastSelectedAt: toFiniteNumber(catalogInput.lastSelectedAt, patchDoc.createdAt),
-    selectedCount: Math.max(1, Math.round(toFiniteNumber(catalogInput.selectedCount, 1))),
+    selectedCount: nextSelectedCount,
     isFavorite: Boolean(catalogInput.isFavorite),
     lastUsedMealType:
       typeof catalogInput.lastUsedMealType === 'string' && catalogInput.lastUsedMealType.trim()
@@ -641,17 +735,18 @@ async function upsertEntity(
     supabaseId: string
     payload: Record<string, unknown>
     mapConvexId: string | null
+    prune: boolean
   },
 ): Promise<{ convexId: string; operation: Exclude<ImportOperation, 'skipped'> }> {
   switch (args.entityType) {
     case 'auth_users':
       return upsertAuthUser(ctx, args.payload)
     case 'profiles':
-      return upsertProfile(ctx, args.payload)
+      return upsertProfile(ctx, args.payload, { prune: args.prune })
     case 'workouts':
       return upsertWorkouts(ctx, args.payload)
     case 'nutrition':
-      return upsertNutrition(ctx, args.payload)
+      return upsertNutrition(ctx, args.payload, { prune: args.prune })
     case 'checkins':
       return upsertCheckin(ctx, args.mapConvexId, args.supabaseId, args.payload)
     case 'aliments':
@@ -716,6 +811,7 @@ export async function importEntityForRun(
     checksum: string
     payload: Record<string, unknown>
     dryRun?: boolean
+    prune?: boolean
     adminSecret?: string
     sessionToken?: string
   },
@@ -742,6 +838,7 @@ export async function importEntityForRun(
     supabaseId: args.supabaseId,
     payload: args.payload,
     mapConvexId: existingMap?.convexId ?? null,
+    prune: args.prune === true,
   })
 
   if (existingMap) {
@@ -784,7 +881,7 @@ export async function finishRunForAdmin(
   await ctx.db.patch(run._id, {
     status: args.status,
     finishedAt: Date.now(),
-    summaryJson: args.summaryJson ?? {},
+    summaryJson: mergeSummaryJson(run.summaryJson, args.summaryJson),
   })
   return null
 }
@@ -812,6 +909,7 @@ export const importEntity = internalMutation({
     checksum: v.string(),
     payload: v.any(),
     dryRun: v.optional(v.boolean()),
+    prune: v.optional(v.boolean()),
     ...adminAuthArgs,
   },
   returns: v.object({
@@ -828,6 +926,7 @@ export const importEntity = internalMutation({
       checksum: args.checksum,
       payload: (args.payload ?? {}) as Record<string, unknown>,
       dryRun: args.dryRun,
+      prune: args.prune,
       adminSecret: args.adminSecret,
       sessionToken: args.sessionToken,
     }),
@@ -874,6 +973,33 @@ function toEntityCounts(rows: Array<{ entityType: string }>): MigrationEntityCou
   return counts
 }
 
+function createEmptyTableCounts() {
+  return {
+    auth_users: 0,
+    profiles: 0,
+    workouts: 0,
+    nutrition: 0,
+    checkins: 0,
+    aliments: 0,
+    activities: 0,
+    ai_usage_limits: 0,
+    user_backups: 0,
+    streak_state: 0,
+    custom_spots: 0,
+    active_checkins: 0,
+    nutrition_meals: 0,
+    nutrition_water_entries: 0,
+    nutrition_day_state: 0,
+    nutrition_food_catalog: 0,
+  }
+}
+
+function createEmptyMetrics() {
+  return {
+    nutrition_food_catalog_selected_count_total: 0,
+  }
+}
+
 function createEmptyDerivedPerUserCounts(): DerivedPerUserCounts {
   return {
     streak_state: {},
@@ -890,11 +1016,17 @@ function incrementPerUserCount(table: Record<string, number>, userId: string) {
   table[userId] = (table[userId] ?? 0) + 1
 }
 
+function shouldIncludeBySet(set: Set<string>, key: string, scopeEnabled: boolean): boolean {
+  if (!scopeEnabled) return true
+  return set.has(key)
+}
+
 export async function getCountsForAdmin(
   ctx: QueryCtx,
   args: {
     runId?: string
     runSecret?: string
+    scope?: MigrationCountScope
     adminSecret?: string
     sessionToken?: string
   },
@@ -906,10 +1038,54 @@ export async function getCountsForAdmin(
       runSecret: args.runSecret ?? '',
     })
   }
+  const scope = args.scope ? asMigrationScope(args.scope) : null
+  const scopeEnabled = Boolean(scope)
+  const migratedUserSet = toStringSet(scope?.migratedUserIds)
+  const entityScopeSets = {
+    auth_users: toStringSet(scope?.entitySupabaseIds?.auth_users),
+    profiles: toStringSet(scope?.entitySupabaseIds?.profiles),
+    workouts: toStringSet(scope?.entitySupabaseIds?.workouts),
+    nutrition: toStringSet(scope?.entitySupabaseIds?.nutrition),
+    checkins: toStringSet(scope?.entitySupabaseIds?.checkins),
+    aliments: toStringSet(scope?.entitySupabaseIds?.aliments),
+    activities: toStringSet(scope?.entitySupabaseIds?.activities),
+    ai_usage_limits: toStringSet(scope?.entitySupabaseIds?.ai_usage_limits),
+    user_backups: toStringSet(scope?.entitySupabaseIds?.user_backups),
+  } as const
+  const customSpotKeySet = toStringSet(scope?.customSpotKeys)
+  const activeCheckinUserSet = toStringSet(scope?.activeCheckinUserIds)
+  const mealKeySet = toStringSet(scope?.mealKeys)
+  const waterEntryKeySet = toStringSet(scope?.waterEntryKeys)
+  const dayStateKeySet = toStringSet(scope?.dayStateKeys)
+  const foodCatalogKeySet = toStringSet(scope?.foodCatalogKeys)
+
   const mapRows = await ctx.db.query('migration_entity_map').collect()
-  const scoped = args.runId ? mapRows.filter((row) => row.runId === args.runId) : mapRows
+  const scoped = mapRows.filter((row) => {
+    if (!scopeEnabled) {
+      return args.runId ? row.runId === args.runId : true
+    }
+    const allowedSupabaseIds = entityScopeSets[row.entityType as MigrationEntityType]
+    return allowedSupabaseIds.has(row.supabaseId)
+  })
   const mappedEntities = toEntityCounts(scoped)
-  const [streakRows, customSpotRows, activeCheckinRows, mealRows, waterRows, dayRows, foodRows] =
+  const tables = createEmptyTableCounts()
+  const metrics = createEmptyMetrics()
+  for (const row of scoped) {
+    if (!row.convexId) continue
+    const doc = await ctx.db.get(row.convexId as never)
+    if (!doc) continue
+    if (row.entityType === 'auth_users') tables.auth_users += 1
+    if (row.entityType === 'profiles') tables.profiles += 1
+    if (row.entityType === 'workouts') tables.workouts += 1
+    if (row.entityType === 'nutrition') tables.nutrition += 1
+    if (row.entityType === 'checkins') tables.checkins += 1
+    if (row.entityType === 'aliments') tables.aliments += 1
+    if (row.entityType === 'activities') tables.activities += 1
+    if (row.entityType === 'ai_usage_limits') tables.ai_usage_limits += 1
+    if (row.entityType === 'user_backups') tables.user_backups += 1
+  }
+
+  const [streakRows, customSpotRows, activeCheckinRows, mealRows, waterRows, dayRows, foodRows, authRows] =
     await Promise.all([
       ctx.db.query('streak_state').collect(),
       ctx.db.query('custom_spots').collect(),
@@ -918,38 +1094,64 @@ export async function getCountsForAdmin(
       ctx.db.query('nutrition_water_entries').collect(),
       ctx.db.query('nutrition_day_state').collect(),
       ctx.db.query('nutrition_food_catalog').collect(),
+      ctx.db.query('auth_users').collect(),
     ])
   const perUserDerivedTables = createEmptyDerivedPerUserCounts()
-  for (const row of streakRows) incrementPerUserCount(perUserDerivedTables.streak_state, row.userId)
-  for (const row of customSpotRows) incrementPerUserCount(perUserDerivedTables.custom_spots, row.userId)
-  for (const row of activeCheckinRows) incrementPerUserCount(perUserDerivedTables.active_checkins, row.userId)
-  for (const row of mealRows) incrementPerUserCount(perUserDerivedTables.nutrition_meals, row.userId)
-  for (const row of waterRows)
+  for (const row of streakRows) {
+    if (!shouldIncludeBySet(migratedUserSet, row.userId, scopeEnabled)) continue
+    tables.streak_state += 1
+    incrementPerUserCount(perUserDerivedTables.streak_state, row.userId)
+  }
+  for (const row of customSpotRows) {
+    if (!shouldIncludeBySet(customSpotKeySet, `${row.userId}:${row.spotId}`, scopeEnabled)) continue
+    tables.custom_spots += 1
+    incrementPerUserCount(perUserDerivedTables.custom_spots, row.userId)
+  }
+  for (const row of activeCheckinRows) {
+    if (!shouldIncludeBySet(activeCheckinUserSet, row.userId, scopeEnabled)) continue
+    tables.active_checkins += 1
+    incrementPerUserCount(perUserDerivedTables.active_checkins, row.userId)
+  }
+  for (const row of mealRows) {
+    if (!shouldIncludeBySet(mealKeySet, `${row.userId}:${row.mealId}`, scopeEnabled)) continue
+    tables.nutrition_meals += 1
+    incrementPerUserCount(perUserDerivedTables.nutrition_meals, row.userId)
+  }
+  for (const row of waterRows) {
+    if (!shouldIncludeBySet(waterEntryKeySet, `${row.userId}:${row.entryId}`, scopeEnabled)) continue
+    tables.nutrition_water_entries += 1
     incrementPerUserCount(perUserDerivedTables.nutrition_water_entries, row.userId)
-  for (const row of dayRows) incrementPerUserCount(perUserDerivedTables.nutrition_day_state, row.userId)
-  for (const row of foodRows)
+  }
+  for (const row of dayRows) {
+    if (!shouldIncludeBySet(dayStateKeySet, `${row.userId}:${row.dateKey}`, scopeEnabled)) continue
+    tables.nutrition_day_state += 1
+    incrementPerUserCount(perUserDerivedTables.nutrition_day_state, row.userId)
+  }
+  for (const row of foodRows) {
+    if (!shouldIncludeBySet(foodCatalogKeySet, `${row.userId}:${row.foodKey}`, scopeEnabled)) continue
+    tables.nutrition_food_catalog += 1
     incrementPerUserCount(perUserDerivedTables.nutrition_food_catalog, row.userId)
+    metrics.nutrition_food_catalog_selected_count_total += Math.max(
+      0,
+      Math.round(toFiniteNumber(row.selectedCount, 0)),
+    )
+  }
+  const nonBundleUserIds =
+    scopeEnabled && migratedUserSet.size > 0
+      ? authRows
+          .map((row) => String(row.userId ?? '').trim())
+          .filter((userId) => userId.length > 0 && !migratedUserSet.has(userId))
+          .sort()
+      : []
   return {
-    tables: {
-      auth_users: (await ctx.db.query('auth_users').collect()).length,
-      profiles: (await ctx.db.query('profiles').collect()).length,
-      workouts: (await ctx.db.query('workouts_state').collect()).length,
-      nutrition: (await ctx.db.query('nutrition_state').collect()).length,
-      checkins: (await ctx.db.query('checkins').collect()).length,
-      aliments: (await ctx.db.query('aliments').collect()).length,
-      activities: (await ctx.db.query('activities').collect()).length,
-      ai_usage_limits: (await ctx.db.query('ai_usage_limits').collect()).length,
-      user_backups: (await ctx.db.query('legacy_supabase_backups').collect()).length,
-      streak_state: streakRows.length,
-      custom_spots: customSpotRows.length,
-      active_checkins: activeCheckinRows.length,
-      nutrition_meals: mealRows.length,
-      nutrition_water_entries: waterRows.length,
-      nutrition_day_state: dayRows.length,
-      nutrition_food_catalog: foodRows.length,
-    },
+    tables,
     mappedEntities,
     perUserDerivedTables,
+    metrics,
+    nonBundleUsers: {
+      count: nonBundleUserIds.length,
+      userIds: nonBundleUserIds.slice(0, 20),
+    },
   }
 }
 
@@ -957,6 +1159,7 @@ export const getCounts = internalQuery({
   args: {
     runId: v.optional(v.string()),
     runSecret: v.optional(v.string()),
+    scope: v.optional(migrationScopeValidator()),
     ...adminAuthArgs,
   },
   returns: v.object({
@@ -997,6 +1200,13 @@ export const getCounts = internalQuery({
       nutrition_water_entries: v.record(v.string(), v.number()),
       nutrition_day_state: v.record(v.string(), v.number()),
       nutrition_food_catalog: v.record(v.string(), v.number()),
+    }),
+    metrics: v.object({
+      nutrition_food_catalog_selected_count_total: v.number(),
+    }),
+    nonBundleUsers: v.object({
+      count: v.number(),
+      userIds: v.array(v.string()),
     }),
   }),
   handler: (ctx, args) => getCountsForAdmin(ctx, args),

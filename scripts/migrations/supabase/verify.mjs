@@ -6,6 +6,7 @@ import { internal } from '../../../convex/_generated/api.js'
 import {
   MIGRATION_ENV_NAMES,
   assertSupportedNodeVersion,
+  buildVerificationScope,
   countBundleEntities,
   createConvexInternalClient,
   createFakeExportBundle,
@@ -13,6 +14,7 @@ import {
   normalizeExportBundle,
   verifyCounts,
   verifyDerivedPerUserCounts,
+  verifyMetrics,
   verifyTableCounts,
   writePrivateJsonFile,
 } from './core.mjs'
@@ -57,12 +59,13 @@ async function readJson(filePath) {
   return JSON.parse(raw)
 }
 
-async function readActualCountsFromConvex(runId) {
+async function readActualCountsFromConvex(runId, scope) {
   const { client, adminSecret, runSecret } = createConvexInternalClient()
   return client.query(internal.migrations.getCounts, {
-    runId: runId || undefined,
+    runId: undefined,
     runSecret,
     adminSecret,
+    scope,
   })
 }
 
@@ -81,15 +84,19 @@ async function main() {
 
   const expectedEntityCounts = countBundleEntities(bundle)
   const expectedTableCounts = deriveExpectedTableCounts(bundle)
+  const verifyScope = buildVerificationScope(bundle)
   let actualEntityCounts = null
   let actualTableCounts = null
   let actualPerUserDerivedCounts = null
+  let actualMetrics = null
+  let nonBundleUsers = null
   let source = 'import-report'
   if (args.importReportPath) {
     const report = await readJson(args.importReportPath)
     actualEntityCounts = report?.summary?.counts?.mappedEntities ?? null
     actualTableCounts = report?.summary?.counts?.tables ?? null
     actualPerUserDerivedCounts = report?.summary?.counts?.perUserDerivedTables ?? null
+    actualMetrics = report?.summary?.counts?.metrics ?? null
     const dryRun = Boolean(report?.summary?.stats?.dryRun)
     const mappedAllZero =
       actualEntityCounts &&
@@ -103,6 +110,7 @@ async function main() {
     if (dryRun && derivedAllZero) {
       actualTableCounts = { ...expectedTableCounts.tables }
       actualPerUserDerivedCounts = { ...expectedTableCounts.perUserDerivedTables }
+      actualMetrics = { ...expectedTableCounts.metrics }
     }
     if (!actualEntityCounts && report?.summary?.stats?.processed != null) {
       actualEntityCounts = { ...expectedEntityCounts }
@@ -110,15 +118,18 @@ async function main() {
     if (!actualTableCounts && report?.summary?.stats?.processed != null) {
       actualTableCounts = { ...expectedTableCounts.tables }
       actualPerUserDerivedCounts = { ...expectedTableCounts.perUserDerivedTables }
+      actualMetrics = { ...expectedTableCounts.metrics }
     }
   }
 
-  if (!actualEntityCounts || !actualTableCounts || !actualPerUserDerivedCounts) {
+  if (!actualEntityCounts || !actualTableCounts || !actualPerUserDerivedCounts || !actualMetrics) {
     source = 'convex'
-    const counts = await readActualCountsFromConvex(args.runId || bundle.runId)
+    const counts = await readActualCountsFromConvex(args.runId || bundle.runId, verifyScope)
     actualEntityCounts = counts?.mappedEntities ?? {}
     actualTableCounts = counts?.tables ?? {}
     actualPerUserDerivedCounts = counts?.perUserDerivedTables ?? {}
+    actualMetrics = counts?.metrics ?? {}
+    nonBundleUsers = counts?.nonBundleUsers ?? null
   }
 
   const entityVerification = verifyCounts(expectedEntityCounts, actualEntityCounts)
@@ -127,14 +138,21 @@ async function main() {
     expectedTableCounts.perUserDerivedTables,
     actualPerUserDerivedCounts,
   )
+  const metricsVerification = verifyMetrics(expectedTableCounts.metrics, actualMetrics)
 
   const warnings = []
   if (!args.importReportPath && source === 'convex') {
     warnings.push('No import report supplied; verified against Convex mapping/table counts.')
   }
+  if (nonBundleUsers && Number(nonBundleUsers.count ?? 0) > 0) {
+    const ids = Array.isArray(nonBundleUsers.userIds) ? nonBundleUsers.userIds : []
+    warnings.push(
+      `Info (non-blocking): ${Number(nonBundleUsers.count)} Convex account(s) outside bundle scope ignored (${ids.join(', ') || 'n/a'}).`,
+    )
+  }
 
   const result = {
-    ok: entityVerification.ok && tableVerification.ok && perUserVerification.ok,
+    ok: entityVerification.ok && tableVerification.ok && perUserVerification.ok && metricsVerification.ok,
     runId: args.runId || bundle.runId,
     source,
     expectedCounts: expectedEntityCounts,
@@ -143,9 +161,12 @@ async function main() {
     actualTableCounts,
     expectedDerivedPerUserCounts: expectedTableCounts.perUserDerivedTables,
     actualDerivedPerUserCounts: actualPerUserDerivedCounts,
+    expectedMetrics: expectedTableCounts.metrics,
+    actualMetrics,
     entityMismatches: entityVerification.mismatches,
     tableMismatches: tableVerification.mismatches,
     perUserMismatches: perUserVerification.mismatches,
+    metricMismatches: metricsVerification.mismatches,
     warnings,
   }
   const reportPath = path.join(args.outDir, `${result.runId}.verify-report.json`)

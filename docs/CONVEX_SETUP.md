@@ -86,7 +86,7 @@ Notes:
 2. **Deploy Convex production code first** (required before migration import):
 
    ```bash
-   npx convex deploy --prod
+   npx convex deploy
    ```
 
 3. **Set migration-only runtime env** (outside git):
@@ -107,6 +107,8 @@ Notes:
    ```bash
    npm run migration:supabase:import -- --input scripts/migrations/artifacts/<run-id>.supabase-export.json --run-id <run-id> --source-sha <git-sha>
    ```
+
+   Default behavior is **upsert-only** (no deletions). Use `--prune` only during a full write-freeze migration window when destructive reconciliation is explicitly intended.
 
 6. **Migrate avatars bucket**:
 
@@ -187,12 +189,12 @@ npx convex run auth:queueGlobalPasswordResetCampaign '{...}'
 npx convex run auth:generateAdminPasswordResetLink '{...}'
 ```
 
-Add `--prod` to target production deployment.
+With `CONVEX_DEPLOY_KEY` set for production, `npx convex run` targets production without `--prod` (Convex 1.45).
 
 Admin one-shot reset link command:
 
 ```bash
-npx convex run auth:generateAdminPasswordResetLink --prod '{
+npx convex run auth:generateAdminPasswordResetLink '{
   "email":"user@example.com",
   "redirectTo":"<APP_PUBLIC_URL>",
   "sendEmail": false,

@@ -7,6 +7,7 @@ import {
   MIGRATION_ENV_NAMES,
   applyImportRows,
   assertSupportedNodeVersion,
+  buildVerificationScope,
   buildImportRows,
   countBundleEntities,
   createConvexInternalClient,
@@ -23,6 +24,7 @@ function parseArgs(argv) {
     outDir: path.resolve(process.cwd(), 'scripts/migrations/artifacts'),
     dryRun: false,
     fakeData: false,
+    prune: false,
     runIdOverride: process.env[MIGRATION_ENV_NAMES.runId] || null,
     sourceSha: process.env.RISK_SHA || process.env.GIT_SHA || 'unknown',
   }
@@ -46,6 +48,10 @@ function parseArgs(argv) {
     if (token === '--source-sha') {
       args.sourceSha = String(argv[i + 1] ?? args.sourceSha)
       i += 1
+      continue
+    }
+    if (token === '--prune') {
+      args.prune = true
       continue
     }
     if (token === '--dry-run') args.dryRun = true
@@ -77,6 +83,7 @@ function createConvexTarget(config) {
         sourceSha: config.sourceSha,
         runSecret,
         adminSecret,
+        prune: config.prune,
         entityType: row.entityType,
         supabaseId: row.supabaseId,
         checksum: row.checksum,
@@ -92,11 +99,12 @@ function createConvexTarget(config) {
         summaryJson,
       })
     },
-    async getCounts() {
+    async getCounts(scope) {
       return client.query(internal.migrations.getCounts, {
         runId: config.runId,
         runSecret,
         adminSecret,
+        scope,
       })
     },
   }
@@ -124,6 +132,7 @@ async function main() {
   const rows = buildImportRows(bundle)
   const expectedCounts = countBundleEntities(bundle)
   const expectedTableCounts = deriveExpectedTableCounts(bundle)
+  const verifyScope = buildVerificationScope(bundle)
 
   let summary
   if (args.dryRun) {
@@ -133,6 +142,7 @@ async function main() {
       mappedEntities: { ...expectedCounts },
       tables: { ...expectedTableCounts.tables },
       perUserDerivedTables: { ...expectedTableCounts.perUserDerivedTables },
+      metrics: { ...expectedTableCounts.metrics },
     }
   } else {
     const { client, adminSecret, runSecret } = createConvexInternalClient()
@@ -142,11 +152,12 @@ async function main() {
       runSecret,
       runId: bundle.runId,
       sourceSha: args.sourceSha,
+      prune: args.prune,
     })
     await target.start()
     try {
       summary = await applyImportRows(target, rows, { dryRun: false })
-      const counts = await target.getCounts()
+      const counts = await target.getCounts(verifyScope)
       summary.counts = counts
       await target.finish('completed', summary)
     } catch (error) {
@@ -162,9 +173,11 @@ async function main() {
     fakeData: args.fakeData,
     runId: bundle.runId,
     sourceSha: args.sourceSha,
+    prune: args.prune,
     expectedCounts,
     expectedTableCounts: expectedTableCounts.tables,
     expectedDerivedPerUserCounts: expectedTableCounts.perUserDerivedTables,
+    expectedMetrics: expectedTableCounts.metrics,
     summary,
   }
   const reportPath = path.join(args.outDir, `${bundle.runId}.convex-import-report.json`)

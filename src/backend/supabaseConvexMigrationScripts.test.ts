@@ -233,6 +233,7 @@ describe('supabase -> convex migration scripts', () => {
     expect(expected.tables.nutrition_day_state).toBe(1)
     expect(expected.tables.nutrition_food_catalog).toBe(1)
     expect(expected.perUserDerivedTables.nutrition_meals['user-rich']).toBe(1)
+    expect(expected.metrics.nutrition_food_catalog_selected_count_total).toBe(1)
 
     const tableVerification = migrationCore.verifyTableCounts(expected.tables, expected.tables)
     expect(tableVerification.ok).toBe(true)
@@ -243,6 +244,67 @@ describe('supabase -> convex migration scripts', () => {
     })
     expect(perUserMismatch.ok).toBe(false)
     expect(perUserMismatch.mismatches[0]?.tableName).toBe('nutrition_meals')
+  })
+
+  it('deduplicates catalog by key and keeps expected selectedCount total for duplicates', () => {
+    const bundle = migrationCore.normalizeExportBundle({
+      runId: 'dup-foods',
+      entities: {
+        auth_users: [],
+        profiles: [],
+        workouts: [],
+        nutrition: [],
+        checkins: [],
+        aliments: [
+          {
+            id: 'a-1',
+            user_id: 'user-a',
+            nom: 'Skyr',
+            calories: 60,
+            proteines: 10,
+            glucides: 4,
+            lipides: 1,
+            barcode: '3274080005003',
+            created_at: '2026-09-27T10:00:00.000Z',
+          },
+          {
+            id: 'a-2',
+            user_id: 'user-a',
+            nom: 'Skyr x2',
+            calories: 61,
+            proteines: 10,
+            glucides: 4,
+            lipides: 1,
+            barcode: '3274080005003',
+            created_at: '2026-09-27T10:01:00.000Z',
+          },
+        ],
+        activities: [],
+        ai_usage_limits: [],
+        user_backups: [],
+      },
+    })
+    const expected = migrationCore.deriveExpectedTableCounts(bundle)
+    expect(expected.tables.nutrition_food_catalog).toBe(1)
+    expect(expected.metrics.nutrition_food_catalog_selected_count_total).toBe(2)
+
+    const metricsVerification = migrationCore.verifyMetrics(expected.metrics, {
+      nutrition_food_catalog_selected_count_total: 2,
+    })
+    expect(metricsVerification.ok).toBe(true)
+  })
+
+  it('builds a deterministic verification scope per bundle ids', () => {
+    const bundle = createRichBundle()
+    const scope = migrationCore.buildVerificationScope(bundle)
+    expect(scope.entitySupabaseIds.profiles).toEqual(['user-rich'])
+    expect(scope.entitySupabaseIds.nutrition).toEqual(['user-rich'])
+    expect(scope.customSpotKeys.sort()).toEqual(['user-rich:spot-1', 'user-rich:spot-2'])
+    expect(scope.activeCheckinUserIds).toEqual(['user-rich'])
+    expect(scope.mealKeys).toEqual(['user-rich:meal-1'])
+    expect(scope.waterEntryKeys).toEqual(['user-rich:water-1'])
+    expect(scope.dayStateKeys).toEqual(['user-rich:2026-09-26'])
+    expect(scope.foodCatalogKeys).toEqual(['user-rich:barcode:3274080005003'])
   })
 
   it('enforces Node 22+ with a clear message', () => {
