@@ -12,7 +12,7 @@
  *   supabase functions deploy analyze-meal-photo
  *
  * Retry / classification / messages FR client :
- *   logique pure partagée → ../../../src/utils/geminiMealPhotoRetry.ts
+ *   logique pure partagée → ../_shared/geminiMealPhotoRetry.ts
  */
 import { createClient } from '@supabase/supabase-js'
 import { GoogleGenerativeAI, type GenerativeModel } from '@google/generative-ai'
@@ -23,7 +23,7 @@ import {
   GeminiRetryBudgetExceededError,
   runGeminiWithRetryFallback,
   uniqueModelCandidates,
-} from '../../../src/utils/geminiMealPhotoRetry.ts'
+} from '../_shared/geminiMealPhotoRetry.ts'
 
 const SYSTEM_PROMPT = `Tu es un nutritionniste expert en analyse visuelle de repas. Ta priorité absolue est la PRÉCISION et la SOUS-ESTIMATION prudente des calories — jamais l'inverse.
 
