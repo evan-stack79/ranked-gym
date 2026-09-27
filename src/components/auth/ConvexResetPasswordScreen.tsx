@@ -187,16 +187,18 @@ export function ConvexResetPasswordScreen() {
               </div>
             </label>
 
-            {error ? (
-              <p className="px-0.5 text-[13px] leading-snug text-[#FF6961]" role="alert" data-reset-error="1">
-                {error}
-              </p>
-            ) : null}
-            {info ? (
-              <p className="px-0.5 text-[13px] leading-snug text-[#30D158]" role="status">
-                {info}
-              </p>
-            ) : null}
+            <div className="min-h-[3rem] px-0.5">
+              {error ? (
+                <p className="text-[13px] leading-snug text-[#FF6961]" role="alert" data-reset-error="1">
+                  {error}
+                </p>
+              ) : null}
+              {!error && info ? (
+                <p className="text-[13px] leading-snug text-[#30D158]" role="status">
+                  {info}
+                </p>
+              ) : null}
+            </div>
 
             <button
               type="submit"

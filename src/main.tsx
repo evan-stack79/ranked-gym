@@ -45,6 +45,7 @@ function isColdLaunchPath() {
   if (typeof window === 'undefined') return true
   const path = window.location.pathname
   if (legalKindFromPath(path)) return false
+  if (path === '/auth/reset-password') return false
   if (path === '/auth-welcome-sheet-fixture') return false
   return true
 }

@@ -123,10 +123,31 @@ If Supabase password hashes are not safely portable to Convex: **global password
 
 ## PR-E auth migration flow (global reset policy)
 
-1. Import legacy users without password hashes into `auth_users` (internal Convex mutation `internal.auth.importUsersWithoutPasswords`, admin secret or admin-role session).
+1. Import legacy users without password hashes into `auth_users` (internal mutation `auth:importUsersWithoutPasswords`, admin secret or admin-role session).
 2. Imported users are flagged `mustResetPassword=true`; password login is denied until reset.
-3. Queue reset campaign emails with `internal.auth.queueGlobalPasswordResetCampaign`.
+3. Queue reset campaign emails with internal mutation `auth:queueGlobalPasswordResetCampaign`.
 4. Complete reset via tokenized link to `/auth/reset-password?token=...` then `auth.consumePasswordReset`.
+
+CLI form for internal functions (`convex@1.45.0`):
+
+```bash
+npx convex run auth:importUsersWithoutPasswords '{...}'
+npx convex run auth:queueGlobalPasswordResetCampaign '{...}'
+npx convex run auth:generateAdminPasswordResetLink '{...}'
+```
+
+Add `--prod` to target production deployment.
+
+Admin one-shot reset link command:
+
+```bash
+npx convex run auth:generateAdminPasswordResetLink --prod '{
+  "email":"user@example.com",
+  "redirectTo":"<APP_PUBLIC_URL>",
+  "sendEmail": false,
+  "adminSecret":"<MIGRATION_ADMIN_SECRET>"
+}'
+```
 
 This preserves the locked policy: no hash portability shortcuts and no legacy password bridge.
 
