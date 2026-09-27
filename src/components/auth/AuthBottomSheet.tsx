@@ -5,6 +5,13 @@ import { IosSheet } from '../ui/IosSheet'
 
 type AuthPanel = 'login' | 'signup' | 'forgot' | 'recovery'
 
+function readPanelFromQuery(): AuthPanel | null {
+  if (typeof window === 'undefined') return null
+  const raw = new URLSearchParams(window.location.search).get('authPanel')
+  if (raw === 'login' || raw === 'signup' || raw === 'forgot') return raw
+  return null
+}
+
 /**
  * Auth email/mot de passe.
  * L’inscription reste gouvernée par la configuration backend.
@@ -15,6 +22,7 @@ export function AuthBottomSheet() {
     closeAuth,
     authLoading,
     authError,
+    authErrorCode,
     authInfo,
     signInWithEmail,
     signUpWithEmail,
@@ -44,6 +52,12 @@ export function AuthBottomSheet() {
   }, [isPasswordRecovery, clearAuthMessages])
 
   useEffect(() => {
+    if (!isAuthOpen || isPasswordRecovery) return
+    const fromQuery = readPanelFromQuery()
+    if (fromQuery) setPanel(fromQuery)
+  }, [isAuthOpen, isPasswordRecovery])
+
+  useEffect(() => {
     if (!isAuthOpen) {
       setEmail('')
       setPassword('')
@@ -66,7 +80,7 @@ export function AuthBottomSheet() {
 
   const subtitle =
     panel === 'forgot'
-      ? 'Reçois un lien par email'
+      ? 'Demande un lien de réinitialisation'
       : panel === 'recovery'
         ? 'Choisis un mot de passe sécurisé'
         : panel === 'signup'
@@ -156,6 +170,21 @@ export function AuthBottomSheet() {
               {authError && (
                 <p className="px-0.5 text-[13px] leading-snug text-[#FF6961]" role="alert" data-auth-error="1">
                   {authError}
+                </p>
+              )}
+              {authErrorCode === 'AUTH_PASSWORD_RESET_REQUIRED' && email.trim().length > 3 ? (
+                <button
+                  type="button"
+                  className="w-full text-left text-[13px] font-medium text-[#AEAEB2] underline-offset-2 hover:text-white hover:underline"
+                  disabled={authLoading}
+                  onClick={() => void requestPasswordReset(email)}
+                >
+                  Renvoyer le lien de réinitialisation
+                </button>
+              ) : null}
+              {authInfo && (
+                <p className="px-0.5 text-[13px] leading-snug text-[#30D158]" role="status">
+                  {authInfo}
                 </p>
               )}
 

@@ -28,7 +28,6 @@ import { HydrationProgressBar } from './HydrationProgressBar'
 import {
   listPersonalFoods,
   setPersonalFoodFavorite,
-  saveAliment,
   searchOpenFoodFacts,
   type OpenFoodFactsProduct,
   type OpenFoodFactsSearchHit,
@@ -43,6 +42,7 @@ import { EditMealSheet } from './EditMealSheet'
 import { MealPhotoAnalyzer } from './MealPhotoAnalyzer'
 import { AddFoodScreen } from './AddFoodScreen'
 import { SectionSkeleton } from '../ui/AppBootScreen'
+import { persistScannedProductSelection } from './persistScannedProductSelection'
 
 interface MealJournalProps {
   targetCalories: number
@@ -192,10 +192,12 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
       setScannerOpen(false)
       setScannedProduct(product)
       if (user) {
-        void saveAliment(product, user.id).catch(() => undefined)
+        void persistScannedProductSelection(product, user.id, (message) => {
+          showToast(message, 'error')
+        })
       }
     },
-    [user],
+    [showToast, user],
   )
 
   const resetForm = () => {

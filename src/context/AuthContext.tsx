@@ -40,6 +40,7 @@ import {
 } from '../utils/authErrors'
 import {
   getPasswordRecoveryRedirectTo,
+  PASSWORD_RESET_MANUAL_MESSAGE,
   PASSWORD_RESET_SENT_MESSAGE,
 } from '../utils/authRedirect'
 import {
@@ -106,6 +107,7 @@ export interface AuthContextValue {
   isAuthOpen: boolean
   authLoading: boolean
   authError: string | null
+  authErrorCode: string | null
   /** Fired when daily streak hits a multiple of 7 (show Accueil celebration). */
   streakWeekBonus: StreakWeekBonus | null
   clearStreakWeekBonus: () => void
@@ -163,6 +165,28 @@ function isConvexAuthRuntime(): boolean {
   return getActiveAuthBackend() === 'convex'
 }
 
+function authErrorCodeOf(err: unknown): string | null {
+  const raw = err instanceof Error ? err.message : String(err ?? '')
+  const upper = raw.toUpperCase()
+  const known = [
+    'AUTH_PASSWORD_RESET_REQUIRED',
+    'AUTH_INVALID_CREDENTIALS',
+    'AUTH_RESET_TOKEN_INVALID',
+    'AUTH_RESET_TOKEN_MISSING',
+    'RATE_LIMITED',
+  ] as const
+  for (const code of known) {
+    if (upper.includes(code)) return code
+  }
+  return null
+}
+
+function isRateLimitedAuthError(err: unknown): boolean {
+  const raw = err instanceof Error ? err.message : String(err ?? '')
+  const lower = raw.toLowerCase()
+  return lower.includes('rate_limited') || lower.includes('too many') || lower.includes('429')
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -172,6 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthOpen, setIsAuthOpen] = useState(false)
   const [authLoading, setAuthLoading] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
+  const [authErrorCode, setAuthErrorCode] = useState<string | null>(null)
   const [authInfo, setAuthInfo] = useState<string | null>(null)
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
   const [streakWeekBonus, setStreakWeekBonus] = useState<StreakWeekBonus | null>(null)
@@ -424,6 +449,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (event === 'PASSWORD_RECOVERY') {
           setIsPasswordRecovery(true)
           setAuthError(null)
+          setAuthErrorCode(null)
           setAuthInfo(null)
           setIsAuthOpen(true)
           void hydrateUser(mapped, metaDisciplineOf(nextSession.user))
@@ -453,6 +479,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsAuthOpen(false)
     setAuthLoading(false)
     setAuthError(null)
+    setAuthErrorCode(null)
     queueMicrotask(() => cb?.())
   }, [])
 
@@ -461,8 +488,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (technical) {
       safeError('[auth] backend config', technical)
       setAuthError(USER_BACKEND_UNAVAILABLE)
+      setAuthErrorCode(null)
     } else {
       setAuthError(null)
+      setAuthErrorCode(null)
     }
     setAuthInfo(null)
     pendingRef.current = onSuccess ?? null
@@ -473,6 +502,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isPasswordRecovery) return
     setIsAuthOpen(false)
     setAuthError(null)
+    setAuthErrorCode(null)
     setAuthInfo(null)
     pendingRef.current = null
     setAuthLoading(false)
@@ -499,6 +529,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setAuthLoading(true)
       setAuthError(null)
+      setAuthErrorCode(null)
       try {
         const signedIn = await apiSignInWithEmail(email, password)
         if (isConvexAuthRuntime()) {
@@ -512,7 +543,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         completePending()
       } catch (err) {
+        const code = authErrorCodeOf(err)
+        if (code === 'AUTH_PASSWORD_RESET_REQUIRED') {
+          setAuthError('Réinitialisation obligatoire : demande un nouveau lien pour continuer.')
+          setAuthErrorCode(code)
+          try {
+            const redirectTo = getPasswordRecoveryRedirectTo()
+            const reset = await apiRequestPasswordReset(email, redirectTo)
+            setAuthInfo(
+              reset.delivery === 'manual' ? PASSWORD_RESET_MANUAL_MESSAGE : PASSWORD_RESET_SENT_MESSAGE,
+            )
+          } catch (resetErr) {
+            if (isRateLimitedAuthError(resetErr)) {
+              setAuthInfo('Un lien a déjà été demandé récemment. Réessaie dans quelques minutes.')
+            } else {
+              setAuthInfo('Redemande un lien depuis “Mot de passe oublié”.')
+            }
+          } finally {
+            setAuthLoading(false)
+          }
+          return
+        }
         setAuthError(friendlyAuthError(err, 'Connexion impossible.'))
+        setAuthErrorCode(code)
         setAuthLoading(false)
       }
     },
@@ -529,6 +582,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setAuthLoading(true)
       setAuthError(null)
+      setAuthErrorCode(null)
       setAuthInfo(null)
       try {
         const signedUp = await apiSignUpWithEmail(email, password, pseudo, discipline)
@@ -546,6 +600,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthInfo('Compte créé. Vérifie ta boîte mail pour confirmer ton inscription.')
       } catch (err) {
         setAuthError(friendlyAuthError(err, 'Inscription impossible.'))
+        setAuthErrorCode(authErrorCodeOf(err))
       } finally {
         setAuthLoading(false)
       }
@@ -555,6 +610,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearAuthMessages = useCallback(() => {
     setAuthError(null)
+    setAuthErrorCode(null)
     setAuthInfo(null)
   }, [])
 
@@ -567,16 +623,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setAuthLoading(true)
     setAuthError(null)
+    setAuthErrorCode(null)
     setAuthInfo(null)
     try {
       const redirectTo = getPasswordRecoveryRedirectTo()
-      await apiRequestPasswordReset(email, redirectTo)
-      setAuthInfo(PASSWORD_RESET_SENT_MESSAGE)
+      const reset = await apiRequestPasswordReset(email, redirectTo)
+      setAuthInfo(
+        reset.delivery === 'manual' ? PASSWORD_RESET_MANUAL_MESSAGE : PASSWORD_RESET_SENT_MESSAGE,
+      )
     } catch (err) {
       if (isAccountEnumerationError(err)) {
         setAuthInfo(PASSWORD_RESET_SENT_MESSAGE)
       } else {
         setAuthError(friendlyAuthError(err, 'Envoi impossible. Réessaie plus tard.'))
+        setAuthErrorCode(authErrorCodeOf(err))
       }
     } finally {
       setAuthLoading(false)
@@ -598,6 +658,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setAuthLoading(true)
       setAuthError(null)
+      setAuthErrorCode(null)
       setAuthInfo(null)
       try {
         await apiUpdatePassword(password)
@@ -610,6 +671,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }, 900)
       } catch (err) {
         setAuthError(friendlyAuthError(err, 'Impossible d’enregistrer le mot de passe.'))
+        setAuthErrorCode(authErrorCodeOf(err))
       } finally {
         setAuthLoading(false)
       }
@@ -666,6 +728,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsPasswordRecovery(false)
     setAuthInfo(null)
     setAuthError(null)
+    setAuthErrorCode(null)
     setBootIssue(null)
     setIsLoading(false)
   }, [])
@@ -699,6 +762,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthOpen,
       authLoading,
       authError,
+      authErrorCode,
       streakWeekBonus,
       clearStreakWeekBonus,
       streakCelebration,
@@ -729,6 +793,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthOpen,
       authLoading,
       authError,
+      authErrorCode,
       streakWeekBonus,
       clearStreakWeekBonus,
       streakCelebration,
