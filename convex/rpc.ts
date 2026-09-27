@@ -1,5 +1,5 @@
 import { v } from 'convex/values'
-import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
+import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
 import { consumeRateLimit } from './lib/rateLimit'
 import { canViewerSeeSubject } from './lib/socialVisibility'
@@ -484,6 +484,13 @@ export async function reserveAiMealScanForSession(
   sessionToken: string,
 ): Promise<{ allowed: boolean; scan_count: number; daily_limit: number }> {
   const userId = await getSessionUserId(ctx, sessionToken)
+  return reserveAiMealScanForUserId(ctx, userId)
+}
+
+export async function reserveAiMealScanForUserId(
+  ctx: MutationCtx,
+  userId: string,
+): Promise<{ allowed: boolean; scan_count: number; daily_limit: number }> {
   const now = Date.now()
   const dateOfScan = toDateKey(new Date(now))
   const row = await ctx.db
@@ -519,6 +526,13 @@ export async function releaseAiMealScanForSession(
   sessionToken: string,
 ): Promise<void> {
   const userId = await getSessionUserId(ctx, sessionToken)
+  await releaseAiMealScanForUserId(ctx, userId)
+}
+
+export async function releaseAiMealScanForUserId(
+  ctx: MutationCtx,
+  userId: string,
+): Promise<void> {
   const dateOfScan = toDateKey(new Date())
   const row = await ctx.db
     .query('ai_usage_limits')
@@ -681,21 +695,21 @@ export const getUserStats = query({
   handler: (ctx, args) => getUserStatsForSession(ctx, args.sessionToken),
 })
 
-export const reserveAiMealScan = mutation({
-  args: { sessionToken: v.string() },
+export const reserveAiMealScanInternal = internalMutation({
+  args: { userId: v.string() },
   returns: v.object({
     allowed: v.boolean(),
     scan_count: v.number(),
     daily_limit: v.number(),
   }),
-  handler: (ctx, args) => reserveAiMealScanForSession(ctx, args.sessionToken),
+  handler: (ctx, args) => reserveAiMealScanForUserId(ctx, args.userId),
 })
 
-export const releaseAiMealScan = mutation({
-  args: { sessionToken: v.string() },
+export const releaseAiMealScanInternal = internalMutation({
+  args: { userId: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await releaseAiMealScanForSession(ctx, args.sessionToken)
+    await releaseAiMealScanForUserId(ctx, args.userId)
     return null
   },
 })

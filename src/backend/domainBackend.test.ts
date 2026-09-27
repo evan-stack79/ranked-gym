@@ -34,7 +34,7 @@ describe('runWithDomainBackend', () => {
     expect(value).toBe('convex-ok')
   })
 
-  it('throws a french Convex error when convex fails in convex-primary mode', async () => {
+  it('throws a french service error when convex fails in convex-primary mode', async () => {
     isConvexDomainActive.mockReturnValue(true)
     const { runWithDomainBackend } = await import('./domainBackend')
     await expect(
@@ -45,6 +45,6 @@ describe('runWithDomainBackend', () => {
         },
         supabase: async () => 'supabase-fallback',
       }),
-    ).rejects.toThrow('Convex')
+    ).rejects.toThrow(/service/i)
   })
 })
