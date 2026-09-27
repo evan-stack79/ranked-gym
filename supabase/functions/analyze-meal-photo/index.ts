@@ -10,9 +10,20 @@
  *
  * Deploy :
  *   supabase functions deploy analyze-meal-photo
+ *
+ * Retry / classification / messages FR client :
+ *   logique pure partagée → ../_shared/geminiMealPhotoRetry.ts
  */
 import { createClient } from '@supabase/supabase-js'
 import { GoogleGenerativeAI, type GenerativeModel } from '@google/generative-ai'
+import {
+  clientFacingFromGeminiError,
+  clientFacingGeminiFailure,
+  GeminiModelsExhaustedError,
+  GeminiRetryBudgetExceededError,
+  runGeminiWithRetryFallback,
+  uniqueModelCandidates,
+} from '../_shared/geminiMealPhotoRetry.ts'
 
 const SYSTEM_PROMPT = `Tu es un nutritionniste expert en analyse visuelle de repas. Ta priorité absolue est la PRÉCISION et la SOUS-ESTIMATION prudente des calories — jamais l'inverse.
 
@@ -52,7 +63,7 @@ Format de réponse : UNIQUEMENT un objet JSON valide, sans markdown, avec exacte
 const USER_PROMPT =
   'Analyse la photo : estime le poids (g) de chaque aliment visible, applique les valeurs CIQUAL/USDA nature par défaut, privilégie la fourchette basse. Renvoie le JSON final (calories, proteines, glucides, lipides).'
 
-/** Modèles vision testés par ordre si le précédent renvoie 404. */
+/** Modèles vision testés par ordre si le précédent échoue (404 ou retries épuisés). */
 const GEMINI_MODEL_FALLBACKS = [
   'gemini-3.6-flash',
   'gemini-flash-latest',
@@ -99,27 +110,7 @@ function geminiModelCandidates(): string[] {
   const ordered = fromEnv
     ? [fromEnv, ...GEMINI_MODEL_FALLBACKS.filter((m) => m !== fromEnv)]
     : [...GEMINI_MODEL_FALLBACKS]
-  return [...new Set(ordered)]
-}
-
-function isGeminiModelNotFoundError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error)
-  return /404|not found|NOT_FOUND/i.test(message) && /models\//i.test(message)
-}
-
-function isGeminiApiKeyError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error)
-  return /API_KEY_INVALID|API key not valid|invalid api key|PERMISSION_DENIED/i.test(message)
-}
-
-function friendlyGeminiError(error: unknown): string {
-  if (isGeminiApiKeyError(error)) {
-    return 'Clé Gemini invalide — crée une clé sur aistudio.google.com/apikey et mets-la dans Supabase → Secrets → GEMINI_API_KEY (format AIzaSy…).'
-  }
-  if (isGeminiModelNotFoundError(error)) {
-    return 'Modèle Gemini indisponible — ajoute GEMINI_MODEL=gemini-3.6-flash dans les secrets Supabase.'
-  }
-  return error instanceof Error ? error.message : 'Erreur Gemini'
+  return uniqueModelCandidates(ordered)
 }
 
 function buildGeminiModel(genAI: GoogleGenerativeAI, modelName: string): GenerativeModel {
@@ -139,12 +130,12 @@ async function analyzeImageWithGemini(
   mimeType: string,
 ): Promise<{ text: string; modelUsed: string }> {
   const candidates = geminiModelCandidates()
-  let lastError: unknown = null
 
-  for (const modelName of candidates) {
-    try {
+  const { result, modelUsed } = await runGeminiWithRetryFallback({
+    models: candidates,
+    attempt: async (modelName) => {
       const model = buildGeminiModel(genAI, modelName)
-      const result = await model.generateContent([
+      const geminiResult = await model.generateContent([
         {
           inlineData: {
             mimeType,
@@ -155,22 +146,53 @@ async function analyzeImageWithGemini(
           text: USER_PROMPT,
         },
       ])
-      return { text: result.response.text(), modelUsed: modelName }
-    } catch (error) {
-      lastError = error
-      if (isGeminiModelNotFoundError(error)) {
-        console.warn('[analyze-meal-photo] model unavailable, trying next:', modelName, error)
-        continue
-      }
-      throw error
-    }
+      return geminiResult.response.text()
+    },
+    onRetry: ({ modelName, attemptIndex, delayMs, error }) => {
+      console.warn(
+        '[analyze-meal-photo] retryable Gemini error, retrying',
+        { modelName, attemptIndex, delayMs, message: error instanceof Error ? error.message : String(error) },
+      )
+    },
+    onModelFallback: ({ fromModel, reason, error }) => {
+      console.warn(
+        '[analyze-meal-photo] switching model',
+        {
+          fromModel,
+          reason,
+          message: error instanceof Error ? error.message : String(error),
+        },
+      )
+    },
+  })
+
+  return { text: result, modelUsed }
+}
+
+function safeClientGeminiErrorResponse(error: unknown): Response {
+  // Détail technique serveur uniquement (jamais la clé API)
+  const technical =
+    error instanceof GeminiModelsExhaustedError
+      ? error.lastError instanceof Error
+        ? error.lastError.message
+        : String(error.lastError)
+      : error instanceof Error
+        ? error.message
+        : String(error)
+  console.error('[analyze-meal-photo] Gemini error (technical):', technical)
+
+  if (
+    error instanceof GeminiRetryBudgetExceededError ||
+    error instanceof GeminiModelsExhaustedError
+  ) {
+    const facing = clientFacingGeminiFailure('unavailable')
+    return jsonResponse({ error: facing.error, code: facing.code }, facing.httpStatus)
   }
 
-  throw lastError instanceof Error
-    ? lastError
-    : new Error(
-        `Aucun modèle Gemini disponible (${candidates.join(', ')}). Définis GEMINI_MODEL dans les secrets Supabase.`,
-      )
+  const facing = clientFacingFromGeminiError(
+    error instanceof GeminiModelsExhaustedError ? error.lastError : error,
+  )
+  return jsonResponse({ error: facing.error, code: facing.code }, facing.httpStatus)
 }
 
 Deno.serve(async (req) => {
@@ -189,7 +211,7 @@ Deno.serve(async (req) => {
 
   if (!geminiKey || !supabaseUrl || !anonKey || !serviceKey) {
     console.error('[analyze-meal-photo] missing env secrets')
-    return jsonResponse({ error: 'Configuration serveur incomplète (secrets Gemini/Supabase).' }, 500)
+    return jsonResponse({ error: 'Configuration serveur incomplète.' }, 500)
   }
 
   const authHeader = req.headers.get('Authorization')
@@ -240,7 +262,7 @@ Deno.serve(async (req) => {
 
   if (reserveError) {
     console.error('[analyze-meal-photo] reserve failed:', reserveError.message)
-    return jsonResponse({ error: `Quota indisponible : ${reserveError.message}` }, 500)
+    return jsonResponse({ error: 'Quota indisponible — réessaie dans un instant.' }, 500)
   }
 
   const reserve = Array.isArray(reserveRows) ? reserveRows[0] : reserveRows
@@ -272,7 +294,7 @@ Deno.serve(async (req) => {
     } catch {
       console.error('[analyze-meal-photo] invalid JSON from model:', text.slice(0, 400))
       await admin.rpc('release_ai_meal_scan', { p_user_id: user.id })
-      return jsonResponse({ error: 'Réponse Gemini non JSON — réessaie.' }, 502)
+      return jsonResponse({ error: 'Réponse IA non exploitable — réessaie.', code: 'ai_error' }, 502)
     }
 
     const macros = parseMacros(parsed)
@@ -298,8 +320,7 @@ Deno.serve(async (req) => {
       scansRemaining,
     })
   } catch (e) {
-    console.error('[analyze-meal-photo] Gemini error:', e)
     await admin.rpc('release_ai_meal_scan', { p_user_id: user.id })
-    return jsonResponse({ error: friendlyGeminiError(e) }, 502)
+    return safeClientGeminiErrorResponse(e)
   }
 })

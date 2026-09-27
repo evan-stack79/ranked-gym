@@ -1,6 +1,10 @@
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 import { compressMealImage } from '../utils/compressMealImage'
+import {
+  AI_UNAVAILABLE_FR,
+  sanitizeMealPhotoAiClientMessage,
+} from '../utils/geminiMealPhotoRetry'
 import { safeError } from '../utils/safeLog'
 import { isConvexDomainActive } from '../backend/adapter'
 import { api as generatedApi } from '../../convex/_generated/api'
@@ -82,7 +86,15 @@ async function readFunctionErrorBody(error: unknown): Promise<InvokePayload | nu
 }
 
 function friendlyInvokeMessage(error: unknown, payload: InvokePayload | null): string {
-  if (payload?.error) return payload.error
+  const httpStatus =
+    error instanceof FunctionsHttpError ? error.context.status : undefined
+
+  if (payload?.error) {
+    return sanitizeMealPhotoAiClientMessage(payload.error, {
+      httpStatus,
+      code: payload.code,
+    })
+  }
 
   if (error instanceof FunctionsHttpError) {
     if (error.context.status === 401) {
@@ -95,7 +107,7 @@ function friendlyInvokeMessage(error: unknown, payload: InvokePayload | null): s
       return 'Fonction analyze-meal-photo introuvable (déploiement Supabase requis).'
     }
     if (error.context.status >= 500) {
-      return 'Serveur d’analyse indisponible — réessaie dans un instant.'
+      return AI_UNAVAILABLE_FR
     }
   }
 
@@ -103,7 +115,7 @@ function friendlyInvokeMessage(error: unknown, payload: InvokePayload | null): s
     if (/failed to send a request to the edge function/i.test(error.message)) {
       return 'Impossible de joindre l’analyse IA — vérifie ta connexion.'
     }
-    return error.message
+    return sanitizeMealPhotoAiClientMessage(error.message, { httpStatus })
   }
 
   return 'Échec analyse photo.'
@@ -203,10 +215,13 @@ export async function analyzeMealPhoto(file: File | Blob): Promise<MealPhotoMacr
   }
 
   if (payload.error) {
-    throw new MealPhotoAiError(payload.error, {
-      code: payload.code,
-      scansRemaining: payload.scansRemaining,
-    })
+    throw new MealPhotoAiError(
+      sanitizeMealPhotoAiClientMessage(payload.error, { code: payload.code }),
+      {
+        code: payload.code,
+        scansRemaining: payload.scansRemaining,
+      },
+    )
   }
 
   const calories = Math.max(0, Math.round(Number(payload.calories) || 0))
