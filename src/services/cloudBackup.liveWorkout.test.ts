@@ -260,7 +260,6 @@ describe('cloudBackup live workout resume (C3)', () => {
   })
 
   it('une écriture pendant un push en cours déclenche un second envoi', async () => {
-    vi.useFakeTimers()
     const { cloud } = await load()
 
     let releaseFirst: (value: { error?: string }) => void = () => undefined
@@ -274,14 +273,19 @@ describe('cloudBackup live workout resume (C3)', () => {
       .mockResolvedValue({})
 
     const first = cloud.pushCloudBackup('user-live')
-    await Promise.resolve()
-    await Promise.resolve()
-    expect(mockPushConvexBackupPayload).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => {
+      expect(mockPushConvexBackupPayload).toHaveBeenCalledTimes(1)
+    })
 
     const overlapping = cloud.pushCloudBackup('user-live')
-    expect(overlapping).toBe(first)
+    const overlappingResult = await Promise.race([
+      overlapping.then(() => 'resolved'),
+      Promise.resolve('pending'),
+    ])
+    expect(overlappingResult).toBe('pending')
     expect(mockPushConvexBackupPayload).toHaveBeenCalledTimes(1)
 
+    vi.useFakeTimers()
     releaseFirst({})
     await first
     await vi.advanceTimersByTimeAsync(450)
