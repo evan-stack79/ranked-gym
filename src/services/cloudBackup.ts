@@ -3,7 +3,7 @@ import { safeError, safeWarn } from '../utils/safeLog'
 import { toUserFacingError } from '../utils/userFacingError'
 import type { Json } from '../types/database'
 import type { CalorieProfile, DayJournal } from '../types/nutrition'
-import type { TrainingState } from '../types/training'
+import type { ActiveWorkoutDraft, TrainingState } from '../types/training'
 import type { NearbyGym } from '../types'
 import { isActiveCloudBackendConfigured, isConvexDomainActive } from '../backend/adapter'
 import {
@@ -197,6 +197,52 @@ export function collectLocalBackup(): CloudBackupPayload {
   }
 }
 
+function isLiveDraftClosedRemotely(
+  localDraft: ActiveWorkoutDraft,
+  remote: TrainingState,
+): boolean {
+  const notes = remote.workoutNotes ?? []
+  // Même startedAt déjà sauvé dans l’historique distant → séance close.
+  if (notes.some((note) => note.createdAt === localDraft.startedAt)) return true
+  if (remote.activeWorkoutDraft) return false
+  // Pas de brouillon distant + note terminée plus récente que le brouillon local.
+  if (notes.some((note) => note.createdAt > localDraft.updatedAt)) return true
+  // Même routine clôturée après le démarrage local (createdAt n’est pas startedAt).
+  return notes.some(
+    (note) =>
+      note.routineId === localDraft.routineId && note.createdAt >= localDraft.startedAt,
+  )
+}
+
+/**
+ * Conserve `activeWorkoutDraft` et la routine du brouillon si la copie locale
+ * est plus récente que le cloud. Ne ressuscite pas une séance déjà close.
+ */
+function mergeLiveWorkout(local: TrainingState, remote: TrainingState): TrainingState {
+  const localDraft = local.activeWorkoutDraft
+  const remoteDraft = remote.activeWorkoutDraft
+  if (!localDraft) return remote
+  if (remoteDraft && remoteDraft.updatedAt >= localDraft.updatedAt) return remote
+  if (isLiveDraftClosedRemotely(localDraft, remote)) return remote
+
+  const localRoutine = local.routines.find((routine) => routine.id === localDraft.routineId)
+  const hasRemoteRoutine = remote.routines.some((routine) => routine.id === localDraft.routineId)
+  const routines = hasRemoteRoutine
+    ? remote.routines.map((routine) =>
+        routine.id === localDraft.routineId && localRoutine ? localRoutine : routine,
+      )
+    : localRoutine
+      ? [...remote.routines, localRoutine]
+      : remote.routines
+
+  return {
+    ...remote,
+    activeWorkoutDraft: localDraft,
+    lastVoluntaryRoute: local.lastVoluntaryRoute ?? null,
+    routines,
+  }
+}
+
 function applyBackup(
   payload: CloudBackupPayload,
   options?: { skipNutritionJournal?: boolean },
@@ -209,7 +255,7 @@ function applyBackup(
     saveMealJournal(payload.nutrition.journal, { skipCloud: true })
   }
   if (payload.training) {
-    saveTrainingState(payload.training, { skipCloud: true })
+    saveTrainingState(mergeLiveWorkout(getTrainingState(), payload.training), { skipCloud: true })
   }
   if (payload.profileProgress) {
     saveProfileProgress(payload.profileProgress, { skipCloud: true })
@@ -587,6 +633,7 @@ export async function pushCloudBackup(
     return { ok: false, error: 'Connecte-toi pour activer la sauvegarde cloud.' }
   }
   if (pushInFlight) {
+    needsRepush = true
     return pushInFlight
   }
 
