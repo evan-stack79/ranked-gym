@@ -1,9 +1,9 @@
 # Product Marketing Context
 
-**Document version:** v3
+**Document version:** v4
 **Last updated:** 2026-09-28
 
-> Draft auto-généré depuis le repo Ranked Gym, enrichi par Evan. Sections marquées *[à confirmer]* ou *[gap]* attendent encore ta validation.
+> Draft auto-généré depuis le repo Ranked Gym, enrichi par Evan + VOC social (Reddit/TikTok, 2026-09-28). Sections marquées *[à confirmer]* ou *[gap]* attendent encore ta validation.
 
 ## Product Overview
 **One-liner:** Tous tes sports. Une seule progression.
@@ -100,13 +100,21 @@ Produit B2C — personas d’usage (pas d’achat multi-stakeholders) :
 
 ## Customer Language
 **How they describe the problem:**
-- *[gap — pas de verbatims]* Hypothèses repo : « j’ai trop d’apps », « je décroche », « personne en salle »
+- « I log everything for 12 days, then one dinner out I can't be bothered to guess, and the app sits there with the red badge until I delete it. » (r/loseit — MFP & Cal AI)
+- « the ads and the paywalled barcode scanner finally pushed me off MFP »
+- « MFP data is a royal mess » / entries « insanely wrong »
+- « the million apps out there are just logging apps »
+- « Idk if gym app is worth paying tbh »
+- « Tracking your fitness shouldn’t feel like a second job » (TikTok niche)
+**How they describe alternatives:**
+- Cal AI : « just snap a photo » — easy TikTok demo ; accuracy doubted (« No way that app is anywhere near accurate »)
+- Stack courant : Hevy/Strong pour la salle + MyFitnessPal pour la diet
 **How they describe us:**
 - « Réseau social de musculation gamifié » (meta description)
 - « Tous tes sports. Une seule progression. » (welcome)
 - « Entraînement, nutrition et récupération réunis au même endroit. »
-**Words to use:** Rank, XP, streak / série, Lobby, check-in, Pump Check, Arène, progression, séance, spot, Mode Furtif, panthère, discipline
-**Words to avoid:** Jargon infra (Supabase, Convex, hydratation cloud, sync…), “récupération des données”, ton corporate / vouvoiement
+**Words to use:** Rank, XP, streak / série, Lobby, check-in, Pump Check, Arène, progression, séance, spot, Mode Furtif, panthère, discipline ; anti-delete / une seule app / gratuit calories+train
+**Words to avoid:** Jargon infra (Supabase, Convex, hydratation cloud, sync…), “récupération des données”, ton corporate / vouvoiement ; promettre une précision calories IA “parfaite”
 **Glossary:**
 | Term | Meaning |
 |------|---------|
@@ -144,6 +152,7 @@ Produit B2C — personas d’usage (pas d’achat multi-stakeholders) :
 
 ## Changelog
 *Newest first. One line per revision: what changed and why.*
+- v4 (2026-09-28) — Added VOC from Reddit/TikTok research (abandon after 2 weeks, MFP barcode paywall hate, Hevy+MFP stack, Cal AI snap hook).
 - v3 (2026-09-28) — Defined free vs Premium: free = calories + hydration + training; paid = barcode scan + AI food analysis; BPM still undecided.
 - v2 (2026-09-28) — Set freemium + 6.99€/mo Premium; named direct competitors MyFitnessPal, Cal AI, Gym Rank; updated objections and switching dynamics.
 - v1 (2026-09-28) — Initial context auto-drafted from README, welcome copy, ranks, lobby, Pump Check, nutrition/sleep engines, and legal (private beta).

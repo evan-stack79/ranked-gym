@@ -39,26 +39,26 @@ Ne disperse pas : 48h focus IG + DM, puis élargis si < 10.
 
 ### Post Instagram / Facebook
 ```
-Je cherche 10 bêta testeurs pour Ranked Gym.
+Combien d’apps fitness tu as déjà deleted ?
 
-L’idée est simple : une seule app pour
+MyFitnessPal. Cal AI. Une gym app.
+Tu logges 12 jours… un resto… et tu delete.
+
+Je lance Ranked Gym en bêta privée (10 places) :
 train + nutrition + récupération,
-avec une vraie progression (ranks, XP, streaks).
+avec ranks / XP / streaks — une seule progression.
 
-Plus besoin de jongler entre MyFitnessPal d’un côté
-et une app ranked de l’autre.
-
-→ Bêta privée
-→ 10 places
 → Accès gratuit
+→ Calories + entraînements free
 → Tu testes, tu me dis ce qui cloche
 
-Tu trackes déjà / tu vas en salle ?
-Envoie-moi un DM « BÊTA ».
+Tu vas en salle / tu trackes déjà ?
+DM « BÊTA ».
 ```
 
 ### Story (court)
 ```
+Combien d’apps tu as déjà deleted ?
 10 places bêta Ranked Gym
 Train · Nutri · Récup
 → DM « BÊTA »
@@ -66,10 +66,10 @@ Train · Nutri · Récup
 
 ### TikTok / Reels — script 15–20s
 ```
-0–2s  Hook : « Je cherche 10 personnes pour tester mon app fitness. »
-2–8s  Problème : « T’as MyFitnessPal pour la bouffe… une autre app pour la salle… et ta motivation qui tombe. »
-8–15s Offre : « Ranked Gym = train + nutri + récup. Une progression. Bêta privée. »
-15–20s CTA : « 10 places. DM BÊTA. »
+0–2s  Hook : « Combien d’apps fitness tu as déjà deleted ? »
+2–8s  Problème : « Tu logges 12 jours, un resto, et tu delete. MFP d’un côté, Hevy de l’autre. »
+8–15s Offre : « Ranked Gym = train + nutri + récup. Une progression. »
+15–20s CTA : « 10 places bêta. DM BÊTA. »
 ```
 
 ### Message groupes (WhatsApp / Discord)
