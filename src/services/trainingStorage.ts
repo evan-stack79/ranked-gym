@@ -174,6 +174,34 @@ export function stripTransientSetMarkers(exercises: ExerciseEntry[]): ExerciseEn
   }))
 }
 
+/** Identifiant stable d’une séance live (UUID, fallback déterministe-local). */
+export function createWorkoutSessionId(): string {
+  try {
+    const webCrypto = globalThis.crypto
+    if (webCrypto && typeof webCrypto.randomUUID === 'function') {
+      return webCrypto.randomUUID()
+    }
+  } catch {
+    /* ignore */
+  }
+  return `sess-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function liveSessionIdForDraft(
+  prior: ActiveWorkoutDraft | null | undefined,
+  sameSession: boolean,
+): string | undefined {
+  if (sameSession) return sanitizeStoredId(prior?.sessionId) ?? undefined
+  return createWorkoutSessionId()
+}
+
+function withLiveSessionId(
+  draft: ActiveWorkoutDraft,
+  sessionId: string | undefined,
+): ActiveWorkoutDraft {
+  return sessionId ? { ...draft, sessionId } : draft
+}
+
 /** IDs persistés : ignore non-string / vide / trop long / caractères de contrôle. */
 export function sanitizeStoredId(value: unknown): string | null {
   if (typeof value !== 'string') return null
@@ -268,6 +296,9 @@ export function normalizeActiveWorkoutDraft(
   ) {
     draft.activeExerciseIndex = Math.floor(raw.activeExerciseIndex as number)
   }
+
+  const sessionId = sanitizeStoredId(raw.sessionId)
+  if (sessionId) draft.sessionId = sessionId
 
   return draft
 }
@@ -685,6 +716,15 @@ export function saveWorkoutNote(
   }
 
   const persistedTitle = resolvePersistedSessionTitle(note, existing)
+  const liveDraft = state.activeWorkoutDraft
+  const copiedSessionId =
+    sanitizeStoredId(note.sessionId) ??
+    sanitizeStoredId(existing?.sessionId) ??
+    (!note.id &&
+    liveDraft &&
+    liveDraft.routineId === (note.routineId ?? liveDraft.routineId)
+      ? sanitizeStoredId(liveDraft.sessionId)
+      : null)
 
   const entry: WorkoutNote = {
     id: note.id ?? `note-${Date.now()}`,
@@ -704,6 +744,7 @@ export function saveWorkoutNote(
     ...(persistedTitle.titleSource
       ? { titleSource: persistedTitle.titleSource }
       : {}),
+    ...(copiedSessionId ? { sessionId: copiedSessionId } : {}),
   }
   const workoutNotes = [entry, ...state.workoutNotes.filter((n) => n.id !== entry.id)].slice(
     0,
@@ -803,17 +844,20 @@ export function saveRoutineDraft(
     'musculation'
   const prior = state.activeWorkoutDraft
   const same = prior?.routineId === routineId
-  const baseDraft: ActiveWorkoutDraft = {
-    routineId,
-    sportId: cleanSportId,
-    startedAt: same ? prior!.startedAt : now,
-    updatedAt: now,
-    elapsedActiveMs: same ? prior?.elapsedActiveMs : 0,
-    runningSince: same ? prior?.runningSince ?? (prior?.paused ? null : now) : now,
-    paused: same ? prior?.paused === true : false,
-    restTimer: same ? prior?.restTimer ?? null : null,
-    activeExerciseIndex: same ? prior?.activeExerciseIndex : undefined,
-  }
+  const baseDraft: ActiveWorkoutDraft = withLiveSessionId(
+    {
+      routineId,
+      sportId: cleanSportId,
+      startedAt: same ? prior!.startedAt : now,
+      updatedAt: now,
+      elapsedActiveMs: same ? prior?.elapsedActiveMs : 0,
+      runningSince: same ? prior?.runningSince ?? (prior?.paused ? null : now) : now,
+      paused: same ? prior?.paused === true : false,
+      restTimer: same ? prior?.restTimer ?? null : null,
+      activeExerciseIndex: same ? prior?.activeExerciseIndex : undefined,
+    },
+    liveSessionIdForDraft(prior, same),
+  )
   const next = {
     ...state,
     routines,
@@ -843,17 +887,23 @@ export function startRoutineDraft(
     lastSelectedRoutineId: cleanRoutineId,
     lastSelectedSportId: cleanSportId,
     lastVoluntaryRoute: null,
-    activeWorkoutDraft: ensureDraftClock({
-      routineId: cleanRoutineId,
-      sportId: cleanSportId,
-      startedAt: same ? prior!.startedAt : now,
-      updatedAt: now,
-      elapsedActiveMs: same ? prior?.elapsedActiveMs : 0,
-      runningSince: same && prior?.paused ? null : now,
-      paused: same ? prior?.paused === true : false,
-      restTimer: same ? prior?.restTimer ?? null : null,
-      activeExerciseIndex: same ? prior?.activeExerciseIndex : 0,
-    }, now),
+    activeWorkoutDraft: ensureDraftClock(
+      withLiveSessionId(
+        {
+          routineId: cleanRoutineId,
+          sportId: cleanSportId,
+          startedAt: same ? prior!.startedAt : now,
+          updatedAt: now,
+          elapsedActiveMs: same ? prior?.elapsedActiveMs : 0,
+          runningSince: same && prior?.paused ? null : now,
+          paused: same ? prior?.paused === true : false,
+          restTimer: same ? prior?.restTimer ?? null : null,
+          activeExerciseIndex: same ? prior?.activeExerciseIndex : 0,
+        },
+        liveSessionIdForDraft(prior, same),
+      ),
+      now,
+    ),
   }
   write(next)
   return next
@@ -887,17 +937,23 @@ export function startFreeWorkoutSession(
     lastSelectedRoutineId: cleanRoutineId,
     lastSelectedSportId: cleanSportId,
     lastVoluntaryRoute: null,
-    activeWorkoutDraft: ensureDraftClock({
-      routineId: cleanRoutineId,
-      sportId: cleanSportId,
-      startedAt: same ? prior!.startedAt : now,
-      updatedAt: now,
-      elapsedActiveMs: same ? prior?.elapsedActiveMs : 0,
-      runningSince: same && prior?.paused ? null : now,
-      paused: same ? prior?.paused === true : false,
-      restTimer: same ? prior?.restTimer ?? null : null,
-      activeExerciseIndex: same ? prior?.activeExerciseIndex : 0,
-    }, now),
+    activeWorkoutDraft: ensureDraftClock(
+      withLiveSessionId(
+        {
+          routineId: cleanRoutineId,
+          sportId: cleanSportId,
+          startedAt: same ? prior!.startedAt : now,
+          updatedAt: now,
+          elapsedActiveMs: same ? prior?.elapsedActiveMs : 0,
+          runningSince: same && prior?.paused ? null : now,
+          paused: same ? prior?.paused === true : false,
+          restTimer: same ? prior?.restTimer ?? null : null,
+          activeExerciseIndex: same ? prior?.activeExerciseIndex : 0,
+        },
+        liveSessionIdForDraft(prior, same),
+      ),
+      now,
+    ),
   }
   write(next)
   return next
