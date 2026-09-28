@@ -39,57 +39,59 @@ Ne disperse pas : 48h focus IG + DM, puis élargis si < 10.
 
 ### Post Instagram / Facebook
 ```
-Combien d’apps fitness tu as déjà deleted ?
+Tu as déjà désinstallé une app sport ?
 
-MyFitnessPal. Cal AI. Une gym app.
-Tu logges 12 jours… un resto… et tu delete.
+Tu notes tes repas pendant 2 semaines…
+Puis un soir au resto, tu as la flemme…
+Et tu supprimes l’app.
 
-Je lance Ranked Gym en bêta privée (10 places) :
-train + nutrition + récupération,
-avec ranks / XP / streaks — une seule progression.
+Je cherche 10 personnes pour tester Ranked Gym
+(accès gratuit, bêta privée) :
 
-→ Accès gratuit
-→ Calories + entraînements free
-→ Tu testes, tu me dis ce qui cloche
+→ Tes séances
+→ Tes calories
+→ Ta progression (ranks, séries)
 
-Tu vas en salle / tu trackes déjà ?
-DM « BÊTA ».
+Tout au même endroit.
+
+Tu vas à la salle ? Envoie-moi « BÊTA » en message.
 ```
 
 ### Story (court)
 ```
-Combien d’apps tu as déjà deleted ?
-10 places bêta Ranked Gym
-Train · Nutri · Récup
-→ DM « BÊTA »
+Tu as déjà deleted une app sport ?
+10 places pour tester Ranked Gym
+→ Envoie « BÊTA »
 ```
 
 ### TikTok / Reels — script 15–20s
 ```
-0–2s  Hook : « Combien d’apps fitness tu as déjà deleted ? »
-2–8s  Problème : « Tu logges 12 jours, un resto, et tu delete. MFP d’un côté, Hevy de l’autre. »
-8–15s Offre : « Ranked Gym = train + nutri + récup. Une progression. »
-15–20s CTA : « 10 places bêta. DM BÊTA. »
+0–2s  « Tu as déjà désinstallé une app sport ? »
+2–8s  « Tu notes tout pendant 2 semaines, un soir tu lâches, et tu delete. »
+8–15s « Ranked Gym : séances + calories + progression. Une seule app. »
+15–20s « 10 places. Envoie BÊTA. »
 ```
 
 ### Message groupes (WhatsApp / Discord)
 ```
-Salut — je lance Ranked Gym en bêta privée (10 places).
-App FR : entraînement + calories/eau + récup, avec ranks/streaks.
-Si tu vas en salle et tu veux tester gratuitement → réponds BÊTA, je t’envoie l’accès.
+Salut — je cherche 10 testeurs pour Ranked Gym (gratuit).
+C’est une app pour suivre tes séances + tes calories + ta progression.
+Si tu vas à la salle et tu veux tester → réponds BÊTA.
 ```
 
 ### Reddit (ton soft)
 ```
-Titre : [Bêta] Je cherche 10 testeurs FR pour une app train + nutri + récup (Ranked Gym)
+Titre : [Bêta] 10 testeurs FR pour une app séances + calories (Ranked Gym)
 
 Corps :
 Salut,
 
-Je construis Ranked Gym : une app qui réunit entraînement, suivi calorique/hydratation et récupération, avec une couche ranks/streaks.
+Je construis Ranked Gym : une app pour suivre tes entraînements,
+tes calories et ta progression (ranks / séries) au même endroit.
 
-Je cherche 10 bêta testeurs motivés (accès gratuit, feedback honnête).
-Si ça t’intéresse, envoie-moi un MP avec ton sport principal (muscu / course / autre).
+Je cherche 10 testeurs (accès gratuit, feedback honnête).
+Si ça t’intéresse, envoie-moi un message avec ton sport
+(muscu / course / autre).
 ```
 
 ---
@@ -99,34 +101,32 @@ Si ça t’intéresse, envoie-moi un MP avec ton sport principal (muscu / course
 ### 1) Premier contact (ils écrivent BÊTA)
 ```
 Salut ! Merci 👊
-Ranked Gym est en bêta privée — je prends 10 testeurs.
-
 2 questions rapides :
-1) Tu fais surtout muscu, course, ou multi-sport ?
-2) Tu trackes déjà quelque chose (MFP, Cal AI, Hevy…) ?
+1) Tu fais surtout musculation, course, ou plusieurs sports ?
+2) Tu utilises déjà une app pour suivre tes repas ou tes séances ?
 
-Ensuite je t’envoie l’invitation.
+Ensuite je t’envoie l’accès.
 ```
 
 ### 2) Confirmation + invitation
 ```
 Parfait — place réservée.
-Voici l’accès : [LIEN / code invitation]
-Quand tu as fait ta 1ère séance + 1 jour de calories, dis-moi ce qui t’a freiné.
+Voici l’accès : [LIEN]
+Quand tu as fait 1 séance et noté 1 repas, dis-moi ce qui t’a embêté.
 ```
 
 ### 3) Relance J+2 (silence)
 ```
-Hey — toujours chaud pour la bêta Ranked Gym ?
+Hey — toujours chaud pour tester Ranked Gym ?
 Il me reste [X] places. Je peux t’envoyer l’accès aujourd’hui.
 ```
 
 ### 4) Feedback J+7
 ```
-Ça fait une semaine — 3 questions chrono :
+Ça fait une semaine — 3 questions rapides :
 1) Qu’est-ce que tu as le plus utilisé ?
 2) Qu’est-ce qui t’a bloqué ?
-3) Tu remplacerais MFP / ton app actuelle par Ranked Gym ? Pourquoi ?
+3) Tu garderais l’app à la place de celle(s) que tu utilisais avant ? Pourquoi ?
 ```
 
 ---
@@ -156,8 +156,8 @@ Il me reste [X] places. Je peux t’envoyer l’accès aujourd’hui.
 
 ## Texte à coller dans Canva (si besoin)
 
-- Titre : `Je cherche 10 places`
-- Sous-titre : `Bêta privée Ranked Gym`
-- Ligne : `Train + nutri + récup. Une seule app.`
-- CTA : `DM « BÊTA »`
-- Footer : `(10 testeurs · accès gratuit)`
+- Titre : `Tu as déjà deleted une app sport ?`
+- Sous-titre : `10 places pour tester Ranked Gym`
+- Ligne : `Séances + calories + progression`
+- CTA : `Envoie « BÊTA »`
+- Footer : `(accès gratuit)`
