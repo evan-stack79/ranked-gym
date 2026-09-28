@@ -197,7 +197,16 @@ export function collectLocalBackup(): CloudBackupPayload {
   }
 }
 
-function isLiveDraftClosedRemotely(
+function liveSessionIdOf(
+  value: { sessionId?: string } | null | undefined,
+): string | null {
+  const id = value?.sessionId
+  if (typeof id !== 'string') return null
+  const trimmed = id.trim()
+  return trimmed ? trimmed : null
+}
+
+function isLegacyLiveDraftClosedRemotely(
   localDraft: ActiveWorkoutDraft,
   remote: TrainingState,
 ): boolean {
@@ -214,17 +223,11 @@ function isLiveDraftClosedRemotely(
   )
 }
 
-/**
- * Conserve `activeWorkoutDraft` et la routine du brouillon si la copie locale
- * est plus récente que le cloud. Ne ressuscite pas une séance déjà close.
- */
-function mergeLiveWorkout(local: TrainingState, remote: TrainingState): TrainingState {
-  const localDraft = local.activeWorkoutDraft
-  const remoteDraft = remote.activeWorkoutDraft
-  if (!localDraft) return remote
-  if (remoteDraft && remoteDraft.updatedAt >= localDraft.updatedAt) return remote
-  if (isLiveDraftClosedRemotely(localDraft, remote)) return remote
-
+function overlayLocalLiveDraft(
+  local: TrainingState,
+  remote: TrainingState,
+  localDraft: ActiveWorkoutDraft,
+): TrainingState {
   const localRoutine = local.routines.find((routine) => routine.id === localDraft.routineId)
   const hasRemoteRoutine = remote.routines.some((routine) => routine.id === localDraft.routineId)
   const routines = hasRemoteRoutine
@@ -241,6 +244,41 @@ function mergeLiveWorkout(local: TrainingState, remote: TrainingState): Training
     lastVoluntaryRoute: local.lastVoluntaryRoute ?? null,
     routines,
   }
+}
+
+/**
+ * Conserve `activeWorkoutDraft` et la routine du brouillon si la copie locale
+ * est encore la séance live. Résolution **ID d’abord** (`sessionId`) ;
+ * horodatage uniquement pour les données legacy sans id.
+ *
+ * Deux brouillons live d’ids différents : on ne mélange pas. On garde la
+ * séance locale toujours en cours (sauf note distante déjà close pour
+ * *ce* sessionId). L’historique distant (`workoutNotes`) reste via `...remote`.
+ */
+function mergeLiveWorkout(local: TrainingState, remote: TrainingState): TrainingState {
+  const localDraft = local.activeWorkoutDraft
+  const remoteDraft = remote.activeWorkoutDraft
+  if (!localDraft) return remote
+
+  const localId = liveSessionIdOf(localDraft)
+  if (localId) {
+    const notes = remote.workoutNotes ?? []
+    if (notes.some((note) => liveSessionIdOf(note) === localId)) return remote
+
+    const remoteId = liveSessionIdOf(remoteDraft)
+    if (remoteDraft && remoteId === localId) {
+      if (remoteDraft.updatedAt >= localDraft.updatedAt) return remote
+      return overlayLocalLiveDraft(local, remote, localDraft)
+    }
+
+    // Brouillon distant absent, autre sessionId, ou id manquant : ne pas blender.
+    // La séance locale est encore live (pas de note close pour localId).
+    return overlayLocalLiveDraft(local, remote, localDraft)
+  }
+
+  if (remoteDraft && remoteDraft.updatedAt >= localDraft.updatedAt) return remote
+  if (isLegacyLiveDraftClosedRemotely(localDraft, remote)) return remote
+  return overlayLocalLiveDraft(local, remote, localDraft)
 }
 
 function applyBackup(
