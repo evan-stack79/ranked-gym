@@ -1,6 +1,6 @@
 # Product Marketing Context
 
-**Document version:** v2
+**Document version:** v3
 **Last updated:** 2026-09-28
 
 > Draft auto-généré depuis le repo Ranked Gym, enrichi par Evan. Sections marquées *[à confirmer]* ou *[gap]* attendent encore ta validation.
@@ -10,7 +10,21 @@
 **What it does:** Ranked Gym est une app mobile-first (PWA + Capacitor) qui réunit entraînement, nutrition et récupération dans un même parcours gamifié — ranks, XP, streaks — avec une couche sociale autour des salles (Lobby / check-in) et un moment de share post-séance (Pump Check).
 **Product category:** App fitness / suivi d’entraînement gamifié · réseau social sportif
 **Product type:** Consumer mobile app (SaaS B2C) — bêta privée sur invitation
-**Business model:** Freemium — accès gratuit avec un sous-ensemble de fonctionnalités ; abonnement **6,99 € / mois** pour pousser à fond, centrer le parcours sur tes objectifs, et le faire de manière vraiment efficace *[détail exact free vs paid à préciser]*
+**Business model:** Freemium — **6,99 € / mois** pour Premium
+
+### Free vs Premium
+**Gratuit :**
+- Compteur / suivi calorique
+- Suivi hydratation
+- Entraînements (logging séances)
+
+**Premium (6,99 €/mois) :**
+- Scanner code-barres aliments
+- Analyse d’aliments par IA
+- Parcours objectifs poussé à fond / plus efficace *[périmètre exact à affiner]*
+
+**À décider :**
+- BPM / fréquence cardiaque (caméra) — gratuit ou Premium ? *[ouvert]*
 
 ## Target Audience
 **Target companies:** N/A (B2C)
@@ -55,15 +69,15 @@ Produit B2C — personas d’usage (pas d’achat multi-stakeholders) :
 
 ## Differentiation
 **Key differentiators:**
-- Freemium clair : gratuit pour démarrer ; **6,99 €/mois** pour pousser à fond et centrer l’app sur tes objectifs efficacement
+- Freemium clair : gratuit = calories + hydratation + entraînements ; Premium **6,99 €/mois** = scanner code-barres + analyse aliments IA (+ parcours objectifs poussé)
 - Positionnement “rank / arène” : ranks Bronze→Légende avec titres (“Recrue de la Fonte”, “Légende Vivante”…)
 - Unification entraînement + nutrition + sommeil (là où MFP/Cal AI et Gym Rank restent chacun d’un côté)
 - Multi-disciplines (pas muscu-only)
 - Lobby géolocalisé (spots proches + check-in)
 - Pump Check (carte photo post-séance partageable)
 - Brand dark crimson + panthère, ton FR tutoiement “Hero & Arena”
-**How we do it differently:** Une seule progression (XP/rank/streak) branchée sur train + nutri + récup, pas un logger calories ou un classement salle isolé
-**Why that's better:** Moins d’apps, motivation continue, objectifs vraiment poussés (surtout en Premium)
+**How we do it differently:** Une seule progression (XP/rank/streak) branchée sur train + nutri + récup, pas un logger calories ou un classement salle isolé ; le paywall accélère la nutrition (scan + IA) sans bloquer le cœur train/calories
+**Why that's better:** Tu démarres gratuit ; tu payes quand tu veux logger la bouffe plus vite et pousser tes objectifs à fond
 **Why customers choose us:** *[gap — pas encore de verbatims clients]* — hypothèse : “enfin train + nutri + ranks au même endroit”
 
 ## Objections
@@ -72,7 +86,7 @@ Produit B2C — personas d’usage (pas d’achat multi-stakeholders) :
 | « Encore une app fitness » | Une progression pour tous tes sports — train, nutri, récup au même endroit, pas un logger de plus |
 | « J’ai déjà MyFitnessPal / Cal AI » | Tu logges les repas ; ici tu progresses aussi en salle, en rank, et sur ton objectif global |
 | « Gym Rank / les apps ranked font déjà ça » | Le classement ne suffit pas — on couple ranks + nutrition + récup pour pousser tes objectifs |
-| « Pourquoi payer 6,99 € ? » | Le gratuit couvre le cœur ; Premium pousse à fond et recentre l’app sur tes objectifs efficacement |
+| « Pourquoi payer 6,99 € ? » | Gratuit = calories, eau, entraînements. Premium = scanner code-barres + analyse IA pour logger plus vite et pousser tes objectifs |
 | « C’est fermé / bêta » | Oui : bêta privée sur invitation pour soigner l’expérience avant une ouverture plus large |
 | « Et ma vie privée en salle ? » | Mode Furtif (Stealth) : masque ta localisation dans le feed |
 
@@ -103,6 +117,8 @@ Produit B2C — personas d’usage (pas d’achat multi-stakeholders) :
 | Pump Check | Photo post-séance → carte victoire partageable |
 | Mode Furtif | Masque la localisation dans le feed social |
 | Discipline | Sport principal / identité (muscu, course, football…) |
+| Premium | Abo 6,99 €/mois : scanner code-barres + analyse aliments IA (+ objectifs poussés) |
+| BPM | Fréquence cardiaque (caméra) — free vs Premium encore ouvert |
 
 ## Brand Voice
 **Tone:** Direct, motivant, compétitif sans être toxique ; tutoiement FR
@@ -123,10 +139,11 @@ Produit B2C — personas d’usage (pas d’achat multi-stakeholders) :
 
 ## Goals
 **Business goal:** *[à confirmer]* — bêta privée solide → ouverture plus large + conversion freemium → Premium 6,99 €
-**Conversion action:** Invitation / compte → usage gratuit régulier → upgrade Premium quand l’utilisateur veut pousser ses objectifs à fond
+**Conversion action:** Invitation / compte → usage gratuit (calories + hydratation + train) → upgrade Premium au moment du scan / IA aliments ou pour pousser les objectifs
 **Current metrics:** *[gap]*
 
 ## Changelog
 *Newest first. One line per revision: what changed and why.*
+- v3 (2026-09-28) — Defined free vs Premium: free = calories + hydration + training; paid = barcode scan + AI food analysis; BPM still undecided.
 - v2 (2026-09-28) — Set freemium + 6.99€/mo Premium; named direct competitors MyFitnessPal, Cal AI, Gym Rank; updated objections and switching dynamics.
 - v1 (2026-09-28) — Initial context auto-drafted from README, welcome copy, ranks, lobby, Pump Check, nutrition/sleep engines, and legal (private beta).
