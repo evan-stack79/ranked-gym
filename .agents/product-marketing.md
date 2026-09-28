@@ -1,16 +1,16 @@
 # Product Marketing Context
 
-**Document version:** v1
+**Document version:** v2
 **Last updated:** 2026-09-28
 
-> Draft auto-généré depuis le repo Ranked Gym. Sections marquées *[à confirmer]* ou *[gap]* attendent ta validation.
+> Draft auto-généré depuis le repo Ranked Gym, enrichi par Evan. Sections marquées *[à confirmer]* ou *[gap]* attendent encore ta validation.
 
 ## Product Overview
 **One-liner:** Tous tes sports. Une seule progression.
 **What it does:** Ranked Gym est une app mobile-first (PWA + Capacitor) qui réunit entraînement, nutrition et récupération dans un même parcours gamifié — ranks, XP, streaks — avec une couche sociale autour des salles (Lobby / check-in) et un moment de share post-séance (Pump Check).
 **Product category:** App fitness / suivi d’entraînement gamifié · réseau social sportif
 **Product type:** Consumer mobile app (SaaS B2C) — bêta privée sur invitation
-**Business model:** *[à confirmer]* — aujourd’hui accès gratuit sur invitation ; monétisation (freemium, abo, etc.) non définie dans le repo
+**Business model:** Freemium — accès gratuit avec un sous-ensemble de fonctionnalités ; abonnement **6,99 € / mois** pour pousser à fond, centrer le parcours sur tes objectifs, et le faire de manière vraiment efficace *[détail exact free vs paid à préciser]*
 
 ## Target Audience
 **Target companies:** N/A (B2C)
@@ -35,50 +35,54 @@ Produit B2C — personas d’usage (pas d’achat multi-stakeholders) :
 |---------|-------------|-----------|------------------|
 | Pratiquant régulier (muscu / hybride) | Progression, régularité, stats crédibles | Apps fragmentées + motivation qui chute | Une progression unique (rank/XP) + train/nutri/récup |
 | Social gym-goer | Qui est en salle, vibe, partage | Salles anonymes, peu de lien entre sessions | Lobby / check-in + feed + Pump Check |
-| Multi-sport | Un seul endroit pour force + endurance + co | Stack d’apps (Strava + Hevy + MyFitnessPal…) | « Tous tes sports » dans Ranked Gym |
+| Multi-sport | Un seul endroit pour force + endurance + co | Stack d’apps (MyFitnessPal / Cal AI + Gym Rank / logger…) | « Tous tes sports » dans Ranked Gym |
 
 ## Problems & Pain Points
-**Core problem:** Les pratiquants doivent empiler plusieurs apps pour s’entraîner, manger, récupérer et rester motivés — et la salle reste isolée socialement.
+**Core problem:** Les pratiquants doivent empiler plusieurs apps (nutrition d’un côté, ranks / salle de l’autre) pour s’entraîner, manger, récupérer et rester motivés — et rien ne pousse vraiment leurs objectifs à fond.
 **Why alternatives fall short:**
-- Loggers purs (Hevy, Strong…) : excellents sur la fonte, faibles sur nutrition/sommeil/social salle *[à confirmer vs marché]*
-- Trackers nutrition (MyFitnessPal…) : hors entraînement et sans gamification “ranked”
-- Apps sociales sport (Strava…) : orientées outdoor / endurance, pas l’expérience salle + ranks
-- Motivation externe faible : pas de système de rang / streak unifié train+nutri+récup
-**What it costs them:** Friction quotidienne, abandon de tracking, perte de motivation, données éclatées
-**Emotional tension:** Se sentir seul en salle, stagner sans feedback, culpabilité quand la série casse
+- Trackers nutrition (MyFitnessPal, Cal AI…) : bons pour logger les repas / calories, mais hors entraînement gamifié, hors Lobby salle, hors progression “ranked”
+- Apps “ranked / gym rank” (Gym Rank et équivalents) : misent sur le classement / social salle, mais pas sur un parcours objectifs train + nutri + récup unifié
+- Stack multi-apps : contexte et motivation éclatés, tu ne restes pas centré sur ton objectif
+**What it costs them:** Friction quotidienne, abandon de tracking, objectifs flous, motivation qui tombe
+**Emotional tension:** Se sentir seul en salle, stagner sans feedback, culpabilité quand la série casse, impression de “faire des trucs” sans progresser vraiment
 
 ## Competitive Landscape
-**Direct:** Apps de logging muscu gamifiées / sociales (Hevy, Strong, Alpha Progression, Freeletics…) — often strong on logging, weaker on unified train+nutri+sleep+lobby *[à affiner]*
-**Secondary:** Stack multi-apps (Hevy + MyFitnessPal + Whoop/Oura + Instagram) — falls short because context and motivation are split
-**Indirect:** Coach perso, carnet papier, “juste y aller” sans tracker — falls short on progression visible and accountability
+**Direct:**
+- Nutrition / calories : **MyFitnessPal**, **Cal AI**, et apps similaires — fort sur le food logging / IA repas, faible sur train gamifié + ranks + social salle
+- Ranked / gym social : **Gym Rank** et apps du même type — fort sur classement / vibe salle, faible sur nutrition + récup + objectifs poussés à fond dans un seul parcours
+**Secondary:** Loggers muscu (Hevy, Strong…) + Strava + carnet — falls short because you still juggle pieces and lack a single ranked progression tied to goals
+**Indirect:** Coach perso, “juste y aller” sans tracker — falls short on daily accountability and visible progress
 
 ## Differentiation
 **Key differentiators:**
+- Freemium clair : gratuit pour démarrer ; **6,99 €/mois** pour pousser à fond et centrer l’app sur tes objectifs efficacement
 - Positionnement “rank / arène” : ranks Bronze→Légende avec titres (“Recrue de la Fonte”, “Légende Vivante”…)
-- Unification entraînement + nutrition + sommeil
+- Unification entraînement + nutrition + sommeil (là où MFP/Cal AI et Gym Rank restent chacun d’un côté)
 - Multi-disciplines (pas muscu-only)
 - Lobby géolocalisé (spots proches + check-in)
 - Pump Check (carte photo post-séance partageable)
 - Brand dark crimson + panthère, ton FR tutoiement “Hero & Arena”
-**How we do it differently:** Progression unique (XP/rank/streak) au centre, pas un logger avec un badge collé après coup
-**Why that's better:** Motivation continue + moins d’apps + moment social/share natif
-**Why customers choose us:** *[gap — pas encore de verbatims clients dans le repo]*
+**How we do it differently:** Une seule progression (XP/rank/streak) branchée sur train + nutri + récup, pas un logger calories ou un classement salle isolé
+**Why that's better:** Moins d’apps, motivation continue, objectifs vraiment poussés (surtout en Premium)
+**Why customers choose us:** *[gap — pas encore de verbatims clients]* — hypothèse : “enfin train + nutri + ranks au même endroit”
 
 ## Objections
 | Objection | Response |
 |-----------|----------|
 | « Encore une app fitness » | Une progression pour tous tes sports — train, nutri, récup au même endroit, pas un logger de plus |
+| « J’ai déjà MyFitnessPal / Cal AI » | Tu logges les repas ; ici tu progresses aussi en salle, en rank, et sur ton objectif global |
+| « Gym Rank / les apps ranked font déjà ça » | Le classement ne suffit pas — on couple ranks + nutrition + récup pour pousser tes objectifs |
+| « Pourquoi payer 6,99 € ? » | Le gratuit couvre le cœur ; Premium pousse à fond et recentre l’app sur tes objectifs efficacement |
 | « C’est fermé / bêta » | Oui : bêta privée sur invitation pour soigner l’expérience avant une ouverture plus large |
-| « Je veux juste logger ma muscu » | Le logging force est là ; le rank + streak te gardent régulier sans friction |
 | « Et ma vie privée en salle ? » | Mode Furtif (Stealth) : masque ta localisation dans le feed |
 
-**Anti-persona:** Quelqu’un qui veut uniquement un tableau Excel / un logger ultra-minimal sans gamification ni social ; ou un pro purement outdoor-only déjà 100 % Strava sans besoin salle/nutri
+**Anti-persona:** Quelqu’un qui veut uniquement un logger calories minimal (sans ranks / social) ; ou un classement salle pur sans suivi nutrition/objectifs ; ou un tableau Excel ultra-minimal
 
 ## Switching Dynamics
-**Push:** Fatigue de 2–3 apps, motivation plate, salle anonyme, tracking abandonné
-**Pull:** Rank visible, streak, “tous tes sports”, Lobby, Pump Check, UI dark premium
-**Habit:** Déjà une routine dans Hevy / Strong / notes iPhone
-**Anxiety:** Perdre l’historique, communauté trop “gamer”, bêta instable, données sensibles
+**Push:** Fatigué de MyFitnessPal/Cal AI d’un côté et d’une app ranked/salle de l’autre ; objectifs pas vraiment poussés
+**Pull:** Rank + nutri + récup unifiés ; Premium 6,99 € pour un parcours objectifs sérieux ; Lobby + Pump Check
+**Habit:** Routine déjà ancrée dans MFP / Cal AI / Gym Rank / Hevy
+**Anxiety:** Perdre l’historique nutrition, payer pour quelque chose de “déjà gratuit ailleurs”, bêta instable
 
 ## Customer Language
 **How they describe the problem:**
@@ -118,10 +122,11 @@ Produit B2C — personas d’usage (pas d’achat multi-stakeholders) :
 | Shareable wins | Pump Check / Victory Camera |
 
 ## Goals
-**Business goal:** *[à confirmer]* — sortir une bêta privée solide, puis ouvrir plus largement (acquisition FR fitness)
-**Conversion action:** Aujourd’hui → obtention d’une invitation / création de compte ; plus tard → install + première séance + check-in Lobby *[à confirmer]*
+**Business goal:** *[à confirmer]* — bêta privée solide → ouverture plus large + conversion freemium → Premium 6,99 €
+**Conversion action:** Invitation / compte → usage gratuit régulier → upgrade Premium quand l’utilisateur veut pousser ses objectifs à fond
 **Current metrics:** *[gap]*
 
 ## Changelog
 *Newest first. One line per revision: what changed and why.*
+- v2 (2026-09-28) — Set freemium + 6.99€/mo Premium; named direct competitors MyFitnessPal, Cal AI, Gym Rank; updated objections and switching dynamics.
 - v1 (2026-09-28) — Initial context auto-drafted from README, welcome copy, ranks, lobby, Pump Check, nutrition/sleep engines, and legal (private beta).
