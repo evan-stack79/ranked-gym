@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpen, Check, Pause, Pencil, Play, Plus, Trash2, X } from 'lucide-react'
 import type {
   ExerciseEntry,
@@ -432,7 +432,7 @@ export function WorkoutNotebook({
     }
   }, [onDraftSave, onRegisterDraftFlush])
 
-  const focusExercise = (index: number) => {
+  const focusExercise = useCallback((index: number) => {
     setActiveExerciseIndex(index)
     if (!editingNote) {
       try {
@@ -441,7 +441,7 @@ export function WorkoutNotebook({
         // persist error déjà émis par trainingStorage
       }
     }
-  }
+  }, [editingNote])
 
   const handleActiveIndexChange = focusExercise
 
@@ -581,7 +581,7 @@ export function WorkoutNotebook({
     if (activeExerciseIndex > exercises.length - 1) {
       focusExercise(exercises.length - 1)
     }
-  }, [exercises.length, immersiveLive, activeExerciseIndex])
+  }, [exercises.length, immersiveLive, activeExerciseIndex, focusExercise])
 
   // Au démarrage immersif : l’index enregistré gagne ; sinon premier exo avec série en cours.
   useEffect(() => {
