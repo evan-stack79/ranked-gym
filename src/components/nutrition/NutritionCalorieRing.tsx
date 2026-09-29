@@ -1,9 +1,20 @@
+import { useState, type CSSProperties } from 'react'
+import {
+  ANIMATED_CIRCULAR_PROGRESS_DURATION,
+  circularProgressTransition,
+} from '../ui/animated-circular-progress-bar.tokens'
+
 interface NutritionCalorieRingProps {
   remainingCalories: number
   consumedCalories: number
   targetCalories: number
   progress: number
   onOpenSetup: () => void
+  /** Journal hydraté — évite d’animer 0 → repas déjà loggés au montage. */
+  ready?: boolean
+  /** Change de jour : snap, pas le fill Magic UI. */
+  dateKey?: string
+  reducedMotion?: boolean
 }
 
 function formatKcal(n: number): string {
@@ -15,13 +26,13 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
 const RING_SWEEP = 280
 const RING_DASH = (RING_SWEEP / 360) * RING_CIRCUMFERENCE
 const RING_ROTATION = 130
+const PROGRESS_EPSILON = 0.002
 
-function polarPoint(angle: number) {
-  const radians = (angle * Math.PI) / 180
-  return {
-    x: 120 + RING_RADIUS * Math.cos(radians),
-    y: 120 + RING_RADIUS * Math.sin(radians),
+function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false
   }
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
 export function NutritionCalorieRing({
@@ -30,14 +41,62 @@ export function NutritionCalorieRing({
   targetCalories,
   progress,
   onOpenSetup,
+  ready = true,
+  dateKey = '',
+  reducedMotion,
 }: NutritionCalorieRingProps) {
   const hasTarget = Number.isFinite(targetCalories) && targetCalories > 0
   const safeConsumed = Number.isFinite(consumedCalories) ? Math.max(0, consumedCalories) : 0
   const safeProgress = hasTarget
     ? Math.min(1, Math.max(0, Number.isFinite(progress) ? progress : safeConsumed / targetCalories))
     : 0
-  const indicator = polarPoint(RING_ROTATION + 280 * safeProgress)
   const isOverTarget = hasTarget && remainingCalories < 0
+  const staticMotion = reducedMotion === true || prefersReducedMotion()
+
+  const [motion, setMotion] = useState({
+    shown: safeProgress,
+    animate: false,
+    primed: false,
+    dateKey,
+    ready,
+  })
+
+  let nextMotion = motion
+  if (!ready) {
+    if (motion.ready || motion.shown !== safeProgress || motion.animate || motion.primed) {
+      nextMotion = {
+        shown: safeProgress,
+        animate: false,
+        primed: false,
+        dateKey,
+        ready: false,
+      }
+    }
+  } else if (!motion.primed || motion.dateKey !== dateKey || !motion.ready) {
+    nextMotion = {
+      shown: safeProgress,
+      animate: false,
+      primed: true,
+      dateKey,
+      ready: true,
+    }
+  } else if (motion.shown !== safeProgress) {
+    nextMotion = {
+      shown: safeProgress,
+      animate: safeProgress > motion.shown + PROGRESS_EPSILON && !staticMotion,
+      primed: true,
+      dateKey,
+      ready: true,
+    }
+  }
+  if (nextMotion !== motion) {
+    setMotion(nextMotion)
+  }
+
+  const displayed = nextMotion.shown
+  const animateFill = nextMotion.animate
+  const armDeg = RING_ROTATION + RING_SWEEP * displayed
+  const fillTransition = circularProgressTransition(animateFill)
 
   const heading = (
     <div className="mb-3 flex w-full items-center justify-between gap-3">
@@ -73,7 +132,12 @@ export function NutritionCalorieRing({
   return (
     <div className="flex flex-col items-center">
       {heading}
-      <div className="relative aspect-square w-full max-w-[282px]">
+      <div
+        className="relative aspect-square w-full max-w-[282px]"
+        data-calorie-ring=""
+        data-motion={animateFill ? 'animated' : 'static'}
+        data-ring-progress={displayed}
+      >
         <svg viewBox="0 0 240 240" className="h-full w-full overflow-visible" role="img" aria-label="Progression calorique">
           <circle
             cx="120"
@@ -107,10 +171,24 @@ export function NutritionCalorieRing({
             stroke="#FF2B2B"
             strokeWidth="14"
             strokeLinecap="round"
-            strokeDasharray={`${Math.max(0.01, RING_DASH * safeProgress)} ${2 * Math.PI * RING_RADIUS}`}
+            className="nutrition-calorie-ring-fill"
+            data-calorie-ring-fill=""
+            style={
+              {
+                '--circumference': RING_CIRCUMFERENCE,
+                '--percent-to-px': `${RING_DASH / 100}px`,
+                '--stroke-percent': displayed * 100,
+                '--transition-length': animateFill
+                  ? ANIMATED_CIRCULAR_PROGRESS_DURATION
+                  : '0s',
+                '--delay': '0s',
+                strokeDasharray:
+                  'calc(var(--stroke-percent) * var(--percent-to-px)) var(--circumference)',
+                transition: fillTransition,
+              } as CSSProperties
+            }
             transform={`rotate(${RING_ROTATION} 120 120)`}
           />
-          <circle cx={indicator.x} cy={indicator.y} r="5" fill="#FF2B2B" stroke="#0C0C0E" strokeWidth="3" />
         </svg>
         <div className="absolute inset-[18%] flex flex-col items-center justify-center text-center">
           <img
@@ -128,12 +206,35 @@ export function NutritionCalorieRing({
             {isOverTarget ? 'kcal dépassées' : 'kcal restantes'}
           </p>
         </div>
-        <span
-          className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#FF2B2B]/50 bg-[#171719] px-2 py-1 text-[11px] font-bold tabular-nums text-white"
-          style={{ left: `${(indicator.x / 240) * 100}%`, top: `${(indicator.y / 240) * 100}%` }}
+        <div
+          className="nutrition-calorie-ring-indicator pointer-events-none absolute inset-0"
+          data-calorie-ring-indicator=""
+          style={{
+            transform: `rotate(${armDeg}deg)`,
+            transformOrigin: '50% 50%',
+            transition: fillTransition,
+          }}
         >
-          {Math.round(safeProgress * 100)}%
-        </span>
+          <span
+            className="absolute h-[10px] w-[10px] rounded-full border-[3px] border-[#0C0C0E] bg-[#FF2B2B]"
+            style={{
+              left: `${((120 + RING_RADIUS) / 240) * 100}%`,
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+            }}
+          />
+          <span
+            className="absolute rounded-full border border-[#FF2B2B]/50 bg-[#171719] px-2 py-1 text-[11px] font-bold tabular-nums text-white"
+            style={{
+              left: `${((120 + RING_RADIUS) / 240) * 100}%`,
+              top: '50%',
+              transform: `translate(-50%, -50%) rotate(${-armDeg}deg)`,
+              transition: fillTransition,
+            }}
+          >
+            {Math.round(safeProgress * 100)}%
+          </span>
+        </div>
       </div>
     </div>
   )

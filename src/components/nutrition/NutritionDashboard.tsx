@@ -498,6 +498,8 @@ export function NutritionDashboard({
             targetCalories={targetCalories}
             progress={calorieProgress}
             onOpenSetup={onOpenSetup}
+            ready={hydrated}
+            dateKey={selectedDateKey}
           />
         </div>
 

@@ -1739,6 +1739,11 @@ body {
     transition: none !important;
   }
 
+  .nutrition-calorie-ring-fill,
+  .nutrition-calorie-ring-indicator {
+    transition: none !important;
+  }
+
   .ios-sheet-backdrop {
     transition-duration: 80ms !important;
   }
