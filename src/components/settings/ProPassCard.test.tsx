@@ -38,7 +38,9 @@ describe('ProPassCard', () => {
     await act(async () => {
       root.render(<ProPassCard onTryFree={onTryFree} onDismiss={onDismiss} />)
     })
-    expect(host.querySelector('[data-border-beam-panel]')).toBeTruthy()
+    const panel = host.querySelector('[data-border-beam-panel]') as HTMLElement
+    expect(panel).toBeTruthy()
+    expect(panel.className).not.toMatch(/overflow-hidden/)
     expect(host.querySelector('.mk-beam-ring')).toBeTruthy()
     expect(host.textContent).toContain('Pass Pro')
     expect(host.textContent).toContain('Essayer gratuitement')

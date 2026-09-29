@@ -9,14 +9,14 @@ interface ProPassCardProps {
 export function ProPassCard({ onTryFree, onDismiss }: ProPassCardProps) {
   return (
     <BorderBeamPanel
-      className="overflow-hidden border-[#FF2B2B]/25 p-5"
+      className="overflow-visible border-transparent p-5"
       style={{
         background:
           'linear-gradient(135deg, rgb(18 18 20) 0%, rgb(28 12 14) 45%, rgb(80 18 22) 100%)',
         boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.06)',
       }}
       beams={2}
-      colors={['#FF2B2B', '#FF6961']}
+      colors={['#FF2B2B', '#FFB4A8']}
       thickness={2}
       radius={24}
       glow
