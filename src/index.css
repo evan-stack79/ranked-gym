@@ -1846,6 +1846,7 @@ body {
   font-size: 1.375rem;
   line-height: 1.25;
   margin-bottom: 0.55rem;
+  min-height: 2.5em;
 }
 
 .welcome-screen__subtitle {

@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from 'react'
 import type { RankInfo } from '../../utils/rank'
 import { rankVisuals } from '../../utils/rankVisuals'
+import { BlurReveal } from '../ui/blur-reveal'
+import { HERO_BLUR_PROPS, takeSessionHeroReveal } from '../ui/heroBlur'
 
 interface RankShowcaseProps {
   rank: RankInfo
@@ -39,6 +41,7 @@ export function RankShowcase({ rank, level }: RankShowcaseProps) {
     glareY: 50,
     active: false,
   })
+  const [playRank] = useState(() => takeSessionHeroReveal('rank-label'))
 
   const resetTilt = useCallback(() => {
     setTilt({ rx: 0, ry: 0, glareX: 50, glareY: 50, active: false })
@@ -164,9 +167,14 @@ export function RankShowcase({ rank, level }: RankShowcaseProps) {
             Muscu Classée
           </p>
 
-          <h2 className={`mt-3 text-[34px] font-black tracking-tight ${visual.label}`}>
+          <BlurReveal
+            as="h2"
+            className={`mt-3 text-[34px] font-black tracking-tight ${visual.label}`}
+            reducedMotion={!playRank}
+            {...HERO_BLUR_PROPS}
+          >
             {rank.label}
-          </h2>
+          </BlurReveal>
 
           <p className={`mt-1 text-[15px] font-semibold ${visual.sublabel}`}>{rank.tier}</p>
 

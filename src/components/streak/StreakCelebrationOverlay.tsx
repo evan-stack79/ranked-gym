@@ -9,6 +9,8 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import pantherRoaringUrl from '../../assets/brand/panther-roaring.png'
+import { BlurReveal } from '../ui/blur-reveal'
+import { HERO_BLUR_PROPS } from '../ui/heroBlur'
 import {
   formatStreakDaysLabel,
   getStreakStatusMessage,
@@ -316,8 +318,27 @@ export const StreakCelebrationOverlay = forwardRef<
           {displayCount}
         </div>
 
-        {showReveal ? <p className="streak-celeb__label">{daysLabel}</p> : null}
-        {showReveal ? <p className="streak-celeb__message">{statusMessage}</p> : null}
+        {showReveal ? (
+          <BlurReveal
+            as="p"
+            className="streak-celeb__label"
+            reducedMotion={reduced}
+            {...HERO_BLUR_PROPS}
+          >
+            {daysLabel}
+          </BlurReveal>
+        ) : null}
+        {showReveal ? (
+          <BlurReveal
+            as="p"
+            className="streak-celeb__message"
+            delay={0.12}
+            reducedMotion={reduced}
+            {...HERO_BLUR_PROPS}
+          >
+            {statusMessage}
+          </BlurReveal>
+        ) : null}
       </div>
 
       {showWeek ? (

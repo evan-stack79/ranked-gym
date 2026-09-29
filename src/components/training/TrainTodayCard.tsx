@@ -1,4 +1,7 @@
+import { useState } from 'react'
 import { TRAIN_CTA_LABELS, type TodayHubCard } from '../../utils/trainHub'
+import { BlurReveal } from '../ui/blur-reveal'
+import { HERO_BLUR_PROPS, takeSessionHeroReveal } from '../ui/heroBlur'
 
 interface TrainTodayCardProps {
   card: TodayHubCard
@@ -12,6 +15,7 @@ export function TrainTodayCard({ card, onPrimary }: TrainTodayCardProps) {
   const isPrimaryRed =
     card.cta === 'resume' || card.cta === 'start' || card.cta === 'choose_activity'
   const label = TRAIN_CTA_LABELS[card.cta]
+  const [playTitle] = useState(() => takeSessionHeroReveal('train-today'))
 
   return (
     <section
@@ -21,9 +25,14 @@ export function TrainTodayCard({ card, onPrimary }: TrainTodayCardProps) {
       <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8E8E93]">
         Aujourd’hui
       </p>
-      <h2 className="mt-2 text-[26px] font-bold leading-tight tracking-tight text-white">
+      <BlurReveal
+        as="h2"
+        className="mt-2 text-[26px] font-bold leading-tight tracking-tight text-white"
+        reducedMotion={!playTitle}
+        {...HERO_BLUR_PROPS}
+      >
         {card.title}
-      </h2>
+      </BlurReveal>
       <p className="mt-1 text-[14px] font-medium text-[#FF6961]">{card.sportLabel}</p>
       {card.summaryLine ? (
         <p className="mt-2 truncate text-[14px] leading-snug text-[#AEAEB2]">
