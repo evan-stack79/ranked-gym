@@ -44,24 +44,26 @@ afterEach(async () => {
 })
 
 describe('NutritionCalorieRing', () => {
-  it('ne joue pas le fill Magic UI sur la première valeur hydratée', async () => {
+  it('garde la transition Magic UI 1s ease déjà active (sinon le fill snap)', async () => {
     await act(async () => {
-      root.render(<NutritionCalorieRing {...base} progress={0} ready={false} dateKey="2026-09-29" />)
-    })
-    await act(async () => {
-      root.render(<NutritionCalorieRing {...base} progress={0.4} ready dateKey="2026-09-29" />)
+      root.render(<NutritionCalorieRing {...base} progress={0.4} />)
     })
     const ring = host.querySelector('[data-calorie-ring]') as HTMLElement
     const fill = host.querySelector('[data-calorie-ring-fill]') as SVGCircleElement
-    expect(ring.getAttribute('data-motion')).toBe('static')
-    expect(fill.style.transition).toBe('none')
-    expect(fill.style.getPropertyValue('--stroke-percent')).toBe('40')
+    expect(ring.getAttribute('data-motion')).toBe('animated')
+    expect(fill.style.transition).toContain('stroke-dashoffset')
+    expect(fill.style.transition).toContain(ANIMATED_CIRCULAR_PROGRESS_DURATION)
+    expect(fill.style.transition).toContain('ease')
+    expect(fill.style.strokeDasharray).toMatch(/px/)
+    expect(parseFloat(fill.style.strokeDashoffset)).toBeGreaterThan(0)
   })
 
-  it('anime stroke-dasharray 1s ease quand la progression augmente', async () => {
+  it('met à jour dashoffset quand la progression augmente', async () => {
     await act(async () => {
-      root.render(<NutritionCalorieRing {...base} progress={0.4} ready dateKey="2026-09-29" />)
+      root.render(<NutritionCalorieRing {...base} progress={0.4} />)
     })
+    const fill = host.querySelector('[data-calorie-ring-fill]') as SVGCircleElement
+    const before = parseFloat(fill.style.strokeDashoffset)
     await act(async () => {
       root.render(
         <NutritionCalorieRing
@@ -69,73 +71,21 @@ describe('NutritionCalorieRing', () => {
           remainingCalories={800}
           consumedCalories={1200}
           progress={0.6}
-          ready
-          dateKey="2026-09-29"
         />,
       )
     })
-    const ring = host.querySelector('[data-calorie-ring]') as HTMLElement
-    const fill = host.querySelector('[data-calorie-ring-fill]') as SVGCircleElement
-    const indicator = host.querySelector('[data-calorie-ring-indicator]') as HTMLElement
-    expect(ring.getAttribute('data-motion')).toBe('animated')
-    expect(fill.style.transition).toContain('stroke-dasharray')
-    expect(fill.style.transition).toContain(ANIMATED_CIRCULAR_PROGRESS_DURATION)
-    expect(fill.style.transition).toContain('ease')
-    expect(fill.style.getPropertyValue('--transition-length')).toBe(
-      ANIMATED_CIRCULAR_PROGRESS_DURATION,
-    )
-    expect(fill.style.getPropertyValue('--stroke-percent')).toBe('60')
-    expect(indicator.style.transition).toContain('transform')
-  })
-
-  it('ne joue pas l’animation si les calories baissent', async () => {
-    await act(async () => {
-      root.render(<NutritionCalorieRing {...base} progress={0.6} ready dateKey="2026-09-29" />)
-    })
-    await act(async () => {
-      root.render(
-        <NutritionCalorieRing
-          {...base}
-          remainingCalories={1600}
-          consumedCalories={400}
-          progress={0.2}
-          ready
-          dateKey="2026-09-29"
-        />,
-      )
-    })
-    const ring = host.querySelector('[data-calorie-ring]') as HTMLElement
-    const fill = host.querySelector('[data-calorie-ring-fill]') as SVGCircleElement
-    expect(ring.getAttribute('data-motion')).toBe('static')
-    expect(fill.style.transition).toBe('none')
-    expect(fill.style.getPropertyValue('--stroke-percent')).toBe('20')
-  })
-
-  it('snap au changement de jour même si le pourcentage monte', async () => {
-    await act(async () => {
-      root.render(<NutritionCalorieRing {...base} progress={0.2} ready dateKey="2026-09-28" />)
-    })
-    await act(async () => {
-      root.render(<NutritionCalorieRing {...base} progress={0.8} ready dateKey="2026-09-29" />)
-    })
-    const ring = host.querySelector('[data-calorie-ring]') as HTMLElement
-    const fill = host.querySelector('[data-calorie-ring-fill]') as SVGCircleElement
-    expect(ring.getAttribute('data-motion')).toBe('static')
-    expect(fill.style.transition).toBe('none')
-    expect(fill.style.getPropertyValue('--stroke-percent')).toBe('80')
+    const after = parseFloat(fill.style.strokeDashoffset)
+    expect(after).toBeLessThan(before)
+    expect(fill.style.transition).toContain('stroke-dashoffset 1s ease')
   })
 
   it('reste statique en reduced motion', async () => {
     mockMatchMedia(true)
     await act(async () => {
-      root.render(
-        <NutritionCalorieRing {...base} progress={0.3} ready dateKey="2026-09-29" reducedMotion />,
-      )
+      root.render(<NutritionCalorieRing {...base} progress={0.3} reducedMotion />)
     })
     await act(async () => {
-      root.render(
-        <NutritionCalorieRing {...base} progress={0.7} ready dateKey="2026-09-29" reducedMotion />,
-      )
+      root.render(<NutritionCalorieRing {...base} progress={0.7} reducedMotion />)
     })
     const ring = host.querySelector('[data-calorie-ring]') as HTMLElement
     const fill = host.querySelector('[data-calorie-ring-fill]') as SVGCircleElement

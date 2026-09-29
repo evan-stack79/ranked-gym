@@ -103,7 +103,7 @@ export function AnimatedCircularProgressBar({
               "--stroke-percent": currentPercent,
               strokeDasharray:
                 "calc(var(--stroke-percent) * var(--percent-to-px)) var(--circumference)",
-              transition: `stroke-dasharray var(--transition-length) ${ANIMATED_CIRCULAR_PROGRESS_EASING} var(--delay), transform var(--transition-length) ${ANIMATED_CIRCULAR_PROGRESS_EASING} var(--delay)`,
+              transition: `stroke-dasharray var(--transition-length) ${ANIMATED_CIRCULAR_PROGRESS_EASING} var(--delay), --stroke-percent var(--transition-length) ${ANIMATED_CIRCULAR_PROGRESS_EASING} var(--delay), transform var(--transition-length) ${ANIMATED_CIRCULAR_PROGRESS_EASING} var(--delay)`,
               transform:
                 "rotate(calc(-90deg + var(--gap-percent) * var(--offset-factor) * var(--percent-to-deg)))",
               transformOrigin: "calc(var(--circle-size) / 2) calc(var(--circle-size) / 2)",

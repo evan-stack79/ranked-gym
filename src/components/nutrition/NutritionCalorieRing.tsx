@@ -1,8 +1,5 @@
-import { useState, type CSSProperties } from 'react'
-import {
-  ANIMATED_CIRCULAR_PROGRESS_DURATION,
-  circularProgressTransition,
-} from '../ui/animated-circular-progress-bar.tokens'
+import type { CSSProperties } from 'react'
+import { circularProgressTransition } from '../ui/animated-circular-progress-bar.tokens'
 
 interface NutritionCalorieRingProps {
   remainingCalories: number
@@ -10,10 +7,6 @@ interface NutritionCalorieRingProps {
   targetCalories: number
   progress: number
   onOpenSetup: () => void
-  /** Journal hydraté — évite d’animer 0 → repas déjà loggés au montage. */
-  ready?: boolean
-  /** Change de jour : snap, pas le fill Magic UI. */
-  dateKey?: string
   reducedMotion?: boolean
 }
 
@@ -26,7 +19,6 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
 const RING_SWEEP = 280
 const RING_DASH = (RING_SWEEP / 360) * RING_CIRCUMFERENCE
 const RING_ROTATION = 130
-const PROGRESS_EPSILON = 0.002
 
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -41,8 +33,6 @@ export function NutritionCalorieRing({
   targetCalories,
   progress,
   onOpenSetup,
-  ready = true,
-  dateKey = '',
   reducedMotion,
 }: NutritionCalorieRingProps) {
   const hasTarget = Number.isFinite(targetCalories) && targetCalories > 0
@@ -52,51 +42,10 @@ export function NutritionCalorieRing({
     : 0
   const isOverTarget = hasTarget && remainingCalories < 0
   const staticMotion = reducedMotion === true || prefersReducedMotion()
-
-  const [motion, setMotion] = useState({
-    shown: safeProgress,
-    animate: false,
-    primed: false,
-    dateKey,
-    ready,
-  })
-
-  let nextMotion = motion
-  if (!ready) {
-    if (motion.ready || motion.shown !== safeProgress || motion.animate || motion.primed) {
-      nextMotion = {
-        shown: safeProgress,
-        animate: false,
-        primed: false,
-        dateKey,
-        ready: false,
-      }
-    }
-  } else if (!motion.primed || motion.dateKey !== dateKey || !motion.ready) {
-    nextMotion = {
-      shown: safeProgress,
-      animate: false,
-      primed: true,
-      dateKey,
-      ready: true,
-    }
-  } else if (motion.shown !== safeProgress) {
-    nextMotion = {
-      shown: safeProgress,
-      animate: safeProgress > motion.shown + PROGRESS_EPSILON && !staticMotion,
-      primed: true,
-      dateKey,
-      ready: true,
-    }
-  }
-  if (nextMotion !== motion) {
-    setMotion(nextMotion)
-  }
-
-  const displayed = nextMotion.shown
-  const animateFill = nextMotion.animate
-  const armDeg = RING_ROTATION + RING_SWEEP * displayed
-  const fillTransition = circularProgressTransition(animateFill)
+  const fillLength = Math.max(0, RING_DASH * safeProgress)
+  const fillOffset = RING_DASH - fillLength
+  const armDeg = RING_ROTATION + RING_SWEEP * safeProgress
+  const motionTransition = circularProgressTransition(!staticMotion)
 
   const heading = (
     <div className="mb-3 flex w-full items-center justify-between gap-3">
@@ -135,8 +84,8 @@ export function NutritionCalorieRing({
       <div
         className="relative aspect-square w-full max-w-[282px]"
         data-calorie-ring=""
-        data-motion={animateFill ? 'animated' : 'static'}
-        data-ring-progress={displayed}
+        data-motion={staticMotion ? 'static' : 'animated'}
+        data-ring-progress={safeProgress}
       >
         <svg viewBox="0 0 240 240" className="h-full w-full overflow-visible" role="img" aria-label="Progression calorique">
           <circle
@@ -147,7 +96,7 @@ export function NutritionCalorieRing({
             stroke="#2A2A2E"
             strokeWidth="14"
             strokeLinecap="round"
-            strokeDasharray={`${RING_DASH} ${2 * Math.PI * RING_RADIUS - RING_DASH}`}
+            strokeDasharray={`${RING_DASH} ${RING_CIRCUMFERENCE - RING_DASH}`}
             transform={`rotate(${RING_ROTATION} 120 120)`}
           />
           <circle
@@ -175,16 +124,10 @@ export function NutritionCalorieRing({
             data-calorie-ring-fill=""
             style={
               {
-                '--circumference': RING_CIRCUMFERENCE,
-                '--percent-to-px': `${RING_DASH / 100}px`,
-                '--stroke-percent': displayed * 100,
-                '--transition-length': animateFill
-                  ? ANIMATED_CIRCULAR_PROGRESS_DURATION
-                  : '0s',
-                '--delay': '0s',
-                strokeDasharray:
-                  'calc(var(--stroke-percent) * var(--percent-to-px)) var(--circumference)',
-                transition: fillTransition,
+                '--stroke-percent': safeProgress * 100,
+                strokeDasharray: `${RING_DASH}px ${RING_CIRCUMFERENCE}px`,
+                strokeDashoffset: `${fillOffset}px`,
+                transition: motionTransition,
               } as CSSProperties
             }
             transform={`rotate(${RING_ROTATION} 120 120)`}
@@ -212,7 +155,7 @@ export function NutritionCalorieRing({
           style={{
             transform: `rotate(${armDeg}deg)`,
             transformOrigin: '50% 50%',
-            transition: fillTransition,
+            transition: motionTransition,
           }}
         >
           <span
@@ -229,7 +172,7 @@ export function NutritionCalorieRing({
               left: `${((120 + RING_RADIUS) / 240) * 100}%`,
               top: '50%',
               transform: `translate(-50%, -50%) rotate(${-armDeg}deg)`,
-              transition: fillTransition,
+              transition: motionTransition,
             }}
           >
             {Math.round(safeProgress * 100)}%
