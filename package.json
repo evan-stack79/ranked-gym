@@ -36,12 +36,14 @@
   "dependencies": {
     "@capacitor/core": "^8.5.0",
     "@supabase/supabase-js": "^2.112.3",
+    "clsx": "^2.1.1",
     "convex": "^1.45.0",
     "html5-qrcode": "^2.3.8",
     "lucide-react": "^1.33.0",
     "motion": "^13.4.5",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.0",

@@ -1,4 +1,5 @@
 import { X } from 'lucide-react'
+import { BorderBeamPanel } from '../ui/border-beam-panel'
 import { BlurReveal } from '../ui/blur-reveal'
 import { HERO_BLUR_PROPS } from '../ui/heroBlur'
 
@@ -9,19 +10,24 @@ interface ProPassCardProps {
 
 export function ProPassCard({ onTryFree, onDismiss }: ProPassCardProps) {
   return (
-    <div
-      className="relative overflow-hidden rounded-3xl border border-[#FF2B2B]/25 p-5"
+    <BorderBeamPanel
+      className="overflow-visible border border-[#FF2B2B]/40 p-5"
       style={{
         background:
           'linear-gradient(135deg, rgb(18 18 20) 0%, rgb(28 12 14) 45%, rgb(80 18 22) 100%)',
         boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.06)',
       }}
+      beams={2}
+      colors={['#FF2B2B', '#FFB4A8']}
+      thickness={2}
+      radius={24}
+      glow
     >
       <button
         type="button"
         onClick={onDismiss}
         aria-label="Fermer l’offre Pass Pro"
-        className="ios-press absolute right-2 top-2 flex min-h-11 min-w-11 items-center justify-center rounded-full text-[#AEAEB2] hover:bg-white/10 hover:text-white"
+        className="ios-press absolute right-2 top-2 z-[1] flex min-h-11 min-w-11 items-center justify-center rounded-full text-[#AEAEB2] hover:bg-white/10 hover:text-white"
       >
         <X className="h-4 w-4" strokeWidth={2.25} />
       </button>
@@ -47,6 +53,6 @@ export function ProPassCard({ onTryFree, onDismiss }: ProPassCardProps) {
       >
         Essayer gratuitement
       </button>
-    </div>
+    </BorderBeamPanel>
   )
 }
