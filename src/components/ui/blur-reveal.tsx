@@ -113,7 +113,7 @@ export function BlurReveal({
   const MotionTag = motion[as as keyof typeof motion] as typeof motion.div;
 
   return (
-    <AnimatePresence mode="popLayout">
+    <AnimatePresence>
       {trigger && (
         <MotionTag
           initial="hidden"

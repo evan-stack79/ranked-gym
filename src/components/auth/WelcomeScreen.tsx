@@ -77,10 +77,24 @@ export function WelcomeScreen({ onConnect }: WelcomeScreenProps) {
           className="welcome-screen__title mx-auto max-w-[20rem] text-center font-bold tracking-tight text-white"
           data-welcome-title="1"
         >
-          <BlurReveal as="span" className="block" trigger={revealTitle} delay={0.04}>
+          <BlurReveal
+            as="span"
+            className="block"
+            trigger={revealTitle}
+            delay={0.04}
+            speedReveal={0.7}
+            speedSegment={0.4}
+          >
             {WELCOME_TITLE_LINE_1}
           </BlurReveal>
-          <BlurReveal as="span" className="block" trigger={revealTitle} delay={0.18}>
+          <BlurReveal
+            as="span"
+            className="block"
+            trigger={revealTitle}
+            delay={0.22}
+            speedReveal={0.7}
+            speedSegment={0.4}
+          >
             {WELCOME_TITLE_LINE_2}
           </BlurReveal>
         </p>
