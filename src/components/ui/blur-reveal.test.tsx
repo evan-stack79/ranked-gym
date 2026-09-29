@@ -3,6 +3,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { BlurReveal } from './blur-reveal'
+import { takeSessionHeroReveal } from './heroBlur'
 import BlurRevealDemo from './blur-reveal.demo'
 
 let host: HTMLDivElement
@@ -75,5 +76,11 @@ describe('BlurReveal', () => {
       root.render(<BlurRevealDemo />)
     })
     expect(host.textContent).toContain('You can just ship things.')
+  })
+
+  it('takeSessionHeroReveal n’anime qu’une fois par id', () => {
+    const id = `hero-${Math.random()}`
+    expect(takeSessionHeroReveal(id)).toBe(true)
+    expect(takeSessionHeroReveal(id)).toBe(false)
   })
 })

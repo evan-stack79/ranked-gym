@@ -1,4 +1,6 @@
 import { X } from 'lucide-react'
+import { BlurReveal } from '../ui/blur-reveal'
+import { HERO_BLUR_PROPS } from '../ui/heroBlur'
 
 interface ProPassCardProps {
   onTryFree: () => void
@@ -27,9 +29,13 @@ export function ProPassCard({ onTryFree, onDismiss }: ProPassCardProps) {
       <p className="pr-12 text-[11px] font-bold uppercase tracking-[0.14em] text-[#FF6961]">
         Pass Pro
       </p>
-      <h2 className="mt-1 pr-12 text-[22px] font-bold leading-tight text-white">
+      <BlurReveal
+        as="h2"
+        className="mt-1 pr-12 text-[22px] font-bold leading-tight text-white"
+        {...HERO_BLUR_PROPS}
+      >
         Débloque le Pass Pro
-      </h2>
+      </BlurReveal>
       <p className="mt-2 max-w-[280px] text-[14px] leading-snug text-[#C7C7CC]">
         Toutes les fonctionnalités débloquées. 7 jours d&apos;essai gratuit, puis 6,99&nbsp;€ /
         mois.

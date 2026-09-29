@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { getTrainingState } from '../../services/trainingStorage'
+import { BlurReveal } from '../ui/blur-reveal'
+import { HERO_BLUR_PROPS, takeSessionHeroReveal } from '../ui/heroBlur'
 import { getHomeGreeting, resolveDisplayFirstName } from '../../utils/homeGreeting'
 import { getTodayWorkout } from '../../utils/todayWorkout'
 import { DailyStreak } from './DailyStreak'
@@ -66,6 +68,7 @@ export function HomeView({ onStartTraining, onOpenTraining, onOpenNutrition }: H
     pseudo: profile?.pseudo,
   })
   const greeting = getHomeGreeting(firstName)
+  const [playGreeting] = useState(() => takeSessionHeroReveal('home-greeting'))
 
   const todayWorkout = useMemo(
     () => getTodayWorkout(getTrainingState()),
@@ -75,9 +78,14 @@ export function HomeView({ onStartTraining, onOpenTraining, onOpenNutrition }: H
   return (
     <div className={`flex flex-col gap-8 ${coldEntering ? 'home-cold-enter home-cold-enter--active' : ''}`}>
       <header className="home-cold-enter__group home-cold-enter__group--0">
-        <h1 className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white">
+        <BlurReveal
+          as="h1"
+          className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white"
+          reducedMotion={!playGreeting}
+          {...HERO_BLUR_PROPS}
+        >
           {greeting}
-        </h1>
+        </BlurReveal>
       </header>
 
       <div className="home-cold-enter__group home-cold-enter__group--1">
