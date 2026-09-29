@@ -59,6 +59,17 @@ describe('BlurReveal', () => {
     expect(host.querySelector('.sr-only')).toBeNull()
   })
 
+  it('reste lisible si matchMedia est absent (jsdom)', async () => {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: undefined,
+    })
+    await act(async () => {
+      root.render(<BlurReveal>Sans matchMedia</BlurReveal>)
+    })
+    expect(host.querySelector('[data-blur-reveal]')?.textContent).toContain('Sans matchMedia')
+  })
+
   it('démo Motiq affiche le titre', async () => {
     await act(async () => {
       root.render(<BlurRevealDemo />)
