@@ -1,15 +1,15 @@
 # Product Marketing Context
 
-**Document version:** v4
-**Last updated:** 2026-09-28
+**Document version:** v5
+**Last updated:** 2026-09-30
 
-> Draft auto-généré depuis le repo Ranked Gym, enrichi par Evan + VOC social (Reddit/TikTok, 2026-09-28). Sections marquées *[à confirmer]* ou *[gap]* attendent encore ta validation.
+> Contexte Ranked Gym — sortie commerciale freemium. Enrichi par VOC social + brief ads. Sections *[à confirmer]* / *[gap]* encore ouvertes.
 
 ## Product Overview
 **One-liner:** Tous tes sports. Une seule progression.
 **What it does:** Ranked Gym est une app mobile-first (PWA + Capacitor) qui réunit entraînement, nutrition et récupération dans un même parcours gamifié — ranks, XP, streaks — avec une couche sociale autour des salles (Lobby / check-in) et un moment de share post-séance (Pump Check).
 **Product category:** App fitness / suivi d’entraînement gamifié · réseau social sportif
-**Product type:** Consumer mobile app (SaaS B2C) — bêta privée sur invitation
+**Product type:** Consumer mobile app (SaaS B2C) — sortie commerciale / freemium
 **Business model:** Freemium — **6,99 € / mois** pour Premium
 
 ### Free vs Premium
@@ -146,12 +146,13 @@ Produit B2C — personas d’usage (pas d’achat multi-stakeholders) :
 | Shareable wins | Pump Check / Victory Camera |
 
 ## Goals
-**Business goal:** *[à confirmer]* — bêta privée solide → ouverture plus large + conversion freemium → Premium 6,99 €
-**Conversion action:** Invitation / compte → usage gratuit (calories + hydratation + train) → upgrade Premium au moment du scan / IA aliments ou pour pousser les objectifs
+**Business goal:** Lancement commercial Ranked Gym → acquisition utilisateurs (install / ouverture app) → activation freemium → upgrade Premium 6,99 €
+**Conversion action:** Voir la pub / le profil → **télécharger ou ouvrir l’app** → créer un compte → 1ère séance + calories (gratuit) → upgrade Premium (scan / IA) plus tard
 **Current metrics:** *[gap]*
 
 ## Changelog
 *Newest first. One line per revision: what changed and why.*
+- v5 (2026-09-30) — Shifted from private beta to commercial launch; primary CTA is download / start free (not DM BÊTA).
 - v4 (2026-09-28) — Added VOC from Reddit/TikTok research (abandon after 2 weeks, MFP barcode paywall hate, Hevy+MFP stack, Cal AI snap hook).
 - v3 (2026-09-28) — Defined free vs Premium: free = calories + hydration + training; paid = barcode scan + AI food analysis; BPM still undecided.
 - v2 (2026-09-28) — Set freemium + 6.99€/mo Premium; named direct competitors MyFitnessPal, Cal AI, Gym Rank; updated objections and switching dynamics.
