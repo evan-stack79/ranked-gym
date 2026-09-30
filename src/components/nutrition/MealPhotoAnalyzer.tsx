@@ -17,6 +17,7 @@ import {
 import { MEAL_TYPE_LABELS } from '../../utils/calories'
 import type { MealType } from '../../types/nutrition'
 import { safeError } from '../../utils/safeLog'
+import { MealPhotoAiOverlay } from './MealPhotoAiOverlay'
 
 interface MealPhotoAnalyzerProps {
   onAnalyzed: (macros: MealPhotoMacros & { name: string; mealType: MealType }) => void
@@ -143,16 +144,24 @@ export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAn
     }
   }
 
+  const overlay = <MealPhotoAiOverlay open={busy} previewUrl={previewUrl} />
+  const fileInput = (
+    <input
+      ref={inputRef}
+      type="file"
+      accept="image/*"
+      capture="environment"
+      className="hidden"
+      onChange={(e) => void onFile(e.target.files?.[0])}
+    />
+  )
+
   if (variant === 'headless') {
     return (
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={(e) => void onFile(e.target.files?.[0])}
-      />
+      <>
+        {overlay}
+        {fileInput}
+      </>
     )
   }
 
@@ -257,14 +266,8 @@ export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAn
         </div>
       ) : null}
 
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={(e) => void onFile(e.target.files?.[0])}
-      />
+      {overlay}
+      {fileInput}
     </div>
   )
 })

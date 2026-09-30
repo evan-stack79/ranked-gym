@@ -9,6 +9,7 @@ import { NutritionUxFixture } from './fixtures/NutritionUxFixture.tsx'
 import { AuthWelcomeLoggedInFixture } from './fixtures/AuthWelcomeLoggedInFixture.tsx'
 import { AuthWelcomeSheetFixture } from './fixtures/AuthWelcomeSheetFixture.tsx'
 import { NutritionAiErrorFixture } from './fixtures/NutritionAiErrorFixture.tsx'
+import { NutritionAiLoadingFixture } from './fixtures/NutritionAiLoadingFixture.tsx
 import { LegalDocumentScreen } from './components/legal/LegalDocumentScreen.tsx'
 import { legalKindFromPath } from './components/legal/legalRoutes.ts'
 import { ConvexClientProvider } from './lib/ConvexClientProvider.tsx'
@@ -41,6 +42,8 @@ function resolveBootTree() {
   if (QA_FIXTURES_ENABLED && path === '/accueil-fixture') return <ColdLaunchAccueilFixture />
   if (QA_FIXTURES_ENABLED && path === '/nutrition-fixture') return <NutritionUxFixture />
   if (QA_FIXTURES_ENABLED && path === '/nutrition-ai-error-fixture') return <NutritionAiErrorFixture />
+  if (QA_FIXTURES_ENABLED && path === '/nutrition-ai-loading-fixture')
+    return <NutritionAiLoadingFixture />
   if (QA_FIXTURES_ENABLED && path === '/auth-welcome-logged-in-fixture')
     return <AuthWelcomeLoggedInFixture />
   if (QA_FIXTURES_ENABLED && path === '/auth-welcome-sheet-fixture') return <AuthWelcomeSheetFixture />
@@ -54,6 +57,7 @@ function isColdLaunchPath() {
   if (path === '/auth/reset-password') return false
   if (QA_FIXTURES_ENABLED && path === '/auth-reset-fixture') return false
   if (QA_FIXTURES_ENABLED && path === '/nutrition-ai-error-fixture') return false
+  if (QA_FIXTURES_ENABLED && path === '/nutrition-ai-loading-fixture') return false
   if (QA_FIXTURES_ENABLED && path === '/auth-welcome-sheet-fixture') return false
   return true
 }

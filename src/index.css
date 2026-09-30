@@ -1885,3 +1885,221 @@ body {
     margin-top: 1rem;
   }
 }
+
+/* ——— Scan repas IA (loading) ——— */
+.meal-photo-ai-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(1.25rem, env(safe-area-inset-top, 0px)) 1.25rem
+    max(1.25rem, env(safe-area-inset-bottom, 0px));
+  background: rgb(8 8 10 / 0.72);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  animation: meal-ai-overlay-in 220ms var(--ease-out) both;
+}
+
+.meal-photo-ai-overlay__card {
+  width: min(100%, 22.5rem);
+  border-radius: 1.5rem;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  background: #141416;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 24px 48px rgb(0 0 0 / 0.45);
+  padding: 1.35rem 1.25rem 1.2rem;
+  animation: meal-ai-card-in 220ms var(--ease-out) both;
+}
+
+@keyframes meal-ai-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes meal-ai-card-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.meal-photo-ai-overlay__kicker {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #c4b5fd;
+}
+
+.meal-photo-ai-overlay__title {
+  margin: 0.2rem 0 1rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+
+.meal-photo-ai-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.9rem;
+}
+
+.meal-photo-ai-loading__preview {
+  width: 4.5rem;
+  height: 4.5rem;
+  margin: 0 auto;
+  border-radius: 1rem;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  object-fit: cover;
+  background: #1c1c1e;
+}
+
+.meal-photo-ai-loading__status {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 1.75rem;
+}
+
+.meal-photo-ai-loading__status-text {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #e5e5ea;
+}
+
+.meal-photo-ai-loading__hint {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: #8e8e93;
+}
+
+.meal-photo-ai-spinner {
+  position: relative;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+}
+
+.meal-photo-ai-spinner__svg {
+  width: 100%;
+  height: 100%;
+}
+
+.meal-photo-ai-spinner__rings {
+  stroke-width: 16;
+  stroke-dasharray: 18% 40%;
+}
+
+.meal-photo-ai-spinner__rings circle {
+  transform-origin: 120px 120px;
+  animation: meal-ai-spin-cw 8s linear infinite;
+}
+
+.meal-photo-ai-spinner__rings circle:nth-child(even) {
+  animation-name: meal-ai-spin-ccw;
+  animation-delay: 0.2s;
+}
+
+.meal-photo-ai-spinner__rings circle:nth-child(3n) {
+  animation-delay: 0.3s;
+}
+
+@keyframes meal-ai-spin-cw {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes meal-ai-spin-ccw {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+.meal-photo-ai-loading__log {
+  position: relative;
+}
+
+.meal-photo-ai-loading__log-window {
+  overflow: hidden;
+  border-radius: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+.meal-photo-ai-loading__log-track {
+  transform: translateY(0);
+  transition: transform 220ms var(--ease-out);
+}
+
+.meal-photo-ai-loading__log-line {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 0.5rem;
+}
+
+.meal-photo-ai-loading__log-num {
+  width: 1.5rem;
+  margin-right: 0.65rem;
+  text-align: right;
+  color: #636366;
+  user-select: none;
+}
+
+.meal-photo-ai-loading__log-text {
+  flex: 1;
+  min-width: 0;
+  color: #d1d1d6;
+}
+
+.meal-photo-ai-loading__log-fade {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: 0.75rem;
+  background: linear-gradient(
+    to bottom,
+    rgb(20 20 22 / 0.92) 0%,
+    rgb(20 20 22 / 0.28) 34%,
+    transparent 100%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meal-photo-ai-overlay,
+  .meal-photo-ai-overlay__card {
+    animation: meal-ai-overlay-in 160ms ease both;
+  }
+
+  .meal-photo-ai-spinner__rings circle {
+    animation: none;
+  }
+
+  .meal-photo-ai-loading__log-track {
+    transition: none;
+  }
+}
