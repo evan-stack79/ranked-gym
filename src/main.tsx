@@ -9,7 +9,7 @@ import { NutritionUxFixture } from './fixtures/NutritionUxFixture.tsx'
 import { AuthWelcomeLoggedInFixture } from './fixtures/AuthWelcomeLoggedInFixture.tsx'
 import { AuthWelcomeSheetFixture } from './fixtures/AuthWelcomeSheetFixture.tsx'
 import { NutritionAiErrorFixture } from './fixtures/NutritionAiErrorFixture.tsx'
-import { NutritionAiLoadingFixture } from './fixtures/NutritionAiLoadingFixture.tsx
+import { NutritionAiLoadingFixture } from './fixtures/NutritionAiLoadingFixture.tsx'
 import { LegalDocumentScreen } from './components/legal/LegalDocumentScreen.tsx'
 import { legalKindFromPath } from './components/legal/legalRoutes.ts'
 import { ConvexClientProvider } from './lib/ConvexClientProvider.tsx'
