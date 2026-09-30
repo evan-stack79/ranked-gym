@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
   flattenMealPhotoAiSteps,
   MEAL_PHOTO_AI_LINE_HEIGHT_PX,
@@ -68,11 +69,13 @@ export function MealPhotoAiLoadingState({
   const rootRef = useRef<HTMLDivElement>(null)
   const [isVisible, setIsVisible] = useState(true)
   const [cursor, setCursor] = useState(0)
-  const reduceMotion = forceReducedMotion || prefersReducedMotion()
+  const motionReduce = useReducedMotion()
+  const reduceMotion = forceReducedMotion || prefersReducedMotion() || Boolean(motionReduce)
   const { step, progress, index } = resolveMealPhotoAiStep(cursor)
   const statusLabel = `${step.status}…`
   const allSteps = flattenMealPhotoAiSteps()
   const trackOffset = Math.max(0, index - (MEAL_PHOTO_AI_VISIBLE_LINES - 1)) * MEAL_PHOTO_AI_LINE_HEIGHT_PX
+  const easeOut = [0.23, 1, 0.32, 1] as const
 
   useEffect(() => {
     const element = rootRef.current
@@ -107,9 +110,29 @@ export function MealPhotoAiLoadingState({
 
       <div className="meal-photo-ai-loading__status">
         <MealPhotoAiSpinner progress={progress} />
-        <p className="meal-photo-ai-loading__status-text" aria-live="polite">
-          {statusLabel}
-        </p>
+        <div className="meal-photo-ai-loading__status-slot">
+          <AnimatePresence initial={false}>
+            <motion.p
+              key={statusLabel}
+              className="meal-photo-ai-loading__status-text"
+              aria-live="polite"
+              initial={
+                reduceMotion
+                  ? { opacity: 0 }
+                  : { opacity: 0, transform: 'translateY(8px)' }
+              }
+              animate={{ opacity: 1, transform: 'translateY(0px)' }}
+              exit={
+                reduceMotion
+                  ? { opacity: 0 }
+                  : { opacity: 0, transform: 'translateY(-8px)' }
+              }
+              transition={{ duration: 0.22, ease: easeOut }}
+            >
+              {statusLabel}
+            </motion.p>
+          </AnimatePresence>
+        </div>
       </div>
 
       <div className="meal-photo-ai-loading__log" aria-hidden={reduceMotion}>
@@ -124,7 +147,14 @@ export function MealPhotoAiLoadingState({
             }}
           >
             {allSteps.map((line, stepIndex) => (
-              <div className="meal-photo-ai-loading__log-line" key={`${stepIndex}-${line.text}`}>
+              <div
+                className={
+                  stepIndex === index
+                    ? 'meal-photo-ai-loading__log-line is-current'
+                    : 'meal-photo-ai-loading__log-line'
+                }
+                key={`${stepIndex}-${line.text}`}
+              >
                 <span className="meal-photo-ai-loading__log-num">{line.number}</span>
                 <span className="meal-photo-ai-loading__log-text">{line.text}</span>
               </div>
