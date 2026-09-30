@@ -35,7 +35,7 @@ export function TrainWeekStrip({ days }: TrainWeekStripProps) {
               </span>
               <span
                 className={`mt-1 h-1 w-1 rounded-full ${
-                  day.hasSession ? 'bg-[#FF2B2B]' : day.isToday ? 'bg-white/40' : 'bg-transparent'
+                  day.hasSession ? 'bg-brand' : day.isToday ? 'bg-white/40' : 'bg-transparent'
                 }`}
                 aria-hidden="true"
               />

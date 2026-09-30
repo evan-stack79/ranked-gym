@@ -1,5 +1,6 @@
 import type { ScheduledSession, SessionKind, TrainingState, Weekday } from '../types/training'
 import { sessionKindForSport } from './sessionMeta'
+import { BRAND_COLOR } from '../theme/colors'
 
 export interface TodayWorkoutPlan {
   routineId: string
@@ -115,7 +116,7 @@ export function getTodayWorkout(
     routineId,
     title: scheduled.title,
     subtitle: routine?.subtitle ?? 'Programme du jour',
-    accent: routine?.accent ?? '#FF2B2B',
+    accent: routine?.accent ?? BRAND_COLOR,
     source: 'schedule',
     exerciseCount,
     canStart,

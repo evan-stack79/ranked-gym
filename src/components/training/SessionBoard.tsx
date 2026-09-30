@@ -110,7 +110,7 @@ export function SessionBoard({ templates, onStart, onAddCustom }: SessionBoardPr
                     onClick={() => toggleMuscle(m)}
                     className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
                       on
-                        ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-[#FF6961]'
+                        ? 'border-brand/45 bg-brand/20 text-[#FF6961]'
                         : 'border-white/10 text-[#8E8E93]'
                     }`}
                   >

@@ -138,7 +138,7 @@ export function PersonalInformationScreen({
           type="button"
           onClick={openAvatarPicker}
           disabled={avatarUploading}
-          className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/55 disabled:opacity-70"
+          className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-brand/55 disabled:opacity-70"
           aria-label="Changer la photo de profil"
         >
           <Avatar
@@ -146,7 +146,7 @@ export function PersonalInformationScreen({
             imageUrl={displayAvatar}
             size="xl"
             loading={avatarUploading}
-            className="ring-2 ring-[#FF2B2B]/35"
+            className="ring-2 ring-brand/35"
           />
           <span className="absolute -bottom-0.5 -right-0.5 flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/20 bg-[#2C2C2E] text-white shadow-[0_4px_12px_rgb(0_0_0_/0.45)]">
             {avatarUploading ? (
@@ -167,7 +167,7 @@ export function PersonalInformationScreen({
         <button
           type="button"
           onClick={openAvatarPicker}
-          className="ios-press text-[13px] font-semibold text-[#FF2B2B]"
+          className="ios-press text-[13px] font-semibold text-brand"
         >
           Changer la photo
         </button>

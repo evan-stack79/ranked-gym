@@ -696,7 +696,7 @@ export function TrainingView({
             <button
               type="button"
               onClick={() => setPanel('agenda')}
-              className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-[#AEAEB2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/35"
+              className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-[#AEAEB2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35"
               aria-label="Réglages"
             >
               <Settings2 className="h-5 w-5" aria-hidden="true" />
@@ -708,7 +708,7 @@ export function TrainingView({
           <button
             type="button"
             onClick={goHub}
-            className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/35"
+            className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35"
             aria-label="Retour à Train"
           >
             <ChevronLeft className="h-5 w-5" />
@@ -720,7 +720,7 @@ export function TrainingView({
       )}
 
       {dueBanner && !immersiveLiveSession && panel !== 'hub' ? (
-        <div className="rounded-2xl border border-[#FF2B2B]/40 bg-[#FF2B2B]/15 px-4 py-3 text-[14px] font-semibold text-white">
+        <div className="rounded-2xl border border-brand/40 bg-brand/15 px-4 py-3 text-[14px] font-semibold text-white">
           {dueBanner}
         </div>
       ) : null}
@@ -958,7 +958,7 @@ export function TrainingView({
                 onClick={() => setDurationMin(m)}
                 className={`min-h-11 rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
                   durationMin === m
-                    ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-[#FF6961]'
+                    ? 'border-brand/45 bg-brand/20 text-[#FF6961]'
                     : 'border-white/10 text-[#8E8E93]'
                 }`}
               >
@@ -989,7 +989,7 @@ export function TrainingView({
                       }}
                       className={`min-h-11 rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
                         teamSessionType === opt.id
-                          ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-[#FF6961]'
+                          ? 'border-brand/45 bg-brand/20 text-[#FF6961]'
                           : 'border-white/10 text-[#8E8E93]'
                       }`}
                     >

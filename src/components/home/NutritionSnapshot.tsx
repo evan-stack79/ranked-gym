@@ -144,7 +144,7 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
             aria-label="Progression calorique"
           >
             <div
-              className="motion-progress-fill h-full rounded-full bg-gradient-to-r from-[#B91C1C] to-[#FF2B2B]"
+              className="motion-progress-fill h-full rounded-full bg-gradient-to-r from-[#D20000] to-brand"
               style={{ transform: `scaleX(${Math.max(0, Math.min(snapshot.progress, 1))})` }}
             />
           </div>
@@ -155,7 +155,7 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
           onClick={onOpenNutrition}
           disabled={!onOpenNutrition}
           aria-label="Ajouter un repas"
-          className="btn-brand ios-press mt-4 min-h-11 w-full rounded-2xl border border-white/15 px-3 py-2.5 text-[14px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E] disabled:opacity-50"
+          className="btn-brand ios-press mt-4 min-h-11 w-full rounded-2xl border border-white/15 px-3 py-2.5 text-[14px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E] disabled:opacity-50"
         >
           Ajouter un repas
         </button>

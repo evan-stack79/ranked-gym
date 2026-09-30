@@ -48,7 +48,7 @@ function formatEffort(set: WorkoutSet): string | null {
 }
 
 const FIELD =
-  'min-h-11 w-full rounded-lg border border-white/12 bg-[#1c1c1e] px-2 text-center text-[15px] font-semibold tabular-nums text-white outline-none focus-visible:border-[#FF2B2B]/55'
+  'min-h-11 w-full rounded-lg border border-white/12 bg-[#1c1c1e] px-2 text-center text-[15px] font-semibold tabular-nums text-white outline-none focus-visible:border-brand/55'
 
 /**
  * Immersive single-exercise session canvas (bench-press reference layout).
@@ -222,7 +222,7 @@ export function ImmersiveExerciseSession({
             <button
               type="button"
               onClick={onToggleSessionPause}
-              className="pointer-events-auto ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full bg-black/45 text-[#FF2B2B]"
+              className="pointer-events-auto ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full bg-black/45 text-brand"
               aria-label={sessionPaused ? 'Reprendre la séance' : 'Mettre la séance en pause'}
             >
               {sessionPaused ? (
@@ -289,7 +289,7 @@ export function ImmersiveExerciseSession({
               >
                 {active ? (
                   <span
-                    className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#FF2B2B]"
+                    className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-full bg-brand"
                     aria-hidden="true"
                   />
                 ) : null}
@@ -388,7 +388,7 @@ export function ImmersiveExerciseSession({
               type="button"
               onClick={() => onValidateSet(exercise, validateIdx, restSecResolved)}
               disabled={Boolean(exercise.sets[validateIdx]?.done) && pendingIdx < 0}
-              className="ios-press flex min-h-11 flex-[1.35] items-center justify-center rounded-xl bg-[#FF2B2B] px-3 text-[14px] font-semibold text-white disabled:opacity-40"
+              className="ios-press flex min-h-11 flex-[1.35] items-center justify-center rounded-xl bg-brand px-3 text-[14px] font-semibold text-white disabled:opacity-40"
             >
               Valider la série
             </button>
@@ -405,7 +405,7 @@ export function ImmersiveExerciseSession({
               : `Repos prévu ${formatClock(restDisplaySec)}`
           }
         >
-          <Timer className="h-4 w-4 shrink-0 text-[#FF2B2B]" strokeWidth={2.25} />
+          <Timer className="h-4 w-4 shrink-0 text-brand" strokeWidth={2.25} />
           <p className="flex-1 text-[14px] font-semibold text-white">
             Repos{' '}
             <span className="tabular-nums tracking-tight">{formatClock(restDisplaySec)}</span>
@@ -453,7 +453,7 @@ export function ImmersiveExerciseSession({
                     cy={ringSize / 2}
                     r={radius}
                     fill="none"
-                    stroke="#FF2B2B"
+                    stroke="#E22400"
                     strokeWidth={stroke}
                     strokeLinecap="round"
                     strokeDasharray={circumference}
@@ -489,7 +489,7 @@ export function ImmersiveExerciseSession({
                       >
                         {i + 1}
                         {current ? (
-                          <span className="absolute inset-x-0 -bottom-0.5 mx-auto h-0.5 w-3 rounded-full bg-[#FF2B2B]" />
+                          <span className="absolute inset-x-0 -bottom-0.5 mx-auto h-0.5 w-3 rounded-full bg-brand" />
                         ) : null}
                       </button>
                     )

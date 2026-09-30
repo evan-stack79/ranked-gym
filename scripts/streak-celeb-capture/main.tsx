@@ -33,7 +33,7 @@ function StreakCard({ legacy }: { legacy: boolean }) {
   return (
     <div
       ref={cardRef}
-      className="streak-card relative h-28 overflow-hidden rounded-2xl border border-[#FF2B2B]/45 px-4 py-3.5"
+      className="streak-card relative h-28 overflow-hidden rounded-2xl border border-brand/45 px-4 py-3.5"
       style={{
         background:
           'radial-gradient(ellipse 90% 120% at 8% 40%, rgb(255 43 43 / 0.32) 0%, transparent 55%), rgb(28 28 30 / 0.82)',

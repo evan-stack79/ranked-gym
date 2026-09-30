@@ -73,11 +73,11 @@ export function NutritionCalendarSheet({
                 aria-label={`Sélectionner le ${day.getDate()}`}
                 aria-pressed={selected}
                 className={`relative mx-auto flex h-11 w-11 flex-col items-center justify-center rounded-full text-[14px] tabular-nums ${
-                  selected ? 'bg-[#FF2B2B] font-bold text-white' : 'text-[#EBEBF5]'
+                  selected ? 'bg-brand font-bold text-white' : 'text-[#EBEBF5]'
                 } ${today && !selected ? 'ring-1 ring-[#8E8E93]' : ''}`}
               >
                 <span>{day.getDate()}</span>
-                {hasData ? <span className={`absolute bottom-1 h-1 w-1 rounded-full ${selected ? 'bg-white' : 'bg-[#FF2B2B]'}`} /> : null}
+                {hasData ? <span className={`absolute bottom-1 h-1 w-1 rounded-full ${selected ? 'bg-white' : 'bg-brand'}`} /> : null}
               </button>
             )
           })}

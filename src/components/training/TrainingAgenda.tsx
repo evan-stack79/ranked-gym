@@ -112,7 +112,7 @@ export function TrainingAgenda({
           type="button"
           onClick={() => setOpen(true)}
           data-agenda-control="create"
-          className="ios-press inline-flex min-h-11 items-center gap-1 rounded-full border border-[#FF2B2B]/35 bg-[#FF2B2B]/15 px-3 py-2 text-[12px] font-semibold text-[#FF6961] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E]"
+          className="ios-press inline-flex min-h-11 items-center gap-1 rounded-full border border-brand/35 bg-brand/15 px-3 py-2 text-[12px] font-semibold text-[#FF6961] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E]"
         >
           <Plus className="h-3.5 w-3.5" />
           Créneau
@@ -125,7 +125,7 @@ export function TrainingAgenda({
           void enableNotifs()
         }}
         data-agenda-control="notifications"
-        className={`ios-press flex min-h-11 w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E] ${
+        className={`ios-press flex min-h-11 w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E] ${
           notificationsEnabled && perm === 'granted'
             ? 'border-[#30D158]/35 bg-[#30D158]/10'
             : 'border-white/10 bg-black/25'
@@ -163,7 +163,7 @@ export function TrainingAgenda({
               key={item.id}
               className="glass-card flex items-center gap-3 rounded-2xl px-3.5 py-3"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#FF2B2B]/15 text-[#FF6961]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand/15 text-[#FF6961]">
                 <Bell className="h-4 w-4" />
               </div>
               <div className="min-w-0 flex-1">
@@ -185,7 +185,7 @@ export function TrainingAgenda({
                 type="button"
                 onClick={() => onRemove(item.id)}
                 data-agenda-control="delete"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/5 text-[#8E8E93] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E]"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/5 text-[#8E8E93] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E]"
                 aria-label={`Supprimer ${item.title}`}
               >
                 <Trash2 className="h-4 w-4" />
@@ -207,7 +207,7 @@ export function TrainingAgenda({
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ex. Upper, Pecs, Course…"
               data-agenda-control="title"
-              className="min-h-11 w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/70"
+              className="min-h-11 w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus-visible:ring-2 focus-visible:ring-brand/70"
             />
           </label>
 
@@ -229,7 +229,7 @@ export function TrainingAgenda({
                 }
               }}
               data-agenda-control="sport"
-              className="min-h-11 w-full rounded-xl border border-white/10 bg-[#141416] px-3.5 py-3 text-[15px] text-white outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/70"
+              className="min-h-11 w-full rounded-xl border border-white/10 bg-[#141416] px-3.5 py-3 text-[15px] text-white outline-none focus-visible:ring-2 focus-visible:ring-brand/70"
             >
               {[...SPORTS]
                 .sort((a, b) => b.popularity - a.popularity)
@@ -250,7 +250,7 @@ export function TrainingAgenda({
                 value={routineId}
                 onChange={(event) => setRoutineId(event.target.value)}
                 data-agenda-control="routine"
-                className="min-h-11 w-full rounded-xl border border-white/10 bg-[#141416] px-3.5 py-3 text-[15px] text-white outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/70"
+                className="min-h-11 w-full rounded-xl border border-white/10 bg-[#141416] px-3.5 py-3 text-[15px] text-white outline-none focus-visible:ring-2 focus-visible:ring-brand/70"
               >
                 <option value="notebook">Choisir dans le carnet</option>
                 {routines.map((routine) => (
@@ -275,8 +275,8 @@ export function TrainingAgenda({
                     data-agenda-control="day"
                     aria-label={name}
                     aria-pressed={on}
-                    className={`flex h-11 w-11 items-center justify-center rounded-full text-[13px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1C1C1E] ${
-                      on ? 'bg-[#FF2B2B] text-white' : 'bg-white/5 text-[#8E8E93]'
+                    className={`flex h-11 w-11 items-center justify-center rounded-full text-[13px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1C1C1E] ${
+                      on ? 'bg-brand text-white' : 'bg-white/5 text-[#8E8E93]'
                     }`}
                   >
                     {short}
@@ -293,7 +293,7 @@ export function TrainingAgenda({
               value={time}
               onChange={(e) => setTime(e.target.value)}
               data-agenda-control="time"
-              className="min-h-11 w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/70"
+              className="min-h-11 w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none focus-visible:ring-2 focus-visible:ring-brand/70"
             />
           </label>
 
@@ -307,9 +307,9 @@ export function TrainingAgenda({
                   onClick={() => setRemindBefore(m)}
                   data-agenda-control="reminder"
                   aria-pressed={remindBefore === m}
-                  className={`min-h-11 rounded-full border px-3 py-2 text-[12px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1C1C1E] ${
+                  className={`min-h-11 rounded-full border px-3 py-2 text-[12px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1C1C1E] ${
                     remindBefore === m
-                      ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-[#FF6961]'
+                      ? 'border-brand/45 bg-brand/20 text-[#FF6961]'
                       : 'border-white/10 text-[#8E8E93]'
                   }`}
                 >

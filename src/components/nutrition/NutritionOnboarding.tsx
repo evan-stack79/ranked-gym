@@ -6,6 +6,8 @@ import { getNutritionTarget } from '../../services/nutritionActivity'
 import { MORPHOLOGY_LABELS } from '../../utils/morphology'
 import { normalizeCalorieProfile } from '../../services/nutritionStorage'
 import { IconBadge } from '../ui/IconBadge'
+import { BlurReveal } from '../ui/blur-reveal'
+import { HERO_BLUR_PROPS } from '../ui/heroBlur'
 import { ClearableNumberInput } from './ClearableNumberInput'
 import { ActivityLevelPicker } from './ActivityLevelPicker'
 import { MorphologyPicker } from './MorphologyPicker'
@@ -200,7 +202,14 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
             <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
               Setup nutrition
             </p>
-            <h2 className="text-[22px] font-bold tracking-tight text-white">{stepTitle(step)}</h2>
+            <BlurReveal
+              key={step}
+              as="h2"
+              className="text-[22px] font-bold tracking-tight text-white"
+              {...HERO_BLUR_PROPS}
+            >
+              {stepTitle(step)}
+            </BlurReveal>
           </div>
         </div>
 

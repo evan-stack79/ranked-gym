@@ -1,14 +1,25 @@
 @import "tailwindcss";
+@import "./theme/radix-dark.css";
 @source "./";
 
+/* Magic UI AnimatedCircularProgressBar — interpolates --stroke-percent so the gauge fill can ease. */
+@property --stroke-percent {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
 @theme {
-  --color-brand: #ff2b2b;
-  --color-brand-deep: #b91c1c;
+  --color-brand: #e22400;
+  --color-brand-hover: #d20000;
+  --color-brand-deep: #d20000;
+  --color-brand-text: #ff917b;
+  --color-brand-subtle: #3b140e;
   --color-ios-blue: #7dd3fc;
-  --color-ios-gray: #aeaeb2;
-  --color-ios-bg: #0c0c0e;
-  --color-ios-surface: #141416;
-  --color-ios-inset: #2c2c2e;
+  --color-ios-gray: #b2b3bd;
+  --color-ios-bg: #111111;
+  --color-ios-surface: #19191b;
+  --color-ios-inset: #292a2e;
   --font-family-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
 }
 
@@ -29,8 +40,8 @@ html {
 
 body {
   margin: 0;
-  background-color: #0c0c0e;
-  color: #fff;
+  background-color: var(--color-background, #111);
+  color: var(--gray-12, #eeeef0);
   font-family: var(--font-family-sans);
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
@@ -63,12 +74,12 @@ body {
   --dur-fast: 180ms;
   --dur-ui: 220ms;
   --dur-drawer: 260ms;
-  --color-card: #141416;
-  --color-muted: #aeaeb2;
+  --color-card: var(--gray-2, #19191b);
+  --color-muted: var(--gray-11, #b2b3bd);
 }
 
 .glass-bar {
-  background-color: rgb(12 12 14 / 0.78);
+  background-color: rgb(17 17 19 / 0.78);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
 }
@@ -93,11 +104,11 @@ body {
 }
 
 .mesh-bg {
-  background-color: #0c0c0e;
+  background-color: var(--color-background, #111);
 }
 
 .xp-fill {
-  background: #ff2b2b;
+  background: var(--color-brand);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.16);
 }
 
@@ -107,17 +118,36 @@ body {
   transition: transform var(--dur-ui) var(--ease-out);
 }
 
+/* Always-on 1s ease (Magic UI). Must be present *before* progress changes or the fill snaps. */
+.nutrition-calorie-ring-fill {
+  transition:
+    stroke-dasharray 1s ease,
+    stroke-dashoffset 1s ease;
+}
+
+.nutrition-calorie-ring-indicator {
+  transition: transform 1s ease;
+}
+
 .btn-brand {
-  background: #ff2b2b;
+  background: var(--color-brand);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14);
   transition:
     transform var(--dur-press) var(--ease-out),
-    opacity var(--dur-press) var(--ease-out);
+    opacity var(--dur-press) var(--ease-out),
+    background-color var(--dur-press) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-brand:hover {
+    background: var(--color-brand-hover);
+  }
 }
 
 .btn-brand:active {
   opacity: 0.9;
   transform: scale(0.98);
+  background: var(--color-brand-hover);
 }
 
 @keyframes card-shine {
@@ -407,7 +437,7 @@ body {
 }
 
 .history-row:focus-visible {
-  outline: 2px solid #ff2b2b;
+  outline: 2px solid var(--color-brand);
   outline-offset: -2px;
 }
 
@@ -520,11 +550,11 @@ body {
 
 .streak-confetti {
   background-image:
-    radial-gradient(circle at 12% 30%, #ff2b2b 0 2px, transparent 3px),
+    radial-gradient(circle at 12% 30%, var(--color-brand) 0 2px, transparent 3px),
     radial-gradient(circle at 28% 70%, #ffd60a 0 2px, transparent 3px),
     radial-gradient(circle at 55% 25%, #ff9f0a 0 2.5px, transparent 3px),
     radial-gradient(circle at 78% 60%, #30d158 0 2px, transparent 3px),
-    radial-gradient(circle at 90% 35%, #ff2b2b 0 1.5px, transparent 2.5px);
+    radial-gradient(circle at 90% 35%, var(--color-brand) 0 1.5px, transparent 2.5px);
   opacity: 0.55;
   animation: streak-confetti-drift 2.8s ease-in-out infinite;
 }
@@ -543,9 +573,9 @@ body {
 
 /* —— Daily Streak celebration overlay (premium Ranked Gym) —— */
 .streak-celeb {
-  --sc-bg: #0c0c0e;
-  --sc-red: #ff2b2b;
-  --sc-red-deep: #b91c1c;
+  --sc-bg: var(--color-background, #111);
+  --sc-red: var(--color-brand);
+  --sc-red-deep: var(--color-brand-deep);
   --sc-orange: #ff7a1a;
   --sc-gold: #ffc928;
   --sc-cream: #fff4c2;
@@ -612,7 +642,7 @@ body {
     #fff4c2 0%,
     #ffc928 18%,
     #ff7a1a 42%,
-    #ff2b2b 70%,
+    var(--color-brand) 70%,
     transparent 100%
   );
   animation: streak-celeb-flash 180ms ease-out both;
@@ -668,7 +698,7 @@ body {
   width: 14px;
   height: 14px;
   margin: -7px 0 0 -7px;
-  background: radial-gradient(circle, #fff4c2 0%, #ffc928 45%, #ff2b2b 100%);
+  background: radial-gradient(circle, #fff4c2 0%, #ffc928 45%, var(--color-brand) 100%);
   clip-path: polygon(
     50% 0%,
     61% 35%,
@@ -1654,7 +1684,7 @@ body {
 }
 
 .app-cold-launch__wordmark span {
-  color: #ff2b2b;
+  color: var(--color-brand);
 }
 
 .app-cold-launch[data-reduced='true'] .app-cold-launch__mark {
@@ -1736,6 +1766,11 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .motion-progress-fill {
+    transition: none !important;
+  }
+
+  .nutrition-calorie-ring-fill,
+  .nutrition-calorie-ring-indicator {
     transition: none !important;
   }
 
@@ -1846,6 +1881,7 @@ body {
   font-size: 1.375rem;
   line-height: 1.25;
   margin-bottom: 0.55rem;
+  min-height: 2.5em;
 }
 
 .welcome-screen__subtitle {

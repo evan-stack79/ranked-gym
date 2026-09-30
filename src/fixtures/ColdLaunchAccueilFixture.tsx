@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BrandMark } from '../components/brand/BrandMark'
+import { BlurReveal } from '../components/ui/blur-reveal'
+import { HERO_BLUR_PROPS } from '../components/ui/heroBlur'
 
 export function ColdLaunchAccueilFixture() {
   const [coldEntering, setColdEntering] = useState(() => {
@@ -48,9 +50,13 @@ export function ColdLaunchAccueilFixture() {
         <div className="mx-auto w-full max-w-lg px-5 py-8">
           <div className="flex flex-col gap-8">
             <header className="home-cold-enter__group home-cold-enter__group--0">
-              <h1 className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white">
-                Séance de l&apos;après-midi, Alex ?
-              </h1>
+              <BlurReveal
+                as="h1"
+                className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white"
+                {...HERO_BLUR_PROPS}
+              >
+                Séance de l'après-midi, Alex ?
+              </BlurReveal>
             </header>
 
             <section className="home-cold-enter__group home-cold-enter__group--1">
@@ -64,7 +70,7 @@ export function ColdLaunchAccueilFixture() {
               <div className="glass-card rounded-3xl p-5">
                 <div className="mb-3 h-5 w-52 rounded-full bg-white/20" />
                 <div className="mb-4 h-3 w-44 rounded-full bg-white/10" />
-                <div className="h-10 w-40 rounded-2xl bg-[#FF2B2B]/25" />
+                <div className="h-10 w-40 rounded-2xl bg-brand/25" />
               </div>
             </section>
 
@@ -102,7 +108,7 @@ export function ColdLaunchAccueilFixture() {
 
       <footer data-bottom-nav-host className="fixed bottom-0 left-0 right-0 z-40">
         <div className="mx-auto flex h-[calc(var(--app-bottom-nav)+env(safe-area-inset-bottom,0px))] w-full max-w-lg items-center justify-around border-t border-white/10 bg-[#111114] px-4 pb-[env(safe-area-inset-bottom,0px)]">
-          <span className="text-sm font-semibold text-[#FF2B2B]">Accueil</span>
+          <span className="text-sm font-semibold text-brand">Accueil</span>
           <span className="text-sm text-[#8E8E93]">Train</span>
           <span className="text-sm text-[#8E8E93]">Nutri</span>
           <span className="text-sm text-[#8E8E93]">Profil</span>

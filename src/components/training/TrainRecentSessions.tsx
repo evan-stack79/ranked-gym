@@ -26,7 +26,7 @@ export function TrainRecentSessions({
           <button
             type="button"
             onClick={onSeeAll}
-            className="ios-press min-h-11 rounded-xl px-2 text-[13px] font-semibold text-[#FF6961] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/40"
+            className="ios-press min-h-11 rounded-xl px-2 text-[13px] font-semibold text-[#FF6961] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
           >
             Voir tout
           </button>
@@ -43,7 +43,7 @@ export function TrainRecentSessions({
                 type="button"
                 onClick={() => onOpen(item.id)}
                 data-last-session={item.id}
-                className="ios-press flex min-h-11 w-full flex-col border-t border-white/10 px-0 py-3.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/40"
+                className="ios-press flex min-h-11 w-full flex-col border-t border-white/10 px-0 py-3.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="truncate text-[15px] font-semibold text-white">{item.title}</p>

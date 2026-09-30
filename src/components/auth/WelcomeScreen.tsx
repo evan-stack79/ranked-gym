@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { LEGAL_PRIVACY_PATH, LEGAL_TERMS_PATH } from '../legal/legalRoutes'
+import { BlurReveal } from '../ui/blur-reveal'
 import {
   WELCOME_BETA,
   WELCOME_BRAND_GYM,
@@ -23,7 +25,30 @@ interface WelcomeScreenProps {
   onConnect: () => void
 }
 
+/** Wait until the cold-launch overlay starts revealing so the title is not spent under the splash. */
+function useWelcomeTitleReveal() {
+  const [trigger, setTrigger] = useState(() => {
+    if (typeof document === 'undefined') return true
+    return document.documentElement.dataset.coldLaunchHandoff !== 'flying'
+  })
+
+  useEffect(() => {
+    if (trigger) return
+    const kick = () => setTrigger(true)
+    window.addEventListener('ranked-gym:cold-launch-landing', kick)
+    const t = window.setTimeout(kick, 2200)
+    return () => {
+      window.removeEventListener('ranked-gym:cold-launch-landing', kick)
+      window.clearTimeout(t)
+    }
+  }, [trigger])
+
+  return trigger
+}
+
 export function WelcomeScreen({ onConnect }: WelcomeScreenProps) {
+  const revealTitle = useWelcomeTitleReveal()
+
   return (
     <div
       className="welcome-screen relative flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-[#070708] font-sans"
@@ -46,11 +71,32 @@ export function WelcomeScreen({ onConnect }: WelcomeScreenProps) {
       <div className="welcome-screen__body relative z-[1] mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col justify-end">
         <h1 className="welcome-screen__brand text-center font-semibold tracking-tight text-[#F2F2F7]">
           {WELCOME_BRAND_RANKED}{' '}
-          <span className="text-[#FF2B2B]">{WELCOME_BRAND_GYM}</span>
+          <span className="text-brand">{WELCOME_BRAND_GYM}</span>
         </h1>
-        <p className="welcome-screen__title mx-auto max-w-[20rem] text-center font-bold tracking-tight text-white">
-          <span className="block">{WELCOME_TITLE_LINE_1} </span>
-          <span className="block">{WELCOME_TITLE_LINE_2}</span>
+        <p
+          className="welcome-screen__title mx-auto max-w-[20rem] text-center font-bold tracking-tight text-white"
+          data-welcome-title="1"
+        >
+          <BlurReveal
+            as="span"
+            className="block"
+            trigger={revealTitle}
+            delay={0.04}
+            speedReveal={0.7}
+            speedSegment={0.4}
+          >
+            {WELCOME_TITLE_LINE_1}
+          </BlurReveal>
+          <BlurReveal
+            as="span"
+            className="block"
+            trigger={revealTitle}
+            delay={0.22}
+            speedReveal={0.7}
+            speedSegment={0.4}
+          >
+            {WELCOME_TITLE_LINE_2}
+          </BlurReveal>
         </p>
         <p className="welcome-screen__subtitle mx-auto max-w-[22rem] text-center font-medium text-[#AEAEB2]">
           <span className="block">{WELCOME_SUBTITLE_LINE_1} </span>
@@ -61,7 +107,7 @@ export function WelcomeScreen({ onConnect }: WelcomeScreenProps) {
           type="button"
           onClick={onConnect}
           data-welcome-cta="1"
-          className="welcome-screen__cta ios-press w-full min-h-12 rounded-lg bg-[#FF2B2B] text-[16px] font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+          className="welcome-screen__cta ios-press w-full min-h-12 rounded-lg bg-brand text-[16px] font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-white/80"
         >
           {WELCOME_CTA}
         </button>

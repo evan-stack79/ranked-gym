@@ -56,7 +56,7 @@ export function ArenaRadarChart({
   if (loading) {
     return (
       <div className={`flex min-h-[260px] items-center justify-center ${className}`}>
-        <div className="avatar-spinner h-8 w-8 rounded-full border-2 border-white/20 border-t-[#FF2B2B]" aria-hidden />
+        <div className="avatar-spinner h-8 w-8 rounded-full border-2 border-white/20 border-t-[#E22400]" aria-hidden />
       </div>
     )
   }
@@ -83,8 +83,8 @@ export function ArenaRadarChart({
       >
         <defs>
           <linearGradient id="arena-radar-fill" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#FF2B2B" stopOpacity="0.45" />
-            <stop offset="100%" stopColor="#FF2B2B" stopOpacity="0.12" />
+            <stop offset="0%" stopColor="#E22400" stopOpacity="0.45" />
+            <stop offset="100%" stopColor="#E22400" stopOpacity="0.12" />
           </linearGradient>
           <filter id="arena-radar-glow" x="-30%" y="-30%" width="160%" height="160%">
             <feGaussianBlur stdDeviation="2.5" result="blur" />
@@ -124,7 +124,7 @@ export function ArenaRadarChart({
         <path
           d={dataPath}
           fill="none"
-          stroke="#FF2B2B"
+          stroke="#E22400"
           strokeWidth={2.25}
           strokeLinejoin="round"
           filter="url(#arena-radar-glow)"

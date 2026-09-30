@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import { resolvePickerIllustrationSrc } from '../../utils/exercisePickerIllustrations'
 import { formatExerciseMuscles } from '../../utils/exerciseMedia'
 import { getCatalogExercise } from '../../data/exerciseCatalog'
 import type { TrainingRecommendation } from '../../training-engine'
+import { BlurReveal } from '../ui/blur-reveal'
+import { HERO_BLUR_PROPS, takeSessionHeroReveal } from '../ui/heroBlur'
 
 interface TrainingRecommendationCardProps {
   recommendation: TrainingRecommendation
@@ -35,6 +38,7 @@ export function TrainingRecommendationCard({
   if (recommendation.durationMin != null) {
     metaParts.push(`${recommendation.durationMin} min`)
   }
+  const [playReco] = useState(() => takeSessionHeroReveal(`train-reco:${recommendation.canonicalExerciseId}`))
 
   return (
     <section
@@ -65,9 +69,14 @@ export function TrainingRecommendationCard({
           aria-hidden="true"
         />
         <div className="relative z-[1] flex min-h-[200px] flex-col justify-end px-4 pb-4 pt-16">
-          <h2 className="text-[26px] font-bold leading-tight tracking-tight text-white">
+          <BlurReveal
+            as="h2"
+            className="text-[26px] font-bold leading-tight tracking-tight text-white"
+            reducedMotion={!playReco}
+            {...HERO_BLUR_PROPS}
+          >
             {recommendation.name}
-          </h2>
+          </BlurReveal>
           {muscleLine ? (
             <p className="mt-1 text-[13px] font-medium text-[#AEAEB2]">{muscleLine}</p>
           ) : null}
@@ -82,7 +91,7 @@ export function TrainingRecommendationCard({
         <button
           type="button"
           onClick={onPrimary}
-          className="ios-press flex min-h-11 w-full items-center justify-center rounded-2xl bg-[#FF2B2B] px-4 text-[16px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/60"
+          className="ios-press flex min-h-11 w-full items-center justify-center rounded-2xl bg-brand px-4 text-[16px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
         >
           {cta}
         </button>

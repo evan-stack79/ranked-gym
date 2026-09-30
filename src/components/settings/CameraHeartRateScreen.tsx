@@ -191,7 +191,7 @@ export function CameraHeartRateScreen({ onBack }: CameraHeartRateScreenProps) {
             type="button"
             onClick={() => void start()}
             disabled={Boolean(availabilityMessage)}
-            className="ios-press min-h-12 flex-1 rounded-2xl border border-[#FF2B2B]/40 bg-[#FF2B2B]/20 text-[15px] font-semibold text-white disabled:opacity-40"
+            className="ios-press min-h-12 flex-1 rounded-2xl border border-brand/40 bg-brand/20 text-[15px] font-semibold text-white disabled:opacity-40"
           >
             Démarrer la mesure
           </button>

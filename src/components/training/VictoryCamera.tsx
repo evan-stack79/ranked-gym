@@ -198,7 +198,7 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
         style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top))' }}
       >
         <p className="text-[10px] font-semibold uppercase tracking-[0.28em]">
-          <span className="text-[#FF2B2B]">Ranked</span>{' '}
+          <span className="text-brand">Ranked</span>{' '}
           <span className="text-white">Gym</span>
           <span className="text-[#C7C7CC]"> // UPPER</span>
         </p>
@@ -285,7 +285,7 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
             >
               <div className="pointer-events-none min-w-0">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.28em]">
-                  <span className="text-[#FF2B2B]">Ranked</span>{' '}
+                  <span className="text-brand">Ranked</span>{' '}
                   <span className="text-white">Gym</span>
                   <span className="text-[#C7C7CC]"> // UPPER</span>
                 </p>
@@ -315,7 +315,7 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
               className="ios-press relative z-10 flex h-[72px] w-[72px] items-center justify-center rounded-full border-[3px] border-white bg-transparent disabled:opacity-40"
               aria-label="Prendre la photo"
             >
-              <span className="h-[54px] w-[54px] rounded-full bg-[#FF2B2B] shadow-[0_0_28px_rgba(255,43,43,0.55)]" />
+              <span className="h-[54px] w-[54px] rounded-full bg-brand shadow-[0_0_28px_rgba(255,43,43,0.55)]" />
             </button>
             <button
               type="button"

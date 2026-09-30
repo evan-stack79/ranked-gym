@@ -4,6 +4,8 @@ import { Avatar } from '../ui/Avatar'
 import { StatusBadge, statusFromPower } from '../ui/StatusBadge'
 import type { AuthMethod } from '../../services/authService'
 import { uploadUserAvatar } from '../../services/avatarService'
+import { BlurReveal } from '../ui/blur-reveal'
+import { HERO_BLUR_PROPS, takeSessionHeroReveal } from '../ui/heroBlur'
 
 interface FighterHeaderProps {
   username: string
@@ -28,7 +30,7 @@ export function FighterHeader({
   email,
   provider,
   disciplineLabel,
-  disciplineAccent = '#FF2B2B',
+  disciplineAccent = '#E22400',
   avatarUrl,
   userId,
   onAvatarUpdated,
@@ -39,6 +41,7 @@ export function FighterHeader({
   const [uploading, setUploading] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [playName] = useState(() => takeSessionHeroReveal('fighter-name'))
 
   const displayUrl = previewUrl || avatarUrl || null
   const canEdit = Boolean(userId)
@@ -81,7 +84,7 @@ export function FighterHeader({
             type="button"
             onClick={openPicker}
             disabled={!canEdit || uploading}
-            className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/55 disabled:opacity-100"
+            className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-brand/55 disabled:opacity-100"
             aria-label={canEdit ? 'Changer la photo de profil' : `Avatar de ${username}`}
           >
             <Avatar
@@ -89,7 +92,7 @@ export function FighterHeader({
               imageUrl={displayUrl}
               size="lg"
               loading={uploading}
-              className="ring-2 ring-[#FF2B2B]/40"
+              className="ring-2 ring-brand/40"
             />
             {canEdit ? (
               <span
@@ -112,7 +115,14 @@ export function FighterHeader({
 
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-[28px] font-bold tracking-tight text-white">{username}</h1>
+            <BlurReveal
+              as="h1"
+              className="text-[28px] font-bold tracking-tight text-white"
+              reducedMotion={!playName}
+              {...HERO_BLUR_PROPS}
+            >
+              {username}
+            </BlurReveal>
             {status && <StatusBadge variant={status} />}
           </div>
           <p className="mt-0.5 text-[15px] text-[#8E8E93]">{title}</p>

@@ -6,7 +6,7 @@ import { AppShell } from './App'
 import { AuthStateProvider } from './context/AuthContext'
 import { RestTimerProvider } from './context/RestTimerContext'
 import { buildAuthContextValue, FIXTURE_AUTH_USER } from './test/authFixtureValue'
-import { WELCOME_TITLE } from './components/auth/welcomeCopy'
+import { WELCOME_TITLE, WELCOME_TITLE_LINE_1, WELCOME_TITLE_LINE_2 } from './components/auth/welcomeCopy'
 import { saveCalorieProfile } from './services/nutritionStorage'
 
 vi.mock('./assets/brand/panther-roaring.png', () => ({ default: 'panther.png' }))
@@ -64,7 +64,8 @@ describe('AppShell auth welcome', () => {
       openAuth,
     })
     expect(host.querySelector('[data-welcome-screen]')).toBeTruthy()
-    expect(host.textContent).toContain(WELCOME_TITLE)
+    expect(host.textContent).toContain(WELCOME_TITLE_LINE_1)
+    expect(host.textContent).toContain(WELCOME_TITLE_LINE_2)
     expect(document.querySelector('[role="dialog"]')).toBeNull()
     expect(openAuth).not.toHaveBeenCalled()
     const cta = [...host.querySelectorAll('button')].find((el) => el.textContent === 'Se connecter')
