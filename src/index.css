@@ -2,6 +2,13 @@
 @import "./theme/radix-dark.css";
 @source "./";
 
+/* Magic UI AnimatedCircularProgressBar — interpolates --stroke-percent so the gauge fill can ease. */
+@property --stroke-percent {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
 @theme {
   --color-brand: #e22400;
   --color-brand-hover: #d20000;
@@ -109,6 +116,17 @@ body {
   width: 100%;
   transform-origin: left center;
   transition: transform var(--dur-ui) var(--ease-out);
+}
+
+/* Always-on 1s ease (Magic UI). Must be present *before* progress changes or the fill snaps. */
+.nutrition-calorie-ring-fill {
+  transition:
+    stroke-dasharray 1s ease,
+    stroke-dashoffset 1s ease;
+}
+
+.nutrition-calorie-ring-indicator {
+  transition: transform 1s ease;
 }
 
 .btn-brand {
@@ -1751,6 +1769,11 @@ body {
     transition: none !important;
   }
 
+  .nutrition-calorie-ring-fill,
+  .nutrition-calorie-ring-indicator {
+    transition: none !important;
+  }
+
   .ios-sheet-backdrop {
     transition-duration: 80ms !important;
   }
@@ -1858,6 +1881,7 @@ body {
   font-size: 1.375rem;
   line-height: 1.25;
   margin-bottom: 0.55rem;
+  min-height: 2.5em;
 }
 
 .welcome-screen__subtitle {

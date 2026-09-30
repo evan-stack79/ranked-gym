@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { SportsMultiSelect } from './SportsMultiSelect'
 import { getTrainingState, setTrainingSports } from '../../services/trainingStorage'
+import { BlurReveal } from '../ui/blur-reveal'
 
 interface SportsOnboardingScreenProps {
   onComplete: () => void
@@ -40,9 +41,14 @@ export function SportsOnboardingScreen({ onComplete }: SportsOnboardingScreenPro
       </header>
 
       <main className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col px-5 pb-5 pt-6">
-        <h1 className="text-[28px] font-bold leading-tight tracking-tight text-white">
+        <BlurReveal
+          as="h1"
+          className="text-[28px] font-bold leading-tight tracking-tight text-white"
+          speedReveal={1.6}
+          speedSegment={0.6}
+        >
           Quels sports pratiques-tu ou aimerais-tu commencer ?
-        </h1>
+        </BlurReveal>
         <p className="mt-2 text-[15px] leading-snug text-[#8E8E93]">
           Tu pourras modifier ce choix plus tard dans ton profil.
         </p>

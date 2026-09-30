@@ -4,6 +4,8 @@ import { Avatar } from '../ui/Avatar'
 import { StatusBadge, statusFromPower } from '../ui/StatusBadge'
 import type { AuthMethod } from '../../services/authService'
 import { uploadUserAvatar } from '../../services/avatarService'
+import { BlurReveal } from '../ui/blur-reveal'
+import { HERO_BLUR_PROPS, takeSessionHeroReveal } from '../ui/heroBlur'
 
 interface FighterHeaderProps {
   username: string
@@ -39,6 +41,7 @@ export function FighterHeader({
   const [uploading, setUploading] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [playName] = useState(() => takeSessionHeroReveal('fighter-name'))
 
   const displayUrl = previewUrl || avatarUrl || null
   const canEdit = Boolean(userId)
@@ -112,7 +115,14 @@ export function FighterHeader({
 
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-[28px] font-bold tracking-tight text-white">{username}</h1>
+            <BlurReveal
+              as="h1"
+              className="text-[28px] font-bold tracking-tight text-white"
+              reducedMotion={!playName}
+              {...HERO_BLUR_PROPS}
+            >
+              {username}
+            </BlurReveal>
             {status && <StatusBadge variant={status} />}
           </div>
           <p className="mt-0.5 text-[15px] text-[#8E8E93]">{title}</p>

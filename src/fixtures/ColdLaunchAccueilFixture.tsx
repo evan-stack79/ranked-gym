@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BrandMark } from '../components/brand/BrandMark'
+import { BlurReveal } from '../components/ui/blur-reveal'
+import { HERO_BLUR_PROPS } from '../components/ui/heroBlur'
 
 export function ColdLaunchAccueilFixture() {
   const [coldEntering, setColdEntering] = useState(() => {
@@ -48,9 +50,13 @@ export function ColdLaunchAccueilFixture() {
         <div className="mx-auto w-full max-w-lg px-5 py-8">
           <div className="flex flex-col gap-8">
             <header className="home-cold-enter__group home-cold-enter__group--0">
-              <h1 className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white">
-                Séance de l&apos;après-midi, Alex ?
-              </h1>
+              <BlurReveal
+                as="h1"
+                className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white"
+                {...HERO_BLUR_PROPS}
+              >
+                Séance de l'après-midi, Alex ?
+              </BlurReveal>
             </header>
 
             <section className="home-cold-enter__group home-cold-enter__group--1">

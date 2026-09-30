@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { createRoot } from 'react-dom/client'
 import { act } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { WelcomeScreen } from './WelcomeScreen'
 import {
   WELCOME_BETA,
@@ -9,9 +9,26 @@ import {
   WELCOME_HERO_PNG,
   WELCOME_HERO_WEBP,
   WELCOME_SUBTITLE,
-  WELCOME_TITLE,
+  WELCOME_TITLE_LINE_1,
+  WELCOME_TITLE_LINE_2,
 } from './welcomeCopy'
 import { LEGAL_PRIVACY_PATH, LEGAL_TERMS_PATH } from '../legal/legalRoutes'
+
+beforeEach(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    configurable: true,
+    value: (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }),
+  })
+})
 
 async function renderWelcome(onConnect = vi.fn()) {
   const host = document.createElement('div')
@@ -38,7 +55,9 @@ describe('WelcomeScreen', () => {
     expect(host.querySelector('[data-welcome-screen]')).toBeTruthy()
     expect(host.textContent).toContain('Ranked')
     expect(host.textContent).toContain('Gym')
-    expect(host.textContent).toContain(WELCOME_TITLE)
+    expect(host.textContent).toContain(WELCOME_TITLE_LINE_1)
+    expect(host.textContent).toContain(WELCOME_TITLE_LINE_2)
+    expect(host.querySelectorAll('[data-blur-reveal]')).toHaveLength(2)
     expect(host.textContent).toContain(WELCOME_SUBTITLE)
     expect(host.textContent).toContain(WELCOME_CTA)
     expect(host.textContent).toContain(WELCOME_BETA)

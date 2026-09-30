@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react'
 import { Sparkles } from 'lucide-react'
 import { NutritionOnboarding } from '../nutrition/NutritionOnboarding'
+import { BlurReveal } from '../ui/blur-reveal'
+import { HERO_BLUR_PROPS } from '../ui/heroBlur'
 import {
   getCalorieProfile,
   saveCalorieProfile,
@@ -45,9 +47,13 @@ export function GlobalOnboardingScreen({ onComplete }: GlobalOnboardingScreenPro
         className="relative z-10 mx-auto w-full max-w-lg flex-1 overflow-y-auto px-5 pb-8 pt-6"
       >
         <header className="mb-8 ios-fade-up">
-          <h1 className="text-[28px] font-bold leading-tight tracking-tight text-white">
+          <BlurReveal
+            as="h1"
+            className="text-[28px] font-bold leading-tight tracking-tight text-white"
+            {...HERO_BLUR_PROPS}
+          >
             Ton plan sur mesure
-          </h1>
+          </BlurReveal>
           <p className="mt-2 flex items-start gap-2 text-[15px] leading-snug text-[#8E8E93]">
             <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#FFD60A]" />
             Objectif, morphologie et rythme — on calcule tes calories et macros.
