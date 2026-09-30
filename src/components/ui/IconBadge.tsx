@@ -11,7 +11,7 @@ const VARIANTS = {
   white: 'bg-white/15 text-white',
   green: 'bg-[#30D158]/20 text-[#30D158]',
   orange: 'bg-[#FF9F0A]/20 text-[#FF9F0A]',
-  crimson: 'bg-[#FF2B2B]/20 text-[#FF5C5C]',
+  crimson: 'bg-brand/20 text-[#FF5C5C]',
   violet: 'bg-[#BF5AF2]/20 text-[#D78FFF]',
   muted: 'bg-[#636366]/25 text-[#8E8E93]',
 }

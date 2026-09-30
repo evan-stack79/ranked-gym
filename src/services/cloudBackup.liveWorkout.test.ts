@@ -27,7 +27,7 @@ function routine(id: string, name: string, updatedAt: number, extra?: Partial<Wo
     id,
     label: name,
     subtitle: '',
-    accent: '#FF2B2B',
+    accent: '#E22400',
     updatedAt,
     exercises: [
       {

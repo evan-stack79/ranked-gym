@@ -183,7 +183,7 @@ export function ExercisePicker({
                   onChange={(e) => setCustomName(e.target.value)}
                   placeholder="Nom de ton exercice"
                   autoFocus
-                  className="min-h-11 w-full rounded-xl border border-white/12 bg-[#1c1c1e] px-3.5 text-[15px] text-white placeholder:text-[#636366] outline-none focus-visible:border-[#FF2B2B]/55"
+                  className="min-h-11 w-full rounded-xl border border-white/12 bg-[#1c1c1e] px-3.5 text-[15px] text-white placeholder:text-[#636366] outline-none focus-visible:border-brand/55"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') submitCustom()
                   }}
@@ -193,7 +193,7 @@ export function ExercisePicker({
                 type="button"
                 onClick={submitCustom}
                 disabled={!customName.trim()}
-                className="ios-press flex min-h-11 w-full items-center justify-center rounded-xl bg-[#FF2B2B] text-[14px] font-semibold text-white disabled:opacity-40"
+                className="ios-press flex min-h-11 w-full items-center justify-center rounded-xl bg-brand text-[14px] font-semibold text-white disabled:opacity-40"
               >
                 Créer et ajouter
               </button>
@@ -245,7 +245,7 @@ function ExerciseResultRow({
       >
         {active ? (
           <span
-            className="absolute left-0 top-3 bottom-3 w-[2.5px] rounded-full bg-[#FF2B2B]"
+            className="absolute left-0 top-3 bottom-3 w-[2.5px] rounded-full bg-brand"
             aria-hidden="true"
           />
         ) : null}

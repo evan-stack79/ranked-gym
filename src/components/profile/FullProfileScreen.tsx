@@ -39,7 +39,7 @@ interface FullProfileScreenProps {
 
 function TrustBanner() {
   return (
-    <div className="flex gap-3 rounded-2xl border border-[#FF2B2B]/20 bg-[#FF2B2B]/08 px-4 py-3.5">
+    <div className="flex gap-3 rounded-2xl border border-brand/20 bg-brand/08 px-4 py-3.5">
       <span className="shrink-0 text-[18px]" aria-hidden>
         🔒
       </span>
@@ -64,7 +64,7 @@ function SectionTitle({
   return (
     <div className="px-1">
       <div className="flex items-center gap-2">
-        <Icon className="h-4 w-4 text-[#FF2B2B]" strokeWidth={2.25} />
+        <Icon className="h-4 w-4 text-brand" strokeWidth={2.25} />
         <h2 className="text-[13px] font-bold uppercase tracking-[0.14em] text-white">{title}</h2>
       </div>
       {subtitle ? <p className="mt-1 text-[12px] text-[#636366]">{subtitle}</p> : null}
@@ -219,7 +219,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
 
       {/* En-tête joueur */}
       <section
-        className="relative overflow-hidden rounded-3xl border border-[#FF2B2B]/20 p-5"
+        className="relative overflow-hidden rounded-3xl border border-brand/20 p-5"
         style={{
           background:
             'linear-gradient(160deg, rgb(20 20 22) 0%, rgb(28 14 16) 55%, rgb(18 18 20) 100%)',
@@ -238,10 +238,10 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
               type="button"
               onClick={openAvatarPicker}
               disabled={avatarUploading || !user?.id}
-              className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/55"
+              className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-brand/55"
               aria-label="Changer la photo de profil"
             >
-              <div className="rounded-full p-1 ring-2 ring-[#FF2B2B]/50 ring-offset-2 ring-offset-[#141416]">
+              <div className="rounded-full p-1 ring-2 ring-brand/50 ring-offset-2 ring-offset-[#141416]">
                 <Avatar
                   username={username}
                   imageUrl={displayAvatarUrl}
@@ -271,7 +271,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
 
           <div>
             <h2 className="text-[24px] font-black tracking-tight text-white">{username}</h2>
-            <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#FF2B2B]/35 bg-[#FF2B2B]/15 px-3.5 py-1.5 text-[13px] font-bold text-[#FF6961]">
+            <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-brand/35 bg-brand/15 px-3.5 py-1.5 text-[13px] font-bold text-[#FF6961]">
               <Crosshair className="h-3.5 w-3.5" strokeWidth={2.5} />
               Niveau {level} · {rank.title}
             </span>
@@ -301,7 +301,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
 
         <div className="glass-card rounded-2xl p-4">
           <div className="mb-3 flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-[#FF2B2B]" strokeWidth={2.25} />
+            <TrendingUp className="h-4 w-4 text-brand" strokeWidth={2.25} />
             <p className="text-[14px] font-semibold text-white">Courbe de Puissance</p>
           </div>
           {statsLoading ? (

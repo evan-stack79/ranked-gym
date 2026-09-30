@@ -1,0 +1,82 @@
+/* Radix Colors custom palette — dark
+   https://www.radix-ui.com/colors/custom?accent-dark=E22400
+   Accent #E22400 · Gray #8B8D98 · Background #111 */
+
+:root {
+  --red-1: #170f0d;
+  --red-2: #201412;
+  --red-3: #3b140e;
+  --red-4: #530e05;
+  --red-5: #631509;
+  --red-6: #742316;
+  --red-7: #8d3325;
+  --red-8: #b64331;
+  --red-9: #e22400;
+  --red-10: #d20000;
+  --red-11: #ff917b;
+  --red-12: #ffd1c8;
+
+  --red-a1: #ec000007;
+  --red-a2: #f23e2011;
+  --red-a3: #ff22002d;
+  --red-a4: #ff070047;
+  --red-a5: #ff1d0058;
+  --red-a6: #fd3c1d6b;
+  --red-a7: #ff533885;
+  --red-a8: #ff5a40b1;
+  --red-a9: #ff2700e0;
+  --red-a10: #ff0000cf;
+  --red-a11: #ff917b;
+  --red-a12: #ffd1c8;
+
+  --red-contrast: #fff;
+  --red-surface: #2f171380;
+  --red-indicator: #e22400;
+  --red-track: #e22400;
+
+  --gray-1: #111113;
+  --gray-2: #19191b;
+  --gray-3: #222325;
+  --gray-4: #292a2e;
+  --gray-5: #303136;
+  --gray-6: #393a40;
+  --gray-7: #46484f;
+  --gray-8: #5f606a;
+  --gray-9: #6c6e79;
+  --gray-10: #797b86;
+  --gray-11: #b2b3bd;
+  --gray-12: #eeeef0;
+
+  --gray-a1: #1111bb03;
+  --gray-a2: #cbcbf90b;
+  --gray-a3: #d6e2f916;
+  --gray-a4: #d1d9f920;
+  --gray-a5: #d7ddfd28;
+  --gray-a6: #d9defc33;
+  --gray-a7: #dae2fd43;
+  --gray-a8: #e0e3fd60;
+  --gray-a9: #e0e4fd70;
+  --gray-a10: #e3e7fd7e;
+  --gray-a11: #eff0feb9;
+  --gray-a12: #fdfdffef;
+
+  --gray-contrast: #ffffff;
+  --gray-surface: rgb(0 0 0 / 0.05);
+  --gray-indicator: #6c6e79;
+  --gray-track: #6c6e79;
+
+  --color-background: #111;
+}
+
+@supports (color: color(display-p3 1 1 1)) {
+  @media (color-gamut: p3) {
+    :root {
+      --red-9: oklch(58.5% 0.2242 31.59);
+      --red-10: oklch(54.1% 0.2242 31.59);
+      --red-11: oklch(78.4% 0.189 31.59);
+      --red-12: oklch(89.9% 0.0542 31.59);
+      --red-indicator: oklch(58.5% 0.2242 31.59);
+      --red-track: oklch(58.5% 0.2242 31.59);
+    }
+  }
+}

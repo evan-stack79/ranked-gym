@@ -4,7 +4,7 @@ interface SparklineProps {
   className?: string
 }
 
-export function Sparkline({ points, color = '#FF2B2B', className = '' }: SparklineProps) {
+export function Sparkline({ points, color = '#E22400', className = '' }: SparklineProps) {
   const max = Math.max(...points)
   const min = Math.min(...points)
   const range = max - min || 1

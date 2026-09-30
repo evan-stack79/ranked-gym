@@ -59,7 +59,7 @@ export function MealBudgetsCard({ targetCalories, morphology, meals }: MealBudge
                     transform: `scaleX(${Math.max(progress, row.used > 0 ? 0.06 : 0)})`,
                     background:
                       progress > 1.05
-                        ? 'linear-gradient(90deg, #FF2B2B, #FF9F0A)'
+                        ? 'linear-gradient(90deg, #E22400, #FF9F0A)'
                         : 'linear-gradient(90deg, #00B4FF, #30D158)',
                   }}
                 />

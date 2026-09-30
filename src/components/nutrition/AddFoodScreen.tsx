@@ -162,7 +162,7 @@ export function AddFoodScreen({
             value={searchQuery}
             onChange={(e) => onSearchQueryChange(e.target.value)}
             placeholder="Rechercher un aliment, une marque..."
-            className="w-full rounded-2xl border border-white/10 bg-[#1C1C1E] py-3.5 pl-10 pr-3.5 text-[15px] text-white placeholder:text-[#636366] outline-none focus:border-[#FF2B2B]/45"
+            className="w-full rounded-2xl border border-white/10 bg-[#1C1C1E] py-3.5 pl-10 pr-3.5 text-[15px] text-white placeholder:text-[#636366] outline-none focus:border-brand/45"
             autoComplete="off"
             autoFocus
             role="searchbox"
@@ -282,7 +282,7 @@ export function AddFoodScreen({
                       onProteinChange(e.target.value === '' ? '' : Number(e.target.value))
                     }
                     placeholder="Optionnel"
-                    className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/40"
+                    className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-brand/40"
                   />
                 </label>
                 <label className="block">

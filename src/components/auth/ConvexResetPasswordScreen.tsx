@@ -153,7 +153,7 @@ export function ConvexResetPasswordScreen() {
 
       <div className="welcome-screen__body relative z-[1] mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col justify-end">
         <h1 className="welcome-screen__brand text-center font-semibold tracking-tight text-[#F2F2F7]">
-          Ranked <span className="text-[#FF2B2B]">Gym</span>
+          Ranked <span className="text-brand">Gym</span>
         </h1>
         <div className="rounded-3xl border border-white/10 bg-[#111113]/90 p-4 backdrop-blur">
           <p className="text-center text-[19px] font-bold tracking-tight text-white">
@@ -178,7 +178,7 @@ export function ConvexResetPasswordScreen() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Au moins 6 caractères"
                   disabled={loading}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-brand/45 disabled:opacity-50"
                 />
                 <button
                   type="button"
@@ -205,7 +205,7 @@ export function ConvexResetPasswordScreen() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Retape le mot de passe"
                   disabled={loading}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-brand/45 disabled:opacity-50"
                 />
                 <button
                   type="button"
@@ -246,7 +246,7 @@ export function ConvexResetPasswordScreen() {
                     onChange={(event) => setResendEmail(event.target.value)}
                     placeholder="toi@email.com"
                     disabled={loading || resendLoading}
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-brand/45 disabled:opacity-50"
                   />
                 </label>
                 <button

@@ -271,7 +271,7 @@ export function LobbyView() {
             className="flex h-10 w-10 items-center justify-center glass-card rounded-full active:bg-ios-inset"
             aria-label="Nouvelle recherche"
           >
-            <RefreshCw className="h-5 w-5 text-[#FF2B2B]" />
+            <RefreshCw className="h-5 w-5 text-brand" />
           </button>
         )}
       </header>
@@ -389,7 +389,7 @@ export function LobbyView() {
       {phase === 'checked-in' && checkedInGym && (
         <>
           <div
-            className="relative overflow-hidden rounded-3xl border border-[#FF2B2B]/30 p-5"
+            className="relative overflow-hidden rounded-3xl border border-brand/30 p-5"
             style={{
               background:
                 'radial-gradient(ellipse 90% 80% at 10% 0%, rgb(255 43 43 / 0.28) 0%, transparent 55%), radial-gradient(ellipse 60% 50% at 100% 100%, rgb(255 159 10 / 0.12) 0%, transparent 50%), rgb(28 28 30 / 0.95)',

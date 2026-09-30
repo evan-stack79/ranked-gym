@@ -82,7 +82,7 @@ export function TrainingRecommendationCard({
         <button
           type="button"
           onClick={onPrimary}
-          className="ios-press flex min-h-11 w-full items-center justify-center rounded-2xl bg-[#FF2B2B] px-4 text-[16px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/60"
+          className="ios-press flex min-h-11 w-full items-center justify-center rounded-2xl bg-brand px-4 text-[16px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
         >
           {cta}
         </button>

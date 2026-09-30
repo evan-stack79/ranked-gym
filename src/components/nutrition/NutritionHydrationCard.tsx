@@ -42,7 +42,7 @@ export function NutritionHydrationCard({
           aria-label="Progression hydratation"
         >
           <div
-            className="motion-progress-fill h-full rounded-full bg-[#FF2B2B]"
+            className="motion-progress-fill h-full rounded-full bg-brand"
             style={{ transform: `scaleX(${Math.max(0.02, progress)})` }}
           />
         </div>
@@ -52,7 +52,7 @@ export function NutritionHydrationCard({
         onClick={onAdd250}
         disabled={!canAdd}
         aria-label={`Ajouter ${HOME_QUICK_WATER_ML} ml`}
-        className="ios-press shrink-0 rounded-xl bg-[#FF2B2B] px-3.5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
+        className="ios-press shrink-0 rounded-xl bg-brand px-3.5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
       >
         +{HOME_QUICK_WATER_ML} ml
       </button>

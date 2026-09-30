@@ -177,7 +177,7 @@ export function SleepDetailsSheet({
                   {snapshot.warnings.map((w) => (
                     <li
                       key={w.slice(0, 48)}
-                      className="rounded-xl border border-[#FF6961]/20 bg-[#FF2B2B]/10 px-3 py-2 text-[12px] leading-relaxed text-[#FFCCCB]"
+                      className="rounded-xl border border-[#FF6961]/20 bg-brand/10 px-3 py-2 text-[12px] leading-relaxed text-[#FFCCCB]"
                     >
                       {w}
                     </li>

@@ -18,6 +18,7 @@ import {
 } from '../utils/strength'
 import { getActiveCloudUserId } from './cloudSession'
 import { sessionKindForSport } from '../utils/sessionMeta'
+import { BRAND_COLOR } from '../theme/colors'
 import { getSportById } from '../data/sports'
 import {
   ensureDraftClock,
@@ -55,7 +56,7 @@ export const DEFAULT_TEMPLATES: SessionTemplate[] = [
     title: 'Upper',
     subtitle: 'Haut du corps',
     muscles: ['Pectoraux', 'Dos', 'Épaules', 'Bras'],
-    accent: '#FF2B2B',
+    accent: BRAND_COLOR,
   },
   {
     id: 'tpl-lower',
@@ -100,7 +101,7 @@ export const DEFAULT_TEMPLATES: SessionTemplate[] = [
 ]
 
 export const DEFAULT_ROUTINES: WorkoutRoutine[] = [
-  { id: 'upper', label: 'Upper', subtitle: 'Haut du corps', accent: '#FF2B2B', exercises: [], updatedAt: 0 },
+  { id: 'upper', label: 'Upper', subtitle: 'Haut du corps', accent: BRAND_COLOR, exercises: [], updatedAt: 0 },
   { id: 'lower', label: 'Lower', subtitle: 'Bas du corps', accent: '#00B4FF', exercises: [], updatedAt: 0 },
   { id: 'push', label: 'Push', subtitle: 'Poussée', accent: '#FF9F0A', exercises: [], updatedAt: 0 },
   { id: 'pull', label: 'Pull', subtitle: 'Tirage', accent: '#BF5AF2', exercises: [], updatedAt: 0 },
@@ -607,7 +608,7 @@ export function addCustomTemplate(input: {
     title: input.title.trim() || 'Séance custom',
     subtitle: 'Ciblage musculaire',
     muscles: input.muscles.length ? input.muscles : ['Personnalisé'],
-    accent: input.accent ?? '#FF2B2B',
+    accent: input.accent ?? BRAND_COLOR,
   }
   const next = { ...state, templates: [tpl, ...state.templates] }
   write(next)

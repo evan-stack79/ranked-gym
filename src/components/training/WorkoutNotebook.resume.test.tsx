@@ -92,7 +92,7 @@ const routine: WorkoutRoutine = {
   id: 'live',
   label: 'Musculation',
   subtitle: '',
-  accent: '#FF2B2B',
+  accent: '#E22400',
   exercises,
   updatedAt: 2_000,
 }

@@ -180,7 +180,7 @@ export function SettingsScreen({
             type="button"
             onClick={canEditAvatar ? openAvatarPicker : openPersonal}
             disabled={avatarUploading}
-            className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/55 disabled:opacity-100"
+            className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-brand/55 disabled:opacity-100"
             aria-label={canEditAvatar ? 'Changer la photo de profil' : `Avatar de ${username}`}
           >
             <Avatar
@@ -188,7 +188,7 @@ export function SettingsScreen({
               imageUrl={displayAvatarUrl}
               size="xl"
               loading={avatarUploading}
-              className="ring-2 ring-[#FF2B2B]/35"
+              className="ring-2 ring-brand/35"
             />
             {canEditAvatar ? (
               <span

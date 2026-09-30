@@ -1,4 +1,5 @@
 import type { SportCategory } from '../types/training'
+import { BRAND_COLOR } from '../theme/colors'
 
 /** Coarse app-level discipline (profile identity). */
 export type AppDisciplineId =
@@ -34,7 +35,7 @@ export const APP_DISCIPLINES: AppDiscipline[] = [
     shortLabel: 'Muscu',
     family: 'strength',
     primarySportId: 'musculation',
-    accent: '#FF2B2B',
+    accent: BRAND_COLOR,
     placeQueries: [
       { type: 'gym' },
       { type: 'fitness_center' },

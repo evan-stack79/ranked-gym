@@ -16,10 +16,10 @@ function secondaryLine(workout: TodayWorkoutPlan | null): string {
 }
 
 const secondaryButtonClass =
-  'ios-press min-h-11 shrink-0 rounded-2xl border border-[#FF2B2B]/20 bg-white/5 px-4 py-2.5 text-[14px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E]'
+  'ios-press min-h-11 shrink-0 rounded-2xl border border-brand/20 bg-white/5 px-4 py-2.5 text-[14px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E]'
 
 const primaryButtonClass =
-  'btn-brand ios-press min-h-11 shrink-0 rounded-2xl border border-white/15 px-4 py-2.5 text-[14px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E]'
+  'btn-brand ios-press min-h-11 shrink-0 rounded-2xl border border-white/15 px-4 py-2.5 text-[14px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E]'
 
 /**
  * Accueil — carte entraînement compacte (alignée Nutrition / Sommeil).
