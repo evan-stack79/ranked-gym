@@ -1,37 +1,23 @@
-# Pub Google Ads — Lancement commercial · Multisport (motion design)
+# Pub Google Ads — Lancement commercial · Multisport (15s + 30s)
 
-**Skills :** launch · ads · ad-creative · copywriting · product-marketing  
-**Contexte :** sortie officielle Ranked Gym (pas une bêta / pas “envoie BÊTA”).  
-**Objectif pub :** faire comprendre vite le bénéfice **multisport** et pousser au **téléchargement / ouverture de l’app**.  
-**Format :** **15 s** (YouTube / Demand Gen) + bumper **6 s**.  
-**Style :** motion design dark crimson, marque Ranked Gym, peu de texte, lisible **sans son**.
-
-**CTA commercial (choisis-en un et garde-le partout) :**
-- `Télécharge l’app` (si store / install)
-- `Commence gratuitement` (si freemium web / PWA)
-- Lien : `[TON LIEN STORE OU SITE]`
+**Contexte :** sortie officielle Ranked Gym  
+**Promesse :** tous tes sports → une seule app → une progression  
+**CTA :** `Commence gratuitement` ou `Télécharge l’app` + `[TON LIEN]`  
+**Style :** motion design dark crimson, texte court, lisible **sans son**
 
 ---
 
-## Message unique (ne pas diluer)
-> Tu fais plusieurs sports → Ranked Gym les suit **ensemble**, avec **une** progression.  
-> Commence gratuitement (séances + calories).
+## Version 15 secondes
 
-Hors de cette pub : Premium 6,99 €, Lobby, Pump Check, BPM, “bêta”, “10 places”.
+| Temps | Image | Texte écran | VO |
+|------|--------|-------------|-----|
+| 0–2s | Sports qui s’empilent (chaos) | `Trop d’apps ?` | « Trop d’apps pour trop de sports ? » |
+| 2–5s | Tout rentre dans une app | `Un seul endroit` | « Tout au même endroit. » |
+| 5–10s | Muscu → course → calories → progression | `Tous tes sports` / `Une progression` | « Muscu, course, et plus — une seule progression. » |
+| 10–13s | Logo Ranked Gym | `Ranked Gym` | « Ranked Gym. » |
+| 13–15s | Bouton CTA | `Commence gratuitement` | « Commence gratuitement. » |
 
----
-
-## Version 15 secondes (principale)
-
-| Temps | Image (motion) | Texte écran | VO (optionnelle) |
-|------|----------------|-------------|------------------|
-| 0–2s | Icônes sports qui s’empilent (muscu, course, foot, vélo…) | `Trop d’apps ?` | « Trop d’apps pour trop de sports ? » |
-| 2–5s | Tout fusionne dans **une** app Ranked Gym | `Un seul endroit` | « Tout au même endroit. » |
-| 5–10s | Muscu → course → calories → barre de progression qui monte | `Tous tes sports` puis `Une progression` | « Muscu, course, et plus — une seule progression. » |
-| 10–13s | Logo + wordmark Ranked Gym | `Ranked Gym` | « Ranked Gym. » |
-| 13–15s | CTA commercial clair (bouton) | `Commence gratuitement` | « Commence gratuitement. » |
-
-### Script VO (15 s)
+### VO 15s (bloc)
 ```
 Trop d’apps pour trop de sports ?
 Ranked Gym : muscu, course, et plus —
@@ -40,57 +26,72 @@ Une seule app.
 Commence gratuitement.
 ```
 
-### Règles motion (Google Ads)
-- 1 idée = multisport → une app
-- 3–5 mots max par plan
-- Hook **0–2 s** compréhensible muet
-- Logo + CTA dans les **3 dernières secondes**
-- Langage simple (pas de jargon)
+---
+
+## Version 30 secondes
+
+Même idée, avec un peu plus de **preuve** et de **bénéfice** (sans parler Premium / bêta).
+
+| Temps | Image | Texte écran | VO |
+|------|--------|-------------|-----|
+| 0–3s | Plusieurs apps / icônes sports qui s’accumulent | `Trop d’apps ?` | « Trop d’apps pour trop de sports ? » |
+| 3–7s | Personne qui passe de muscu → course → foot (flash) | `Muscu. Course. Et plus.` | « Muscu le matin. Course le week-end. Et le reste. » |
+| 7–12s | Chaos des apps qui se condensent dans Ranked Gym | `Un seul endroit` | « Une seule app pour tout suivre. » |
+| 12–18s | Écran séances + calories (simple, pas de jargon) | `Séances + calories` | « Tes séances. Tes calories. » |
+| 18–23s | Barre / rank / série qui avance | `Une progression` | « Une seule progression. » |
+| 23–27s | Logo Ranked Gym + panthère (optionnel) | `Ranked Gym` | « Ranked Gym. » |
+| 27–30s | CTA fort | `Commence gratuitement` | « Commence gratuitement. » |
+
+### VO 30s (bloc)
+```
+Trop d’apps pour trop de sports ?
+Muscu le matin. Course le week-end. Et le reste.
+Ranked Gym : une seule app pour tout suivre.
+Tes séances. Tes calories.
+Une seule progression.
+Ranked Gym.
+Commence gratuitement.
+```
+
+### Variante VO 30s (plus punchy)
+```
+Tu changes de sport. Pas d’app.
+Ranked Gym suit muscu, course, et plus.
+Séances, calories, progression — au même endroit.
+Commence gratuitement.
+```
 
 ---
 
-## Version 6 secondes (bumper)
+## Bumper 6s (option Google)
 
-| Temps | Image | Texte |
-|------|--------|--------|
-| 0–2s | Flash multisport | `Tous tes sports` |
-| 2–4s | Une progression | `Une progression` |
-| 4–6s | Logo + CTA | `Ranked Gym · Commence gratuitement` |
-
-VO : « Tous tes sports. Une progression. Ranked Gym. »
+| Temps | Texte |
+|------|--------|
+| 0–2s | `Tous tes sports` |
+| 2–4s | `Une progression` |
+| 4–6s | `Ranked Gym · Commence gratuitement` |
 
 ---
 
-## Textes Google Ads (compagnon vidéo)
+## Textes Google Ads (mêmes pour 15s et 30s)
 
-**Titres (~30 car.)**
+**Titres**
 1. Tous tes sports. Une app.
 2. Muscu + course. Un suivi.
 3. Une seule progression
 4. Ranked Gym — dispo
-5. Séances + calories
-6. Commence gratuitement
+5. Commence gratuitement
 
-**Descriptions (~90 car.)**
+**Descriptions**
 1. Suis tes séances et tes calories dans une seule app. Tous tes sports, une progression.
 2. Plus besoin d’une app par sport. Ranked Gym — commence gratuitement.
 
-**Bouton Google :** Télécharger / En savoir plus  
-*(selon destination : Play Store, App Store, ou site)*
+**Bouton :** Télécharger / En savoir plus
 
 ---
 
-## Landing / destination (launch)
-La pub doit atterrir sur une page claire :
-1. Même promesse : tous tes sports · une progression  
-2. Un seul bouton : télécharger / commencer  
-3. Pas de “bêta privée” ni “DM”
-
----
-
-## Variantes CTA (A/B plus tard)
-| Variante | CTA écran | Quand l’utiliser |
-|----------|-----------|------------------|
-| A | `Commence gratuitement` | Freemium / PWA |
-| B | `Télécharge Ranked Gym` | Stores |
-| C | `Ouvre l’app` | Remarketing / déjà connu |
+## Conseils prod motion
+- **15s** = hook + promesse + CTA (campagne large / CPC)
+- **30s** = même hook, +1 preuve visuelle (séances/calories), puis CTA (YouTube in-stream)
+- Garder le **même CTA** et le **même logo** sur les deux
+- Pas de “bêta”, pas de “envoie BÊTA”, pas de prix Premium dans ces spots
