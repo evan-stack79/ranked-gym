@@ -24,17 +24,12 @@ export function MealPhotoAiOverlay({ open, previewUrl = null }: MealPhotoAiOverl
       aria-labelledby="meal-photo-ai-title"
       aria-busy="true"
     >
-      <div className="meal-photo-ai-overlay__glow" aria-hidden />
-      <div className="meal-photo-ai-overlay__frame">
-        <div className="meal-photo-ai-overlay__orbit" aria-hidden />
-        <div className="meal-photo-ai-overlay__card">
-          <div className="meal-photo-ai-overlay__shine" aria-hidden />
-          <p className="meal-photo-ai-overlay__kicker">Photo IA</p>
-          <h2 id="meal-photo-ai-title" className="meal-photo-ai-overlay__title">
-            Analyse du repas
-          </h2>
-          <MealPhotoAiLoadingState previewUrl={previewUrl} />
-        </div>
+      <div className="meal-photo-ai-overlay__card">
+        <p className="meal-photo-ai-overlay__kicker">Photo IA</p>
+        <h2 id="meal-photo-ai-title" className="meal-photo-ai-overlay__title">
+          Analyse du repas
+        </h2>
+        <MealPhotoAiLoadingState previewUrl={previewUrl} />
       </div>
     </div>,
     document.body,

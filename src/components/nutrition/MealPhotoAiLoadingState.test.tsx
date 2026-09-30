@@ -69,9 +69,7 @@ describe('MealPhotoAiOverlay', () => {
     })
     const dialog = document.querySelector('[role="dialog"][aria-busy="true"]')
     expect(dialog).toBeTruthy()
-    expect(dialog?.querySelector('.meal-photo-ai-overlay__orbit')).toBeTruthy()
-    expect(dialog?.querySelector('.meal-photo-ai-overlay__glow')).toBeTruthy()
-    expect(dialog?.querySelector('.meal-photo-ai-overlay__shine')).toBeTruthy()
+    expect(dialog?.querySelector('#meal-photo-ai-title')?.textContent).toBe('Analyse du repas')
     expect(dialog?.querySelector('img')?.getAttribute('src')).toBe('blob:meal')
 
     await act(async () => {
