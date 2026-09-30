@@ -150,7 +150,7 @@ function ActivityRow({
           <span className="text-[#EBEBF5]">{actionText}</span>
         </p>
         <p className="mt-1 text-[13px] text-[#8E8E93]">
-          <span className="font-semibold text-[#FF2B2B]">{item.xp}</span> · il y a {item.time}
+          <span className="font-semibold text-brand">{item.xp}</span> · il y a {item.time}
           {selfGhost && (
             <span className="ml-1.5 text-[#BF5AF2]">· Masqué pour les autres</span>
           )}
@@ -166,7 +166,7 @@ function ActivityRow({
         aria-label={cheered ? 'Félicitations envoyées' : 'Féliciter'}
         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-all active:scale-95 ${
           cheered
-            ? 'border-[#FF2B2B]/50 bg-[#FF2B2B]/25 text-[#FF5C5C] shadow-[0_0_14px_rgb(255_43_43_/_0.35)]'
+            ? 'border-brand/50 bg-brand/25 text-[#FF5C5C] shadow-[0_0_14px_rgb(255_43_43_/_0.35)]'
             : 'border-white/10 bg-black/25 text-[#8E8E93] hover:border-white/20'
         }`}
       >

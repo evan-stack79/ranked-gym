@@ -845,13 +845,13 @@ export function WorkoutNotebook({
         className="rounded-3xl border border-white/10 px-4 py-3.5"
         style={{
           background: editingNote
-            ? `radial-gradient(ellipse 80% 60% at 100% 0%, #FF2B2B33 0%, transparent 55%), rgb(22 22 24 / 0.96)`
-            : `radial-gradient(ellipse 80% 60% at 100% 0%, ${activeRoutine?.accent ?? '#FF2B2B'}28 0%, transparent 55%), rgb(22 22 24 / 0.96)`,
+            ? `radial-gradient(ellipse 80% 60% at 100% 0%, #E2240033 0%, transparent 55%), rgb(22 22 24 / 0.96)`
+            : `radial-gradient(ellipse 80% 60% at 100% 0%, ${activeRoutine?.accent ?? '#E22400'}28 0%, transparent 55%), rgb(22 22 24 / 0.96)`,
           boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.06)',
         }}
       >
         {editingNote ? (
-          <div className="mb-2.5 flex items-center justify-between gap-2 rounded-2xl border border-[#FF2B2B]/35 bg-[#FF2B2B]/12 px-3 py-2">
+          <div className="mb-2.5 flex items-center justify-between gap-2 rounded-2xl border border-brand/35 bg-brand/12 px-3 py-2">
             <div className="flex items-center gap-2">
               <Pencil className="h-4 w-4 shrink-0 text-[#FF6961]" strokeWidth={2.25} />
               <div>

@@ -5,7 +5,7 @@
  *
  * Les masters dans `src/assets/brand/` ne sont jamais modifiés.
  * Les rouges du logo principal (header / splash) sont normalisés à la
- * génération vers la palette produit (#B91C1C → #FF2B2B), fond #0C0C0E.
+ * génération vers la palette produit (#D20000 → #E22400), fond #111111.
  * Les icônes home-screen / PWA / native copient les pixels exacts de la
  * plaque panthère (bouche fermée, couronne rouge, glow).
  *
@@ -23,11 +23,11 @@ sharp.concurrency(1)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
 
-const BRAND_BG = { r: 0x0c, g: 0x0c, b: 0x0e, alpha: 1 }
-/** Rouge profond (`--color-brand-deep`). */
-const BRAND_RED_DEEP = { r: 0xb9, g: 0x1c, b: 0x1c }
-/** Rouge produit principal (`--color-brand`). */
-const BRAND_RED_BRIGHT = { r: 0xff, g: 0x2b, b: 0x2b }
+const BRAND_BG = { r: 0x11, g: 0x11, b: 0x11, alpha: 1 }
+/** Rouge profond (`--color-brand-deep` / Radix red-10). */
+const BRAND_RED_DEEP = { r: 0xd2, g: 0x00, b: 0x00 }
+/** Rouge produit principal (`--color-brand` / Radix red-9). */
+const BRAND_RED_BRIGHT = { r: 0xe2, g: 0x24, b: 0x00 }
 
 const MASTER_CALM = path.join(root, 'src/assets/brand/panther-calm-crowned.png')
 /** Icône store/PWA — source propriétaire opaque (A5A15C62…), jamais de fond vert. */
@@ -167,7 +167,7 @@ function isBrandRedCandidate(r, g, b) {
 }
 
 /**
- * Remappe un rouge source vers la rampe #B91C1C → #FF2B2B selon sa valeur,
+ * Remappe un rouge source vers la rampe #D20000 → #E22400 selon sa valeur,
  * en adoucissant les bords anti-aliasés (mélange avec le pixel d’origine).
  */
 function normalizeRedPixel(r, g, b) {
@@ -734,7 +734,7 @@ async function main() {
 
   if (!iconsOnly) {
     console.log(
-      'Brand assets — masters intactes, rouges → #B91C1C…#FF2B2B, fond #0C0C0E ; icônes PWA via panther-icon-opaque',
+      'Brand assets — masters intactes, rouges → #D20000…#E22400, fond #0C0C0E ; icônes PWA via panther-icon-opaque',
     )
     const headerMasterPixels = await loadProcessedMasterPixels({ opaqueProductBackground: false })
     await writeHeaderMark(headerMasterPixels)

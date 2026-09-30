@@ -30,7 +30,7 @@ function MacroColumn({ label, consumedG, targetG }: MacroStat) {
         aria-label={label}
       >
         <div
-          className="motion-progress-fill h-full rounded-full bg-[#FF2B2B]"
+          className="motion-progress-fill h-full rounded-full bg-brand"
           style={{ transform: `scaleX(${Math.max(0.02, progress)})` }}
         />
       </div>

@@ -36,9 +36,9 @@ export function GymMemberCard({ member, index }: GymMemberCardProps) {
           <Avatar
             username={member.username}
             size="md"
-            className="ring-2 ring-[#FF2B2B]/35"
+            className="ring-2 ring-brand/35"
           />
-          <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-[#0C0C0E] bg-[#FF2B2B] text-[10px] font-bold text-white">
+          <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-[#0C0C0E] bg-brand text-[10px] font-bold text-white">
             {index + 1}
           </span>
         </div>
@@ -95,7 +95,7 @@ export function GymMemberList({ members, gymName }: GymMemberListProps) {
               <Flame className="h-4 w-4 shrink-0 text-[#FF9F0A]" />
             </div>
             <p className="text-[13px] text-[#8E8E93]">
-              <span className="font-semibold text-[#FF2B2B]">{members.length}</span> rival
+              <span className="font-semibold text-brand">{members.length}</span> rival
               {members.length > 1 ? 's' : ''} en ligne · compétition active
             </p>
           </div>

@@ -28,7 +28,7 @@ export function FighterHeader({
   email,
   provider,
   disciplineLabel,
-  disciplineAccent = '#FF2B2B',
+  disciplineAccent = '#E22400',
   avatarUrl,
   userId,
   onAvatarUpdated,
@@ -81,7 +81,7 @@ export function FighterHeader({
             type="button"
             onClick={openPicker}
             disabled={!canEdit || uploading}
-            className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/55 disabled:opacity-100"
+            className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-brand/55 disabled:opacity-100"
             aria-label={canEdit ? 'Changer la photo de profil' : `Avatar de ${username}`}
           >
             <Avatar
@@ -89,7 +89,7 @@ export function FighterHeader({
               imageUrl={displayUrl}
               size="lg"
               loading={uploading}
-              className="ring-2 ring-[#FF2B2B]/40"
+              className="ring-2 ring-brand/40"
             />
             {canEdit ? (
               <span

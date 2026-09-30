@@ -18,7 +18,7 @@ export const rankColors: Record<RankTier, { text: string; bg: string; border: st
   Platine: { text: 'text-[#5CFFE8]', bg: 'bg-[#00D4AA]/20', border: 'border-[#5CFFE8]/30' },
   Diamant: { text: 'text-[#FF4DCF]', bg: 'bg-[#C026FF]/20', border: 'border-[#FF4DCF]/35' },
   Master: { text: 'text-[#C4B5FD]', bg: 'bg-[#7C3AED]/25', border: 'border-[#A78BFA]/35' },
-  Légende: { text: 'text-[#FFD700]', bg: 'bg-[#FF2B2B]/25', border: 'border-[#FFD700]/40' },
+  Légende: { text: 'text-[#FFD700]', bg: 'bg-brand/25', border: 'border-[#FFD700]/40' },
 }
 
 const NAME_POOL = [

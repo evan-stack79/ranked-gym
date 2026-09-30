@@ -144,7 +144,7 @@ export function StatGrid() {
               <p className="mt-1 line-clamp-2 text-[11px] font-medium leading-snug text-[#D1D1D6]">
                 {pinned.exerciseName}
               </p>
-              <span className="mt-2 inline-flex max-w-full truncate rounded-full border border-[#FF2B2B]/25 bg-[#FF2B2B]/12 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-[#FF8A80]">
+              <span className="mt-2 inline-flex max-w-full truncate rounded-full border border-brand/25 bg-brand/12 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-[#FF8A80]">
                 {formatPrAgeLabel(pinned.achievedAt)}
               </span>
               <p className="mt-2 text-[12px] text-[#8E8E93]">PR</p>
@@ -166,7 +166,7 @@ export function StatGrid() {
         onClose={() => setPickerOpen(false)}
         title="PR épinglé"
         subtitle="Choisis l’exercice favori en vitrine"
-        leading={<Trophy className="mt-0.5 h-5 w-5 text-[#FF2B2B]" />}
+        leading={<Trophy className="mt-0.5 h-5 w-5 text-brand" />}
       >
         <div className="space-y-3 pb-4">
           {bestPrs.length > 3 ? (
@@ -177,7 +177,7 @@ export function StatGrid() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Rechercher un exercice…"
-                className="w-full rounded-2xl border border-white/10 bg-white/[0.05] py-3 pl-10 pr-4 text-[15px] text-white outline-none placeholder:text-[#636366] focus:border-[#FF2B2B]/35"
+                className="w-full rounded-2xl border border-white/10 bg-white/[0.05] py-3 pl-10 pr-4 text-[15px] text-white outline-none placeholder:text-[#636366] focus:border-brand/35"
               />
             </label>
           ) : null}
@@ -200,7 +200,7 @@ export function StatGrid() {
                       onClick={() => pickPr(pr)}
                       className={`ios-press flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3.5 text-left ${
                         selected
-                          ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/15'
+                          ? 'border-brand/45 bg-brand/15'
                           : 'border-white/10 bg-white/[0.04]'
                       }`}
                     >

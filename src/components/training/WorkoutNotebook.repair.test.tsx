@@ -21,7 +21,7 @@ const exercises: ExerciseEntry[] = [{
   ],
 }]
 const routine: WorkoutRoutine = {
-  id: 'push', label: 'Push', subtitle: '', accent: '#FF2B2B', exercises, updatedAt: 1,
+  id: 'push', label: 'Push', subtitle: '', accent: '#E22400', exercises, updatedAt: 1,
 }
 const historyNote: WorkoutNote = {
   id: 'historic', title: 'Ancienne séance', routineId: 'push', dateKey: '2026-09-01',

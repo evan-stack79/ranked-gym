@@ -1,4 +1,5 @@
 import type { VictorySessionStats } from '../types/victory'
+import { BRAND_COLOR } from '../theme/colors'
 
 const CARD_WIDTH = 1080
 const CARD_HEIGHT = 1920
@@ -50,7 +51,7 @@ function drawStats(ctx: CanvasRenderingContext2D, stats: VictorySessionStats) {
   ctx.textAlign = 'left'
 
   ctx.font = '600 28px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
-  ctx.fillStyle = '#FF2B2B'
+  ctx.fillStyle = BRAND_COLOR
   ctx.fillText('RANKED', left, 140)
   const rankedW = ctx.measureText('RANKED').width
   ctx.fillStyle = '#FFFFFF'

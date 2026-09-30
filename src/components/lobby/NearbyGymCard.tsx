@@ -61,7 +61,7 @@ export function NearbyGymCard({
 
           {gym.address && (
             <p className="mt-1.5 flex items-start gap-1.5 text-[13px] leading-snug text-[#8E8E93]">
-              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#FF2B2B]/80" />
+              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand/80" />
               <span className="line-clamp-2">{gym.address}</span>
             </p>
           )}
@@ -157,7 +157,7 @@ export function NearbyGymList({
                 onClick={() => setSortMode(id)}
                 className={`shrink-0 rounded-full border px-3.5 py-2 text-[13px] font-semibold transition-all ${
                   active
-                    ? 'border-[#FF2B2B]/50 bg-[#FF2B2B]/20 text-[#FF5C5C] shadow-[0_0_12px_rgb(255_43_43_/_0.2)]'
+                    ? 'border-brand/50 bg-brand/20 text-[#FF5C5C] shadow-[0_0_12px_rgb(255_43_43_/_0.2)]'
                     : 'border-white/10 bg-black/20 text-[#8E8E93] active:bg-white/5'
                 }`}
                 aria-pressed={active}

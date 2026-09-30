@@ -83,7 +83,7 @@ export function SportsMultiSelect({
                 onClick={() => toggle(sport)}
                 className={`ios-press flex min-h-11 w-full items-center justify-between gap-3 rounded-2xl border px-3.5 py-3 text-left ${
                   active
-                    ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/12'
+                    ? 'border-brand/45 bg-brand/12'
                     : 'border-white/10 bg-[#141416]'
                 }`}
               >
@@ -97,7 +97,7 @@ export function SportsMultiSelect({
                 </span>
                 <span
                   className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${
-                    active ? 'border-[#FF2B2B] bg-[#FF2B2B] text-white' : 'border-white/20'
+                    active ? 'border-brand bg-brand text-white' : 'border-white/20'
                   }`}
                   aria-hidden="true"
                 >

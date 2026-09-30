@@ -34,7 +34,7 @@ export function SportsOnboardingScreen({ onComplete }: SportsOnboardingScreenPro
       <header className="border-b border-white/5 bg-[#0C0C0E]">
         <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-3">
           <span className="text-[17px] font-semibold tracking-tight text-white">
-            Ranked <span className="text-[#FF2B2B]">Gym</span>
+            Ranked <span className="text-brand">Gym</span>
           </span>
         </div>
       </header>

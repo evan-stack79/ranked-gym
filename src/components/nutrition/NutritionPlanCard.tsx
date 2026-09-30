@@ -181,7 +181,7 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
 
         <div className="grid grid-cols-3 gap-2">
           {[
-            { label: 'Protéines', value: `${nutrition.proteinG} g`, color: '#FF2B2B' },
+            { label: 'Protéines', value: `${nutrition.proteinG} g`, color: '#E22400' },
             { label: 'Glucides', value: `${nutrition.carbsG} g`, color: '#FF9F0A' },
             { label: 'Lipides', value: `${nutrition.fatG} g`, color: '#00B4FF' },
           ].map((macro) => (

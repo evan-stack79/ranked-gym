@@ -63,7 +63,7 @@ export function TrainWeeklySummary({
                 onClick={() => onFilterChange(f.id)}
                 className={`ios-press flex min-h-11 shrink-0 items-center rounded-full border px-2.5 text-[11px] font-semibold ${
                   active
-                    ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/18 text-[#FF6961]'
+                    ? 'border-brand/45 bg-brand/18 text-[#FF6961]'
                     : 'border-white/10 text-[#8E8E93]'
                 }`}
               >

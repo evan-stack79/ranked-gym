@@ -61,7 +61,7 @@ export function PowerCurveChart({
   if (loading) {
     return (
       <div className={`flex min-h-[148px] items-center justify-center ${className}`}>
-        <div className="avatar-spinner h-8 w-8 rounded-full border-2 border-white/20 border-t-[#FF2B2B]" aria-hidden />
+        <div className="avatar-spinner h-8 w-8 rounded-full border-2 border-white/20 border-t-[#E22400]" aria-hidden />
       </div>
     )
   }
@@ -99,8 +99,8 @@ export function PowerCurveChart({
       >
         <defs>
           <linearGradient id="power-curve-area" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#FF2B2B" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#FF2B2B" stopOpacity="0" />
+            <stop offset="0%" stopColor="#E22400" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#E22400" stopOpacity="0" />
           </linearGradient>
           <filter id="power-curve-neon" x="-20%" y="-20%" width="140%" height="140%">
             <feGaussianBlur stdDeviation="1.8" result="blur" />
@@ -142,7 +142,7 @@ export function PowerCurveChart({
         <path
           d={linePath}
           fill="none"
-          stroke="#FF2B2B"
+          stroke="#E22400"
           strokeWidth={2.75}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -154,7 +154,7 @@ export function PowerCurveChart({
           const y = PAD.top + INNER_H - ((p.valueKg - minY) / range) * INNER_H
           return (
             <g key={p.label}>
-              <circle cx={x} cy={y} r={4.5} fill="#FF2B2B" stroke="#0C0C0E" strokeWidth={2} />
+              <circle cx={x} cy={y} r={4.5} fill="#E22400" stroke="#0C0C0E" strokeWidth={2} />
               <text
                 x={x}
                 y={H - 8}

@@ -22,7 +22,7 @@ export function CitySearchFallback({ onSearch, disabled = false, loading = false
       <p className="mb-3 text-center text-[15px] text-[#8E8E93]">Ou entre ta ville manuellement</p>
 
       <form onSubmit={handleSubmit} className="glass-card flex items-center gap-2 rounded-2xl p-2 pl-4">
-        <Search className="h-5 w-5 shrink-0 text-[#FF2B2B]" strokeWidth={1.75} />
+        <Search className="h-5 w-5 shrink-0 text-brand" strokeWidth={1.75} />
         <input
           type="text"
           value={city}

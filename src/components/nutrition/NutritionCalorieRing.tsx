@@ -62,7 +62,7 @@ export function NutritionCalorieRing({
         <button
           type="button"
           onClick={onOpenSetup}
-          className="ios-press mt-5 rounded-xl bg-[#FF2B2B] px-4 py-2.5 text-[13px] font-semibold text-white"
+          className="ios-press mt-5 rounded-xl bg-brand px-4 py-2.5 text-[13px] font-semibold text-white"
         >
           Définir mon objectif
         </button>
@@ -104,13 +104,13 @@ export function NutritionCalorieRing({
             cy="120"
             r={RING_RADIUS}
             fill="none"
-            stroke="#FF2B2B"
+            stroke="#E22400"
             strokeWidth="14"
             strokeLinecap="round"
             strokeDasharray={`${Math.max(0.01, RING_DASH * safeProgress)} ${2 * Math.PI * RING_RADIUS}`}
             transform={`rotate(${RING_ROTATION} 120 120)`}
           />
-          <circle cx={indicator.x} cy={indicator.y} r="5" fill="#FF2B2B" stroke="#0C0C0E" strokeWidth="3" />
+          <circle cx={indicator.x} cy={indicator.y} r="5" fill="#E22400" stroke="#0C0C0E" strokeWidth="3" />
         </svg>
         <div className="absolute inset-[18%] flex flex-col items-center justify-center text-center">
           <img
@@ -129,7 +129,7 @@ export function NutritionCalorieRing({
           </p>
         </div>
         <span
-          className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#FF2B2B]/50 bg-[#171719] px-2 py-1 text-[11px] font-bold tabular-nums text-white"
+          className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-brand/50 bg-[#171719] px-2 py-1 text-[11px] font-bold tabular-nums text-white"
           style={{ left: `${(indicator.x / 240) * 100}%`, top: `${(indicator.y / 240) * 100}%` }}
         >
           {Math.round(safeProgress * 100)}%

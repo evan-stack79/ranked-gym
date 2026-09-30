@@ -115,13 +115,13 @@ export function AuthBottomSheet() {
       dismissible={dismissible}
       title={title}
       subtitle={subtitle}
-      leading={<span className="mt-0.5 text-[15px] font-bold text-[#FF2B2B]">RG</span>}
+      leading={<span className="mt-0.5 text-[15px] font-bold text-brand">RG</span>}
     >
       <div className="space-y-4 pb-3">
         {panel === 'login' && (
           <>
             <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3.5 py-3">
-              <Mail className="h-4 w-4 shrink-0 text-[#FF2B2B]" />
+              <Mail className="h-4 w-4 shrink-0 text-brand" />
               <p className="text-[13px] text-[#AEAEB2]">Connexion par email</p>
             </div>
 
@@ -136,7 +136,7 @@ export function AuthBottomSheet() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="toi@email.com"
                   disabled={authLoading}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-brand/45 disabled:opacity-50"
                 />
               </label>
 
@@ -154,7 +154,7 @@ export function AuthBottomSheet() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Ton mot de passe"
                     disabled={authLoading}
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-brand/45 disabled:opacity-50"
                   />
                   <button
                     type="button"
@@ -249,7 +249,7 @@ export function AuthBottomSheet() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="toi@email.com"
                   disabled={authLoading}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-brand/45 disabled:opacity-50"
                 />
               </label>
 
@@ -267,7 +267,7 @@ export function AuthBottomSheet() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Au moins 6 caractères"
                     disabled={authLoading}
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-brand/45 disabled:opacity-50"
                   />
                   <button
                     type="button"
@@ -339,7 +339,7 @@ export function AuthBottomSheet() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="toi@email.com"
                   disabled={authLoading}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-brand/45 disabled:opacity-50"
                 />
               </label>
 
@@ -405,7 +405,7 @@ export function AuthBottomSheet() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Au moins 6 caractères"
                     disabled={authLoading}
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-brand/45 disabled:opacity-50"
                   />
                   <button
                     type="button"
@@ -432,7 +432,7 @@ export function AuthBottomSheet() {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Retape le mot de passe"
                     disabled={authLoading}
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-brand/45 disabled:opacity-50"
                   />
                   <button
                     type="button"

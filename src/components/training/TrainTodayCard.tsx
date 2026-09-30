@@ -37,8 +37,8 @@ export function TrainTodayCard({ card, onPrimary }: TrainTodayCardProps) {
         aria-label={label}
         className={
           isPrimaryRed
-            ? 'btn-brand ios-press mt-5 flex min-h-11 w-full items-center justify-center rounded-2xl px-4 py-3.5 text-[16px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/60'
-            : 'ios-press mt-5 flex min-h-11 w-full items-center justify-center rounded-2xl border border-[#FF2B2B]/30 bg-white/5 px-4 py-3.5 text-[16px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/35'
+            ? 'btn-brand ios-press mt-5 flex min-h-11 w-full items-center justify-center rounded-2xl px-4 py-3.5 text-[16px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60'
+            : 'ios-press mt-5 flex min-h-11 w-full items-center justify-center rounded-2xl border border-brand/30 bg-white/5 px-4 py-3.5 text-[16px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35'
         }
       >
         {label}

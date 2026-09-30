@@ -54,7 +54,7 @@ const MEAL_META: Record<
   { icon: typeof Coffee; accent: 'orange' | 'crimson' | 'violet' | 'blue'; glow: string }
 > = {
   breakfast: { icon: Coffee, accent: 'orange', glow: '#FF9F0A' },
-  lunch: { icon: Sun, accent: 'crimson', glow: '#FF2B2B' },
+  lunch: { icon: Sun, accent: 'crimson', glow: '#E22400' },
   dinner: { icon: Moon, accent: 'violet', glow: '#BF5AF2' },
   snack: { icon: Cookie, accent: 'blue', glow: '#00B4FF' },
 }
@@ -398,7 +398,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
             progress={progress}
             size={100}
             stroke={9}
-            color={progress > 1 ? '#FF2B2B' : '#FF9F0A'}
+            color={progress > 1 ? '#E22400' : '#FF9F0A'}
           >
             <p className="text-[20px] font-black text-white">{Math.round(progress * 100)}%</p>
             <p className="text-[10px] text-[#8E8E93]">objectif</p>
@@ -420,8 +420,8 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
                   transform: `scaleX(${Math.max(0, Math.min(progress, 1))})`,
                   background:
                     progress > 1
-                      ? 'linear-gradient(90deg, #FF2B2B, #FF0055)'
-                      : 'linear-gradient(90deg, #FF9F0A, #FF2B2B)',
+                      ? 'linear-gradient(90deg, #E22400, #FF0055)'
+                      : 'linear-gradient(90deg, #FF9F0A, #E22400)',
                   boxShadow: '0 0 12px rgb(255 159 10 / 0.4)',
                 }}
               />

@@ -8,7 +8,7 @@ interface ProPassCardProps {
 export function ProPassCard({ onTryFree, onDismiss }: ProPassCardProps) {
   return (
     <div
-      className="relative overflow-hidden rounded-3xl border border-[#FF2B2B]/25 p-5"
+      className="relative overflow-hidden rounded-3xl border border-brand/25 p-5"
       style={{
         background:
           'linear-gradient(135deg, rgb(18 18 20) 0%, rgb(28 12 14) 45%, rgb(80 18 22) 100%)',

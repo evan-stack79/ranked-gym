@@ -52,7 +52,7 @@ function renderResetEmailHtml(resetLink: string): string {
       Tu as demandé un nouveau mot de passe. Clique sur le bouton ci-dessous pour continuer.
     </p>
     <p style="margin:0 0 22px;">
-      <a href="${resetLink}" style="display:inline-block;background:#ff2b2b;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 16px;border-radius:10px;">
+      <a href="${resetLink}" style="display:inline-block;background:#e22400;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 16px;border-radius:10px;">
         Définir un nouveau mot de passe
       </a>
     </p>

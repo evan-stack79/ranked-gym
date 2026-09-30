@@ -42,7 +42,7 @@ function seedState(scenario: string): TrainingState {
     id: 'push',
     label: 'Push',
     subtitle: 'Pecs · Épaules',
-    accent: '#FF2B2B',
+    accent: '#E22400',
     exercises: [
       {
         id: 'ex-bench',
@@ -279,7 +279,7 @@ function seedState(scenario: string): TrainingState {
           id: 'push',
           label: 'Push',
           subtitle: '',
-          accent: '#FF2B2B',
+          accent: '#E22400',
           exercises: [],
           updatedAt: FIXED_MS,
         },

@@ -89,7 +89,7 @@ export function DailyStreak() {
       <div
         className={`streak-card relative overflow-hidden rounded-2xl border px-4 py-3.5 transition-all duration-500 ${
           lit
-            ? `border-[#FF2B2B]/45 ${weekGlow ? 'streak-card--jackpot' : 'streak-card--lit'}`
+            ? `border-brand/45 ${weekGlow ? 'streak-card--jackpot' : 'streak-card--lit'}`
             : 'border-white/10'
         }`}
         style={
@@ -110,7 +110,7 @@ export function DailyStreak() {
           <Flame
             className={`h-8 w-8 shrink-0 transition-colors duration-300 ${
               lit
-                ? `text-[#FF2B2B] ${bump ? 'streak-flame--pop' : ''}`
+                ? `text-brand ${bump ? 'streak-flame--pop' : ''}`
                 : 'text-[#636366]'
             }`}
             strokeWidth={2.25}
@@ -130,7 +130,7 @@ export function DailyStreak() {
                   }`}
                 >
                   {displayStreak}{' '}
-                  <span className="text-[18px] font-bold text-[#FF2B2B]">
+                  <span className="text-[18px] font-bold text-brand">
                     Jour{displayStreak > 1 ? 's' : ''} de feu
                   </span>
                 </p>

@@ -86,7 +86,7 @@ export function RecoveryTimerPanel() {
         }}
       >
         <p className="text-center text-[15px] font-semibold tracking-tight" data-recovery-label>
-          <span className="text-[#FF2B2B]">Récupération</span>
+          <span className="text-brand">Récupération</span>
           <span className="text-white"> · {durationLabel}</span>
         </p>
 
@@ -100,7 +100,7 @@ export function RecoveryTimerPanel() {
         <button
           type="button"
           onClick={() => rest.skip()}
-          className="ios-press mt-6 flex min-h-12 w-[52%] max-w-[200px] items-center justify-center rounded-full border border-[#FF2B2B] bg-transparent text-[16px] font-semibold text-white"
+          className="ios-press mt-6 flex min-h-12 w-[52%] max-w-[200px] items-center justify-center rounded-full border border-brand bg-transparent text-[16px] font-semibold text-white"
           data-recovery-resume
         >
           Reprendre

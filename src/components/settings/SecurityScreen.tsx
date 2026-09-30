@@ -196,7 +196,7 @@ export function SecurityScreen({
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               disabled={passwordBusy}
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+              className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white outline-none focus:border-brand/45 disabled:opacity-50"
             />
           </label>
           <label className="block">
@@ -211,7 +211,7 @@ export function SecurityScreen({
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               disabled={passwordBusy}
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+              className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white outline-none focus:border-brand/45 disabled:opacity-50"
             />
           </label>
           <label className="block">
@@ -226,7 +226,7 @@ export function SecurityScreen({
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               disabled={passwordBusy}
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+              className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white outline-none focus:border-brand/45 disabled:opacity-50"
             />
           </label>
 
