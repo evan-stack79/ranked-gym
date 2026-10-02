@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { describe, expect, it, vi, afterEach } from 'vitest'
 import { createRoot } from 'react-dom/client'
 import { act } from 'react'
 import { FullProfileScreen } from './FullProfileScreen'
