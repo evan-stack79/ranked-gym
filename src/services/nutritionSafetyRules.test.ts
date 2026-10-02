@@ -15,6 +15,7 @@ import {
   maxWeeklyPaceKg,
   maxWeeklyPaceKgWithDeficit,
   MAX_DAILY_DEFICIT_KCAL,
+  paceKgToDailyDeficit,
   softBandMessage,
 } from './nutritionSafetyRules'
 import { applySafetyToProfile } from './nutritionSafetyRules'
@@ -229,8 +230,19 @@ describe('Vitesse de perte', () => {
     expect(clampWeeklyPaceKg(0.9, 100)).toBeLessThanOrEqual(0.9)
     expect(clampWeeklyPaceKg(0.91, 100)).toBeLessThanOrEqual(0.9)
     expect(clampWeeklyPaceKg(1.5, 80)).toBeLessThanOrEqual(maxWeeklyPaceKgWithDeficit(80))
-    // 600 kcal/j ≈ 0.545 kg/sem < 0.9
+    // 600 kcal/j ≈ 0.545 kg/sem < 0.9 — floor à 0,54 (jamais 0,55 → 605 kcal)
     expect(maxWeeklyPaceKgWithDeficit(120)).toBeLessThan(0.9)
+  })
+
+  it('BUG-11 : plafond déficit 600 gagne toujours sur l’arrondi (0,55 → 605)', () => {
+    const max = maxWeeklyPaceKgWithDeficit(80)
+    expect(max).toBeLessThanOrEqual(0.54)
+    expect(paceKgToDailyDeficit(max)).toBeLessThanOrEqual(600)
+    // Affichage / sélecteur : jamais 0,55 si cela implique > 600 kcal/j
+    expect(max).not.toBe(0.55)
+    // Défaut aussi plafonné (ex. 120 kg → 0,5 % = 0,6 > plafond)
+    expect(defaultWeeklyPaceKg(120)).toBeLessThanOrEqual(maxWeeklyPaceKgWithDeficit(120))
+    expect(paceKgToDailyDeficit(defaultWeeklyPaceKg(120))).toBeLessThanOrEqual(600)
   })
 })
 

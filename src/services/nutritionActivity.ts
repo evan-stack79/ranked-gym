@@ -12,10 +12,11 @@ import { isCalorieGoalEnabled } from '../backend/calorieGoalFeatureFlag'
 import {
   decideEstimationEligibility,
   decideLossEligibility,
+  messageForLossRefusal,
   readHealthDeclarations,
   softBandMessage,
 } from './nutritionSafetyRules'
-import { M_INFO_1 } from '../content/safetyCopy'
+import { M_CAL_3, M_INFO_1 } from '../content/safetyCopy'
 
 export interface NutritionTargetResult {
   profile: CalorieProfile
@@ -154,18 +155,24 @@ export function getNutritionTarget(
       : profile
 
   const notices = [estimation.disclaimer, M_INFO_1].filter(Boolean) as string[]
+  if (profile.goal === 'cut' && !loss.eligible) {
+    const refusal = messageForLossRefusal(loss.reason)
+    if (refusal) notices.unshift(refusal)
+  }
 
   const result = runNutritionEngine(
     profileToEngineInput(engineProfile, { calorieGoalEnabled: true }),
   )
   if (!result.ok) {
+    const hardFloor =
+      result.code === 'ERR_TARGET_BELOW_BCMR' || result.code === 'ERR_INVALID_DEFICIT'
     return {
       profile,
       ...EMPTY_TARGET,
       goalLabel: GOAL_LABELS[engineProfile.goal],
       errorCode: result.code,
       errorMessage: result.message,
-      safetyNotices: notices,
+      safetyNotices: hardFloor ? [M_CAL_3, ...notices] : notices,
       showCalorieGoal: false,
     }
   }
