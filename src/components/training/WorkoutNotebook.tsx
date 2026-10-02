@@ -1128,9 +1128,6 @@ export function WorkoutNotebook({
             className="btn-brand ios-press flex flex-[1.4] flex-col items-center justify-center rounded-2xl py-2.5 text-[13px] font-semibold leading-tight text-white disabled:opacity-60"
           >
             <span>{saving ? 'Synchro…' : editingNote ? 'Sauvegarder' : 'Terminer la séance'}</span>
-            {!saving && (
-              <span className="mt-0.5 text-[11px] font-normal text-white/65">~{stats.kcal} kcal</span>
-            )}
           </button>
         </div>
 
