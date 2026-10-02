@@ -101,13 +101,24 @@ describe('Test 3 — BCMR hard stop', () => {
       weight_kg: 50,
       sport_principal: 'velo',
       goal: 'cut',
-      deficit_kcal: 2000,
+      deficit_kcal: 600,
     }
     const result = runNutritionEngine(input)
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.code).toBe(ERROR_CODES.TARGET_BELOW_BCMR)
     expect(result.httpStatus).toBe(422)
+  })
+
+  it('déficit > 600 → invalidé (plafond sécurité lot 1)', () => {
+    const result = runNutritionEngine({
+      ...BASE_INPUT,
+      goal: 'cut',
+      deficit_kcal: 601,
+    })
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.code).toBe(ERROR_CODES.INVALID_DEFICIT)
   })
 })
 
@@ -403,7 +414,7 @@ describe('Régression — payload API', () => {
       weight_kg: 50,
       sport_principal: 'velo',
       goal: 'cut',
-      deficit_kcal: 2000,
+      deficit_kcal: 600,
     })
     const payload = formatApiPayload(result)
     expect(payload.status).toBe('ERROR')
