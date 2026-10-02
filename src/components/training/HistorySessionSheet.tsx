@@ -191,7 +191,7 @@ export function HistorySessionSheet({
           ) : (
             <>
           <div
-            className="grid grid-cols-3 gap-2 border-b border-[#161618] pb-3"
+            className="grid grid-cols-2 gap-2 border-b border-[#161618] pb-3"
             data-history-detail-summary
           >
             <div>
@@ -204,12 +204,6 @@ export function HistorySessionSheet({
               <p className="text-[11px] font-medium text-[#8E8E93]">Volume</p>
               <p className="mt-0.5 text-[14px] tabular-nums text-white" data-history-metric="volume">
                 {formatHistoryDetailMetric('volume', metrics.volume)}
-              </p>
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-[#8E8E93]">Calories</p>
-              <p className="mt-0.5 text-[14px] tabular-nums text-white" data-history-metric="kcal">
-                {formatHistoryDetailMetric('kcal', metrics.kcal)}
               </p>
             </div>
           </div>

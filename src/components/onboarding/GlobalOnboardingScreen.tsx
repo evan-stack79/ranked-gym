@@ -6,6 +6,8 @@ import {
   saveCalorieProfile,
 } from '../../services/nutritionStorage'
 import type { CalorieProfile } from '../../types/nutrition'
+import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
+import { M_INFO_1 } from '../../content/safetyCopy'
 
 interface GlobalOnboardingScreenProps {
   onComplete: () => void
@@ -13,6 +15,7 @@ interface GlobalOnboardingScreenProps {
 
 export function GlobalOnboardingScreen({ onComplete }: GlobalOnboardingScreenProps) {
   const [profile, setProfile] = useState<CalorieProfile>(() => getCalorieProfile())
+  const calorieGoalEnabled = isCalorieGoalEnabled()
 
   const handleComplete = useCallback(
     (next: CalorieProfile) => {
@@ -32,6 +35,8 @@ export function GlobalOnboardingScreen({ onComplete }: GlobalOnboardingScreenPro
         paddingRight: 'env(safe-area-inset-right, 0px)',
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
+      data-testid="global-onboarding"
+      data-calorie-goal={calorieGoalEnabled ? 'on' : 'off'}
     >
       <header className="glass-bar relative z-10 border-b border-white/5">
         <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-3">
@@ -46,11 +51,13 @@ export function GlobalOnboardingScreen({ onComplete }: GlobalOnboardingScreenPro
       >
         <header className="mb-8 ios-fade-up">
           <h1 className="text-[28px] font-bold leading-tight tracking-tight text-white">
-            Ton plan sur mesure
+            {calorieGoalEnabled ? 'Ton plan sur mesure' : 'Bienvenue'}
           </h1>
           <p className="mt-2 flex items-start gap-2 text-[15px] leading-snug text-[#8E8E93]">
             <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#FFD60A]" />
-            Objectif, morphologie et rythme — on calcule tes calories et macros.
+            {calorieGoalEnabled
+              ? 'Objectif, morphologie et rythme — on calcule tes calories et macros.'
+              : M_INFO_1}
           </p>
         </header>
 

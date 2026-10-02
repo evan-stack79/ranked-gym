@@ -37,6 +37,12 @@ import { isActiveCloudBackendConfigured } from '../../backend/adapter'
 import { useAuth } from '../../context/AuthContext'
 import type { GymMember, LobbyPhase, LocationContext, NearbyGym } from '../../types'
 import { getStoredDisciplineId, getDiscipline } from '../../data/disciplines'
+import {
+  isRankingEligible,
+  neutralizeLevelRanking,
+  shouldHideRankings,
+} from '../../services/communitySafety'
+import { Q12_PROFIL_PRIVE } from '../../content/safetyCopy'
 
 function gymToLocation(gym: NearbyGym): LocationContext {
   return {
@@ -70,9 +76,11 @@ export function LobbyView() {
       setCheckedInAt(savedCheckIn.checkedInAt)
       setLocation(gymToLocation(savedCheckIn.gym))
       setLobbyMembers(
-        generateLobbyMembersForDiscipline(
-          savedCheckIn.gym.id,
-          memberCountForGym(savedCheckIn.gym),
+        neutralizeLevelRanking(
+          generateLobbyMembersForDiscipline(
+            savedCheckIn.gym.id,
+            memberCountForGym(savedCheckIn.gym),
+          ),
         ),
       )
       setNearbyGyms(mergeWithCustomGyms([savedCheckIn.gym]))
@@ -87,7 +95,9 @@ export function LobbyView() {
       setCheckedInGym(gym)
       setCheckedInAt(Date.now())
       setLobbyMembers(
-        generateLobbyMembersForDiscipline(gym.id, memberCountForGym(gym)),
+        neutralizeLevelRanking(
+          generateLobbyMembersForDiscipline(gym.id, memberCountForGym(gym)),
+        ),
       )
       setPhase('checked-in')
 
@@ -246,6 +256,22 @@ export function LobbyView() {
     return (
       <div className="flex flex-col gap-6">
         <LobbyLoader phase="fetching" />
+      </div>
+    )
+  }
+
+  if (shouldHideRankings()) {
+    return (
+      <div className="flex flex-col gap-6" data-testid="lobby-rankings-hidden">
+        <header>
+          <h1 className="text-[34px] font-bold tracking-tight text-white">Lobby</h1>
+        </header>
+        <p className="text-[15px] leading-relaxed text-[#EBEBF5]">{Q12_PROFIL_PRIVE}</p>
+        {!isRankingEligible() ? (
+          <p className="text-[13px] text-[#8E8E93]">
+            La découverte de spots reste disponible après 18 ans, sans classement.
+          </p>
+        ) : null}
       </div>
     )
   }
@@ -418,7 +444,7 @@ export function LobbyView() {
               <p className="mt-1 text-[13px] text-[#AEAEB2]">{checkedInGym.address}</p>
             )}
             <p className="mt-4 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-[13px] text-[#EBEBF5]">
-              Affronte les athlètes présents — toutes disciplines. Monte en XP. Domine le rank.
+              Athlètes présents — toutes disciplines. Pas de classement par volume ni par séances.
             </p>
           </div>
 

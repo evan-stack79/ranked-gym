@@ -150,9 +150,11 @@ export function EnduranceSessionCard({
           <div className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2.5">
             <p className="flex items-center gap-1.5 text-[11px] text-[#8E8E93]">
               <Gauge className="h-3.5 w-3.5" />
-              Énergie
+              Distance
             </p>
-            <p className="mt-0.5 text-[18px] font-bold text-white">~{kcal} kcal</p>
+            <p className="mt-0.5 text-[18px] font-bold text-white">
+              {distanceKm != null ? `${distanceKm} km` : '—'}
+            </p>
           </div>
         </div>
 

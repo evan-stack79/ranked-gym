@@ -18,10 +18,46 @@ import { isConvexDomainActive } from '../backend/adapter'
 import { getActiveCloudUserId } from './cloudSession'
 import { enqueueConvexNutritionOp } from './convexNutritionQueue'
 import { safeWarn } from '../utils/safeLog'
-import { readLocal, writeLocal } from './secureLocalStore'
+import { readLocal, removeLocal, writeLocal } from './secureLocalStore'
+import {
+  applySafetyToProfile,
+  clampWeeklyPaceKg,
+  isPlausibleOnboardingAge,
+} from './nutritionSafetyRules'
+import type { Sex } from '../types/nutrition'
+import { clearQueuedConvexNutritionOpsForUser } from './convexNutritionQueue'
 
 const PROFILE_BASE = 'ranked-gym:nutrition-profile'
 const JOURNAL_BASE = 'ranked-gym:nutrition-journal'
+const PIECE_PRESETS_KEY = 'ranked-gym:piece-presets'
+const CONVEX_NUTRITION_QUEUE_PREFIX = 'ranked-gym:convex-nutrition-queue'
+
+/** Préfixes / clés locales liées à la santé ou aux données personnelles sensibles (BUG-34). */
+const HEALTH_LOCAL_KEY_PREFIXES = [
+  PROFILE_BASE,
+  JOURNAL_BASE,
+  'ranked-gym:sleep-log',
+  'ranked-gym:training',
+  'ranked-gym:profile',
+  'ranked-gym:last-location',
+  'ranked-gym:check-in',
+  'ranked-gym:custom-gyms',
+  CONVEX_NUTRITION_QUEUE_PREFIX,
+  // BUG-40 : préférences d’interface (discipline, ghost, streak)
+  'ranked-gym:ghost-mode',
+  'ranked-gym:streak-celebration',
+] as const
+
+const HEALTH_LOCAL_EXACT_KEYS = [
+  PIECE_PRESETS_KEY,
+  'ranked-gym:cloud-backup-meta',
+  'ranked-gym:reminder-fired',
+  'ranked-gym:discipline',
+  'ranked-gym:pro-pass-dismissed',
+] as const
+
+/** Cache sessionStorage (géocodage inverse) — vidé à la suppression de compte (BUG-40). */
+const SESSION_CLEAR_PREFIXES = ['ranked-gym:revgeo'] as const
 
 export type StorageSaveOptions = { skipCloud?: boolean }
 
@@ -109,12 +145,16 @@ export const BLANK_PROFILE: CalorieProfile = {
   goalWeightKg: 0,
   heightCm: 0,
   age: 0,
-  sex: 'male',
+  sex: null,
   activity: 'moderate',
   morphology: 'mesomorph',
   goal: 'maintain',
-  weeklyPaceKg: 0.5,
+  weeklyPaceKg: 0,
   onboardingComplete: false,
+  declaredPregnancy: false,
+  declaredBreastfeeding: false,
+  declaredEatingDisorder: false,
+  preferNotAnswerHealth: false,
 }
 
 /** @deprecated Use BLANK_PROFILE — kept for imports that still reference the name. */
@@ -151,26 +191,43 @@ function normalizeGoal(value: unknown, fallback: NutritionGoal): NutritionGoal {
     : fallback
 }
 
-/** Persist exactly what the user entered — no mock overwrite. */
+function normalizeSex(value: unknown): Sex | null {
+  if (value === 'female' || value === 'male') return value
+  return null
+}
+
+/** Persist exactly what the user entered — bornes sécurité via nutritionSafetyRules. */
 export function normalizeCalorieProfile(input: CalorieProfile): CalorieProfile {
   const goal = normalizeGoal(input.goal, 'maintain')
+  const weightKg = asFiniteNumber(input.weightKg, 0)
+  const rawPace = asFiniteNumber(input.weeklyPaceKg, 0)
   const weeklyPaceKg =
-    goal === 'maintain'
-      ? 0
-      : Math.max(0.1, Math.min(1.5, asFiniteNumber(input.weeklyPaceKg, 0.5)))
+    goal === 'maintain' ? 0 : clampWeeklyPaceKg(rawPace > 0 ? rawPace : 0.5, weightKg || 70)
 
-  return {
-    weightKg: asFiniteNumber(input.weightKg, 0),
+  let age = Math.round(asFiniteNumber(input.age, 0))
+  if (age !== 0 && !isPlausibleOnboardingAge(age)) {
+    // Valeur hors plage plausible → traitée comme inconnue (pas de plan).
+    age = 0
+  }
+
+  const draft: CalorieProfile = {
+    weightKg,
     goalWeightKg: asFiniteNumber(input.goalWeightKg, 0),
     heightCm: asFiniteNumber(input.heightCm, 0),
-    age: Math.round(asFiniteNumber(input.age, 0)),
-    sex: input.sex === 'female' ? 'female' : 'male',
+    age,
+    sex: normalizeSex(input.sex),
     activity: input.activity || 'moderate',
     morphology: input.morphology || 'mesomorph',
     goal,
     weeklyPaceKg,
     onboardingComplete: Boolean(input.onboardingComplete),
+    declaredPregnancy: Boolean(input.declaredPregnancy),
+    declaredBreastfeeding: Boolean(input.declaredBreastfeeding),
+    declaredEatingDisorder: Boolean(input.declaredEatingDisorder),
+    preferNotAnswerHealth: Boolean(input.preferNotAnswerHealth),
   }
+
+  return applySafetyToProfile(draft)
 }
 
 export function getCalorieProfile(): CalorieProfile {
@@ -195,12 +252,16 @@ export function getCalorieProfile(): CalorieProfile {
     goalWeightKg: asFiniteNumber(stored.goalWeightKg, asFiniteNumber(stored.weightKg, 0)),
     heightCm: asFiniteNumber(stored.heightCm, 0),
     age: asFiniteNumber(stored.age, 0),
-    sex: stored.sex === 'female' ? 'female' : 'male',
+    sex: normalizeSex(stored.sex),
     activity: stored.activity || 'moderate',
     morphology: stored.morphology || 'mesomorph',
     goal: normalizeGoal(stored.goal, 'maintain'),
-    weeklyPaceKg: asFiniteNumber(stored.weeklyPaceKg, 0.5),
+    weeklyPaceKg: asFiniteNumber(stored.weeklyPaceKg, 0),
     onboardingComplete: Boolean(stored.onboardingComplete),
+    declaredPregnancy: Boolean(stored.declaredPregnancy),
+    declaredBreastfeeding: Boolean(stored.declaredBreastfeeding),
+    declaredEatingDisorder: Boolean(stored.declaredEatingDisorder),
+    preferNotAnswerHealth: Boolean(stored.preferNotAnswerHealth),
   })
 }
 
@@ -229,6 +290,89 @@ export function hasCompletedNutritionOnboarding(): boolean {
   } catch (error) {
     safeWarn('[nutrition] hasCompletedNutritionOnboarding failed', error)
     return false
+  }
+}
+
+function isHealthLocalKey(key: string): boolean {
+  if ((HEALTH_LOCAL_EXACT_KEYS as readonly string[]).includes(key)) return true
+  return HEALTH_LOCAL_KEY_PREFIXES.some(
+    (prefix) => key === prefix || key.startsWith(`${prefix}:`) || key.startsWith(prefix),
+  )
+}
+
+/**
+ * Efface les données de santé locales (nutrition, sommeil, entraînement, GPS,
+ * check-ins, caches) et les préférences d’interface locales — appelé à la
+ * suppression de compte (SEC-DON-02 / R-13 / BUG-34 / BUG-40).
+ */
+export function clearLocalNutritionData(opts?: { userId?: string | null }): void {
+  const uid = opts?.userId ?? getActiveCloudUserId()
+  const keys = new Set<string>([...HEALTH_LOCAL_EXACT_KEYS])
+  for (const prefix of HEALTH_LOCAL_KEY_PREFIXES) {
+    keys.add(prefix)
+    if (uid) keys.add(`${prefix}:u:${uid}`)
+  }
+
+  if (typeof localStorage !== 'undefined') {
+    try {
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i)
+        if (key && isHealthLocalKey(key)) keys.add(key)
+      }
+    } catch (error) {
+      safeWarn('[nutrition] clearLocalNutritionData scan failed', error)
+    }
+  }
+
+  for (const key of keys) {
+    try {
+      removeLocal(key)
+    } catch (error) {
+      safeWarn('[nutrition] clearLocalNutritionData removeLocal failed', error)
+    }
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.removeItem(key)
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  // BUG-40 : cache géocodage inverse en sessionStorage
+  if (typeof sessionStorage !== 'undefined') {
+    try {
+      const sessionKeys: string[] = []
+      for (let i = 0; i < sessionStorage.length; i += 1) {
+        const key = sessionStorage.key(i)
+        if (
+          key &&
+          SESSION_CLEAR_PREFIXES.some(
+            (prefix) => key === prefix || key.startsWith(`${prefix}:`),
+          )
+        ) {
+          sessionKeys.push(key)
+        }
+      }
+      for (const key of sessionKeys) {
+        sessionStorage.removeItem(key)
+      }
+    } catch (error) {
+      safeWarn('[nutrition] clearLocalNutritionData sessionStorage failed', error)
+    }
+  }
+
+  if (uid) {
+    try {
+      clearQueuedConvexNutritionOpsForUser(uid)
+    } catch (error) {
+      safeWarn('[nutrition] clearLocalNutritionData queue clear failed', error)
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('ranked-gym:profile-changed'))
+    window.dispatchEvent(new Event('ranked-gym:training-changed'))
   }
 }
 

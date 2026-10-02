@@ -26,6 +26,10 @@ type TableName =
   | 'profiles'
   | 'workouts_state'
   | 'nutrition_state'
+  | 'nutrition_meals'
+  | 'nutrition_water_entries'
+  | 'nutrition_day_state'
+  | 'nutrition_food_catalog'
   | 'sleep_nights'
   | 'checkins'
   | 'custom_spots'
@@ -57,6 +61,10 @@ class FakeDb {
     profiles: [],
     workouts_state: [],
     nutrition_state: [],
+    nutrition_meals: [],
+    nutrition_water_entries: [],
+    nutrition_day_state: [],
+    nutrition_food_catalog: [],
     sleep_nights: [],
     checkins: [],
     custom_spots: [],
