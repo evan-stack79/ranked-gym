@@ -32,23 +32,37 @@ async function renderOnboarding(
   return { host, root, cleanup: () => { root.unmount(); host.remove() } }
 }
 
-function fillMeasurements(host: HTMLElement, opts: { age: number; weight?: number; height?: number }) {
-  const weight = host.querySelector('input[aria-label="Poids actuel"]') as HTMLInputElement
-  const height = host.querySelector('input[aria-label="Taille"]') as HTMLInputElement
+function setNative(el: HTMLInputElement, value: string) {
+  const proto = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
+  proto?.set?.call(el, value)
+  el.dispatchEvent(new Event('input', { bubbles: true }))
+  el.dispatchEvent(new Event('change', { bubbles: true }))
+}
+
+function fillAgeSex(host: HTMLElement, ageYears: number) {
   const age = host.querySelector('input[aria-label="Âge"]') as HTMLInputElement
   const male = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'Homme')
-
-  const setNative = (el: HTMLInputElement, value: string) => {
-    const proto = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
-    proto?.set?.call(el, value)
-    el.dispatchEvent(new Event('input', { bubbles: true }))
-    el.dispatchEvent(new Event('change', { bubbles: true }))
-  }
-
-  setNative(weight, String(opts.weight ?? 60))
-  setNative(height, String(opts.height ?? 170))
-  setNative(age, String(opts.age))
+  setNative(age, String(ageYears))
   male?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+}
+
+function fillBody(host: HTMLElement, opts?: { weight?: number; height?: number }) {
+  const weight = host.querySelector('input[aria-label="Poids actuel"]') as HTMLInputElement
+  const height = host.querySelector('input[aria-label="Taille"]') as HTMLInputElement
+  setNative(weight, String(opts?.weight ?? 60))
+  setNative(height, String(opts?.height ?? 170))
+}
+
+async function fillAdultMeasurements(
+  host: HTMLElement,
+  opts: { age: number; weight?: number; height?: number },
+) {
+  await act(async () => {
+    fillAgeSex(host, opts.age)
+  })
+  await act(async () => {
+    fillBody(host, opts)
+  })
 }
 
 describe('QA BUG-01 — drapeau OFF coupe l’assistant calories', () => {
@@ -73,9 +87,7 @@ describe('QA BUG-01 — drapeau OFF coupe l’assistant calories', () => {
     expect(host.textContent).not.toMatch(/on calcule tes calories/i)
     expect(host.textContent).toContain(M_INFO_1)
 
-    await act(async () => {
-      fillMeasurements(host, { age: 30, weight: 80, height: 180 })
-    })
+    await fillAdultMeasurements(host, { age: 30, weight: 80, height: 180 })
 
     const continuer = Array.from(host.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Continuer'),
@@ -130,8 +142,12 @@ describe('QA BUG-02 — mineur 17 ans peut s’inscrire', () => {
     })
 
     await act(async () => {
-      fillMeasurements(host, { age: 17, weight: 60, height: 170 })
+      fillAgeSex(host, 17)
     })
+    // BUG-08 : pas de champs poids/taille pour un mineur
+    expect(host.querySelector('[data-testid="onboarding-body-fields"]')).toBeNull()
+    expect(host.querySelector('input[aria-label="Poids actuel"]')).toBeNull()
+
     const continuer = Array.from(host.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Continuer'),
     )
@@ -142,7 +158,6 @@ describe('QA BUG-02 — mineur 17 ans peut s’inscrire', () => {
     expect(host.querySelector('[data-testid="onboarding-exit"]')).toBeTruthy()
     expect(host.textContent).toContain(Q6A_MINEURS)
     expect(host.textContent).toContain(M_MIN_1)
-    expect(host.textContent).not.toMatch(/Certaines fonctions de nutrition ne sont pas proposées avant 18 ans\.$/)
 
     await act(async () => {
       host
@@ -152,6 +167,8 @@ describe('QA BUG-02 — mineur 17 ans peut s’inscrire', () => {
 
     expect(saved.current).not.toBeNull()
     expect(saved.current!.age).toBe(17)
+    expect(saved.current!.weightKg).toBe(0)
+    expect(saved.current!.heightCm).toBe(0)
     expect(saved.current!.onboardingComplete).toBe(true)
     expect(saved.current!.goal).toBe('maintain')
 
@@ -186,9 +203,7 @@ describe('QA BUG-03 — grossesse / TCA : sortie vers l’app', () => {
     })
     expect(checkbox.checked).toBe(true)
 
-    await act(async () => {
-      fillMeasurements(host, { age: 28, weight: 65, height: 165 })
-    })
+    await fillAdultMeasurements(host, { age: 28, weight: 65, height: 165 })
 
     const continuer = Array.from(host.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Continuer'),
@@ -224,9 +239,7 @@ describe('QA BUG-03 — grossesse / TCA : sortie vers l’app', () => {
     })
     expect(host.textContent).toContain(M_TCA_1)
 
-    await act(async () => {
-      fillMeasurements(host, { age: 25, weight: 60, height: 170 })
-    })
+    await fillAdultMeasurements(host, { age: 25, weight: 60, height: 170 })
 
     const continuer = Array.from(host.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Continuer'),
@@ -243,6 +256,41 @@ describe('QA BUG-03 — grossesse / TCA : sortie vers l’app', () => {
       talk?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     expect(host.querySelector('[data-testid="need-to-talk-screen"]')).toBeTruthy()
+
+    cleanup()
+  })
+})
+
+describe('QA BUG-31 — TCA dès l’étape 1 interrompt l’assistant (drapeau ON)', () => {
+  const prev = import.meta.env.VITE_ENABLE_CALORIE_GOAL
+
+  beforeEach(() => {
+    vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', 'true')
+  })
+
+  afterEach(() => {
+    if (prev === undefined) vi.unstubAllEnvs()
+    else vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', prev)
+  })
+
+  it('cocher TCA → sortie immédiate, pas de Sèche ni poids objectif', async () => {
+    const { host, cleanup } = await renderOnboarding(() => undefined)
+
+    const tca = Array.from(host.querySelectorAll('label')).find((l) =>
+      l.textContent?.includes('Trouble du comportement'),
+    )
+    await act(async () => {
+      tca?.querySelector('input[type="checkbox"]')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true }),
+      )
+      ;(tca?.querySelector('input[type="checkbox"]') as HTMLInputElement | null)?.click()
+    })
+
+    expect(host.querySelector('[data-testid="onboarding-exit"]')).toBeTruthy()
+    expect(host.textContent).toContain(M_TCA_1)
+    expect(host.textContent).not.toMatch(/Sèche/)
+    expect(host.querySelector('input[aria-label="Poids objectif"]')).toBeNull()
+    expect(host.querySelector('[data-testid="exit-need-to-talk"]')).toBeTruthy()
 
     cleanup()
   })

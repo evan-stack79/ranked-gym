@@ -159,13 +159,13 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
     [age, weightKg, heightCm, sex, goalWeightKg, declarations, calorieGoalEnabled],
   )
 
-  /** Cut autorisé seulement une fois les mensurations connues et éligibles. */
+  /** Cut : jamais si TCA/grossesse ; sinon seulement après mensurations éligibles. */
   const allowCut =
-    !calorieGoalEnabled
-      ? false
-      : !measurementsComplete
-        ? true
-        : lossGate.eligible
+    calorieGoalEnabled &&
+    !isRestrictedHealth &&
+    (measurementsComplete ? lossGate.eligible : true)
+
+  const showBodyFields = age != null && !isMinorAge(age)
 
   const draft: CalorieProfile | null = useMemo(() => {
     if (!calorieGoalEnabled) return null
@@ -229,12 +229,17 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
   }, [draft])
 
   const buildLiteProfile = (): CalorieProfile | null => {
-    if (weightKg == null || heightCm == null || age == null || sex == null) return null
-    if (weightKg <= 0 || heightCm <= 0 || age <= 0) return null
+    if (age == null || sex == null || age <= 0) return null
+    const minor = isMinorAge(age)
+    if (!minor && (weightKg == null || heightCm == null || weightKg <= 0 || heightCm <= 0)) {
+      return null
+    }
+    const w = minor ? 0 : (weightKg as number)
+    const h = minor ? 0 : (heightCm as number)
     return normalizeCalorieProfile({
-      weightKg,
-      goalWeightKg: weightKg,
-      heightCm,
+      weightKg: w,
+      goalWeightKg: w,
+      heightCm: h,
       age,
       sex,
       activity: 'moderate',
@@ -247,11 +252,15 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
   }
 
   const buildRestrictedProfile = (): CalorieProfile | null => {
-    if (weightKg == null || heightCm == null || age == null || sex == null) return null
+    if (age == null || sex == null || age <= 0) return null
+    const minor = isMinorAge(age)
+    // Sortie anticipée (TCA/grossesse) : poids/taille optionnels
+    const w = minor ? 0 : Math.max(0, weightKg ?? 0)
+    const h = minor ? 0 : Math.max(0, heightCm ?? 0)
     return normalizeCalorieProfile({
-      weightKg,
-      goalWeightKg: weightKg,
-      heightCm,
+      weightKg: w,
+      goalWeightKg: w,
+      heightCm: h,
       age,
       sex,
       activity: activity || 'moderate',
@@ -263,6 +272,22 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
     })
   }
 
+  const applyHealthChange = (next: typeof health) => {
+    setHealth(next)
+    const d = readHealthDeclarations({ ...next })
+    // BUG-31 : TCA / grossesse / allaitement dès l'étape 1 → interrompre l'assistant
+    if (
+      calorieGoalEnabled &&
+      (d.pregnancy || d.breastfeeding || d.eatingDisorder) &&
+      step !== 'exit'
+    ) {
+      setGoal('maintain')
+      setWeeklyPaceKg(0)
+      setError(null)
+      setStep('exit')
+    }
+  }
+
   const goBack = () => {
     setError(null)
     const prev = steps[stepIndex - 1]
@@ -270,6 +295,11 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
   }
 
   const goGoalWeight = () => {
+    if (isRestrictedHealth) {
+      setError(null)
+      setStep('exit')
+      return
+    }
     if (goal == null) {
       setError('Choisis un objectif pour continuer.')
       return
@@ -298,18 +328,24 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
   }
 
   const goActivity = () => {
-    if (weightKg == null || heightCm == null || age == null || sex == null) {
-      setError('Remplis poids actuel, taille, âge et sexe.')
+    if (age == null || sex == null) {
+      setError('Remplis âge et sexe.')
       return
     }
     if (age < PLAUSIBLE_AGE_MIN || age > PLAUSIBLE_AGE_MAX) {
       setError(`Indique un âge entre ${PLAUSIBLE_AGE_MIN} et ${PLAUSIBLE_AGE_MAX} ans.`)
       return
     }
-    // BUG-02 : mineur → enregistrer l'âge et sortir vers l'app (pas de blocage).
+    // BUG-02 / BUG-08 : mineur → âge enregistré, pas de poids/taille, sortie app.
     if (isMinorAge(age)) {
+      setWeightKg(null)
+      setHeightCm(null)
       setError(null)
       setStep('exit')
+      return
+    }
+    if (weightKg == null || heightCm == null || weightKg <= 0 || heightCm <= 0) {
+      setError('Remplis poids actuel et taille.')
       return
     }
     // BUG-04 : éligibilité perte une fois les mensurations connues.
@@ -355,15 +391,19 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
   const submitLiteOrExit = () => {
     const profile = calorieGoalEnabled ? buildRestrictedProfile() : buildLiteProfile()
     if (!profile) {
-      setError('Remplis poids actuel, taille, âge et sexe.')
+      setError(
+        age != null && isMinorAge(age)
+          ? 'Remplis âge et sexe.'
+          : 'Remplis âge, sexe, poids actuel et taille.',
+      )
       return
     }
     onComplete(profile)
   }
 
   const continueLite = () => {
-    if (weightKg == null || heightCm == null || age == null || sex == null) {
-      setError('Remplis poids actuel, taille, âge et sexe.')
+    if (age == null || sex == null) {
+      setError('Remplis âge et sexe.')
       return
     }
     if (age < PLAUSIBLE_AGE_MIN || age > PLAUSIBLE_AGE_MAX) {
@@ -371,8 +411,18 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
       return
     }
     setError(null)
-    if (isMinorAge(age) || isRestrictedHealth) {
+    if (isMinorAge(age)) {
+      setWeightKg(null)
+      setHeightCm(null)
       setStep('exit')
+      return
+    }
+    if (isRestrictedHealth) {
+      setStep('exit')
+      return
+    }
+    if (weightKg == null || heightCm == null || weightKg <= 0 || heightCm <= 0) {
+      setError('Remplis poids actuel et taille.')
       return
     }
     submitLiteOrExit()
@@ -433,7 +483,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
             <p className="text-[15px] text-[#AEAEB2]">{M_INFO_1}</p>
             <HealthSituationsForm
               value={health}
-              onChange={setHealth}
+              onChange={applyHealthChange}
               showTcaMessage
               onOpenNeedToTalk={() => setShowNeedToTalk(true)}
             />
@@ -446,6 +496,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               setAge={setAge}
               sex={sex}
               setSex={setSex}
+              showBodyFields={showBodyFields}
             />
             <button
               type="button"
@@ -465,22 +516,24 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
 
             <HealthSituationsForm
               value={health}
-              onChange={setHealth}
+              onChange={applyHealthChange}
               showTcaMessage
               onOpenNeedToTalk={() => setShowNeedToTalk(true)}
             />
 
-            <GoalPicker
-              value={goal}
-              allowCut={allowCut}
-              onChange={(next) => {
-                setGoal(next)
-                if (next === 'maintain') setWeeklyPaceKg(0)
-                else if (weeklyPaceKg <= 0) {
-                  setWeeklyPaceKg(defaultWeeklyPaceKg(weightKg ?? 70))
-                }
-              }}
-            />
+            {!isRestrictedHealth ? (
+              <GoalPicker
+                value={goal}
+                allowCut={allowCut}
+                onChange={(next) => {
+                  setGoal(next)
+                  if (next === 'maintain') setWeeklyPaceKg(0)
+                  else if (weeklyPaceKg <= 0) {
+                    setWeeklyPaceKg(defaultWeeklyPaceKg(weightKg ?? 70))
+                  }
+                }}
+              />
+            ) : null}
 
             <button
               type="button"
@@ -582,7 +635,9 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
         {step === 'measurements' && (
           <div className="space-y-3">
             <p className="text-[15px] text-[#AEAEB2]">
-              Poids, taille, âge et sexe — base de ton métabolisme.
+              {showBodyFields
+                ? 'Poids, taille, âge et sexe — base de ton métabolisme.'
+                : 'Indique d’abord ton âge et ton sexe.'}
             </p>
             <MeasurementsFields
               weightKg={weightKg}
@@ -593,6 +648,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               setAge={setAge}
               sex={sex}
               setSex={setSex}
+              showBodyFields={showBodyFields}
             />
             <div className="flex gap-2 pt-1">
               <button
@@ -765,6 +821,19 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
             {!isMinor && !isRestrictedHealth ? (
               <p className="text-[15px] leading-relaxed text-[#AEAEB2]">{M_INFO_1}</p>
             ) : null}
+            {(age == null || sex == null) && (
+              <MeasurementsFields
+                weightKg={weightKg}
+                setWeightKg={setWeightKg}
+                heightCm={heightCm}
+                setHeightCm={setHeightCm}
+                age={age}
+                setAge={setAge}
+                sex={sex}
+                setSex={setSex}
+                showBodyFields={false}
+              />
+            )}
             <button
               type="button"
               onClick={submitLiteOrExit}
@@ -790,6 +859,7 @@ function MeasurementsFields({
   setAge,
   sex,
   setSex,
+  showBodyFields,
 }: {
   weightKg: number | null
   setWeightKg: (v: number | null) => void
@@ -799,51 +869,10 @@ function MeasurementsFields({
   setAge: (v: number | null) => void
   sex: Sex | null
   setSex: (v: Sex) => void
+  showBodyFields: boolean
 }) {
   return (
     <>
-      <div className="grid grid-cols-2 gap-3">
-        <label className="glass-card block rounded-2xl p-3.5">
-          <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
-            <Scale className="h-3.5 w-3.5 text-[#FF9F0A]" />
-            Poids actuel
-          </span>
-          <div className="flex items-end gap-1">
-            <ClearableNumberInput
-              value={weightKg}
-              onChange={setWeightKg}
-              min={35}
-              max={250}
-              step={0.1}
-              required={false}
-              placeholder="70.5"
-              aria-label="Poids actuel"
-              className="w-full bg-transparent text-[28px] font-bold text-white outline-none"
-            />
-            <span className="pb-1 text-[13px] text-[#8E8E93]">kg</span>
-          </div>
-        </label>
-        <label className="glass-card block rounded-2xl p-3.5">
-          <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
-            <Ruler className="h-3.5 w-3.5 text-[#00B4FF]" />
-            Taille
-          </span>
-          <div className="flex items-end gap-1">
-            <ClearableNumberInput
-              value={heightCm}
-              onChange={setHeightCm}
-              min={120}
-              max={230}
-              required={false}
-              placeholder="175"
-              aria-label="Taille"
-              className="w-full bg-transparent text-[28px] font-bold text-white outline-none"
-            />
-            <span className="pb-1 text-[13px] text-[#8E8E93]">cm</span>
-          </div>
-        </label>
-      </div>
-
       <label className="glass-card block rounded-2xl p-3.5">
         <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
           <UserRound className="h-3.5 w-3.5 text-[#FF9F0A]" />
@@ -880,6 +909,50 @@ function MeasurementsFields({
           </button>
         ))}
       </div>
+
+      {showBodyFields ? (
+        <div className="grid grid-cols-2 gap-3" data-testid="onboarding-body-fields">
+          <label className="glass-card block rounded-2xl p-3.5">
+            <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
+              <Scale className="h-3.5 w-3.5 text-[#FF9F0A]" />
+              Poids actuel
+            </span>
+            <div className="flex items-end gap-1">
+              <ClearableNumberInput
+                value={weightKg}
+                onChange={setWeightKg}
+                min={35}
+                max={250}
+                step={0.1}
+                required={false}
+                placeholder="70.5"
+                aria-label="Poids actuel"
+                className="w-full bg-transparent text-[28px] font-bold text-white outline-none"
+              />
+              <span className="pb-1 text-[13px] text-[#8E8E93]">kg</span>
+            </div>
+          </label>
+          <label className="glass-card block rounded-2xl p-3.5">
+            <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
+              <Ruler className="h-3.5 w-3.5 text-[#00B4FF]" />
+              Taille
+            </span>
+            <div className="flex items-end gap-1">
+              <ClearableNumberInput
+                value={heightCm}
+                onChange={setHeightCm}
+                min={120}
+                max={230}
+                required={false}
+                placeholder="175"
+                aria-label="Taille"
+                className="w-full bg-transparent text-[28px] font-bold text-white outline-none"
+              />
+              <span className="pb-1 text-[13px] text-[#8E8E93]">cm</span>
+            </div>
+          </label>
+        </div>
+      ) : null}
     </>
   )
 }
