@@ -32,6 +32,25 @@ const JOURNAL_BASE = 'ranked-gym:nutrition-journal'
 const PIECE_PRESETS_KEY = 'ranked-gym:piece-presets'
 const CONVEX_NUTRITION_QUEUE_PREFIX = 'ranked-gym:convex-nutrition-queue'
 
+/** Préfixes / clés locales liées à la santé ou aux données personnelles sensibles (BUG-34). */
+const HEALTH_LOCAL_KEY_PREFIXES = [
+  PROFILE_BASE,
+  JOURNAL_BASE,
+  'ranked-gym:sleep-log',
+  'ranked-gym:training',
+  'ranked-gym:profile',
+  'ranked-gym:last-location',
+  'ranked-gym:check-in',
+  'ranked-gym:custom-gyms',
+  CONVEX_NUTRITION_QUEUE_PREFIX,
+] as const
+
+const HEALTH_LOCAL_EXACT_KEYS = [
+  PIECE_PRESETS_KEY,
+  'ranked-gym:cloud-backup-meta',
+  'ranked-gym:reminder-fired',
+] as const
+
 export type StorageSaveOptions = { skipCloud?: boolean }
 
 function triggerCloudBackup(mode: 'profile' | 'journal' = 'journal') {
@@ -266,33 +285,31 @@ export function hasCompletedNutritionOnboarding(): boolean {
   }
 }
 
+function isHealthLocalKey(key: string): boolean {
+  if ((HEALTH_LOCAL_EXACT_KEYS as readonly string[]).includes(key)) return true
+  return HEALTH_LOCAL_KEY_PREFIXES.some(
+    (prefix) => key === prefix || key.startsWith(`${prefix}:`) || key.startsWith(prefix),
+  )
+}
+
 /**
- * Efface les données de santé / nutrition locales (profil, situations déclarées,
- * journal, caches) — appelé à la suppression de compte (SEC-DON-02 / R-13).
+ * Efface les données de santé locales (nutrition, sommeil, entraînement, GPS,
+ * check-ins, caches) — appelé à la suppression de compte (SEC-DON-02 / R-13 / BUG-34).
+ * Ne touche pas aux préférences hors santé (ex. pro-pass dismissé, discipline UI).
  */
 export function clearLocalNutritionData(opts?: { userId?: string | null }): void {
   const uid = opts?.userId ?? getActiveCloudUserId()
-  const keys = new Set<string>([PROFILE_BASE, JOURNAL_BASE, PIECE_PRESETS_KEY])
-  if (uid) {
-    keys.add(`${PROFILE_BASE}:u:${uid}`)
-    keys.add(`${JOURNAL_BASE}:u:${uid}`)
+  const keys = new Set<string>([...HEALTH_LOCAL_EXACT_KEYS])
+  for (const prefix of HEALTH_LOCAL_KEY_PREFIXES) {
+    keys.add(prefix)
+    if (uid) keys.add(`${prefix}:u:${uid}`)
   }
 
   if (typeof localStorage !== 'undefined') {
     try {
       for (let i = 0; i < localStorage.length; i += 1) {
         const key = localStorage.key(i)
-        if (!key) continue
-        if (
-          key === PROFILE_BASE ||
-          key.startsWith(`${PROFILE_BASE}:`) ||
-          key === JOURNAL_BASE ||
-          key.startsWith(`${JOURNAL_BASE}:`) ||
-          key === PIECE_PRESETS_KEY ||
-          key.startsWith(`${CONVEX_NUTRITION_QUEUE_PREFIX}`)
-        ) {
-          keys.add(key)
-        }
+        if (key && isHealthLocalKey(key)) keys.add(key)
       }
     } catch (error) {
       safeWarn('[nutrition] clearLocalNutritionData scan failed', error)
@@ -324,6 +341,7 @@ export function clearLocalNutritionData(opts?: { userId?: string | null }): void
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('ranked-gym:profile-changed'))
+    window.dispatchEvent(new Event('ranked-gym:training-changed'))
   }
 }
 

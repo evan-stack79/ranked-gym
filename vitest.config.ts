@@ -15,6 +15,7 @@ export default defineConfig({
       ['src/components/nutrition/**/*.test.tsx', 'jsdom'],
       ['src/components/profile/**/*.test.tsx', 'jsdom'],
       ['src/components/onboarding/**/*.test.tsx', 'jsdom'],
+      ['src/components/home/**/*.test.tsx', 'jsdom'],
       ['src/components/ui/AppBootScreen.test.tsx', 'jsdom'],
       ['src/components/ui/BootIssueScreen.test.tsx', 'jsdom'],
       ['src/App.test.tsx', 'jsdom'],
