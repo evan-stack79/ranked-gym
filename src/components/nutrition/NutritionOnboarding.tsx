@@ -119,11 +119,17 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
     if (!calorieGoalEnabled) {
       return ['lite', 'exit']
     }
-    const flow: Step[] = ['goal', 'goalWeight']
-    if (goal != null && goal !== 'maintain') flow.push('pace')
-    flow.push('measurements', 'activity', 'morphology', 'result', 'exit')
+    // BUG-08 ON : mensurations (âge) avant « poids objectif » / « rythme »
+    const flow: Step[] = ['goal', 'measurements']
+    const ageKnownAdult = age != null && !isMinorAge(age)
+    if (ageKnownAdult && !isRestrictedHealth) {
+      flow.push('goalWeight')
+      if (goal != null && goal !== 'maintain') flow.push('pace')
+      flow.push('activity', 'morphology', 'result')
+    }
+    flow.push('exit')
     return flow
-  }, [calorieGoalEnabled, goal])
+  }, [calorieGoalEnabled, goal, age, isRestrictedHealth])
 
   const stepIndex = Math.max(0, steps.indexOf(step))
 
@@ -304,9 +310,9 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
       setError('Choisis un objectif pour continuer.')
       return
     }
-    // BUG-04 : ne pas juger l'éligibilité à la perte avant les mensurations.
+    // BUG-04 / BUG-08 ON : mensurations (âge) avant poids objectif / rythme.
     setError(null)
-    setStep('goalWeight')
+    setStep('measurements')
   }
 
   const goAfterGoalWeight = () => {
@@ -315,16 +321,16 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
       return
     }
     setError(null)
-    setStep(goal === 'maintain' ? 'measurements' : 'pace')
+    setStep(goal === 'maintain' ? 'activity' : 'pace')
   }
 
-  const goMeasurements = () => {
+  const goAfterPace = () => {
     if (goal !== 'maintain' && weeklyPaceKg < 0.1) {
       setError('Choisis un rythme hebdomadaire.')
       return
     }
     setError(null)
-    setStep('measurements')
+    setStep('activity')
   }
 
   const goActivity = () => {
@@ -357,7 +363,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
       return
     }
     setError(null)
-    setStep('activity')
+    setStep('goalWeight')
   }
 
   const goMorphology = () => {
@@ -389,10 +395,14 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
   }
 
   const submitLiteOrExit = () => {
-    const profile = calorieGoalEnabled ? buildRestrictedProfile() : buildLiteProfile()
+    // BUG-36 : situation à risque (OFF) → poids/taille non requis (comme ON)
+    const profile =
+      calorieGoalEnabled || isRestrictedHealth
+        ? buildRestrictedProfile()
+        : buildLiteProfile()
     if (!profile) {
       setError(
-        age != null && isMinorAge(age)
+        (age != null && isMinorAge(age)) || isRestrictedHealth
           ? 'Remplis âge et sexe.'
           : 'Remplis âge, sexe, poids actuel et taille.',
       )
@@ -622,7 +632,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               </button>
               <button
                 type="button"
-                onClick={goMeasurements}
+                onClick={goAfterPace}
                 className="btn-brand ios-press flex flex-[1.4] items-center justify-center gap-1 rounded-2xl py-3.5 text-[15px] font-semibold text-white"
               >
                 Continuer
