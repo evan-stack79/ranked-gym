@@ -89,7 +89,12 @@ describe('QA BUG-08 — poids cible masqué mineur / drapeau OFF', () => {
 
   it('adulte + drapeau ON : Poids cible visible', async () => {
     vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', 'true')
-    profileState.current = { ...profileState.current, age: 30 }
+    profileState.current = {
+      ...profileState.current,
+      age: 30,
+      declaredEatingDisorder: false,
+      declaredPregnancy: false,
+    }
     const host = document.createElement('div')
     document.body.appendChild(host)
     const root = createRoot(host)
@@ -97,6 +102,41 @@ describe('QA BUG-08 — poids cible masqué mineur / drapeau OFF', () => {
       root.render(<FullProfileScreen onBack={() => undefined} />)
     })
     expect(host.querySelector('[data-testid="full-profile-goal-weight"]')).toBeTruthy()
+    expect(host.querySelector('[data-testid="full-profile-body-metrics"]')).toBeTruthy()
+    root.unmount()
+    host.remove()
+  })
+
+  it('mineur : pas de Poids actuel ni Taille', async () => {
+    vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', 'true')
+    profileState.current = { ...profileState.current, age: 17 }
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(<FullProfileScreen onBack={() => undefined} />)
+    })
+    expect(host.querySelector('[data-testid="full-profile-body-metrics"]')).toBeNull()
+    expect(host.querySelector('input[aria-label="Poids actuel"]')).toBeNull()
+    expect(host.querySelector('input[aria-label="Taille"]')).toBeNull()
+    root.unmount()
+    host.remove()
+  })
+
+  it('TCA déclaré + drapeau ON : Poids cible masqué', async () => {
+    vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', 'true')
+    profileState.current = {
+      ...profileState.current,
+      age: 30,
+      declaredEatingDisorder: true,
+    }
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(<FullProfileScreen onBack={() => undefined} />)
+    })
+    expect(host.querySelector('[data-testid="full-profile-goal-weight"]')).toBeNull()
     root.unmount()
     host.remove()
   })

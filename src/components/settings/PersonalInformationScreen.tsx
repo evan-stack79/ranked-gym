@@ -11,6 +11,7 @@ import {
   normalizeCalorieProfile,
   saveCalorieProfile,
 } from '../../services/nutritionStorage'
+import { isMinorAge } from '../../services/nutritionSafetyRules'
 import { getTrainingState, setTrainingSports } from '../../services/trainingStorage'
 import { SportsMultiSelect } from '../onboarding/SportsMultiSelect'
 
@@ -29,6 +30,7 @@ export function PersonalInformationScreen({
   const [pseudo, setPseudo] = useState(profile?.pseudo || user?.displayName || '')
   const [weightKg, setWeightKg] = useState<number | null>(null)
   const [heightCm, setHeightCm] = useState<number | null>(null)
+  const [profileAge, setProfileAge] = useState(0)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarError, setAvatarError] = useState<string | null>(null)
@@ -39,6 +41,8 @@ export function PersonalInformationScreen({
 
   const displayAvatar = avatarPreview || profile?.avatar_url || null
   const email = user?.email ?? ''
+  // BUG-08 : mineur → pas de saisie/affichage poids & taille
+  const showBodyMetrics = !isMinorAge(profileAge)
 
   useEffect(() => {
     setPseudo(profile?.pseudo || user?.displayName || '')
@@ -48,6 +52,7 @@ export function PersonalInformationScreen({
     const calorie = getCalorieProfile()
     setWeightKg(calorie.weightKg > 0 ? calorie.weightKg : null)
     setHeightCm(calorie.heightCm > 0 ? calorie.heightCm : null)
+    setProfileAge(calorie.age > 0 ? calorie.age : 0)
     const training = getTrainingState()
     setSportIds(training.sportsUndecided ? [] : training.favoriteSportIds)
   }, [])
@@ -92,9 +97,11 @@ export function PersonalInformationScreen({
       setError('Le pseudo doit contenir au moins 2 caractères.')
       return
     }
-    if (weightKg == null || heightCm == null || weightKg <= 0 || heightCm <= 0) {
-      setError('Indique un poids et une taille valides.')
-      return
+    if (showBodyMetrics) {
+      if (weightKg == null || heightCm == null || weightKg <= 0 || heightCm <= 0) {
+        setError('Indique un poids et une taille valides.')
+        return
+      }
     }
 
     setSaving(true)
@@ -106,8 +113,8 @@ export function PersonalInformationScreen({
       saveCalorieProfile(
         normalizeCalorieProfile({
           ...current,
-          weightKg,
-          heightCm,
+          weightKg: showBodyMetrics ? (weightKg as number) : current.weightKg,
+          heightCm: showBodyMetrics ? (heightCm as number) : current.heightCm,
           onboardingComplete: current.onboardingComplete || true,
         }),
       )
@@ -196,45 +203,47 @@ export function PersonalInformationScreen({
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <label className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80 px-4 py-3">
-            <span className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-[#8E8E93]">
-              <Scale className="h-3.5 w-3.5" aria-hidden />
-              Poids
-            </span>
-            <div className="flex items-end gap-1">
-              <ClearableNumberInput
-                value={weightKg}
-                onChange={setWeightKg}
-                min={35}
-                max={250}
-                step={0.1}
-                aria-label="Poids en kg"
-                className="w-full bg-transparent text-[22px] font-bold text-white outline-none"
-              />
-              <span className="pb-0.5 text-[13px] text-[#8E8E93]">kg</span>
-            </div>
-          </label>
+        {showBodyMetrics ? (
+          <div className="grid grid-cols-2 gap-3" data-testid="personal-info-body-metrics">
+            <label className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80 px-4 py-3">
+              <span className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-[#8E8E93]">
+                <Scale className="h-3.5 w-3.5" aria-hidden />
+                Poids
+              </span>
+              <div className="flex items-end gap-1">
+                <ClearableNumberInput
+                  value={weightKg}
+                  onChange={setWeightKg}
+                  min={35}
+                  max={250}
+                  step={0.1}
+                  aria-label="Poids en kg"
+                  className="w-full bg-transparent text-[22px] font-bold text-white outline-none"
+                />
+                <span className="pb-0.5 text-[13px] text-[#8E8E93]">kg</span>
+              </div>
+            </label>
 
-          <label className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80 px-4 py-3">
-            <span className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-[#8E8E93]">
-              <Ruler className="h-3.5 w-3.5" aria-hidden />
-              Taille
-            </span>
-            <div className="flex items-end gap-1">
-              <ClearableNumberInput
-                value={heightCm}
-                onChange={setHeightCm}
-                min={120}
-                max={230}
-                step={1}
-                aria-label="Taille en cm"
-                className="w-full bg-transparent text-[22px] font-bold text-white outline-none"
-              />
-              <span className="pb-0.5 text-[13px] text-[#8E8E93]">cm</span>
-            </div>
-          </label>
-        </div>
+            <label className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80 px-4 py-3">
+              <span className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-[#8E8E93]">
+                <Ruler className="h-3.5 w-3.5" aria-hidden />
+                Taille
+              </span>
+              <div className="flex items-end gap-1">
+                <ClearableNumberInput
+                  value={heightCm}
+                  onChange={setHeightCm}
+                  min={120}
+                  max={230}
+                  step={1}
+                  aria-label="Taille en cm"
+                  className="w-full bg-transparent text-[22px] font-bold text-white outline-none"
+                />
+                <span className="pb-0.5 text-[13px] text-[#8E8E93]">cm</span>
+              </div>
+            </label>
+          </div>
+        ) : null}
 
         <div
           className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80 px-4 py-3"
