@@ -27,6 +27,12 @@ import {
   normalizeCalorieProfile,
   saveCalorieProfile,
 } from '../../services/nutritionStorage'
+import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
+import {
+  isMinorAge,
+  PLAUSIBLE_AGE_MAX,
+  PLAUSIBLE_AGE_MIN,
+} from '../../services/nutritionSafetyRules'
 import { getRankFromLevel } from '../../utils/rank'
 import { fetchUserStats, type UserStatsPayload } from '../../services/userStatsService'
 import { ChartSkeleton } from './charts/ChartSkeleton'
@@ -93,6 +99,9 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
   const currentXp = profile?.xp ?? 0
   const rank = getRankFromLevel(level)
   const displayAvatarUrl = avatarPreview || profile?.avatar_url || null
+  const calorieGoalEnabled = isCalorieGoalEnabled()
+  const showGoalWeight =
+    calorieGoalEnabled && !(age != null && isMinorAge(age))
 
   useEffect(() => {
     const calorie = getCalorieProfile()
@@ -166,11 +175,24 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
     setSaveError(null)
     setSaveMessage(null)
 
-    if (weightKg == null || goalWeightKg == null || heightCm == null || age == null) {
+    if (weightKg == null || heightCm == null || age == null) {
+      setSaveError(
+        showGoalWeight
+          ? 'Remplis poids actuel, poids cible, taille et âge.'
+          : 'Remplis poids actuel, taille et âge.',
+      )
+      return
+    }
+    if (showGoalWeight && goalWeightKg == null) {
       setSaveError('Remplis poids actuel, poids cible, taille et âge.')
       return
     }
-    if (weightKg <= 0 || goalWeightKg <= 0 || heightCm <= 0 || age <= 0) {
+    if (
+      weightKg <= 0 ||
+      heightCm <= 0 ||
+      age <= 0 ||
+      (showGoalWeight && (goalWeightKg == null || goalWeightKg <= 0))
+    ) {
       setSaveError('Les valeurs doivent être supérieures à zéro.')
       return
     }
@@ -178,11 +200,16 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
     setSaving(true)
     try {
       const current = getCalorieProfile()
+      const nextGoalWeight = showGoalWeight
+        ? (goalWeightKg as number)
+        : current.goalWeightKg > 0
+          ? current.goalWeightKg
+          : weightKg
       saveCalorieProfile(
         normalizeCalorieProfile({
           ...current,
           weightKg,
-          goalWeightKg,
+          goalWeightKg: nextGoalWeight,
           heightCm,
           age,
           onboardingComplete: current.onboardingComplete || true,
@@ -353,26 +380,28 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
             </div>
           </label>
 
-          <label className="glass-card block rounded-2xl p-4">
-            <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
-              <Target className="h-3.5 w-3.5 text-[#FF6961]" />
-              Poids cible
-            </span>
-            <div className="flex items-end gap-1">
-              <ClearableNumberInput
-                value={goalWeightKg}
-                onChange={setGoalWeightKg}
-                min={35}
-                max={250}
-                step={0.1}
-                required={false}
-                placeholder="68.0"
-                aria-label="Poids cible"
-                className="w-full bg-transparent text-[26px] font-bold text-white outline-none"
-              />
-              <span className="pb-1 text-[13px] text-[#8E8E93]">kg</span>
-            </div>
-          </label>
+          {showGoalWeight ? (
+            <label className="glass-card block rounded-2xl p-4" data-testid="full-profile-goal-weight">
+              <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
+                <Target className="h-3.5 w-3.5 text-[#FF6961]" />
+                Poids cible
+              </span>
+              <div className="flex items-end gap-1">
+                <ClearableNumberInput
+                  value={goalWeightKg}
+                  onChange={setGoalWeightKg}
+                  min={35}
+                  max={250}
+                  step={0.1}
+                  required={false}
+                  placeholder="68.0"
+                  aria-label="Poids cible"
+                  className="w-full bg-transparent text-[26px] font-bold text-white outline-none"
+                />
+                <span className="pb-1 text-[13px] text-[#8E8E93]">kg</span>
+              </div>
+            </label>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -404,8 +433,8 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
             <ClearableNumberInput
               value={age}
               onChange={setAge}
-              min={14}
-              max={90}
+              min={PLAUSIBLE_AGE_MIN}
+              max={PLAUSIBLE_AGE_MAX}
               required={false}
               placeholder="24"
               aria-label="Âge"

@@ -15,7 +15,15 @@ import {
   healthSituationsFromProfile,
 } from '../settings/HealthSituationsForm'
 import { EnergyRecoveryInfo } from '../settings/EnergyRecoveryInfo'
-import { M_INFO_1, M_MIN_1, Q6A_MINEURS, Q6B_GROSSESSE_ALLAITEMENT } from '../../content/safetyCopy'
+import { NeedToTalkScreen } from '../settings/NeedToTalkScreen'
+import {
+  M_INFO_1,
+  M_MIN_1,
+  M_TCA_1,
+  Q6A_MINEURS,
+  Q6B_GROSSESSE_ALLAITEMENT,
+  Q8_SCREEN_TITLE,
+} from '../../content/safetyCopy'
 
 function MinorNutritionScreen() {
   return (
@@ -33,6 +41,7 @@ export function NutritionView() {
   const { isLoading: isBootLoading } = useAuth()
   const [profile, setProfile] = useState<CalorieProfile>(() => getCalorieProfile())
   const [showSetupEditor, setShowSetupEditor] = useState(false)
+  const [showNeedToTalk, setShowNeedToTalk] = useState(false)
   const calorieGoalEnabled = isCalorieGoalEnabled()
 
   useEffect(() => {
@@ -69,6 +78,10 @@ export function NutritionView() {
 
   if (isBootLoading) return <HomeBootSkeleton />
 
+  if (showNeedToTalk) {
+    return <NeedToTalkScreen onBack={() => setShowNeedToTalk(false)} />
+  }
+
   if (isMinorAge(profile.age)) {
     return <MinorNutritionScreen />
   }
@@ -89,10 +102,15 @@ export function NutritionView() {
         <HealthSituationsForm
           value={healthSituationsFromProfile(profile)}
           onChange={(next) => handleProfileChange({ ...profile, ...next })}
+          onOpenNeedToTalk={() => setShowNeedToTalk(true)}
         />
-        <p className="text-[12px] text-[#8E8E93]">
-          Ressources d&apos;écoute : Réglages → Besoin d&apos;en parler ?
-        </p>
+        <button
+          type="button"
+          onClick={() => setShowNeedToTalk(true)}
+          className="ios-press text-left text-[13px] font-semibold text-[#64D2FF] underline"
+        >
+          {Q8_SCREEN_TITLE}
+        </button>
       </div>
     )
   }
@@ -103,6 +121,19 @@ export function NutritionView() {
         <p className="rounded-2xl border border-white/10 bg-black/25 px-3.5 py-3 text-[13px] leading-relaxed text-[#EBEBF5]">
           {Q6B_GROSSESSE_ALLAITEMENT}
         </p>
+      )}
+      {declarations.eatingDisorder && (
+        <div className="space-y-2 rounded-2xl border border-white/10 bg-[#FF9F0A]/10 px-3.5 py-3">
+          <p className="text-[13px] leading-relaxed text-[#EBEBF5]">{M_TCA_1}</p>
+          <button
+            type="button"
+            onClick={() => setShowNeedToTalk(true)}
+            className="ios-press text-[13px] font-semibold text-[#64D2FF] underline"
+            data-testid="nutrition-need-to-talk"
+          >
+            {Q8_SCREEN_TITLE}
+          </button>
+        </div>
       )}
       {!calorieGoalEnabled && (
         <p
@@ -116,7 +147,14 @@ export function NutritionView() {
         profile={profile}
         onChangeProfile={handleProfileChange}
         onOpenSetup={() => {
-          if (calorieGoalEnabled) setShowSetupEditor(true)
+          if (
+            calorieGoalEnabled &&
+            !declarations.eatingDisorder &&
+            !declarations.pregnancy &&
+            !declarations.breastfeeding
+          ) {
+            setShowSetupEditor(true)
+          }
         }}
       />
     </div>
