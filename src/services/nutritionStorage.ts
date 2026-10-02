@@ -18,16 +18,19 @@ import { isConvexDomainActive } from '../backend/adapter'
 import { getActiveCloudUserId } from './cloudSession'
 import { enqueueConvexNutritionOp } from './convexNutritionQueue'
 import { safeWarn } from '../utils/safeLog'
-import { readLocal, writeLocal } from './secureLocalStore'
+import { readLocal, removeLocal, writeLocal } from './secureLocalStore'
 import {
   applySafetyToProfile,
   clampWeeklyPaceKg,
   isPlausibleOnboardingAge,
 } from './nutritionSafetyRules'
 import type { Sex } from '../types/nutrition'
+import { clearQueuedConvexNutritionOpsForUser } from './convexNutritionQueue'
 
 const PROFILE_BASE = 'ranked-gym:nutrition-profile'
 const JOURNAL_BASE = 'ranked-gym:nutrition-journal'
+const PIECE_PRESETS_KEY = 'ranked-gym:piece-presets'
+const CONVEX_NUTRITION_QUEUE_PREFIX = 'ranked-gym:convex-nutrition-queue'
 
 export type StorageSaveOptions = { skipCloud?: boolean }
 
@@ -260,6 +263,67 @@ export function hasCompletedNutritionOnboarding(): boolean {
   } catch (error) {
     safeWarn('[nutrition] hasCompletedNutritionOnboarding failed', error)
     return false
+  }
+}
+
+/**
+ * Efface les données de santé / nutrition locales (profil, situations déclarées,
+ * journal, caches) — appelé à la suppression de compte (SEC-DON-02 / R-13).
+ */
+export function clearLocalNutritionData(opts?: { userId?: string | null }): void {
+  const uid = opts?.userId ?? getActiveCloudUserId()
+  const keys = new Set<string>([PROFILE_BASE, JOURNAL_BASE, PIECE_PRESETS_KEY])
+  if (uid) {
+    keys.add(`${PROFILE_BASE}:u:${uid}`)
+    keys.add(`${JOURNAL_BASE}:u:${uid}`)
+  }
+
+  if (typeof localStorage !== 'undefined') {
+    try {
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i)
+        if (!key) continue
+        if (
+          key === PROFILE_BASE ||
+          key.startsWith(`${PROFILE_BASE}:`) ||
+          key === JOURNAL_BASE ||
+          key.startsWith(`${JOURNAL_BASE}:`) ||
+          key === PIECE_PRESETS_KEY ||
+          key.startsWith(`${CONVEX_NUTRITION_QUEUE_PREFIX}`)
+        ) {
+          keys.add(key)
+        }
+      }
+    } catch (error) {
+      safeWarn('[nutrition] clearLocalNutritionData scan failed', error)
+    }
+  }
+
+  for (const key of keys) {
+    try {
+      removeLocal(key)
+    } catch (error) {
+      safeWarn('[nutrition] clearLocalNutritionData removeLocal failed', error)
+    }
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.removeItem(key)
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  if (uid) {
+    try {
+      clearQueuedConvexNutritionOpsForUser(uid)
+    } catch (error) {
+      safeWarn('[nutrition] clearLocalNutritionData queue clear failed', error)
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('ranked-gym:profile-changed'))
   }
 }
 
