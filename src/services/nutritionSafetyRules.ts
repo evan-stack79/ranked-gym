@@ -315,8 +315,12 @@ export function softBandMessage(targetCalories: number): string | null {
 }
 
 export function defaultWeeklyPaceKg(weightKg: number): number {
-  if (!Number.isFinite(weightKg) || weightKg <= 0) return 0.5
-  return roundPace(weightKg * DEFAULT_WEEKLY_PACE_PCT)
+  if (!Number.isFinite(weightKg) || weightKg <= 0) {
+    return Math.min(0.5, maxWeeklyPaceKgWithDeficit(70))
+  }
+  const raw = roundPace(weightKg * DEFAULT_WEEKLY_PACE_PCT)
+  // Le défaut ne doit jamais dépasser le plafond (dont déficit 600 kcal/j).
+  return Math.min(raw, maxWeeklyPaceKgWithDeficit(weightKg))
 }
 
 export function maxWeeklyPaceKg(weightKg: number): number {
@@ -325,21 +329,32 @@ export function maxWeeklyPaceKg(weightKg: number): number {
   return roundPace(Math.min(MAX_WEEKLY_PACE_KG, fromPct))
 }
 
-/** Plafond combiné avec déficit 600 kcal/j. */
+/**
+ * Plafond combiné avec déficit 600 kcal/j.
+ * La contrainte la plus restrictive l'emporte : on ne doit jamais arrondir
+ * au-dessus de l'équivalent 600 kcal/j (ex. 0,545… → 0,54 et non 0,55).
+ */
 export function maxWeeklyPaceKgWithDeficit(weightKg: number): number {
   const fromBody = maxWeeklyPaceKg(weightKg)
   const fromDeficit = (MAX_DAILY_DEFICIT_KCAL * 7) / KCAL_PER_KG
-  return roundPace(Math.min(fromBody, fromDeficit))
+  return Math.min(fromBody, floorPace(fromDeficit))
 }
 
 export function clampWeeklyPaceKg(paceKg: number, weightKg: number): number {
   if (!Number.isFinite(paceKg) || paceKg <= 0) return 0
   const max = maxWeeklyPaceKgWithDeficit(weightKg)
-  return roundPace(Math.min(Math.max(0.1, paceKg), max))
+  const clamped = Math.min(Math.max(0.1, paceKg), max)
+  // Ne pas remonter au-dessus du plafond via un arrondi.
+  return Math.min(roundPace(clamped), max)
 }
 
 function roundPace(n: number): number {
   return Math.round(n * 100) / 100
+}
+
+/** Arrondi vers le bas à 2 décimales — pour ne jamais dépasser un plafond kcal. */
+function floorPace(n: number): number {
+  return Math.floor(n * 100 + 1e-9) / 100
 }
 
 export function paceKgToDailyDeficit(paceKg: number): number {
