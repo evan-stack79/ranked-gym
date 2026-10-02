@@ -52,4 +52,21 @@ describe('QA BUG-05 — safetyNotices consommés via getNutritionTarget', () => 
     expect(result.targetCalories).toBe(0)
     expect(result.safetyNotices).toContain(M_INFO_1)
   })
+
+  it('BUG-33 : profil déjà en maintain (après cut) + IMC bas → Q4_IMC', () => {
+    // Homme 40 ans, 200 cm, 73.6 kg → IMC ≈ 18.4 ; goal déjà neutralisé
+    const result = getNutritionTarget(
+      {
+        ...base,
+        age: 40,
+        heightCm: 200,
+        weightKg: 73.6,
+        goalWeightKg: 70,
+        goal: 'maintain',
+        weeklyPaceKg: 0,
+      },
+      { calorieGoalEnabled: true },
+    )
+    expect(result.safetyNotices).toContain(Q4_IMC)
+  })
 })

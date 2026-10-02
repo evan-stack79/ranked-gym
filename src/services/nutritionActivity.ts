@@ -155,9 +155,15 @@ export function getNutritionTarget(
       : profile
 
   const notices = [estimation.disclaimer, M_INFO_1].filter(Boolean) as string[]
-  if (profile.goal === 'cut' && !loss.eligible) {
+  // BUG-33 : IMC bas même si goal déjà neutralisé en « maintain » à la lecture.
+  if (
+    !loss.eligible &&
+    (loss.reason === 'low_bmi' ||
+      loss.reason === 'low_target_bmi' ||
+      profile.goal === 'cut')
+  ) {
     const refusal = messageForLossRefusal(loss.reason)
-    if (refusal) notices.unshift(refusal)
+    if (refusal && !notices.includes(refusal)) notices.unshift(refusal)
   }
 
   const result = runNutritionEngine(

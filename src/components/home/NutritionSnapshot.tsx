@@ -8,6 +8,8 @@ import {
   shouldShowHomeQuickWaterButton,
   tryAddHomeQuickWater,
 } from '../../utils/homeNutritionQuickActions'
+import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
+import { isMinorAge } from '../../services/nutritionSafetyRules'
 
 interface NutritionSnapshotProps {
   onOpenNutrition?: () => void
@@ -74,9 +76,14 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
     const showQuickWater = shouldShowHomeQuickWaterButton(waterMl, waterGoalMl)
     const waterGoalReached = waterMl >= waterGoalMl
 
+    const calorieGoalEnabled = isCalorieGoalEnabled()
+    const minor = isMinorAge(profile.age)
+
     return {
       onboardingComplete: nutrition.profile.onboardingComplete,
       targetAvailable,
+      // BUG-16 : drapeau OFF / mineur → carte neutre, jamais « Objectif indisponible »
+      showUnavailableGoal: !targetAvailable && calorieGoalEnabled && !minor,
       targetCalories,
       remainingCalories,
       consumedCalories,
@@ -127,10 +134,17 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
               {snapshot.targetCalories.toLocaleString('fr-FR')}
             </p>
           </>
-        ) : (
+        ) : snapshot.showUnavailableGoal ? (
           <>
             <p className="mt-1 text-[17px] font-semibold text-white">Objectif indisponible</p>
             <p className="mt-1 text-[13px] text-[#AEAEB2]">Ouvre Nutri pour vérifier ton plan.</p>
+          </>
+        ) : (
+          <>
+            <p className="mt-1 text-[17px] font-semibold text-white">Suivi du jour</p>
+            <p className="mt-1 text-[13px] text-[#AEAEB2]">
+              {Math.round(snapshot.consumedCalories).toLocaleString('fr-FR')} kcal consommées
+            </p>
           </>
         )}
 
