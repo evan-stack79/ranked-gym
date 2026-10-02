@@ -331,8 +331,142 @@ describe('QA BUG-04 — sèche non refusée avant mensurations', () => {
 
     expect(host.textContent).not.toContain("Cet objectif de perte n’est pas proposé.")
     expect(host.textContent).not.toContain("Cet objectif de perte n'est pas proposé.")
-    // On doit être passé à l'étape poids objectif
-    expect(host.querySelector('input[aria-label="Poids objectif"]')).toBeTruthy()
+    // BUG-08 ON : étape suivante = mensurations (âge), pas encore poids objectif
+    expect(host.textContent).toContain('Tes mensurations')
+    expect(host.querySelector('input[aria-label="Âge"]')).toBeTruthy()
+    expect(host.querySelector('input[aria-label="Poids objectif"]')).toBeNull()
+
+    cleanup()
+  })
+})
+
+describe('QA BUG-36 — adulte à risque OFF sans poids/taille peut terminer', () => {
+  const prev = import.meta.env.VITE_ENABLE_CALORIE_GOAL
+
+  beforeEach(() => {
+    vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', '')
+  })
+
+  afterEach(() => {
+    if (prev === undefined) vi.unstubAllEnvs()
+    else vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', prev)
+  })
+
+  it.each([
+    { label: 'Grossesse', field: 'declaredPregnancy' as const },
+    { label: 'Allaitement', field: 'declaredBreastfeeding' as const },
+    { label: 'Trouble du comportement', field: 'declaredEatingDisorder' as const },
+  ])(
+    '$label : Continuer vers l’app sans poids ni taille',
+    async ({ label, field }) => {
+      const saved: { current: CalorieProfile | null } = { current: null }
+      const { host, cleanup } = await renderOnboarding((p) => {
+        saved.current = p
+      })
+
+      const row = Array.from(host.querySelectorAll('label')).find((l) =>
+        l.textContent?.includes(label),
+      )
+      await act(async () => {
+        ;(row?.querySelector('input[type="checkbox"]') as HTMLInputElement | null)?.click()
+      })
+
+      await act(async () => {
+        fillAgeSex(host, 30)
+      })
+      // Poids / taille laissés vides volontairement
+      expect(host.querySelector('input[aria-label="Poids actuel"]')).toBeTruthy()
+
+      const continuer = Array.from(host.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Continuer'),
+      )
+      await act(async () => {
+        continuer?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+
+      expect(host.querySelector('[data-testid="onboarding-exit"]')).toBeTruthy()
+      expect(host.querySelector('[data-testid="onboarding-error"]')).toBeNull()
+
+      await act(async () => {
+        host
+          .querySelector('[data-testid="exit-continue"]')
+          ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+
+      expect(host.querySelector('[data-testid="onboarding-error"]')).toBeNull()
+      expect(saved.current).not.toBeNull()
+      expect(saved.current![field]).toBe(true)
+      expect(saved.current!.onboardingComplete).toBe(true)
+      expect(saved.current!.age).toBe(30)
+      expect(saved.current!.weightKg).toBe(0)
+      expect(saved.current!.heightCm).toBe(0)
+
+      cleanup()
+    },
+  )
+})
+
+describe('QA BUG-08 ON — pas de poids objectif / rythme avant l’âge', () => {
+  const prev = import.meta.env.VITE_ENABLE_CALORIE_GOAL
+
+  beforeEach(() => {
+    vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', 'true')
+  })
+
+  afterEach(() => {
+    if (prev === undefined) vi.unstubAllEnvs()
+    else vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', prev)
+  })
+
+  it('mineur 17 ans : jamais « Ton poids objectif » ni « Ton rythme »', async () => {
+    const saved: { current: CalorieProfile | null } = { current: null }
+    const { host, cleanup } = await renderOnboarding((p) => {
+      saved.current = p
+    })
+
+    const goalButtons = Array.from(host.querySelectorAll('button'))
+    const cut = goalButtons.find((b) => /sèche|cut|perte/i.test(b.textContent ?? ''))
+    await act(async () => {
+      cut?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    const continuer = Array.from(host.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Continuer'),
+    )
+    await act(async () => {
+      continuer?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(host.textContent).toContain('Tes mensurations')
+    expect(host.querySelector('input[aria-label="Poids objectif"]')).toBeNull()
+    expect(host.textContent).not.toContain('Ton rythme')
+
+    await act(async () => {
+      fillAgeSex(host, 17)
+    })
+    expect(host.querySelector('input[aria-label="Poids actuel"]')).toBeNull()
+
+    const continuer2 = Array.from(host.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Continuer'),
+    )
+    await act(async () => {
+      continuer2?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(host.querySelector('[data-testid="onboarding-exit"]')).toBeTruthy()
+    expect(host.textContent).toContain(Q6A_MINEURS)
+    expect(host.querySelector('input[aria-label="Poids objectif"]')).toBeNull()
+    expect(host.textContent).not.toContain('Ton rythme')
+
+    await act(async () => {
+      host
+        .querySelector('[data-testid="exit-continue"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(saved.current?.age).toBe(17)
+    expect(saved.current?.goal).toBe('maintain')
+    expect(saved.current?.goalWeightKg).toBe(0)
 
     cleanup()
   })
