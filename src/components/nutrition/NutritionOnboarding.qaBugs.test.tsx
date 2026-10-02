@@ -64,9 +64,9 @@ describe('QA BUG-01 — drapeau OFF coupe l’assistant calories', () => {
   })
 
   it('n’affiche pas le calcul calorique et n’enregistre aucun objectif chiffré', async () => {
-    let saved: CalorieProfile | null = null
+    const saved: { current: CalorieProfile | null } = { current: null }
     const { host, cleanup } = await renderOnboarding((p) => {
-      saved = p
+      saved.current = p
     })
 
     expect(host.querySelector('[data-testid="onboarding-lite"]')).toBeTruthy()
@@ -84,13 +84,13 @@ describe('QA BUG-01 — drapeau OFF coupe l’assistant calories', () => {
       continuer?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
-    expect(saved).not.toBeNull()
-    expect(saved!.onboardingComplete).toBe(true)
-    expect(saved!.goal).toBe('maintain')
-    expect(saved!.weeklyPaceKg).toBe(0)
-    expect(saved!.age).toBe(30)
+    expect(saved.current).not.toBeNull()
+    expect(saved.current!.onboardingComplete).toBe(true)
+    expect(saved.current!.goal).toBe('maintain')
+    expect(saved.current!.weeklyPaceKg).toBe(0)
+    expect(saved.current!.age).toBe(30)
     // Pas d’objectif de perte / rythme stocké comme plan calorique
-    expect(saved!.goalWeightKg).toBe(saved!.weightKg)
+    expect(saved.current!.goalWeightKg).toBe(saved.current!.weightKg)
 
     cleanup()
   })
@@ -124,9 +124,9 @@ describe('QA BUG-02 — mineur 17 ans peut s’inscrire', () => {
   })
 
   it('enregistre l’âge et affiche Q6A + M_MIN_1 puis laisse entrer', async () => {
-    let saved: CalorieProfile | null = null
+    const saved: { current: CalorieProfile | null } = { current: null }
     const { host, cleanup } = await renderOnboarding((p) => {
-      saved = p
+      saved.current = p
     })
 
     await act(async () => {
@@ -150,10 +150,10 @@ describe('QA BUG-02 — mineur 17 ans peut s’inscrire', () => {
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
-    expect(saved).not.toBeNull()
-    expect(saved!.age).toBe(17)
-    expect(saved!.onboardingComplete).toBe(true)
-    expect(saved!.goal).toBe('maintain')
+    expect(saved.current).not.toBeNull()
+    expect(saved.current!.age).toBe(17)
+    expect(saved.current!.onboardingComplete).toBe(true)
+    expect(saved.current!.goal).toBe('maintain')
 
     cleanup()
   })
@@ -172,9 +172,9 @@ describe('QA BUG-03 — grossesse / TCA : sortie vers l’app', () => {
   })
 
   it('grossesse : Q6B + bouton Continuer (pas d’écran vide)', async () => {
-    let saved: CalorieProfile | null = null
+    const saved: { current: CalorieProfile | null } = { current: null }
     const { host, cleanup } = await renderOnboarding((p) => {
-      saved = p
+      saved.current = p
     })
 
     const pregnancy = Array.from(host.querySelectorAll('label')).find((l) =>
@@ -206,8 +206,8 @@ describe('QA BUG-03 — grossesse / TCA : sortie vers l’app', () => {
         .querySelector('[data-testid="exit-continue"]')
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-    expect(saved?.declaredPregnancy).toBe(true)
-    expect(saved?.onboardingComplete).toBe(true)
+    expect(saved.current?.declaredPregnancy).toBe(true)
+    expect(saved.current?.onboardingComplete).toBe(true)
 
     cleanup()
   })
