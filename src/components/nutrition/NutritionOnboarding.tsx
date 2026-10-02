@@ -10,6 +10,25 @@ import { ClearableNumberInput } from './ClearableNumberInput'
 import { ActivityLevelPicker } from './ActivityLevelPicker'
 import { MorphologyPicker } from './MorphologyPicker'
 import { GoalPicker, WeeklyPacePicker } from './GoalPacePickers'
+import {
+  decideLossEligibility,
+  defaultWeeklyPaceKg,
+  isMinorAge,
+  PLAUSIBLE_AGE_MAX,
+  PLAUSIBLE_AGE_MIN,
+  messageForLossRefusal,
+  readHealthDeclarations,
+} from '../../services/nutritionSafetyRules'
+import {
+  HealthSituationsForm,
+  healthSituationsFromProfile,
+} from '../settings/HealthSituationsForm'
+import {
+  M_CAL_1,
+  M_CAL_2,
+  M_INFO_1,
+  Q1_TOUS_AGES,
+} from '../../content/safetyCopy'
 
 interface NutritionOnboardingProps {
   initial: CalorieProfile
@@ -45,11 +64,16 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
   const [step, setStep] = useState<Step>('goal')
   const [error, setError] = useState<string | null>(null)
 
-  const [goal, setGoal] = useState<NutritionGoal>(
-    initial.onboardingComplete ? initial.goal : 'cut',
+  // SEC-TCA-04 / SEC-NUT-01 : rien de présélectionné pour un nouvel onboarding.
+  const [goal, setGoal] = useState<NutritionGoal | null>(
+    initial.onboardingComplete ? initial.goal : null,
   )
   const [weeklyPaceKg, setWeeklyPaceKg] = useState(
-    initial.weeklyPaceKg > 0 ? initial.weeklyPaceKg : 0.5,
+    initial.weeklyPaceKg > 0
+      ? initial.weeklyPaceKg
+      : initial.weightKg > 0
+        ? defaultWeeklyPaceKg(initial.weightKg)
+        : 0,
   )
   const [goalWeightKg, setGoalWeightKg] = useState<number | null>(
     seedNumber(initial.goalWeightKg),
@@ -57,15 +81,16 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
   const [weightKg, setWeightKg] = useState<number | null>(seedNumber(initial.weightKg))
   const [heightCm, setHeightCm] = useState<number | null>(seedNumber(initial.heightCm))
   const [age, setAge] = useState<number | null>(seedNumber(initial.age))
-  const [sex, setSex] = useState<Sex>(initial.sex || 'male')
+  const [sex, setSex] = useState<Sex | null>(initial.sex)
   const [activity, setActivity] = useState<ActivityLevel>(initial.activity || 'moderate')
   const [morphology, setMorphology] = useState<BodyMorphology>(
     initial.morphology || 'mesomorph',
   )
+  const [health, setHealth] = useState(() => healthSituationsFromProfile(initial))
 
   const steps = useMemo<Step[]>(() => {
     const flow: Step[] = ['goal', 'goalWeight']
-    if (goal !== 'maintain') flow.push('pace')
+    if (goal != null && goal !== 'maintain') flow.push('pace')
     flow.push('measurements', 'activity', 'morphology', 'result')
     return flow
   }, [goal])
@@ -80,6 +105,8 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
 
   const draft: CalorieProfile | null = useMemo(() => {
     if (
+      goal == null ||
+      sex == null ||
       weightKg == null ||
       goalWeightKg == null ||
       heightCm == null ||
@@ -102,6 +129,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
       goal,
       weeklyPaceKg: goal === 'maintain' ? 0 : weeklyPaceKg,
       onboardingComplete: true,
+      ...health,
     })
   }, [
     weightKg,
@@ -113,9 +141,29 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
     morphology,
     goal,
     weeklyPaceKg,
+    health,
   ])
 
-  const nutrition = useMemo(() => (draft ? getNutritionTarget(draft) : null), [draft])
+  const nutrition = useMemo(
+    () => (draft ? getNutritionTarget(draft, { calorieGoalEnabled: true }) : null),
+    [draft],
+  )
+
+  const lossGate = useMemo(
+    () =>
+      decideLossEligibility(
+        {
+          age: age ?? 0,
+          weightKg: weightKg ?? 0,
+          heightCm: heightCm ?? 0,
+          sex,
+          goalWeightKg: goalWeightKg ?? 0,
+          declarations: readHealthDeclarations({ ...health }),
+        },
+        { calorieGoalEnabled: true },
+      ),
+    [age, weightKg, heightCm, sex, goalWeightKg, health],
+  )
 
   const estimatedWeeks = useMemo(() => {
     if (!draft || draft.goal === 'maintain' || draft.weeklyPaceKg <= 0) return null
@@ -131,6 +179,14 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
   }
 
   const goGoalWeight = () => {
+    if (goal == null) {
+      setError('Choisis un objectif pour continuer.')
+      return
+    }
+    if (goal === 'cut' && !lossGate.eligible) {
+      setError(messageForLossRefusal(lossGate.reason) ?? 'Cet objectif de perte n’est pas proposé.')
+      return
+    }
     setError(null)
     setStep('goalWeight')
   }
@@ -139,6 +195,23 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
     if (goalWeightKg == null || goalWeightKg < 35) {
       setError('Indique ton poids objectif (ex. 61.7).')
       return
+    }
+    if (goal === 'cut') {
+      const targetGate = decideLossEligibility(
+        {
+          age: age ?? 25,
+          weightKg: weightKg ?? goalWeightKg,
+          heightCm: heightCm ?? 170,
+          sex: sex ?? 'female',
+          goalWeightKg,
+          declarations: readHealthDeclarations({ ...health }),
+        },
+        { calorieGoalEnabled: true },
+      )
+      if (targetGate.reason === 'low_target_bmi') {
+        setError(messageForLossRefusal('low_target_bmi') ?? '')
+        return
+      }
     }
     setError(null)
     setStep(goal === 'maintain' ? 'measurements' : 'pace')
@@ -154,8 +227,16 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
   }
 
   const goActivity = () => {
-    if (weightKg == null || heightCm == null || age == null) {
-      setError('Remplis poids actuel, taille et âge.')
+    if (weightKg == null || heightCm == null || age == null || sex == null) {
+      setError('Remplis poids actuel, taille, âge et sexe.')
+      return
+    }
+    if (age < PLAUSIBLE_AGE_MIN || age > PLAUSIBLE_AGE_MAX) {
+      setError(`Indique un âge entre ${PLAUSIBLE_AGE_MIN} et ${PLAUSIBLE_AGE_MAX} ans.`)
+      return
+    }
+    if (isMinorAge(age)) {
+      setError('Certaines fonctions de nutrition ne sont pas proposées avant 18 ans.')
       return
     }
     setError(null)
@@ -223,16 +304,20 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
 
         {step === 'goal' && (
           <div className="space-y-4">
-            <p className="text-[15px] text-[#AEAEB2]">
-              On adapte les calculs à ton métabolisme pour des résultats optimaux.
-            </p>
+            <p className="text-[15px] text-[#AEAEB2]">{M_CAL_1}</p>
+            <p className="text-[13px] text-[#8E8E93]">{M_INFO_1}</p>
+
+            <HealthSituationsForm value={health} onChange={setHealth} showTcaMessage />
 
             <GoalPicker
               value={goal}
+              allowCut={lossGate.eligible || age == null}
               onChange={(next) => {
                 setGoal(next)
                 if (next === 'maintain') setWeeklyPaceKg(0)
-                else if (weeklyPaceKg <= 0) setWeeklyPaceKg(0.5)
+                else if (weeklyPaceKg <= 0) {
+                  setWeeklyPaceKg(defaultWeeklyPaceKg(weightKg ?? 70))
+                }
               }}
             />
 
@@ -251,7 +336,9 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
           <div className="space-y-4">
             <p className="text-[15px] text-[#AEAEB2]">
               Quel poids vises-tu avec ton objectif{' '}
-              <span className="font-semibold text-white">{GOAL_LABELS[goal].toLowerCase()}</span>{' '}
+              <span className="font-semibold text-white">
+                {goal ? GOAL_LABELS[goal].toLowerCase() : ''}
+              </span>{' '}
               ?
             </p>
 
@@ -296,16 +383,19 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
           </div>
         )}
 
-        {step === 'pace' && goal !== 'maintain' && (
+        {step === 'pace' && goal != null && goal !== 'maintain' && (
           <div className="space-y-4">
             <p className="text-[15px] text-[#AEAEB2]">
               À quelle vitesse veux-tu progresser chaque semaine ?
             </p>
 
             <WeeklyPacePicker
-              value={weeklyPaceKg > 0 ? weeklyPaceKg : 0.5}
+              value={
+                weeklyPaceKg > 0 ? weeklyPaceKg : defaultWeeklyPaceKg(weightKg ?? 70)
+              }
               onChange={setWeeklyPaceKg}
               goal={goal}
+              weightKg={weightKg ?? 70}
             />
 
             <div className="flex gap-2 pt-1">
@@ -384,8 +474,8 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               <ClearableNumberInput
                 value={age}
                 onChange={setAge}
-                min={14}
-                max={90}
+                min={PLAUSIBLE_AGE_MIN}
+                max={PLAUSIBLE_AGE_MAX}
                 required={false}
                 placeholder="24"
                 aria-label="Âge"
@@ -492,7 +582,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
           <div className="space-y-4">
             <div className="rounded-2xl border border-[#30D158]/25 bg-[#30D158]/10 p-4 text-center">
               <p className="text-[12px] font-semibold uppercase tracking-wide text-[#8E8E93]">
-                Objectif {GOAL_LABELS[draft.goal]} · {MORPHOLOGY_LABELS[morphology]}
+                Estimation · {GOAL_LABELS[draft.goal]} · {MORPHOLOGY_LABELS[morphology]}
               </p>
               <p className="mt-1 text-[42px] font-black tracking-tight text-white">
                 {nutrition.targetCalories}
@@ -501,10 +591,13 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               <p className="mt-2 text-[13px] text-[#AEAEB2]">
                 {draft.weightKg} kg → {draft.goalWeightKg} kg
                 {draft.goal !== 'maintain' && (
-                  <> · {draft.weeklyPaceKg.toFixed(1)} kg/sem.</>
+                  <> · {draft.weeklyPaceKg.toFixed(2)} kg/sem.</>
                 )}
                 {estimatedWeeks != null && <> · ~{estimatedWeeks} sem.</>}
               </p>
+              <p className="mt-3 text-[12px] leading-relaxed text-[#AEAEB2]">{M_CAL_2}</p>
+              <p className="mt-2 text-[12px] leading-relaxed text-[#8E8E93]">{Q1_TOUS_AGES}</p>
+              <p className="mt-2 text-[12px] leading-relaxed text-[#8E8E93]">{M_INFO_1}</p>
             </div>
 
             <div className="grid grid-cols-3 gap-2">

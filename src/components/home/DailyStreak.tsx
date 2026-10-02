@@ -6,6 +6,7 @@ import {
   isStreakActiveToday,
   STREAK_WEEK_BONUS_XP,
 } from '../../services/streakService'
+import { shouldBlockNutritionStreakAlerts } from '../../services/communitySafety'
 
 /**
  * DailyStreak — série connectée à Supabase (`profiles.current_streak`, `last_login_date`).
@@ -83,17 +84,18 @@ export function DailyStreak() {
 
   const lit = isTodayDone && currentStreak > 0
   const weekGlow = Boolean(bonusFlash)
+  const calmStreak = shouldBlockNutritionStreakAlerts()
 
   return (
     <section className="ios-fade-up space-y-3">
       <div
         className={`streak-card relative overflow-hidden rounded-2xl border px-4 py-3.5 transition-all duration-500 ${
-          lit
+          lit && !calmStreak
             ? `border-[#FF2B2B]/45 ${weekGlow ? 'streak-card--jackpot' : 'streak-card--lit'}`
             : 'border-white/10'
         }`}
         style={
-          lit
+          lit && !calmStreak
             ? {
                 background: 'var(--color-card)',
                 boxShadow: weekGlow
@@ -109,17 +111,26 @@ export function DailyStreak() {
         <div className="relative flex items-center gap-3">
           <Flame
             className={`h-8 w-8 shrink-0 transition-colors duration-300 ${
-              lit
+              lit && !calmStreak
                 ? `text-[#FF2B2B] ${bump ? 'streak-flame--pop' : ''}`
                 : 'text-[#636366]'
             }`}
             strokeWidth={2.25}
-            fill={lit ? 'currentColor' : 'none'}
+            fill={lit && !calmStreak ? 'currentColor' : 'none'}
             aria-hidden
           />
 
           <div className="min-w-0 flex-1">
-            {lit ? (
+            {calmStreak ? (
+              <>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#AEAEB2]">
+                  Série
+                </p>
+                <p className="mt-0.5 text-[16px] font-semibold leading-snug text-[#AEAEB2]">
+                  {currentStreak > 0 ? `${displayStreak} jour${displayStreak > 1 ? 's' : ''}` : '—'}
+                </p>
+              </>
+            ) : lit ? (
               <>
                 <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#FF9F0A]">
                   Série en cours
