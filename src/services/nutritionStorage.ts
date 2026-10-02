@@ -43,13 +43,21 @@ const HEALTH_LOCAL_KEY_PREFIXES = [
   'ranked-gym:check-in',
   'ranked-gym:custom-gyms',
   CONVEX_NUTRITION_QUEUE_PREFIX,
+  // BUG-40 : préférences d’interface (discipline, ghost, streak)
+  'ranked-gym:ghost-mode',
+  'ranked-gym:streak-celebration',
 ] as const
 
 const HEALTH_LOCAL_EXACT_KEYS = [
   PIECE_PRESETS_KEY,
   'ranked-gym:cloud-backup-meta',
   'ranked-gym:reminder-fired',
+  'ranked-gym:discipline',
+  'ranked-gym:pro-pass-dismissed',
 ] as const
+
+/** Cache sessionStorage (géocodage inverse) — vidé à la suppression de compte (BUG-40). */
+const SESSION_CLEAR_PREFIXES = ['ranked-gym:revgeo'] as const
 
 export type StorageSaveOptions = { skipCloud?: boolean }
 
@@ -294,8 +302,8 @@ function isHealthLocalKey(key: string): boolean {
 
 /**
  * Efface les données de santé locales (nutrition, sommeil, entraînement, GPS,
- * check-ins, caches) — appelé à la suppression de compte (SEC-DON-02 / R-13 / BUG-34).
- * Ne touche pas aux préférences hors santé (ex. pro-pass dismissé, discipline UI).
+ * check-ins, caches) et les préférences d’interface locales — appelé à la
+ * suppression de compte (SEC-DON-02 / R-13 / BUG-34 / BUG-40).
  */
 export function clearLocalNutritionData(opts?: { userId?: string | null }): void {
   const uid = opts?.userId ?? getActiveCloudUserId()
@@ -328,6 +336,29 @@ export function clearLocalNutritionData(opts?: { userId?: string | null }): void
       } catch {
         /* ignore */
       }
+    }
+  }
+
+  // BUG-40 : cache géocodage inverse en sessionStorage
+  if (typeof sessionStorage !== 'undefined') {
+    try {
+      const sessionKeys: string[] = []
+      for (let i = 0; i < sessionStorage.length; i += 1) {
+        const key = sessionStorage.key(i)
+        if (
+          key &&
+          SESSION_CLEAR_PREFIXES.some(
+            (prefix) => key === prefix || key.startsWith(`${prefix}:`),
+          )
+        ) {
+          sessionKeys.push(key)
+        }
+      }
+      for (const key of sessionKeys) {
+        sessionStorage.removeItem(key)
+      }
+    } catch (error) {
+      safeWarn('[nutrition] clearLocalNutritionData sessionStorage failed', error)
     }
   }
 
