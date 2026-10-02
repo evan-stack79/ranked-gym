@@ -86,8 +86,6 @@ describe('QA BUG-10 — purge locale à la suppression de compte', () => {
     localStorage.setItem('ranked-gym:profile', '{"xp":10}')
     localStorage.setItem('ranked-gym:cloud-backup-meta', '{"v":1}')
     localStorage.setItem('ranked-gym:reminder-fired', '{}')
-    // Préférence hors santé — ne doit pas être effacée
-    localStorage.setItem('ranked-gym:pro-pass-dismissed', '1')
 
     clearLocalNutritionData({ userId: 'user-qa-10' })
 
@@ -100,7 +98,22 @@ describe('QA BUG-10 — purge locale à la suppression de compte', () => {
     expect(localStorage.getItem('ranked-gym:profile')).toBeNull()
     expect(localStorage.getItem('ranked-gym:cloud-backup-meta')).toBeNull()
     expect(localStorage.getItem('ranked-gym:reminder-fired')).toBeNull()
-    expect(localStorage.getItem('ranked-gym:pro-pass-dismissed')).toBe('1')
+  })
+
+  it('BUG-40 : purge aussi les préférences d’interface locales', () => {
+    localStorage.setItem('ranked-gym:discipline', 'course')
+    localStorage.setItem('ranked-gym:ghost-mode:u:user-qa-10', '1')
+    localStorage.setItem('ranked-gym:pro-pass-dismissed', '1')
+    localStorage.setItem('ranked-gym:streak-celebration:u:user-qa-10', '{"shown":true}')
+    sessionStorage.setItem('ranked-gym:revgeo:48.8,2.3', '{"label":"Paris"}')
+
+    clearLocalNutritionData({ userId: 'user-qa-10' })
+
+    expect(localStorage.getItem('ranked-gym:discipline')).toBeNull()
+    expect(localStorage.getItem('ranked-gym:ghost-mode:u:user-qa-10')).toBeNull()
+    expect(localStorage.getItem('ranked-gym:pro-pass-dismissed')).toBeNull()
+    expect(localStorage.getItem('ranked-gym:streak-celebration:u:user-qa-10')).toBeNull()
+    expect(sessionStorage.getItem('ranked-gym:revgeo:48.8,2.3')).toBeNull()
   })
 
   it('cas limite : idempotent si déjà vide', () => {
