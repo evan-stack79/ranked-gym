@@ -10,7 +10,8 @@ export interface CalorieProfile {
   goalWeightKg: number
   heightCm: number
   age: number
-  sex: Sex
+  /** Null si non renseigné — plus de défaut « homme » (SEC-POP / profil incomplet). */
+  sex: Sex | null
   activity: ActivityLevel
   morphology: BodyMorphology
   /** Explicit user choice: cut | maintain | bulk */
@@ -21,6 +22,11 @@ export interface CalorieProfile {
    */
   weeklyPaceKg: number
   onboardingComplete: boolean
+  /** Déclarations facultatives — jamais inférées (SEC-POP-04). */
+  declaredPregnancy?: boolean
+  declaredBreastfeeding?: boolean
+  declaredEatingDisorder?: boolean
+  preferNotAnswerHealth?: boolean
 }
 
 export interface CalorieResult {

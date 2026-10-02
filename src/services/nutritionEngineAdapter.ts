@@ -1,6 +1,16 @@
 import type { ActivityLevel as ProfileActivity, CalorieProfile } from '../types/nutrition'
 import type { ActivityLevel as EngineActivity, NutritionEngineInput } from '../nutrition-engine/types'
 import { getTrainingState } from './trainingStorage'
+import {
+  decideEstimationEligibility,
+  decideLossEligibility,
+  evaluateCalorieTarget,
+  estimateRmrKcal,
+  isProfileCompleteForNutrition,
+  paceKgToDailyDeficit,
+  readHealthDeclarations,
+} from './nutritionSafetyRules'
+import { isCalorieGoalEnabled } from '../backend/calorieGoalFeatureFlag'
 
 const PROFILE_ACTIVITY_TO_IOM: Record<ProfileActivity, EngineActivity> = {
   sedentary: 1,
@@ -10,34 +20,54 @@ const PROFILE_ACTIVITY_TO_IOM: Record<ProfileActivity, EngineActivity> = {
   athlete: 4,
 }
 
-/** IOM adulte ≥ 19 ans — clamp onboarding si âge < 18. */
-function engineAge(profileAge: number): number {
-  return Math.max(18, Math.min(120, profileAge))
-}
+function paceToDeficitSurplus(
+  profile: CalorieProfile,
+  opts?: { calorieGoalEnabled?: boolean },
+): { deficit_kcal: number; surplus_kcal: number } {
+  const enabled = opts?.calorieGoalEnabled ?? isCalorieGoalEnabled()
+  const declarations = readHealthDeclarations(profile)
+  const loss = decideLossEligibility(
+    {
+      age: profile.age,
+      weightKg: profile.weightKg,
+      heightCm: profile.heightCm,
+      sex: profile.sex,
+      goalWeightKg: profile.goalWeightKg,
+      declarations,
+    },
+    { calorieGoalEnabled: enabled },
+  )
 
-function paceToDeficitSurplus(profile: CalorieProfile): { deficit_kcal: number; surplus_kcal: number } {
   const paceMag = Math.max(0, profile.weeklyPaceKg || 0)
-  if (profile.goal === 'maintain' || paceMag === 0) {
+  if (!enabled || profile.goal === 'maintain' || paceMag === 0) {
     return { deficit_kcal: 0, surplus_kcal: 0 }
   }
-  const daily = Math.round((paceMag * 7700) / 7)
+
   if (profile.goal === 'cut') {
-    return { deficit_kcal: Math.min(2000, daily), surplus_kcal: 0 }
+    if (!loss.eligible) return { deficit_kcal: 0, surplus_kcal: 0 }
+    // Plafond moteur = déficit max sécurité (600), plus le plancher RMR appliqué après.
+    return { deficit_kcal: Math.min(600, paceKgToDailyDeficit(paceMag)), surplus_kcal: 0 }
   }
-  return { deficit_kcal: 0, surplus_kcal: Math.min(1000, daily) }
+
+  return { deficit_kcal: 0, surplus_kcal: Math.min(1000, paceKgToDailyDeficit(paceMag)) }
 }
 
-export function profileToEngineInput(profile: CalorieProfile): NutritionEngineInput {
+export function profileToEngineInput(
+  profile: CalorieProfile,
+  opts?: { calorieGoalEnabled?: boolean },
+): NutritionEngineInput {
   const training = getTrainingState()
-  const { deficit_kcal, surplus_kcal } = paceToDeficitSurplus(profile)
+  const { deficit_kcal, surplus_kcal } = paceToDeficitSurplus(profile, opts)
+  const sex = profile.sex === 'female' ? 'female' : 'male'
 
   return {
-    sex: profile.sex,
-    age: engineAge(profile.age),
+    sex,
+    // Ne plus remonter les mineurs à 18 — l'âge réel est transmis ; le moteur refuse < 18.
+    age: profile.age,
     weight_kg: profile.weightKg,
     height_m: profile.heightCm / 100,
     activity: PROFILE_ACTIVITY_TO_IOM[profile.activity],
-    goal: profile.goal,
+    goal: profile.goal === 'cut' && deficit_kcal === 0 ? 'maintain' : profile.goal,
     deficit_kcal,
     surplus_kcal,
     sport_principal: training.primarySportId,
@@ -49,13 +79,57 @@ export function profileToEngineInput(profile: CalorieProfile): NutritionEngineIn
   }
 }
 
-export function isEngineReadyProfile(profile: CalorieProfile): boolean {
-  return (
-    profile.onboardingComplete &&
-    profile.weightKg >= 30 &&
-    profile.weightKg <= 250 &&
-    profile.heightCm >= 100 &&
-    profile.heightCm <= 250 &&
-    profile.age >= 14
+export function isEngineReadyProfile(
+  profile: CalorieProfile,
+  opts?: { calorieGoalEnabled?: boolean },
+): boolean {
+  const enabled = opts?.calorieGoalEnabled ?? isCalorieGoalEnabled()
+  if (!profile.onboardingComplete) return false
+  if (
+    !isProfileCompleteForNutrition({
+      age: profile.age,
+      weightKg: profile.weightKg,
+      heightCm: profile.heightCm,
+      sex: profile.sex,
+    })
+  ) {
+    return false
+  }
+
+  const estimation = decideEstimationEligibility(
+    {
+      age: profile.age,
+      weightKg: profile.weightKg,
+      heightCm: profile.heightCm,
+      sex: profile.sex,
+      declarations: readHealthDeclarations(profile),
+    },
+    { calorieGoalEnabled: enabled },
   )
+
+  // Sans drapeau : pas de cible moteur affichée. Avec drapeau : estimation si autorisée.
+  if (!enabled) return false
+  return estimation.allowed
+}
+
+/** Applique plancher / déficit après un résultat moteur. */
+export function clampEngineTargetCalories(
+  profile: CalorieProfile,
+  targetCalories: number,
+  maintenanceKcal: number,
+): { targetCalories: number; softBandWarning: boolean } {
+  if (profile.sex !== 'male' && profile.sex !== 'female') {
+    return { targetCalories: 0, softBandWarning: false }
+  }
+  const rmr = estimateRmrKcal(profile.weightKg, profile.heightCm, profile.age, profile.sex)
+  const decision = evaluateCalorieTarget({
+    targetCalories,
+    maintenanceKcal,
+    rmrKcal: rmr,
+    mode: 'clamp',
+  })
+  if (!decision.ok) {
+    return { targetCalories: decision.clampedTarget ?? 0, softBandWarning: false }
+  }
+  return { targetCalories: decision.targetCalories, softBandWarning: decision.softBandWarning }
 }
