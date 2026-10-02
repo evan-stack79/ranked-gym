@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpen, Check, Pause, Pencil, Play, Plus, Trash2, X } from 'lucide-react'
 import type {
   ExerciseEntry,
@@ -432,7 +432,7 @@ export function WorkoutNotebook({
     }
   }, [onDraftSave, onRegisterDraftFlush])
 
-  const handleActiveIndexChange = (index: number) => {
+  const focusExercise = useCallback((index: number) => {
     setActiveExerciseIndex(index)
     if (!editingNote) {
       try {
@@ -441,20 +441,16 @@ export function WorkoutNotebook({
         // persist error déjà émis par trainingStorage
       }
     }
-  }
+  }, [editingNote])
+
+  const handleActiveIndexChange = focusExercise
 
   const handleSoftBack = () => {
     if (!draftBlocked.current && draftDirty.current && onDraftSave) {
       onDraftSave(routineIdRef.current, exercisesRef.current)
       draftDirty.current = false
     }
-    if (!editingNote) {
-      try {
-        persistActiveExerciseIndex(activeExerciseIndex)
-      } catch {
-        // ignore
-      }
-    }
+    focusExercise(activeExerciseIndex)
     onBack?.()
   }
 
@@ -582,14 +578,25 @@ export function WorkoutNotebook({
 
   useEffect(() => {
     if (!immersiveLive || exercises.length === 0) return
-    setActiveExerciseIndex((i) => Math.min(i, exercises.length - 1))
-  }, [exercises.length, immersiveLive])
+    if (activeExerciseIndex > exercises.length - 1) {
+      focusExercise(exercises.length - 1)
+    }
+  }, [exercises.length, immersiveLive, activeExerciseIndex, focusExercise])
 
-  // Au démarrage immersif : focus sur le premier exercice avec série en cours.
+  // Au démarrage immersif : l’index enregistré gagne ; sinon premier exo avec série en cours.
   useEffect(() => {
     if (!immersiveLive) return
+    let stored: number | undefined
+    if (resume) {
+      try {
+        stored = getTrainingState().activeWorkoutDraft?.activeExerciseIndex
+      } catch {
+        stored = undefined
+      }
+    }
+    if (typeof stored === 'number' && stored >= 0 && stored < exercises.length) return
     const idx = exercises.findIndex((e) => e.sets.some((s) => !s.done))
-    if (idx >= 0) setActiveExerciseIndex(idx)
+    focusExercise(idx >= 0 ? idx : 0)
     // Montage immersif uniquement
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [immersiveLive])
@@ -600,8 +607,9 @@ export function WorkoutNotebook({
     const next = [...base, entry]
     const nextIndex = next.length - 1
     setExercises(next)
-    setActiveExerciseIndex(nextIndex)
+    // persistActiveExerciseIndex no-op sans brouillon : onDraftSave le crée / le maintient d’abord.
     if (!draftBlocked.current) onDraftSave?.(routineId, next)
+    focusExercise(nextIndex)
     draftDirty.current = false
     setPickerMode(null)
   }
