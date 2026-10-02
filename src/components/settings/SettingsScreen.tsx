@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import {
   ChevronRight,
   CreditCard,
+  HeartHandshake,
   HeartPulse,
+  Info,
   LogOut,
   Pencil,
   Settings2,
@@ -26,7 +28,15 @@ const PRO_PASS_DISMISSED_KEY = 'ranked-gym:pro-pass-dismissed'
 
 export type SettingsSheet = 'payment' | 'preferences' | null
 
-export type SettingsMenuId = 'personal' | 'privacy' | 'payment' | 'preferences' | 'cameraHeartRate'
+export type SettingsMenuId =
+  | 'personal'
+  | 'privacy'
+  | 'payment'
+  | 'preferences'
+  | 'cameraHeartRate'
+  | 'needToTalk'
+  | 'healthSituations'
+  | 'energyInfo'
 
 interface SettingsScreenProps {
   username: string
@@ -38,6 +48,9 @@ interface SettingsScreenProps {
   onOpenPersonalInfo?: () => void
   onOpenSecurity?: () => void
   onOpenCameraHeartRate?: () => void
+  onOpenNeedToTalk?: () => void
+  onOpenHealthSituations?: () => void
+  onOpenEnergyInfo?: () => void
   onRequireAuth?: () => void
   onTryPro?: () => void
   onDisciplineChange?: (disciplineLabel: string) => void
@@ -72,6 +85,9 @@ export function SettingsScreen({
   onOpenPersonalInfo,
   onOpenSecurity,
   onOpenCameraHeartRate,
+  onOpenNeedToTalk,
+  onOpenHealthSituations,
+  onOpenEnergyInfo,
   onRequireAuth,
   onTryPro,
   onDisciplineChange,
@@ -163,6 +179,9 @@ export function SettingsScreen({
       items: [
         { id: 'personal', icon: UserRound, label: 'Informations personnelles' },
         { id: 'privacy', icon: Shield, label: 'Sécurité & Confidentialité' },
+        { id: 'healthSituations', icon: HeartHandshake, label: 'Situations de santé' },
+        { id: 'needToTalk', icon: HeartHandshake, label: "Besoin d'en parler ?" },
+        { id: 'energyInfo', icon: Info, label: 'Informations' },
         { id: 'payment', icon: CreditCard, label: 'Méthodes de paiement' },
         { id: 'preferences', icon: Settings2, label: 'Préférences' },
         ...(isCameraHeartRateEnabled()
@@ -258,11 +277,23 @@ export function SettingsScreen({
                       openSecurity()
                       return
                     }
+                    if (item.id === 'needToTalk') {
+                      onOpenNeedToTalk?.()
+                      return
+                    }
+                    if (item.id === 'healthSituations') {
+                      onOpenHealthSituations?.()
+                      return
+                    }
+                    if (item.id === 'energyInfo') {
+                      onOpenEnergyInfo?.()
+                      return
+                    }
                     if (!isAuthenticated) {
                       onRequireAuth?.()
                       return
                     }
-                    setSheet(item.id)
+                    setSheet(item.id as SettingsSheet)
                   }}
                 />
               </div>

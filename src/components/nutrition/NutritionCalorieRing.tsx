@@ -1,3 +1,6 @@
+import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
+import { M_INFO_1 } from '../../content/safetyCopy'
+
 interface NutritionCalorieRingProps {
   remainingCalories: number
   consumedCalories: number
@@ -49,23 +52,34 @@ export function NutritionCalorieRing({
   )
 
   if (!hasTarget) {
+    const goalAssistantEnabled = isCalorieGoalEnabled()
     return (
       <div className="flex flex-col items-center text-center">
         {heading}
         <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-[#19191C]">
           <img src="/panther-trim.png" alt="" width={38} height={38} className="h-10 w-10 object-contain" draggable={false} />
         </div>
-        <p className="mt-4 text-[16px] font-semibold text-white">Définis ton objectif calorique</p>
-        <p className="mt-1 max-w-[18rem] text-[13px] leading-5 text-[#8E8E93]">
-          Ton compteur apparaîtra dès que ton plan nutrition sera renseigné.
+        <p className="mt-4 text-[16px] font-semibold text-white">
+          {goalAssistantEnabled ? 'Définis ton objectif calorique' : 'Suivi sans objectif chiffré'}
         </p>
-        <button
-          type="button"
-          onClick={onOpenSetup}
-          className="ios-press mt-5 rounded-xl bg-[#FF2B2B] px-4 py-2.5 text-[13px] font-semibold text-white"
-        >
-          Définir mon objectif
-        </button>
+        <p className="mt-1 max-w-[18rem] text-[13px] leading-5 text-[#8E8E93]">
+          {goalAssistantEnabled
+            ? 'Ton compteur apparaîtra dès que ton plan nutrition sera renseigné.'
+            : M_INFO_1}
+        </p>
+        {goalAssistantEnabled ? (
+          <button
+            type="button"
+            onClick={onOpenSetup}
+            className="ios-press mt-5 rounded-xl bg-[#FF2B2B] px-4 py-2.5 text-[13px] font-semibold text-white"
+          >
+            Définir mon objectif
+          </button>
+        ) : (
+          <p className="mt-4 text-[13px] tabular-nums text-white">
+            Consommé aujourd&apos;hui : {formatKcal(safeConsumed)} kcal
+          </p>
+        )}
       </div>
     )
   }

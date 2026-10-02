@@ -596,8 +596,12 @@ export function NutritionDashboard({
 
         {advancedOpen ? (
           <div className="space-y-6 border-t border-white/8 pt-6">
-            <NutritionPlanCard profile={profile} onChange={onChangeProfile} />
-            <WeightPaceCard profile={profile} />
+            {nutrition.showCalorieGoal ? (
+              <>
+                <NutritionPlanCard profile={profile} onChange={onChangeProfile} />
+                <WeightPaceCard profile={profile} />
+              </>
+            ) : null}
             <SmartWaterGauge weightKg={profile.weightKg} />
           </div>
         ) : null}
