@@ -38,7 +38,6 @@ import {
   AUTO_VALIDATE_UNDO_MS,
   isSetReadyForAutoValidate,
   makeAutoValidateKey,
-  shouldAppendNextSetOnRestSkip,
   shouldCommitAutoValidate,
 } from '../../utils/autoValidateSet'
 import { CANONICAL_REST_SEC, resolveRestDuration } from '../../utils/restDuration'
@@ -370,25 +369,14 @@ export function WorkoutNotebook({
 
   useEffect(() => {
     if (!restLogRequest || draftBlocked.current) return
-    const { exerciseId, setIndex, restSec, addNextSet } = restLogRequest
+    // DEV-RG-07 : journaliser repos uniquement — jamais d’append de série ici.
+    // (addNextSet était l’ancien enchaînement Reprendre → nouvelle série ; seul « + Ajouter une série » crée.)
+    const { exerciseId, setIndex, restSec } = restLogRequest
     setExercises((prev) => {
       draftDirty.current = true
       const next = prev.map((e) => {
         if (e.id !== exerciseId) return e
-        let sets = e.sets.map((s, i) => (i === setIndex ? { ...s, restSec, done: true } : s))
-        // Reprendre : append seulement s’il n’existe pas déjà une série suivante !done.
-        if (addNextSet && shouldAppendNextSetOnRestSkip(sets, setIndex)) {
-          const last = sets[sets.length - 1]
-          sets = [
-            ...sets,
-            {
-              reps: last?.reps ?? 8,
-              weightKg: last?.weightKg ?? 20,
-              difficulty: last?.difficulty,
-              rpe: last?.rpe,
-            },
-          ]
-        }
+        const sets = e.sets.map((s, i) => (i === setIndex ? { ...s, restSec, done: true } : s))
         return { ...e, sets }
       })
       onDraftSave?.(routineId, next)
