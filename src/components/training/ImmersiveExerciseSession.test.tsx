@@ -898,10 +898,9 @@ describe('ImmersiveExerciseSession', () => {
     expect(onAddSet).not.toHaveBeenCalled()
   })
 
-  it('Reprendre : n’append pas si une série !done existe déjà (restLog guard)', async () => {
+  it('Reprendre (dernière série) : DEV-RG-07 jamais d’append auto via shouldAppend', async () => {
     const { shouldAppendNextSetOnRestSkip } = await import('../../utils/autoValidateSet')
 
-    // Simule l’effet WorkoutNotebook après validate série 0 + skip
     const afterValidate = [
       { reps: 6, weightKg: 80, done: true as const, restSec: 12, rpe: 8 },
       { reps: 6, weightKg: 80, done: false as const },
@@ -909,16 +908,12 @@ describe('ImmersiveExerciseSession', () => {
     expect(shouldAppendNextSetOnRestSkip(afterValidate, 0)).toBe(false)
 
     const lastOnly = [{ reps: 6, weightKg: 80, done: true as const, restSec: 12, rpe: 9 }]
-    expect(shouldAppendNextSetOnRestSkip(lastOnly, 0)).toBe(true)
+    expect(shouldAppendNextSetOnRestSkip(lastOnly, 0)).toBe(false)
 
-    // Harness UI : 2 séries, Reprendre ne crée pas de 3ᵉ via onAddSet
     const onAddSet = vi.fn()
     function Harness() {
       const rest = useRestTimerContext()
-      const [sets, setSets] = useState([
-        { reps: 6, weightKg: 80 },
-        { reps: 6, weightKg: 80 },
-      ])
+      const [sets, setSets] = useState([{ reps: 6, weightKg: 80 }])
       return (
         <ImmersiveExerciseSession
           exercises={[{ id: 'ex-1', name: 'Squat', sets }]}
@@ -936,7 +931,6 @@ describe('ImmersiveExerciseSession', () => {
               const next: Array<{ reps: number; weightKg: number; done?: boolean }> = prev.map(
                 (s, i) => (i === setIndex ? { ...s, done: true as const } : s),
               )
-              // Miroir restLogRequest addNextSet:skipped + guard
               if (shouldAppendNextSetOnRestSkip(next, setIndex)) {
                 const last = next[next.length - 1]
                 next.push({
@@ -980,6 +974,6 @@ describe('ImmersiveExerciseSession', () => {
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     expect(onAddSet).not.toHaveBeenCalled()
-    expect(host.querySelectorAll('[data-set-row]')).toHaveLength(2)
+    expect(host.querySelectorAll('[data-set-row]')).toHaveLength(1)
   })
 })
