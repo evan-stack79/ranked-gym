@@ -9,6 +9,7 @@ import { BootIssueScreen, RecoverableRetryBar } from './components/ui/BootIssueS
 import { OfflineBanner } from './components/ui/OfflineBanner'
 import { SupabaseConfigBanner } from './components/ui/SupabaseConfigBanner'
 import { useOnlineStatus } from './hooks/useOnlineStatus'
+import { usePwaLifecycle } from './hooks/usePwaUpdate'
 import { GlobalOnboardingScreen } from './components/onboarding/GlobalOnboardingScreen'
 import { SportsOnboardingScreen } from './components/onboarding/SportsOnboardingScreen'
 import { HomeView } from './components/home/HomeView'
@@ -119,6 +120,7 @@ export function AppShell() {
   const [hasActiveWorkout, setHasActiveWorkout] = useState(() => Boolean(getTrainingState().activeWorkoutDraft))
   const { openAuth, isAuthenticated, isLoading, bootIssue, retryHydrate } = useAuth()
   const online = useOnlineStatus()
+  usePwaLifecycle()
 
   useEffect(() => {
     if (isLoading) {

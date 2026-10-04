@@ -3,7 +3,22 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+/** SHA court (Cloudflare Pages / CI) pour la pastille de version dans Réglages. */
+function resolveAppBuildId(): string {
+  const fromEnv =
+    process.env.CF_PAGES_COMMIT_SHA ||
+    process.env.VITE_APP_BUILD_ID ||
+    process.env.GITHUB_SHA ||
+    ''
+  const short = fromEnv.trim().slice(0, 7)
+  if (short) return short
+  return `local-${new Date().toISOString().slice(0, 10)}`
+}
+
 export default defineConfig({
+  define: {
+    __APP_BUILD_ID__: JSON.stringify(resolveAppBuildId()),
+  },
   server: {
     host: true,
     port: 5173,
