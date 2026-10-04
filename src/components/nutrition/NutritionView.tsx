@@ -17,7 +17,6 @@ import {
 import { EnergyRecoveryInfo } from '../settings/EnergyRecoveryInfo'
 import { NeedToTalkScreen } from '../settings/NeedToTalkScreen'
 import {
-  M_INFO_1,
   M_MIN_1,
   M_TCA_1,
   Q6A_MINEURS,
@@ -134,14 +133,6 @@ export function NutritionView() {
             {Q8_SCREEN_TITLE}
           </button>
         </div>
-      )}
-      {!calorieGoalEnabled && (
-        <p
-          className="rounded-2xl border border-white/10 bg-black/25 px-3.5 py-3 text-[13px] leading-relaxed text-[#AEAEB2]"
-          data-testid="calorie-goal-disabled-notice"
-        >
-          {M_INFO_1}
-        </p>
       )}
       <NutritionDashboard
         profile={profile}
