@@ -402,6 +402,8 @@ export function applySafetyToProfile(
     weeklyPaceKg = clampWeeklyPaceKg(weeklyPaceKg, weightKg)
   }
 
+  let goalWeightKg = profile.goalWeightKg
+
   if (enabled) {
     const loss = decideLossEligibility(
       {
@@ -422,6 +424,17 @@ export function applySafetyToProfile(
 
   if (goal === 'maintain') {
     weeklyPaceKg = 0
+    // BUG-42 : en Maintien (drapeau ON), ne pas conserver un poids objectif de perte.
+    if (
+      enabled &&
+      Number.isFinite(weightKg) &&
+      weightKg > 0 &&
+      Number.isFinite(goalWeightKg) &&
+      goalWeightKg > 0 &&
+      goalWeightKg < weightKg
+    ) {
+      goalWeightKg = weightKg
+    }
   }
 
   return {
@@ -429,6 +442,7 @@ export function applySafetyToProfile(
     sex,
     goal,
     weeklyPaceKg,
+    goalWeightKg,
     declaredPregnancy: declarations.pregnancy,
     declaredBreastfeeding: declarations.breastfeeding,
     declaredEatingDisorder: declarations.eatingDisorder,

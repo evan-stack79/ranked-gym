@@ -12,6 +12,7 @@ import {
   M_TCA_1,
   Q8_SCREEN_TITLE,
   M_INFO_1,
+  Q4_IMC,
 } from '../../content/safetyCopy'
 import type { CalorieProfile } from '../../types/nutrition'
 
@@ -468,6 +469,131 @@ describe('QA BUG-08 ON — pas de poids objectif / rythme avant l’âge', () =>
     expect(saved.current?.goal).toBe('maintain')
     expect(saved.current?.goalWeightKg).toBe(0)
 
+    cleanup()
+  })
+})
+
+describe('QA BUG-42 — IMC cible refusé dès « Ton poids objectif »', () => {
+  const prev = import.meta.env.VITE_ENABLE_CALORIE_GOAL
+
+  beforeEach(() => {
+    vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', 'true')
+  })
+
+  afterEach(() => {
+    if (prev === undefined) vi.unstubAllEnvs()
+    else vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', prev)
+  })
+
+  async function reachGoalWeightScreen(host: HTMLElement) {
+    const cut = Array.from(host.querySelectorAll('button')).find((b) =>
+      /sèche|cut|perte/i.test(b.textContent ?? ''),
+    )
+    await act(async () => {
+      cut?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    const continuer = Array.from(host.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Continuer'),
+    )
+    await act(async () => {
+      continuer?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await fillAdultMeasurements(host, { age: 30, weight: 80, height: 180 })
+    const continuer2 = Array.from(host.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Continuer'),
+    )
+    await act(async () => {
+      continuer2?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(host.textContent).toContain('Ton poids objectif')
+  }
+
+  async function submitGoalWeight(host: HTMLElement, kg: number) {
+    const input = host.querySelector('input[aria-label="Poids objectif"]') as HTMLInputElement
+    await act(async () => {
+      setNative(input, String(kg))
+    })
+    const continuer = Array.from(host.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Continuer'),
+    )
+    await act(async () => {
+      continuer?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+  }
+
+  it.each([55, 40])(
+    'adulte 80 kg / 180 cm, Sèche, objectif %i kg → refus Q4 immédiat (pas de Rythme)',
+    async (goalKg) => {
+      const { host, cleanup } = await renderOnboarding(() => undefined)
+      await reachGoalWeightScreen(host)
+      await submitGoalWeight(host, goalKg)
+
+      expect(host.querySelector('[data-testid="onboarding-error"]')?.textContent).toBe(Q4_IMC)
+      expect(host.textContent).toContain('Ton poids objectif')
+      expect(host.textContent).not.toContain('Ton rythme')
+      cleanup()
+    },
+  )
+
+  it('objectif 70 kg (IMC cible ≥ 18,5) → accepté, passe à Rythme', async () => {
+    const { host, cleanup } = await renderOnboarding(() => undefined)
+    await reachGoalWeightScreen(host)
+    await submitGoalWeight(host, 70)
+
+    expect(host.querySelector('[data-testid="onboarding-error"]')).toBeNull()
+    expect(host.textContent).toContain('Ton rythme')
+    cleanup()
+  })
+
+  it('passage en Maintien aligne le poids objectif sur le poids actuel', async () => {
+    const { host, cleanup } = await renderOnboarding(() => undefined)
+    await reachGoalWeightScreen(host)
+    await submitGoalWeight(host, 55)
+    expect(host.querySelector('[data-testid="onboarding-error"]')?.textContent).toBe(Q4_IMC)
+
+    // Retour → Objectif → choisir Maintien
+    const retour = Array.from(host.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Retour'),
+    )
+    await act(async () => {
+      retour?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    // Retour encore vers Objectif si on est sur mensurations… depuis goalWeight, Retour = measurements
+    // Puis Retour = goal
+    const retour2 = Array.from(host.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Retour'),
+    )
+    await act(async () => {
+      retour2?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    const maintain = Array.from(host.querySelectorAll('button')).find((b) =>
+      /maintien/i.test(b.textContent ?? ''),
+    )
+    await act(async () => {
+      maintain?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    // Avancer jusqu'au poids objectif : doit afficher ~80 (poids actuel)
+    const continuer = Array.from(host.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Continuer'),
+    )
+    await act(async () => {
+      continuer?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    // Mensurations déjà remplies → Continuer
+    if (host.textContent?.includes('Tes mensurations')) {
+      const c2 = Array.from(host.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Continuer'),
+      )
+      await act(async () => {
+        c2?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+    }
+    if (host.textContent?.includes('Ton poids objectif')) {
+      const input = host.querySelector('input[aria-label="Poids objectif"]') as HTMLInputElement
+      expect(Number(input.value)).toBe(80)
+    }
     cleanup()
   })
 })

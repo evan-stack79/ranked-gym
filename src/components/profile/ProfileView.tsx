@@ -17,7 +17,6 @@ import {
   getCalorieProfile,
   saveCalorieProfile,
 } from '../../services/nutritionStorage'
-import { M_INFO_1 } from '../../content/safetyCopy'
 import {
   disciplineFromLabel,
   getDiscipline,
@@ -161,9 +160,7 @@ function ProfileViewContent() {
           onChange={handleHealthChange}
           onOpenNeedToTalk={() => navigate('needToTalk')}
         />
-        {!healthValue.declaredEatingDisorder && healthValue.preferNotAnswerHealth ? (
-          <p className="text-[12px] text-[#8E8E93]">{M_INFO_1}</p>
-        ) : null}
+        {/* BUG-23 : M_INFO_1 est déjà affiché dans HealthSituationsForm — pas de doublon ici. */}
       </section>
     )
   }

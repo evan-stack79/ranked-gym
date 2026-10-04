@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { NutritionOnboarding } from './NutritionOnboarding'
 import { NutritionDashboard } from './NutritionDashboard'
 import {
+  consumeTcaReactivationInfoPending,
   getCalorieProfile,
+  peekTcaReactivationInfoPending,
   saveCalorieProfile,
 } from '../../services/nutritionStorage'
 import { useAuth } from '../../context/AuthContext'
@@ -42,6 +44,12 @@ export function NutritionView() {
   const [profile, setProfile] = useState<CalorieProfile>(() => getCalorieProfile())
   const [showSetupEditor, setShowSetupEditor] = useState(false)
   const [showNeedToTalk, setShowNeedToTalk] = useState(false)
+  // BUG-22 : rappel M_INFO_1 une fois après réactivation TCA (si non déjà consommé dans le formulaire).
+  const [showTcaReactivationInfo, setShowTcaReactivationInfo] = useState(() => {
+    if (!peekTcaReactivationInfoPending()) return false
+    if (getCalorieProfile().declaredEatingDisorder) return false
+    return consumeTcaReactivationInfoPending()
+  })
   const calorieGoalEnabled = isCalorieGoalEnabled()
 
   useEffect(() => {
@@ -64,7 +72,19 @@ export function NutritionView() {
   }, [])
 
   const handleProfileChange = useCallback((next: CalorieProfile) => {
-    setProfile(next)
+    setProfile((prev) => {
+      // BUG-22 : transition TCA → off hors formulaire (ex. sync) → afficher une fois.
+      if (
+        prev.declaredEatingDisorder &&
+        !next.declaredEatingDisorder &&
+        peekTcaReactivationInfoPending()
+      ) {
+        if (consumeTcaReactivationInfoPending()) {
+          setShowTcaReactivationInfo(true)
+        }
+      }
+      return next
+    })
     saveCalorieProfile(next)
   }, [])
 
@@ -88,6 +108,10 @@ export function NutritionView() {
 
   const declarations = readHealthDeclarations(profile)
 
+  // BUG-23 : ne pas doubler M_INFO_1 si le bandeau drapeau OFF est déjà affiché.
+  const showReactivationBanner =
+    showTcaReactivationInfo && !declarations.eatingDisorder && calorieGoalEnabled
+
   if (showSetupEditor && calorieGoalEnabled) {
     return (
       <div className="flex flex-col gap-6 pb-2">
@@ -97,6 +121,14 @@ export function NutritionView() {
             Ajuste ton objectif et ton plan calorique.
           </p>
         </header>
+        {showReactivationBanner ? (
+          <p
+            className="rounded-2xl border border-white/10 bg-black/25 px-3.5 py-3 text-[13px] leading-relaxed text-[#AEAEB2]"
+            data-testid="tca-reactivation-m-info-1"
+          >
+            {M_INFO_1}
+          </p>
+        ) : null}
         <NutritionOnboarding initial={profile} onComplete={handleSetupComplete} />
         <EnergyRecoveryInfo />
         <HealthSituationsForm
@@ -135,6 +167,14 @@ export function NutritionView() {
           </button>
         </div>
       )}
+      {showReactivationBanner ? (
+        <p
+          className="rounded-2xl border border-white/10 bg-black/25 px-3.5 py-3 text-[13px] leading-relaxed text-[#AEAEB2]"
+          data-testid="tca-reactivation-m-info-1"
+        >
+          {M_INFO_1}
+        </p>
+      ) : null}
       {!calorieGoalEnabled && (
         <p
           className="rounded-2xl border border-white/10 bg-black/25 px-3.5 py-3 text-[13px] leading-relaxed text-[#AEAEB2]"
