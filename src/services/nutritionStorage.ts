@@ -31,6 +31,8 @@ const PROFILE_BASE = 'ranked-gym:nutrition-profile'
 const JOURNAL_BASE = 'ranked-gym:nutrition-journal'
 const PIECE_PRESETS_KEY = 'ranked-gym:piece-presets'
 const CONVEX_NUTRITION_QUEUE_PREFIX = 'ranked-gym:convex-nutrition-queue'
+/** BUG-22 : rappel M_INFO_1 après décochage TCA — à consommer une seule fois. */
+const TCA_REACTIVATION_INFO_KEY = 'ranked-gym:tca-reactivation-m-info-1'
 
 /** Préfixes / clés locales liées à la santé ou aux données personnelles sensibles (BUG-34). */
 const HEALTH_LOCAL_KEY_PREFIXES = [
@@ -54,6 +56,7 @@ const HEALTH_LOCAL_EXACT_KEYS = [
   'ranked-gym:reminder-fired',
   'ranked-gym:discipline',
   'ranked-gym:pro-pass-dismissed',
+  TCA_REACTIVATION_INFO_KEY,
 ] as const
 
 /** Cache sessionStorage (géocodage inverse) — vidé à la suppression de compte (BUG-40). */
@@ -291,6 +294,30 @@ export function hasCompletedNutritionOnboarding(): boolean {
     safeWarn('[nutrition] hasCompletedNutritionOnboarding failed', error)
     return false
   }
+}
+
+/** BUG-22 — drapeau local : rappel M_INFO_1 en attente après décochage TCA. */
+export function markTcaReactivationInfoPending(): void {
+  writeLocal(TCA_REACTIVATION_INFO_KEY, '1')
+}
+
+export function peekTcaReactivationInfoPending(): boolean {
+  try {
+    return readLocal(TCA_REACTIVATION_INFO_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+/** Consomme le drapeau (une seule affichage). Renvoie true s’il était en attente. */
+export function consumeTcaReactivationInfoPending(): boolean {
+  const pending = peekTcaReactivationInfoPending()
+  if (pending) removeLocal(TCA_REACTIVATION_INFO_KEY)
+  return pending
+}
+
+export function clearTcaReactivationInfoPending(): void {
+  removeLocal(TCA_REACTIVATION_INFO_KEY)
 }
 
 function isHealthLocalKey(key: string): boolean {

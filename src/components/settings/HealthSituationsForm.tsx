@@ -1,5 +1,12 @@
+import { useState } from 'react'
 import { Q7_INTRO, M_INFO_1, M_TCA_1 } from '../../content/safetyCopy'
 import type { CalorieProfile } from '../../types/nutrition'
+import {
+  clearTcaReactivationInfoPending,
+  consumeTcaReactivationInfoPending,
+  markTcaReactivationInfoPending,
+  peekTcaReactivationInfoPending,
+} from '../../services/nutritionStorage'
 
 export interface HealthSituationsValue {
   declaredPregnancy: boolean
@@ -30,8 +37,18 @@ export function HealthSituationsForm({
   onOpenNeedToTalk,
   showTcaMessage = true,
 }: HealthSituationsFormProps) {
+  // BUG-22 : rappel M_INFO_1 une seule fois à la réactivation (décochage TCA).
+  const [showReactivationInfo, setShowReactivationInfo] = useState(() => {
+    if (value.declaredEatingDisorder) return false
+    if (value.preferNotAnswerHealth) return false
+    if (!peekTcaReactivationInfoPending()) return false
+    consumeTcaReactivationInfoPending()
+    return true
+  })
+
   const setFlag = (key: keyof HealthSituationsValue, checked: boolean) => {
     if (key === 'preferNotAnswerHealth' && checked) {
+      setShowReactivationInfo(false)
       onChange({
         declaredPregnancy: false,
         declaredBreastfeeding: false,
@@ -40,12 +57,33 @@ export function HealthSituationsForm({
       })
       return
     }
+
+    if (key === 'declaredEatingDisorder') {
+      if (checked) {
+        // Nouvelle déclaration TCA : prochain décochage pourra réafficher le rappel.
+        clearTcaReactivationInfoPending()
+        setShowReactivationInfo(false)
+      } else if (value.declaredEatingDisorder) {
+        // Réactivation : afficher une fois. Si « ne pas répondre » montre déjà M_INFO_1, ne pas marquer.
+        if (!value.preferNotAnswerHealth) {
+          markTcaReactivationInfoPending()
+          consumeTcaReactivationInfoPending()
+          setShowReactivationInfo(true)
+        }
+      }
+    }
+
     onChange({
       ...value,
       [key]: checked,
       preferNotAnswerHealth: key === 'preferNotAnswerHealth' ? checked : false,
     })
   }
+
+  // BUG-23 : ne jamais afficher M_INFO_1 en double (réactivation + « ne pas répondre »).
+  const showPreferNotAnswerInfo = value.preferNotAnswerHealth
+  const showMInfoOnce =
+    showPreferNotAnswerInfo || (showReactivationInfo && !value.declaredEatingDisorder)
 
   return (
     <section className="space-y-3" data-testid="health-situations-form">
@@ -77,8 +115,13 @@ export function HealthSituationsForm({
         ))}
       </div>
 
-      {value.preferNotAnswerHealth ? (
-        <p className="text-[12px] leading-relaxed text-[#8E8E93]">{M_INFO_1}</p>
+      {showMInfoOnce ? (
+        <p
+          className="text-[12px] leading-relaxed text-[#8E8E93]"
+          data-testid="m-info-1-notice"
+        >
+          {M_INFO_1}
+        </p>
       ) : null}
 
       {showTcaMessage && value.declaredEatingDisorder ? (

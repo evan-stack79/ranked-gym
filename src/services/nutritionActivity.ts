@@ -4,7 +4,7 @@ import type { NutritionEngineSuccess } from '../nutrition-engine/types'
 import { GOAL_LABELS } from '../utils/calories'
 import { getCalorieProfile } from './nutritionStorage'
 import {
-  clampEngineTargetCalories,
+  clampEngineTargetAndMacros,
   isEngineReadyProfile,
   profileToEngineInput,
 } from './nutritionEngineAdapter'
@@ -67,10 +67,16 @@ function mapEngineSuccess(
   notices: string[],
 ): NutritionTargetResult {
   const serialized = serializeEngineResult(result)
-  const clamped = clampEngineTargetCalories(
+  // BUG-13 : macros recalculées sur la cible relevée au plancher (affichée).
+  const clamped = clampEngineTargetAndMacros(
     profile,
     serialized.target_kcal,
     serialized.eer_kcal,
+    {
+      proteinG: serialized.proteines_g,
+      carbsG: serialized.glucides_g,
+      fatG: serialized.lipides_g,
+    },
   )
   const soft = softBandMessage(clamped.targetCalories)
   return {
@@ -78,9 +84,9 @@ function mapEngineSuccess(
     targetCalories: clamped.targetCalories,
     eerKcal: serialized.eer_kcal,
     bcmrKcal: serialized.bcmr_kcal,
-    proteinG: serialized.proteines_g,
-    carbsG: serialized.glucides_g,
-    fatG: serialized.lipides_g,
+    proteinG: clamped.proteinG,
+    carbsG: clamped.carbsG,
+    fatG: clamped.fatG,
     recommendations: serialized.recommendations,
     goalLabel: GOAL_LABELS[profile.goal],
     activityBonus: 0,

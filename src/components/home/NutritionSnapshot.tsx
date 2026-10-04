@@ -9,7 +9,10 @@ import {
   tryAddHomeQuickWater,
 } from '../../utils/homeNutritionQuickActions'
 import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
-import { isMinorAge } from '../../services/nutritionSafetyRules'
+import {
+  readHealthDeclarations,
+  shouldHideWeightAndCaloriesTracking,
+} from '../../services/nutritionSafetyRules'
 
 interface NutritionSnapshotProps {
   onOpenNutrition?: () => void
@@ -77,13 +80,29 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
     const waterGoalReached = waterMl >= waterGoalMl
 
     const calorieGoalEnabled = isCalorieGoalEnabled()
-    const minor = isMinorAge(profile.age)
+    const declarations = readHealthDeclarations(profile)
+    // BUG-38 : mineur / TCA → pas de compteur ni « Ajouter un repas ».
+    const hideCalorieTracking = shouldHideWeightAndCaloriesTracking({
+      age: profile.age,
+      weightKg: profile.weightKg,
+      heightCm: profile.heightCm,
+      sex: profile.sex,
+      declarations,
+    })
+    // BUG-39 : TCA / grossesse / allaitement → jamais « Objectif indisponible ».
+    const restrictedPlan =
+      declarations.eatingDisorder ||
+      declarations.pregnancy ||
+      declarations.breastfeeding
 
     return {
       onboardingComplete: nutrition.profile.onboardingComplete,
-      targetAvailable,
-      // BUG-16 : drapeau OFF / mineur → carte neutre, jamais « Objectif indisponible »
-      showUnavailableGoal: !targetAvailable && calorieGoalEnabled && !minor,
+      targetAvailable: targetAvailable && !hideCalorieTracking,
+      // BUG-16 + BUG-39 : pas de message trompeur si plan volontairement absent.
+      showUnavailableGoal:
+        !targetAvailable && calorieGoalEnabled && !hideCalorieTracking && !restrictedPlan,
+      hideCalorieTracking,
+      showAddMeal: !hideCalorieTracking,
       targetCalories,
       remainingCalories,
       consumedCalories,
@@ -139,6 +158,12 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
             <p className="mt-1 text-[17px] font-semibold text-white">Objectif indisponible</p>
             <p className="mt-1 text-[13px] text-[#AEAEB2]">Ouvre Nutri pour vérifier ton plan.</p>
           </>
+        ) : snapshot.hideCalorieTracking ? (
+          <>
+            {/* BUG-38 : carte neutre sans compteur pour mineur / TCA */}
+            <p className="mt-1 text-[17px] font-semibold text-white">Suivi du jour</p>
+            <p className="mt-1 text-[13px] text-[#AEAEB2]">Hydratation et repères du jour.</p>
+          </>
         ) : (
           <>
             <p className="mt-1 text-[17px] font-semibold text-white">Suivi du jour</p>
@@ -164,15 +189,17 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
           </div>
         ) : null}
 
-        <button
-          type="button"
-          onClick={onOpenNutrition}
-          disabled={!onOpenNutrition}
-          aria-label="Ajouter un repas"
-          className="btn-brand ios-press mt-4 min-h-11 w-full rounded-2xl border border-white/15 px-3 py-2.5 text-[14px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E] disabled:opacity-50"
-        >
-          Ajouter un repas
-        </button>
+        {snapshot.showAddMeal ? (
+          <button
+            type="button"
+            onClick={onOpenNutrition}
+            disabled={!onOpenNutrition}
+            aria-label="Ajouter un repas"
+            className="btn-brand ios-press mt-4 min-h-11 w-full rounded-2xl border border-white/15 px-3 py-2.5 text-[14px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E] disabled:opacity-50"
+          >
+            Ajouter un repas
+          </button>
+        ) : null}
       </div>
 
       <div className="mt-4 border-t border-white/8 pt-4">

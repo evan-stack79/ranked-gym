@@ -1,5 +1,6 @@
 import type { ActivityLevel as ProfileActivity, CalorieProfile } from '../types/nutrition'
 import type { ActivityLevel as EngineActivity, NutritionEngineInput } from '../nutrition-engine/types'
+import { reconcileApiIntegerMacros } from '../nutrition-engine'
 import { getTrainingState } from './trainingStorage'
 import {
   decideEstimationEligibility,
@@ -11,6 +12,64 @@ import {
   readHealthDeclarations,
 } from './nutritionSafetyRules'
 import { isCalorieGoalEnabled } from '../backend/calorieGoalFeatureFlag'
+
+export interface EngineMacroGrams {
+  proteinG: number
+  carbsG: number
+  fatG: number
+}
+
+/** Somme calorique des macros (protéines/glucides × 4, lipides × 9). */
+export function macrosToKcal(macros: EngineMacroGrams): number {
+  return macros.proteinG * 4 + macros.carbsG * 4 + macros.fatG * 9
+}
+
+/**
+ * BUG-13 : quand la cible est relevée au plancher, recalcule les macros (g)
+ * pour coller à la cible affichée (écart < 5 %).
+ * Garde protéines et lipides, ajuste les glucides, puis réconciliation entière.
+ */
+export function rescaleMacrosToRaisedTarget(
+  raisedTargetKcal: number,
+  macros: EngineMacroGrams,
+): EngineMacroGrams {
+  const target = Math.round(raisedTargetKcal)
+  if (!Number.isFinite(target) || target <= 0) {
+    return { proteinG: 0, carbsG: 0, fatG: 0 }
+  }
+
+  const current = macrosToKcal(macros)
+  if (!Number.isFinite(current) || current <= 0) {
+    // Répartition de secours : 30 % P / 30 % L / 40 % G
+    const proteinG = Math.round((target * 0.3) / 4)
+    const fatG = Math.round((target * 0.3) / 9)
+    const carbsG = Math.max(0, Math.round((target - proteinG * 4 - fatG * 9) / 4))
+    return { proteinG, carbsG, fatG }
+  }
+
+  if (Math.abs(current - target) / target < 0.05) {
+    return {
+      proteinG: Math.round(macros.proteinG),
+      carbsG: Math.round(macros.carbsG),
+      fatG: Math.round(macros.fatG),
+    }
+  }
+
+  // Cible relevée : on ajoute (ou retire) l’écart sur les glucides en priorité.
+  const deltaKcal = target - current
+  const adjustedCarbs = Math.max(0, macros.carbsG + deltaKcal / 4)
+  const reconciled = reconcileApiIntegerMacros(
+    target,
+    Math.round(macros.proteinG),
+    Math.round(macros.fatG),
+    Math.round(adjustedCarbs),
+  )
+  return {
+    proteinG: reconciled.proteines_g,
+    carbsG: reconciled.glucides_g,
+    fatG: reconciled.lipides_g,
+  }
+}
 
 const PROFILE_ACTIVITY_TO_IOM: Record<ProfileActivity, EngineActivity> = {
   sedentary: 1,
@@ -132,4 +191,42 @@ export function clampEngineTargetCalories(
     return { targetCalories: decision.clampedTarget ?? 0, softBandWarning: false }
   }
   return { targetCalories: decision.targetCalories, softBandWarning: decision.softBandWarning }
+}
+
+/**
+ * BUG-13 : plancher + macros recalculées sur la cible relevée affichée.
+ * Si la cible n’est pas relevée, les macros moteur sont conservées (arrondies).
+ */
+export function clampEngineTargetAndMacros(
+  profile: CalorieProfile,
+  targetCalories: number,
+  maintenanceKcal: number,
+  macros: EngineMacroGrams,
+): {
+  targetCalories: number
+  softBandWarning: boolean
+  proteinG: number
+  carbsG: number
+  fatG: number
+  raisedToFloor: boolean
+} {
+  const clamped = clampEngineTargetCalories(profile, targetCalories, maintenanceKcal)
+  const raisedToFloor = clamped.targetCalories > Math.round(targetCalories)
+  if (raisedToFloor && clamped.targetCalories > 0) {
+    const scaled = rescaleMacrosToRaisedTarget(clamped.targetCalories, macros)
+    return {
+      ...clamped,
+      proteinG: scaled.proteinG,
+      carbsG: scaled.carbsG,
+      fatG: scaled.fatG,
+      raisedToFloor: true,
+    }
+  }
+  return {
+    ...clamped,
+    proteinG: Math.round(macros.proteinG * 10) / 10,
+    carbsG: Math.round(macros.carbsG * 10) / 10,
+    fatG: Math.round(macros.fatG * 10) / 10,
+    raisedToFloor: false,
+  }
 }

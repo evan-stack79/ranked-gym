@@ -32,6 +32,7 @@ import {
   M_INFO_1,
   M_MIN_1,
   M_TCA_1,
+  Q4_IMC,
   Q6A_MINEURS,
   Q6B_GROSSESSE_ALLAITEMENT,
   Q8_SCREEN_TITLE,
@@ -320,6 +321,24 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
       setError('Indique ton poids objectif (ex. 61.7).')
       return
     }
+    // BUG-42 : vérifier l'IMC cible dès « Ton poids objectif », avant « Rythme ».
+    if (goal === 'cut' && measurementsComplete) {
+      const gate = decideLossEligibility(
+        {
+          age: age ?? null,
+          weightKg: weightKg ?? null,
+          heightCm: heightCm ?? null,
+          sex,
+          goalWeightKg,
+          declarations,
+        },
+        { calorieGoalEnabled },
+      )
+      if (!gate.eligible) {
+        setError(messageForLossRefusal(gate.reason) ?? Q4_IMC)
+        return
+      }
+    }
     setError(null)
     setStep(goal === 'maintain' ? 'activity' : 'pace')
   }
@@ -359,6 +378,8 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
       const msg = messageForLossRefusal(lossGate.reason)
       setGoal('maintain')
       setWeeklyPaceKg(0)
+      // BUG-42 : ne pas conserver un poids objectif incohérent en Maintien.
+      if (weightKg != null && weightKg > 0) setGoalWeightKg(weightKg)
       setError(msg)
       return
     }
@@ -537,8 +558,11 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
                 allowCut={allowCut}
                 onChange={(next) => {
                   setGoal(next)
-                  if (next === 'maintain') setWeeklyPaceKg(0)
-                  else if (weeklyPaceKg <= 0) {
+                  if (next === 'maintain') {
+                    setWeeklyPaceKg(0)
+                    // BUG-42 : Maintien → pas de poids objectif distinct incohérent.
+                    if (weightKg != null && weightKg > 0) setGoalWeightKg(weightKg)
+                  } else if (weeklyPaceKg <= 0) {
                     setWeeklyPaceKg(defaultWeeklyPaceKg(weightKg ?? 70))
                   }
                 }}
