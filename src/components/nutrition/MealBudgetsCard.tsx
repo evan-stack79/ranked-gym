@@ -17,6 +17,11 @@ interface MealBudgetsCardProps {
 }
 
 export function MealBudgetsCard({ targetCalories, morphology, meals }: MealBudgetsCardProps) {
+  // Sans cible journalière valide, la carte affiche des « 0 kcal / zone 80–0 » absurdes.
+  if (!(Number.isFinite(targetCalories) && targetCalories > 0)) {
+    return null
+  }
+
   const { rows, sumBudgets, dailyTarget } = allMealBudgets(targetCalories, morphology, meals)
 
   return (
