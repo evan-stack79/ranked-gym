@@ -38,6 +38,18 @@ describe('shouldAppendNextSetOnRestSkip', () => {
     expect(shouldAppendNextSetOnRestSkip([{ done: true }], 0)).toBe(false)
     expect(shouldAppendNextSetOnRestSkip([{ done: true }, { done: true }], 0)).toBe(false)
   })
+
+  it('DEV-RG-08 capture : dernière série validée malgré trou !done → jamais d’append', () => {
+    // Capture : [done, done, !done, done] + Reprendre sur index 3 (ancien shouldAppend = true)
+    const captureLike = [
+      { done: true },
+      { done: true },
+      { done: false },
+      { done: true },
+    ]
+    expect(shouldAppendNextSetOnRestSkip(captureLike, 3)).toBe(false)
+    expect(shouldAppendNextSetOnRestSkip([{ done: true }], 0)).toBe(false)
+  })
 })
 
 describe('isSetReadyForAutoValidate', () => {

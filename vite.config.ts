@@ -17,6 +17,9 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    // PWA : autoUpdate ⇒ Workbox skipWaiting + clientsClaim (vite-plugin-pwa).
+    // iOS standalone peut quand même servir un SW / precache périmé jusqu’à
+    // fermeture complète de la PWA (pas seulement swipe away). Voir DEV-RG-08.
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: [

@@ -369,8 +369,9 @@ export function WorkoutNotebook({
 
   useEffect(() => {
     if (!restLogRequest || draftBlocked.current) return
-    // DEV-RG-07 : journaliser repos uniquement — jamais d’append de série ici.
-    // (addNextSet était l’ancien enchaînement Reprendre → nouvelle série ; seul « + Ajouter une série » crée.)
+    // DEV-RG-07 / DEV-RG-08 : journaliser repos uniquement — jamais d’append ici.
+    // (addNextSet / shouldAppendNextSetOnRestSkip = ancien Reprendre → série fantôme ;
+    //  seul « + Ajouter une série » crée. Si prod iPhone voit encore l’append : SW PWA périmé.)
     const { exerciseId, setIndex, restSec } = restLogRequest
     setExercises((prev) => {
       draftDirty.current = true
