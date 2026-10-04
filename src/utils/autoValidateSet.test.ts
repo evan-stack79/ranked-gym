@@ -31,15 +31,12 @@ describe('isAmbiguousIntegerPrefix (Effort 1–10)', () => {
 })
 
 describe('shouldAppendNextSetOnRestSkip', () => {
-  it('n’append pas si une série suivante !done existe déjà', () => {
+  it('DEV-RG-07 : jamais d’append auto (série suivante ou dernière)', () => {
     expect(
       shouldAppendNextSetOnRestSkip([{ done: true }, { done: false }, { done: false }], 0),
     ).toBe(false)
-  })
-
-  it('append seulement s’il n’existe pas de série suivante !done', () => {
-    expect(shouldAppendNextSetOnRestSkip([{ done: true }], 0)).toBe(true)
-    expect(shouldAppendNextSetOnRestSkip([{ done: true }, { done: true }], 0)).toBe(true)
+    expect(shouldAppendNextSetOnRestSkip([{ done: true }], 0)).toBe(false)
+    expect(shouldAppendNextSetOnRestSkip([{ done: true }, { done: true }], 0)).toBe(false)
   })
 })
 
