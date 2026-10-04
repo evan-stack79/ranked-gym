@@ -82,17 +82,13 @@ describe('pwaUpdate', () => {
     const registration = { update, waiting: null } as unknown as ServiceWorkerRegistration
     const onAfterUpdate = vi.fn()
 
-    type VisDoc = {
-      visibilityState: DocumentVisibilityState
-      addEventListener: (type: string, listener: () => void) => void
-      removeEventListener: (type: string, listener: () => void) => void
-    }
-
-    let handler: (() => void) | undefined
-    const doc: VisDoc = {
-      visibilityState: 'hidden',
-      addEventListener: (_type, listener) => {
-        handler = listener
+    let handler: EventListener | undefined
+    const doc = {
+      visibilityState: 'hidden' as DocumentVisibilityState,
+      addEventListener: (type: string, listener: EventListenerOrEventListenerObject) => {
+        if (type === 'visibilitychange' && typeof listener === 'function') {
+          handler = listener
+        }
       },
       removeEventListener: vi.fn(),
     }
@@ -102,12 +98,12 @@ describe('pwaUpdate', () => {
       onAfterUpdate,
     })
 
-    handler?.()
+    handler?.({} as Event)
     await Promise.resolve()
     expect(update).not.toHaveBeenCalled()
 
     doc.visibilityState = 'visible'
-    handler?.()
+    handler?.({} as Event)
     await vi.waitFor(() => {
       expect(update).toHaveBeenCalledTimes(1)
       expect(onAfterUpdate).toHaveBeenCalledWith(registration)

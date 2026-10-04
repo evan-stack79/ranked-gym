@@ -66,8 +66,14 @@ export function applyWaitingUpdate(
   return true
 }
 
+type VisibilityDocument = {
+  visibilityState: DocumentVisibilityState
+  addEventListener: (type: string, listener: EventListenerOrEventListenerObject) => void
+  removeEventListener: (type: string, listener: EventListenerOrEventListenerObject) => void
+}
+
 type VisibilityUpdateOptions = {
-  document?: Pick<Document, 'visibilityState' | 'addEventListener' | 'removeEventListener'>
+  document?: VisibilityDocument
   onAfterUpdate?: (registration: ServiceWorkerRegistration | undefined) => void
 }
 

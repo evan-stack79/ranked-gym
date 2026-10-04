@@ -7,10 +7,10 @@ describe('appBuildId', () => {
     expect(formatAppVersionLabel('c809daa')).toBe('Version c809daa')
   })
 
-  it('retombe sur dev si vide', () => {
+  it('retombe sur dev si override vide ; sinon id injecté (vitest = test)', () => {
     expect(getAppBuildId('')).toBe('dev')
     expect(getAppBuildId('   ')).toBe('dev')
-    expect(getAppBuildId(undefined)).toBe('dev')
+    expect(getAppBuildId()).toBe('test')
   })
 
   it('libelle simple sans jargon', () => {
