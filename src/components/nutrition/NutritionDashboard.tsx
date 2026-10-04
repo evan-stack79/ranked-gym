@@ -2,8 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import { ChevronLeft, ChevronRight, Ellipsis, Pencil, RotateCcw, Trash2, X } from 'lucide-react'
 import type { BodyMorphology, CalorieProfile, MealEntry, MealType } from '../../types/nutrition'
 import { MEAL_TYPE_LABELS } from '../../utils/calories'
-import { remainingMealBudget } from '../../utils/portionGuide'
-import type { PortionMode } from '../../utils/morphology'
 import {
   addMealToDate,
   getJournalForDate,
@@ -11,6 +9,7 @@ import {
   getWaterMlForDate,
   addWaterEntryForDate,
   removeMealFromDate,
+  saveJournalForDate,
   updateMealOnDate,
 } from '../../services/nutritionStorage'
 import { getNutritionTarget, hasMealTargets } from '../../services/nutritionActivity'
@@ -54,9 +53,28 @@ import {
 import { AddFoodScreen } from './AddFoodScreen'
 import { IosSheet } from '../ui/IosSheet'
 import { SectionSkeleton } from '../ui/AppBootScreen'
-import { dateFromKey, nutritionDateLabel, shiftDateKey } from '../../utils/nutritionDate'
+import {
+  dateFromKey,
+  formatNutritionDate,
+  nutritionDateLabel,
+  shiftDateKey,
+} from '../../utils/nutritionDate'
 import { todayKey } from '../../utils/calories'
 import { persistScannedProductSelection } from './persistScannedProductSelection'
+
+type DashboardToast = {
+  message: string
+  variant: 'success' | 'error'
+  actionLabel?: string
+  onAction?: () => void
+}
+
+function shortAddDateLabel(dateKey: string): string {
+  const today = todayKey()
+  if (dateKey === today) return 'Aujourd’hui'
+  if (dateKey === shiftDateKey(today, -1)) return `Hier, ${formatNutritionDate(dateKey)}`
+  return formatNutritionDate(dateKey)
+}
 
 interface NutritionDashboardProps {
   profile: CalorieProfile
@@ -96,16 +114,35 @@ export function NutritionDashboard({
   const [searchHits, setSearchHits] = useState<OpenFoodFactsSearchHit[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
-  const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' } | null>(
-    null,
-  )
+  const [toast, setToast] = useState<DashboardToast | null>(null)
   const photoRef = useRef<MealPhotoAnalyzerHandle>(null)
   const journalRef = useRef<HTMLDivElement>(null)
   const swipeStart = useRef<{ x: number; y: number } | null>(null)
+  const toastTimerRef = useRef<number | null>(null)
+  const followTodayRef = useRef(true)
 
   const showToast = useCallback((message: string, variant: 'success' | 'error' = 'success') => {
+    if (toastTimerRef.current != null) window.clearTimeout(toastTimerRef.current)
     setToast({ message, variant })
-    window.setTimeout(() => setToast(null), variant === 'error' ? 5200 : 3400)
+    toastTimerRef.current = window.setTimeout(
+      () => setToast(null),
+      variant === 'error' ? 5200 : 3400,
+    )
+  }, [])
+
+  const showUndoToast = useCallback((message: string, onUndo: () => void) => {
+    if (toastTimerRef.current != null) window.clearTimeout(toastTimerRef.current)
+    setToast({
+      message,
+      variant: 'success',
+      actionLabel: 'Annuler',
+      onAction: () => {
+        onUndo()
+        setToast(null)
+        if (toastTimerRef.current != null) window.clearTimeout(toastTimerRef.current)
+      },
+    })
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 5000)
   }, [])
 
   useEffect(() => {
@@ -115,6 +152,11 @@ export function NutritionDashboard({
 
   useEffect(() => {
     const sync = () => {
+      const today = todayKey()
+      if (followTodayRef.current && selectedDateKey !== today) {
+        setSelectedDateKey(today)
+        return
+      }
       setMeals(getJournalForDate(selectedDateKey).meals)
       setTick((n) => n + 1)
     }
@@ -261,11 +303,14 @@ export function NutritionDashboard({
     if (type) {
       setMealType(type)
       setPendingMealType(type)
+    } else {
+      setPendingMealType(null)
     }
     setShowForm(true)
   }
 
   const selectDate = (dateKey: string) => {
+    followTodayRef.current = dateKey === todayKey()
     setSelectedDateKey(dateKey)
     setJournalDetailOpen(false)
   }
@@ -290,6 +335,8 @@ export function NutritionDashboard({
     if (forMeal) {
       setPendingMealType(forMeal)
       setMealType(forMeal)
+    } else {
+      setPendingMealType(null)
     }
     requireAuth(() => {
       setScannerOpen(true)
@@ -318,34 +365,34 @@ export function NutritionDashboard({
     fatG: number | null
     grams: number
     pieces?: number
-    portionMode: PortionMode
   }) => {
-    const journal = addMealToDate(selectedDateKey, {
-      name: entry.name,
-      mealType: entry.mealType,
-      calories: entry.calories,
-      proteinG: entry.proteinG ?? undefined,
-      carbsG: entry.carbsG ?? undefined,
-      fatG: entry.fatG ?? undefined,
-      grams: entry.grams,
-      pieces: entry.pieces,
-      portionMode: entry.portionMode,
-    })
-    setMeals(journal.meals)
-    setTick((n) => n + 1)
-    setScannedProduct(null)
-    resetForm()
-
-    const remain = remainingMealBudget(
-      targetCalories,
-      entry.mealType,
-      journal.meals,
-      profile.morphology,
-    )
-    if (entry.portionMode === 'with_sides' && remain > 60) {
-      setPendingMealType(entry.mealType)
-    } else if (remain <= 60) {
+    try {
+      const journal = addMealToDate(selectedDateKey, {
+        name: entry.name,
+        mealType: entry.mealType,
+        calories: entry.calories,
+        proteinG: entry.proteinG ?? undefined,
+        carbsG: entry.carbsG ?? undefined,
+        fatG: entry.fatG ?? undefined,
+        grams: entry.grams,
+        pieces: entry.pieces,
+      })
+      const added = journal.meals[0]
+      setMeals(journal.meals)
+      setTick((n) => n + 1)
+      setScannedProduct(null)
       setPendingMealType(null)
+      resetForm()
+      showUndoToast(
+        `Ajouté au ${MEAL_TYPE_LABELS[entry.mealType]} · ${entry.calories} kcal`,
+        () => {
+          const next = removeMealFromDate(selectedDateKey, added.id)
+          setMeals(next.meals)
+          setTick((n) => n + 1)
+        },
+      )
+    } catch {
+      showToast("L'ajout n'a pas fonctionné. Réessaie.", 'error')
     }
   }
 
@@ -394,10 +441,16 @@ export function NutritionDashboard({
   }
 
   const handleRemove = (id: string) => {
+    const snapshot = getJournalForDate(selectedDateKey)
     const journal = removeMealFromDate(selectedDateKey, id)
     setMeals(journal.meals)
     setTick((n) => n + 1)
     setEditingMeal(null)
+    showUndoToast('Supprimé', () => {
+      saveJournalForDate(snapshot)
+      setMeals(snapshot.meals)
+      setTick((n) => n + 1)
+    })
   }
 
   const handleEditSave = (mealId: string, patch: Partial<MealEntry>) => {
@@ -612,7 +665,7 @@ export function NutritionDashboard({
                         <button
                           type="button"
                           onClick={() => setEditingMeal(meal)}
-                          className="flex h-9 w-9 items-center justify-center rounded-xl text-[#8E8E93]"
+                          className="flex h-11 w-11 items-center justify-center rounded-xl text-[#8E8E93]"
                           aria-label="Modifier l’aliment"
                         >
                           <Pencil className="h-4 w-4" />
@@ -620,7 +673,7 @@ export function NutritionDashboard({
                         <button
                           type="button"
                           onClick={() => handleRemove(meal.id)}
-                          className="flex h-9 w-9 items-center justify-center rounded-xl text-[#8E8E93]"
+                          className="flex h-11 w-11 items-center justify-center rounded-xl text-[#8E8E93]"
                           aria-label="Supprimer le repas"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -742,7 +795,21 @@ export function NutritionDashboard({
         morphology={profile.morphology as BodyMorphology}
         meals={meals}
         preferredMealType={pendingMealType}
-        onClose={() => setScannedProduct(null)}
+        dateLabel={shortAddDateLabel(selectedDateKey)}
+        onClose={() => {
+          setScannedProduct(null)
+          setPendingMealType(null)
+        }}
+        onRequestManualEntry={(product) => {
+          setScannedProduct(null)
+          setPendingMealType(null)
+          setName(product.nom)
+          setCalories(0)
+          setProteinG(product.proteines ?? '')
+          setCarbsG(product.glucides ?? '')
+          setFatG(product.lipides ?? '')
+          setShowForm(true)
+        }}
         onSave={handleScanSave}
       />
 
@@ -820,14 +887,23 @@ export function NutritionDashboard({
 
       {toast ? (
         <div
-          className={`fixed left-1/2 z-[120] max-w-[92%] -translate-x-1/2 rounded-2xl border px-4 py-3 text-center text-[13px] font-medium shadow-lg ${
+          className={`fixed left-1/2 z-[120] flex max-w-[92%] -translate-x-1/2 items-center gap-3 rounded-2xl border px-4 py-3 text-[13px] font-medium shadow-lg ${
             toast.variant === 'error'
               ? 'bottom-[calc(var(--app-bottom-nav)+env(safe-area-inset-bottom,0px)+1rem)] border-[#FF453A]/40 bg-[#2C1014]/95 text-[#FF6961]'
-              : 'bottom-[calc(var(--app-bottom-nav)+env(safe-area-inset-bottom,0px)+1rem)] border-[#30D158]/35 bg-[#102C18]/95 text-white'
+              : 'bottom-[calc(var(--app-bottom-nav)+env(safe-area-inset-bottom,0px)+1rem)] border-white/15 bg-[#1C1C1E]/95 text-white'
           }`}
           role={toast.variant === 'error' ? 'alert' : 'status'}
         >
-          {toast.message}
+          <span className="min-w-0 flex-1 text-left">{toast.message}</span>
+          {toast.actionLabel && toast.onAction ? (
+            <button
+              type="button"
+              onClick={toast.onAction}
+              className="ios-press min-h-11 shrink-0 px-2 text-[14px] font-semibold text-[#64D2FF] underline"
+            >
+              {toast.actionLabel}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>

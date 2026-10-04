@@ -8,10 +8,21 @@ interface IosSheetProps {
   title: string
   subtitle?: string
   children: ReactNode
+  /** Sticky footer outside the scroll area (e.g. primary action above keyboard). */
+  footer?: ReactNode
   /** Prevent backdrop/close while busy */
   dismissible?: boolean
   /** Leading icon or node in header */
   leading?: ReactNode
+  /**
+   * When true (default if footer is set), panel height follows visualViewport
+   * so the sticky footer stays above the iOS keyboard.
+   */
+  adaptToKeyboard?: boolean
+}
+
+function readViewportHeight(): number {
+  return window.visualViewport?.height ?? window.innerHeight
 }
 
 export function IosSheet({
@@ -20,12 +31,18 @@ export function IosSheet({
   title,
   subtitle,
   children,
+  footer,
   dismissible = true,
   leading,
+  adaptToKeyboard,
 }: IosSheetProps) {
   const titleId = useId()
   const [mounted, setMounted] = useState(false)
   const [visible, setVisible] = useState(false)
+  const followKeyboard = adaptToKeyboard ?? footer != null
+  const [viewportHeight, setViewportHeight] = useState(() =>
+    typeof window === 'undefined' ? 0 : readViewportHeight(),
+  )
 
   useEffect(() => {
     if (open) {
@@ -56,7 +73,26 @@ export function IosSheet({
     return () => window.removeEventListener('keydown', onKey)
   }, [open, dismissible, onClose])
 
+  useEffect(() => {
+    if (!open || !followKeyboard) return
+    const sync = () => setViewportHeight(readViewportHeight())
+    sync()
+    const viewport = window.visualViewport
+    viewport?.addEventListener('resize', sync)
+    viewport?.addEventListener('scroll', sync)
+    window.addEventListener('resize', sync)
+    return () => {
+      viewport?.removeEventListener('resize', sync)
+      viewport?.removeEventListener('scroll', sync)
+      window.removeEventListener('resize', sync)
+    }
+  }, [open, followKeyboard])
+
   if (!mounted || typeof document === 'undefined') return null
+
+  const panelMaxHeight = followKeyboard
+    ? `min(${Math.max(240, viewportHeight - 8)}px, 720px)`
+    : 'min(92dvh, 720px)'
 
   return createPortal(
     <div
@@ -83,11 +119,14 @@ export function IosSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`ios-sheet-panel relative z-10 flex max-h-[min(92dvh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] border border-white/10 sm:mx-4 sm:rounded-[28px] ${
+        className={`ios-sheet-panel relative z-10 flex w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] border border-white/10 sm:mx-4 sm:rounded-[28px] ${
           visible ? 'ios-sheet-panel--open' : 'ios-sheet-panel--closed'
         }`}
         style={{
-          paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))',
+          maxHeight: panelMaxHeight,
+          paddingBottom: footer
+            ? undefined
+            : 'max(1.25rem, env(safe-area-inset-bottom))',
         }}
       >
         <div className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-white/25 sm:hidden" aria-hidden="true" />
@@ -116,6 +155,17 @@ export function IosSheet({
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-2 pt-1">
           {children}
         </div>
+
+        {footer ? (
+          <div
+            className="shrink-0 border-t border-white/10 bg-[#1C1C1E]/95 px-5 pt-3 backdrop-blur-md"
+            style={{
+              paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+            }}
+          >
+            {footer}
+          </div>
+        ) : null}
       </div>
     </div>,
     document.body,

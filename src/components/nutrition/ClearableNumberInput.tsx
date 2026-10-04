@@ -12,11 +12,32 @@ interface ClearableNumberInputProps {
   /** When true (default), empty blur restores the last known value. */
   required?: boolean
   /**
+   * When true (default), blur clamps into [min, max].
+   * Set false to avoid silent correction — parent shows a message instead.
+   */
+  clampOnBlur?: boolean
+  /**
+   * Strip spaces / unit suffixes (g, ml…) so paste like « 150 g » becomes 150.
+   */
+  sanitizeUnits?: boolean
+  /**
    * Effort 1–10 : ne pas commit le préfixe ambigu « 1 » (vers « 10 ») tant que
    * l’utilisateur frappe / avant blur — évite l’auto-validate prématuré.
    */
   deferAmbiguousIntegerPrefix?: boolean
+  /** Select all text on focus (handy when default is prefilled). */
+  selectOnFocus?: boolean
+  enterKeyHint?: 'done' | 'enter' | 'go' | 'next' | 'previous' | 'search' | 'send'
   'aria-label'?: string
+}
+
+/** Remove spaces / common unit suffixes before parsing a quantity. */
+export function sanitizeQuantityRaw(raw: string): string {
+  return raw
+    .replace(/\u00a0/g, ' ')
+    .replace(/\s+/g, '')
+    .replace(/,/g, '.')
+    .replace(/(g|ml|gr|grammes?|mll?)$/i, '')
 }
 
 /**
@@ -46,7 +67,11 @@ export function ClearableNumberInput({
   placeholder,
   placeholderClassName,
   required = true,
+  clampOnBlur = true,
+  sanitizeUnits = false,
   deferAmbiguousIntegerPrefix = false,
+  selectOnFocus = false,
+  enterKeyHint,
   'aria-label': ariaLabel,
 }: ClearableNumberInputProps) {
   const [text, setText] = useState(() => formatValue(value, step))
@@ -74,12 +99,22 @@ export function ClearableNumberInput({
       <input
         type="text"
         inputMode="decimal"
+        enterKeyHint={enterKeyHint}
+        autoComplete="off"
         aria-label={ariaLabel}
         value={text}
         placeholder={focused ? placeholder : undefined}
-        onFocus={() => setFocused(true)}
+        onFocus={(e) => {
+          setFocused(true)
+          if (selectOnFocus) {
+            const target = e.currentTarget
+            window.requestAnimationFrame(() => target.select())
+          }
+        }}
         onChange={(e) => {
-          const raw = e.target.value.replace(',', '.')
+          const raw = sanitizeUnits
+            ? sanitizeQuantityRaw(e.target.value)
+            : e.target.value.replace(',', '.')
           if (raw !== '' && !/^\d*\.?\d*$/.test(raw)) return
           setText(raw)
           if (raw === '' || raw === '.') {
@@ -102,6 +137,11 @@ export function ClearableNumberInput({
             }
             onChange(null)
             setText('')
+            return
+          }
+          if (!clampOnBlur) {
+            onChange(parsed)
+            setText(formatValue(parsed, step))
             return
           }
           const clamped = clamp(parsed, min, max, step)

@@ -37,7 +37,6 @@ const ADULT: CalorieProfile = {
 async function renderSheet(opts: {
   hasMealTargets: boolean
   targetCalories: number
-  grams?: number
 }) {
   const host = document.createElement('div')
   document.body.appendChild(host)
@@ -56,26 +55,11 @@ async function renderSheet(opts: {
       />,
     )
   })
-  // IosSheet monte via useEffect + portal sur document.body
   await act(async () => {
     await new Promise<void>((resolve) => {
       requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
     })
   })
-
-  if (opts.grams != null) {
-    const input = document.querySelector(
-      'input[aria-label="Poids en grammes"]',
-    ) as HTMLInputElement | null
-    expect(input).toBeTruthy()
-    await act(async () => {
-      input!.focus()
-      input!.value = String(opts.grams)
-      input!.dispatchEvent(new Event('input', { bubbles: true }))
-      input!.dispatchEvent(new Event('change', { bubbles: true }))
-      input!.blur()
-    })
-  }
 
   return {
     text: () => document.body.textContent ?? '',
@@ -121,12 +105,12 @@ describe('AR-01…AR-04 — pas de budget/zone/cible sans objectifs repas', () =
     const sheet = await renderSheet({
       hasMealTargets: active,
       targetCalories: nutrition.targetCalories,
-      grams: 61.05,
     })
     const text = sheet.text()
     expect(text).toMatch(/ketchup/i)
     expect(text).not.toMatch(FORBIDDEN)
     expect(text).not.toContain('Tu manges comment')
+    expect(text).toContain('Ajouter au journal')
     await sheet.cleanup()
 
     const budgets = await renderBudgets(nutrition.targetCalories)
@@ -141,7 +125,6 @@ describe('AR-01…AR-04 — pas de budget/zone/cible sans objectifs repas', () =
     const sheet = await renderSheet({
       hasMealTargets: active,
       targetCalories: 0,
-      grams: 100,
     })
     expect(sheet.text()).not.toMatch(FORBIDDEN)
     expect(sheet.text()).not.toContain('Tu manges comment')
@@ -152,7 +135,7 @@ describe('AR-01…AR-04 — pas de budget/zone/cible sans objectifs repas', () =
     await budgets.cleanup()
   })
 
-  it('ON avec cible : comportement actuel (budget/zone visibles)', async () => {
+  it('ON avec cible : repère neutre, jamais zone/budget/Tu manges comment', async () => {
     const nutrition = getNutritionTarget(ADULT, { calorieGoalEnabled: true })
     const active = hasMealTargets(nutrition)
     expect(active).toBe(true)
@@ -161,15 +144,13 @@ describe('AR-01…AR-04 — pas de budget/zone/cible sans objectifs repas', () =
       targetCalories: nutrition.targetCalories,
     })
     const text = sheet.text()
-    expect(text).toMatch(/budget/i)
-    expect(text).toMatch(/zone/i)
-    expect(text).toMatch(/cible/i)
-    expect(text).toContain('Tu manges comment')
+    expect(text).toMatch(/Repère indicatif/i)
+    expect(text).not.toMatch(/budget|zone|bonne zone|Tu manges comment|manquera|parfait/i)
     await sheet.cleanup()
 
     const budgets = await renderBudgets(nutrition.targetCalories)
-    expect(budgets.text).toMatch(/Objectifs par repas|Combien manger/i)
-    expect(budgets.text).toMatch(/zone/i)
+    expect(budgets.text).toMatch(/Repères par repas/i)
+    expect(budgets.text).not.toMatch(/budget OK|Combien manger|exactement/i)
     await budgets.cleanup()
   })
 
@@ -183,7 +164,6 @@ describe('AR-01…AR-04 — pas de budget/zone/cible sans objectifs repas', () =
     const sheet = await renderSheet({
       hasMealTargets: active,
       targetCalories: nutrition.targetCalories,
-      grams: 50,
     })
     expect(sheet.text()).not.toMatch(FORBIDDEN)
     await sheet.cleanup()
@@ -202,7 +182,6 @@ describe('AR-01…AR-04 — pas de budget/zone/cible sans objectifs repas', () =
     const sheet = await renderSheet({
       hasMealTargets: active,
       targetCalories: nutrition.targetCalories,
-      grams: 50,
     })
     expect(sheet.text()).not.toMatch(FORBIDDEN)
     await sheet.cleanup()
@@ -221,7 +200,6 @@ describe('AR-01…AR-04 — pas de budget/zone/cible sans objectifs repas', () =
     const sheet = await renderSheet({
       hasMealTargets: active,
       targetCalories: nutrition.targetCalories,
-      grams: 50,
     })
     expect(sheet.text()).not.toMatch(FORBIDDEN)
     await sheet.cleanup()
