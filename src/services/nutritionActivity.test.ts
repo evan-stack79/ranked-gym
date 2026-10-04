@@ -49,7 +49,7 @@ describe('getNutritionTarget — pas de double comptabilisation', () => {
   it('target_kcal identique quelle que soit la variation steps/workout (non injectés)', async () => {
     const training = await import('./trainingStorage')
 
-    const low = getNutritionTarget(BASE_PROFILE)
+    const low = getNutritionTarget(BASE_PROFILE, { calorieGoalEnabled: true })
     vi.mocked(training.getTrainingState).mockReturnValue({
       ...BASE_TRAINING,
       stepsToday: 12000,
@@ -66,7 +66,7 @@ describe('getNutritionTarget — pas de double comptabilisation', () => {
       ],
     })
 
-    const high = getNutritionTarget(BASE_PROFILE)
+    const high = getNutritionTarget(BASE_PROFILE, { calorieGoalEnabled: true })
 
     expect(low.engineOk).toBe(true)
     expect(high.engineOk).toBe(true)
@@ -78,8 +78,15 @@ describe('getNutritionTarget — pas de double comptabilisation', () => {
   })
 
   it('activityBonus reste toujours 0', () => {
-    const result = getNutritionTarget(BASE_PROFILE)
+    const result = getNutritionTarget(BASE_PROFILE, { calorieGoalEnabled: true })
     expect(result.activityBonus).toBe(0)
+  })
+
+  it('drapeau OFF → aucune cible affichée', () => {
+    const result = getNutritionTarget(BASE_PROFILE, { calorieGoalEnabled: false })
+    expect(result.showCalorieGoal).toBe(false)
+    expect(result.targetCalories).toBe(0)
+    expect(result.engineOk).toBe(false)
   })
 })
 
@@ -109,7 +116,7 @@ describe('getNutritionTarget — cas écran 61,7 kg force + prise de masse', () 
     const { runNutritionEngine, ALLOCATION_FLAGS } = await import('../nutrition-engine')
     const { profileToEngineInput } = await import('./nutritionEngineAdapter')
 
-    const input = profileToEngineInput(SCREEN_PROFILE)
+    const input = profileToEngineInput(SCREEN_PROFILE, { calorieGoalEnabled: true })
     expect(input.sport_principal).toBe('musculation')
     expect(input.goal).toBe('bulk')
     expect(input.surplus_kcal).toBe(550)
@@ -124,7 +131,7 @@ describe('getNutritionTarget — cas écran 61,7 kg force + prise de masse', () 
     expect(Math.round(engine.bcmr_kcal)).toBe(623)
     expect(engine.allocation_flags).toContain(ALLOCATION_FLAGS.CARB_REVIEW_REMAINING_AFTER_LIMITS)
 
-    const ui = getNutritionTarget(SCREEN_PROFILE)
+    const ui = getNutritionTarget(SCREEN_PROFILE, { calorieGoalEnabled: true })
     expect(ui.engineOk).toBe(true)
     expect(ui.proteinG).toBeCloseTo(135.7, 1)
     expect(ui.bcmrKcal).toBe(623)

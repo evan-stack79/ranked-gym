@@ -27,6 +27,13 @@ import {
   normalizeCalorieProfile,
   saveCalorieProfile,
 } from '../../services/nutritionStorage'
+import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
+import {
+  isMinorAge,
+  PLAUSIBLE_AGE_MAX,
+  PLAUSIBLE_AGE_MIN,
+  readHealthDeclarations,
+} from '../../services/nutritionSafetyRules'
 import { getRankFromLevel } from '../../utils/rank'
 import { fetchUserStats, type UserStatsPayload } from '../../services/userStatsService'
 import { ChartSkeleton } from './charts/ChartSkeleton'
@@ -93,6 +100,19 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
   const currentXp = profile?.xp ?? 0
   const rank = getRankFromLevel(level)
   const displayAvatarUrl = avatarPreview || profile?.avatar_url || null
+  const calorieGoalEnabled = isCalorieGoalEnabled()
+  const [healthFlags, setHealthFlags] = useState(() =>
+    readHealthDeclarations(getCalorieProfile()),
+  )
+  const isMinorProfile = age != null && isMinorAge(age)
+  // BUG-08 : mineur → pas de poids/taille/cible ; TCA/grossesse → pas de poids cible
+  const showBodyMetrics = !isMinorProfile
+  const showGoalWeight =
+    calorieGoalEnabled &&
+    showBodyMetrics &&
+    !healthFlags.eatingDisorder &&
+    !healthFlags.pregnancy &&
+    !healthFlags.breastfeeding
 
   useEffect(() => {
     const calorie = getCalorieProfile()
@@ -100,6 +120,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
     setGoalWeightKg(calorie.goalWeightKg > 0 ? calorie.goalWeightKg : null)
     setHeightCm(calorie.heightCm > 0 ? calorie.heightCm : null)
     setAge(calorie.age > 0 ? calorie.age : null)
+    setHealthFlags(readHealthDeclarations(calorie))
   }, [])
 
   useEffect(() => {
@@ -166,24 +187,49 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
     setSaveError(null)
     setSaveMessage(null)
 
-    if (weightKg == null || goalWeightKg == null || heightCm == null || age == null) {
-      setSaveError('Remplis poids actuel, poids cible, taille et âge.')
+    if (age == null || age <= 0) {
+      setSaveError('Indique un âge valide.')
       return
     }
-    if (weightKg <= 0 || goalWeightKg <= 0 || heightCm <= 0 || age <= 0) {
-      setSaveError('Les valeurs doivent être supérieures à zéro.')
-      return
+    if (showBodyMetrics) {
+      if (weightKg == null || heightCm == null) {
+        setSaveError(
+          showGoalWeight
+            ? 'Remplis poids actuel, poids cible, taille et âge.'
+            : 'Remplis poids actuel, taille et âge.',
+        )
+        return
+      }
+      if (showGoalWeight && goalWeightKg == null) {
+        setSaveError('Remplis poids actuel, poids cible, taille et âge.')
+        return
+      }
+      if (
+        weightKg <= 0 ||
+        heightCm <= 0 ||
+        (showGoalWeight && (goalWeightKg == null || goalWeightKg <= 0))
+      ) {
+        setSaveError('Les valeurs doivent être supérieures à zéro.')
+        return
+      }
     }
 
     setSaving(true)
     try {
       const current = getCalorieProfile()
+      const nextWeight = showBodyMetrics ? (weightKg as number) : current.weightKg
+      const nextHeight = showBodyMetrics ? (heightCm as number) : current.heightCm
+      const nextGoalWeight = showGoalWeight
+        ? (goalWeightKg as number)
+        : current.goalWeightKg > 0
+          ? current.goalWeightKg
+          : nextWeight
       saveCalorieProfile(
         normalizeCalorieProfile({
           ...current,
-          weightKg,
-          goalWeightKg,
-          heightCm,
+          weightKg: nextWeight,
+          goalWeightKg: nextGoalWeight,
+          heightCm: nextHeight,
           age,
           onboardingComplete: current.onboardingComplete || true,
         }),
@@ -331,70 +377,76 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
       <section className="space-y-3">
         <SectionTitle icon={UserRound} title="Corps & métabolisme" />
 
-        <div className="grid grid-cols-2 gap-3">
-          <label className="glass-card block rounded-2xl p-4">
-            <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
-              <Scale className="h-3.5 w-3.5 text-[#FF9F0A]" />
-              Poids actuel
-            </span>
-            <div className="flex items-end gap-1">
-              <ClearableNumberInput
-                value={weightKg}
-                onChange={setWeightKg}
-                min={35}
-                max={250}
-                step={0.1}
-                required={false}
-                placeholder="70.5"
-                aria-label="Poids actuel"
-                className="w-full bg-transparent text-[26px] font-bold text-white outline-none"
-              />
-              <span className="pb-1 text-[13px] text-[#8E8E93]">kg</span>
-            </div>
-          </label>
+        {showBodyMetrics ? (
+          <div className="grid grid-cols-2 gap-3" data-testid="full-profile-body-metrics">
+            <label className="glass-card block rounded-2xl p-4">
+              <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
+                <Scale className="h-3.5 w-3.5 text-[#FF9F0A]" />
+                Poids actuel
+              </span>
+              <div className="flex items-end gap-1">
+                <ClearableNumberInput
+                  value={weightKg}
+                  onChange={setWeightKg}
+                  min={35}
+                  max={250}
+                  step={0.1}
+                  required={false}
+                  placeholder="70.5"
+                  aria-label="Poids actuel"
+                  className="w-full bg-transparent text-[26px] font-bold text-white outline-none"
+                />
+                <span className="pb-1 text-[13px] text-[#8E8E93]">kg</span>
+              </div>
+            </label>
 
-          <label className="glass-card block rounded-2xl p-4">
-            <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
-              <Target className="h-3.5 w-3.5 text-[#FF6961]" />
-              Poids cible
-            </span>
-            <div className="flex items-end gap-1">
-              <ClearableNumberInput
-                value={goalWeightKg}
-                onChange={setGoalWeightKg}
-                min={35}
-                max={250}
-                step={0.1}
-                required={false}
-                placeholder="68.0"
-                aria-label="Poids cible"
-                className="w-full bg-transparent text-[26px] font-bold text-white outline-none"
-              />
-              <span className="pb-1 text-[13px] text-[#8E8E93]">kg</span>
-            </div>
-          </label>
-        </div>
+            {showGoalWeight ? (
+              <label className="glass-card block rounded-2xl p-4" data-testid="full-profile-goal-weight">
+                <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
+                  <Target className="h-3.5 w-3.5 text-[#FF6961]" />
+                  Poids cible
+                </span>
+                <div className="flex items-end gap-1">
+                  <ClearableNumberInput
+                    value={goalWeightKg}
+                    onChange={setGoalWeightKg}
+                    min={35}
+                    max={250}
+                    step={0.1}
+                    required={false}
+                    placeholder="68.0"
+                    aria-label="Poids cible"
+                    className="w-full bg-transparent text-[26px] font-bold text-white outline-none"
+                  />
+                  <span className="pb-1 text-[13px] text-[#8E8E93]">kg</span>
+                </div>
+              </label>
+            ) : null}
+          </div>
+        ) : null}
 
-        <div className="grid grid-cols-2 gap-3">
-          <label className="glass-card block rounded-2xl p-4">
-            <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
-              <Ruler className="h-3.5 w-3.5 text-[#00B4FF]" />
-              Taille
-            </span>
-            <div className="flex items-end gap-1">
-              <ClearableNumberInput
-                value={heightCm}
-                onChange={setHeightCm}
-                min={120}
-                max={230}
-                required={false}
-                placeholder="175"
-                aria-label="Taille"
-                className="w-full bg-transparent text-[24px] font-bold text-white outline-none"
-              />
-              <span className="pb-0.5 text-[13px] text-[#8E8E93]">cm</span>
-            </div>
-          </label>
+        <div className={`grid gap-3 ${showBodyMetrics ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          {showBodyMetrics ? (
+            <label className="glass-card block rounded-2xl p-4">
+              <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
+                <Ruler className="h-3.5 w-3.5 text-[#00B4FF]" />
+                Taille
+              </span>
+              <div className="flex items-end gap-1">
+                <ClearableNumberInput
+                  value={heightCm}
+                  onChange={setHeightCm}
+                  min={120}
+                  max={230}
+                  required={false}
+                  placeholder="175"
+                  aria-label="Taille"
+                  className="w-full bg-transparent text-[24px] font-bold text-white outline-none"
+                />
+                <span className="pb-0.5 text-[13px] text-[#8E8E93]">cm</span>
+              </div>
+            </label>
+          ) : null}
 
           <label className="glass-card block rounded-2xl p-4">
             <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
@@ -404,8 +456,8 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
             <ClearableNumberInput
               value={age}
               onChange={setAge}
-              min={14}
-              max={90}
+              min={PLAUSIBLE_AGE_MIN}
+              max={PLAUSIBLE_AGE_MAX}
               required={false}
               placeholder="24"
               aria-label="Âge"

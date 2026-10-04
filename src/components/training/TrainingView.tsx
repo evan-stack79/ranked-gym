@@ -634,7 +634,7 @@ export function TrainingView({
     setCardioOpen(false)
     resetCardioSheet()
     setPanel('hub')
-    showToast(`${sport?.name ?? 'Séance'} · ~${estimated} kcal → Nutri`)
+    showToast(`${sport?.name ?? 'Séance'} enregistrée`)
   }
 
   const handleQuickActivity = (id: QuickActivityId) => {
@@ -851,7 +851,7 @@ export function TrainingView({
                   ...(details ? { details } : {}),
                 }),
               )
-              showToast(`${entry.title} · ~${entry.estimatedKcal} kcal → Nutri`)
+              showToast(`${entry.title} enregistrée`)
               setPanel('hub')
             }}
           />

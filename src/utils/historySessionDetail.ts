@@ -32,8 +32,8 @@ export function historySessionMetrics(note: WorkoutNote): HistorySessionMetrics 
   // Volume kg uniquement pour la force avec charge réelle.
   const volume =
     kind === 'strength' && isFinitePositive(volumeRaw) ? Math.round(volumeRaw) : null
-  // kcal : uniquement si > 0 et fini — pas d’énergie fictive (0 / NaN).
-  const kcal = isFinitePositive(note.estimatedKcal) ? Math.round(note.estimatedKcal) : null
+  // VETO Q15 : aucun affichage de calories dépensées — toujours masqué.
+  const kcal = null
   return { kind, duration, volume, kcal }
 }
 

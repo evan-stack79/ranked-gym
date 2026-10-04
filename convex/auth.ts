@@ -139,6 +139,69 @@ async function deleteRows(
   }
 }
 
+/** Lot 1 SEC-DON-02 — suppression nutrition granulaire par lots. */
+export const NUTRITION_DELETE_BATCH_SIZE = 500
+
+/**
+ * Tables nutrition contenant userId (hors nutrition_state déjà géré à part).
+ * Toute nouvelle table user-scoped nutrition doit être ajoutée ici.
+ */
+export const NUTRITION_USER_CHILD_TABLES = [
+  { table: 'nutrition_meals' as const, index: 'by_userId_updatedAt' as const },
+  { table: 'nutrition_water_entries' as const, index: 'by_userId_updatedAt' as const },
+  { table: 'nutrition_day_state' as const, index: 'by_userId_updatedAt' as const },
+  { table: 'nutrition_food_catalog' as const, index: 'by_userId_lastSelectedAt' as const },
+]
+
+const continuePurgeNutritionUserDataRef = makeFunctionReference<
+  'mutation',
+  { userId: string },
+  { done: boolean; deleted: number }
+>('auth:continuePurgeNutritionUserData')
+
+/**
+ * Supprime jusqu'à NUTRITION_DELETE_BATCH_SIZE lignes par table enfant.
+ * @returns true s'il reste des lignes (continuation nécessaire).
+ */
+export async function purgeNutritionUserDataBatch(
+  ctx: MutationCtx,
+  userId: string,
+  deletedDocIds: Set<string>,
+  batchSize: number = NUTRITION_DELETE_BATCH_SIZE,
+): Promise<{ remaining: boolean; deleted: number }> {
+  let deleted = 0
+  let remaining = false
+
+  const batches = [
+    await ctx.db
+      .query('nutrition_meals')
+      .withIndex('by_userId_updatedAt', (q) => q.eq('userId', userId))
+      .take(batchSize),
+    await ctx.db
+      .query('nutrition_water_entries')
+      .withIndex('by_userId_updatedAt', (q) => q.eq('userId', userId))
+      .take(batchSize),
+    await ctx.db
+      .query('nutrition_day_state')
+      .withIndex('by_userId_updatedAt', (q) => q.eq('userId', userId))
+      .take(batchSize),
+    await ctx.db
+      .query('nutrition_food_catalog')
+      .withIndex('by_userId_lastSelectedAt', (q) => q.eq('userId', userId))
+      .take(batchSize),
+  ]
+
+  for (const rows of batches) {
+    await deleteRows(ctx, rows, deletedDocIds)
+    deleted += rows.length
+    if (rows.length >= batchSize) {
+      remaining = true
+    }
+  }
+
+  return { remaining, deleted }
+}
+
 type IssuePasswordResetOptions = {
   persistOutbox?: boolean
   scheduleDelivery?: boolean
@@ -377,6 +440,23 @@ export async function deleteAccountAndUserData(
   }
 
   const deletedDocIds = new Set<string>()
+
+  // SEC-DON-02 : enfants nutrition d'abord (lots + continuation planifiée si plein).
+  // auth_users n'est supprimé qu'après ce batch initial + planification fiable.
+  const nutritionPurge = await purgeNutritionUserDataBatch(ctx, user.userId, deletedDocIds)
+  if (nutritionPurge.remaining && hasScheduler(ctx)) {
+    await ctx.scheduler.runAfter(0, continuePurgeNutritionUserDataRef, {
+      userId: user.userId,
+    })
+  } else if (nutritionPurge.remaining) {
+    // Sans scheduler (tests) : vider jusqu'à épuisement dans la même mutation.
+    let guard = 0
+    while (guard < 10_000) {
+      const next = await purgeNutritionUserDataBatch(ctx, user.userId, deletedDocIds)
+      if (!next.remaining) break
+      guard += 1
+    }
+  }
 
   await deleteRows(
     ctx,
@@ -1007,6 +1087,37 @@ export const changePassword = mutation({
     expiresAt: v.number(),
   }),
   handler: (ctx, args) => changePasswordForSession(ctx, args),
+})
+
+/**
+ * Continuation planifiée — purge les lignes nutrition restantes pour userId.
+ * Peut s'exécuter après suppression de auth_users (pas d'orphelins durables).
+ */
+export const continuePurgeNutritionUserData = internalMutation({
+  args: { userId: v.string() },
+  returns: v.object({ done: v.boolean(), deleted: v.number() }),
+  handler: async (ctx, args) => {
+    const deletedDocIds = new Set<string>()
+    const result = await purgeNutritionUserDataBatch(ctx, args.userId, deletedDocIds)
+    if (result.remaining && hasScheduler(ctx)) {
+      await ctx.scheduler.runAfter(0, continuePurgeNutritionUserDataRef, {
+        userId: args.userId,
+      })
+      return { done: false, deleted: result.deleted }
+    }
+    if (result.remaining) {
+      let guard = 0
+      let deleted = result.deleted
+      while (guard < 10_000) {
+        const next = await purgeNutritionUserDataBatch(ctx, args.userId, deletedDocIds)
+        deleted += next.deleted
+        if (!next.remaining) return { done: true, deleted }
+        guard += 1
+      }
+      return { done: false, deleted }
+    }
+    return { done: true, deleted: result.deleted }
+  },
 })
 
 export const deleteOwnAccount = mutation({

@@ -1,9 +1,13 @@
+import { M_INFO_1 } from '../../content/safetyCopy'
+
 interface NutritionCalorieRingProps {
   remainingCalories: number
   consumedCalories: number
   targetCalories: number
   progress: number
   onOpenSetup: () => void
+  /** Si false : pas de CTA « Définir mon objectif » (drapeau OFF, TCA, grossesse…). */
+  allowGoalSetup?: boolean
 }
 
 function formatKcal(n: number): string {
@@ -30,6 +34,7 @@ export function NutritionCalorieRing({
   targetCalories,
   progress,
   onOpenSetup,
+  allowGoalSetup = false,
 }: NutritionCalorieRingProps) {
   const hasTarget = Number.isFinite(targetCalories) && targetCalories > 0
   const safeConsumed = Number.isFinite(consumedCalories) ? Math.max(0, consumedCalories) : 0
@@ -43,7 +48,11 @@ export function NutritionCalorieRing({
     <div className="mb-3 flex w-full items-center justify-between gap-3">
       <p className="text-[15px] font-semibold text-white">Calories aujourd’hui</p>
       <p className="text-right text-[12px] tabular-nums text-[#8E8E93]">
-        {hasTarget ? `${formatKcal(safeConsumed)} / ${formatKcal(targetCalories)} kcal` : 'Objectif à définir'}
+        {hasTarget
+          ? `${formatKcal(safeConsumed)} / ${formatKcal(targetCalories)} kcal`
+          : allowGoalSetup
+            ? 'Objectif à définir'
+            : 'Suivi sans objectif'}
       </p>
     </div>
   )
@@ -55,17 +64,28 @@ export function NutritionCalorieRing({
         <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-[#19191C]">
           <img src="/panther-trim.png" alt="" width={38} height={38} className="h-10 w-10 object-contain" draggable={false} />
         </div>
-        <p className="mt-4 text-[16px] font-semibold text-white">Définis ton objectif calorique</p>
-        <p className="mt-1 max-w-[18rem] text-[13px] leading-5 text-[#8E8E93]">
-          Ton compteur apparaîtra dès que ton plan nutrition sera renseigné.
+        <p className="mt-4 text-[16px] font-semibold text-white">
+          {allowGoalSetup ? 'Définis ton objectif calorique' : 'Suivi sans objectif chiffré'}
         </p>
-        <button
-          type="button"
-          onClick={onOpenSetup}
-          className="ios-press mt-5 rounded-xl bg-[#FF2B2B] px-4 py-2.5 text-[13px] font-semibold text-white"
-        >
-          Définir mon objectif
-        </button>
+        <p className="mt-1 max-w-[18rem] text-[13px] leading-5 text-[#8E8E93]">
+          {allowGoalSetup
+            ? 'Ton compteur apparaîtra dès que ton plan nutrition sera renseigné.'
+            : M_INFO_1}
+        </p>
+        {allowGoalSetup ? (
+          <button
+            type="button"
+            onClick={onOpenSetup}
+            className="ios-press mt-5 rounded-xl bg-[#FF2B2B] px-4 py-2.5 text-[13px] font-semibold text-white"
+            data-testid="define-calorie-goal"
+          >
+            Définir mon objectif
+          </button>
+        ) : (
+          <p className="mt-4 text-[13px] tabular-nums text-white">
+            Consommé aujourd&apos;hui : {formatKcal(safeConsumed)} kcal
+          </p>
+        )}
       </div>
     )
   }
@@ -127,6 +147,7 @@ export function NutritionCalorieRing({
           <p className={`mt-1 text-[14px] font-medium ${isOverTarget ? 'text-[#FF6B6B]' : 'text-[#8E8E93]'}`}>
             {isOverTarget ? 'kcal dépassées' : 'kcal restantes'}
           </p>
+          <p className="mt-1 text-[11px] leading-snug text-[#8E8E93]">Estimation</p>
         </div>
         <span
           className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#FF2B2B]/50 bg-[#171719] px-2 py-1 text-[11px] font-bold tabular-nums text-white"

@@ -67,6 +67,21 @@ export function computeCaloriePlan(profile: CalorieProfile): CalorieResult {
   const height = parseFloat(String(profile.heightCm)) || 0
   const age = parseFloat(String(profile.age)) || 0
   const goalWeight = parseFloat(String(profile.goalWeightKg)) || weight
+  // Legacy helper — ne calcule pas sans sexe renseigné (pas de défaut homme).
+  if (profile.sex !== 'male' && profile.sex !== 'female') {
+    return {
+      bmr: 0,
+      tdee: 0,
+      targetCalories: 0,
+      proteinG: 0,
+      carbsG: 0,
+      fatG: 0,
+      goal: profile.goal,
+      deltaKg: Math.round((goalWeight - weight) * 10) / 10,
+      weeklyChangeKg: 0,
+      estimatedWeeks: null,
+    }
+  }
 
   const bmr = computeBmr(weight, height, age, profile.sex)
   const tdee = Math.round(bmr * ACTIVITY_MULTIPLIER[profile.activity])

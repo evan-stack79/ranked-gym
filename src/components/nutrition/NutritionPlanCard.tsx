@@ -254,8 +254,8 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
             label="Âge"
             value={draft.age}
             onChange={(v) => setDraft((p) => ({ ...p, age: v }))}
-            min={14}
-            max={90}
+            min={10}
+            max={120}
             suffix="ans"
             icon={<span className="text-[11px] text-[#8E8E93]">ans</span>}
           />
@@ -275,6 +275,7 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
             value={draft.weeklyPaceKg > 0 ? draft.weeklyPaceKg : 0.5}
             onChange={(weeklyPaceKg) => setDraft((p) => ({ ...p, weeklyPaceKg }))}
             goal={draft.goal}
+            weightKg={draft.weightKg}
           />
 
           <div className="flex gap-1 rounded-xl border border-white/10 bg-black/30 p-1">

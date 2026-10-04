@@ -14,6 +14,10 @@ import {
   updateMealOnDate,
 } from '../../services/nutritionStorage'
 import { getNutritionTarget } from '../../services/nutritionActivity'
+import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
+import { readHealthDeclarations } from '../../services/nutritionSafetyRules'
+import { M_CAL_2, M_INFO_1, Q8_SCREEN_TITLE } from '../../content/safetyCopy'
+import { NeedToTalkScreen } from '../settings/NeedToTalkScreen'
 import { getDailyWaterGoalMl, isTrainingDayToday } from '../../utils/waterGoal'
 import {
   canSubmitHomeQuickWater,
@@ -68,6 +72,7 @@ export function NutritionDashboard({
   const [tick, setTick] = useState(0)
   const [meals, setMeals] = useState<MealEntry[]>([])
   const [hydrated, setHydrated] = useState(false)
+  const [showNeedToTalk, setShowNeedToTalk] = useState(false)
   const [waterSaving, setWaterSaving] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
@@ -199,6 +204,15 @@ export function NutritionDashboard({
     void tick
     return getNutritionTarget(profile)
   }, [profile, tick])
+
+  const declarations = useMemo(() => readHealthDeclarations(profile), [profile])
+  const calorieGoalEnabled = isCalorieGoalEnabled()
+  const allowGoalSetup =
+    calorieGoalEnabled &&
+    !declarations.eatingDisorder &&
+    !declarations.pregnancy &&
+    !declarations.breastfeeding &&
+    !nutrition.showCalorieGoal
 
   const totals = useMemo(() => {
     return meals.reduce(
@@ -446,6 +460,10 @@ export function NutritionDashboard({
     )
   }
 
+  if (showNeedToTalk) {
+    return <NeedToTalkScreen onBack={() => setShowNeedToTalk(false)} />
+  }
+
   return (
     <div className="-mx-5 min-h-[70vh] overflow-hidden bg-[#0C0C0E] pb-2">
       <div className="flex flex-col gap-4 px-5 pt-1">
@@ -498,7 +516,39 @@ export function NutritionDashboard({
             targetCalories={targetCalories}
             progress={calorieProgress}
             onOpenSetup={onOpenSetup}
+            allowGoalSetup={allowGoalSetup}
           />
+          {nutrition.showCalorieGoal ? (
+            <div className="mt-3 space-y-2 px-1" data-testid="dashboard-estimation-notices">
+              <p className="text-[12px] leading-relaxed text-[#AEAEB2]">{M_CAL_2}</p>
+              <p className="text-[12px] leading-relaxed text-[#8E8E93]">{M_INFO_1}</p>
+              {nutrition.safetyNotices
+                .filter((n) => n !== M_INFO_1 && n !== M_CAL_2)
+                .map((notice) => (
+                  <p key={notice} className="text-[12px] leading-relaxed text-[#8E8E93]">
+                    {notice}
+                  </p>
+                ))}
+            </div>
+          ) : (
+            nutrition.safetyNotices.length > 0 && (
+              <div className="mt-3 space-y-2 px-1" data-testid="dashboard-safety-notices">
+                {nutrition.safetyNotices.map((notice) => (
+                  <p key={notice} className="text-[12px] leading-relaxed text-[#8E8E93]">
+                    {notice}
+                  </p>
+                ))}
+              </div>
+            )
+          )}
+          <button
+            type="button"
+            onClick={() => setShowNeedToTalk(true)}
+            className="ios-press mt-3 text-[13px] font-semibold text-[#64D2FF] underline"
+            data-testid="dashboard-need-to-talk"
+          >
+            {Q8_SCREEN_TITLE}
+          </button>
         </div>
 
         <NutritionMacrosRow
@@ -596,8 +646,12 @@ export function NutritionDashboard({
 
         {advancedOpen ? (
           <div className="space-y-6 border-t border-white/8 pt-6">
-            <NutritionPlanCard profile={profile} onChange={onChangeProfile} />
-            <WeightPaceCard profile={profile} />
+            {nutrition.showCalorieGoal ? (
+              <>
+                <NutritionPlanCard profile={profile} onChange={onChangeProfile} />
+                <WeightPaceCard profile={profile} />
+              </>
+            ) : null}
             <SmartWaterGauge weightKg={profile.weightKg} />
           </div>
         ) : null}

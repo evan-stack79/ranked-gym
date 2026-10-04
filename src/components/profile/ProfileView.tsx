@@ -1,11 +1,23 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { CloudBackupCard } from './CloudBackupCard'
 import { SettingsScreen } from '../settings/SettingsScreen'
 import { PersonalInformationScreen } from '../settings/PersonalInformationScreen'
 import { SecurityScreen } from '../settings/SecurityScreen'
 import { CameraHeartRateScreen } from '../settings/CameraHeartRateScreen'
+import { NeedToTalkScreen } from '../settings/NeedToTalkScreen'
+import { EnergyRecoveryInfo } from '../settings/EnergyRecoveryInfo'
+import {
+  HealthSituationsForm,
+  healthSituationsFromProfile,
+  type HealthSituationsValue,
+} from '../settings/HealthSituationsForm'
 import { FullProfileScreen } from './FullProfileScreen'
 import { useAuth } from '../../context/AuthContext'
+import {
+  getCalorieProfile,
+  saveCalorieProfile,
+} from '../../services/nutritionStorage'
+import { M_INFO_1 } from '../../content/safetyCopy'
 import {
   disciplineFromLabel,
   getDiscipline,
@@ -35,6 +47,9 @@ function ProfileViewContent() {
   const [disciplineId, setDisciplineId] = useState<AppDisciplineId>(() =>
     disciplineFromLabel(profile?.discipline) || getStoredDisciplineId(),
   )
+  const [healthValue, setHealthValue] = useState<HealthSituationsValue>(() =>
+    healthSituationsFromProfile(getCalorieProfile()),
+  )
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -56,6 +71,12 @@ function ProfileViewContent() {
     }
   }, [route, isAuthenticated, user, goBack])
 
+  useEffect(() => {
+    if (route === 'healthSituations') {
+      setHealthValue(healthSituationsFromProfile(getCalorieProfile()))
+    }
+  }, [route])
+
   const handleGhostModeChange = async (enabled: boolean) => {
     setGhostSaving(true)
     try {
@@ -64,6 +85,15 @@ function ProfileViewContent() {
       setGhostSaving(false)
     }
   }
+
+  const handleHealthChange = useCallback((next: HealthSituationsValue) => {
+    setHealthValue(next)
+    const current = getCalorieProfile()
+    saveCalorieProfile({
+      ...current,
+      ...next,
+    })
+  }, [])
 
   if (route === 'personalInfo') {
     if (!isAuthenticated || !user) return null
@@ -92,9 +122,50 @@ function ProfileViewContent() {
     )
   }
 
-
   if (route === 'cameraHeartRate') {
     return <CameraHeartRateScreen onBack={goBack} />
+  }
+
+  if (route === 'needToTalk') {
+    return <NeedToTalkScreen onBack={goBack} />
+  }
+
+  if (route === 'energyInfo') {
+    return (
+      <section className="ios-fade-up space-y-4 pb-8">
+        <button
+          type="button"
+          onClick={goBack}
+          className="ios-press rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-[13px] font-semibold text-[#AEAEB2]"
+        >
+          Retour
+        </button>
+        <EnergyRecoveryInfo />
+      </section>
+    )
+  }
+
+  if (route === 'healthSituations') {
+    return (
+      <section className="ios-fade-up space-y-4 pb-8">
+        <button
+          type="button"
+          onClick={goBack}
+          className="ios-press rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-[13px] font-semibold text-[#AEAEB2]"
+        >
+          Retour
+        </button>
+        <h1 className="text-[28px] font-bold tracking-tight text-white">Situations de santé</h1>
+        <HealthSituationsForm
+          value={healthValue}
+          onChange={handleHealthChange}
+          onOpenNeedToTalk={() => navigate('needToTalk')}
+        />
+        {!healthValue.declaredEatingDisorder && healthValue.preferNotAnswerHealth ? (
+          <p className="text-[12px] text-[#8E8E93]">{M_INFO_1}</p>
+        ) : null}
+      </section>
+    )
   }
 
   if (route === 'fullProfile') {
@@ -113,6 +184,9 @@ function ProfileViewContent() {
           onOpenPersonalInfo={() => requireAuth(() => navigate('personalInfo'))}
           onOpenSecurity={() => requireAuth(() => navigate('security'))}
           onOpenCameraHeartRate={() => navigate('cameraHeartRate')}
+          onOpenNeedToTalk={() => navigate('needToTalk')}
+          onOpenHealthSituations={() => navigate('healthSituations')}
+          onOpenEnergyInfo={() => navigate('energyInfo')}
         />
         <CloudBackupCard />
       </div>
@@ -135,6 +209,9 @@ function ProfileViewContent() {
         onOpenPersonalInfo={() => navigate('personalInfo')}
         onOpenSecurity={() => navigate('security')}
         onOpenCameraHeartRate={() => navigate('cameraHeartRate')}
+        onOpenNeedToTalk={() => navigate('needToTalk')}
+        onOpenHealthSituations={() => navigate('healthSituations')}
+        onOpenEnergyInfo={() => navigate('energyInfo')}
         onRequireAuth={() => requireAuth(() => undefined)}
         onDisciplineChange={(label) => {
           setDisciplineId(disciplineFromLabel(label))
