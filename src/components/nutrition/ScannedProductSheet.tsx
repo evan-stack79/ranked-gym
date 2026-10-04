@@ -111,6 +111,7 @@ export function ScannedProductSheet({
   const [saving, setSaving] = useState(false)
 
   const initKeyRef = useRef<string | null>(null)
+  const saveLockRef = useRef(false)
 
   const pieceKind = useMemo(
     () => (product ? detectPieceKind(product.nom) : 'generic'),
@@ -141,6 +142,7 @@ export function ScannedProductSheet({
     setEatenPieces(null)
     setManualCalories(null)
     setSaving(false)
+    saveLockRef.current = false
     setShowPieces(false)
 
     const kind = detectPieceKind(product.nom)
@@ -273,6 +275,8 @@ export function ScannedProductSheet({
 
   const handleSave = () => {
     if (!canSave || !product || effectiveGrams == null || nutrition == null) return
+    if (saveLockRef.current) return
+    saveLockRef.current = true
     setSaving(true)
     if (
       showPieces &&
