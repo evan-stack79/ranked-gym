@@ -16,6 +16,7 @@ import { Avatar } from '../ui/Avatar'
 import { uploadUserAvatar } from '../../services/avatarService'
 import { IosSheet } from '../ui/IosSheet'
 import { DisciplinePicker } from '../discipline/DisciplinePicker'
+import { AppVersionFooter } from './AppVersionFooter'
 import { ProPassCard } from './ProPassCard'
 import { SettingsMenuRow } from './SettingsMenuRow'
 import {
@@ -312,6 +313,8 @@ export function SettingsScreen({
           Se déconnecter
         </button>
       )}
+
+      <AppVersionFooter />
 
       <IosSheet
         open={sheet === 'payment'}

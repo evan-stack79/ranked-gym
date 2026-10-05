@@ -1,5 +1,6 @@
 # Content-Type explicites — évite JS/CSS servis en text/html (écran noir)
 # + durcissement réseau (CSP / security headers) — Finding H6
+# + cache : HTML/SW sans cache ; assets hashés en cache long
 
 /*
   X-Content-Type-Options: nosniff
@@ -12,15 +13,22 @@
 /index.html
   Content-Type: text/html; charset=utf-8
   X-Content-Type-Options: nosniff
+  Cache-Control: no-cache
 
 /
   Content-Type: text/html; charset=utf-8
+  Cache-Control: no-cache
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
 
 /assets/*.js
   Content-Type: application/javascript; charset=utf-8
+  Cache-Control: public, max-age=31536000, immutable
 
 /assets/*.css
   Content-Type: text/css; charset=utf-8
+  Cache-Control: public, max-age=31536000, immutable
 
 /*.js
   Content-Type: application/javascript; charset=utf-8
@@ -31,12 +39,15 @@
 
 /registerSW.js
   Content-Type: application/javascript; charset=utf-8
+  Cache-Control: no-cache
 
 /sw.js
   Content-Type: application/javascript; charset=utf-8
+  Cache-Control: no-cache
 
 /workbox-*.js
   Content-Type: application/javascript; charset=utf-8
 
 /manifest.webmanifest
   Content-Type: application/manifest+json; charset=utf-8
+  Cache-Control: no-cache
