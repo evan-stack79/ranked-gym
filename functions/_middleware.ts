@@ -33,6 +33,20 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     headers.set(key, value)
   }
 
+  // PWA : ne jamais mettre le SW / HTML en cache HTTP (sinon vieux bundle).
+  if (
+    path === '/sw.js' ||
+    path === '/registerSW.js' ||
+    path === '/index.html' ||
+    path === '/' ||
+    path === '/manifest.webmanifest' ||
+    path === '/boot-t0.js'
+  ) {
+    headers.set('Cache-Control', 'no-cache')
+  } else if (path.startsWith('/assets/')) {
+    headers.set('Cache-Control', 'public, max-age=31536000, immutable')
+  }
+
   // Assets statiques : laisser Cloudflare détecter le bon Content-Type
   if (
     path.startsWith('/assets/') ||

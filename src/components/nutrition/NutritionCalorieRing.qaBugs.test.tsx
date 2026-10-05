@@ -6,7 +6,7 @@ import { NutritionCalorieRing } from './NutritionCalorieRing'
 import { M_INFO_1 } from '../../content/safetyCopy'
 
 describe('QA BUG-07 — TCA : pas de CTA objectif calorique', () => {
-  it('allowGoalSetup=false n’affiche pas Définir mon objectif', async () => {
+  it('allowGoalSetup=false n’affiche pas Définir mon objectif ni M_INFO_1 (porté par SafetyNote)', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const root = createRoot(host)
@@ -25,7 +25,7 @@ describe('QA BUG-07 — TCA : pas de CTA objectif calorique', () => {
     expect(host.querySelector('[data-testid="define-calorie-goal"]')).toBeNull()
     expect(host.textContent).not.toContain('Définir mon objectif')
     expect(host.textContent).toContain('Suivi sans objectif chiffré')
-    expect(host.textContent).toContain(M_INFO_1)
+    expect(host.textContent).not.toContain(M_INFO_1)
     root.unmount()
     host.remove()
   })

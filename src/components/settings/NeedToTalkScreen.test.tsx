@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { act } from 'react'
 import { NeedToTalkScreen } from './NeedToTalkScreen'
 import {
+  M_INFO_1,
   Q8_ECRAN_ORIENTATION,
   TCA_PHONE_TEL,
   TCA_RESOURCE_LINKS,
@@ -26,6 +27,22 @@ describe('NeedToTalkScreen', () => {
     const ffab = host.querySelector(`a[href="${TCA_RESOURCE_LINKS.ffabAnnuaire}"]`)
     expect(ffab?.getAttribute('target')).toBe('_blank')
     expect(ffab?.getAttribute('rel')).toContain('noopener')
+
+    root.unmount()
+    host.remove()
+  })
+
+  it('n’affiche pas le bandeau M_INFO_1 (écran d’orientation, pas de doublon)', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(<NeedToTalkScreen onBack={() => undefined} />)
+    })
+
+    expect(host.textContent).not.toContain(M_INFO_1)
+    expect(host.querySelector('[data-testid="safety-note"]')).toBeNull()
+    expect(host.querySelector('[data-testid="calorie-goal-disabled-notice"]')).toBeNull()
 
     root.unmount()
     host.remove()

@@ -1,5 +1,3 @@
-import { M_INFO_1 } from '../../content/safetyCopy'
-
 interface NutritionCalorieRingProps {
   remainingCalories: number
   consumedCalories: number
@@ -67,11 +65,11 @@ export function NutritionCalorieRing({
         <p className="mt-4 text-[16px] font-semibold text-white">
           {allowGoalSetup ? 'Définis ton objectif calorique' : 'Suivi sans objectif chiffré'}
         </p>
-        <p className="mt-1 max-w-[18rem] text-[13px] leading-5 text-[#8E8E93]">
-          {allowGoalSetup
-            ? 'Ton compteur apparaîtra dès que ton plan nutrition sera renseigné.'
-            : M_INFO_1}
-        </p>
+        {allowGoalSetup ? (
+          <p className="mt-1 max-w-[18rem] text-[13px] leading-5 text-[#8E8E93]">
+            Ton compteur apparaîtra dès que ton plan nutrition sera renseigné.
+          </p>
+        ) : null}
         {allowGoalSetup ? (
           <button
             type="button"
