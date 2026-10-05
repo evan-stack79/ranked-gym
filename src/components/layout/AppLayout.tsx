@@ -7,6 +7,7 @@ import { RestTimerOverlay, REST_BAR_CONTENT_PAD } from '../training/RestTimerOve
 import { useRestTimerContext, type RestPresetSec } from '../../context/RestTimerContext'
 import type { TabId } from '../../types'
 import { useAdaptiveBottomNav } from '../../hooks/useAdaptiveBottomNav'
+import { shouldShowBrandHeader } from './shouldShowBrandHeader'
 
 interface AppLayoutProps {
   activeTab: TabId
@@ -15,12 +16,6 @@ interface AppLayoutProps {
   hasActiveWorkout?: boolean
   hideBottomNav?: boolean
   children: ReactNode
-}
-
-/** Barre marque Ranked Gym : sticky uniquement sur Nutrition (`nutrition`) et Train (`training`). */
-export function shouldShowBrandHeader(activeTab: TabId, chromeHidden = false): boolean {
-  if (chromeHidden) return false
-  return activeTab === 'nutrition' || activeTab === 'training'
 }
 
 export function AppLayout({
