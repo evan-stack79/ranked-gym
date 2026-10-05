@@ -42,6 +42,8 @@ interface ScannedProductSheetProps {
   open: boolean
   product: OpenFoodFactsProduct | null
   targetCalories: number
+  /** Objectifs repas affichables (drapeau ON + cible > 0 + profil éligible). */
+  hasMealTargets?: boolean
   morphology: BodyMorphology
   meals: Array<{ mealType: MealType; calories: number; name?: string }>
   preferredMealType?: MealType | null
@@ -78,6 +80,7 @@ export function ScannedProductSheet({
   open,
   product,
   targetCalories,
+  hasMealTargets = false,
   morphology,
   meals,
   preferredMealType,
@@ -248,25 +251,37 @@ export function ScannedProductSheet({
           </div>
         ) : null}
 
-        <div className="rounded-2xl border border-white/10 bg-black/25 px-3.5 py-3">
-          <p className="text-[12px] font-semibold text-white">
-            {MEAL_TYPE_LABELS[mealType]} · budget {budget} kcal (zone {range.min}–{range.max})
-          </p>
-          <p className="mt-1 text-[12px] text-[#AEAEB2]">
-            Déjà noté sur ce repas :{' '}
-            <span className="font-semibold text-white">{used} kcal</span>
-            {' · '}
-            Budget repas restant{' '}
-            <span className="font-semibold text-[#30D158]">{remaining} kcal</span>
-            {' / '}
-            cible jour {targetCalories} kcal
-          </p>
-          {isFollowUp && (
+        {hasMealTargets ? (
+          <div className="rounded-2xl border border-white/10 bg-black/25 px-3.5 py-3">
+            <p className="text-[12px] font-semibold text-white">
+              {MEAL_TYPE_LABELS[mealType]} · budget {budget} kcal (zone {range.min}–{range.max})
+            </p>
+            <p className="mt-1 text-[12px] text-[#AEAEB2]">
+              Déjà noté sur ce repas :{' '}
+              <span className="font-semibold text-white">{used} kcal</span>
+              {' · '}
+              Budget repas restant{' '}
+              <span className="font-semibold text-[#30D158]">{remaining} kcal</span>
+              {' / '}
+              cible jour {targetCalories} kcal
+            </p>
+            {isFollowUp && (
+              <p className="mt-1 text-[11px] text-[#8E8E93]">
+                Avec : {foodsAlready.map((f) => f.name ?? 'aliment').join(', ')}
+              </p>
+            )}
+          </div>
+        ) : isFollowUp ? (
+          <div className="rounded-2xl border border-white/10 bg-black/25 px-3.5 py-3">
+            <p className="text-[12px] text-[#AEAEB2]">
+              Déjà noté sur ce repas :{' '}
+              <span className="font-semibold text-white">{used} kcal</span>
+            </p>
             <p className="mt-1 text-[11px] text-[#8E8E93]">
               Avec : {foodsAlready.map((f) => f.name ?? 'aliment').join(', ')}
             </p>
-          )}
-        </div>
+          </div>
+        ) : null}
 
         <div>
           <p className="mb-2 text-[13px] font-semibold text-white">1. Pour quel repas ?</p>
@@ -292,50 +307,56 @@ export function ScannedProductSheet({
           </div>
         </div>
 
-        <div>
-          <p className="mb-2 text-[13px] font-semibold text-white">2. Tu manges comment ?</p>
-          <div className="grid grid-cols-1 gap-2">
-            <button
-              type="button"
-              onClick={() => setMode('solo')}
-              className={`ios-press rounded-2xl border px-3.5 py-3 text-left ${
-                mode === 'solo'
-                  ? 'border-[#00B4FF]/45 bg-[#00B4FF]/15'
-                  : 'border-white/10 bg-black/25'
-              }`}
-            >
-              <p className="flex items-center gap-2 text-[14px] font-semibold text-white">
-                <Cookie className="h-4 w-4 text-[#64D2FF]" />
-                {isFollowUp ? 'Compléter le repas' : 'Uniquement ça'}
-              </p>
-              <p className="mt-1 text-[12px] text-[#AEAEB2]">
-                {isFollowUp
-                  ? `On calcule la portion pour utiliser les ~${remaining} kcal qu’il reste avec ce que tu as déjà.`
-                  : `Ce produit couvre presque tout le repas (${remaining} kcal restantes).`}
-              </p>
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('with_sides')}
-              className={`ios-press rounded-2xl border px-3.5 py-3 text-left ${
-                mode === 'with_sides'
-                  ? 'border-[#00B4FF]/45 bg-[#00B4FF]/15'
-                  : 'border-white/10 bg-black/25'
-              }`}
-            >
-              <p className="flex items-center gap-2 text-[14px] font-semibold text-white">
-                <Utensils className="h-4 w-4 text-[#64D2FF]" />
-                Avec autre chose
-              </p>
-              <p className="mt-1 text-[12px] text-[#AEAEB2]">
-                On laisse de la place pour un 2ᵉ aliment (ex. steak puis frites).
-              </p>
-            </button>
+        {hasMealTargets ? (
+          <div>
+            <p className="mb-2 text-[13px] font-semibold text-white">2. Tu manges comment ?</p>
+            <div className="grid grid-cols-1 gap-2">
+              <button
+                type="button"
+                onClick={() => setMode('solo')}
+                className={`ios-press rounded-2xl border px-3.5 py-3 text-left ${
+                  mode === 'solo'
+                    ? 'border-[#00B4FF]/45 bg-[#00B4FF]/15'
+                    : 'border-white/10 bg-black/25'
+                }`}
+              >
+                <p className="flex items-center gap-2 text-[14px] font-semibold text-white">
+                  <Cookie className="h-4 w-4 text-[#64D2FF]" />
+                  {isFollowUp ? 'Compléter le repas' : 'Uniquement ça'}
+                </p>
+                {budget > 0 && remaining > 0 ? (
+                  <p className="mt-1 text-[12px] text-[#AEAEB2]">
+                    {isFollowUp
+                      ? `On calcule la portion pour utiliser les ~${remaining} kcal qu’il reste avec ce que tu as déjà.`
+                      : `Ce produit couvre presque tout le repas (${remaining} kcal restantes).`}
+                  </p>
+                ) : null}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('with_sides')}
+                className={`ios-press rounded-2xl border px-3.5 py-3 text-left ${
+                  mode === 'with_sides'
+                    ? 'border-[#00B4FF]/45 bg-[#00B4FF]/15'
+                    : 'border-white/10 bg-black/25'
+                }`}
+              >
+                <p className="flex items-center gap-2 text-[14px] font-semibold text-white">
+                  <Utensils className="h-4 w-4 text-[#64D2FF]" />
+                  Avec autre chose
+                </p>
+                <p className="mt-1 text-[12px] text-[#AEAEB2]">
+                  On laisse de la place pour un 2ᵉ aliment (ex. steak puis frites).
+                </p>
+              </button>
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div>
-          <p className="mb-2 text-[13px] font-semibold text-white">3. Quelle quantité ?</p>
+          <p className="mb-2 text-[13px] font-semibold text-white">
+            {hasMealTargets ? '3. Quelle quantité ?' : '2. Quelle quantité ?'}
+          </p>
           <div className="mb-3 grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -494,7 +515,7 @@ export function ScannedProductSheet({
             </div>
           )}
 
-          {measure === 'scale' && suggested != null && (
+          {hasMealTargets && measure === 'scale' && suggested != null && remaining > 0 ? (
             <button
               type="button"
               onClick={() => setGrams(suggested)}
@@ -514,7 +535,7 @@ export function ScannedProductSheet({
                   : ''}
               </p>
             </button>
-          )}
+          ) : null}
 
           {nutrition && (
             <div className="mt-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-center">
@@ -525,13 +546,15 @@ export function ScannedProductSheet({
                 {nutrition.glucides == null ? 'ND' : `${nutrition.glucides}g`} · L{' '}
                 {nutrition.lipides == null ? 'ND' : `${nutrition.lipides}g`}
               </p>
-              <p className="mt-1 text-[12px] text-[#AEAEB2]">
-                {afterAddRemaining > 40
-                  ? `Après ça, il manquera encore ~${afterAddRemaining} kcal pour atteindre la zone du repas.`
-                  : afterAddRemaining > 0
-                    ? `Presque parfait — il restera ~${afterAddRemaining} kcal (optionnel).`
-                    : 'Repas bien rempli — tu es dans la bonne zone.'}
-              </p>
+              {hasMealTargets ? (
+                <p className="mt-1 text-[12px] text-[#AEAEB2]">
+                  {afterAddRemaining > 40
+                    ? `Après ça, il manquera encore ~${afterAddRemaining} kcal pour atteindre la zone du repas.`
+                    : afterAddRemaining > 0
+                      ? `Presque parfait — il restera ~${afterAddRemaining} kcal (optionnel).`
+                      : 'Repas bien rempli — tu es dans la bonne zone.'}
+                </p>
+              ) : null}
             </div>
           )}
         </div>

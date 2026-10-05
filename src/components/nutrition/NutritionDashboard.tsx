@@ -13,7 +13,7 @@ import {
   removeMealFromDate,
   updateMealOnDate,
 } from '../../services/nutritionStorage'
-import { getNutritionTarget } from '../../services/nutritionActivity'
+import { getNutritionTarget, hasMealTargets } from '../../services/nutritionActivity'
 import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
 import { readHealthDeclarations } from '../../services/nutritionSafetyRules'
 import { M_CAL_2, M_INFO_1 } from '../../content/safetyCopy'
@@ -228,6 +228,7 @@ export function NutritionDashboard({
   }, [meals])
 
   const targetCalories = nutrition.targetCalories
+  const mealTargetsActive = hasMealTargets(nutrition)
   const remainingCalories = targetCalories > 0 ? targetCalories - totals.calories : 0
   const calorieProgress =
     targetCalories > 0 ? totals.calories / targetCalories : 0
@@ -629,11 +630,13 @@ export function NutritionDashboard({
                   ))}
                 </ul>
               )}
-              <MealBudgetsCard
-                targetCalories={targetCalories}
-                morphology={profile.morphology}
-                meals={meals}
-              />
+              {mealTargetsActive ? (
+                <MealBudgetsCard
+                  targetCalories={targetCalories}
+                  morphology={profile.morphology}
+                  meals={meals}
+                />
+              ) : null}
             </section>
           ) : null}
         </div>
@@ -735,6 +738,7 @@ export function NutritionDashboard({
         open={scannedProduct != null}
         product={scannedProduct}
         targetCalories={targetCalories}
+        hasMealTargets={mealTargetsActive}
         morphology={profile.morphology as BodyMorphology}
         meals={meals}
         preferredMealType={pendingMealType}

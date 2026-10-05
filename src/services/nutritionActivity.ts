@@ -186,5 +186,16 @@ export function getNutritionTarget(
   return mapEngineSuccess(engineProfile, result, notices)
 }
 
+/**
+ * Objectifs par repas affichables : drapeau ON, cible > 0, profil éligible
+ * (pas TCA / grossesse / allaitement / mineur — déjà reflété par `showCalorieGoal`).
+ * Sans ça : aucun mot budget / zone / cible / restantes / « bonne zone ».
+ */
+export function hasMealTargets(
+  nutrition: Pick<NutritionTargetResult, 'showCalorieGoal' | 'targetCalories'>,
+): boolean {
+  return nutrition.showCalorieGoal && nutrition.targetCalories > 0
+}
+
 /** @deprecated Alias — préférer getNutritionTarget */
 export const getAdjustedNutritionTarget = getNutritionTarget
