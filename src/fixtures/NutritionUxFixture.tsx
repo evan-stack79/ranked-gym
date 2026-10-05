@@ -124,7 +124,7 @@ function NutritionFixtureShell() {
           paddingTop: 'var(--app-safe-area-top, env(safe-area-inset-top, 0px))',
         }}
       >
-        <div className="mx-auto flex max-w-lg items-center justify-center px-4 pb-2 pt-1.5">
+        <div className="mx-auto flex max-w-lg items-center justify-center px-4 pb-2 pt-0">
           <div data-cold-launch-target="compact">
             <BrandMark variant="compact" />
           </div>

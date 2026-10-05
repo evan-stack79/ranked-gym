@@ -26,14 +26,15 @@ export const BRAND_MARK_HERO_SRC = '/pwa-192x192.png'
 export const BRAND_MARK_COMPACT_SRC = '/brand-header-mark.png'
 export const BRAND_MARK_COMPACT_SRC_2X = '/brand-header-mark@2x.png'
 export const BRAND_MARK_COMPACT_SRC_3X = '/brand-header-mark@3x.png'
+export const BRAND_MARK_COMPACT_SRC_4X = '/brand-header-mark@4x.png'
 /** Taille CSS du mark compact (header Nutrition / Train). */
 export const BRAND_MARK_COMPACT_CSS_PX = 38
 
 const VARIANT = {
   compact: {
     size: BRAND_MARK_COMPACT_CSS_PX,
-    src: BRAND_MARK_COMPACT_SRC,
-    srcSet: `${BRAND_MARK_COMPACT_SRC_2X} 2x, ${BRAND_MARK_COMPACT_SRC_3X} 3x`,
+    src: BRAND_MARK_COMPACT_SRC_3X,
+    srcSet: `${BRAND_MARK_COMPACT_SRC_2X} 2x, ${BRAND_MARK_COMPACT_SRC_3X} 3x, ${BRAND_MARK_COMPACT_SRC_4X} 4x`,
     textClass: 'text-[17px] font-semibold tracking-tight',
     stackClass: 'flex-row items-center gap-2',
     taglineClass: 'text-[11px]',

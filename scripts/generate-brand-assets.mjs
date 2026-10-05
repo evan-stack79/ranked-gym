@@ -53,14 +53,15 @@ const HEADER_MARK_BASENAME = 'brand-header-mark'
 /** Taille CSS du mark compact (BrandMark). */
 const HEADER_MARK_CSS_PX = 38
 /**
- * Densités retina exportées :
- * - brand-header-mark.png = @3x (fallback net si srcset ignoré)
- * - @2x / @3x pour srcSet
+ * Densités retina exportées (CSS 38 px) :
+ * - brand-header-mark.png = @3x fallback (src sans srcset)
+ * - @2x / @3x / @4x pour srcSet haute densité
  */
 const HEADER_MARK_DENSITIES = Object.freeze([
   { file: `${HEADER_MARK_BASENAME}.png`, scale: 3 },
   { file: `${HEADER_MARK_BASENAME}@2x.png`, scale: 2 },
   { file: `${HEADER_MARK_BASENAME}@3x.png`, scale: 3 },
+  { file: `${HEADER_MARK_BASENAME}@4x.png`, scale: 4 },
 ])
 /** Tête ≈ 88–92 % du carré exporté (header 38 px). */
 const HEADER_HEAD_FILL = 0.9

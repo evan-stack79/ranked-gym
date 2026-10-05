@@ -32,9 +32,10 @@ describe('BrandMark compact — netteté header', () => {
 
     const img = host.querySelector('[data-brand-mark-image="compact"]') as HTMLImageElement | null
     expect(img).not.toBeNull()
-    expect(img?.getAttribute('src')).toBe(BRAND_MARK_COMPACT_SRC)
+    expect(img?.getAttribute('src')).toBe(BRAND_MARK_COMPACT_SRC_3X)
     expect(img?.getAttribute('srcset')).toContain(BRAND_MARK_COMPACT_SRC_2X)
     expect(img?.getAttribute('srcset')).toContain(BRAND_MARK_COMPACT_SRC_3X)
+    expect(img?.getAttribute('srcset')).toContain('/brand-header-mark@4x.png')
     expect(img?.getAttribute('width')).toBe(String(BRAND_MARK_COMPACT_CSS_PX))
     expect(img?.getAttribute('height')).toBe(String(BRAND_MARK_COMPACT_CSS_PX))
     expect(img?.style.filter).toBe('none')

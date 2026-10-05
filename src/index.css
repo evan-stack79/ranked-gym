@@ -1703,9 +1703,8 @@ body {
 /* Header mark : netteté retina, aucun filtre / blur / soft scale. */
 .brand-mark-image {
   filter: none !important;
-  /* Safari iOS : contraste net (équivalent « crisp » sans pixeliser une photo). */
+  /* Safari iOS : contraste net. Éviter crisp-edges (pixelise la photo panthère). */
   image-rendering: -webkit-optimize-contrast;
-  image-rendering: crisp-edges;
 }
 
 .home-cold-enter--active .home-cold-enter__group {

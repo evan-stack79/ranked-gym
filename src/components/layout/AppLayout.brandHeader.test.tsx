@@ -114,7 +114,7 @@ describe('AppLayout — barre marque sticky Nutrition / Train', () => {
     const inner = header?.querySelector(':scope > div') as HTMLElement | null
     expect(inner).not.toBeNull()
     expect(inner?.style.paddingTop).toBe('')
-    expect(inner?.className).toMatch(/\bpt-1\.5\b/)
+    expect(inner?.className).toMatch(/\bpt-0\b/)
     expect(inner?.className).toMatch(/\bpb-2\b/)
     expect(inner?.className).not.toMatch(/\bpy-3\b/)
   }
