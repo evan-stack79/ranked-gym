@@ -1,7 +1,9 @@
 /// <reference types="vite/client" />
 
-/** SHA / id de build injecté par Vite (`vite.config.ts`). */
+/** Short SHA / id de build injecté par Vite (`vite.config.ts`). */
 declare const __APP_BUILD_ID__: string
+/** ISO du moment de build injecté par Vite (`vite.config.ts`). */
+declare const __APP_BUILD_TIME__: string
 
 interface ImportMetaEnv {
   readonly VITE_PUBLIC_APP_URL?: string
