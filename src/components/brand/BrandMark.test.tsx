@@ -5,7 +5,6 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   BrandMark,
   BRAND_MARK_COMPACT_CSS_PX,
-  BRAND_MARK_COMPACT_SRC,
   BRAND_MARK_COMPACT_SRC_2X,
   BRAND_MARK_COMPACT_SRC_3X,
 } from './BrandMark'
