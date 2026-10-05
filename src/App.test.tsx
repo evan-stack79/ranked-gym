@@ -98,9 +98,10 @@ describe('AppShell auth welcome', () => {
     })
     expect(host.querySelector('[data-welcome-screen]')).toBeNull()
     expect(host.textContent).not.toContain(WELCOME_TITLE)
-    expect(
-      host.querySelector('[data-app-brand-header]') || host.textContent?.includes('Ton plan'),
-    ).toBeTruthy()
+    // Accueil (onglet défaut) : pas de barre marque — BottomNav confirme l’entrée app.
+    expect(host.querySelector('[data-app-brand-header]')).toBeNull()
+    expect(host.querySelector('nav[aria-label="Navigation principale"]')).toBeTruthy()
     await cleanup()
   })
 })
+

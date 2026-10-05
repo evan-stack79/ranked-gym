@@ -17,6 +17,12 @@ interface AppLayoutProps {
   children: ReactNode
 }
 
+/** Barre marque Ranked Gym : sticky uniquement sur Nutrition (`nutrition`) et Train (`training`). */
+export function shouldShowBrandHeader(activeTab: TabId, chromeHidden = false): boolean {
+  if (chromeHidden) return false
+  return activeTab === 'nutrition' || activeTab === 'training'
+}
+
 export function AppLayout({
   activeTab,
   onTabChange,
@@ -41,7 +47,7 @@ export function AppLayout({
   } = useRestTimerContext()
 
   const streakCelebrationActive = Boolean(streakCelebration)
-  const showHeader = !chromeHidden
+  const showHeader = shouldShowBrandHeader(activeTab, chromeHidden)
   const { mode: bottomNavMode, keyboardOpen, expand } = useAdaptiveBottomNav({ mainRef, resetKey: activeTab })
   const showBottomNav = !chromeHidden && !hideBottomNav && !keyboardOpen
   const bottomNavObscured = streakCelebrationActive
@@ -75,7 +81,7 @@ export function AppLayout({
       >
         {showHeader ? (
           <header
-            className="border-b border-white/5 bg-[#0C0C0E]"
+            className="sticky top-0 z-30 border-b border-white/5 bg-[#0C0C0E]"
             data-app-brand-header="1"
             aria-hidden={streakCelebrationActive ? true : undefined}
           >
@@ -93,6 +99,14 @@ export function AppLayout({
         <div
           className={
             chromeHidden ? undefined : 'mx-auto w-full max-w-lg px-5 py-8'
+          }
+          style={
+            chromeHidden || showHeader
+              ? undefined
+              : {
+                  /* Pas de barre marque : le contenu gère l’encoche iOS (safe-area). */
+                  paddingTop: 'max(2rem, calc(env(safe-area-inset-top, 0px) + 1rem))',
+                }
           }
         >
           {children}
