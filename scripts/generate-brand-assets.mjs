@@ -49,9 +49,19 @@ const ICON_FOREGROUND_SCALE = 1
 /** Maskable PWA : sujet centré ~72 % pour que le crop circulaire n’entame pas couronne/oreilles. */
 const MASKABLE_CONTENT_SCALE = 0.72
 /** Marque header compacte — fond transparent, cadrage serré (BrandMark compact uniquement). */
-const HEADER_MARK_FILENAME = 'brand-header-mark.png'
-/** Export raster header — affiché en CSS à 38×38 px. */
-const HEADER_MARK_EXPORT_SIZE = 192
+const HEADER_MARK_BASENAME = 'brand-header-mark'
+/** Taille CSS du mark compact (BrandMark). */
+const HEADER_MARK_CSS_PX = 38
+/**
+ * Densités retina exportées :
+ * - brand-header-mark.png = @3x (fallback net si srcset ignoré)
+ * - @2x / @3x pour srcSet
+ */
+const HEADER_MARK_DENSITIES = Object.freeze([
+  { file: `${HEADER_MARK_BASENAME}.png`, scale: 3 },
+  { file: `${HEADER_MARK_BASENAME}@2x.png`, scale: 2 },
+  { file: `${HEADER_MARK_BASENAME}@3x.png`, scale: 3 },
+])
 /** Tête ≈ 88–92 % du carré exporté (header 38 px). */
 const HEADER_HEAD_FILL = 0.9
 /** Contours silhouette — anthracite produit. */
@@ -465,20 +475,11 @@ function removeDarkFringe(data, width, height) {
   }
 }
 
-async function writeHeaderMark(masterPixels) {
-  const { data, info } = masterPixels
-  removeEdgeConnectedBackground(data, info.width, info.height)
-  lightenHeaderContours(data, info.width, info.height)
-  removeDarkFringe(data, info.width, info.height)
-  neutralizeTransparentRgb(data)
-  const crop = computeHeaderCropBox(data, info.width, info.height)
-  const outPath = path.join(PUBLIC_DIR, HEADER_MARK_FILENAME)
-
-  const resized = await sharp(data, {
-    raw: { width: info.width, height: info.height, channels: 4 },
+async function writeHeaderMarkDensity(extracted, exportSize, outPath) {
+  const resized = await sharp(extracted.data, {
+    raw: { width: extracted.info.width, height: extracted.info.height, channels: 4 },
   })
-    .extract(crop)
-    .resize(HEADER_MARK_EXPORT_SIZE, HEADER_MARK_EXPORT_SIZE, {
+    .resize(exportSize, exportSize, {
       fit: 'fill',
       kernel: sharp.kernel.lanczos3,
     })
@@ -488,6 +489,18 @@ async function writeHeaderMark(masterPixels) {
 
   despillAfterResize(resized.data)
   neutralizeTransparentRgb(resized.data)
+  // Durcit l’alpha des franges (réduit le soft-blur perçu à 38 CSS px).
+  for (let i = 3; i < resized.data.length; i += 4) {
+    const a = resized.data[i]
+    if (a < 24) {
+      resized.data[i] = 0
+      resized.data[i - 3] = 0
+      resized.data[i - 2] = 0
+      resized.data[i - 1] = 0
+    } else if (a > 232) {
+      resized.data[i] = 255
+    }
+  }
 
   await sharp(resized.data, {
     raw: { width: resized.info.width, height: resized.info.height, channels: 4 },
@@ -504,6 +517,31 @@ async function writeHeaderMark(masterPixels) {
     `  ✓ ${path.relative(root, outPath)} (${meta.width}×${meta.height}, fill ~${fillPct}%, alpha max ${alphaMax})`,
   )
   return outPath
+}
+
+async function writeHeaderMark(masterPixels) {
+  const { data, info } = masterPixels
+  removeEdgeConnectedBackground(data, info.width, info.height)
+  lightenHeaderContours(data, info.width, info.height)
+  removeDarkFringe(data, info.width, info.height)
+  neutralizeTransparentRgb(data)
+  const crop = computeHeaderCropBox(data, info.width, info.height)
+
+  const extracted = await sharp(data, {
+    raw: { width: info.width, height: info.height, channels: 4 },
+  })
+    .extract(crop)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+
+  const written = []
+  for (const density of HEADER_MARK_DENSITIES) {
+    const exportSize = HEADER_MARK_CSS_PX * density.scale
+    const outPath = path.join(PUBLIC_DIR, density.file)
+    written.push(await writeHeaderMarkDensity(extracted, exportSize, outPath))
+  }
+  return written[0]
 }
 
 /** Mesure le % de remplissage du sujet dans le carré exporté (debug). */
@@ -731,6 +769,7 @@ async function generateAppIconsFromMaster() {
 async function main() {
   await mkdir(PUBLIC_DIR, { recursive: true })
   const iconsOnly = process.argv.includes('--icons-only')
+  const headerOnly = process.argv.includes('--header-only')
 
   if (!iconsOnly) {
     console.log(
@@ -738,10 +777,14 @@ async function main() {
     )
     const headerMasterPixels = await loadProcessedMasterPixels({ opaqueProductBackground: false })
     await writeHeaderMark(headerMasterPixels)
-    await writeNativeSplash()
+    if (!headerOnly) {
+      await writeNativeSplash()
+    }
   }
 
-  await generateAppIconsFromMaster()
+  if (!headerOnly) {
+    await generateAppIconsFromMaster()
+  }
 
   console.log('Done.')
 }

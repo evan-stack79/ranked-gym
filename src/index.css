@@ -1681,16 +1681,31 @@ body {
 :root[data-cold-launch-handoff='done']:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-mark-image='compact'],
 :root[data-cold-launch-played='1'] [data-cold-launch-target='compact'] [data-brand-mark-image='compact'] {
   visibility: visible;
-  opacity: 1;
+  /* Après handoff : retirer opacity (même à 1) — calque GPU iOS = texte/logo flous. */
+  opacity: unset;
+  transition: none;
 }
 
 :root:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-wordmark='compact'] {
   opacity: 0;
 }
 
-:root[data-cold-launch-header-wordmark='1']:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-wordmark='compact'],
-:root[data-cold-launch-played='1'] [data-cold-launch-target='compact'] [data-brand-wordmark='compact'] {
+:root[data-cold-launch-header-wordmark='1']:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-wordmark='compact'] {
   opacity: 1;
+}
+
+:root[data-cold-launch-played='1'] [data-cold-launch-target='compact'] [data-brand-wordmark='compact'] {
+  opacity: unset;
+  transition: none;
+  filter: none;
+}
+
+/* Header mark : netteté retina, aucun filtre / blur / soft scale. */
+.brand-mark-image {
+  filter: none !important;
+  /* Safari iOS : contraste net (équivalent « crisp » sans pixeliser une photo). */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
 }
 
 .home-cold-enter--active .home-cold-enter__group {
