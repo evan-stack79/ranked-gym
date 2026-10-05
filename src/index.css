@@ -1700,7 +1700,15 @@ body {
   filter: none;
 }
 
-/* Header mark : netteté retina, aucun filtre / blur / soft scale. */
+/* Header mark au repos (après cold-launch) : zéro opacity/filter/transform (anti-flou iOS). */
+:root[data-cold-launch-played='1'] .brand-mark-image,
+:root[data-cold-launch-played='1'] [data-brand-wordmark='compact'] {
+  filter: none !important;
+  opacity: unset !important;
+  transform: none !important;
+  transition: none !important;
+}
+
 .brand-mark-image {
   filter: none !important;
   /* Safari iOS : contraste net. Éviter crisp-edges (pixelise la photo panthère). */

@@ -38,7 +38,7 @@ describe('BrandMark compact — netteté header', () => {
     expect(img?.getAttribute('width')).toBe(String(BRAND_MARK_COMPACT_CSS_PX))
     expect(img?.getAttribute('height')).toBe(String(BRAND_MARK_COMPACT_CSS_PX))
     expect(img?.style.filter).toBe('none')
-    expect(img?.style.opacity).toBe('1')
+    expect(img?.style.opacity).toBe('')
     expect(img?.style.transform).toBe('none')
     expect(img?.className).toContain('brand-mark-image')
 
@@ -46,7 +46,7 @@ describe('BrandMark compact — netteté header', () => {
     expect(word).not.toBeNull()
     expect(word?.textContent).toMatch(/Ranked\s*Gym/)
     const wordParent = word?.parentElement as HTMLElement | null
-    expect(wordParent?.style.opacity).toBe('1')
+    expect(wordParent?.style.opacity).toBe('')
     expect(wordParent?.style.filter).toBe('none')
   })
 })

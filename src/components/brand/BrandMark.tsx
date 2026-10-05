@@ -87,8 +87,8 @@ export function BrandMark({
           style={{
             width: size,
             height: size,
+            /* Pas d’opacity/filter/transform — calque GPU iOS = flou. */
             filter: 'none',
-            opacity: 1,
             transform: 'none',
           }}
         />
@@ -102,7 +102,7 @@ export function BrandMark({
         >
           <p
             className={`${cfg.textClass} text-white`}
-            style={{ opacity: 1, filter: 'none', transform: 'none' }}
+            style={{ filter: 'none', transform: 'none' }}
           >
             <span data-brand-wordmark={variant}>
               Ranked <span className="text-[#FF2B2B]">Gym</span>
