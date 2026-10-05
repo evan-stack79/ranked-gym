@@ -51,13 +51,35 @@ export function AppLayout({
   return (
     <div
       ref={shellRef}
-      className="relative flex h-full min-h-0 flex-col mesh-bg font-sans"
+      className="relative flex h-[100dvh] min-h-0 flex-col overflow-hidden mesh-bg font-sans"
       data-streak-celebration-active={streakCelebrationActive ? '' : undefined}
       inert={streakCelebrationActive ? true : undefined}
     >
+      {/*
+        Barre marque HORS du conteneur de scroll (`main`) : elle reste visible
+        pendant le scroll sans dépendre de `position: sticky` (souvent cassé
+        sur iOS PWA quand un ancêtre scroll/overflow est en jeu).
+      */}
+      {showHeader ? (
+        <header
+          className="sticky top-0 z-30 shrink-0 border-b border-white/5 bg-[#0C0C0E]"
+          data-app-brand-header="1"
+          aria-hidden={streakCelebrationActive ? true : undefined}
+        >
+          <div
+            className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"
+            style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+          >
+            <div data-cold-launch-target="compact">
+              <BrandMark variant="compact" />
+            </div>
+          </div>
+        </header>
+      ) : null}
+
       <main
         ref={mainRef}
-        className={`relative z-10 min-h-0 w-full flex-1 overflow-y-auto ${
+        className={`relative z-10 min-h-0 w-full flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch] ${
           chromeHidden ? 'max-w-none' : ''
         }`}
         style={
@@ -73,24 +95,8 @@ export function AppLayout({
               }
         }
         aria-hidden={streakCelebrationActive ? true : undefined}
+        data-app-scroll-main="1"
       >
-        {showHeader ? (
-          <header
-            className="sticky top-0 z-30 border-b border-white/5 bg-[#0C0C0E]"
-            data-app-brand-header="1"
-            aria-hidden={streakCelebrationActive ? true : undefined}
-          >
-            <div
-              className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"
-              style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
-            >
-              <div data-cold-launch-target="compact">
-                <BrandMark variant="compact" />
-              </div>
-            </div>
-          </header>
-        ) : null}
-
         <div
           className={
             chromeHidden ? undefined : 'mx-auto w-full max-w-lg px-5 py-8'

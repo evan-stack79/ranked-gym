@@ -472,7 +472,7 @@ export function NutritionDashboard({
   }
 
   return (
-    <div className="-mx-5 min-h-[70vh] overflow-hidden bg-[#0C0C0E] pb-2">
+    <div className="-mx-5 min-h-[70vh] overflow-x-hidden bg-[#0C0C0E] pb-2">
       <div className="flex flex-col gap-4 px-5 pt-1">
         <header className="flex items-center justify-between gap-3">
           <h1 className="text-[32px] font-bold tracking-tight text-white">Nutrition</h1>
