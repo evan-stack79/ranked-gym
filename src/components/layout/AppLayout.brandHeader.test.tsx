@@ -92,21 +92,30 @@ describe('AppLayout — barre marque sticky Nutrition / Train', () => {
     host.remove()
   })
 
-  it('monte une barre sticky sur Nutrition', () => {
-    ;({ root, host } = renderLayout('nutrition'))
-    const header = host.querySelector('[data-app-brand-header="1"]')
+  function assertPinnedBrandHeader(tab: TabId) {
+    ;({ root, host } = renderLayout(tab))
+    const header = host.querySelector('[data-app-brand-header="1"]') as HTMLElement | null
+    const main = host.querySelector('[data-app-scroll-main="1"]') as HTMLElement | null
     expect(header).not.toBeNull()
+    expect(main).not.toBeNull()
+    // Pin réel : hors du conteneur de scroll (pas un sticky fragile dans main).
+    expect(main?.contains(header)).toBe(false)
+    expect(header?.previousElementSibling).toBeNull()
+    expect(header?.nextElementSibling).toBe(main)
     expect(header?.className).toContain('sticky')
     expect(header?.className).toContain('top-0')
+    expect(header?.className).toContain('shrink-0')
+    expect(main?.className).toMatch(/overflow-y-auto/)
+    expect(main?.className).toMatch(/overscroll-y-contain/)
     expect(host.querySelector('nav[aria-label="Navigation principale"]')).not.toBeNull()
+  }
+
+  it('monte une barre pinée (hors scroll) sur Nutrition', () => {
+    assertPinnedBrandHeader('nutrition')
   })
 
-  it('monte une barre sticky sur Train', () => {
-    ;({ root, host } = renderLayout('training'))
-    const header = host.querySelector('[data-app-brand-header="1"]')
-    expect(header).not.toBeNull()
-    expect(header?.className).toContain('sticky')
-    expect(header?.className).toContain('top-0')
+  it('monte une barre pinée (hors scroll) sur Train', () => {
+    assertPinnedBrandHeader('training')
   })
 
   it('n’affiche pas la barre sur Accueil (home)', () => {

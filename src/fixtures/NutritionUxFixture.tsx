@@ -114,30 +114,31 @@ function NutritionFixtureShell() {
 
   return (
     <div
-      className="relative flex h-[100dvh] min-h-0 flex-col bg-[#0C0C0E] font-sans"
+      className="relative flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-[#0C0C0E] font-sans"
       data-nutrition-fixture="1"
     >
+      <header
+        className="sticky top-0 z-30 shrink-0 border-b border-white/5 bg-[#0C0C0E]"
+        data-app-brand-header="1"
+      >
+        <div
+          className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"
+          style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+        >
+          <div data-cold-launch-target="compact">
+            <BrandMark variant="compact" />
+          </div>
+        </div>
+      </header>
+
       <main
-        className="relative z-10 min-h-0 w-full flex-1 overflow-y-auto"
+        className="relative z-10 min-h-0 w-full flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
         style={{
           paddingBottom:
             'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 1rem)',
         }}
+        data-app-scroll-main="1"
       >
-        <header
-          className="border-b border-white/5 bg-[#0C0C0E]"
-          data-app-brand-header="1"
-        >
-          <div
-            className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"
-            style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
-          >
-            <div data-cold-launch-target="compact">
-              <BrandMark variant="compact" />
-            </div>
-          </div>
-        </header>
-
         <div className="mx-auto w-full max-w-lg px-5 py-8">{content}</div>
       </main>
       <BottomNav activeTab={activeTab} onTabChange={() => undefined} />
