@@ -42,6 +42,19 @@ const eligibleProfile: CalorieProfile = {
   preferNotAnswerHealth: false,
 }
 
+function countOccurrences(haystack: string, needle: string): number {
+  if (!needle) return 0
+  let count = 0
+  let from = 0
+  while (from < haystack.length) {
+    const idx = haystack.indexOf(needle, from)
+    if (idx === -1) break
+    count += 1
+    from = idx + needle.length
+  }
+  return count
+}
+
 describe('QA BUG-05 / BUG-06 — notices + estimation + Besoin d’en parler', () => {
   const prev = import.meta.env.VITE_ENABLE_CALORIE_GOAL
 
@@ -54,7 +67,7 @@ describe('QA BUG-05 / BUG-06 — notices + estimation + Besoin d’en parler', (
     else vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', prev)
   })
 
-  it('affiche M_CAL_2 / M_INFO_1 et un lien Besoin d’en parler ?', async () => {
+  it('affiche M_INFO_1 exactement une fois + lien Besoin d’en parler ?', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const root = createRoot(host)
@@ -71,15 +84,52 @@ describe('QA BUG-05 / BUG-06 — notices + estimation + Besoin d’en parler', (
     expect(host.querySelector('[data-testid="dashboard-need-to-talk"]')?.textContent).toContain(
       Q8_SCREEN_TITLE,
     )
-    // Avec objectif moteur OK : notices d’estimation
+    expect(host.querySelector('[data-testid="safety-note"]')).toBeTruthy()
+    expect(countOccurrences(host.textContent ?? '', M_INFO_1)).toBe(1)
+
     const notices = host.querySelector('[data-testid="dashboard-estimation-notices"]')
     if (notices) {
       expect(notices.textContent).toContain(M_CAL_2)
-      expect(notices.textContent).toContain(M_INFO_1)
-    } else {
-      // Si moteur non OK en environnement de test, au moins safety notices ou lien
-      expect(host.textContent).toMatch(/estimation|Repère indicatif/i)
+      expect(notices.textContent).not.toContain(M_INFO_1)
     }
+
+    root.unmount()
+    host.remove()
+  })
+})
+
+describe('NutritionDashboard — drapeau OFF : un seul M_INFO_1', () => {
+  const prev = import.meta.env.VITE_ENABLE_CALORIE_GOAL
+
+  beforeEach(() => {
+    vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', 'false')
+  })
+
+  afterEach(() => {
+    if (prev === undefined) vi.unstubAllEnvs()
+    else vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', prev)
+  })
+
+  it('affiche le repère une seule fois avec le lien Besoin d’en parler ?', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(
+        <NutritionDashboard
+          profile={eligibleProfile}
+          onChangeProfile={() => undefined}
+          onOpenSetup={() => undefined}
+        />,
+      )
+    })
+
+    expect(countOccurrences(host.textContent ?? '', M_INFO_1)).toBe(1)
+    expect(host.querySelector('[data-testid="safety-note"]')?.textContent).toContain(M_INFO_1)
+    expect(host.querySelector('[data-testid="dashboard-need-to-talk"]')?.textContent).toContain(
+      Q8_SCREEN_TITLE,
+    )
+    expect(host.querySelector('[data-testid="dashboard-safety-notices"]')).toBeNull()
 
     root.unmount()
     host.remove()
