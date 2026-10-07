@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BrandMark } from '../components/brand/BrandMark'
+import { BlurInText, Reveal } from '../components/motion'
 
 export function ColdLaunchAccueilFixture() {
   const [coldEntering, setColdEntering] = useState(() => {
@@ -54,23 +55,29 @@ export function ColdLaunchAccueilFixture() {
           <div className="flex flex-col gap-8">
             <header className="home-cold-enter__group home-cold-enter__group--0">
               <h1 className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white">
-                Séance de l&apos;après-midi, Alex ?
+                <BlurInText as="span" instant={coldEntering}>
+                  Séance de l&apos;après-midi, Alex ?
+                </BlurInText>
               </h1>
             </header>
 
             <section className="home-cold-enter__group home-cold-enter__group--1">
-              <div className="glass-card rounded-3xl p-5">
-                <div className="mb-3 h-4 w-24 rounded-full bg-white/20" />
-                <div className="h-3 w-full rounded-full bg-white/10" />
-              </div>
+              <Reveal instant={coldEntering}>
+                <div className="glass-card rounded-3xl p-5" data-reveal-card="nutrition">
+                  <div className="mb-3 h-4 w-24 rounded-full bg-white/20" />
+                  <div className="h-3 w-full rounded-full bg-white/10" />
+                </div>
+              </Reveal>
             </section>
 
             <section className="home-cold-enter__group home-cold-enter__group--2">
-              <div className="glass-card rounded-3xl p-5">
-                <div className="mb-3 h-5 w-52 rounded-full bg-white/20" />
-                <div className="mb-4 h-3 w-44 rounded-full bg-white/10" />
-                <div className="h-10 w-40 rounded-2xl bg-[#FF2B2B]/25" />
-              </div>
+              <Reveal delayMs={40} instant={coldEntering}>
+                <div className="glass-card rounded-3xl p-5" data-reveal-card="train">
+                  <div className="mb-3 h-5 w-52 rounded-full bg-white/20" />
+                  <div className="mb-4 h-3 w-44 rounded-full bg-white/10" />
+                  <div className="h-10 w-40 rounded-2xl bg-[#FF2B2B]/25" />
+                </div>
+              </Reveal>
             </section>
 
             <section className="home-cold-enter__group home-cold-enter__group--3">

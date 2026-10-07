@@ -97,6 +97,7 @@ import {
   shouldAutoReopenSession,
 } from '../../utils/sessionBackNav'
 import { deriveSessionDisplayTitle } from '../../utils/sessionDisplayTitle'
+import { BlurInText, Reveal } from '../motion'
 
 type TrainPanel = 'hub' | 'notebook' | 'endurance' | 'agenda' | 'history' | 'steps'
 
@@ -692,7 +693,9 @@ export function TrainingView({
       {panel === 'hub' ? (
         <header className="relative ios-fade-up">
           <div className="flex items-start justify-between gap-3">
-            <h1 className="text-[34px] font-bold tracking-tight text-white">Train</h1>
+            <h1 className="text-[34px] font-bold tracking-tight text-white">
+              <BlurInText as="span">Train</BlurInText>
+            </h1>
             <button
               type="button"
               onClick={() => setPanel('agenda')}
@@ -743,22 +746,26 @@ export function TrainingView({
             </p>
           ) : null}
 
-          <TrainWeeklySummary
-            summary={weeklySummary}
-            filter={summaryFilter}
-            onFilterChange={setSummaryFilter}
-            compact
-          />
+          <Reveal>
+            <TrainWeeklySummary
+              summary={weeklySummary}
+              filter={summaryFilter}
+              onFilterChange={setSummaryFilter}
+              compact
+            />
+          </Reveal>
 
-          <TrainRecentSessions
-            items={recentSessions}
-            single
-            onOpen={(id) => {
-              setFocusNoteId(id)
-              setPanel('history')
-            }}
-            onSeeAll={() => setPanel('history')}
-          />
+          <Reveal delayMs={40}>
+            <TrainRecentSessions
+              items={recentSessions}
+              single
+              onOpen={(id) => {
+                setFocusNoteId(id)
+                setPanel('history')
+              }}
+              onSeeAll={() => setPanel('history')}
+            />
+          </Reveal>
         </div>
       ) : null}
 

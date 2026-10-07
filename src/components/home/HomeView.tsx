@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import { getTrainingState } from '../../services/trainingStorage'
 import { getHomeGreeting, resolveDisplayFirstName } from '../../utils/homeGreeting'
 import { getTodayWorkout } from '../../utils/todayWorkout'
+import { BlurInText, Reveal } from '../motion'
 import { DailyStreak } from './DailyStreak'
 import { TodayWorkoutCard } from './TodayWorkoutCard'
 import { NutritionSnapshot } from './NutritionSnapshot'
@@ -76,22 +77,28 @@ export function HomeView({ onStartTraining, onOpenTraining, onOpenNutrition }: H
     <div className={`flex flex-col gap-8 ${coldEntering ? 'home-cold-enter home-cold-enter--active' : ''}`}>
       <header className="home-cold-enter__group home-cold-enter__group--0">
         <h1 className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white">
-          {greeting}
+          <BlurInText as="span" instant={coldEntering}>
+            {greeting}
+          </BlurInText>
         </h1>
       </header>
 
       <div className="home-cold-enter__group home-cold-enter__group--1">
-        <NutritionSnapshot onOpenNutrition={onOpenNutrition} />
+        <Reveal instant={coldEntering}>
+          <NutritionSnapshot onOpenNutrition={onOpenNutrition} />
+        </Reveal>
       </div>
 
       <div className="home-cold-enter__group home-cold-enter__group--2">
-        <TodayWorkoutCard
-          workout={todayWorkout}
-          onStart={() => {
-            if (todayWorkout?.canStart) onStartTraining(todayWorkout.routineId)
-          }}
-          onOpenNotebook={onOpenTraining}
-        />
+        <Reveal delayMs={40} instant={coldEntering}>
+          <TodayWorkoutCard
+            workout={todayWorkout}
+            onStart={() => {
+              if (todayWorkout?.canStart) onStartTraining(todayWorkout.routineId)
+            }}
+            onOpenNotebook={onOpenTraining}
+          />
+        </Reveal>
       </div>
 
       <div className="home-cold-enter__group home-cold-enter__group--3">

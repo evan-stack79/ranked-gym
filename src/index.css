@@ -64,6 +64,8 @@ body {
   --dur-fast: 180ms;
   --dur-ui: 220ms;
   --dur-drawer: 260ms;
+  /* Scroll reveal / title blur-in — occasional, once per element */
+  --dur-reveal: 400ms;
   --color-card: #141416;
   --color-muted: #aeaeb2;
 }
@@ -441,6 +443,74 @@ body {
 
 .ios-fade-up-delay-3 {
   animation-delay: 0.15s;
+}
+
+/* --- Tasteful scroll reveal / blur-in (MIT: CSS + IntersectionObserver) --- */
+.rg-reveal {
+  opacity: 0;
+  transform: translate3d(0, 14px, 0);
+  will-change: opacity, transform;
+}
+
+.rg-reveal--in {
+  animation: rg-reveal-in var(--dur-reveal) var(--ease-out) both;
+  animation-delay: var(--rg-reveal-delay, 0ms);
+}
+
+.rg-reveal--instant,
+.rg-reveal--instant.rg-reveal--in {
+  animation: none !important;
+  opacity: 1;
+  transform: none;
+  will-change: auto;
+}
+
+@keyframes rg-reveal-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rg-blur-in {
+  display: inline-block;
+  max-width: 100%;
+  opacity: 0;
+  filter: blur(8px);
+  transform: translate3d(0, 8px, 0);
+  will-change: opacity, transform, filter;
+}
+
+.rg-blur-in--in:not(.rg-blur-in--settled) {
+  animation: rg-blur-in var(--dur-reveal) var(--ease-out) both;
+  animation-delay: var(--rg-blur-delay, 0ms);
+}
+
+/* Settled / reduced-motion: never leave a lingering blur */
+.rg-blur-in--settled,
+.rg-blur-in--settled.rg-blur-in--in {
+  animation: none !important;
+  opacity: 1;
+  filter: none;
+  transform: none;
+  will-change: auto;
+}
+
+@keyframes rg-blur-in {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
 }
 
 @keyframes skeleton-shimmer {
@@ -1824,6 +1894,11 @@ body {
   .ios-fade-up-delay-1,
   .ios-fade-up-delay-2,
   .ios-fade-up-delay-3,
+  .rg-reveal,
+  .rg-reveal--in,
+  .rg-blur-in,
+  .rg-blur-in--in,
+  .rg-blur-in--settled,
   .skeleton-shimmer,
   .arena-glow,
   .streak-card--lit,
@@ -1839,6 +1914,17 @@ body {
   .water-preset-badge,
   .avatar-spinner {
     animation: none !important;
+  }
+
+  .rg-reveal,
+  .rg-reveal--in,
+  .rg-blur-in,
+  .rg-blur-in--in,
+  .rg-blur-in--settled {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    will-change: auto !important;
   }
 
   .ios-press:active {
