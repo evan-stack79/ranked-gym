@@ -63,7 +63,7 @@ describe('AppColdLaunch', () => {
 
     target = document.createElement('div')
     target.innerHTML =
-      '<div data-cold-launch-target="compact"><svg data-brand-mark-svg="compact" width="38" height="38" viewBox="0 0 512 512" aria-hidden="true"></svg></div>'
+      '<div data-cold-launch-target="compact"><img data-brand-mark-image="compact" alt="" /></div>'
     document.body.appendChild(target)
 
     host = document.createElement('div')
@@ -198,9 +198,7 @@ describe('AppColdLaunch', () => {
     })
 
     const flyer = host.querySelector('[data-cold-launch-panther-flyer]') as HTMLDivElement
-    const compact = target.querySelector(
-      '[data-brand-mark-svg="compact"], [data-brand-mark-image="compact"]',
-    ) as HTMLElement
+    const compact = target.querySelector('[data-brand-mark-image="compact"]') as HTMLImageElement
     flyer.getBoundingClientRect = () => flyerRect
     compact.getBoundingClientRect = () => targetRect
     ;(flyer as HTMLDivElement & { animate: typeof flyerAnimate }).animate = flyerAnimate.mockReturnValue({
@@ -282,10 +280,7 @@ describe('AppColdLaunch', () => {
       if (el.matches('[data-cold-launch-panther-flyer]')) {
         return makeRect(129, 504, 132, 132)
       }
-      if (
-        el.matches('[data-brand-mark-svg="compact"]') ||
-        el.matches('[data-brand-mark-image="compact"]')
-      ) {
+      if (el.matches('[data-brand-mark-image="compact"]')) {
         return makeRect(18, 72, 38, 38)
       }
       return makeRect(0, 0, 0, 0)

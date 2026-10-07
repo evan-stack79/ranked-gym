@@ -114,7 +114,13 @@ describe('AppLayout — barre marque sticky Nutrition / Train', () => {
     // Fond en calque frère (pas backdrop-filter sur le <header> ancêtre du logo/texte).
     expect(header?.className).not.toMatch(/backdrop-blur|glass-bar/)
     expect(header?.querySelector('[data-brand-header-bg="1"]')).not.toBeNull()
-    expect(header?.querySelector('[data-brand-mark-svg="compact"]')).not.toBeNull()
+    expect(header?.querySelector('[data-brand-mark-svg="compact"]')).toBeNull()
+    const mark = header?.querySelector(
+      '[data-brand-mark-image="compact"]',
+    ) as HTMLImageElement | null
+    expect(mark).not.toBeNull()
+    expect(mark?.getAttribute('src')).toContain('brand-header-mark')
+    expect(mark?.style.opacity).toBe('')
     expect(header?.querySelector('[data-brand-wordmark="compact"]')?.textContent).toMatch(
       /Ranked\s*Gym/,
     )
