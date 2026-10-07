@@ -126,3 +126,4 @@ ios/DerivedData
 
 # Migration artifacts can contain sensitive export metadata.
 scripts/migrations/artifacts/
+scripts/screenshots/reveal-blur/video-tmp/
