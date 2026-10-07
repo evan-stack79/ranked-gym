@@ -11,11 +11,7 @@ import {
 } from './_generated/server'
 import { requireSessionUser } from './lib/auth'
 import { detectDistressLevel, type DistressLevel } from './avisDistress'
-import {
-  AVIS_MOTS_BLESSANTS,
-  detectInsultWords,
-  maskInsultWords,
-} from './avisInsults'
+import { detectInsultWords, maskInsultWords } from './avisInsults'
 
 export {
   detectDistressLevel,
