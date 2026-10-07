@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -33,14 +34,8 @@ function textFromChildren(children: ReactNode): string {
 }
 
 function splitWords(text: string): string[] {
-  const parts = text.trim().split(/(\s+)/)
-  const words: string[] = []
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i]
-    if (!part || /^\s+$/.test(part)) continue
-    const trailingSpace = i + 1 < parts.length && /^\s+$/.test(parts[i + 1] ?? '')
-    words.push(trailingSpace ? `${part} ` : part)
-  }
+  // Keep bare words only — trailing spaces inside inline-block spans collapse in CSS.
+  const words = text.trim().split(/\s+/).filter(Boolean)
   return words.length > 0 ? words : text ? [text] : []
 }
 
@@ -112,19 +107,21 @@ export function BlurInText({
       <span className="sr-only">{fullText}</span>
       <span aria-hidden="true" className="rg-blur-words">
         {words.map((word, index) => (
-          <span
-            key={`${index}-${word}`}
-            className="rg-blur-word"
-            style={
-              {
-                '--rg-word-delay': skip
-                  ? '0ms'
-                  : `${delayMs + index * BLUR_WORD_STAGGER_MS}ms`,
-              } as CSSProperties
-            }
-          >
-            {word}
-          </span>
+          <Fragment key={`${index}-${word}`}>
+            <span
+              className="rg-blur-word"
+              style={
+                {
+                  '--rg-word-delay': skip
+                    ? '0ms'
+                    : `${delayMs + index * BLUR_WORD_STAGGER_MS}ms`,
+                } as CSSProperties
+              }
+            >
+              {word}
+            </span>
+            {index < words.length - 1 ? ' ' : null}
+          </Fragment>
         ))}
       </span>
     </Tag>

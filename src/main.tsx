@@ -57,6 +57,10 @@ function isColdLaunchPath() {
   if (QA_FIXTURES_ENABLED && path === '/auth-reset-fixture') return false
   if (QA_FIXTURES_ENABLED && path === '/nutrition-ai-error-fixture') return false
   if (QA_FIXTURES_ENABLED && path === '/auth-welcome-sheet-fixture') return false
+  // Motion / UX fixtures skip cold-launch gate for clean capture demos
+  if (QA_FIXTURES_ENABLED && path === '/accueil-fixture') return false
+  if (QA_FIXTURES_ENABLED && path === '/nutrition-fixture') return false
+  if (QA_FIXTURES_ENABLED && path === '/train-fixture') return false
   return true
 }
 

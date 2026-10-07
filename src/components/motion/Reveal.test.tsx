@@ -111,8 +111,9 @@ describe('Reveal / BlurInText', () => {
 
     const words = el.querySelectorAll('.rg-blur-word')
     expect(words.length).toBe(2)
-    expect(words[0]?.textContent?.trim()).toBe('Bonjour')
-    expect(words[1]?.textContent?.trim()).toBe('Alex')
+    expect(words[0]?.textContent).toBe('Bonjour')
+    expect(words[1]?.textContent).toBe('Alex')
+    expect(el.querySelector('.rg-blur-words')?.textContent).toBe('Bonjour Alex')
     expect((words[1] as HTMLElement).style.getPropertyValue('--rg-word-delay')).toBe(
       `${BLUR_WORD_STAGGER_MS}ms`,
     )
