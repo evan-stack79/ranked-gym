@@ -108,6 +108,15 @@ describe('AppLayout — barre marque sticky Nutrition / Train', () => {
     expect(main?.className).toMatch(/overflow-y-auto/)
     expect(main?.className).toMatch(/overscroll-y-contain/)
     expect(host.querySelector('nav[aria-label="Navigation principale"]')).not.toBeNull()
+    // Safe-area seule sur le header — pas de max(fixe, safe-area) empilé sur l’inner.
+    expect(header?.style.paddingTop).toContain('safe-area-inset-top')
+    expect(header?.style.paddingTop).not.toContain('0.75rem')
+    const inner = header?.querySelector(':scope > div') as HTMLElement | null
+    expect(inner).not.toBeNull()
+    expect(inner?.style.paddingTop).toBe('')
+    expect(inner?.className).toMatch(/\bpt-0\b/)
+    expect(inner?.className).toMatch(/\bpb-2\b/)
+    expect(inner?.className).not.toMatch(/\bpy-3\b/)
   }
 
   it('monte une barre pinée (hors scroll) sur Nutrition', () => {

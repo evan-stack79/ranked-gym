@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   define: {
     __APP_BUILD_ID__: JSON.stringify('test'),
+    __APP_BUILD_TIME__: JSON.stringify('2026-10-06T00:05:00.000Z'),
   },
   test: {
     environment: 'node',

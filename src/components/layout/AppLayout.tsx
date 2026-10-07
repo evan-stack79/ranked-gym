@@ -65,11 +65,12 @@ export function AppLayout({
           className="sticky top-0 z-30 shrink-0 border-b border-white/5 bg-[#0C0C0E]"
           data-app-brand-header="1"
           aria-hidden={streakCelebrationActive ? true : undefined}
+          /* Safe-area seule — pas de padding fixe empilé par-dessus (Dynamic Island). */
+          style={{
+            paddingTop: 'var(--app-safe-area-top, env(safe-area-inset-top, 0px))',
+          }}
         >
-          <div
-            className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"
-            style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
-          >
+          <div className="mx-auto flex max-w-lg items-center justify-center px-4 pb-2 pt-0">
             <div data-cold-launch-target="compact">
               <BrandMark variant="compact" />
             </div>
