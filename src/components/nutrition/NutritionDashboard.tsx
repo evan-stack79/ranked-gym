@@ -622,7 +622,7 @@ export function NutritionDashboard({
           }}
         />
 
-        <Reveal delayMs={50}>
+        <Reveal delayMs={60}>
           <NutritionHydrationCard
             consumedMl={hydration.consumedMl}
             goalMl={hydration.goalMl}
@@ -643,7 +643,9 @@ export function NutritionDashboard({
           {journalDetailOpen ? (
             <section className="space-y-3" aria-label="Détail du journal">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-[17px] font-semibold text-white">Aliments du jour</h2>
+                <h2 className="text-[17px] font-semibold text-white">
+                  <BlurInText as="span">Aliments du jour</BlurInText>
+                </h2>
                 <button
                   type="button"
                   onClick={() => setJournalDetailOpen(false)}

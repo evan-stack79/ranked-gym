@@ -412,9 +412,10 @@ export function BetaFeedbackScreen({
   if (phase === 'urgent_tca') {
     return (
       <section
-        className="ios-fade-up space-y-5 pb-8"
+        className="space-y-5 pb-8"
         data-testid="beta-feedback-screen"
         data-distress-level="1"
+        data-rg-no-motion="1"
       >
         <Header onBack={onBack} />
         <p className="text-[15px] leading-relaxed text-[#EBEBF5]" data-testid="beta-feedback-confirm">
@@ -438,9 +439,10 @@ export function BetaFeedbackScreen({
   if (phase === 'urgent_suicide') {
     return (
       <section
-        className="ios-fade-up space-y-5 pb-8"
+        className="space-y-5 pb-8"
         data-testid="beta-feedback-screen"
         data-distress-level="2"
+        data-rg-no-motion="1"
       >
         <Header onBack={onBack} />
         <p className="text-[15px] leading-relaxed text-[#EBEBF5]" data-testid="beta-feedback-confirm">
