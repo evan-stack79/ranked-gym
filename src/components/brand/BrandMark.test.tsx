@@ -2,9 +2,15 @@
 import { act, type ReactElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it } from 'vitest'
-import { BrandMark, BRAND_MARK_COMPACT_CSS_PX, BRAND_MARK_HERO_SRC } from './BrandMark'
+import {
+  BrandMark,
+  BRAND_MARK_COMPACT_CSS_PX,
+  BRAND_MARK_COMPACT_SRC_2X,
+  BRAND_MARK_COMPACT_SRC_3X,
+  BRAND_MARK_HERO_SRC,
+} from './BrandMark'
 
-describe('BrandMark compact — SVG + texte réel', () => {
+describe('BrandMark compact — PNG header (pré-#84)', () => {
   let root: Root
   let host: HTMLDivElement
 
@@ -15,7 +21,7 @@ describe('BrandMark compact — SVG + texte réel', () => {
     host.remove()
   })
 
-  it('rend un SVG inline + wordmark texte, sans PNG ni filter/opacity', () => {
+  it('sert un PNG @2x/@3x sans filtre, opacity ni scale flou', () => {
     host = document.createElement('div')
     document.body.append(host)
     root = createRoot(host)
@@ -24,25 +30,27 @@ describe('BrandMark compact — SVG + texte réel', () => {
       root.render(ui)
     })
 
-    const svg = host.querySelector('[data-brand-mark-svg="compact"]') as SVGSVGElement | null
-    expect(svg).not.toBeNull()
-    expect(svg?.getAttribute('width')).toBe(String(BRAND_MARK_COMPACT_CSS_PX))
-    expect(svg?.getAttribute('height')).toBe(String(BRAND_MARK_COMPACT_CSS_PX))
-    expect(svg?.querySelectorAll('path').length).toBeGreaterThan(0)
-    expect(host.querySelector('[data-brand-mark-image="compact"]')).toBeNull()
-    expect(host.querySelector('img')).toBeNull()
+    const img = host.querySelector('[data-brand-mark-image="compact"]') as HTMLImageElement | null
+    expect(img).not.toBeNull()
+    expect(img?.getAttribute('src')).toBe(BRAND_MARK_COMPACT_SRC_3X)
+    expect(img?.getAttribute('srcset')).toContain(BRAND_MARK_COMPACT_SRC_2X)
+    expect(img?.getAttribute('srcset')).toContain(BRAND_MARK_COMPACT_SRC_3X)
+    expect(img?.getAttribute('srcset')).toContain('/brand-header-mark@4x.png')
+    expect(img?.getAttribute('width')).toBe(String(BRAND_MARK_COMPACT_CSS_PX))
+    expect(img?.getAttribute('height')).toBe(String(BRAND_MARK_COMPACT_CSS_PX))
+    expect(img?.style.filter).toBe('none')
+    expect(img?.style.opacity).toBe('')
+    expect(img?.style.transform).toBe('none')
+    expect(img?.className).toContain('brand-mark-image')
+    expect(host.querySelector('[data-brand-mark-svg="compact"]')).toBeNull()
+    expect(host.querySelector('svg')).toBeNull()
 
     const word = host.querySelector('[data-brand-wordmark="compact"]')
     expect(word).not.toBeNull()
-    expect(word?.tagName).toBe('SPAN')
     expect(word?.textContent).toMatch(/Ranked\s*Gym/)
-    expect(word?.querySelector('span')?.textContent).toBe('Gym')
-
-    const line = host.querySelector('[data-brand-wordmark-line="compact"]') as HTMLElement | null
-    expect(line?.className).toMatch(/text-white/)
-    expect(line?.style.opacity).toBe('')
-    expect(line?.style.filter).toBe('')
-    expect(line?.style.transform).toBe('')
+    const wordParent = word?.parentElement as HTMLElement | null
+    expect(wordParent?.style.opacity).toBe('')
+    expect(wordParent?.style.filter).toBe('none')
   })
 
   it('garde le raster PWA pour le variant hero', () => {

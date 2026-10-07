@@ -1738,27 +1738,23 @@ body {
   transition-duration: 120ms !important;
 }
 
-/* Cibles header compact : SVG (préféré) ou legacy PNG. */
-:root:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-mark-svg='compact'],
-:root:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-mark-image='compact'] {
+/*
+ * Header compact PNG : jamais d’opacity/fade sur le logo (anti-flou iOS WebKit).
+ * Masquage pré-handoff via visibility seule — révélation instantanée, opaque.
+ */
+:root:not([data-cold-launch-played='1']):not([data-cold-launch-handoff='done'])
+  [data-cold-launch-target='compact']
+  [data-brand-mark-image='compact'] {
   visibility: hidden;
-  opacity: 0;
 }
 
-[data-cold-launch-target='compact'] [data-brand-mark-svg='compact'],
-[data-cold-launch-target='compact'] [data-brand-mark-image='compact'],
-[data-cold-launch-target='compact'] [data-brand-wordmark='compact'] {
-  transition: opacity 140ms var(--ease-out);
-}
-
-:root[data-cold-launch-handoff='done']:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-mark-svg='compact'],
-:root[data-cold-launch-handoff='done']:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-mark-image='compact'],
-:root[data-cold-launch-played='1'] [data-cold-launch-target='compact'] [data-brand-mark-svg='compact'],
+:root[data-cold-launch-handoff='done'] [data-cold-launch-target='compact'] [data-brand-mark-image='compact'],
 :root[data-cold-launch-played='1'] [data-cold-launch-target='compact'] [data-brand-mark-image='compact'] {
   visibility: visible;
-  /* Après handoff : retirer opacity (même à 1) — calque GPU iOS = texte/logo flous. */
-  opacity: unset;
-  transition: none;
+}
+
+[data-cold-launch-target='compact'] [data-brand-wordmark='compact'] {
+  transition: opacity 140ms var(--ease-out);
 }
 
 :root:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-wordmark='compact'] {
@@ -1779,8 +1775,7 @@ body {
  * Header marque au repos : jamais opacity/filter/transform (anti-flou iOS WebKit).
  * Le fond blur éventuel vit uniquement sur [data-brand-header-bg], frère sous le contenu.
  */
-:root[data-cold-launch-played='1'] .brand-mark-svg,
-:root[data-cold-launch-played='1'] .brand-mark-image,
+.brand-mark-image,
 :root[data-cold-launch-played='1'] [data-brand-wordmark='compact'] {
   filter: none !important;
   opacity: unset !important;
@@ -1788,15 +1783,10 @@ body {
   transition: none !important;
 }
 
-.brand-mark-svg {
-  display: block;
-  flex-shrink: 0;
-  /* Vecteur — pas d’image-rendering raster qui adoucit. */
-  overflow: visible;
-}
-
 .brand-mark-image {
   filter: none !important;
+  opacity: unset !important;
+  /* Safari iOS : contraste net. Éviter crisp-edges (pixelise la photo panthère). */
   image-rendering: -webkit-optimize-contrast;
 }
 
