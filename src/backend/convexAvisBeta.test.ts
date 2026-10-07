@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   AVIS_ANTI_DOUBLON_MS,
+  AVIS_BETA_ADMIN_FORBIDDEN,
+  AVIS_BETA_ADMIN_KEY_ENV,
   AVIS_BETA_CONSENT_ERROR,
   AVIS_BETA_DAILY_LIMIT_ERROR,
   AVIS_BETA_MINOR_ERROR,
@@ -13,11 +15,16 @@ import {
   extractAgeFromNutritionProfileJson,
   hashUserIdForWebhook,
   isAdultStoredAge,
+  listAvisBetaForTriage,
   maskInsultWords,
+  requireAvisBetaAdminKey,
   sanitizeSyncedNutritionProfileJson,
+  signalNiveauForPayload,
   submitAvisBetaForSession,
+  triageAvisBeta,
   validateAvisTexte,
 } from '../../convex/avisBeta'
+import type { Id } from '../../convex/_generated/dataModel'
 import { deleteAccountAndUserData } from '../../convex/auth'
 import { hashPassword, hashToken } from '../../convex/lib/authCrypto'
 
@@ -186,7 +193,7 @@ describe('avis beta helpers', () => {
     expect(detectDistressLevel('Le chrono reste à zéro')).toBe(0)
   })
 
-  it('produit un JSON webhook avec exactement les clés attendues', () => {
+  it('produit un JSON webhook avec exactement les clés attendues (dont urgence)', () => {
     const body = buildWebhookJsonBody({
       id: 'avis_1',
       type: 'bug',
@@ -195,6 +202,9 @@ describe('avis beta helpers', () => {
       version: 'test',
       date: '2026-01-01T12:00:00.000Z',
       id_utilisateur_hache: 'abc',
+      statut: 'nouveau',
+      signalUrgent: false,
+      signalNiveau: null,
     })
     expect(JSON.parse(body)).toEqual({
       id: 'avis_1',
@@ -204,7 +214,27 @@ describe('avis beta helpers', () => {
       version: 'test',
       date: '2026-01-01T12:00:00.000Z',
       id_utilisateur_hache: 'abc',
+      statut: 'nouveau',
+      signalUrgent: false,
+      signalNiveau: null,
     })
+
+    const urgentBody = buildWebhookJsonBody({
+      id: 'avis_2',
+      type: 'autre',
+      texte: 'détresse',
+      page: 'Nutrition',
+      version: 'test',
+      date: '2026-01-01T13:00:00.000Z',
+      id_utilisateur_hache: 'def',
+      statut: 'urgent',
+      signalUrgent: true,
+      signalNiveau: 2,
+    })
+    expect(JSON.parse(urgentBody).signalNiveau).toBe(2)
+    expect(JSON.parse(urgentBody).statut).toBe('urgent')
+    expect(signalNiveauForPayload(undefined)).toBeNull()
+    expect(signalNiveauForPayload(1)).toBe(1)
   })
 
   it('hashe le userId de façon stable (HMAC)', async () => {
@@ -604,6 +634,197 @@ describe('submitAvisBetaForSession', () => {
     const sample = 'L’échelle Effort de 1 à 10 n’est pas claire pour moi.'
     expect(sample.toLowerCase()).not.toContain('rpe')
     expect(detectDistressLevel(sample)).toBe(0)
+  })
+})
+
+describe('admin triage (AVIS_BETA_ADMIN_KEY)', () => {
+  const ADMIN_KEY = 'avis-admin-test-key-32chars-min!!'
+  const HASH_SALT = 'avis-hash-salt-test'
+
+  function withAdminEnv<T>(fn: () => Promise<T> | T): Promise<T> | T {
+    const prevKey = process.env[AVIS_BETA_ADMIN_KEY_ENV]
+    const prevSalt = process.env.AVIS_BETA_USER_HASH_SALT
+    process.env[AVIS_BETA_ADMIN_KEY_ENV] = ADMIN_KEY
+    process.env.AVIS_BETA_USER_HASH_SALT = HASH_SALT
+    const restore = () => {
+      if (prevKey === undefined) delete process.env[AVIS_BETA_ADMIN_KEY_ENV]
+      else process.env[AVIS_BETA_ADMIN_KEY_ENV] = prevKey
+      if (prevSalt === undefined) delete process.env.AVIS_BETA_USER_HASH_SALT
+      else process.env.AVIS_BETA_USER_HASH_SALT = prevSalt
+    }
+    try {
+      const result = fn()
+      if (result && typeof (result as Promise<T>).then === 'function') {
+        return (result as Promise<T>).finally(restore)
+      }
+      restore()
+      return result
+    } catch (error) {
+      restore()
+      throw error
+    }
+  }
+
+  async function seedAvis(
+    db: FakeDb,
+    overrides: Partial<StoredRow> & { userId: string; statut: string; creeLe: number },
+  ) {
+    return db.insert('avis_beta', {
+      type: 'bug',
+      texte: 'Message de triage assez long.',
+      page: 'Profil',
+      version: 'test',
+      consentementDate: overrides.creeLe,
+      consentementVersion: 'avis-beta-v1-2026-10-06',
+      signalUrgent: overrides.statut === 'urgent',
+      signalNiveau: overrides.statut === 'urgent' ? 1 : undefined,
+      motsMasques: false,
+      notif: 'a_envoyer',
+      notifEssais: 0,
+      cleAntiDoublon: `triage-${overrides.creeLe}-${overrides.userId}`,
+      ...overrides,
+    })
+  }
+
+  it('refuse si la clé admin est absente (env) ou incorrecte', async () => {
+    const prevKey = process.env[AVIS_BETA_ADMIN_KEY_ENV]
+    delete process.env[AVIS_BETA_ADMIN_KEY_ENV]
+    try {
+      expect(() => requireAvisBetaAdminKey(ADMIN_KEY)).toThrow(AVIS_BETA_ADMIN_FORBIDDEN)
+      expect(() => requireAvisBetaAdminKey(undefined)).toThrow(AVIS_BETA_ADMIN_FORBIDDEN)
+    } finally {
+      if (prevKey === undefined) delete process.env[AVIS_BETA_ADMIN_KEY_ENV]
+      else process.env[AVIS_BETA_ADMIN_KEY_ENV] = prevKey
+    }
+
+    await withAdminEnv(async () => {
+      expect(() => requireAvisBetaAdminKey('wrong-key')).toThrow(AVIS_BETA_ADMIN_FORBIDDEN)
+      expect(() => requireAvisBetaAdminKey(ADMIN_KEY)).not.toThrow()
+
+      const db = new FakeDb()
+      await expect(
+        listAvisBetaForTriage(createCtx(db) as never, { adminKey: 'wrong-key' }),
+      ).rejects.toThrow(AVIS_BETA_ADMIN_FORBIDDEN)
+
+      await expect(
+        triageAvisBeta(createCtx(db) as never, {
+          adminKey: 'wrong-key',
+          avisId: 'avis_beta:missing' as Id<'avis_beta'>,
+          decision: 'garde',
+          noteTri: 'x',
+        }),
+      ).rejects.toThrow(AVIS_BETA_ADMIN_FORBIDDEN)
+    })
+  })
+
+  it('liste urgent d’abord puis nouveau, sans userId ni âge', async () => {
+    await withAdminEnv(async () => {
+      const db = new FakeDb()
+      const ctx = createCtx(db)
+      await seedAvis(db, {
+        userId: 'user-n1',
+        statut: 'nouveau',
+        creeLe: 1_000,
+        texte: 'Avis nouveau plus ancien.',
+      })
+      await seedAvis(db, {
+        userId: 'user-u1',
+        statut: 'urgent',
+        creeLe: 500,
+        texte: 'Urgent plus ancien.',
+        signalUrgent: true,
+        signalNiveau: 2,
+      })
+      await seedAvis(db, {
+        userId: 'user-n2',
+        statut: 'nouveau',
+        creeLe: 2_000,
+        texte: 'Avis nouveau plus récent.',
+      })
+      await seedAvis(db, {
+        userId: 'user-u2',
+        statut: 'urgent',
+        creeLe: 1_500,
+        texte: 'Urgent plus récent.',
+        signalUrgent: true,
+        signalNiveau: 1,
+      })
+      await seedAvis(db, {
+        userId: 'user-other',
+        statut: 'traite',
+        creeLe: 3_000,
+        texte: 'Déjà traité, hors file.',
+      })
+      await seedStoredAge(db, 'user-u1', 17)
+
+      const page = await listAvisBetaForTriage(ctx as never, {
+        adminKey: ADMIN_KEY,
+        limit: 10,
+      })
+      expect(page.items.map((item) => item.statut)).toEqual([
+        'urgent',
+        'urgent',
+        'nouveau',
+        'nouveau',
+      ])
+      expect(page.items.map((item) => item.creeLe)).toEqual([1_500, 500, 2_000, 1_000])
+      expect(page.items[0]?.signalNiveau).toBe(1)
+      expect(page.items[1]?.signalNiveau).toBe(2)
+      for (const item of page.items) {
+        expect(item).not.toHaveProperty('userId')
+        expect(item).not.toHaveProperty('age')
+        expect(item.id_utilisateur_hache).toMatch(/^[0-9a-f]{64}$/)
+        expect(item.id_utilisateur_hache).not.toContain('user-')
+      }
+      expect(page.nextCursor).toBeNull()
+
+      const page1 = await listAvisBetaForTriage(ctx as never, {
+        adminKey: ADMIN_KEY,
+        limit: 2,
+      })
+      expect(page1.items).toHaveLength(2)
+      expect(page1.nextCursor).toBeTruthy()
+      const page2 = await listAvisBetaForTriage(ctx as never, {
+        adminKey: ADMIN_KEY,
+        limit: 2,
+        cursor: page1.nextCursor ?? undefined,
+      })
+      expect(page2.items.map((item) => item.creeLe)).toEqual([2_000, 1_000])
+    })
+  })
+
+  it('mutation triage pose decision/noteTri et statut optionnel', async () => {
+    await withAdminEnv(async () => {
+      const db = new FakeDb()
+      const ctx = createCtx(db)
+      const avisId = await seedAvis(db, {
+        userId: 'user-t',
+        statut: 'urgent',
+        creeLe: Date.now(),
+        signalUrgent: true,
+        signalNiveau: 1,
+      })
+
+      const result = await triageAvisBeta(ctx as never, {
+        adminKey: ADMIN_KEY,
+        avisId: avisId as Id<'avis_beta'>,
+        decision: 'transmis',
+        noteTri: 'Escaladé à la permanence.',
+        statut: 'trie',
+      })
+      expect(result).toEqual({
+        ok: true,
+        avisId,
+        statut: 'trie',
+        decision: 'transmis',
+        noteTri: 'Escaladé à la permanence.',
+      })
+      const row = db.table('avis_beta')[0]
+      expect(row.decision).toBe('transmis')
+      expect(row.noteTri).toBe('Escaladé à la permanence.')
+      expect(row.statut).toBe('trie')
+      expect(row).not.toHaveProperty('age')
+    })
   })
 })
 
