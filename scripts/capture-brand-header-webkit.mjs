@@ -112,13 +112,14 @@ async function main() {
       })
     }
     const word = page.locator('[data-brand-wordmark="compact"]')
-    const mark = page.locator('[data-brand-mark-svg="compact"], [data-brand-mark-image="compact"]')
+    const mark = page.locator('[data-brand-mark-image="compact"]')
     if (await word.count()) await word.screenshot({ path: join(outDir, `${label}_wordmark_crop.png`) })
     if (await mark.count()) await mark.screenshot({ path: join(outDir, `${label}_mark_crop.png`) })
 
     const kind = await page.evaluate(() => ({
       svg: !!document.querySelector('[data-brand-mark-svg="compact"]'),
       img: !!document.querySelector('[data-brand-mark-image="compact"]'),
+      imgSrc: document.querySelector('[data-brand-mark-image="compact"]')?.getAttribute('src'),
       word: document.querySelector('[data-brand-wordmark="compact"]')?.textContent,
     }))
     console.log(JSON.stringify({ ok: true, label, kind, outDir }, null, 2))
