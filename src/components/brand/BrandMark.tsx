@@ -39,7 +39,6 @@ const VARIANT = {
   },
   hero: {
     size: 96,
-    src: BRAND_MARK_HERO_SRC,
     textClass: 'text-[22px] font-semibold tracking-tight text-white',
     stackClass: 'flex-col items-center gap-3',
     taglineClass: 'text-[13px]',
@@ -76,7 +75,7 @@ export function BrandMark({
           />
         ) : (
           <img
-            src={cfg.src}
+            src={BRAND_MARK_HERO_SRC}
             width={size}
             height={size}
             alt=""
