@@ -7,7 +7,7 @@ import { mkdir, copyFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { spawn, execFileSync } from 'node:child_process'
-import { webkit } from 'playwright'
+import { chromium, webkit } from 'playwright'
 import { projectRoot, stopHarnessServer } from './streak-celeb-browser-utils.mjs'
 
 const outDir = join(projectRoot, 'scripts', 'screenshots', 'animations-par-type')
@@ -127,7 +127,14 @@ async function capture() {
   let browser
 
   try {
-    browser = await webkit.launch({ headless: true })
+    try {
+      browser = await webkit.launch({ headless: true })
+    } catch {
+      browser = await chromium.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-dev-shm-usage'],
+      })
+    }
     const context = await browser.newContext({
       viewport: { width, height },
       deviceScaleFactor: 3,
