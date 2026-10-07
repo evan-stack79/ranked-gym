@@ -602,14 +602,17 @@ body {
   position: relative;
   display: inline-flex;
   align-items: baseline;
+  justify-content: flex-end;
   vertical-align: baseline;
   perspective: 480px;
 }
 
 .rg-text-flip__viewport {
   display: inline-block;
+  width: 100%;
   overflow: hidden;
   line-height: 1.15;
+  text-align: right;
   transform-style: preserve-3d;
 }
 
@@ -665,7 +668,6 @@ body {
 
 .rg-text-flip__measure-item {
   display: inline-block;
-  padding-right: 0.15em;
 }
 
 /* Avis bêta distress (level 1 TCA / level 2 suicide — 3114 / 15 / 112): no motion */
