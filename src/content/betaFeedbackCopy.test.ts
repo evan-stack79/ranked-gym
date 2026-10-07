@@ -30,4 +30,13 @@ describe('betaFeedbackCopy lexicon + Vérificateur §7.1', () => {
     const joined = Object.values(copy).join('\n')
     expect(joined).not.toMatch(/0\s*810/)
   })
+
+  it('AV-16 — libellés UI déplacés hors du JSX', () => {
+    expect(copy.BETA_FEEDBACK_BACK).toBe('Retour')
+    expect(copy.BETA_FEEDBACK_TYPE_GROUP_LABEL).toBe("Type d'avis")
+    expect(copy.BETA_FEEDBACK_TEXTE_SR_LABEL).toBe('Ton avis')
+    expect(copy.BETA_FEEDBACK_DRAFT_KEPT).toContain('Brouillon')
+    expect(copy.BETA_FEEDBACK_EMPTY).toContain('Écris quelques mots')
+    expect(copy.BETA_FEEDBACK_TOO_LONG).toContain('2 000')
+  })
 })

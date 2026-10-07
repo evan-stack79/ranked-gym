@@ -14,7 +14,8 @@ export function normalizeForMatch(text: string): string {
   return text
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
-    .replace(/[\u2018\u2019\u201A\u201B`´]/g, "'")
+    // ’ ‘ ‚ ‛ + modifier letter apostrophe ʼ (U+02BC, AV-14)
+    .replace(/[\u2018\u2019\u201A\u201B\u02BC`´]/g, "'")
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim()
@@ -26,8 +27,9 @@ function escapeRegex(value: string): string {
 
 /**
  * Limites de mots autour de la phrase entière.
- * Cas « en finir » : ne pas déclencher sur « en finir avec ce bug »
- * (seulement seul, ou « avec la vie » / « avec tout » via les entrées dédiées).
+ * Cas « en finir » : ne pas déclencher sur « en finir avec ce bug ».
+ * Autorisé : seul, « avec la vie », « avec tout », plus AV-02 (en attente
+ * validation Vérificateur) : « avec ma vie », « avec moi ».
  */
 export function matchesDistressPhrase(normalizedHaystack: string, phrase: string): boolean {
   const needle = normalizeForMatch(phrase)
@@ -67,6 +69,9 @@ export const AVIS_MOTS_DETRESSE_NIVEAU_2 = [
   'en finir',
   'en finir avec la vie',
   'en finir avec tout',
+  // AV-02 — ajouts QA, en attente validation Vérificateur
+  'en finir avec ma vie',
+  'en finir avec moi',
   'tout arreter pour de bon',
   'mettre fin a mes jours',
   'mettre fin a ma vie',

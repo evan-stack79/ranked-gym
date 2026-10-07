@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   BETA_FEEDBACK_AGE_BLOCKED,
+  BETA_FEEDBACK_BACK,
   BETA_FEEDBACK_CALL_15,
   BETA_FEEDBACK_CALL_3114,
   BETA_FEEDBACK_CONFIRM,
@@ -10,6 +11,7 @@ import {
   BETA_FEEDBACK_CONSENT_MORE,
   BETA_FEEDBACK_CONSENT_MORE_BODY,
   BETA_FEEDBACK_DAILY_LIMIT,
+  BETA_FEEDBACK_DRAFT_KEPT,
   BETA_FEEDBACK_EMPTY,
   BETA_FEEDBACK_ERROR_SEND,
   BETA_FEEDBACK_INSULT_PROMPT,
@@ -17,6 +19,7 @@ import {
   BETA_FEEDBACK_NEED_TO_TALK,
   BETA_FEEDBACK_NO_REALTIME,
   BETA_FEEDBACK_OFFLINE,
+  BETA_FEEDBACK_OFFLINE_QUEUED_HELP,
   BETA_FEEDBACK_PAGE_LABEL,
   BETA_FEEDBACK_REFORMULATE,
   BETA_FEEDBACK_RETRY,
@@ -27,17 +30,19 @@ import {
   BETA_FEEDBACK_TEL_3114,
   BETA_FEEDBACK_TEXTE_HELP,
   BETA_FEEDBACK_TEXTE_HINT,
+  BETA_FEEDBACK_TEXTE_SR_LABEL,
   BETA_FEEDBACK_TOO_LONG,
   BETA_FEEDBACK_TYPE_AUTRE,
   BETA_FEEDBACK_TYPE_AUTRE_HINT,
   BETA_FEEDBACK_TYPE_BUG,
   BETA_FEEDBACK_TYPE_BUG_HINT,
+  BETA_FEEDBACK_TYPE_GROUP_LABEL,
   BETA_FEEDBACK_TYPE_IDEE,
   BETA_FEEDBACK_TYPE_IDEE_HINT,
   BETA_FEEDBACK_VERSION_LABEL,
 } from '../../content/betaFeedbackCopy'
-import { formatAppVersionLabel, getAppBuildId } from '../../pwa/appBuildId'
-import { canAccessBetaFeedback, getDeclaredAgeForAvis } from '../../services/betaFeedbackAccess'
+import { getAppBuildId } from '../../pwa/appBuildId'
+import { canAccessBetaFeedback } from '../../services/betaFeedbackAccess'
 import {
   BETA_FEEDBACK_PAGES,
   isBetaFeedbackPage,
@@ -48,16 +53,17 @@ import {
   enqueueAvisOffline,
   wireAvisQueueLifecycleOnce,
 } from '../../services/avisBetaOfflineQueue'
+import { AVIS_BETA_DRAFT_KEY } from '../../services/clearAvisBetaLocalData'
 import {
   createAvisAntiDoublonKey,
   submitAvisBeta,
   type AvisType,
 } from '../../services/convexAvisBetaService'
+import { detectDistressLevel } from '../../../convex/avisDistress'
 
 const TEXTE_MIN = 10
 const TEXTE_MAX = 2000
 const COUNTER_FROM = 1800
-const DRAFT_KEY = 'ranked-gym:avis-beta-draft'
 
 type Phase = 'form' | 'insult' | 'success' | 'urgent_tca' | 'urgent_suicide' | 'blocked'
 
@@ -76,7 +82,7 @@ type DraftState = {
 
 function readDraft(): DraftState | null {
   try {
-    const raw = localStorage.getItem(DRAFT_KEY)
+    const raw = localStorage.getItem(AVIS_BETA_DRAFT_KEY)
     if (!raw) return null
     return JSON.parse(raw) as DraftState
   } catch {
@@ -86,7 +92,7 @@ function readDraft(): DraftState | null {
 
 function writeDraft(draft: DraftState): void {
   try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+    localStorage.setItem(AVIS_BETA_DRAFT_KEY, JSON.stringify(draft))
   } catch {
     /* ignore */
   }
@@ -94,7 +100,7 @@ function writeDraft(draft: DraftState): void {
 
 function clearDraft(): void {
   try {
-    localStorage.removeItem(DRAFT_KEY)
+    localStorage.removeItem(AVIS_BETA_DRAFT_KEY)
   } catch {
     /* ignore */
   }
@@ -106,15 +112,22 @@ function resolveInitialPage(explicit?: string): BetaFeedbackPage {
   return 'Réglages'
 }
 
+function applyDistressPhase(
+  setPhase: (p: Phase) => void,
+  level: 0 | 1 | 2,
+): void {
+  if (level === 2) setPhase('urgent_suicide')
+  else if (level === 1) setPhase('urgent_tca')
+  else setPhase('success')
+}
+
 export function BetaFeedbackScreen({
   onBack,
   onOpenNeedToTalk,
   initialPage,
 }: BetaFeedbackScreenProps) {
   const allowed = canAccessBetaFeedback()
-  const declaredAge = getDeclaredAgeForAvis()
   const versionId = getAppBuildId()
-  const versionLabel = formatAppVersionLabel(versionId)
 
   const draft = useMemo(() => readDraft(), [])
   const [phase, setPhase] = useState<Phase>(() => (allowed ? 'form' : 'blocked'))
@@ -128,9 +141,11 @@ export function BetaFeedbackScreen({
   const [consentMoreOpen, setConsentMoreOpen] = useState(false)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldHint, setFieldHint] = useState<'empty' | 'too_long' | null>(null)
   const [offlineQueued, setOfflineQueued] = useState(false)
   const [antiDoublonKey, setAntiDoublonKey] = useState(() => createAvisAntiDoublonKey())
   const [forceInsults, setForceInsults] = useState(false)
+  const sendingLock = useRef(false)
 
   useEffect(() => {
     wireAvisQueueLifecycleOnce()
@@ -142,45 +157,55 @@ export function BetaFeedbackScreen({
   }, [type, texte, page, phase])
 
   const trimmedLen = texte.trim().length
-  const tooShort = trimmedLen > 0 && trimmedLen < TEXTE_MIN
   const canSubmit =
     allowed &&
-    declaredAge != null &&
     type != null &&
     trimmedLen >= TEXTE_MIN &&
     trimmedLen <= TEXTE_MAX &&
     consent &&
     !sending
 
+  // AV-15 : une seule ligne version (pas de doublon).
   const metaLine = `${BETA_FEEDBACK_PAGE_LABEL} : ${page} · ${BETA_FEEDBACK_VERSION_LABEL} ${versionId}. ${BETA_FEEDBACK_META_HINT}`
 
   const handleTexteChange = (value: string) => {
+    // AV-10 : pas de maxLength HTML silencieux — on coupe + message.
     if (value.length > TEXTE_MAX) {
       setTexte(value.slice(0, TEXTE_MAX))
+      setFieldHint('too_long')
       setError(BETA_FEEDBACK_TOO_LONG)
       return
     }
     setTexte(value)
+    const len = value.trim().length
+    if (len === 0) setFieldHint('empty')
+    else if (len < TEXTE_MIN) setFieldHint('empty')
+    else setFieldHint(null)
     if (error === BETA_FEEDBACK_TOO_LONG || error === BETA_FEEDBACK_EMPTY) {
       setError(null)
     }
   }
 
   const doSubmit = async (forcerEnvoiAvecInsultes: boolean) => {
-    if (!type || declaredAge == null) return
+    if (!type || sendingLock.current) return
+    sendingLock.current = true
     setSending(true)
     setError(null)
     setOfflineQueued(false)
 
+    const trimmed = texte.trim()
+    const localDistress = detectDistressLevel(trimmed)
+
     const payload = {
       type,
-      texte: texte.trim(),
+      texte: trimmed,
       page,
       version: versionId,
       cleAntiDoublon: antiDoublonKey,
       consentementAccepte: true as const,
-      declaredAge,
-      forcerEnvoiAvecInsultes: forcerEnvoiAvecInsultes || undefined,
+      // Détresse : masquage auto côté client aussi (AV-05).
+      forcerEnvoiAvecInsultes:
+        forcerEnvoiAvecInsultes || localDistress > 0 ? true : undefined,
     }
 
     const offline = typeof navigator !== 'undefined' && navigator.onLine === false
@@ -188,10 +213,18 @@ export function BetaFeedbackScreen({
       try {
         enqueueAvisOffline(payload)
         setOfflineQueued(true)
-        setError(BETA_FEEDBACK_OFFLINE)
+        clearDraft()
+        setAntiDoublonKey(createAvisAntiDoublonKey())
+        // AV-03 : message de soutien immédiat hors ligne (détection locale).
+        if (localDistress > 0) {
+          applyDistressPhase(setPhase, localDistress)
+        } else {
+          setError(BETA_FEEDBACK_OFFLINE)
+        }
       } catch {
         setError(BETA_FEEDBACK_ERROR_SEND)
       } finally {
+        sendingLock.current = false
         setSending(false)
       }
       return
@@ -200,35 +233,46 @@ export function BetaFeedbackScreen({
     try {
       const result = await submitAvisBeta(payload)
       if (!result.ok) {
+        // AV-04 : si le serveur refuse pour limite, afficher quand même l’aide locale.
+        if (localDistress > 0) {
+          applyDistressPhase(setPhase, localDistress)
+          sendingLock.current = false
+          setSending(false)
+          return
+        }
         if (result.needsReformulation || result.reason === 'insults') {
           setForceInsults(false)
           setPhase('insult')
+          sendingLock.current = false
           setSending(false)
           return
         }
         if (result.error === 'AVIS_BETA_DAILY_LIMIT') {
           setError(BETA_FEEDBACK_DAILY_LIMIT)
+          sendingLock.current = false
           setSending(false)
           return
         }
         if (result.error === 'AVIS_BETA_AGE_REQUIRED') {
           setPhase('blocked')
+          sendingLock.current = false
           setSending(false)
           return
         }
         setError(BETA_FEEDBACK_ERROR_SEND)
+        sendingLock.current = false
         setSending(false)
         return
       }
 
       clearDraft()
       setAntiDoublonKey(createAvisAntiDoublonKey())
-      if (result.distressLevel === 2) setPhase('urgent_suicide')
-      else if (result.distressLevel === 1) setPhase('urgent_tca')
-      else setPhase('success')
+      applyDistressPhase(setPhase, result.distressLevel)
     } catch {
-      setError(BETA_FEEDBACK_ERROR_SEND)
+      if (localDistress > 0) applyDistressPhase(setPhase, localDistress)
+      else setError(BETA_FEEDBACK_ERROR_SEND)
     } finally {
+      sendingLock.current = false
       setSending(false)
     }
   }
@@ -236,6 +280,7 @@ export function BetaFeedbackScreen({
   const onSubmitClick = () => {
     if (!type) return
     if (trimmedLen < TEXTE_MIN) {
+      setFieldHint('empty')
       setError(BETA_FEEDBACK_EMPTY)
       return
     }
@@ -259,6 +304,9 @@ export function BetaFeedbackScreen({
         <p className="text-[15px] leading-relaxed text-[#EBEBF5]" data-testid="beta-feedback-confirm">
           {BETA_FEEDBACK_CONFIRM}
         </p>
+        {offlineQueued ? (
+          <p className="text-[13px] text-[#AEAEB2]">{BETA_FEEDBACK_OFFLINE_QUEUED_HELP}</p>
+        ) : null}
         <button
           type="button"
           onClick={onOpenNeedToTalk}
@@ -282,6 +330,9 @@ export function BetaFeedbackScreen({
         <p className="text-[15px] leading-relaxed text-[#EBEBF5]" data-testid="beta-feedback-confirm">
           {BETA_FEEDBACK_CONFIRM_URGENT_TCA}
         </p>
+        {offlineQueued ? (
+          <p className="text-[13px] text-[#AEAEB2]">{BETA_FEEDBACK_OFFLINE_QUEUED_HELP}</p>
+        ) : null}
         <button
           type="button"
           onClick={onOpenNeedToTalk}
@@ -308,6 +359,9 @@ export function BetaFeedbackScreen({
         <p className="text-[13px] leading-relaxed text-[#AEAEB2]" data-testid="beta-feedback-no-realtime">
           {BETA_FEEDBACK_NO_REALTIME}
         </p>
+        {offlineQueued ? (
+          <p className="text-[13px] text-[#AEAEB2]">{BETA_FEEDBACK_OFFLINE_QUEUED_HELP}</p>
+        ) : null}
         <div className="flex flex-col gap-3">
           <a
             href={BETA_FEEDBACK_TEL_3114}
@@ -373,7 +427,7 @@ export function BetaFeedbackScreen({
       <Header onBack={onBack} />
       <h1 className="text-[28px] font-bold tracking-tight text-white">{BETA_FEEDBACK_SCREEN_TITLE}</h1>
 
-      <div className="space-y-2" role="group" aria-label="Type d’avis">
+      <div className="space-y-2" role="group" aria-label={BETA_FEEDBACK_TYPE_GROUP_LABEL}>
         {(
           [
             { id: 'bug' as const, label: BETA_FEEDBACK_TYPE_BUG, hint: BETA_FEEDBACK_TYPE_BUG_HINT },
@@ -407,14 +461,13 @@ export function BetaFeedbackScreen({
 
       <div className="space-y-2">
         <label htmlFor="beta-feedback-texte" className="sr-only">
-          Ton avis
+          {BETA_FEEDBACK_TEXTE_SR_LABEL}
         </label>
         <textarea
           id="beta-feedback-texte"
           value={texte}
           onChange={(e) => handleTexteChange(e.target.value)}
           rows={6}
-          maxLength={TEXTE_MAX}
           placeholder={BETA_FEEDBACK_TEXTE_HELP}
           className="w-full resize-none rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-[15px] leading-relaxed text-white placeholder:text-[#636366] outline-none focus:border-[#FF2B2B]/50"
           data-testid="beta-feedback-texte"
@@ -425,8 +478,16 @@ export function BetaFeedbackScreen({
             {texte.length} / {TEXTE_MAX}
           </p>
         ) : null}
-        {tooShort || (trimmedLen === 0 && error === BETA_FEEDBACK_EMPTY) ? (
-          <p className="text-[13px] text-[#FF6961]">{BETA_FEEDBACK_EMPTY}</p>
+        {/* AV-09 / critère 5 : message visible dès que le texte est trop court / vide */}
+        {fieldHint === 'empty' || trimmedLen < TEXTE_MIN ? (
+          <p className="text-[13px] text-[#FF6961]" data-testid="beta-feedback-empty-hint">
+            {BETA_FEEDBACK_EMPTY}
+          </p>
+        ) : null}
+        {fieldHint === 'too_long' || error === BETA_FEEDBACK_TOO_LONG ? (
+          <p className="text-[13px] text-[#FF6961]" data-testid="beta-feedback-too-long-hint">
+            {BETA_FEEDBACK_TOO_LONG}
+          </p>
         ) : null}
       </div>
 
@@ -450,7 +511,6 @@ export function BetaFeedbackScreen({
         <p className="text-[12px] leading-snug text-[#8E8E93]" data-testid="beta-feedback-meta">
           {metaLine}
         </p>
-        <p className="text-[12px] text-[#636366]">{versionLabel}</p>
       </div>
 
       <div className="space-y-2">
@@ -476,7 +536,7 @@ export function BetaFeedbackScreen({
         ) : null}
       </div>
 
-      {error ? (
+      {error && error !== BETA_FEEDBACK_EMPTY && error !== BETA_FEEDBACK_TOO_LONG ? (
         <div className="space-y-2 rounded-2xl border border-[#FF453A]/30 bg-[#FF453A]/10 p-3">
           <p className="text-[13px] text-[#FF6961]" data-testid="beta-feedback-error">
             {error}
@@ -492,7 +552,7 @@ export function BetaFeedbackScreen({
             </button>
           ) : null}
           {offlineQueued ? (
-            <p className="text-[12px] text-[#AEAEB2]">Brouillon conservé sur cet appareil.</p>
+            <p className="text-[12px] text-[#AEAEB2]">{BETA_FEEDBACK_DRAFT_KEPT}</p>
           ) : null}
         </div>
       ) : null}
@@ -518,7 +578,7 @@ function Header({ onBack }: { onBack: () => void }) {
         onClick={onBack}
         className="ios-press rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-[13px] font-semibold text-[#AEAEB2]"
       >
-        Retour
+        {BETA_FEEDBACK_BACK}
       </button>
     </header>
   )

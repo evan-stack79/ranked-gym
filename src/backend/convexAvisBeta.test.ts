@@ -6,10 +6,13 @@ import {
   AVIS_BETA_MINOR_ERROR,
   AVIS_PAR_JOUR,
   AVIS_TEXTE_MAX,
+  assertAdultFromStoredProfile,
   buildWebhookJsonBody,
   detectDistressLevel,
   detectInsultWords,
+  extractAgeFromNutritionProfileJson,
   hashUserIdForWebhook,
+  isAdultStoredAge,
   maskInsultWords,
   submitAvisBetaForSession,
   validateAvisTexte,
@@ -22,6 +25,7 @@ type TableName =
   | 'auth_password_credentials'
   | 'auth_sessions'
   | 'avis_beta'
+  | 'nutrition_state'
   | 'rate_limit_buckets'
 
 type StoredRow = Record<string, unknown> & { _id: string }
@@ -33,11 +37,12 @@ class FakeDb {
     auth_password_credentials: [],
     auth_sessions: [],
     avis_beta: [],
+    nutrition_state: [],
     rate_limit_buckets: [],
   }
 
   insert(table: TableName, value: Record<string, unknown>) {
-    const row = { _id: `${table}:${this.idCounter += 1}`, ...value }
+    const row = { _id: `${table}:${(this.idCounter += 1)}`, ...value }
     this.rows[table].push(row)
     return Promise.resolve(row._id)
   }
@@ -142,6 +147,23 @@ async function seedUser(db: FakeDb, userId: string, sessionToken: string) {
   })
 }
 
+/** AV-01 — âge serveur dans nutrition_state.profileJson (jamais envoyé par le client). */
+async function seedStoredAge(db: FakeDb, userId: string, age: number | undefined) {
+  await db.insert('nutrition_state', {
+    userId,
+    profileJson: age === undefined ? {} : { age },
+    updatedAt: Date.now(),
+  })
+}
+
+const baseSubmit = {
+  type: 'bug' as const,
+  texte: 'Quand je reviens, le chrono reste à 0:00.',
+  page: 'Séance en cours',
+  version: 'test',
+  consentementAccepte: true,
+}
+
 describe('avis beta helpers', () => {
   it('valide la longueur 10–2000', () => {
     expect(validateAvisTexte('court').ok).toBe(false)
@@ -194,21 +216,57 @@ describe('avis beta helpers', () => {
   })
 })
 
+describe('AV-01 — âge serveur (nutrition_state), jamais declaredAge', () => {
+  it('isAdultStoredAge fail-closed', () => {
+    expect(isAdultStoredAge(18)).toBe(true)
+    expect(isAdultStoredAge(30)).toBe(true)
+    expect(isAdultStoredAge(17)).toBe(false)
+    expect(isAdultStoredAge(undefined)).toBe(false)
+    expect(isAdultStoredAge(null)).toBe(false)
+    expect(isAdultStoredAge('30')).toBe(false)
+    expect(isAdultStoredAge(Number.NaN)).toBe(false)
+    expect(isAdultStoredAge(121)).toBe(false)
+  })
+
+  it('extrait age depuis profileJson uniquement', () => {
+    expect(extractAgeFromNutritionProfileJson({ age: 28 })).toBe(28)
+    expect(extractAgeFromNutritionProfileJson({})).toBeUndefined()
+    expect(extractAgeFromNutritionProfileJson(null)).toBeUndefined()
+  })
+
+  it('assertAdultFromStoredProfile refuse sans nutrition_state', async () => {
+    const db = new FakeDb()
+    const result = await assertAdultFromStoredProfile(createCtx(db) as never, 'user-x')
+    expect(result).toEqual({ ok: false, error: AVIS_BETA_MINOR_ERROR })
+  })
+
+  it('assertAdultFromStoredProfile refuse mineur, accepte adulte', async () => {
+    const db = new FakeDb()
+    await seedStoredAge(db, 'user-m', 16)
+    expect(await assertAdultFromStoredProfile(createCtx(db) as never, 'user-m')).toEqual({
+      ok: false,
+      error: AVIS_BETA_MINOR_ERROR,
+    })
+
+    const db2 = new FakeDb()
+    await seedStoredAge(db2, 'user-a', 28)
+    expect(await assertAdultFromStoredProfile(createCtx(db2) as never, 'user-a')).toEqual({
+      ok: true,
+    })
+  })
+})
+
 describe('submitAvisBetaForSession', () => {
-  it('enregistre un avis adulte valide (statut nouveau)', async () => {
+  it('enregistre un avis adulte valide (âge serveur, pas d’âge sur l’avis)', async () => {
     const db = new FakeDb()
     const ctx = createCtx(db)
     await seedUser(db, 'user-a', 'session-a')
+    await seedStoredAge(db, 'user-a', 28)
 
     const result = await submitAvisBetaForSession(ctx as never, {
+      ...baseSubmit,
       sessionToken: 'session-a',
-      type: 'bug',
-      texte: 'Quand je reviens, le chrono reste à 0:00.',
-      page: 'Séance en cours',
-      version: 'test',
       cleAntiDoublon: 'key-1',
-      consentementAccepte: true,
-      declaredAge: 28,
     })
 
     expect(result.ok).toBe(true)
@@ -223,50 +281,49 @@ describe('submitAvisBetaForSession', () => {
     expect(row.notif).toBe('a_envoyer')
   })
 
-  it('refuse mineur / âge inconnu et ne crée pas de ligne', async () => {
+  it('refuse si âge serveur manquant / mineur et ignore tout âge client', async () => {
     const db = new FakeDb()
     const ctx = createCtx(db)
     await seedUser(db, 'user-m', 'session-m')
-
-    const minor = await submitAvisBetaForSession(ctx as never, {
+    // Pas de nutrition_state → fail closed (même si un client envoie un âge spoofé)
+    const missing = await submitAvisBetaForSession(ctx as never, {
+      ...baseSubmit,
       sessionToken: 'session-m',
       type: 'idee',
       texte: 'Une idée pour les rappels d’eau.',
       page: 'Nutrition',
-      version: 'test',
       cleAntiDoublon: 'key-m',
-      consentementAccepte: true,
-      declaredAge: 16,
+      declaredAge: 30,
+    } as never)
+    expect(missing).toEqual({ ok: false, error: AVIS_BETA_MINOR_ERROR })
+    expect(db.table('avis_beta')).toHaveLength(0)
+
+    await seedStoredAge(db, 'user-m', 16)
+    const minor = await submitAvisBetaForSession(ctx as never, {
+      ...baseSubmit,
+      sessionToken: 'session-m',
+      type: 'idee',
+      texte: 'Une idée pour les rappels d’eau.',
+      page: 'Nutrition',
+      cleAntiDoublon: 'key-m2',
     })
     expect(minor).toEqual({ ok: false, error: AVIS_BETA_MINOR_ERROR })
     expect(db.table('avis_beta')).toHaveLength(0)
-
-    const unknown = await submitAvisBetaForSession(ctx as never, {
-      sessionToken: 'session-m',
-      type: 'idee',
-      texte: 'Une idée pour les rappels d’eau.',
-      page: 'Nutrition',
-      version: 'test',
-      cleAntiDoublon: 'key-m2',
-      consentementAccepte: true,
-      declaredAge: Number.NaN,
-    })
-    expect(unknown).toEqual({ ok: false, error: AVIS_BETA_MINOR_ERROR })
   })
 
   it('refuse sans consentement', async () => {
     const db = new FakeDb()
     const ctx = createCtx(db)
     await seedUser(db, 'user-c', 'session-c')
+    await seedStoredAge(db, 'user-c', 22)
     const result = await submitAvisBetaForSession(ctx as never, {
+      ...baseSubmit,
       sessionToken: 'session-c',
       type: 'autre',
       texte: 'Message assez long pour passer.',
       page: 'Accueil',
-      version: 'test',
       cleAntiDoublon: 'key-c',
       consentementAccepte: false,
-      declaredAge: 22,
     })
     expect(result).toEqual({ ok: false, error: AVIS_BETA_CONSENT_ERROR })
   })
@@ -275,16 +332,13 @@ describe('submitAvisBetaForSession', () => {
     const db = new FakeDb()
     const ctx = createCtx(db)
     await seedUser(db, 'user-i', 'session-i')
+    await seedStoredAge(db, 'user-i', 30)
 
     const blocked = await submitAvisBetaForSession(ctx as never, {
+      ...baseSubmit,
       sessionToken: 'session-i',
-      type: 'bug',
       texte: 'Cette merde de chrono plante encore.',
-      page: 'Séance en cours',
-      version: 'test',
       cleAntiDoublon: 'key-i1',
-      consentementAccepte: true,
-      declaredAge: 30,
     })
     expect(blocked.ok).toBe(false)
     if (blocked.ok) return
@@ -292,14 +346,10 @@ describe('submitAvisBetaForSession', () => {
     expect(db.table('avis_beta')).toHaveLength(0)
 
     const forced = await submitAvisBetaForSession(ctx as never, {
+      ...baseSubmit,
       sessionToken: 'session-i',
-      type: 'bug',
       texte: 'Cette merde de chrono plante encore.',
-      page: 'Séance en cours',
-      version: 'test',
       cleAntiDoublon: 'key-i2',
-      consentementAccepte: true,
-      declaredAge: 30,
       forcerEnvoiAvecInsultes: true,
     })
     expect(forced.ok).toBe(true)
@@ -312,15 +362,14 @@ describe('submitAvisBetaForSession', () => {
     const db = new FakeDb()
     const ctx = createCtx(db)
     await seedUser(db, 'user-u', 'session-u')
+    await seedStoredAge(db, 'user-u', 25)
     const result = await submitAvisBetaForSession(ctx as never, {
+      ...baseSubmit,
       sessionToken: 'session-u',
       type: 'autre',
       texte: 'Je mange presque plus pour monter au classement, lol.',
       page: 'Nutrition',
-      version: 'test',
       cleAntiDoublon: 'key-u',
-      consentementAccepte: true,
-      declaredAge: 25,
     })
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -334,15 +383,14 @@ describe('submitAvisBetaForSession', () => {
     const db = new FakeDb()
     const ctx = createCtx(db)
     await seedUser(db, 'user-s', 'session-s')
+    await seedStoredAge(db, 'user-s', 25)
     const result = await submitAvisBetaForSession(ctx as never, {
+      ...baseSubmit,
       sessionToken: 'session-s',
       type: 'autre',
       texte: 'Anorexie et j’ai envie de mourir, vraiment.',
       page: 'Nutrition',
-      version: 'test',
       cleAntiDoublon: 'key-s',
-      consentementAccepte: true,
-      declaredAge: 25,
     })
     expect(result.ok).toBe(true)
     if (!result.ok) return
@@ -350,65 +398,95 @@ describe('submitAvisBetaForSession', () => {
     expect(result.statut).toBe('urgent')
   })
 
-  it('respecte la limite 5 avis/jour et l’anti-doublon clé / texte', async () => {
+  it('AV-04 — détresse contourne la limite journalière', async () => {
     const db = new FakeDb()
     const ctx = createCtx(db)
     await seedUser(db, 'user-l', 'session-l')
+    await seedStoredAge(db, 'user-l', 40)
     const now = Date.now()
 
     for (let i = 0; i < AVIS_PAR_JOUR; i += 1) {
       const result = await submitAvisBetaForSession(ctx as never, {
+        ...baseSubmit,
         sessionToken: 'session-l',
-        type: 'bug',
         texte: `Problème numéro ${i} assez long.`,
         page: 'Train',
-        version: 'test',
         cleAntiDoublon: `key-l-${i}`,
-        consentementAccepte: true,
-        declaredAge: 40,
         now: now + i,
       })
       expect(result.ok).toBe(true)
     }
 
     const limited = await submitAvisBetaForSession(ctx as never, {
+      ...baseSubmit,
       sessionToken: 'session-l',
-      type: 'bug',
       texte: 'Encore un sixième avis aujourd’hui.',
       page: 'Train',
-      version: 'test',
       cleAntiDoublon: 'key-l-6',
-      consentementAccepte: true,
-      declaredAge: 40,
       now: now + 10,
     })
     expect(limited).toEqual({ ok: false, error: AVIS_BETA_DAILY_LIMIT_ERROR })
     expect(db.table('avis_beta')).toHaveLength(AVIS_PAR_JOUR)
 
-    // Anti-doublon clé : même clé → pas de nouvelle ligne (sur un autre user seed)
+    const distress = await submitAvisBetaForSession(ctx as never, {
+      ...baseSubmit,
+      sessionToken: 'session-l',
+      type: 'autre',
+      texte: 'j’ai envie de mourir vraiment beaucoup.',
+      page: 'Nutrition',
+      cleAntiDoublon: 'key-l-distress',
+      now: now + 20,
+    })
+    expect(distress.ok).toBe(true)
+    if (!distress.ok) return
+    expect(distress.distressLevel).toBe(2)
+    expect(distress.statut).toBe('urgent')
+    expect(db.table('avis_beta')).toHaveLength(AVIS_PAR_JOUR + 1)
+  })
+
+  it('AV-05 — détresse avant insultes : envoi masqué, pas de reformulation', async () => {
+    const db = new FakeDb()
+    const ctx = createCtx(db)
+    await seedUser(db, 'user-di', 'session-di')
+    await seedStoredAge(db, 'user-di', 30)
+
+    const result = await submitAvisBetaForSession(ctx as never, {
+      ...baseSubmit,
+      sessionToken: 'session-di',
+      type: 'autre',
+      texte: 'putain j’ai envie de mourir ce soir.',
+      page: 'Nutrition',
+      cleAntiDoublon: 'key-di',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.needsReformulation).toBe(false)
+    expect(result.distressLevel).toBe(2)
+    expect(result.motsMasques).toBe(true)
+    expect(db.table('avis_beta')[0].texteMasque).toContain('•••')
+  })
+
+  it('respecte l’anti-doublon clé / texte', async () => {
     const db2 = new FakeDb()
     const ctx2 = createCtx(db2)
     await seedUser(db2, 'user-d', 'session-d')
+    await seedStoredAge(db2, 'user-d', 33)
+    const now = Date.now()
+
     const first = await submitAvisBetaForSession(ctx2 as never, {
+      ...baseSubmit,
       sessionToken: 'session-d',
       type: 'idee',
       texte: 'Ajouter un rappel Effort plus clair.',
-      page: 'Séance en cours',
-      version: 'test',
       cleAntiDoublon: 'same-key',
-      consentementAccepte: true,
-      declaredAge: 33,
       now,
     })
     const dupKey = await submitAvisBetaForSession(ctx2 as never, {
+      ...baseSubmit,
       sessionToken: 'session-d',
       type: 'idee',
       texte: 'Ajouter un rappel Effort plus clair.',
-      page: 'Séance en cours',
-      version: 'test',
       cleAntiDoublon: 'same-key',
-      consentementAccepte: true,
-      declaredAge: 33,
       now: now + 1,
     })
     expect(first.ok && dupKey.ok).toBe(true)
@@ -419,14 +497,11 @@ describe('submitAvisBetaForSession', () => {
     expect(db2.table('avis_beta')).toHaveLength(1)
 
     const dupText = await submitAvisBetaForSession(ctx2 as never, {
+      ...baseSubmit,
       sessionToken: 'session-d',
       type: 'idee',
       texte: 'Ajouter un rappel Effort plus clair.',
-      page: 'Séance en cours',
-      version: 'test',
       cleAntiDoublon: 'other-key',
-      consentementAccepte: true,
-      declaredAge: 33,
       now: now + AVIS_ANTI_DOUBLON_MS - 1000,
     })
     expect(dupText.ok).toBe(true)
@@ -443,15 +518,6 @@ describe('submitAvisBetaForSession', () => {
 
 describe('delete account purge avis_beta', () => {
   it('supprime les avis du compte', async () => {
-    const db = new FakeDb() as FakeDb & {
-      insert: FakeDb['insert']
-      query: FakeDb['query']
-      get: FakeDb['get']
-      patch: FakeDb['patch']
-      delete: FakeDb['delete']
-      table: FakeDb['table']
-    }
-    // Minimal tables for deleteAccount — extend FakeDb via proxy for missing tables
     const allTables = new Map<string, StoredRow[]>()
     const ensure = (name: string) => {
       if (!allTables.has(name)) allTables.set(name, [])
@@ -497,7 +563,6 @@ describe('delete account purge avis_beta', () => {
       },
     }
 
-    void db
     const password = 'password-ok'
     const userId = 'user-del'
     const sessionToken = 'session-del'

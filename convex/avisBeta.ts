@@ -115,14 +115,44 @@ function startOfUtcDayMs(now: number): number {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
 }
 
-export function isAdultDeclaredAge(age: unknown): age is number {
+function readEnv(name: string): string | undefined {
+  const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
+  return proc?.env?.[name]
+}
+
+/** Âge stocké serveur (nutrition_state.profileJson) — jamais lu depuis le client. */
+export function isAdultStoredAge(age: unknown): age is number {
   return (
     typeof age === 'number' &&
     Number.isFinite(age) &&
-    Number.isInteger(age) &&
     age >= AVIS_AGE_MIN_ADULT &&
     age <= AVIS_AGE_MAX
   )
+}
+
+export function extractAgeFromNutritionProfileJson(profileJson: unknown): unknown {
+  if (!profileJson || typeof profileJson !== 'object') return undefined
+  const record = profileJson as Record<string, unknown>
+  return record.age
+}
+
+/**
+ * Garde 18+ fail-closed : lit l’âge déjà synchronisé dans Convex.
+ * Ne fait confiance à aucune valeur client. Ne stocke pas l’âge sur l’avis.
+ */
+export async function assertAdultFromStoredProfile(
+  ctx: MutationCtx | QueryCtx,
+  userId: string,
+): Promise<{ ok: true } | { ok: false; error: typeof AVIS_BETA_MINOR_ERROR }> {
+  const nutrition = await ctx.db
+    .query('nutrition_state')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .first()
+  const age = extractAgeFromNutritionProfileJson(nutrition?.profileJson)
+  if (!isAdultStoredAge(age)) {
+    return { ok: false, error: AVIS_BETA_MINOR_ERROR }
+  }
+  return { ok: true }
 }
 
 function escapeRegex(value: string): string {
@@ -178,8 +208,6 @@ export type SubmitAvisInput = {
   version: string
   cleAntiDoublon: string
   consentementAccepte: boolean
-  /** Âge déclaré — validé puis non stocké (garde 18+). */
-  declaredAge: number
   forcerEnvoiAvecInsultes?: boolean
   now?: number
 }
@@ -257,9 +285,12 @@ export async function submitAvisBetaForSession(
   const user = await requireSessionUser(ctx, input.sessionToken)
   const now = input.now ?? Date.now()
 
-  if (!isAdultDeclaredAge(input.declaredAge)) {
-    return { ok: false, error: AVIS_BETA_MINOR_ERROR }
+  // AV-01 : 18+ depuis nutrition_state serveur uniquement (fail-closed).
+  const ageGate = await assertAdultFromStoredProfile(ctx, user.userId)
+  if (!ageGate.ok) {
+    return { ok: false, error: ageGate.error }
   }
+
   if (!input.consentementAccepte) {
     return { ok: false, error: AVIS_BETA_CONSENT_ERROR }
   }
@@ -321,13 +352,20 @@ export async function submitAvisBetaForSession(
     }
   }
 
-  const todayCount = await countAvisTodayForUser(ctx, user.userId, now)
-  if (todayCount >= AVIS_PAR_JOUR) {
-    return { ok: false, error: AVIS_BETA_DAILY_LIMIT_ERROR }
+  // AV-04 / AV-05 : détresse avant limite journalière et filtre insultes.
+  const distressLevel = detectDistressLevel(texte)
+  const signalUrgent = distressLevel > 0
+
+  if (!signalUrgent) {
+    const todayCount = await countAvisTodayForUser(ctx, user.userId, now)
+    if (todayCount >= AVIS_PAR_JOUR) {
+      return { ok: false, error: AVIS_BETA_DAILY_LIMIT_ERROR }
+    }
   }
 
   const insults = detectInsultWords(texte)
-  if (insults.length > 0 && !input.forcerEnvoiAvecInsultes) {
+  // Détresse : envoi avec masquage auto (pas d’écran « reformuler »).
+  if (insults.length > 0 && !signalUrgent && !input.forcerEnvoiAvecInsultes) {
     return {
       ok: false,
       error: AVIS_BETA_VALIDATION_ERROR,
@@ -338,8 +376,6 @@ export async function submitAvisBetaForSession(
 
   const motsMasques = insults.length > 0
   const texteMasque = motsMasques ? maskInsultWords(texte, insults) : undefined
-  const distressLevel = detectDistressLevel(texte)
-  const signalUrgent = distressLevel > 0
   const statut: AvisStatut = signalUrgent ? 'urgent' : 'nouveau'
 
   const avisId = await ctx.db.insert('avis_beta', {
@@ -441,7 +477,6 @@ export const submitAvis = mutation({
     version: v.string(),
     cleAntiDoublon: v.string(),
     consentementAccepte: v.boolean(),
-    declaredAge: v.number(),
     forcerEnvoiAvecInsultes: v.optional(v.boolean()),
   },
   returns: v.union(
@@ -519,8 +554,8 @@ export const loadAvisForWebhook = internalMutation({
       return null
     }
 
-    const salt = process.env.AVIS_BETA_USER_HASH_SALT?.trim()
-    const url = process.env.AVIS_BETA_WEBHOOK_URL?.trim()
+    const salt = readEnv('AVIS_BETA_USER_HASH_SALT')?.trim()
+    const url = readEnv('AVIS_BETA_WEBHOOK_URL')?.trim()
     if (!salt || !url) {
       console.info('[avis-beta] webhook env incomplete — avis kept, notif pending')
       return null
@@ -580,8 +615,8 @@ export const markAvisNotifFailed = internalMutation({
 async function postAvisWebhook(
   payload: AvisWebhookPayload,
 ): Promise<{ ok: boolean; configured: boolean }> {
-  const url = process.env.AVIS_BETA_WEBHOOK_URL?.trim()
-  const secret = process.env.AVIS_BETA_WEBHOOK_SECRET?.trim()
+  const url = readEnv('AVIS_BETA_WEBHOOK_URL')?.trim()
+  const secret = readEnv('AVIS_BETA_WEBHOOK_SECRET')?.trim()
   if (!url) {
     console.info('[avis-beta] AVIS_BETA_WEBHOOK_URL missing — avis kept, notif left pending')
     return { ok: false, configured: false }

@@ -74,6 +74,20 @@ describe('detectDistressLevel — niveaux + limites de mots', () => {
     expect(detectDistressLevel('en finir avec tout')).toBe(2)
   })
 
+  it('AV-02 — « en finir avec ma vie / moi » (ajouts QA, pending Vérificateur)', () => {
+    expect(detectDistressLevel('je veux en finir avec ma vie')).toBe(2)
+    expect(detectDistressLevel('je veux en finir avec moi')).toBe(2)
+    expect(AVIS_MOTS_DETRESSE_NIVEAU_2).toContain('en finir avec ma vie')
+    expect(AVIS_MOTS_DETRESSE_NIVEAU_2).toContain('en finir avec moi')
+    // Toujours silencieux sur le faux positif produit
+    expect(detectDistressLevel('Je veux en finir avec ce bug du chrono')).toBe(0)
+  })
+
+  it('AV-14 — normalise l’apostrophe U+02BC', () => {
+    expect(normalizeForMatch('jʼai envie de mourir')).toBe("j'ai envie de mourir")
+    expect(detectDistressLevel('jʼai envie de mourir')).toBe(2)
+  })
+
   it('ne déclenche pas sur « je mange plus de légumes »', () => {
     expect(detectDistressLevel('Je mange plus de légumes qu’avant')).toBe(0)
   })

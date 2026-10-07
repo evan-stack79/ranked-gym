@@ -37,7 +37,6 @@ export async function submitAvisBeta(input: {
   version: string
   cleAntiDoublon: string
   consentementAccepte: boolean
-  declaredAge: number
   forcerEnvoiAvecInsultes?: boolean
 }): Promise<SubmitAvisClientResult> {
   const sessionToken = await requireToken()

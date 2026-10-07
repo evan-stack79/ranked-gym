@@ -86,3 +86,10 @@ export const BETA_FEEDBACK_VERSION_LABEL = 'Version'
 
 export const BETA_FEEDBACK_AGE_BLOCKED =
   'Cette fonction est réservée aux personnes majeures.'
+
+export const BETA_FEEDBACK_BACK = 'Retour'
+export const BETA_FEEDBACK_TYPE_GROUP_LABEL = "Type d'avis"
+export const BETA_FEEDBACK_TEXTE_SR_LABEL = 'Ton avis'
+export const BETA_FEEDBACK_DRAFT_KEPT = 'Brouillon conservé sur cet appareil.'
+export const BETA_FEEDBACK_OFFLINE_QUEUED_HELP =
+  'Ton avis partira dès que tu seras reconnecté(e).'

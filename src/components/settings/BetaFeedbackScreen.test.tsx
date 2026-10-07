@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { act } from 'react'
 import { BetaFeedbackScreen } from './BetaFeedbackScreen'
 import {
+  BETA_FEEDBACK_BACK,
   BETA_FEEDBACK_CALL_15,
   BETA_FEEDBACK_CALL_3114,
   BETA_FEEDBACK_CONFIRM,
@@ -18,9 +19,13 @@ import {
   BETA_FEEDBACK_TEL_15,
   BETA_FEEDBACK_TEL_3114,
   BETA_FEEDBACK_TEXTE_HINT,
+  BETA_FEEDBACK_TOO_LONG,
+  BETA_FEEDBACK_TYPE_GROUP_LABEL,
+  BETA_FEEDBACK_VERSION_LABEL,
 } from '../../content/betaFeedbackCopy'
 import { saveCalorieProfile, getCalorieProfile } from '../../services/nutritionStorage'
 import { submitAvisBeta } from '../../services/convexAvisBetaService'
+import { enqueueAvisOffline } from '../../services/avisBetaOfflineQueue'
 
 vi.mock('../../services/convexAvisBetaService', () => ({
   createAvisAntiDoublonKey: () => 'test-key',
@@ -41,21 +46,28 @@ vi.mock('../../services/avisBetaOfflineQueue', () => ({
   wireAvisQueueLifecycleOnce: vi.fn(),
 }))
 
-async function fillAndSubmit(host: HTMLElement) {
+async function setTexte(host: HTMLElement, value: string) {
+  const textarea = host.querySelector(
+    '[data-testid="beta-feedback-texte"]',
+  ) as HTMLTextAreaElement
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+    setter?.call(textarea, value)
+    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+}
+
+async function fillAndSubmit(
+  host: HTMLElement,
+  texte = 'Le chrono reste bloqué à zéro quand je reviens.',
+) {
   await act(async () => {
     host.querySelector('[data-testid="beta-feedback-type-bug"]')?.dispatchEvent(
       new MouseEvent('click', { bubbles: true }),
     )
   })
 
-  const textarea = host.querySelector(
-    '[data-testid="beta-feedback-texte"]',
-  ) as HTMLTextAreaElement
-  await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
-    setter?.call(textarea, 'Le chrono reste bloqué à zéro quand je reviens.')
-    textarea.dispatchEvent(new Event('input', { bubbles: true }))
-  })
+  await setTexte(host, texte)
 
   const consent = host.querySelector(
     '[data-testid="beta-feedback-consent"]',
@@ -75,7 +87,9 @@ describe('BetaFeedbackScreen', () => {
   beforeEach(() => {
     localStorage.clear()
     sessionStorage.clear()
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
     vi.mocked(submitAvisBeta).mockReset()
+    vi.mocked(enqueueAvisOffline).mockReset()
     vi.mocked(submitAvisBeta).mockResolvedValue({
       ok: true,
       avisId: 'avis_1',
@@ -251,6 +265,111 @@ describe('BetaFeedbackScreen', () => {
     expect(host.textContent).not.toMatch(/0\s*810/)
     expect(host.querySelector('[data-testid="beta-feedback-need-to-talk"]')).toBeTruthy()
 
+    root.unmount()
+    host.remove()
+  })
+
+  it('AV-03 — hors ligne, affiche l’aide détresse localement', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(
+        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} />,
+      )
+    })
+    await fillAndSubmit(host, 'j’ai envie de mourir vraiment beaucoup')
+
+    expect(enqueueAvisOffline).toHaveBeenCalled()
+    expect(submitAvisBeta).not.toHaveBeenCalled()
+    expect(host.querySelector('[data-distress-level="2"]')).toBeTruthy()
+    expect(host.textContent).toContain(BETA_FEEDBACK_CONFIRM_URGENT_SUICIDE)
+    expect(host.querySelector(`[href="${BETA_FEEDBACK_TEL_3114}"]`)).toBeTruthy()
+
+    root.unmount()
+    host.remove()
+  })
+
+  it('AV-04 — limite serveur : aide détresse locale quand même', async () => {
+    vi.mocked(submitAvisBeta).mockResolvedValue({
+      ok: false,
+      error: 'AVIS_BETA_DAILY_LIMIT',
+    })
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(
+        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} />,
+      )
+    })
+    await fillAndSubmit(host, 'j’ai envie de mourir vraiment beaucoup')
+
+    expect(host.querySelector('[data-distress-level="2"]')).toBeTruthy()
+    expect(host.textContent).toContain(BETA_FEEDBACK_CONFIRM_URGENT_SUICIDE)
+
+    root.unmount()
+    host.remove()
+  })
+
+  it('critère 5 / AV-09 — message vide visible quand texte trop court', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(
+        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} />,
+      )
+    })
+    expect(host.querySelector('[data-testid="beta-feedback-empty-hint"]')?.textContent).toBe(
+      BETA_FEEDBACK_EMPTY,
+    )
+    await setTexte(host, 'court')
+    expect(host.querySelector('[data-testid="beta-feedback-empty-hint"]')?.textContent).toBe(
+      BETA_FEEDBACK_EMPTY,
+    )
+    root.unmount()
+    host.remove()
+  })
+
+  it('critère 6 / AV-10 — message trop long si collage > 2000', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(
+        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} />,
+      )
+    })
+    await setTexte(host, 'x'.repeat(2001))
+    expect(host.querySelector('[data-testid="beta-feedback-too-long-hint"]')?.textContent).toBe(
+      BETA_FEEDBACK_TOO_LONG,
+    )
+    const textarea = host.querySelector(
+      '[data-testid="beta-feedback-texte"]',
+    ) as HTMLTextAreaElement
+    expect(textarea.value.length).toBe(2000)
+    root.unmount()
+    host.remove()
+  })
+
+  it('AV-15 / AV-16 — une seule ligne Version + textes depuis copy', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(
+        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} />,
+      )
+    })
+    const meta = host.querySelector('[data-testid="beta-feedback-meta"]')?.textContent ?? ''
+    const versionHits = meta.split(BETA_FEEDBACK_VERSION_LABEL).length - 1
+    expect(versionHits).toBe(1)
+    expect(host.textContent).toContain(BETA_FEEDBACK_BACK)
+    expect(
+      host.querySelector(`[aria-label="${BETA_FEEDBACK_TYPE_GROUP_LABEL}"]`),
+    ).toBeTruthy()
     root.unmount()
     host.remove()
   })

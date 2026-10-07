@@ -1,6 +1,7 @@
 import { getActiveCloudUserId } from './cloudSession'
 import { safeWarn } from '../utils/safeLog'
 import { submitAvisBeta, type AvisType } from './convexAvisBetaService'
+import { AVIS_BETA_QUEUE_PREFIX } from './clearAvisBetaLocalData'
 
 /** 7 jours max hors ligne (VP). */
 export const AVIS_OFFLINE_TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -13,18 +14,15 @@ export type PendingAvis = {
   version: string
   cleAntiDoublon: string
   consentementAccepte: true
-  declaredAge: number
   forcerEnvoiAvecInsultes?: boolean
   enqueuedAt: number
 }
-
-const QUEUE_PREFIX = 'ranked-gym:avis-beta-queue:u:'
 
 let flushInFlight: Promise<void> | null = null
 let lifecycleWired = false
 
 function queueKey(userId: string): string {
-  return `${QUEUE_PREFIX}${userId}`
+  return `${AVIS_BETA_QUEUE_PREFIX}${userId}`
 }
 
 function readQueue(userId: string): PendingAvis[] {
@@ -74,13 +72,6 @@ export function enqueueAvisOffline(
   return entry
 }
 
-export function readPendingAvisDraft(userId?: string | null): PendingAvis | null {
-  const uid = userId ?? getActiveCloudUserId()
-  if (!uid) return null
-  const queue = pruneExpired(readQueue(uid))
-  return queue[queue.length - 1] ?? null
-}
-
 export async function flushAvisBetaQueue(): Promise<void> {
   if (flushInFlight) return flushInFlight
   flushInFlight = (async () => {
@@ -100,10 +91,15 @@ export async function flushAvisBetaQueue(): Promise<void> {
           version: entry.version,
           cleAntiDoublon: entry.cleAntiDoublon,
           consentementAccepte: true,
-          declaredAge: entry.declaredAge,
-          forcerEnvoiAvecInsultes: entry.forcerEnvoiAvecInsultes,
+          forcerEnvoiAvecInsultes: entry.forcerEnvoiAvecInsultes ?? true,
         })
-        if (result.ok || result.error === 'AVIS_BETA_DAILY_LIMIT') {
+        // AV-07 : ne pas jeter silencieusement à la limite — garder jusqu’au lendemain / TTL.
+        if (result.ok) {
+          entries = entries.filter((item) => item.id !== entry.id)
+          writeQueue(userId, entries)
+        } else if (result.error === 'AVIS_BETA_DAILY_LIMIT') {
+          break
+        } else if (result.error === 'AVIS_BETA_AGE_REQUIRED') {
           entries = entries.filter((item) => item.id !== entry.id)
           writeQueue(userId, entries)
         }

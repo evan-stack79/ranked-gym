@@ -416,7 +416,7 @@ export const convexTables = {
   /**
    * Avis bêta (« Donner mon avis ») — SPEC_AVIS_BETA.
    * Pas d’âge, poids, e-mail, IP ni donnée de santé en colonnes.
-   * `declaredAge` est validé à l’écriture puis jeté (garde 18+).
+   * Garde 18+ : âge lu côté serveur dans `nutrition_state.profileJson` (jamais stocké ici).
    */
   avis_beta: defineTable({
     userId: v.string(),

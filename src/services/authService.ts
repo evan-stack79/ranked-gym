@@ -12,6 +12,7 @@ import {
 import { clearSecureAuthStorage } from './secureAuthStorage'
 import { getActiveCloudUserId } from './cloudSession'
 import { clearLocalNutritionData } from './nutritionStorage'
+import { clearAvisBetaLocalData } from './clearAvisBetaLocalData'
 
 export type AuthMethod = 'email'
 
@@ -101,6 +102,8 @@ export async function signInWithEmail(email: string, password: string) {
 }
 
 export async function signOut() {
+  const localUserId = getActiveCloudUserId()
+  clearAvisBetaLocalData({ userId: localUserId })
   if (isConvexAuthActive()) {
     await convexAuth.signOut()
     await clearSecureAuthStorage()
@@ -162,6 +165,7 @@ export async function deleteOwnAccount(password?: string) {
     if (!password) throw new Error('Password is required for Convex account deletion.')
     await convexAuth.deleteOwnAccount(password)
     clearLocalNutritionData({ userId: localUserId })
+    clearAvisBetaLocalData({ userId: localUserId })
     await clearSecureAuthStorage()
     return
   }
@@ -170,6 +174,7 @@ export async function deleteOwnAccount(password?: string) {
   if (error) throw error
   await supabase.auth.signOut()
   clearLocalNutritionData({ userId: localUserId })
+  clearAvisBetaLocalData({ userId: localUserId })
   await clearSecureAuthStorage()
 }
 
