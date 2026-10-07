@@ -74,12 +74,11 @@ describe('detectDistressLevel — niveaux + limites de mots', () => {
     expect(detectDistressLevel('en finir avec tout')).toBe(2)
   })
 
-  it('AV-02 — « en finir avec ma vie / moi » (ajouts QA, pending Vérificateur)', () => {
+  it('« en finir avec ma vie / moi » validés niveau 2', () => {
     expect(detectDistressLevel('je veux en finir avec ma vie')).toBe(2)
     expect(detectDistressLevel('je veux en finir avec moi')).toBe(2)
     expect(AVIS_MOTS_DETRESSE_NIVEAU_2).toContain('en finir avec ma vie')
     expect(AVIS_MOTS_DETRESSE_NIVEAU_2).toContain('en finir avec moi')
-    // Toujours silencieux sur le faux positif produit
     expect(detectDistressLevel('Je veux en finir avec ce bug du chrono')).toBe(0)
   })
 
@@ -92,8 +91,64 @@ describe('detectDistressLevel — niveaux + limites de mots', () => {
     expect(detectDistressLevel('Je mange plus de légumes qu’avant')).toBe(0)
   })
 
+  it('garde « j’en peux plus » en niveau 1 (y compris « de ce bug »)', () => {
+    expect(detectDistressLevel("j'en peux plus")).toBe(1)
+    expect(detectDistressLevel("j'en peux plus de ce bug")).toBe(1)
+    expect(AVIS_MOTS_DETRESSE_NIVEAU_1).toContain("j'en peux plus")
+  })
+
   it('listes non vides (section 7.4)', () => {
     expect(AVIS_MOTS_DETRESSE_NIVEAU_2.length).toBeGreaterThan(40)
     expect(AVIS_MOTS_DETRESSE_NIVEAU_1.length).toBeGreaterThan(40)
+    expect(AVIS_MOTS_DETRESSE_NIVEAU_1).not.toContain('purge')
+    expect(AVIS_MOTS_DETRESSE_NIVEAU_1).toContain('me purger')
+  })
+})
+
+describe('Vérificateur — kms / je me coupe / overdose / purge', () => {
+  it('kms : mot entier positif, pas après un nombre', () => {
+    expect(detectDistressLevel('les kms parcourus me dépassent')).toBe(2)
+    expect(detectDistressLevel('kms')).toBe(2)
+    expect(detectDistressLevel('10 kms de course')).toBe(0)
+    expect(detectDistressLevel('5 km de footing')).toBe(0)
+    expect(matchesDistressPhrase(normalizeForMatch('10 kms'), 'kms')).toBe(false)
+  })
+
+  it('je me coupe : positif sauf ongles / cheveux / barbe / frange', () => {
+    expect(detectDistressLevel('je me coupe quand ça va mal')).toBe(2)
+    expect(detectDistressLevel('je me coupe.')).toBe(2)
+    expect(detectDistressLevel('je me coupe les ongles')).toBe(0)
+    expect(detectDistressLevel('je me coupe les cheveux')).toBe(0)
+    expect(detectDistressLevel('je me coupe la barbe')).toBe(0)
+    expect(detectDistressLevel('je me coupe la frange')).toBe(0)
+  })
+
+  it('overdose : formes ciblées seulement', () => {
+    expect(detectDistressLevel('je veux faire une overdose')).toBe(2)
+    expect(detectDistressLevel('il a pris une overdose')).toBe(2)
+    expect(detectDistressLevel('prendre une overdose ce soir')).toBe(2)
+    expect(detectDistressLevel('overdose de medicaments')).toBe(2)
+    expect(detectDistressLevel('overdose de cachets')).toBe(2)
+    expect(detectDistressLevel('overdose de squats')).toBe(0)
+    expect(detectDistressLevel('overdose de pompes')).toBe(0)
+    expect(detectDistressLevel('overdose de sucre')).toBe(0)
+  })
+
+  it('purge seul retiré ; me purger / vomir gardés', () => {
+    expect(detectDistressLevel('purge du cache')).toBe(0)
+    expect(detectDistressLevel('la purge des données')).toBe(0)
+    expect(detectDistressLevel('je dois me purger')).toBe(1)
+    expect(detectDistressLevel('je me fais vomir')).toBe(1)
+    expect(detectDistressLevel('me faire vomir après manger')).toBe(1)
+  })
+
+  it('5 faux positifs QA ciblés ne déclenchent plus le niveau erroné', () => {
+    expect(detectDistressLevel('10 kms de course')).toBe(0)
+    expect(detectDistressLevel('je me coupe les ongles')).toBe(0)
+    expect(detectDistressLevel('overdose de squats')).toBe(0)
+    expect(detectDistressLevel('purge du cache')).toBe(0)
+    expect(detectDistressLevel('la purge des données')).toBe(0)
+    // Intentionnel : reste niveau 1
+    expect(detectDistressLevel("j'en peux plus de ce bug")).toBe(1)
   })
 })

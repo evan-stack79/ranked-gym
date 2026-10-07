@@ -36,7 +36,7 @@ import {
   setBetaFeedbackPrefillPage,
   type OpenBetaFeedbackDetail,
 } from '../../services/betaFeedbackNav'
-import { canAccessBetaFeedback } from '../../services/betaFeedbackAccess'
+import { canOpenBetaFeedback } from '../../services/betaFeedbackAccess'
 
 function ProfileViewContent() {
   const {
@@ -67,7 +67,7 @@ function ProfileViewContent() {
 
   useEffect(() => {
     const openFeedback = (page?: string) => {
-      if (!canAccessBetaFeedback()) return
+      if (!canOpenBetaFeedback()) return
       if (page) setBetaFeedbackPrefillPage(page)
       if (!isAuthenticated) {
         requireAuth(() => navigate('giveFeedback'))
@@ -162,7 +162,7 @@ function ProfileViewContent() {
   }
 
   if (route === 'giveFeedback') {
-    if (!canAccessBetaFeedback()) {
+    if (!canOpenBetaFeedback()) {
       goBack()
       return null
     }
@@ -175,6 +175,7 @@ function ProfileViewContent() {
       <BetaFeedbackScreen
         onBack={goBack}
         onOpenNeedToTalk={() => navigate('needToTalk')}
+        onOpenProfile={() => navigate('personalInfo')}
       />
     )
   }

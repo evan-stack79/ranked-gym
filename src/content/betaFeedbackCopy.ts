@@ -87,6 +87,12 @@ export const BETA_FEEDBACK_VERSION_LABEL = 'Version'
 export const BETA_FEEDBACK_AGE_BLOCKED =
   'Cette fonction est réservée aux personnes majeures.'
 
+/** Âge manquant côté profil (serveur fail-closed) — orienter vers le profil. */
+export const BETA_FEEDBACK_COMPLETE_PROFILE =
+  'Complète ton profil pour donner ton avis'
+
+export const BETA_FEEDBACK_OPEN_PROFILE = 'Compléter mon profil'
+
 export const BETA_FEEDBACK_BACK = 'Retour'
 export const BETA_FEEDBACK_TYPE_GROUP_LABEL = "Type d'avis"
 export const BETA_FEEDBACK_TEXTE_SR_LABEL = 'Ton avis'

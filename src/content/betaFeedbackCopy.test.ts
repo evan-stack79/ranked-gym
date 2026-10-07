@@ -39,4 +39,11 @@ describe('betaFeedbackCopy lexicon + Vérificateur §7.1', () => {
     expect(copy.BETA_FEEDBACK_EMPTY).toContain('Écris quelques mots')
     expect(copy.BETA_FEEDBACK_TOO_LONG).toContain('2 000')
   })
+
+  it('âge manquant : texte profil exact', () => {
+    expect(copy.BETA_FEEDBACK_COMPLETE_PROFILE).toBe(
+      'Complète ton profil pour donner ton avis',
+    )
+    expect(copy.BETA_FEEDBACK_OPEN_PROFILE).toBe('Compléter mon profil')
+  })
 })

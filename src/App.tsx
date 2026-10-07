@@ -22,7 +22,7 @@ import { safeWarn } from './utils/safeLog'
 import { getTrainingState } from './services/trainingStorage'
 import { isSportsOnboardingEnabled } from './backend/trainingFeatureFlags'
 import { OPEN_BETA_FEEDBACK_EVENT } from './services/betaFeedbackNav'
-import { canAccessBetaFeedback } from './services/betaFeedbackAccess'
+import { canOpenBetaFeedback } from './services/betaFeedbackAccess'
 
 type AppPhase = 'loading' | 'onboarding' | 'sports' | 'main'
 
@@ -168,7 +168,7 @@ export function AppShell() {
 
   useEffect(() => {
     const onOpenFeedback = () => {
-      if (!canAccessBetaFeedback()) return
+      if (!canOpenBetaFeedback()) return
       if (!isAuthenticated) {
         openAuth()
         return

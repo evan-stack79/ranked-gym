@@ -4,6 +4,7 @@ import {
   BETA_FEEDBACK_BACK,
   BETA_FEEDBACK_CALL_15,
   BETA_FEEDBACK_CALL_3114,
+  BETA_FEEDBACK_COMPLETE_PROFILE,
   BETA_FEEDBACK_CONFIRM,
   BETA_FEEDBACK_CONFIRM_URGENT_SUICIDE,
   BETA_FEEDBACK_CONFIRM_URGENT_TCA,
@@ -20,6 +21,7 @@ import {
   BETA_FEEDBACK_NO_REALTIME,
   BETA_FEEDBACK_OFFLINE,
   BETA_FEEDBACK_OFFLINE_QUEUED_HELP,
+  BETA_FEEDBACK_OPEN_PROFILE,
   BETA_FEEDBACK_PAGE_LABEL,
   BETA_FEEDBACK_REFORMULATE,
   BETA_FEEDBACK_RETRY,
@@ -42,7 +44,7 @@ import {
   BETA_FEEDBACK_VERSION_LABEL,
 } from '../../content/betaFeedbackCopy'
 import { getAppBuildId } from '../../pwa/appBuildId'
-import { canAccessBetaFeedback } from '../../services/betaFeedbackAccess'
+import { getBetaFeedbackAgeStatus } from '../../services/betaFeedbackAccess'
 import {
   BETA_FEEDBACK_PAGES,
   isBetaFeedbackPage,
@@ -65,12 +67,28 @@ const TEXTE_MIN = 10
 const TEXTE_MAX = 2000
 const COUNTER_FROM = 1800
 
-type Phase = 'form' | 'insult' | 'success' | 'urgent_tca' | 'urgent_suicide' | 'blocked'
+type Phase =
+  | 'form'
+  | 'insult'
+  | 'success'
+  | 'urgent_tca'
+  | 'urgent_suicide'
+  | 'blocked'
+  | 'needs_profile'
 
 interface BetaFeedbackScreenProps {
   onBack: () => void
   onOpenNeedToTalk: () => void
+  /** Ouvre l’écran profil (âge manquant → compléter le profil). */
+  onOpenProfile: () => void
   initialPage?: string
+}
+
+function initialPhaseFromAge(): Phase {
+  const status = getBetaFeedbackAgeStatus()
+  if (status === 'adult') return 'form'
+  if (status === 'missing') return 'needs_profile'
+  return 'blocked'
 }
 
 type DraftState = {
@@ -124,13 +142,15 @@ function applyDistressPhase(
 export function BetaFeedbackScreen({
   onBack,
   onOpenNeedToTalk,
+  onOpenProfile,
   initialPage,
 }: BetaFeedbackScreenProps) {
-  const allowed = canAccessBetaFeedback()
+  const ageStatus = getBetaFeedbackAgeStatus()
+  const allowed = ageStatus === 'adult'
   const versionId = getAppBuildId()
 
   const draft = useMemo(() => readDraft(), [])
-  const [phase, setPhase] = useState<Phase>(() => (allowed ? 'form' : 'blocked'))
+  const [phase, setPhase] = useState<Phase>(initialPhaseFromAge)
   const [type, setType] = useState<AvisType | null>(draft?.type ?? null)
   const [texte, setTexte] = useState(draft?.texte ?? '')
   const [page, setPage] = useState<BetaFeedbackPage>(() => {
@@ -254,7 +274,8 @@ export function BetaFeedbackScreen({
           return
         }
         if (result.error === 'AVIS_BETA_AGE_REQUIRED') {
-          setPhase('blocked')
+          // Serveur fail-closed : âge manquant → compléter le profil ; mineur → bloqué.
+          setPhase(getBetaFeedbackAgeStatus() === 'missing' ? 'needs_profile' : 'blocked')
           sendingLock.current = false
           setSending(false)
           return
@@ -286,6 +307,40 @@ export function BetaFeedbackScreen({
     }
     if (!consent) return
     void doSubmit(forceInsults)
+  }
+
+  if (phase === 'needs_profile') {
+    return (
+      <section
+        className="ios-fade-up space-y-5 pb-8"
+        data-testid="beta-feedback-screen"
+        data-age-gate="missing"
+      >
+        <Header onBack={onBack} />
+        <p
+          className="text-[15px] leading-relaxed text-[#EBEBF5]"
+          data-testid="beta-feedback-complete-profile"
+        >
+          {BETA_FEEDBACK_COMPLETE_PROFILE}
+        </p>
+        <button
+          type="button"
+          onClick={onOpenProfile}
+          className="ios-press w-full rounded-2xl bg-[#FF2B2B] px-4 py-3.5 text-[15px] font-semibold text-white"
+          data-testid="beta-feedback-open-profile"
+        >
+          {BETA_FEEDBACK_OPEN_PROFILE}
+        </button>
+        <button
+          type="button"
+          onClick={onOpenNeedToTalk}
+          className="ios-press text-[15px] font-semibold text-[#64D2FF] underline"
+          data-testid="beta-feedback-need-to-talk"
+        >
+          {BETA_FEEDBACK_NEED_TO_TALK}
+        </button>
+      </section>
+    )
   }
 
   if (phase === 'blocked') {

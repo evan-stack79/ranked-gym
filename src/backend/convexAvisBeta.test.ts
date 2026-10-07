@@ -281,7 +281,7 @@ describe('submitAvisBetaForSession', () => {
     expect(row.notif).toBe('a_envoyer')
   })
 
-  it('refuse si âge serveur manquant / mineur et ignore tout âge client', async () => {
+  it('refuse si âge serveur manquant / mineur et ignore tout âge client (fail-closed)', async () => {
     const db = new FakeDb()
     const ctx = createCtx(db)
     await seedUser(db, 'user-m', 'session-m')
@@ -298,17 +298,33 @@ describe('submitAvisBetaForSession', () => {
     expect(missing).toEqual({ ok: false, error: AVIS_BETA_MINOR_ERROR })
     expect(db.table('avis_beta')).toHaveLength(0)
 
-    await seedStoredAge(db, 'user-m', 16)
-    const minor = await submitAvisBetaForSession(ctx as never, {
+    // nutrition_state sans age dans profileJson → fail-closed
+    await seedStoredAge(db, 'user-m', undefined)
+    const emptyAge = await submitAvisBetaForSession(ctx as never, {
       ...baseSubmit,
       sessionToken: 'session-m',
+      type: 'idee',
+      texte: 'Une idée pour les rappels d’eau.',
+      page: 'Nutrition',
+      cleAntiDoublon: 'key-m-empty',
+    })
+    expect(emptyAge).toEqual({ ok: false, error: AVIS_BETA_MINOR_ERROR })
+    expect(db.table('avis_beta')).toHaveLength(0)
+
+    const db2 = new FakeDb()
+    const ctx2 = createCtx(db2)
+    await seedUser(db2, 'user-min', 'session-min')
+    await seedStoredAge(db2, 'user-min', 16)
+    const minor = await submitAvisBetaForSession(ctx2 as never, {
+      ...baseSubmit,
+      sessionToken: 'session-min',
       type: 'idee',
       texte: 'Une idée pour les rappels d’eau.',
       page: 'Nutrition',
       cleAntiDoublon: 'key-m2',
     })
     expect(minor).toEqual({ ok: false, error: AVIS_BETA_MINOR_ERROR })
-    expect(db.table('avis_beta')).toHaveLength(0)
+    expect(db2.table('avis_beta')).toHaveLength(0)
   })
 
   it('refuse sans consentement', async () => {

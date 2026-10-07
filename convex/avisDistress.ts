@@ -1,5 +1,5 @@
 /**
- * Repérage détresse / TCA pour avis bêta — liste Vérificateur §7.4 (2026-10-07).
+ * Repérage détresse / TCA pour avis bêta — liste Vérificateur §7.4 + décisions QA.
  * Jamais de diagnostic, jamais de blocage d’envoi, rien sur le profil.
  */
 
@@ -25,11 +25,16 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+const JE_ME_COUPE_EXCEPTIONS =
+  '(?:les ongles|les cheveux|la barbe|la frange)'
+
+const OVERDOSE_VERB =
+  '(?:faire|fais|fait|font|faisait|faisais|faisaient|ferai|feras|fera|ferons|ferez|feront|prendre|prends|prend|prennent|prenait|prenais|prenaient|prendrai|prendras|prendra|pris|prise|prises)'
+
 /**
  * Limites de mots autour de la phrase entière.
  * Cas « en finir » : ne pas déclencher sur « en finir avec ce bug ».
- * Autorisé : seul, « avec la vie », « avec tout », plus AV-02 (en attente
- * validation Vérificateur) : « avec ma vie », « avec moi ».
+ * Autorisé : seul, « avec la vie », « avec tout », « avec ma vie », « avec moi ».
  */
 export function matchesDistressPhrase(normalizedHaystack: string, phrase: string): boolean {
   const needle = normalizeForMatch(phrase)
@@ -41,6 +46,37 @@ export function matchesDistressPhrase(normalizedHaystack: string, phrase: string
       'u',
     )
     return pattern.test(normalizedHaystack)
+  }
+
+  // « kms » entier, sauf s’il suit un nombre (« 10 kms », « 5 km » n’est pas « kms »).
+  if (needle === 'kms') {
+    const pattern = new RegExp(
+      `(?:^|[^\\p{L}\\p{N}])(?<!\\d\\s)kms(?:[^\\p{L}\\p{N}]|$)`,
+      'u',
+    )
+    return pattern.test(normalizedHaystack)
+  }
+
+  // « je me coupe » sauf ongles / cheveux / barbe / frange.
+  if (needle === 'je me coupe') {
+    const pattern = new RegExp(
+      `(?:^|[^\\p{L}\\p{N}])je me coupe(?!\\s+${JE_ME_COUPE_EXCEPTIONS}\\b)(?:[^\\p{L}\\p{N}]|$)`,
+      'u',
+    )
+    return pattern.test(normalizedHaystack)
+  }
+
+  // « overdose » uniquement via formes verbales ciblées ou médicaments/cachets.
+  if (needle === 'overdose') {
+    const viaVerb = new RegExp(
+      `(?:^|[^\\p{L}\\p{N}])${OVERDOSE_VERB}\\s+une\\s+overdose(?:[^\\p{L}\\p{N}]|$)`,
+      'u',
+    )
+    const viaMeds = new RegExp(
+      `(?:^|[^\\p{L}\\p{N}])overdose\\s+de\\s+(?:medicaments|cachets)(?:[^\\p{L}\\p{N}]|$)`,
+      'u',
+    )
+    return viaVerb.test(normalizedHaystack) || viaMeds.test(normalizedHaystack)
   }
 
   const pattern = new RegExp(
@@ -69,7 +105,7 @@ export const AVIS_MOTS_DETRESSE_NIVEAU_2 = [
   'en finir',
   'en finir avec la vie',
   'en finir avec tout',
-  // AV-02 — ajouts QA, en attente validation Vérificateur
+  // Validé Vérificateur : « en finir avec ma vie / moi »
   'en finir avec ma vie',
   'en finir avec moi',
   'tout arreter pour de bon',
@@ -108,9 +144,11 @@ export const AVIS_MOTS_DETRESSE_NIVEAU_2 = [
   'me faire du mal',
   'automutilation',
   'auto mutilation',
+  // « overdose » : matching restreint dans matchesDistressPhrase
   'overdose',
   'avaler des cachets',
   'avaler tous mes medicaments',
+  // « kms » : matching restreint (pas après un nombre)
   'kms',
   'kill myself',
 ] as const
@@ -131,7 +169,7 @@ export const AVIS_MOTS_DETRESSE_NIVEAU_1 = [
   'laxatifs',
   'diuretique',
   'diuretiques',
-  'purge',
+  // « purge » seul retiré (faux positifs cache / données) — garder « me purger »
   'me purger',
   'ne plus manger',
   'ne mange plus',

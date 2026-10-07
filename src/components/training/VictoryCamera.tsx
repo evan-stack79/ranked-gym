@@ -10,7 +10,7 @@ import {
 import { vibrate } from '../../utils/haptics'
 import { useRestTimerContext } from '../../context/RestTimerContext'
 import { BETA_FEEDBACK_SESSION_LINK } from '../../content/betaFeedbackCopy'
-import { canAccessBetaFeedback } from '../../services/betaFeedbackAccess'
+import { canOpenBetaFeedback } from '../../services/betaFeedbackAccess'
 import { requestOpenBetaFeedback } from '../../services/betaFeedbackNav'
 import { BETA_FEEDBACK_PAGE_SESSION_END } from '../../services/betaFeedbackPages'
 
@@ -406,7 +406,7 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
               </button>
             </div>
 
-            {canAccessBetaFeedback() ? (
+            {canOpenBetaFeedback() ? (
               <button
                 type="button"
                 className="mx-auto mt-3 block text-center text-[12px] font-medium text-[#AEAEB2] underline"

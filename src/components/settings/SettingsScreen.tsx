@@ -26,7 +26,7 @@ import {
   type AppDisciplineId,
 } from '../../data/disciplines'
 import { BETA_FEEDBACK_SETTINGS_LABEL } from '../../content/betaFeedbackCopy'
-import { canAccessBetaFeedback } from '../../services/betaFeedbackAccess'
+import { canOpenBetaFeedback } from '../../services/betaFeedbackAccess'
 
 const PRO_PASS_DISMISSED_KEY = 'ranked-gym:pro-pass-dismissed'
 
@@ -103,7 +103,7 @@ export function SettingsScreen({
   userId,
   onAvatarUpdated,
 }: SettingsScreenProps) {
-  const showGiveFeedback = canAccessBetaFeedback()
+  const showGiveFeedback = canOpenBetaFeedback()
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const [proDismissed, setProDismissed] = useState(readProPassDismissed)
   const [sheet, setSheet] = useState<SettingsSheet>(null)

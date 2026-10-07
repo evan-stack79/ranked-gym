@@ -6,6 +6,7 @@ import {
   BETA_FEEDBACK_BACK,
   BETA_FEEDBACK_CALL_15,
   BETA_FEEDBACK_CALL_3114,
+  BETA_FEEDBACK_COMPLETE_PROFILE,
   BETA_FEEDBACK_CONFIRM,
   BETA_FEEDBACK_CONFIRM_URGENT_SUICIDE,
   BETA_FEEDBACK_CONFIRM_URGENT_TCA,
@@ -13,6 +14,7 @@ import {
   BETA_FEEDBACK_EMPTY,
   BETA_FEEDBACK_NEED_TO_TALK,
   BETA_FEEDBACK_NO_REALTIME,
+  BETA_FEEDBACK_OPEN_PROFILE,
   BETA_FEEDBACK_SCREEN_TITLE,
   BETA_FEEDBACK_SETTINGS_LABEL,
   BETA_FEEDBACK_SUBMIT,
@@ -110,7 +112,7 @@ describe('BetaFeedbackScreen', () => {
     const root = createRoot(host)
     await act(async () => {
       root.render(
-        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} />,
+        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} onOpenProfile={() => undefined} />,
       )
     })
 
@@ -142,6 +144,7 @@ describe('BetaFeedbackScreen', () => {
         <BetaFeedbackScreen
           onBack={() => undefined}
           onOpenNeedToTalk={() => undefined}
+          onOpenProfile={() => undefined}
           initialPage="Fin de séance"
         />,
       )
@@ -162,11 +165,58 @@ describe('BetaFeedbackScreen', () => {
     const root = createRoot(host)
     await act(async () => {
       root.render(
-        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} />,
+        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} onOpenProfile={() => undefined} />,
       )
     })
     expect(host.textContent).toContain('personnes majeures')
     expect(host.querySelector('[data-testid="beta-feedback-submit"]')).toBeNull()
+    expect(host.querySelector('[data-testid="beta-feedback-complete-profile"]')).toBeNull()
+    root.unmount()
+    host.remove()
+  })
+
+  it('âge manquant : message profil, bouton profil, lien Besoin d’en parler ?', async () => {
+    const current = getCalorieProfile()
+    saveCalorieProfile({ ...current, age: 0 })
+    const onOpenProfile = vi.fn()
+    const onOpenNeedToTalk = vi.fn()
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(
+        <BetaFeedbackScreen
+          onBack={() => undefined}
+          onOpenNeedToTalk={onOpenNeedToTalk}
+          onOpenProfile={onOpenProfile}
+        />,
+      )
+    })
+
+    expect(host.querySelector('[data-age-gate="missing"]')).toBeTruthy()
+    expect(host.querySelector('[data-testid="beta-feedback-complete-profile"]')?.textContent).toBe(
+      BETA_FEEDBACK_COMPLETE_PROFILE,
+    )
+    expect(host.querySelector('[data-testid="beta-feedback-submit"]')).toBeNull()
+
+    const profileBtn = host.querySelector(
+      '[data-testid="beta-feedback-open-profile"]',
+    ) as HTMLButtonElement
+    expect(profileBtn?.textContent).toBe(BETA_FEEDBACK_OPEN_PROFILE)
+    await act(async () => {
+      profileBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(onOpenProfile).toHaveBeenCalledTimes(1)
+
+    const help = host.querySelector(
+      '[data-testid="beta-feedback-need-to-talk"]',
+    ) as HTMLButtonElement
+    expect(help?.textContent).toBe(BETA_FEEDBACK_NEED_TO_TALK)
+    await act(async () => {
+      help.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(onOpenNeedToTalk).toHaveBeenCalledTimes(1)
+
     root.unmount()
     host.remove()
   })
@@ -177,7 +227,7 @@ describe('BetaFeedbackScreen', () => {
     const root = createRoot(host)
     await act(async () => {
       root.render(
-        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} />,
+        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} onOpenProfile={() => undefined} />,
       )
     })
 
@@ -216,7 +266,7 @@ describe('BetaFeedbackScreen', () => {
     const root = createRoot(host)
     await act(async () => {
       root.render(
-        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} />,
+        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} onOpenProfile={() => undefined} />,
       )
     })
     await fillAndSubmit(host)
@@ -249,7 +299,7 @@ describe('BetaFeedbackScreen', () => {
     const root = createRoot(host)
     await act(async () => {
       root.render(
-        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} />,
+        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} onOpenProfile={() => undefined} />,
       )
     })
     await fillAndSubmit(host)
@@ -276,7 +326,7 @@ describe('BetaFeedbackScreen', () => {
     const root = createRoot(host)
     await act(async () => {
       root.render(
-        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} />,
+        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} onOpenProfile={() => undefined} />,
       )
     })
     await fillAndSubmit(host, 'j’ai envie de mourir vraiment beaucoup')
@@ -301,7 +351,7 @@ describe('BetaFeedbackScreen', () => {
     const root = createRoot(host)
     await act(async () => {
       root.render(
-        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} />,
+        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} onOpenProfile={() => undefined} />,
       )
     })
     await fillAndSubmit(host, 'j’ai envie de mourir vraiment beaucoup')
@@ -319,7 +369,7 @@ describe('BetaFeedbackScreen', () => {
     const root = createRoot(host)
     await act(async () => {
       root.render(
-        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} />,
+        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} onOpenProfile={() => undefined} />,
       )
     })
     expect(host.querySelector('[data-testid="beta-feedback-empty-hint"]')?.textContent).toBe(
@@ -339,7 +389,7 @@ describe('BetaFeedbackScreen', () => {
     const root = createRoot(host)
     await act(async () => {
       root.render(
-        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} />,
+        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} onOpenProfile={() => undefined} />,
       )
     })
     await setTexte(host, 'x'.repeat(2001))
@@ -360,7 +410,7 @@ describe('BetaFeedbackScreen', () => {
     const root = createRoot(host)
     await act(async () => {
       root.render(
-        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} />,
+        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} onOpenProfile={() => undefined} />,
       )
     })
     const meta = host.querySelector('[data-testid="beta-feedback-meta"]')?.textContent ?? ''
