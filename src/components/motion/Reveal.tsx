@@ -18,7 +18,8 @@ export interface RevealProps {
 }
 
 /**
- * Soft fade + rise on first viewport entry (CSS + IntersectionObserver).
+ * Soft fade + rise (translateY 12px) on first viewport entry — for cards.
+ * Stagger via delayMs (keep ≤80ms between siblings).
  * MIT-friendly: no paid libs. Disabled under prefers-reduced-motion.
  */
 export function Reveal({

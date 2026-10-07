@@ -3,6 +3,7 @@ import {
   canSubmitHomeQuickWater,
   HOME_QUICK_WATER_ML,
 } from '../../utils/homeNutritionQuickActions'
+import { CountUpNumber } from '../motion'
 
 interface NutritionHydrationCardProps {
   consumedMl: number
@@ -31,7 +32,12 @@ export function NutritionHydrationCard({
       <div className="min-w-0 flex-1">
         <p className="text-[14px] font-semibold text-white">Hydratation</p>
         <p className="mt-0.5 text-[13px] font-medium tabular-nums text-[#AEAEB2]">
-          {formatLiters(consumedMl)} / {formatLiters(safeGoal)} L
+          <CountUpNumber
+            kind="water"
+            value={consumedMl}
+            format={(n) => formatLiters(Math.round(n))}
+          />{' '}
+          / {formatLiters(safeGoal)} L
         </p>
         <div
           className="mt-2 h-[3px] overflow-hidden rounded-full bg-[#2A2A2E]"

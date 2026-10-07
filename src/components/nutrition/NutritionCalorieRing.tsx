@@ -1,3 +1,5 @@
+import { StaticKcalNumber } from '../motion'
+
 interface NutritionCalorieRingProps {
   remainingCalories: number
   consumedCalories: number
@@ -8,9 +10,7 @@ interface NutritionCalorieRingProps {
   allowGoalSetup?: boolean
 }
 
-function formatKcal(n: number): string {
-  return Math.max(0, Math.round(Number.isFinite(n) ? n : 0)).toLocaleString('fr-FR')
-}
+// SAFETY (PM / Vérificateur): kcal renders via StaticKcalNumber — never CountUpNumber.
 
 const RING_RADIUS = 92
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
@@ -46,11 +46,16 @@ export function NutritionCalorieRing({
     <div className="mb-3 flex w-full items-center justify-between gap-3">
       <p className="text-[15px] font-semibold text-white">Calories aujourd’hui</p>
       <p className="text-right text-[12px] tabular-nums text-[#8E8E93]">
-        {hasTarget
-          ? `${formatKcal(safeConsumed)} / ${formatKcal(targetCalories)} kcal`
-          : allowGoalSetup
-            ? 'Objectif à définir'
-            : 'Suivi sans objectif'}
+        {hasTarget ? (
+          <>
+            <StaticKcalNumber value={safeConsumed} /> / <StaticKcalNumber value={targetCalories} />{' '}
+            kcal
+          </>
+        ) : allowGoalSetup ? (
+          'Objectif à définir'
+        ) : (
+          'Suivi sans objectif'
+        )}
       </p>
     </div>
   )
@@ -81,7 +86,7 @@ export function NutritionCalorieRing({
           </button>
         ) : (
           <p className="mt-4 text-[13px] tabular-nums text-white">
-            Consommé aujourd&apos;hui : {formatKcal(safeConsumed)} kcal
+            Consommé aujourd&apos;hui : <StaticKcalNumber value={safeConsumed} /> kcal
           </p>
         )}
       </div>
@@ -140,7 +145,9 @@ export function NutritionCalorieRing({
             draggable={false}
           />
           <p className="text-[36px] font-bold leading-none tracking-tight text-white tabular-nums">
-            {isOverTarget ? formatKcal(Math.abs(remainingCalories)) : formatKcal(remainingCalories)}
+            <StaticKcalNumber
+              value={isOverTarget ? Math.abs(remainingCalories) : remainingCalories}
+            />
           </p>
           <p className={`mt-1 text-[14px] font-medium ${isOverTarget ? 'text-[#FF6B6B]' : 'text-[#8E8E93]'}`}>
             {isOverTarget ? 'kcal dépassées' : 'kcal restantes'}

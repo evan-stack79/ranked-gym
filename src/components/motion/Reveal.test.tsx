@@ -3,7 +3,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Reveal } from './Reveal'
-import { BlurInText } from './BlurInText'
+import { BlurInText, BLUR_WORD_STAGGER_MS } from './BlurInText'
 
 function mockMatchMedia(reduced: boolean) {
   Object.defineProperty(window, 'matchMedia', {
@@ -17,7 +17,6 @@ function mockMatchMedia(reduced: boolean) {
       removeListener: vi.fn(),
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
     })),
   })
 }
@@ -78,7 +77,7 @@ describe('Reveal / BlurInText', () => {
     expect(observe).not.toHaveBeenCalled()
   })
 
-  it('BlurInText reduced-motion path settles with no filter class', () => {
+  it('BlurInText reduced-motion path settles with accessible full text', () => {
     mockMatchMedia(true)
 
     act(() => {
@@ -93,18 +92,30 @@ describe('Reveal / BlurInText', () => {
     expect(el).not.toBeNull()
     expect(el.getAttribute('data-rg-blur')).toBe('settled')
     expect(el.getAttribute('data-rg-motion')).toBe('reduced')
+    expect(el.getAttribute('aria-label')).toBe('Nutrition')
     expect(el.className).toContain('rg-blur-in--settled')
+    expect(el.querySelector('.sr-only')?.textContent).toBe('Nutrition')
+    expect(el.querySelector('.rg-blur-words')?.getAttribute('aria-hidden')).toBe('true')
   })
 
-  it('BlurInText final state has filter none after animation end', () => {
+  it('BlurInText splits into words with stagger ≤80ms and settles after last word', () => {
+    expect(BLUR_WORD_STAGGER_MS).toBeLessThanOrEqual(80)
+
     act(() => {
-      root.render(
-        <BlurInText as="h1">Train</BlurInText>,
-      )
+      root.render(<BlurInText as="h1">Bonjour Alex</BlurInText>)
     })
 
     const el = host.querySelector('[data-rg-blur]') as HTMLElement
     expect(el.getAttribute('data-rg-blur')).toBe('pending')
+    expect(el.getAttribute('aria-label')).toBe('Bonjour Alex')
+
+    const words = el.querySelectorAll('.rg-blur-word')
+    expect(words.length).toBe(2)
+    expect(words[0]?.textContent?.trim()).toBe('Bonjour')
+    expect(words[1]?.textContent?.trim()).toBe('Alex')
+    expect((words[1] as HTMLElement).style.getPropertyValue('--rg-word-delay')).toBe(
+      `${BLUR_WORD_STAGGER_MS}ms`,
+    )
 
     act(() => {
       ioCallback?.(
@@ -127,17 +138,16 @@ describe('Reveal / BlurInText', () => {
     expect(el.className).toContain('rg-blur-in--in')
 
     act(() => {
-      el.dispatchEvent(new Event('animationend', { bubbles: true }))
+      words[0]!.dispatchEvent(new Event('animationend', { bubbles: true }))
+    })
+    expect(el.getAttribute('data-rg-blur')).toBe('in')
+
+    act(() => {
+      words[1]!.dispatchEvent(new Event('animationend', { bubbles: true }))
     })
 
     expect(el.getAttribute('data-rg-blur')).toBe('settled')
     expect(el.className).toContain('rg-blur-in--settled')
-
-    // Settled class locks filter: none in CSS — assert class contract here;
-    // jsdom does not compute stylesheet cascade for custom classes.
-    const settledRule =
-      '.rg-blur-in--settled { filter: none; opacity: 1; transform: none; }'
-    expect(settledRule).toContain('filter: none')
     expect(disconnect).toHaveBeenCalled()
   })
 

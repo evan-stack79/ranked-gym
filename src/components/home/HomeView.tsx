@@ -90,7 +90,7 @@ export function HomeView({ onStartTraining, onOpenTraining, onOpenNutrition }: H
       </div>
 
       <div className="home-cold-enter__group home-cold-enter__group--2">
-        <Reveal delayMs={40} instant={coldEntering}>
+        <Reveal delayMs={60} instant={coldEntering}>
           <TodayWorkoutCard
             workout={todayWorkout}
             onStart={() => {

@@ -755,7 +755,7 @@ export function TrainingView({
             />
           </Reveal>
 
-          <Reveal delayMs={40}>
+          <Reveal delayMs={60}>
             <TrainRecentSessions
               items={recentSessions}
               single

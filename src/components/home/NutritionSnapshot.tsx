@@ -10,6 +10,7 @@ import {
 } from '../../utils/homeNutritionQuickActions'
 import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
 import { isMinorAge } from '../../services/nutritionSafetyRules'
+import { CountUpNumber, StaticKcalNumber } from '../motion'
 
 interface NutritionSnapshotProps {
   onOpenNutrition?: () => void
@@ -127,11 +128,12 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
         {snapshot.targetAvailable ? (
           <>
             <p className="mt-1 text-[22px] font-bold leading-tight tracking-tight text-white">
-              Il te reste {snapshot.remainingCalories.toLocaleString('fr-FR')} kcal
+              {/* SAFETY: kcal must stay static — never CountUpNumber (PM / Vérificateur). */}
+              Il te reste <StaticKcalNumber value={snapshot.remainingCalories} /> kcal
             </p>
             <p className="mt-1 text-[13px] text-[#AEAEB2]">
-              {Math.round(snapshot.consumedCalories).toLocaleString('fr-FR')} consommées sur{' '}
-              {snapshot.targetCalories.toLocaleString('fr-FR')}
+              <StaticKcalNumber value={snapshot.consumedCalories} /> consommées sur{' '}
+              <StaticKcalNumber value={snapshot.targetCalories} />
             </p>
           </>
         ) : snapshot.showUnavailableGoal ? (
@@ -143,7 +145,7 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
           <>
             <p className="mt-1 text-[17px] font-semibold text-white">Suivi du jour</p>
             <p className="mt-1 text-[13px] text-[#AEAEB2]">
-              {Math.round(snapshot.consumedCalories).toLocaleString('fr-FR')} kcal consommées
+              <StaticKcalNumber value={snapshot.consumedCalories} /> kcal consommées
             </p>
           </>
         )}
@@ -183,7 +185,12 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
               <p className="mt-0.5 text-[15px] font-semibold text-[#7DD3FC]">Objectif atteint</p>
             ) : (
               <p className="mt-0.5 text-[15px] font-semibold text-white">
-                {formatWaterMl(snapshot.waterMl)} sur {formatWaterMl(snapshot.waterGoalMl)}
+                <CountUpNumber
+                  kind="water"
+                  value={snapshot.waterMl}
+                  format={(n) => formatWaterMl(Math.round(n))}
+                />{' '}
+                sur {formatWaterMl(snapshot.waterGoalMl)}
               </p>
             )}
             <div

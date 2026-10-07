@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BrandMark } from '../components/brand/BrandMark'
-import { BlurInText, Reveal } from '../components/motion'
+import { BlurInText, CountUpNumber, Reveal, StaticKcalNumber } from '../components/motion'
 
 export function ColdLaunchAccueilFixture() {
   const [coldEntering, setColdEntering] = useState(() => {
@@ -63,19 +63,47 @@ export function ColdLaunchAccueilFixture() {
 
             <section className="home-cold-enter__group home-cold-enter__group--1">
               <Reveal instant={coldEntering}>
-                <div className="glass-card rounded-3xl p-5" data-reveal-card="nutrition">
-                  <div className="mb-3 h-4 w-24 rounded-full bg-white/20" />
-                  <div className="h-3 w-full rounded-full bg-white/10" />
+                <div
+                  className="glass-card rounded-3xl p-5"
+                  data-reveal-card="nutrition"
+                  data-testid="accueil-kcal-static"
+                >
+                  <p className="text-[11px] font-medium text-[#8E8E93]">Aujourd&apos;hui</p>
+                  <p className="mt-1 text-[22px] font-bold tracking-tight text-white">
+                    Il te reste <StaticKcalNumber value={842} /> kcal
+                  </p>
+                  <p className="mt-3 text-[11px] font-medium text-[#8E8E93]">Eau</p>
+                  <p className="mt-0.5 text-[15px] font-semibold text-white">
+                    <CountUpNumber
+                      kind="water"
+                      value={900}
+                      instant={coldEntering}
+                      format={(n) => `${Math.round(n)} ml`}
+                    />{' '}
+                    sur 2,8 L
+                  </p>
+                  <button
+                    type="button"
+                    className="btn-brand ios-press mt-4 min-h-11 w-full rounded-2xl border border-white/15 px-3 py-2.5 text-[14px] font-semibold text-white"
+                    data-testid="accueil-fixture-cta"
+                  >
+                    Ajouter un repas
+                  </button>
                 </div>
               </Reveal>
             </section>
 
             <section className="home-cold-enter__group home-cold-enter__group--2">
-              <Reveal delayMs={40} instant={coldEntering}>
+              <Reveal delayMs={60} instant={coldEntering}>
                 <div className="glass-card rounded-3xl p-5" data-reveal-card="train">
-                  <div className="mb-3 h-5 w-52 rounded-full bg-white/20" />
-                  <div className="mb-4 h-3 w-44 rounded-full bg-white/10" />
-                  <div className="h-10 w-40 rounded-2xl bg-[#FF2B2B]/25" />
+                  <p className="text-[11px] font-medium text-[#8E8E93]">Entraînement</p>
+                  <p className="mt-1 text-[15px] font-semibold text-white">Push · 4 exercices</p>
+                  <button
+                    type="button"
+                    className="btn-brand ios-press mt-4 min-h-11 rounded-2xl border border-white/15 px-4 py-2.5 text-[14px] font-semibold text-white"
+                  >
+                    Démarrer
+                  </button>
                 </div>
               </Reveal>
             </section>
@@ -94,32 +122,16 @@ export function ColdLaunchAccueilFixture() {
               </div>
             </section>
 
-            {/* Contenu additionnel pour démontrer le scroll de la marque */}
             <section className="home-cold-enter__group home-cold-enter__group--4">
               <div className="glass-card rounded-3xl p-5">
                 <div className="mb-3 h-4 w-32 rounded-full bg-white/20" />
                 <div className="mb-2 h-3 w-full rounded-full bg-white/10" />
-                <div className="h-3 w-4/5 rounded-full bg-white/10" />
-              </div>
-            </section>
-            <section>
-              <div className="glass-card rounded-3xl p-5">
-                <div className="mb-3 h-4 w-40 rounded-full bg-white/20" />
-                <div className="h-24 rounded-2xl bg-white/5" />
+                <div className="h-3 w-3/4 rounded-full bg-white/10" />
               </div>
             </section>
           </div>
         </div>
       </main>
-
-      <footer data-bottom-nav-host className="fixed bottom-0 left-0 right-0 z-40">
-        <div className="mx-auto flex h-[calc(var(--app-bottom-nav)+env(safe-area-inset-bottom,0px))] w-full max-w-lg items-center justify-around border-t border-white/10 bg-[#111114] px-4 pb-[env(safe-area-inset-bottom,0px)]">
-          <span className="text-sm font-semibold text-[#FF2B2B]">Accueil</span>
-          <span className="text-sm text-[#8E8E93]">Train</span>
-          <span className="text-sm text-[#8E8E93]">Nutri</span>
-          <span className="text-sm text-[#8E8E93]">Profil</span>
-        </div>
-      </footer>
     </div>
   )
 }
