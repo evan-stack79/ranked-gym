@@ -2,22 +2,20 @@
 /**
  * Playwright WebKit capture — tasteful reveal / blur-in on Accueil + Nutrition.
  * Viewport 390×844, deviceScaleFactor 3 (iPhone-class).
+ *
+ * Note: index.html CSP includes `upgrade-insecure-requests`, which breaks WebKit
+ * against a plain HTTP Vite server. We strip that directive for local capture only.
  */
 import { mkdir, copyFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
-import { spawn } from 'node:child_process'
+import { spawn, execFileSync } from 'node:child_process'
 import { webkit } from 'playwright'
-import {
-  applySafeAreas,
-  preparePage,
-  projectRoot,
-  stopHarnessServer,
-} from './streak-celeb-browser-utils.mjs'
+import { projectRoot, stopHarnessServer } from './streak-celeb-browser-utils.mjs'
 
 const outDir = join(projectRoot, 'scripts', 'screenshots', 'reveal-blur')
 const artifactsDir = '/opt/cursor/artifacts'
-const port = 4197
+const port = 4205
 const width = 390
 const height = 844
 
@@ -58,13 +56,91 @@ async function startAppServer(portNum) {
   return child
 }
 
-async function waitColdLaunchDone(page) {
-  await page
-    .waitForFunction(() => document.documentElement.dataset.coldLaunchPlayed === '1', {
-      timeout: 12_000,
+/** WebKit + upgrade-insecure-requests + HTTP Vite = TLS failures. Strip for local QA. */
+async function allowHttpLocalhost(page) {
+  await page.route('**/*', async (route) => {
+    const request = route.request()
+    if (request.resourceType() !== 'document') {
+      await route.continue()
+      return
+    }
+    const response = await route.fetch()
+    const headers = { ...response.headers() }
+    let body = await response.text()
+    body = body.replace(/\s*upgrade-insecure-requests;?/gi, '')
+    body = body.replace(
+      /script-src 'self'/g,
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+    )
+    delete headers['content-security-policy']
+    delete headers['Content-Security-Policy']
+    await route.fulfill({
+      status: response.status(),
+      headers,
+      body,
+      contentType: 'text/html; charset=utf-8',
     })
-    .catch(() => null)
-  await page.waitForTimeout(200)
+  })
+}
+
+async function saveShot(page, name) {
+  await page.screenshot({ path: join(outDir, name), fullPage: false })
+  await page.screenshot({ path: join(artifactsDir, name), fullPage: false })
+}
+
+async function skipColdLaunch(page) {
+  await page.addInitScript(() => {
+    document.documentElement.dataset.coldLaunchPlayed = '1'
+    document.documentElement.dataset.coldLaunchHandoff = 'done'
+  })
+}
+
+async function open(page, path) {
+  await page.goto(`http://127.0.0.1:${port}${path}`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60_000,
+  })
+  await page.waitForFunction(
+    () =>
+      document.documentElement.dataset.coldLaunchPlayed === '1' ||
+      !document.querySelector('.app-cold-launch, .boot-splash'),
+    { timeout: 12_000 },
+  )
+}
+
+/** Replay entrance with a longer duration so stills catch mid-blur / mid-rise. */
+async function replayEntranceForStill(page) {
+  await page.addStyleTag({
+    content: `
+      .rg-blur-in--in:not(.rg-blur-in--settled) { animation-duration: 1600ms !important; }
+      .rg-reveal--in:not(.rg-reveal--instant) { animation-duration: 1600ms !important; }
+    `,
+  })
+  await page.evaluate(() => {
+    for (const el of document.querySelectorAll('[data-rg-blur], [data-rg-reveal]')) {
+      el.classList.remove(
+        'rg-blur-in--in',
+        'rg-blur-in--settled',
+        'rg-reveal--in',
+        'rg-reveal--instant',
+      )
+      if (el.hasAttribute('data-rg-blur')) el.setAttribute('data-rg-blur', 'pending')
+      if (el.hasAttribute('data-rg-reveal')) el.setAttribute('data-rg-reveal', 'pending')
+    }
+    requestAnimationFrame(() => {
+      for (const el of document.querySelectorAll('[data-rg-blur], [data-rg-reveal]')) {
+        if (el.hasAttribute('data-rg-blur')) {
+          el.classList.add('rg-blur-in--in')
+          el.setAttribute('data-rg-blur', 'in')
+        }
+        if (el.hasAttribute('data-rg-reveal')) {
+          el.classList.add('rg-reveal--in')
+          el.setAttribute('data-rg-reveal', 'in')
+        }
+      }
+    })
+  })
+  await page.waitForTimeout(180)
 }
 
 async function scrollMain(page, top) {
@@ -72,27 +148,20 @@ async function scrollMain(page, top) {
     const main = document.querySelector('main')
     if (main instanceof HTMLElement) main.scrollTo({ top: y, behavior: 'smooth' })
   }, top)
-  await page.waitForTimeout(700)
-}
-
-async function saveShot(page, name) {
-  const local = join(outDir, name)
-  const artifact = join(artifactsDir, name)
-  await page.screenshot({ path: local, fullPage: false })
-  await page.screenshot({ path: artifact, fullPage: false })
-  return artifact
+  await page.waitForTimeout(750)
 }
 
 async function capture() {
   await mkdir(outDir, { recursive: true })
   await mkdir(artifactsDir, { recursive: true })
+  await mkdir(join(outDir, 'video-tmp'), { recursive: true })
   const server = await startAppServer(port)
   let browser
 
   try {
     browser = await webkit.launch({ headless: true })
 
-    // --- Before: reduced motion (instant, no blur) ---
+    // --- Before: reduced motion ---
     {
       const context = await browser.newContext({
         viewport: { width, height },
@@ -100,33 +169,25 @@ async function capture() {
         isMobile: true,
         hasTouch: true,
         reducedMotion: 'reduce',
-        recordVideo: undefined,
       })
       const page = await context.newPage()
-      await preparePage(page)
       await page.emulateMedia({ reducedMotion: 'reduce' })
-      await page.goto(`http://127.0.0.1:${port}/accueil-fixture`, {
-        waitUntil: 'networkidle',
-        timeout: 60_000,
-      })
-      await applySafeAreas(page)
-      await waitColdLaunchDone(page)
-      await page.waitForSelector('[data-rg-blur="settled"], h1', { timeout: 10_000 })
+      await allowHttpLocalhost(page)
+      await skipColdLaunch(page)
+
+      await open(page, '/accueil-fixture')
+      await page.locator('h1').waitFor({ timeout: 10_000 })
+      await page.waitForTimeout(350)
       await saveShot(page, 'reveal_before_accueil.png')
 
-      await page.goto(`http://127.0.0.1:${port}/nutrition-fixture`, {
-        waitUntil: 'networkidle',
-        timeout: 60_000,
-      })
-      await applySafeAreas(page)
-      await waitColdLaunchDone(page)
-      await page.waitForSelector('text=Nutrition', { timeout: 15_000 })
-      await page.waitForTimeout(400)
+      await open(page, '/nutrition-fixture')
+      await page.getByRole('heading', { name: 'Nutrition' }).waitFor({ timeout: 15_000 })
+      await page.waitForTimeout(350)
       await saveShot(page, 'reveal_before_nutrition.png')
       await context.close()
     }
 
-    // --- After + scroll video (motion on) ---
+    // --- After + scroll video ---
     {
       const context = await browser.newContext({
         viewport: { width, height },
@@ -140,35 +201,26 @@ async function capture() {
         },
       })
       const page = await context.newPage()
-      await preparePage(page)
       await page.emulateMedia({ reducedMotion: 'no-preference' })
+      await allowHttpLocalhost(page)
+      await skipColdLaunch(page)
 
-      await page.goto(`http://127.0.0.1:${port}/accueil-fixture`, {
-        waitUntil: 'domcontentloaded',
-        timeout: 60_000,
-      })
-      await applySafeAreas(page)
-      await waitColdLaunchDone(page)
-      // Catch mid/post blur-in
-      await page.waitForSelector('[data-rg-blur]', { timeout: 10_000 })
-      await page.waitForTimeout(180)
+      await open(page, '/accueil-fixture')
+      await page.locator('[data-rg-blur]').first().waitFor({ timeout: 10_000 })
+      await replayEntranceForStill(page)
       await saveShot(page, 'reveal_after_accueil.png')
-      await scrollMain(page, 280)
+      await scrollMain(page, 260)
       await scrollMain(page, 520)
       await scrollMain(page, 0)
-      await page.waitForTimeout(400)
+      await page.waitForTimeout(350)
 
-      await page.goto(`http://127.0.0.1:${port}/nutrition-fixture`, {
-        waitUntil: 'domcontentloaded',
-        timeout: 60_000,
-      })
-      await applySafeAreas(page)
-      await waitColdLaunchDone(page)
-      await page.waitForSelector('[data-rg-blur], text=Nutrition', { timeout: 15_000 })
-      await page.waitForTimeout(180)
+      await open(page, '/nutrition-fixture')
+      await page.getByRole('heading', { name: 'Nutrition' }).waitFor({ timeout: 15_000 })
+      await page.locator('[data-rg-blur]').first().waitFor({ timeout: 10_000 })
+      await replayEntranceForStill(page)
       await saveShot(page, 'reveal_after_nutrition.png')
-      await scrollMain(page, 320)
-      await scrollMain(page, 640)
+      await scrollMain(page, 300)
+      await scrollMain(page, 620)
       await scrollMain(page, 0)
       await page.waitForTimeout(500)
 
@@ -176,41 +228,31 @@ async function capture() {
       await context.close()
       if (video) {
         const rawPath = await video.path()
-        const destLocal = join(outDir, 'reveal_scroll_accueil_nutrition.webm')
-        const destArtifact = join(artifactsDir, 'reveal_scroll_accueil_nutrition.webm')
-        if (existsSync(rawPath)) {
-          await copyFile(rawPath, destLocal)
-          await copyFile(rawPath, destArtifact)
-        }
-        // Prefer mp4 for PR embeds when ffmpeg is available via playwright
+        const webmArtifact = join(artifactsDir, 'reveal_scroll_accueil_nutrition.webm')
         const mp4Artifact = join(artifactsDir, 'reveal_scroll_accueil_nutrition.mp4')
-        const mp4Local = join(outDir, 'reveal_scroll_accueil_nutrition.mp4')
-        try {
-          const { execFileSync } = await import('node:child_process')
-          const ffmpegCandidates = [
-            join(process.env.HOME || '', '.cache/ms-playwright/ffmpeg-1011/ffmpeg-linux'),
-            'ffmpeg',
-          ]
-          let ffmpeg = null
-          for (const c of ffmpegCandidates) {
-            if (c === 'ffmpeg' || existsSync(c)) {
-              ffmpeg = c
-              break
-            }
-          }
-          if (ffmpeg && existsSync(destArtifact)) {
-            execFileSync(
-              ffmpeg,
-              ['-y', '-i', destArtifact, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', mp4Artifact],
-              { stdio: 'ignore' },
-            )
-            await copyFile(mp4Artifact, mp4Local)
-            console.log('mp4:', mp4Artifact)
-          }
-        } catch (err) {
-          console.warn('mp4 convert skipped:', err?.message || err)
+        if (existsSync(rawPath)) {
+          await copyFile(rawPath, webmArtifact)
+          await copyFile(rawPath, join(outDir, 'reveal_scroll_accueil_nutrition.webm'))
         }
-        console.log('video:', destArtifact)
+        execFileSync(
+          '/usr/bin/ffmpeg',
+          [
+            '-y',
+            '-i',
+            webmArtifact,
+            '-c:v',
+            'libx264',
+            '-pix_fmt',
+            'yuv420p',
+            '-movflags',
+            '+faststart',
+            mp4Artifact,
+          ],
+          { stdio: 'ignore' },
+        )
+        await copyFile(mp4Artifact, join(outDir, 'reveal_scroll_accueil_nutrition.mp4'))
+        console.log('mp4:', mp4Artifact)
+        console.log('video:', webmArtifact)
       }
     }
 
