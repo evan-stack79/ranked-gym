@@ -12,6 +12,9 @@ Schema + auth + PR-F domain sync live here. **Supabase remains the default app b
 - `social.ts` / `lib/socialVisibility.ts` — Mission 4 feed/profile/search/follow/block/comment/reaction privacy
 - `migrations.ts` — PR-I import/counting helpers used by migration scripts (internal + admin secret)
 - `files.ts` — private avatar storage lifecycle (`upload` / `signed URL` / `delete`) + migration helpers
+- `avisBeta.ts` — « Donner mon avis » (18+), distress webhook (`deliverAvisWebhook`), admin triage (`listAvisForTriage` / `triageAvis` via `AVIS_BETA_ADMIN_KEY`)
+
+Webhook payload fields (HMAC-signed when secret set): `id`, `type`, `texte`, `page`, `version`, `date`, `id_utilisateur_hache`, `statut`, `signalUrgent`, `signalNiveau` (`1`/`2`/`null`). See `docs/CONVEX_SETUP.md` for curl examples.
 
 ## Commands
 

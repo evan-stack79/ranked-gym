@@ -57,7 +57,23 @@ export type AvisStatut =
   | 'mis_de_cote'
   | 'transmis'
   | 'traite'
+  | 'trie'
 export type AvisNotif = 'a_envoyer' | 'envoyee' | 'echec'
+
+export const AVIS_BETA_ADMIN_KEY_ENV = 'AVIS_BETA_ADMIN_KEY'
+export const AVIS_BETA_ADMIN_FORBIDDEN = 'AVIS_BETA_ADMIN_FORBIDDEN'
+export const AVIS_BETA_ADMIN_DEFAULT_LIMIT = 20
+export const AVIS_BETA_ADMIN_MAX_LIMIT = 100
+
+const avisStatutValidator = v.union(
+  v.literal('nouveau'),
+  v.literal('urgent'),
+  v.literal('garde'),
+  v.literal('mis_de_cote'),
+  v.literal('transmis'),
+  v.literal('traite'),
+  v.literal('trie'),
+)
 
 const deliverAvisWebhookRef = makeFunctionReference<
   'action',
@@ -100,6 +116,43 @@ function startOfUtcDayMs(now: number): number {
 function readEnv(name: string): string | undefined {
   const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
   return proc?.env?.[name]
+}
+
+function trimToEmpty(value: string | undefined): string {
+  return value?.trim() ?? ''
+}
+
+/** Constant-time string compare (length mismatch fails closed without leaking content). */
+export function constantTimeEqualStrings(left: string, right: string): boolean {
+  const leftBytes = new TextEncoder().encode(left)
+  const rightBytes = new TextEncoder().encode(right)
+  if (leftBytes.length !== rightBytes.length) return false
+  let diff = 0
+  for (let i = 0; i < leftBytes.length; i += 1) {
+    diff |= leftBytes[i] ^ rightBytes[i]
+  }
+  return diff === 0
+}
+
+/**
+ * Admin triage gate — fail-closed if `AVIS_BETA_ADMIN_KEY` unset / empty,
+ * or if the presented key does not match (constant-time compare).
+ */
+export function requireAvisBetaAdminKey(presented: string | undefined): void {
+  const expected = trimToEmpty(readEnv(AVIS_BETA_ADMIN_KEY_ENV))
+  if (!expected) {
+    throw new Error(AVIS_BETA_ADMIN_FORBIDDEN)
+  }
+  if (!constantTimeEqualStrings(trimToEmpty(presented), expected)) {
+    throw new Error(AVIS_BETA_ADMIN_FORBIDDEN)
+  }
+}
+
+export function signalNiveauForPayload(
+  niveau: number | undefined | null,
+): 1 | 2 | null {
+  if (niveau === 1 || niveau === 2) return niveau
+  return null
 }
 
 /** Âge stocké serveur (nutrition_state.profileJson) — jamais lu depuis le client. */
@@ -228,6 +281,37 @@ export type AvisWebhookPayload = {
   version: string
   date: string
   id_utilisateur_hache: string
+  statut: AvisStatut
+  signalUrgent: boolean
+  /** 1 = TCA/mal-être · 2 = idées suicidaires · null = pas de signal. */
+  signalNiveau: 1 | 2 | null
+}
+
+export type AvisTriageItem = {
+  id: string
+  type: AvisType
+  texte: string
+  page: string
+  version: string
+  creeLe: number
+  statut: AvisStatut
+  signalUrgent: boolean
+  signalNiveau: 1 | 2 | null
+  motsMasques: boolean
+  decision?: string
+  noteTri?: string
+  id_utilisateur_hache: string
+}
+
+export type AvisTriageListResult = {
+  items: AvisTriageItem[]
+  nextCursor: string | null
+}
+
+type AvisTriageCursor = {
+  phase: AvisStatut
+  creeLe: number
+  id: string
 }
 
 async function hmacSha256Hex(secret: string, message: string): Promise<string> {
@@ -480,7 +564,227 @@ export function buildWebhookJsonBody(payload: AvisWebhookPayload): string {
     version: payload.version,
     date: payload.date,
     id_utilisateur_hache: payload.id_utilisateur_hache,
+    statut: payload.statut,
+    signalUrgent: payload.signalUrgent,
+    signalNiveau: payload.signalNiveau,
   })
+}
+
+function encodeTriageCursor(cursor: AvisTriageCursor): string {
+  return JSON.stringify(cursor)
+}
+
+function decodeTriageCursor(raw: string | undefined): AvisTriageCursor | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as Partial<AvisTriageCursor>
+    if (
+      typeof parsed.phase !== 'string' ||
+      typeof parsed.creeLe !== 'number' ||
+      typeof parsed.id !== 'string'
+    ) {
+      return null
+    }
+    return {
+      phase: parsed.phase as AvisStatut,
+      creeLe: parsed.creeLe,
+      id: parsed.id,
+    }
+  } catch {
+    return null
+  }
+}
+
+function compareAvisTriageOrder(
+  a: { creeLe: number; _id: string },
+  b: { creeLe: number; _id: string },
+): number {
+  // Plus récent d’abord, puis id stable.
+  if (a.creeLe !== b.creeLe) return b.creeLe - a.creeLe
+  return String(a._id).localeCompare(String(b._id))
+}
+
+function isAfterTriageCursor(
+  row: { creeLe: number; _id: string },
+  cursor: AvisTriageCursor,
+): boolean {
+  if (row.creeLe < cursor.creeLe) return true
+  if (row.creeLe > cursor.creeLe) return false
+  return String(row._id).localeCompare(cursor.id) > 0
+}
+
+async function mapAvisRowToTriageItem(
+  row: {
+    _id: Id<'avis_beta'> | string
+    type: AvisType
+    texte: string
+    texteMasque?: string
+    page: string
+    version: string
+    creeLe: number
+    statut: AvisStatut
+    signalUrgent: boolean
+    signalNiveau?: 1 | 2
+    motsMasques: boolean
+    decision?: string
+    noteTri?: string
+    userId: string
+  },
+  salt: string,
+): Promise<AvisTriageItem> {
+  const hashed = await hashUserIdForWebhook(row.userId, salt)
+  return {
+    id: String(row._id),
+    type: row.type,
+    texte: row.texteMasque ?? row.texte,
+    page: row.page,
+    version: row.version,
+    creeLe: row.creeLe,
+    statut: row.statut,
+    signalUrgent: row.signalUrgent,
+    signalNiveau: signalNiveauForPayload(row.signalNiveau),
+    motsMasques: row.motsMasques,
+    decision: row.decision,
+    noteTri: row.noteTri,
+    id_utilisateur_hache: hashed,
+  }
+}
+
+/**
+ * Liste admin — urgent d’abord puis nouveau (index `by_statut`), pagination par curseur.
+ * Ne renvoie jamais le userId brut ni l’âge.
+ */
+export async function listAvisBetaForTriage(
+  ctx: QueryCtx,
+  args: {
+    adminKey: string
+    statut?: AvisStatut
+    limit?: number
+    cursor?: string
+  },
+): Promise<AvisTriageListResult> {
+  requireAvisBetaAdminKey(args.adminKey)
+  const salt = trimToEmpty(readEnv('AVIS_BETA_USER_HASH_SALT'))
+  if (!salt) {
+    throw new Error(AVIS_BETA_ADMIN_FORBIDDEN)
+  }
+
+  const limit = Math.min(
+    Math.max(1, Math.floor(args.limit ?? AVIS_BETA_ADMIN_DEFAULT_LIMIT)),
+    AVIS_BETA_ADMIN_MAX_LIMIT,
+  )
+  const phases: AvisStatut[] = args.statut
+    ? [args.statut]
+    : ['urgent', 'nouveau']
+  const cursor = decodeTriageCursor(args.cursor)
+  const startPhaseIndex = cursor
+    ? Math.max(0, phases.indexOf(cursor.phase))
+    : 0
+
+  const picked: Array<{
+    _id: Id<'avis_beta'> | string
+    type: AvisType
+    texte: string
+    texteMasque?: string
+    page: string
+    version: string
+    creeLe: number
+    statut: AvisStatut
+    signalUrgent: boolean
+    signalNiveau?: 1 | 2
+    motsMasques: boolean
+    decision?: string
+    noteTri?: string
+    userId: string
+  }> = []
+
+  for (let i = startPhaseIndex; i < phases.length && picked.length < limit + 1; i += 1) {
+    const phase = phases[i]!
+    const rows = await ctx.db
+      .query('avis_beta')
+      .withIndex('by_statut', (q) => q.eq('statut', phase))
+      .collect()
+    const sorted = rows.slice().sort(compareAvisTriageOrder)
+    for (const row of sorted) {
+      if (cursor && phase === cursor.phase && !isAfterTriageCursor(row, cursor)) {
+        continue
+      }
+      picked.push(row)
+      if (picked.length >= limit + 1) break
+    }
+  }
+
+  const page = picked.slice(0, limit)
+  const hasMore = picked.length > limit
+  const last = page[page.length - 1]
+  const nextCursor =
+    hasMore && last
+      ? encodeTriageCursor({
+          phase: last.statut,
+          creeLe: last.creeLe,
+          id: String(last._id),
+        })
+      : null
+
+  const items = await Promise.all(page.map((row) => mapAvisRowToTriageItem(row, salt)))
+  return { items, nextCursor }
+}
+
+export type TriageAvisInput = {
+  adminKey: string
+  avisId: Id<'avis_beta'>
+  decision: string
+  noteTri: string
+  statut?: AvisStatut
+}
+
+export type TriageAvisResult =
+  | {
+      ok: true
+      avisId: Id<'avis_beta'>
+      statut: AvisStatut
+      decision: string
+      noteTri: string
+    }
+  | { ok: false; error: string }
+
+/**
+ * Mutation admin — pose `decision` + `noteTri`, et optionnellement `statut` (ex. `trie`).
+ */
+export async function triageAvisBeta(
+  ctx: MutationCtx,
+  input: TriageAvisInput,
+): Promise<TriageAvisResult> {
+  requireAvisBetaAdminKey(input.adminKey)
+
+  const decision = input.decision.trim().slice(0, 200)
+  const noteTri = input.noteTri.trim().slice(0, 2000)
+  if (!decision) {
+    return { ok: false, error: AVIS_BETA_VALIDATION_ERROR }
+  }
+
+  const row = await ctx.db.get(input.avisId)
+  if (!row) {
+    return { ok: false, error: 'AVIS_BETA_NOT_FOUND' }
+  }
+
+  const patch: {
+    decision: string
+    noteTri: string
+    statut?: AvisStatut
+  } = { decision, noteTri }
+  if (input.statut) {
+    patch.statut = input.statut
+  }
+  await ctx.db.patch(input.avisId, patch)
+
+  return {
+    ok: true,
+    avisId: input.avisId,
+    statut: input.statut ?? row.statut,
+    decision,
+    noteTri,
+  }
 }
 
 export const submitAvis = mutation({
@@ -498,14 +802,7 @@ export const submitAvis = mutation({
     v.object({
       ok: v.literal(true),
       avisId: v.id('avis_beta'),
-      statut: v.union(
-        v.literal('nouveau'),
-        v.literal('urgent'),
-        v.literal('garde'),
-        v.literal('mis_de_cote'),
-        v.literal('transmis'),
-        v.literal('traite'),
-      ),
+      statut: avisStatutValidator,
       signalUrgent: v.boolean(),
       distressLevel: v.union(v.literal(0), v.literal(1), v.literal(2)),
       motsMasques: v.boolean(),
@@ -531,17 +828,66 @@ export const listOwnAvis = query({
       page: v.string(),
       version: v.string(),
       creeLe: v.number(),
-      statut: v.union(
-        v.literal('nouveau'),
-        v.literal('urgent'),
-        v.literal('garde'),
-        v.literal('mis_de_cote'),
-        v.literal('transmis'),
-        v.literal('traite'),
-      ),
+      statut: avisStatutValidator,
     }),
   ),
   handler: (ctx, args) => listOwnAvisBetaForSession(ctx, args.sessionToken),
+})
+
+const avisTriageItemValidator = v.object({
+  id: v.string(),
+  type: v.union(v.literal('bug'), v.literal('idee'), v.literal('autre')),
+  texte: v.string(),
+  page: v.string(),
+  version: v.string(),
+  creeLe: v.number(),
+  statut: avisStatutValidator,
+  signalUrgent: v.boolean(),
+  signalNiveau: v.union(v.literal(1), v.literal(2), v.null()),
+  motsMasques: v.boolean(),
+  decision: v.optional(v.string()),
+  noteTri: v.optional(v.string()),
+  id_utilisateur_hache: v.string(),
+})
+
+/** Admin triage list — requires `AVIS_BETA_ADMIN_KEY` (fail-closed if unset). */
+export const listAvisForTriage = query({
+  args: {
+    adminKey: v.string(),
+    statut: v.optional(avisStatutValidator),
+    limit: v.optional(v.number()),
+    cursor: v.optional(v.string()),
+  },
+  returns: v.object({
+    items: v.array(avisTriageItemValidator),
+    nextCursor: v.union(v.string(), v.null()),
+  }),
+  handler: (ctx, args) => listAvisBetaForTriage(ctx, args),
+})
+
+/** Admin triage mutation — sets decision/noteTri (+ optional statut). */
+export const triageAvis = mutation({
+  args: {
+    adminKey: v.string(),
+    avisId: v.id('avis_beta'),
+    decision: v.string(),
+    noteTri: v.string(),
+    statut: v.optional(avisStatutValidator),
+  },
+  returns: v.union(
+    v.object({
+      ok: v.literal(true),
+      avisId: v.id('avis_beta'),
+      statut: avisStatutValidator,
+      decision: v.string(),
+      noteTri: v.string(),
+    }),
+    v.object({
+      ok: v.literal(false),
+      error: v.string(),
+    }),
+  ),
+  handler: (ctx, args) => triageAvisBeta(ctx, args),
 })
 
 export const loadAvisForWebhook = internalMutation({
@@ -555,6 +901,9 @@ export const loadAvisForWebhook = internalMutation({
       version: v.string(),
       date: v.string(),
       id_utilisateur_hache: v.string(),
+      statut: avisStatutValidator,
+      signalUrgent: v.boolean(),
+      signalNiveau: v.union(v.literal(1), v.literal(2), v.null()),
     }),
     v.null(),
   ),
@@ -589,6 +938,9 @@ export const loadAvisForWebhook = internalMutation({
       version: row.version,
       date: toIsoUtcZ(row.creeLe),
       id_utilisateur_hache: hashed,
+      statut: row.statut,
+      signalUrgent: row.signalUrgent,
+      signalNiveau: signalNiveauForPayload(row.signalNiveau),
     } satisfies AvisWebhookPayload
   },
 })

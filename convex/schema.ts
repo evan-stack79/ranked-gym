@@ -435,6 +435,7 @@ export const convexTables = {
       v.literal('mis_de_cote'),
       v.literal('transmis'),
       v.literal('traite'),
+      v.literal('trie'),
     ),
     signalUrgent: v.boolean(),
     /** 1 = TCA/mal-être · 2 = idées suicidaires (jamais de diagnostic stocké au-delà). */
