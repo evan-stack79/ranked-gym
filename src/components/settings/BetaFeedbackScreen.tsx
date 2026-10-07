@@ -268,14 +268,18 @@ export function BetaFeedbackScreen({
     try {
       const result = await submitAvisBeta(payload)
       if (!result.ok) {
+        // AV-25 : âge serveur manquant + détresse → aide L1/L2 d’abord.
         if (result.error === 'AVIS_BETA_AGE_REQUIRED') {
-          // AV-19 : âge pas encore sync → Complète ton profil (sauf mineur connu).
-          setPhase(getBetaFeedbackAgeStatus() === 'minor' ? 'blocked' : 'needs_profile')
+          if (localDistress > 0) {
+            applyDistressPhase(setPhase, localDistress)
+          } else {
+            setPhase(getBetaFeedbackAgeStatus() === 'minor' ? 'blocked' : 'needs_profile')
+          }
           sendingLock.current = false
           setSending(false)
           return
         }
-        // AV-18 / AV-04 : détresse → garder en file + aide (sauf âge).
+        // AV-18 / AV-04 : détresse → garder en file + aide.
         if (localDistress > 0) {
           try {
             queueOfflineAndFinish(payload, localDistress)
@@ -309,12 +313,18 @@ export function BetaFeedbackScreen({
       setAntiDoublonKey(createAvisAntiDoublonKey())
       applyDistressPhase(setPhase, result.distressLevel)
     } catch {
-      // AV-18 : erreur réseau + détresse → file + aide (retry au retour).
-      try {
-        queueOfflineAndFinish(payload, localDistress)
-      } catch {
-        if (localDistress > 0) applyDistressPhase(setPhase, localDistress)
-        else setError(BETA_FEEDBACK_ERROR_SEND)
+      // AV-18 / AV-24 : erreur réseau — reformuler si insultes, sinon file (+ aide détresse).
+      if (hasInsults && localDistress === 0 && !forcerEnvoiAvecInsultes) {
+        setForceInsults(false)
+        setPhase('insult')
+        setError(BETA_FEEDBACK_OFFLINE_INSULT_MASK)
+      } else {
+        try {
+          queueOfflineAndFinish(payload, localDistress)
+        } catch {
+          if (localDistress > 0) applyDistressPhase(setPhase, localDistress)
+          else setError(BETA_FEEDBACK_ERROR_SEND)
+        }
       }
     } finally {
       sendingLock.current = false

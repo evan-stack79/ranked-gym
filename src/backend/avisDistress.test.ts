@@ -17,10 +17,15 @@ describe('normalizeForMatch (apostrophes / accents / tirets)', () => {
     expect(normalizeForMatch('  Détresse   profonde  ')).toBe('detresse profonde')
   })
 
-  it('AV-14 — traite tirets et dashes comme espaces', () => {
+  it('AV-14 / AV-26 — tirets/dashes → espaces (sans escape inutile de -)', async () => {
     expect(normalizeForMatch('envie-de-mourir')).toBe('envie de mourir')
     expect(normalizeForMatch('envie–de–mourir')).toBe('envie de mourir')
     expect(detectDistressLevel('envie-de-mourir')).toBe(2)
+    const { readFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const src = readFileSync(join(process.cwd(), 'convex/avisDistress.ts'), 'utf8')
+    expect(src).toMatch(/\[\\u2010-\\u2015\\u2212-\]/)
+    expect(src).not.toMatch(/\\u2212\\-/)
   })
 })
 

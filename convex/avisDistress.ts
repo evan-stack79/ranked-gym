@@ -17,8 +17,8 @@ export function normalizeForMatch(text: string): string {
     .replace(/\p{M}/gu, '')
     // ’ ‘ ‚ ‛ + modifier letter apostrophe ʼ (U+02BC)
     .replace(/[\u2018\u2019\u201A\u201B\u02BC`´]/g, "'")
-    // AV-14 — tirets / dashes → espaces (« envie-de-mourir »)
-    .replace(/[\u2010-\u2015\u2212\-]/g, ' ')
+    // AV-14 — tirets / dashes → espaces (« envie-de-mourir ») ; AV-26 : pas d’escape inutile
+    .replace(/[\u2010-\u2015\u2212-]/g, ' ')
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim()

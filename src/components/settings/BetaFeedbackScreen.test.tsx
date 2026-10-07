@@ -426,6 +426,29 @@ describe('BetaFeedbackScreen', () => {
     host.remove()
   })
 
+  it('AV-25 — AGE_REQUIRED + détresse → aide niveau 2 (pas seulement profil)', async () => {
+    vi.mocked(submitAvisBeta).mockResolvedValue({
+      ok: false,
+      error: 'AVIS_BETA_AGE_REQUIRED',
+    })
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(
+        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} onOpenProfile={() => undefined} />,
+      )
+    })
+    await fillAndSubmit(host, 'j’ai envie de mourir vraiment beaucoup')
+
+    expect(host.querySelector('[data-distress-level="2"]')).toBeTruthy()
+    expect(host.textContent).toContain(BETA_FEEDBACK_CONFIRM_URGENT_SUICIDE)
+    expect(host.querySelector('[data-testid="beta-feedback-complete-profile"]')).toBeNull()
+
+    root.unmount()
+    host.remove()
+  })
+
   it('AV-17 — hors ligne + insulte → reformuler / masquage (pas d’envoi forcé)', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
     const host = document.createElement('div')

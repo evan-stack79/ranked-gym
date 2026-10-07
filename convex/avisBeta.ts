@@ -122,9 +122,14 @@ function isStoredMinorAge(age: unknown): age is number {
   return typeof age === 'number' && Number.isFinite(age) && age > 0 && age < AVIS_AGE_MIN_ADULT
 }
 
+function isPlausibleStoredAge(age: unknown): age is number {
+  return typeof age === 'number' && Number.isFinite(age) && age > 0 && age <= AVIS_AGE_MAX
+}
+
 /**
  * AV-01 — refuse un saut d’âge synchronisé mineur → adulte (ex. 15 → 30).
- * Conserve l’âge précédent dans profileJson ; le reste du profil est accepté.
+ * Refuse aussi mineur → âge vide/invalide (contournement en deux synchros).
+ * Autorise l’anniversaire : +1 an au plus (17 → 18).
  */
 export function sanitizeSyncedNutritionProfileJson(
   previousProfileJson: unknown,
@@ -135,8 +140,17 @@ export function sanitizeSyncedNutritionProfileJson(
   }
   const prevAge = extractAgeFromNutritionProfileJson(previousProfileJson)
   const nextAge = extractAgeFromNutritionProfileJson(incomingProfileJson)
-  if (isStoredMinorAge(prevAge) && isAdultStoredAge(nextAge)) {
-    return { ...(incomingProfileJson as Record<string, unknown>), age: prevAge }
+  const incoming = { ...(incomingProfileJson as Record<string, unknown>) }
+
+  if (isStoredMinorAge(prevAge)) {
+    // Contournement 15 → vide → 30 : ne pas effacer l’âge mineur.
+    if (!isPlausibleStoredAge(nextAge)) {
+      return { ...incoming, age: prevAge }
+    }
+    // Saut vers adulte : seulement +1 an max (anniversaire).
+    if (isAdultStoredAge(nextAge) && nextAge > prevAge + 1) {
+      return { ...incoming, age: prevAge }
+    }
   }
   return incomingProfileJson
 }
@@ -249,28 +263,26 @@ export async function countAvisTodayForUser(
   return rows.filter((row) => row.creeLe >= dayStart).length
 }
 
-export async function findFirstUrgentAvisToday(
+/** Niveau max des avis urgents du jour (0 si aucun). */
+export async function maxUrgentNiveauToday(
   ctx: MutationCtx | QueryCtx,
   userId: string,
   now: number,
-): Promise<{
-  _id: Id<'avis_beta'>
-  statut: AvisStatut
-  signalUrgent: boolean
-  signalNiveau?: 1 | 2
-  motsMasques: boolean
-  texte: string
-  creeLe: number
-} | null> {
+): Promise<0 | 1 | 2> {
   const dayStart = startOfUtcDayMs(now)
   const rows = await ctx.db
     .query('avis_beta')
     .withIndex('by_userId', (q) => q.eq('userId', userId))
     .collect()
-  const urgent = rows
-    .filter((row) => row.signalUrgent && row.creeLe >= dayStart)
-    .sort((a, b) => a.creeLe - b.creeLe)
-  return urgent[0] ?? null
+  let max: 0 | 1 | 2 = 0
+  for (const row of rows) {
+    if (!row.signalUrgent || row.creeLe < dayStart) continue
+    const niveau = (row.signalNiveau === 1 || row.signalNiveau === 2
+      ? row.signalNiveau
+      : 1) as 1 | 2
+    if (niveau > max) max = niveau
+  }
+  return max
 }
 
 export async function submitAvisBetaForSession(
@@ -349,24 +361,14 @@ export async function submitAvisBetaForSession(
 
   // AV-04 / AV-05 : détresse avant limite journalière et filtre insultes.
   const distressLevel = detectDistressLevel(texte)
-  let signalUrgent = distressLevel > 0
+  const signalUrgent = distressLevel > 0
 
-  // AV-20 : un seul signal urgent / utilisateur / jour atteint l’équipe.
-  // Aide toujours affichée (distressLevel) ; pas de nouvel insert urgent.
+  // AV-23 : toujours enregistrer la détresse ; seule la notification est limitée.
+  // Une notif part encore si le niveau monte (1 → 2).
+  let scheduleNotif = true
   if (signalUrgent) {
-    const existingUrgent = await findFirstUrgentAvisToday(ctx, user.userId, now)
-    if (existingUrgent) {
-      return {
-        ok: true,
-        avisId: existingUrgent._id,
-        statut: existingUrgent.statut,
-        signalUrgent: true,
-        distressLevel,
-        motsMasques: existingUrgent.motsMasques,
-        duplicate: true,
-        needsReformulation: false,
-      }
-    }
+    const maxToday = await maxUrgentNiveauToday(ctx, user.userId, now)
+    scheduleNotif = maxToday === 0 || distressLevel > maxToday
   } else {
     const todayCount = await countAvisTodayForUser(ctx, user.userId, now)
     if (todayCount >= AVIS_PAR_JOUR) {
@@ -388,6 +390,8 @@ export async function submitAvisBetaForSession(
   const motsMasques = insults.length > 0
   const texteMasque = motsMasques ? maskInsultWords(texte, insults) : undefined
   const statut: AvisStatut = signalUrgent ? 'urgent' : 'nouveau'
+  // Notif volontairement non envoyée (déjà un signal du même niveau aujourd’hui).
+  const notif: AvisNotif = scheduleNotif ? 'a_envoyer' : 'envoyee'
 
   const avisId = await ctx.db.insert('avis_beta', {
     userId: user.userId,
@@ -403,12 +407,12 @@ export async function submitAvisBetaForSession(
     signalUrgent,
     signalNiveau: distressLevel === 1 || distressLevel === 2 ? distressLevel : undefined,
     motsMasques,
-    notif: 'a_envoyer',
+    notif,
     notifEssais: 0,
     cleAntiDoublon: cle,
   })
 
-  if (hasScheduler(ctx)) {
+  if (scheduleNotif && hasScheduler(ctx)) {
     await ctx.scheduler.runAfter(0, deliverAvisWebhookRef, { avisId })
   }
 

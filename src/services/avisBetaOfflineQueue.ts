@@ -2,6 +2,7 @@ import { getActiveCloudUserId } from './cloudSession'
 import { safeWarn } from '../utils/safeLog'
 import { submitAvisBeta, type AvisType } from './convexAvisBetaService'
 import { AVIS_BETA_QUEUE_PREFIX } from './clearAvisBetaLocalData'
+import { detectDistressLevel } from '../../convex/avisDistress'
 
 /** 7 jours max hors ligne (VP). */
 export const AVIS_OFFLINE_TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -51,6 +52,16 @@ function pruneExpired(entries: PendingAvis[], now = Date.now()): PendingAvis[] {
   return entries.filter((entry) => now - entry.enqueuedAt <= AVIS_OFFLINE_TTL_MS)
 }
 
+/** AV-24 — détresse d’abord, puis ordre d’arrivée. */
+export function sortAvisQueueForFlush(entries: PendingAvis[]): PendingAvis[] {
+  return [...entries].sort((a, b) => {
+    const da = detectDistressLevel(a.texte) > 0 ? 0 : 1
+    const db = detectDistressLevel(b.texte) > 0 ? 0 : 1
+    if (da !== db) return da - db
+    return a.enqueuedAt - b.enqueuedAt
+  })
+}
+
 export function enqueueAvisOffline(
   payload: Omit<PendingAvis, 'id' | 'enqueuedAt' | 'consentementAccepte'> & {
     consentementAccepte: true
@@ -82,7 +93,10 @@ export async function flushAvisBetaQueue(): Promise<void> {
     let entries = pruneExpired(readQueue(userId))
     writeQueue(userId, entries)
 
-    for (const entry of [...entries]) {
+    // AV-24 : détresse en priorité ; un refus (insulte / limite) ne bloque pas la suite.
+    for (const entry of sortAvisQueueForFlush(entries)) {
+      // Re-read in case earlier iteration mutated storage.
+      if (!entries.some((item) => item.id === entry.id)) continue
       try {
         const result = await submitAvisBeta({
           type: entry.type,
@@ -91,21 +105,20 @@ export async function flushAvisBetaQueue(): Promise<void> {
           version: entry.version,
           cleAntiDoublon: entry.cleAntiDoublon,
           consentementAccepte: true,
-          // AV-17 : ne forcer le masquage que si l’utilisateur l’a choisi (ou détresse).
           forcerEnvoiAvecInsultes: entry.forcerEnvoiAvecInsultes,
         })
-        // AV-07 : ne pas jeter silencieusement à la limite — garder jusqu’au lendemain / TTL.
         if (result.ok) {
           entries = entries.filter((item) => item.id !== entry.id)
           writeQueue(userId, entries)
         } else if (result.error === 'AVIS_BETA_DAILY_LIMIT') {
-          break
+          // Garder pour demain, passer aux suivants (ex. détresse).
+          continue
         } else if (result.error === 'AVIS_BETA_AGE_REQUIRED') {
           entries = entries.filter((item) => item.id !== entry.id)
           writeQueue(userId, entries)
         } else if (result.needsReformulation || result.reason === 'insults') {
-          // AV-17 : rester en file jusqu’à reformulation / choix explicite.
-          break
+          // Rester en file, ne pas bloquer les avis derrière.
+          continue
         }
       } catch (error) {
         safeWarn('[avis-beta] flush failed', error)
