@@ -72,4 +72,26 @@ describe('avisBetaOfflineQueue (AV-07)', () => {
       0,
     )
   })
+
+  it('AV-17 — ne force pas forcerEnvoiAvecInsultes si non choisi', async () => {
+    enqueueAvisOffline({
+      type: 'bug',
+      texte: 'Cette merde de chrono plante encore.',
+      page: 'Réglages',
+      version: 'test',
+      cleAntiDoublon: 'q-insult',
+      consentementAccepte: true,
+    })
+    vi.mocked(submitAvisBeta).mockResolvedValue({
+      ok: false,
+      error: 'AVIS_BETA_VALIDATION',
+      reason: 'insults',
+      needsReformulation: true,
+    })
+    await flushAvisBetaQueue()
+    expect(vi.mocked(submitAvisBeta).mock.calls[0]?.[0].forcerEnvoiAvecInsultes).toBeUndefined()
+    expect(JSON.parse(localStorage.getItem(`${AVIS_BETA_QUEUE_PREFIX}user-q`) ?? '[]')).toHaveLength(
+      1,
+    )
+  })
 })

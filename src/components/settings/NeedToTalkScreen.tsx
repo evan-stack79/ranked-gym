@@ -75,7 +75,7 @@ export function NeedToTalkScreen({ onBack }: NeedToTalkScreenProps) {
                 <a className="text-[#64D2FF] underline" href={TCA_PHONE_TEL.urgence}>
                   {TCA_PHONE_DISPLAY.urgence}
                 </a>
-                .
+                {' (ou le 112).'}
               </p>
             )
           }

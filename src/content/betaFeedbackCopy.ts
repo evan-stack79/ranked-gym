@@ -59,6 +59,14 @@ export const BETA_FEEDBACK_RETRY = 'Réessayer'
 export const BETA_FEEDBACK_OFFLINE =
   "Pas de connexion pour l'instant. Ton avis est gardé sur ton téléphone et partira tout seul dès que tu seras connecté(e)."
 
+/** AV-17 — hors ligne + insultes : prévenir du masquage avant mise en file. */
+export const BETA_FEEDBACK_OFFLINE_INSULT_MASK =
+  "Hors ligne : les mots blessants seront masqués avant l'envoi. Tu peux reformuler, ou envoyer quand même."
+
+/** AV-17 — avertissement avant déconnexion si file hors ligne non vide. */
+export const BETA_FEEDBACK_LOGOUT_QUEUE_WARN =
+  "Tu as des avis en attente d'envoi sur cet appareil. Te déconnecter les effacera. Continuer ?"
+
 export const BETA_FEEDBACK_DAILY_LIMIT =
   "Tu as déjà envoyé 5 avis aujourd'hui, merci pour ton aide ! Tu pourras en envoyer d'autres demain."
 

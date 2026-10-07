@@ -1,5 +1,5 @@
 /**
- * Repérage détresse / TCA pour avis bêta — liste Vérificateur §7.4 + décisions QA.
+ * Repérage détresse / TCA pour avis bêta — liste Vérificateur §7.4.
  * Jamais de diagnostic, jamais de blocage d’envoi, rien sur le profil.
  */
 
@@ -8,14 +8,17 @@ export type DistressLevel = 0 | 1 | 2
 
 /**
  * Normalisation pour comparaison : minuscules, accents retirés,
- * apostrophes typographiques → ', espaces multiples réduits.
+ * apostrophes typographiques → ', tirets/tirets longs → espaces,
+ * espaces multiples réduits.
  */
 export function normalizeForMatch(text: string): string {
   return text
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
-    // ’ ‘ ‚ ‛ + modifier letter apostrophe ʼ (U+02BC, AV-14)
+    // ’ ‘ ‚ ‛ + modifier letter apostrophe ʼ (U+02BC)
     .replace(/[\u2018\u2019\u201A\u201B\u02BC`´]/g, "'")
+    // AV-14 — tirets / dashes → espaces (« envie-de-mourir »)
+    .replace(/[\u2010-\u2015\u2212\-]/g, ' ')
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim()
@@ -31,10 +34,51 @@ const JE_ME_COUPE_EXCEPTIONS =
 const OVERDOSE_VERB =
   '(?:faire|fais|fait|font|faisait|faisais|faisaient|ferai|feras|fera|ferons|ferez|feront|prendre|prends|prend|prennent|prenait|prenais|prenaient|prendrai|prendras|prendra|pris|prise|prises)'
 
+/** Nombres en lettres + déterminants qui annulent « kms » (Vérificateur §7.4). */
+const KMS_PREV_BLOCKERS = [
+  'un',
+  'une',
+  'deux',
+  'trois',
+  'quatre',
+  'cinq',
+  'six',
+  'sept',
+  'huit',
+  'neuf',
+  'dix',
+  'onze',
+  'douze',
+  'treize',
+  'quatorze',
+  'quinze',
+  'seize',
+  'vingt',
+  'trente',
+  'quarante',
+  'cinquante',
+  'soixante',
+  'cent',
+  'mille',
+  'demi',
+  'les',
+  'des',
+  'mes',
+  'tes',
+  'ses',
+  'nos',
+  'vos',
+  'leurs',
+  'ces',
+  'quelques',
+  'plusieurs',
+  'de',
+  'en',
+] as const
+
 /**
  * Limites de mots autour de la phrase entière.
  * Cas « en finir » : ne pas déclencher sur « en finir avec ce bug ».
- * Autorisé : seul, « avec la vie », « avec tout », « avec ma vie », « avec moi ».
  */
 export function matchesDistressPhrase(normalizedHaystack: string, phrase: string): boolean {
   const needle = normalizeForMatch(phrase)
@@ -48,25 +92,25 @@ export function matchesDistressPhrase(normalizedHaystack: string, phrase: string
     return pattern.test(normalizedHaystack)
   }
 
-  // « kms » entier, sauf s’il suit un nombre (« 10 kms », « 5 km » n’est pas « kms »).
+  // « kms » : mot entier ; annulé si précédé d’un chiffre, nombre en lettres ou déterminant.
   if (needle === 'kms') {
+    const blockers = KMS_PREV_BLOCKERS.map(escapeRegex).join('|')
     const pattern = new RegExp(
-      `(?:^|[^\\p{L}\\p{N}])(?<!\\d\\s)kms(?:[^\\p{L}\\p{N}]|$)`,
+      `(?:^|[^\\p{L}\\p{N}])(?<!\\d\\s)(?<!(?:${blockers})\\s)kms(?:[^\\p{L}\\p{N}]|$)`,
       'u',
     )
     return pattern.test(normalizedHaystack)
   }
 
-  // « je me coupe » sauf ongles / cheveux / barbe / frange.
+  // « je me coupe » sauf ongles / cheveux / barbe / frange (virgule / ponctuation soft OK — AV-22).
   if (needle === 'je me coupe') {
     const pattern = new RegExp(
-      `(?:^|[^\\p{L}\\p{N}])je me coupe(?!\\s+${JE_ME_COUPE_EXCEPTIONS}\\b)(?:[^\\p{L}\\p{N}]|$)`,
+      `(?:^|[^\\p{L}\\p{N}])je me coupe(?![\\s,;:]+${JE_ME_COUPE_EXCEPTIONS}\\b)(?:[^\\p{L}\\p{N}]|$)`,
       'u',
     )
     return pattern.test(normalizedHaystack)
   }
 
-  // « overdose » uniquement via formes verbales ciblées ou médicaments/cachets.
   if (needle === 'overdose') {
     const viaVerb = new RegExp(
       `(?:^|[^\\p{L}\\p{N}])${OVERDOSE_VERB}\\s+une\\s+overdose(?:[^\\p{L}\\p{N}]|$)`,
@@ -105,9 +149,10 @@ export const AVIS_MOTS_DETRESSE_NIVEAU_2 = [
   'en finir',
   'en finir avec la vie',
   'en finir avec tout',
-  // Validé Vérificateur : « en finir avec ma vie / moi »
   'en finir avec ma vie',
   'en finir avec moi',
+  // Validé Vérificateur §7.4
+  'en finir avec mes jours',
   'tout arreter pour de bon',
   'mettre fin a mes jours',
   'mettre fin a ma vie',
@@ -144,11 +189,9 @@ export const AVIS_MOTS_DETRESSE_NIVEAU_2 = [
   'me faire du mal',
   'automutilation',
   'auto mutilation',
-  // « overdose » : matching restreint dans matchesDistressPhrase
   'overdose',
   'avaler des cachets',
   'avaler tous mes medicaments',
-  // « kms » : matching restreint (pas après un nombre)
   'kms',
   'kill myself',
 ] as const
@@ -169,7 +212,6 @@ export const AVIS_MOTS_DETRESSE_NIVEAU_1 = [
   'laxatifs',
   'diuretique',
   'diuretiques',
-  // « purge » seul retiré (faux positifs cache / données) — garder « me purger »
   'me purger',
   'ne plus manger',
   'ne mange plus',

@@ -363,7 +363,7 @@ describe('BetaFeedbackScreen', () => {
     host.remove()
   })
 
-  it('critère 5 / AV-09 — message vide visible quand texte trop court', async () => {
+  it('critère 5 / AV-09 / AV-21 — message vide après interaction seulement', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const root = createRoot(host)
@@ -372,13 +372,76 @@ describe('BetaFeedbackScreen', () => {
         <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} onOpenProfile={() => undefined} />,
       )
     })
-    expect(host.querySelector('[data-testid="beta-feedback-empty-hint"]')?.textContent).toBe(
-      BETA_FEEDBACK_EMPTY,
-    )
+    expect(host.querySelector('[data-testid="beta-feedback-empty-hint"]')).toBeNull()
     await setTexte(host, 'court')
     expect(host.querySelector('[data-testid="beta-feedback-empty-hint"]')?.textContent).toBe(
       BETA_FEEDBACK_EMPTY,
     )
+    root.unmount()
+    host.remove()
+  })
+
+  it('AV-18 — erreur réseau + détresse → file hors ligne + aide', async () => {
+    vi.mocked(submitAvisBeta).mockRejectedValue(new Error('network down'))
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(
+        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} onOpenProfile={() => undefined} />,
+      )
+    })
+    await fillAndSubmit(host, 'j’ai envie de mourir vraiment beaucoup')
+
+    expect(enqueueAvisOffline).toHaveBeenCalled()
+    expect(host.querySelector('[data-distress-level="2"]')).toBeTruthy()
+    expect(host.textContent).toContain(BETA_FEEDBACK_CONFIRM_URGENT_SUICIDE)
+
+    root.unmount()
+    host.remove()
+  })
+
+  it('AV-19 — AGE_REQUIRED adulte local → Complète ton profil', async () => {
+    vi.mocked(submitAvisBeta).mockResolvedValue({
+      ok: false,
+      error: 'AVIS_BETA_AGE_REQUIRED',
+    })
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(
+        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} onOpenProfile={() => undefined} />,
+      )
+    })
+    await fillAndSubmit(host)
+
+    expect(host.querySelector('[data-age-gate="missing"]')).toBeTruthy()
+    expect(host.querySelector('[data-testid="beta-feedback-complete-profile"]')?.textContent).toBe(
+      BETA_FEEDBACK_COMPLETE_PROFILE,
+    )
+    expect(host.textContent).not.toContain('personnes majeures')
+
+    root.unmount()
+    host.remove()
+  })
+
+  it('AV-17 — hors ligne + insulte → reformuler / masquage (pas d’envoi forcé)', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(
+        <BetaFeedbackScreen onBack={() => undefined} onOpenNeedToTalk={() => undefined} onOpenProfile={() => undefined} />,
+      )
+    })
+    await fillAndSubmit(host, 'Cette merde de chrono plante encore.')
+
+    expect(enqueueAvisOffline).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('reformuler')
+    expect(host.querySelector('[data-testid="beta-feedback-offline-insult"]')).toBeTruthy()
+
     root.unmount()
     host.remove()
   })

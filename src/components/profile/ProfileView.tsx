@@ -37,6 +37,7 @@ import {
   type OpenBetaFeedbackDetail,
 } from '../../services/betaFeedbackNav'
 import { canOpenBetaFeedback } from '../../services/betaFeedbackAccess'
+import { confirmSignOutClearingAvisQueue } from '../../services/avisBetaLogoutWarn'
 
 function ProfileViewContent() {
   const {
@@ -147,6 +148,7 @@ function ProfileViewContent() {
           void handleGhostModeChange(enabled)
         }}
         onSignOut={() => {
+          if (!confirmSignOutClearingAvisQueue()) return
           void signOut()
         }}
       />
@@ -274,6 +276,7 @@ function ProfileViewContent() {
           void refreshProfile()
         }}
         onSignOut={() => {
+          if (!confirmSignOutClearingAvisQueue()) return
           void signOut()
         }}
         showSignOut

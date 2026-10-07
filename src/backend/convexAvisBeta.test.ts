@@ -14,6 +14,7 @@ import {
   hashUserIdForWebhook,
   isAdultStoredAge,
   maskInsultWords,
+  sanitizeSyncedNutritionProfileJson,
   submitAvisBetaForSession,
   validateAvisTexte,
 } from '../../convex/avisBeta'
@@ -458,6 +459,69 @@ describe('submitAvisBetaForSession', () => {
     expect(distress.distressLevel).toBe(2)
     expect(distress.statut).toBe('urgent')
     expect(db.table('avis_beta')).toHaveLength(AVIS_PAR_JOUR + 1)
+
+    // AV-20 : second signal urgent le même jour → aide (distressLevel) mais pas de nouvelle ligne
+    const second = await submitAvisBetaForSession(ctx as never, {
+      ...baseSubmit,
+      sessionToken: 'session-l',
+      type: 'autre',
+      texte: 'encore des idees noires aujourd’hui vraiment.',
+      page: 'Nutrition',
+      cleAntiDoublon: 'key-l-distress-2',
+      now: now + 30,
+    })
+    expect(second.ok).toBe(true)
+    if (!second.ok) return
+    expect(second.distressLevel).toBe(2)
+    expect(second.duplicate).toBe(true)
+    expect(db.table('avis_beta')).toHaveLength(AVIS_PAR_JOUR + 1)
+  })
+
+  it('AV-01 — sanitizeSyncedNutritionProfileJson refuse saut mineur→adulte', () => {
+    const kept = sanitizeSyncedNutritionProfileJson({ age: 15 }, { age: 30, weightKg: 70 })
+    expect(extractAgeFromNutritionProfileJson(kept)).toBe(15)
+    expect((kept as { weightKg: number }).weightKg).toBe(70)
+
+    const ok = sanitizeSyncedNutritionProfileJson({ age: 20 }, { age: 30 })
+    expect(extractAgeFromNutritionProfileJson(ok)).toBe(30)
+
+    const firstAdult = sanitizeSyncedNutritionProfileJson({}, { age: 28 })
+    expect(extractAgeFromNutritionProfileJson(firstAdult)).toBe(28)
+  })
+
+  it('AV-20 — un seul urgent / jour même sous la limite des 5', async () => {
+    const db = new FakeDb()
+    const ctx = createCtx(db)
+    await seedUser(db, 'user-u1', 'session-u1')
+    await seedStoredAge(db, 'user-u1', 28)
+    const now = Date.now()
+
+    const first = await submitAvisBetaForSession(ctx as never, {
+      ...baseSubmit,
+      sessionToken: 'session-u1',
+      type: 'autre',
+      texte: 'j’ai envie de mourir vraiment beaucoup.',
+      page: 'Nutrition',
+      cleAntiDoublon: 'u1-a',
+      now,
+    })
+    expect(first.ok).toBe(true)
+    expect(db.table('avis_beta').filter((r) => r.signalUrgent)).toHaveLength(1)
+
+    const second = await submitAvisBetaForSession(ctx as never, {
+      ...baseSubmit,
+      sessionToken: 'session-u1',
+      type: 'autre',
+      texte: 'je veux en finir avec mes jours vraiment.',
+      page: 'Nutrition',
+      cleAntiDoublon: 'u1-b',
+      now: now + 1,
+    })
+    expect(second.ok).toBe(true)
+    if (!second.ok) return
+    expect(second.distressLevel).toBe(2)
+    expect(second.duplicate).toBe(true)
+    expect(db.table('avis_beta').filter((r) => r.signalUrgent)).toHaveLength(1)
   })
 
   it('AV-05 — détresse avant insultes : envoi masqué, pas de reformulation', async () => {

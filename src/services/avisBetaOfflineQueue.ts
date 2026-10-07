@@ -91,7 +91,8 @@ export async function flushAvisBetaQueue(): Promise<void> {
           version: entry.version,
           cleAntiDoublon: entry.cleAntiDoublon,
           consentementAccepte: true,
-          forcerEnvoiAvecInsultes: entry.forcerEnvoiAvecInsultes ?? true,
+          // AV-17 : ne forcer le masquage que si l’utilisateur l’a choisi (ou détresse).
+          forcerEnvoiAvecInsultes: entry.forcerEnvoiAvecInsultes,
         })
         // AV-07 : ne pas jeter silencieusement à la limite — garder jusqu’au lendemain / TTL.
         if (result.ok) {
@@ -102,6 +103,9 @@ export async function flushAvisBetaQueue(): Promise<void> {
         } else if (result.error === 'AVIS_BETA_AGE_REQUIRED') {
           entries = entries.filter((item) => item.id !== entry.id)
           writeQueue(userId, entries)
+        } else if (result.needsReformulation || result.reason === 'insults') {
+          // AV-17 : rester en file jusqu’à reformulation / choix explicite.
+          break
         }
       } catch (error) {
         safeWarn('[avis-beta] flush failed', error)

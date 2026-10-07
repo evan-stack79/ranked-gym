@@ -11,6 +11,11 @@ import {
 } from './_generated/server'
 import { requireSessionUser } from './lib/auth'
 import { detectDistressLevel, type DistressLevel } from './avisDistress'
+import {
+  AVIS_MOTS_BLESSANTS,
+  detectInsultWords,
+  maskInsultWords,
+} from './avisInsults'
 
 export {
   detectDistressLevel,
@@ -21,6 +26,8 @@ export {
   AVIS_MOTS_DETRESSE_NIVEAU_2,
   type DistressLevel,
 } from './avisDistress'
+
+export { AVIS_MOTS_BLESSANTS, detectInsultWords, maskInsultWords } from './avisInsults'
 
 /** Valeurs proposées (VP) — SPEC_AVIS_BETA confirmées pour cette implémentation. */
 export const AVIS_TEXTE_MIN = 10
@@ -55,27 +62,6 @@ export type AvisStatut =
   | 'transmis'
   | 'traite'
 export type AvisNotif = 'a_envoyer' | 'envoyee' | 'echec'
-
-/**
- * Liste courte de mots blessants (FR) — masqués côté serveur, jamais bloquants.
- * À enrichir avec le Vérificateur ; volontairement minimale en V1.
- */
-export const AVIS_MOTS_BLESSANTS = [
-  'connard',
-  'connasse',
-  'salope',
-  'pute',
-  'enculé',
-  'encule',
-  'pd',
-  'fdp',
-  'ntm',
-  'nique',
-  'niquer',
-  'putain',
-  'merde',
-  'connerie',
-] as const
 
 const deliverAvisWebhookRef = makeFunctionReference<
   'action',
@@ -136,6 +122,29 @@ export function extractAgeFromNutritionProfileJson(profileJson: unknown): unknow
   return record.age
 }
 
+function isStoredMinorAge(age: unknown): age is number {
+  return typeof age === 'number' && Number.isFinite(age) && age > 0 && age < AVIS_AGE_MIN_ADULT
+}
+
+/**
+ * AV-01 — refuse un saut d’âge synchronisé mineur → adulte (ex. 15 → 30).
+ * Conserve l’âge précédent dans profileJson ; le reste du profil est accepté.
+ */
+export function sanitizeSyncedNutritionProfileJson(
+  previousProfileJson: unknown,
+  incomingProfileJson: unknown,
+): unknown {
+  if (!incomingProfileJson || typeof incomingProfileJson !== 'object') {
+    return incomingProfileJson
+  }
+  const prevAge = extractAgeFromNutritionProfileJson(previousProfileJson)
+  const nextAge = extractAgeFromNutritionProfileJson(incomingProfileJson)
+  if (isStoredMinorAge(prevAge) && isAdultStoredAge(nextAge)) {
+    return { ...(incomingProfileJson as Record<string, unknown>), age: prevAge }
+  }
+  return incomingProfileJson
+}
+
 /**
  * Garde 18+ fail-closed : lit l’âge déjà synchronisé dans Convex.
  * Ne fait confiance à aucune valeur client. Ne stocke pas l’âge sur l’avis.
@@ -153,40 +162,6 @@ export async function assertAdultFromStoredProfile(
     return { ok: false, error: AVIS_BETA_MINOR_ERROR }
   }
   return { ok: true }
-}
-
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-function normalizeInsultHaystack(text: string): string {
-  return text
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .replace(/[\u2018\u2019\u201A\u201B`´]/g, "'")
-    .toLowerCase()
-}
-
-export function detectInsultWords(texte: string): string[] {
-  const normalized = normalizeInsultHaystack(texte)
-  const hits: string[] = []
-  for (const word of AVIS_MOTS_BLESSANTS) {
-    const needle = normalizeInsultHaystack(word)
-    const pattern = new RegExp(`(?:^|[^\\p{L}\\p{N}])${escapeRegex(needle)}(?:[^\\p{L}\\p{N}]|$)`, 'u')
-    if (pattern.test(normalized)) hits.push(word)
-  }
-  return hits
-}
-
-/** Remplace les mots blessants par ••• (version transmise / masquée). */
-export function maskInsultWords(texte: string, insults: string[] = detectInsultWords(texte)): string {
-  if (insults.length === 0) return texte
-  let result = texte
-  for (const word of insults) {
-    const pattern = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegex(word)}(?![\\p{L}\\p{N}])`, 'giu')
-    result = result.replace(pattern, '•••')
-  }
-  return result
 }
 
 export function validateAvisTexte(texte: string): { ok: true; texte: string } | { ok: false; reason: string } {
@@ -278,6 +253,30 @@ export async function countAvisTodayForUser(
   return rows.filter((row) => row.creeLe >= dayStart).length
 }
 
+export async function findFirstUrgentAvisToday(
+  ctx: MutationCtx | QueryCtx,
+  userId: string,
+  now: number,
+): Promise<{
+  _id: Id<'avis_beta'>
+  statut: AvisStatut
+  signalUrgent: boolean
+  signalNiveau?: 1 | 2
+  motsMasques: boolean
+  texte: string
+  creeLe: number
+} | null> {
+  const dayStart = startOfUtcDayMs(now)
+  const rows = await ctx.db
+    .query('avis_beta')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .collect()
+  const urgent = rows
+    .filter((row) => row.signalUrgent && row.creeLe >= dayStart)
+    .sort((a, b) => a.creeLe - b.creeLe)
+  return urgent[0] ?? null
+}
+
 export async function submitAvisBetaForSession(
   ctx: MutationCtx,
   input: SubmitAvisInput,
@@ -354,9 +353,25 @@ export async function submitAvisBetaForSession(
 
   // AV-04 / AV-05 : détresse avant limite journalière et filtre insultes.
   const distressLevel = detectDistressLevel(texte)
-  const signalUrgent = distressLevel > 0
+  let signalUrgent = distressLevel > 0
 
-  if (!signalUrgent) {
+  // AV-20 : un seul signal urgent / utilisateur / jour atteint l’équipe.
+  // Aide toujours affichée (distressLevel) ; pas de nouvel insert urgent.
+  if (signalUrgent) {
+    const existingUrgent = await findFirstUrgentAvisToday(ctx, user.userId, now)
+    if (existingUrgent) {
+      return {
+        ok: true,
+        avisId: existingUrgent._id,
+        statut: existingUrgent.statut,
+        signalUrgent: true,
+        distressLevel,
+        motsMasques: existingUrgent.motsMasques,
+        duplicate: true,
+        needsReformulation: false,
+      }
+    }
+  } else {
     const todayCount = await countAvisTodayForUser(ctx, user.userId, now)
     if (todayCount >= AVIS_PAR_JOUR) {
       return { ok: false, error: AVIS_BETA_DAILY_LIMIT_ERROR }

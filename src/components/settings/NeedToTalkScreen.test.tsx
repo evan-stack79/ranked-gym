@@ -24,6 +24,8 @@ describe('NeedToTalkScreen', () => {
     expect(host.querySelector(`a[href="${TCA_PHONE_TEL.filSanteJeunes}"]`)).toBeTruthy()
     expect(host.querySelector(`a[href="${TCA_PHONE_TEL.detresse}"]`)).toBeTruthy()
     expect(host.querySelector(`a[href="${TCA_PHONE_TEL.urgence}"]`)).toBeTruthy()
+    expect(host.textContent).toMatch(/15 \(ou le 112\)/)
+    expect(host.textContent).not.toContain('0 810 037 037')
     const ffab = host.querySelector(`a[href="${TCA_RESOURCE_LINKS.ffabAnnuaire}"]`)
     expect(ffab?.getAttribute('target')).toBe('_blank')
     expect(ffab?.getAttribute('rel')).toContain('noopener')
