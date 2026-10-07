@@ -53,6 +53,7 @@ import {
 import { AddFoodScreen } from './AddFoodScreen'
 import { IosSheet } from '../ui/IosSheet'
 import { SectionSkeleton } from '../ui/AppBootScreen'
+import { BlurInText, Reveal } from '../motion'
 import {
   dateFromKey,
   formatNutritionDate,
@@ -528,7 +529,9 @@ export function NutritionDashboard({
     <div className="-mx-5 min-h-[70vh] overflow-x-hidden bg-[#0C0C0E] pb-2">
       <div className="flex flex-col gap-4 px-5 pt-1">
         <header className="flex items-center justify-between gap-3">
-          <h1 className="text-[32px] font-bold tracking-tight text-white">Nutrition</h1>
+          <h1 className="text-[32px] font-bold tracking-tight text-white">
+            <BlurInText as="span">Nutrition</BlurInText>
+          </h1>
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
@@ -570,14 +573,16 @@ export function NutritionDashboard({
               <ChevronRight className="h-5 w-5" />
             </button>
           </div>
-          <NutritionCalorieRing
-            remainingCalories={remainingCalories}
-            consumedCalories={totals.calories}
-            targetCalories={targetCalories}
-            progress={calorieProgress}
-            onOpenSetup={onOpenSetup}
-            allowGoalSetup={allowGoalSetup}
-          />
+          <Reveal>
+            <NutritionCalorieRing
+              remainingCalories={remainingCalories}
+              consumedCalories={totals.calories}
+              targetCalories={targetCalories}
+              progress={calorieProgress}
+              onOpenSetup={onOpenSetup}
+              allowGoalSetup={allowGoalSetup}
+            />
+          </Reveal>
           {nutrition.showCalorieGoal ? (
             <div className="mt-3 space-y-2 px-1" data-testid="dashboard-estimation-notices">
               <p className="text-[12px] leading-relaxed text-[#AEAEB2]">{M_CAL_2}</p>
@@ -617,12 +622,14 @@ export function NutritionDashboard({
           }}
         />
 
-        <NutritionHydrationCard
-          consumedMl={hydration.consumedMl}
-          goalMl={hydration.goalMl}
-          onAdd250={handleQuickWater}
-          saving={waterSaving}
-        />
+        <Reveal delayMs={50}>
+          <NutritionHydrationCard
+            consumedMl={hydration.consumedMl}
+            goalMl={hydration.goalMl}
+            onAdd250={handleQuickWater}
+            saving={waterSaving}
+          />
+        </Reveal>
 
         <NutritionQuickActions onAction={handleQuickAction} />
 
