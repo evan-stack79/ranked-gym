@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   BETA_FEEDBACK_AGE_BLOCKED,
+  BETA_FEEDBACK_CALL_15,
+  BETA_FEEDBACK_CALL_3114,
   BETA_FEEDBACK_CONFIRM,
-  BETA_FEEDBACK_CONFIRM_URGENT,
+  BETA_FEEDBACK_CONFIRM_URGENT_SUICIDE,
+  BETA_FEEDBACK_CONFIRM_URGENT_TCA,
   BETA_FEEDBACK_CONSENT,
   BETA_FEEDBACK_CONSENT_MORE,
   BETA_FEEDBACK_CONSENT_MORE_BODY,
@@ -12,6 +15,7 @@ import {
   BETA_FEEDBACK_INSULT_PROMPT,
   BETA_FEEDBACK_META_HINT,
   BETA_FEEDBACK_NEED_TO_TALK,
+  BETA_FEEDBACK_NO_REALTIME,
   BETA_FEEDBACK_OFFLINE,
   BETA_FEEDBACK_PAGE_LABEL,
   BETA_FEEDBACK_REFORMULATE,
@@ -19,6 +23,8 @@ import {
   BETA_FEEDBACK_SCREEN_TITLE,
   BETA_FEEDBACK_SEND_ANYWAY,
   BETA_FEEDBACK_SUBMIT,
+  BETA_FEEDBACK_TEL_15,
+  BETA_FEEDBACK_TEL_3114,
   BETA_FEEDBACK_TEXTE_HELP,
   BETA_FEEDBACK_TEXTE_HINT,
   BETA_FEEDBACK_TOO_LONG,
@@ -53,7 +59,7 @@ const TEXTE_MAX = 2000
 const COUNTER_FROM = 1800
 const DRAFT_KEY = 'ranked-gym:avis-beta-draft'
 
-type Phase = 'form' | 'insult' | 'success' | 'urgent' | 'blocked'
+type Phase = 'form' | 'insult' | 'success' | 'urgent_tca' | 'urgent_suicide' | 'blocked'
 
 interface BetaFeedbackScreenProps {
   onBack: () => void
@@ -217,7 +223,9 @@ export function BetaFeedbackScreen({
 
       clearDraft()
       setAntiDoublonKey(createAvisAntiDoublonKey())
-      setPhase(result.signalUrgent ? 'urgent' : 'success')
+      if (result.distressLevel === 2) setPhase('urgent_suicide')
+      else if (result.distressLevel === 1) setPhase('urgent_tca')
+      else setPhase('success')
     } catch {
       setError(BETA_FEEDBACK_ERROR_SEND)
     } finally {
@@ -244,12 +252,12 @@ export function BetaFeedbackScreen({
     )
   }
 
-  if (phase === 'success' || phase === 'urgent') {
+  if (phase === 'success') {
     return (
       <section className="ios-fade-up space-y-5 pb-8" data-testid="beta-feedback-screen">
         <Header onBack={onBack} />
         <p className="text-[15px] leading-relaxed text-[#EBEBF5]" data-testid="beta-feedback-confirm">
-          {phase === 'urgent' ? BETA_FEEDBACK_CONFIRM_URGENT : BETA_FEEDBACK_CONFIRM}
+          {BETA_FEEDBACK_CONFIRM}
         </p>
         <button
           type="button"
@@ -259,6 +267,71 @@ export function BetaFeedbackScreen({
         >
           {BETA_FEEDBACK_NEED_TO_TALK}
         </button>
+      </section>
+    )
+  }
+
+  if (phase === 'urgent_tca') {
+    return (
+      <section
+        className="ios-fade-up space-y-5 pb-8"
+        data-testid="beta-feedback-screen"
+        data-distress-level="1"
+      >
+        <Header onBack={onBack} />
+        <p className="text-[15px] leading-relaxed text-[#EBEBF5]" data-testid="beta-feedback-confirm">
+          {BETA_FEEDBACK_CONFIRM_URGENT_TCA}
+        </p>
+        <button
+          type="button"
+          onClick={onOpenNeedToTalk}
+          className="ios-press text-[15px] font-semibold text-[#64D2FF] underline"
+          data-testid="beta-feedback-need-to-talk"
+        >
+          {BETA_FEEDBACK_NEED_TO_TALK}
+        </button>
+      </section>
+    )
+  }
+
+  if (phase === 'urgent_suicide') {
+    return (
+      <section
+        className="ios-fade-up space-y-5 pb-8"
+        data-testid="beta-feedback-screen"
+        data-distress-level="2"
+      >
+        <Header onBack={onBack} />
+        <p className="text-[15px] leading-relaxed text-[#EBEBF5]" data-testid="beta-feedback-confirm">
+          {BETA_FEEDBACK_CONFIRM_URGENT_SUICIDE}
+        </p>
+        <p className="text-[13px] leading-relaxed text-[#AEAEB2]" data-testid="beta-feedback-no-realtime">
+          {BETA_FEEDBACK_NO_REALTIME}
+        </p>
+        <div className="flex flex-col gap-3">
+          <a
+            href={BETA_FEEDBACK_TEL_3114}
+            className="ios-press rounded-2xl bg-[#FF2B2B] px-4 py-3.5 text-center text-[15px] font-semibold text-white"
+            data-testid="beta-feedback-call-3114"
+          >
+            {BETA_FEEDBACK_CALL_3114}
+          </a>
+          <a
+            href={BETA_FEEDBACK_TEL_15}
+            className="ios-press rounded-2xl border border-white/15 bg-white/5 px-4 py-3.5 text-center text-[15px] font-semibold text-white"
+            data-testid="beta-feedback-call-15"
+          >
+            {BETA_FEEDBACK_CALL_15}
+          </a>
+          <button
+            type="button"
+            onClick={onOpenNeedToTalk}
+            className="ios-press text-[15px] font-semibold text-[#64D2FF] underline"
+            data-testid="beta-feedback-need-to-talk"
+          >
+            {BETA_FEEDBACK_NEED_TO_TALK}
+          </button>
+        </div>
       </section>
     )
   }

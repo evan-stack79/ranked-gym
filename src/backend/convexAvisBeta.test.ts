@@ -7,7 +7,7 @@ import {
   AVIS_PAR_JOUR,
   AVIS_TEXTE_MAX,
   buildWebhookJsonBody,
-  detectDistressSignals,
+  detectDistressLevel,
   detectInsultWords,
   hashUserIdForWebhook,
   maskInsultWords,
@@ -157,9 +157,10 @@ describe('avis beta helpers', () => {
     )
   })
 
-  it('détecte un signal de détresse / TCA', () => {
-    expect(detectDistressSignals('Je mange plus pour monter au classement')).toBe(true)
-    expect(detectDistressSignals('Le chrono reste à zéro')).toBe(false)
+  it('détecte un signal de détresse / TCA (niveau 1, pas faux positif légumes)', () => {
+    expect(detectDistressLevel('Je mange presque plus pour monter au classement')).toBe(1)
+    expect(detectDistressLevel('Je mange plus de légumes')).toBe(0)
+    expect(detectDistressLevel('Le chrono reste à zéro')).toBe(0)
   })
 
   it('produit un JSON webhook avec exactement les clés attendues', () => {
@@ -307,14 +308,14 @@ describe('submitAvisBetaForSession', () => {
     expect(db.table('avis_beta')[0].texteMasque).toContain('•••')
   })
 
-  it('passe en urgent sur signal TCA / détresse', async () => {
+  it('passe en urgent niveau 1 sur signal TCA, sans bloquer l’envoi', async () => {
     const db = new FakeDb()
     const ctx = createCtx(db)
     await seedUser(db, 'user-u', 'session-u')
     const result = await submitAvisBetaForSession(ctx as never, {
       sessionToken: 'session-u',
       type: 'autre',
-      texte: 'Je mange plus pour monter au classement, lol.',
+      texte: 'Je mange presque plus pour monter au classement, lol.',
       page: 'Nutrition',
       version: 'test',
       cleAntiDoublon: 'key-u',
@@ -325,6 +326,28 @@ describe('submitAvisBetaForSession', () => {
     if (!result.ok) return
     expect(result.statut).toBe('urgent')
     expect(result.signalUrgent).toBe(true)
+    expect(result.distressLevel).toBe(1)
+    expect(db.table('avis_beta')[0].signalNiveau).toBe(1)
+  })
+
+  it('passe en urgent niveau 2 (suicide) et l’emporte sur le niveau 1', async () => {
+    const db = new FakeDb()
+    const ctx = createCtx(db)
+    await seedUser(db, 'user-s', 'session-s')
+    const result = await submitAvisBetaForSession(ctx as never, {
+      sessionToken: 'session-s',
+      type: 'autre',
+      texte: 'Anorexie et j’ai envie de mourir, vraiment.',
+      page: 'Nutrition',
+      version: 'test',
+      cleAntiDoublon: 'key-s',
+      consentementAccepte: true,
+      declaredAge: 25,
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.distressLevel).toBe(2)
+    expect(result.statut).toBe('urgent')
   })
 
   it('respecte la limite 5 avis/jour et l’anti-doublon clé / texte', async () => {
@@ -414,7 +437,7 @@ describe('submitAvisBetaForSession', () => {
   it('ne mentionne jamais RPE dans les helpers lexique Effort', () => {
     const sample = 'L’échelle Effort de 1 à 10 n’est pas claire pour moi.'
     expect(sample.toLowerCase()).not.toContain('rpe')
-    expect(detectDistressSignals(sample)).toBe(false)
+    expect(detectDistressLevel(sample)).toBe(0)
   })
 })
 

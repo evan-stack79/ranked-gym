@@ -12,6 +12,7 @@ export type SubmitAvisClientResult =
       avisId: string
       statut: string
       signalUrgent: boolean
+      distressLevel: 0 | 1 | 2
       motsMasques: boolean
       duplicate: boolean
       needsReformulation: boolean

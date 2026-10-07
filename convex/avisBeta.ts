@@ -10,6 +10,17 @@ import {
   type QueryCtx,
 } from './_generated/server'
 import { requireSessionUser } from './lib/auth'
+import { detectDistressLevel, type DistressLevel } from './avisDistress'
+
+export {
+  detectDistressLevel,
+  detectDistressSignals,
+  matchesDistressPhrase,
+  normalizeForMatch,
+  AVIS_MOTS_DETRESSE_NIVEAU_1,
+  AVIS_MOTS_DETRESSE_NIVEAU_2,
+  type DistressLevel,
+} from './avisDistress'
 
 /** Valeurs proposées (VP) — SPEC_AVIS_BETA confirmées pour cette implémentation. */
 export const AVIS_TEXTE_MIN = 10
@@ -66,28 +77,6 @@ export const AVIS_MOTS_BLESSANTS = [
   'connerie',
 ] as const
 
-/**
- * Signaux de détresse / TCA (SEC-TCA) — déclenchent statut urgent + orientation.
- * Liste courte à valider avec le Vérificateur (Q9).
- */
-export const AVIS_MOTS_DETRESSE = [
-  'suicide',
-  'suicider',
-  'me tuer',
-  'me suicider',
-  'en finir',
-  'plus envie de vivre',
-  'anorexie',
-  'boulimie',
-  'me faire vomir',
-  'je me fais vomir',
-  'je mange plus',
-  'arrêt de manger',
-  'arreter de manger',
-  'détresse',
-  'detresse',
-] as const
-
 const deliverAvisWebhookRef = makeFunctionReference<
   'action',
   { avisId: Id<'avis_beta'> },
@@ -136,31 +125,27 @@ export function isAdultDeclaredAge(age: unknown): age is number {
   )
 }
 
-function normalizeForMatch(text: string): string {
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function normalizeInsultHaystack(text: string): string {
   return text
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
+    .replace(/[\u2018\u2019\u201A\u201B`´]/g, "'")
     .toLowerCase()
 }
 
 export function detectInsultWords(texte: string): string[] {
-  const normalized = normalizeForMatch(texte)
+  const normalized = normalizeInsultHaystack(texte)
   const hits: string[] = []
   for (const word of AVIS_MOTS_BLESSANTS) {
-    const needle = normalizeForMatch(word)
+    const needle = normalizeInsultHaystack(word)
     const pattern = new RegExp(`(?:^|[^\\p{L}\\p{N}])${escapeRegex(needle)}(?:[^\\p{L}\\p{N}]|$)`, 'u')
     if (pattern.test(normalized)) hits.push(word)
   }
   return hits
-}
-
-export function detectDistressSignals(texte: string): boolean {
-  const normalized = normalizeForMatch(texte)
-  return AVIS_MOTS_DETRESSE.some((phrase) => normalized.includes(normalizeForMatch(phrase)))
-}
-
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 /** Remplace les mots blessants par ••• (version transmise / masquée). */
@@ -205,6 +190,8 @@ export type SubmitAvisResult =
       avisId: Id<'avis_beta'>
       statut: AvisStatut
       signalUrgent: boolean
+      /** 0 aucun · 1 TCA/mal-être · 2 idées suicidaires (l’emporte si les deux). */
+      distressLevel: DistressLevel
       motsMasques: boolean
       duplicate: boolean
       needsReformulation: boolean
@@ -298,11 +285,14 @@ export async function submitAvisBetaForSession(
     .withIndex('by_cleAntiDoublon', (q) => q.eq('cleAntiDoublon', cle))
     .first()
   if (existingByKey && existingByKey.userId === user.userId) {
+    const level = (existingByKey.signalNiveau ??
+      (existingByKey.signalUrgent ? detectDistressLevel(existingByKey.texte) : 0)) as DistressLevel
     return {
       ok: true,
       avisId: existingByKey._id,
       statut: existingByKey.statut,
       signalUrgent: existingByKey.signalUrgent,
+      distressLevel: level,
       motsMasques: existingByKey.motsMasques,
       duplicate: true,
       needsReformulation: false,
@@ -317,11 +307,14 @@ export async function submitAvisBetaForSession(
     (row) => row.texte === texte && row.creeLe >= now - AVIS_ANTI_DOUBLON_MS,
   )
   if (sameText) {
+    const level = (sameText.signalNiveau ??
+      (sameText.signalUrgent ? detectDistressLevel(sameText.texte) : 0)) as DistressLevel
     return {
       ok: true,
       avisId: sameText._id,
       statut: sameText.statut,
       signalUrgent: sameText.signalUrgent,
+      distressLevel: level,
       motsMasques: sameText.motsMasques,
       duplicate: true,
       needsReformulation: false,
@@ -345,7 +338,8 @@ export async function submitAvisBetaForSession(
 
   const motsMasques = insults.length > 0
   const texteMasque = motsMasques ? maskInsultWords(texte, insults) : undefined
-  const signalUrgent = detectDistressSignals(texte)
+  const distressLevel = detectDistressLevel(texte)
+  const signalUrgent = distressLevel > 0
   const statut: AvisStatut = signalUrgent ? 'urgent' : 'nouveau'
 
   const avisId = await ctx.db.insert('avis_beta', {
@@ -360,6 +354,7 @@ export async function submitAvisBetaForSession(
     consentementVersion: AVIS_CONSENT_VERSION,
     statut,
     signalUrgent,
+    signalNiveau: distressLevel === 1 || distressLevel === 2 ? distressLevel : undefined,
     motsMasques,
     notif: 'a_envoyer',
     notifEssais: 0,
@@ -375,6 +370,7 @@ export async function submitAvisBetaForSession(
     avisId,
     statut,
     signalUrgent,
+    distressLevel,
     motsMasques,
     duplicate: false,
     needsReformulation: false,
@@ -461,6 +457,7 @@ export const submitAvis = mutation({
         v.literal('traite'),
       ),
       signalUrgent: v.boolean(),
+      distressLevel: v.union(v.literal(0), v.literal(1), v.literal(2)),
       motsMasques: v.boolean(),
       duplicate: v.boolean(),
       needsReformulation: v.boolean(),
