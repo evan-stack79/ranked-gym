@@ -77,9 +77,11 @@ body {
   --dur-fast: 180ms;
   --dur-ui: 220ms;
   --dur-drawer: 260ms;
-  /* Scroll reveal / title blur-in — occasional, once per element (≤600ms) */
-  --dur-reveal: 400ms;
+  /* Motion tokens — Evan choices (Blur In Up / Soft Blur / Mask Reveal / Flip) */
+  --dur-reveal: 450ms;
   --dur-word: 400ms;
+  --dur-soft-blur: 400ms;
+  --dur-text-flip: 420ms;
   --stagger-max: 80ms;
   --color-card: #141416;
   --color-muted: #aeaeb2;
@@ -462,39 +464,56 @@ body {
   animation-delay: 0.15s;
 }
 
-/* --- Tasteful scroll reveal / blur-in (MIT: CSS + IntersectionObserver) --- */
-/* Cards: staggered rise translateY(12px) + fade */
-.rg-reveal {
-  opacity: 0;
-  transform: translate3d(0, 12px, 0);
-  will-change: opacity, transform;
+/* --- Motion (MIT-inspired Animata / Magic UI, pure CSS) --- */
+
+/* Cards: Mask Reveal Up — clip-path inset bottom→top + slight translateY */
+.rg-mask-reveal {
+  clip-path: inset(100% 0 0 0);
+  transform: translate3d(0, 10px, 0);
+  will-change: clip-path, transform;
 }
 
-.rg-reveal--in {
-  animation: rg-reveal-in var(--dur-reveal) var(--ease-out) both;
+.rg-mask-reveal--in {
+  animation: rg-mask-reveal-up var(--dur-reveal) var(--ease-out) both;
   animation-delay: var(--rg-reveal-delay, 0ms);
 }
 
-.rg-reveal--instant,
-.rg-reveal--instant.rg-reveal--in {
+.rg-mask-reveal--instant,
+.rg-mask-reveal--instant.rg-mask-reveal--in {
   animation: none !important;
-  opacity: 1;
+  clip-path: inset(0);
   transform: none;
   will-change: auto;
 }
 
-@keyframes rg-reveal-in {
+@keyframes rg-mask-reveal-up {
   from {
-    opacity: 0;
-    transform: translate3d(0, 12px, 0);
+    clip-path: inset(100% 0 0 0);
+    transform: translate3d(0, 10px, 0);
   }
   to {
-    opacity: 1;
+    clip-path: inset(0);
     transform: none;
   }
 }
 
-/* Titles: word-by-word blur-in (host stays layout-stable; words animate) */
+/* Legacy class aliases kept for any residual selectors */
+.rg-reveal {
+  clip-path: inset(100% 0 0 0);
+  transform: translate3d(0, 10px, 0);
+}
+.rg-reveal--in {
+  animation: rg-mask-reveal-up var(--dur-reveal) var(--ease-out) both;
+  animation-delay: var(--rg-reveal-delay, 0ms);
+}
+.rg-reveal--instant,
+.rg-reveal--instant.rg-reveal--in {
+  animation: none !important;
+  clip-path: inset(0);
+  transform: none;
+}
+
+/* Blur In Up — big titles, word by word (blur 10px, translateY 12px) */
 .rg-blur-in {
   display: inline-block;
   max-width: 100%;
@@ -507,17 +526,16 @@ body {
 .rg-blur-word {
   display: inline-block;
   opacity: 0;
-  filter: blur(8px);
-  transform: translate3d(0, 4px, 0);
+  filter: blur(10px);
+  transform: translate3d(0, 12px, 0);
   will-change: opacity, transform, filter;
 }
 
 .rg-blur-in--in:not(.rg-blur-in--settled) .rg-blur-word {
-  animation: rg-blur-word-in var(--dur-word) var(--ease-out) both;
+  animation: rg-blur-in-up var(--rg-word-dur, var(--dur-word)) var(--ease-out) both;
   animation-delay: var(--rg-word-delay, 0ms);
 }
 
-/* Settled / reduced-motion: never leave a lingering blur */
 .rg-blur-in--settled,
 .rg-blur-in--settled.rg-blur-in--in,
 .rg-blur-in--settled .rg-blur-word,
@@ -529,10 +547,47 @@ body {
   will-change: auto;
 }
 
-@keyframes rg-blur-word-in {
+@keyframes rg-blur-in-up {
   from {
     opacity: 0;
-    filter: blur(8px);
+    filter: blur(10px);
+    transform: translate3d(0, 12px, 0);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
+
+/* Soft Blur In — small texts / subtitles, whole line (~400ms) */
+.rg-soft-blur {
+  display: inline-block;
+  max-width: 100%;
+  opacity: 0;
+  filter: blur(4px);
+  transform: translate3d(0, 4px, 0);
+  will-change: opacity, transform, filter;
+}
+
+.rg-soft-blur--in:not(.rg-soft-blur--settled) {
+  animation: rg-soft-blur-in var(--dur-soft-blur) var(--ease-out) both;
+  animation-delay: var(--rg-soft-blur-delay, 0ms);
+}
+
+.rg-soft-blur--settled,
+.rg-soft-blur--settled.rg-soft-blur--in {
+  animation: none !important;
+  opacity: 1;
+  filter: none;
+  transform: none;
+  will-change: auto;
+}
+
+@keyframes rg-soft-blur-in {
+  from {
+    opacity: 0;
+    filter: blur(4px);
     transform: translate3d(0, 4px, 0);
   }
   to {
@@ -540,6 +595,77 @@ body {
     filter: blur(0);
     transform: none;
   }
+}
+
+/* Text Flip — Accueil greeting word cycle (stable width, rotateX) */
+.rg-text-flip {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  vertical-align: baseline;
+  perspective: 480px;
+}
+
+.rg-text-flip__viewport {
+  display: inline-block;
+  overflow: hidden;
+  line-height: 1.15;
+  transform-style: preserve-3d;
+}
+
+.rg-text-flip__word {
+  display: inline-block;
+  transform-origin: 50% 50%;
+  backface-visibility: hidden;
+}
+
+.rg-text-flip__word--out {
+  animation: rg-text-flip-out var(--dur-text-flip) var(--ease-in-out) both;
+}
+
+.rg-text-flip__word--in {
+  animation: rg-text-flip-in var(--dur-text-flip) var(--ease-out) both;
+}
+
+.rg-text-flip__word--idle {
+  transform: none;
+  opacity: 1;
+}
+
+@keyframes rg-text-flip-out {
+  from {
+    opacity: 1;
+    transform: rotateX(0deg) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: rotateX(-75deg) translateY(-0.35em);
+  }
+}
+
+@keyframes rg-text-flip-in {
+  from {
+    opacity: 0;
+    transform: rotateX(75deg) translateY(0.35em);
+  }
+  to {
+    opacity: 1;
+    transform: rotateX(0deg) translateY(0);
+  }
+}
+
+.rg-text-flip__measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
+  height: 0;
+  overflow: hidden;
+}
+
+.rg-text-flip__measure-item {
+  display: inline-block;
+  padding-right: 0.15em;
 }
 
 /* Avis bêta distress (level 1 TCA / level 2 suicide — 3114 / 15 / 112): no motion */
@@ -1942,10 +2068,18 @@ select,
   .ios-fade-up-delay-3,
   .rg-reveal,
   .rg-reveal--in,
+  .rg-mask-reveal,
+  .rg-mask-reveal--in,
   .rg-blur-in,
   .rg-blur-in--in,
   .rg-blur-in--settled,
   .rg-blur-word,
+  .rg-soft-blur,
+  .rg-soft-blur--in,
+  .rg-soft-blur--settled,
+  .rg-text-flip__word,
+  .rg-text-flip__word--out,
+  .rg-text-flip__word--in,
   .skeleton-shimmer,
   .arena-glow,
   .streak-card--lit,
@@ -1965,13 +2099,20 @@ select,
 
   .rg-reveal,
   .rg-reveal--in,
+  .rg-mask-reveal,
+  .rg-mask-reveal--in,
   .rg-blur-in,
   .rg-blur-in--in,
   .rg-blur-in--settled,
-  .rg-blur-word {
+  .rg-blur-word,
+  .rg-soft-blur,
+  .rg-soft-blur--in,
+  .rg-soft-blur--settled,
+  .rg-text-flip__word {
     opacity: 1 !important;
     transform: none !important;
     filter: none !important;
+    clip-path: none !important;
     will-change: auto !important;
   }
 

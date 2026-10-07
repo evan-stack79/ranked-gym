@@ -10,7 +10,7 @@ import {
 } from '../../utils/homeNutritionQuickActions'
 import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
 import { isMinorAge } from '../../services/nutritionSafetyRules'
-import { CountUpNumber, StaticKcalNumber } from '../motion'
+import { CountUpNumber, SoftBlurIn, StaticKcalNumber } from '../motion'
 
 interface NutritionSnapshotProps {
   onOpenNutrition?: () => void
@@ -124,7 +124,9 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
   return (
     <section className="glass-card rounded-2xl p-4" aria-label="Nutrition du jour">
       <div>
-        <p className="text-[11px] font-medium text-[#8E8E93]">Aujourd&apos;hui</p>
+        <p className="text-[11px] font-medium text-[#8E8E93]">
+          <SoftBlurIn>Aujourd&apos;hui</SoftBlurIn>
+        </p>
         {snapshot.targetAvailable ? (
           <>
             <p className="mt-1 text-[22px] font-bold leading-tight tracking-tight text-white">
@@ -180,7 +182,9 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
       <div className="mt-4 border-t border-white/8 pt-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-medium text-[#8E8E93]">Eau</p>
+            <p className="text-[11px] font-medium text-[#8E8E93]">
+              <SoftBlurIn>Eau</SoftBlurIn>
+            </p>
             {snapshot.waterGoalReached ? (
               <p className="mt-0.5 text-[15px] font-semibold text-[#7DD3FC]">Objectif atteint</p>
             ) : (

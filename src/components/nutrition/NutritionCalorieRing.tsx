@@ -1,4 +1,4 @@
-import { StaticKcalNumber } from '../motion'
+import { SoftBlurIn, StaticKcalNumber } from '../motion'
 
 interface NutritionCalorieRingProps {
   remainingCalories: number
@@ -44,7 +44,9 @@ export function NutritionCalorieRing({
 
   const heading = (
     <div className="mb-3 flex w-full items-center justify-between gap-3">
-      <p className="text-[15px] font-semibold text-white">Calories aujourd’hui</p>
+      <p className="text-[15px] font-semibold text-white">
+        <SoftBlurIn>Calories aujourd’hui</SoftBlurIn>
+      </p>
       <p className="text-right text-[12px] tabular-nums text-[#8E8E93]">
         {hasTarget ? (
           <>

@@ -12,8 +12,11 @@ import {
 import { useInViewOnce } from '../../hooks/useInViewOnce'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 
-/** Max stagger between title words (ms). */
-export const BLUR_WORD_STAGGER_MS = 60
+/** Default stagger between title words (ms). Hard cap ≤80. */
+export const BLUR_WORD_STAGGER_MS = 50
+/** Per-word animation duration — total title time stays ≤600ms. */
+export const BLUR_WORD_DUR_MS = 400
+export const BLUR_IN_UP_TOTAL_MAX_MS = 600
 
 export interface BlurInTextProps {
   children: ReactNode
@@ -34,15 +37,24 @@ function textFromChildren(children: ReactNode): string {
 }
 
 function splitWords(text: string): string[] {
-  // Keep bare words only — trailing spaces inside inline-block spans collapse in CSS.
   const words = text.trim().split(/\s+/).filter(Boolean)
   return words.length > 0 ? words : text ? [text] : []
 }
 
+/** Compress stagger so (n-1)*stagger + wordDur ≤ 600ms. */
+export function blurInUpTiming(wordCount: number): { durationMs: number; staggerMs: number } {
+  const n = Math.max(1, wordCount)
+  const durationMs = BLUR_WORD_DUR_MS
+  if (n <= 1) return { durationMs, staggerMs: 0 }
+  const budget = Math.max(0, BLUR_IN_UP_TOTAL_MAX_MS - durationMs)
+  const staggerMs = Math.min(BLUR_WORD_STAGGER_MS, Math.floor(budget / (n - 1)))
+  return { durationMs, staggerMs }
+}
+
 /**
- * Title blur → sharp entrance, word by word (opacity + blur(8px) + translateY(4px)).
- * Full text stays accessible via aria-label + visually-hidden copy; animated spans are aria-hidden.
- * Final settled state always has filter: none, opacity 1, transform: none.
+ * Blur In Up — big titles (h1 / main section titles).
+ * Word-by-word: opacity 0 + blur(10px) + translateY(12px) → clear.
+ * Total ≤600ms. Accessible via aria-label + sr-only; animated spans aria-hidden.
  */
 export function BlurInText({
   children,
@@ -62,31 +74,29 @@ export function BlurInText({
     [label, children],
   )
   const words = useMemo(() => splitWords(fullText), [fullText])
+  const timing = useMemo(() => blurInUpTiming(words.length), [words.length])
 
   useEffect(() => {
     if (skip) setSettled(true)
   }, [skip])
 
-  const onAnimationEnd = useCallback(
-    (event: AnimationEvent<HTMLElement>) => {
-      // Wait for the last word; ignore bubbled ends from earlier words.
-      const el = event.target as HTMLElement
-      if (!el.classList.contains('rg-blur-word')) return
-      const host = event.currentTarget
-      const all = host.querySelectorAll('.rg-blur-word')
-      const last = all[all.length - 1]
-      if (el === last) setSettled(true)
-    },
-    [],
-  )
+  const onAnimationEnd = useCallback((event: AnimationEvent<HTMLElement>) => {
+    const el = event.target as HTMLElement
+    if (!el.classList.contains('rg-blur-word')) return
+    const host = event.currentTarget
+    const all = host.querySelectorAll('.rg-blur-word')
+    const last = all[all.length - 1]
+    if (el === last) setSettled(true)
+  }, [])
 
-  const style: CSSProperties | undefined =
-    !skip && delayMs > 0
-      ? ({ '--rg-blur-delay': `${delayMs}ms` } as CSSProperties)
-      : undefined
+  const style: CSSProperties = {
+    '--rg-word-dur': `${timing.durationMs}ms`,
+    ...( !skip && delayMs > 0 ? { '--rg-blur-delay': `${delayMs}ms` } : {}),
+  } as CSSProperties
 
   const classes = [
     'rg-blur-in',
+    'rg-blur-in-up',
     inView ? 'rg-blur-in--in' : '',
     skip || settled ? 'rg-blur-in--settled' : '',
     className,
@@ -102,6 +112,7 @@ export function BlurInText({
       onAnimationEnd={onAnimationEnd}
       aria-label={fullText || undefined}
       data-rg-blur={settled ? 'settled' : inView ? 'in' : 'pending'}
+      data-rg-blur-variant="up"
       data-rg-motion={skip ? 'reduced' : 'on'}
     >
       <span className="sr-only">{fullText}</span>
@@ -114,7 +125,7 @@ export function BlurInText({
                 {
                   '--rg-word-delay': skip
                     ? '0ms'
-                    : `${delayMs + index * BLUR_WORD_STAGGER_MS}ms`,
+                    : `${delayMs + index * timing.staggerMs}ms`,
                 } as CSSProperties
               }
             >
@@ -127,3 +138,6 @@ export function BlurInText({
     </Tag>
   )
 }
+
+/** Alias matching Evan’s naming (Blur In Up). */
+export const BlurInUp = BlurInText

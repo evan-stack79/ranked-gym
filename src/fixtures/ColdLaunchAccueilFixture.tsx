@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
 import { BrandMark } from '../components/brand/BrandMark'
-import { BlurInText, CountUpNumber, Reveal, StaticKcalNumber } from '../components/motion'
+import {
+  BlurInText,
+  CountUpNumber,
+  Reveal,
+  SoftBlurIn,
+  StaticKcalNumber,
+  TextFlip,
+} from '../components/motion'
 
 export function ColdLaunchAccueilFixture() {
   const [coldEntering, setColdEntering] = useState(() => {
@@ -55,10 +62,14 @@ export function ColdLaunchAccueilFixture() {
           <div className="flex flex-col gap-8">
             <header className="home-cold-enter__group home-cold-enter__group--0">
               <h1 className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white">
-                <BlurInText as="span" instant={coldEntering}>
-                  Séance de l&apos;après-midi, Alex ?
+                <TextFlip />
+                <BlurInText as="span" instant={coldEntering} label=", Alex ?">
+                  , Alex ?
                 </BlurInText>
               </h1>
+              <p className="mt-1.5 text-[15px] font-medium text-[#AEAEB2]">
+                <SoftBlurIn instant={coldEntering}>Séance de l’après-midi</SoftBlurIn>
+              </p>
             </header>
 
             <section className="home-cold-enter__group home-cold-enter__group--1">
@@ -68,11 +79,15 @@ export function ColdLaunchAccueilFixture() {
                   data-reveal-card="nutrition"
                   data-testid="accueil-kcal-static"
                 >
-                  <p className="text-[11px] font-medium text-[#8E8E93]">Aujourd&apos;hui</p>
+                  <p className="text-[11px] font-medium text-[#8E8E93]">
+                    <SoftBlurIn instant={coldEntering}>Aujourd&apos;hui</SoftBlurIn>
+                  </p>
                   <p className="mt-1 text-[22px] font-bold tracking-tight text-white">
                     Il te reste <StaticKcalNumber value={842} /> kcal
                   </p>
-                  <p className="mt-3 text-[11px] font-medium text-[#8E8E93]">Eau</p>
+                  <p className="mt-3 text-[11px] font-medium text-[#8E8E93]">
+                    <SoftBlurIn instant={coldEntering}>Eau</SoftBlurIn>
+                  </p>
                   <p className="mt-0.5 text-[15px] font-semibold text-white">
                     <CountUpNumber
                       kind="water"
@@ -96,7 +111,9 @@ export function ColdLaunchAccueilFixture() {
             <section className="home-cold-enter__group home-cold-enter__group--2">
               <Reveal delayMs={60} instant={coldEntering}>
                 <div className="glass-card rounded-3xl p-5" data-reveal-card="train">
-                  <p className="text-[11px] font-medium text-[#8E8E93]">Entraînement</p>
+                  <p className="text-[11px] font-medium text-[#8E8E93]">
+                    <SoftBlurIn instant={coldEntering}>Entraînement</SoftBlurIn>
+                  </p>
                   <p className="mt-1 text-[15px] font-semibold text-white">Push · 4 exercices</p>
                   <button
                     type="button"
@@ -119,14 +136,6 @@ export function ColdLaunchAccueilFixture() {
               <div className="glass-card rounded-3xl p-5">
                 <div className="mb-3 h-4 w-28 rounded-full bg-white/20" />
                 <div className="h-3 w-56 rounded-full bg-white/10" />
-              </div>
-            </section>
-
-            <section className="home-cold-enter__group home-cold-enter__group--4">
-              <div className="glass-card rounded-3xl p-5">
-                <div className="mb-3 h-4 w-32 rounded-full bg-white/20" />
-                <div className="mb-2 h-3 w-full rounded-full bg-white/10" />
-                <div className="h-3 w-3/4 rounded-full bg-white/10" />
               </div>
             </section>
           </div>

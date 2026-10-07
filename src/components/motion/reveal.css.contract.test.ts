@@ -4,49 +4,51 @@ import { describe, expect, it } from 'vitest'
 
 const css = readFileSync(join(process.cwd(), 'src/index.css'), 'utf8')
 
-describe('reveal / blur-in / press CSS contract', () => {
-  it('settled blur-in clears filter, opacity, and transform on words', () => {
-    expect(css).toMatch(/\.rg-blur-in--settled[\s\S]*?\.rg-blur-word[\s\S]*?filter:\s*none/)
-    expect(css).toMatch(/\.rg-blur-in--settled[\s\S]*?\.rg-blur-word[\s\S]*?opacity:\s*1/)
-    expect(css).toMatch(/\.rg-blur-in--settled[\s\S]*?\.rg-blur-word[\s\S]*?transform:\s*none/)
+describe('Evan motion CSS contract', () => {
+  it('Blur In Up words use blur(10px) + translateY(12px)', () => {
+    expect(css).toMatch(/\.rg-blur-word[\s\S]*?filter:\s*blur\(10px\)/)
+    expect(css).toMatch(/\.rg-blur-word[\s\S]*?translate3d\(0,\s*12px,\s*0\)/)
+    expect(css).toMatch(/rg-blur-in-up\s+var\(--rg-word-dur/)
   })
 
-  it('title words use blur(8px) + translateY(4px)', () => {
-    expect(css).toMatch(/\.rg-blur-word[\s\S]*?filter:\s*blur\(8px\)/)
-    expect(css).toMatch(/\.rg-blur-word[\s\S]*?translate3d\(0,\s*4px,\s*0\)/)
-    expect(css).toMatch(/rg-blur-word-in\s+var\(--dur-word\)\s+var\(--ease-out\)/)
+  it('Soft Blur In uses blur(4px) + translateY(4px) ~400ms', () => {
+    expect(css).toMatch(/--dur-soft-blur:\s*400ms/)
+    expect(css).toMatch(/\.rg-soft-blur[\s\S]*?filter:\s*blur\(4px\)/)
+    expect(css).toMatch(/\.rg-soft-blur[\s\S]*?translate3d\(0,\s*4px,\s*0\)/)
   })
 
-  it('cards rise with translateY(12px)', () => {
-    expect(css).toMatch(/\.rg-reveal[\s\S]*?translate3d\(0,\s*12px,\s*0\)/)
-    expect(css).toMatch(/rg-reveal-in\s+var\(--dur-reveal\)\s+var\(--ease-out\)/)
+  it('Mask Reveal Up uses clip-path inset from 100% to 0', () => {
+    expect(css).toMatch(/\.rg-mask-reveal[\s\S]*?clip-path:\s*inset\(100%\s+0\s+0\s+0\)/)
+    expect(css).toMatch(/@keyframes\s+rg-mask-reveal-up[\s\S]*?clip-path:\s*inset\(0\)/)
   })
 
-  it('button press uses ~120ms ease-out and scale(0.96)', () => {
+  it('Text Flip uses rotateX and stable-width measure', () => {
+    expect(css).toMatch(/rg-text-flip-out[\s\S]*?rotateX\(-75deg\)/)
+    expect(css).toMatch(/rg-text-flip-in[\s\S]*?rotateX\(75deg\)/)
+    expect(css).toMatch(/\.rg-text-flip__measure/)
+  })
+
+  it('button press keeps scale(0.96) at 120ms', () => {
     expect(css).toMatch(/--dur-press:\s*120ms/)
     expect(css).toMatch(/\.ios-press:active[\s\S]*?scale\(0\.96\)/)
-    expect(css).toMatch(/transform\s+var\(--dur-press\)\s+var\(--ease-out\)/)
   })
 
-  it('prefers-reduced-motion forces visible settled styles', () => {
+  it('prefers-reduced-motion forces settled / unclipped styles', () => {
     expect(css).toMatch(
       /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.rg-blur-word[\s\S]*?filter:\s*none\s*!important/,
     )
     expect(css).toMatch(
-      /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.rg-reveal[\s\S]*?opacity:\s*1\s*!important/,
+      /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.rg-mask-reveal[\s\S]*?clip-path:\s*none\s*!important/,
     )
   })
 
   it('distress screens disable motion', () => {
     expect(css).toMatch(/\[data-distress-level='1'\]/)
     expect(css).toMatch(/\[data-distress-level='2'\]/)
-    expect(css).toMatch(
-      /\[data-distress-level='1'\][\s\S]*?animation:\s*none\s*!important/,
-    )
   })
 
-  it('uses short reveal duration and ease-out token', () => {
-    expect(css).toMatch(/--dur-reveal:\s*400ms/)
-    expect(css).toMatch(/--dur-word:\s*400ms/)
+  it('PNG brand mark has no opacity/fade animation', () => {
+    expect(css).toMatch(/\.brand-mark-image[\s\S]*?opacity:\s*unset\s*!important/)
+    expect(css).toMatch(/jamais d’opacity\/fade sur le logo/)
   })
 })

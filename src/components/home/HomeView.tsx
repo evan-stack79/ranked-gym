@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { getTrainingState } from '../../services/trainingStorage'
-import { getHomeGreeting, resolveDisplayFirstName } from '../../utils/homeGreeting'
+import {
+  getHomeGreetingSubtitle,
+  resolveDisplayFirstName,
+} from '../../utils/homeGreeting'
 import { getTodayWorkout } from '../../utils/todayWorkout'
-import { BlurInText, Reveal } from '../motion'
+import { BlurInText, Reveal, SoftBlurIn, TextFlip } from '../motion'
 import { DailyStreak } from './DailyStreak'
 import { TodayWorkoutCard } from './TodayWorkoutCard'
 import { NutritionSnapshot } from './NutritionSnapshot'
@@ -66,7 +69,7 @@ export function HomeView({ onStartTraining, onOpenTraining, onOpenNutrition }: H
     displayName: user?.displayName,
     pseudo: profile?.pseudo,
   })
-  const greeting = getHomeGreeting(firstName)
+  const subtitle = getHomeGreetingSubtitle()
 
   const todayWorkout = useMemo(
     () => getTodayWorkout(getTrainingState()),
@@ -77,10 +80,14 @@ export function HomeView({ onStartTraining, onOpenTraining, onOpenNutrition }: H
     <div className={`flex flex-col gap-8 ${coldEntering ? 'home-cold-enter home-cold-enter--active' : ''}`}>
       <header className="home-cold-enter__group home-cold-enter__group--0">
         <h1 className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white">
-          <BlurInText as="span" instant={coldEntering}>
-            {greeting}
+          <TextFlip />
+          <BlurInText as="span" instant={coldEntering} label={`, ${firstName} ?`}>
+            {`, ${firstName} ?`}
           </BlurInText>
         </h1>
+        <p className="mt-1.5 text-[15px] font-medium text-[#AEAEB2]">
+          <SoftBlurIn instant={coldEntering}>{subtitle}</SoftBlurIn>
+        </p>
       </header>
 
       <div className="home-cold-enter__group home-cold-enter__group--1">

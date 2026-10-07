@@ -1,4 +1,4 @@
-import { BlurInText, CountUpNumber, Reveal } from '../components/motion'
+import { BlurInText, CountUpNumber, Reveal, SoftBlurIn } from '../components/motion'
 import { BrandMark } from '../components/brand/BrandMark'
 
 /**
@@ -43,6 +43,9 @@ export function TrainUxFixture() {
             <h1 className="text-[34px] font-bold tracking-tight text-white">
               <BlurInText as="span">Train</BlurInText>
             </h1>
+            <p className="mt-1 text-[15px] text-[#AEAEB2]">
+              <SoftBlurIn>Hub de la semaine</SoftBlurIn>
+            </p>
           </header>
 
           <Reveal>
@@ -51,7 +54,9 @@ export function TrainUxFixture() {
               aria-label="Résumé de la semaine"
               data-reveal-card="week"
             >
-              <p className="text-[11px] font-medium text-[#8E8E93]">Cette semaine</p>
+              <p className="text-[11px] font-medium text-[#8E8E93]">
+                <SoftBlurIn>Cette semaine</SoftBlurIn>
+              </p>
               <p className="mt-2 text-[22px] font-bold tabular-nums text-white">
                 <CountUpNumber kind="sessions" value={3} /> séances
               </p>
@@ -67,7 +72,9 @@ export function TrainUxFixture() {
               aria-label="Dernière séance"
               data-reveal-card="recent"
             >
-              <p className="text-[11px] font-medium text-[#8E8E93]">Dernière séance</p>
+              <p className="text-[11px] font-medium text-[#8E8E93]">
+                <SoftBlurIn>Dernière séance</SoftBlurIn>
+              </p>
               <p className="mt-1 text-[15px] font-semibold text-white">Push · Pecs · Épaules</p>
               <button
                 type="button"

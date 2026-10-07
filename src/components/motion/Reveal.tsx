@@ -11,16 +11,16 @@ export interface RevealProps {
   className?: string
   /** Polymorphic wrapper — default `div`. */
   as?: ElementType
-  /** Stagger delay in ms (opacity/transform only). */
+  /** Stagger delay in ms (keep ≤80ms between sibling cards). */
   delayMs?: number
   /** Force visible immediately (cold launch, tests). */
   instant?: boolean
 }
 
 /**
- * Soft fade + rise (translateY 12px) on first viewport entry — for cards.
- * Stagger via delayMs (keep ≤80ms between siblings).
- * MIT-friendly: no paid libs. Disabled under prefers-reduced-motion.
+ * Mask Reveal Up — cards: clip-path inset bottom→top + slight translateY.
+ * Inspired by Animata / Magic UI (MIT), pure CSS. No opacity fade on brand logo.
+ * Stagger via delayMs (≤80ms). Disabled under prefers-reduced-motion.
  */
 export function Reveal({
   children,
@@ -39,9 +39,9 @@ export function Reveal({
       : undefined
 
   const classes = [
-    'rg-reveal',
-    inView ? 'rg-reveal--in' : '',
-    skip ? 'rg-reveal--instant' : '',
+    'rg-mask-reveal',
+    inView ? 'rg-mask-reveal--in' : '',
+    skip ? 'rg-mask-reveal--instant' : '',
     className,
   ]
     .filter(Boolean)
@@ -53,9 +53,13 @@ export function Reveal({
       className={classes}
       style={style}
       data-rg-reveal={inView ? 'in' : 'pending'}
+      data-rg-reveal-variant="mask-up"
       data-rg-motion={skip ? 'reduced' : 'on'}
     >
       {children}
     </Tag>
   )
 }
+
+/** Alias matching Evan’s naming (Mask Reveal Up). */
+export const MaskReveal = Reveal

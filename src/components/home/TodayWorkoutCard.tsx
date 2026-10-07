@@ -1,4 +1,5 @@
 import type { TodayWorkoutPlan } from '../../utils/todayWorkout'
+import { SoftBlurIn } from '../motion'
 
 interface TodayWorkoutCardProps {
   workout: TodayWorkoutPlan | null
@@ -31,8 +32,12 @@ export function TodayWorkoutCard({ workout, onStart, onOpenNotebook }: TodayWork
     <section className="glass-card rounded-2xl p-4" aria-label="Entraînement">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-medium text-[#8E8E93]">Entraînement</p>
-          <p className="mt-1 text-[15px] font-semibold leading-snug text-white">{summary}</p>
+          <p className="text-[11px] font-medium text-[#8E8E93]">
+            <SoftBlurIn>Entraînement</SoftBlurIn>
+          </p>
+          <p className="mt-1 text-[15px] font-semibold leading-snug text-white">
+            <SoftBlurIn delayMs={40}>{summary}</SoftBlurIn>
+          </p>
         </div>
 
         {workout?.canStart ? (
