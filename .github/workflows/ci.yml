@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve Node version
+        id: node
+        run: |
+          if [ -f .nvmrc ]; then
+            echo "version=$(tr -d 'v[:space:]' < .nvmrc)" >> "$GITHUB_OUTPUT"
+          else
+            ver=$(python3 -c 'import json,re,pathlib; p=pathlib.Path("package.json"); e=(json.loads(p.read_text()).get("engines") or {}) if p.exists() else {}; n=str(e.get("node") or ""); m=re.search(r"(\d+)", n); print(m.group(1) if m else "20")')
+            echo "version=$ver" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.node.outputs.version }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: |
+          if node -e "const s=require('./package.json').scripts||{}; process.exit(Object.values(s).some(v=>/\boxlint\b/.test(String(v)))?0:1)"; then
+            npm run lint
+          else
+            echo "No oxlint script; skipping lint"
+          fi
+
+      - run: npm test
+
+      - run: npm run build
+
+      - name: Convex typecheck
+        run: npx convex typecheck
