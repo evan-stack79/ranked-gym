@@ -116,8 +116,16 @@ async function main() {
     await page.screenshot({ path: topPath, fullPage: false })
     await copyFile(topPath, join(artifactsDir, 'accueil_nouveau_haut.png'))
 
-    await page.locator('[data-accueil-recent]').scrollIntoViewIfNeeded()
-    await page.waitForTimeout(200)
+    // Scroll main so Récent sits near the top and the floating pill stays visible.
+    await page.evaluate(() => {
+      const main = document.querySelector('[data-app-scroll-main]')
+      const recent = document.querySelector('[data-accueil-recent]')
+      if (main instanceof HTMLElement && recent instanceof HTMLElement) {
+        const top = recent.offsetTop - 12
+        main.scrollTo({ top: Math.max(0, top), behavior: 'instant' })
+      }
+    })
+    await page.waitForTimeout(250)
     const recentPath = join(outDir, 'accueil_nouveau_recent.png')
     await page.screenshot({ path: recentPath, fullPage: false })
     await copyFile(recentPath, join(artifactsDir, 'accueil_nouveau_recent.png'))
