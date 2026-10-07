@@ -62,7 +62,7 @@ export function AppLayout({
       */}
       {showHeader ? (
         <header
-          className="sticky top-0 z-30 shrink-0 border-b border-white/5 bg-[#0C0C0E]"
+          className="sticky top-0 z-30 shrink-0 border-b border-white/5"
           data-app-brand-header="1"
           aria-hidden={streakCelebrationActive ? true : undefined}
           /* Safe-area seule — pas de padding fixe empilé par-dessus (Dynamic Island). */
@@ -70,9 +70,21 @@ export function AppLayout({
             paddingTop: 'var(--app-safe-area-top, env(safe-area-inset-top, 0px))',
           }}
         >
-          <div className="mx-auto flex max-w-lg items-center justify-center px-4 pb-2 pt-0">
-            <div data-cold-launch-target="compact">
-              <BrandMark variant="compact" />
+          {/*
+            Fond (et éventuel blur) en calque frère ABSOLU sous le contenu —
+            jamais backdrop-filter / opacity / filter sur un ancêtre du logo/texte
+            (WebKit iOS rasterise alors les enfants en basse résolution).
+          */}
+          <div className="relative">
+            <div
+              aria-hidden="true"
+              data-brand-header-bg="1"
+              className="pointer-events-none absolute inset-0 -z-10 bg-[#0C0C0E]"
+            />
+            <div className="mx-auto flex max-w-lg items-center justify-center px-4 pb-2 pt-0">
+              <div data-cold-launch-target="compact">
+                <BrandMark variant="compact" />
+              </div>
             </div>
           </div>
         </header>
