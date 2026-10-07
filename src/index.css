@@ -16,6 +16,19 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Accessible full-text twin for word-by-word title blur-in */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
 html,
 body,
 #root {
@@ -60,12 +73,16 @@ body {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
-  --dur-press: 140ms;
+  --dur-press: 120ms;
   --dur-fast: 180ms;
   --dur-ui: 220ms;
   --dur-drawer: 260ms;
-  /* Scroll reveal / title blur-in — occasional, once per element */
-  --dur-reveal: 400ms;
+  /* Motion tokens — Evan choices (Blur In Up / Soft Blur / Mask Reveal / Flip) */
+  --dur-reveal: 450ms;
+  --dur-word: 400ms;
+  --dur-soft-blur: 400ms;
+  --dur-text-flip: 420ms;
+  --stagger-max: 80ms;
   --color-card: #141416;
   --color-muted: #aeaeb2;
 }
@@ -402,13 +419,15 @@ body {
 
 .ios-press {
   transition:
-    transform var(--dur-fast) var(--ease-out),
-    opacity var(--dur-fast) var(--ease-out),
-    background-color var(--dur-fast) var(--ease-out),
-    color var(--dur-fast) var(--ease-out);
+    transform var(--dur-press) var(--ease-out),
+    opacity var(--dur-press) var(--ease-out),
+    background-color var(--dur-press) var(--ease-out),
+    color var(--dur-press) var(--ease-out);
 }
 
-.ios-press:active {
+/* Press feedback: scale(0.96) on :active / pointerdown (~120ms ease-out) */
+.ios-press:active,
+.ios-press[data-pressed='true'] {
   transform: scale(0.96);
   opacity: 0.88;
 }
@@ -474,54 +493,82 @@ body {
   animation-delay: 0.15s;
 }
 
-/* --- Tasteful scroll reveal / blur-in (MIT: CSS + IntersectionObserver) --- */
-.rg-reveal {
-  opacity: 0;
-  transform: translate3d(0, 14px, 0);
-  will-change: opacity, transform;
+/* --- Motion (MIT-inspired Animata / Magic UI, pure CSS) --- */
+
+/* Cards: Mask Reveal Up — clip-path inset bottom→top + slight translateY */
+.rg-mask-reveal {
+  clip-path: inset(100% 0 0 0);
+  transform: translate3d(0, 10px, 0);
+  will-change: clip-path, transform;
 }
 
-.rg-reveal--in {
-  animation: rg-reveal-in var(--dur-reveal) var(--ease-out) both;
+.rg-mask-reveal--in {
+  animation: rg-mask-reveal-up var(--dur-reveal) var(--ease-out) both;
   animation-delay: var(--rg-reveal-delay, 0ms);
 }
 
-.rg-reveal--instant,
-.rg-reveal--instant.rg-reveal--in {
+.rg-mask-reveal--instant,
+.rg-mask-reveal--instant.rg-mask-reveal--in {
   animation: none !important;
-  opacity: 1;
+  clip-path: inset(0);
   transform: none;
   will-change: auto;
 }
 
-@keyframes rg-reveal-in {
+@keyframes rg-mask-reveal-up {
   from {
-    opacity: 0;
-    transform: translate3d(0, 14px, 0);
+    clip-path: inset(100% 0 0 0);
+    transform: translate3d(0, 10px, 0);
   }
   to {
-    opacity: 1;
+    clip-path: inset(0);
     transform: none;
   }
 }
 
+/* Legacy class aliases kept for any residual selectors */
+.rg-reveal {
+  clip-path: inset(100% 0 0 0);
+  transform: translate3d(0, 10px, 0);
+}
+.rg-reveal--in {
+  animation: rg-mask-reveal-up var(--dur-reveal) var(--ease-out) both;
+  animation-delay: var(--rg-reveal-delay, 0ms);
+}
+.rg-reveal--instant,
+.rg-reveal--instant.rg-reveal--in {
+  animation: none !important;
+  clip-path: inset(0);
+  transform: none;
+}
+
+/* Blur In Up — big titles, word by word (blur 10px, translateY 12px) */
 .rg-blur-in {
   display: inline-block;
   max-width: 100%;
+}
+
+.rg-blur-words {
+  display: inline;
+}
+
+.rg-blur-word {
+  display: inline-block;
   opacity: 0;
-  filter: blur(8px);
-  transform: translate3d(0, 8px, 0);
+  filter: blur(10px);
+  transform: translate3d(0, 12px, 0);
   will-change: opacity, transform, filter;
 }
 
-.rg-blur-in--in:not(.rg-blur-in--settled) {
-  animation: rg-blur-in var(--dur-reveal) var(--ease-out) both;
-  animation-delay: var(--rg-blur-delay, 0ms);
+.rg-blur-in--in:not(.rg-blur-in--settled) .rg-blur-word {
+  animation: rg-blur-in-up var(--rg-word-dur, var(--dur-word)) var(--ease-out) both;
+  animation-delay: var(--rg-word-delay, 0ms);
 }
 
-/* Settled / reduced-motion: never leave a lingering blur */
 .rg-blur-in--settled,
-.rg-blur-in--settled.rg-blur-in--in {
+.rg-blur-in--settled.rg-blur-in--in,
+.rg-blur-in--settled .rg-blur-word,
+.rg-blur-in--settled.rg-blur-in--in .rg-blur-word {
   animation: none !important;
   opacity: 1;
   filter: none;
@@ -529,17 +576,154 @@ body {
   will-change: auto;
 }
 
-@keyframes rg-blur-in {
+@keyframes rg-blur-in-up {
   from {
     opacity: 0;
-    filter: blur(8px);
-    transform: translate3d(0, 8px, 0);
+    filter: blur(10px);
+    transform: translate3d(0, 12px, 0);
   }
   to {
     opacity: 1;
     filter: blur(0);
     transform: none;
   }
+}
+
+/* Soft Blur In — small texts / subtitles, whole line (~400ms) */
+.rg-soft-blur {
+  display: inline-block;
+  max-width: 100%;
+  opacity: 0;
+  filter: blur(4px);
+  transform: translate3d(0, 4px, 0);
+  will-change: opacity, transform, filter;
+}
+
+.rg-soft-blur--in:not(.rg-soft-blur--settled) {
+  animation: rg-soft-blur-in var(--dur-soft-blur) var(--ease-out) both;
+  animation-delay: var(--rg-soft-blur-delay, 0ms);
+}
+
+.rg-soft-blur--settled,
+.rg-soft-blur--settled.rg-soft-blur--in {
+  animation: none !important;
+  opacity: 1;
+  filter: none;
+  transform: none;
+  will-change: auto;
+}
+
+@keyframes rg-soft-blur-in {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translate3d(0, 4px, 0);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
+
+/* Text Flip — Accueil greeting word cycle (stable width, rotateX) */
+.rg-text-flip {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  vertical-align: baseline;
+  perspective: 480px;
+}
+
+.rg-text-flip__viewport {
+  display: inline-block;
+  width: 100%;
+  overflow: hidden;
+  line-height: 1.15;
+  text-align: right;
+  transform-style: preserve-3d;
+}
+
+.rg-text-flip__word {
+  display: inline-block;
+  transform-origin: 50% 50%;
+  backface-visibility: hidden;
+}
+
+.rg-text-flip__word--out {
+  animation: rg-text-flip-out var(--dur-text-flip) var(--ease-in-out) both;
+}
+
+.rg-text-flip__word--in {
+  animation: rg-text-flip-in var(--dur-text-flip) var(--ease-out) both;
+}
+
+.rg-text-flip__word--idle {
+  transform: none;
+  opacity: 1;
+}
+
+@keyframes rg-text-flip-out {
+  from {
+    opacity: 1;
+    transform: rotateX(0deg) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: rotateX(-75deg) translateY(-0.35em);
+  }
+}
+
+@keyframes rg-text-flip-in {
+  from {
+    opacity: 0;
+    transform: rotateX(75deg) translateY(0.35em);
+  }
+  to {
+    opacity: 1;
+    transform: rotateX(0deg) translateY(0);
+  }
+}
+
+.rg-text-flip__measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
+  height: 0;
+  overflow: hidden;
+}
+
+.rg-text-flip__measure-item {
+  display: inline-block;
+}
+
+/* Avis bêta distress (level 1 TCA / level 2 suicide — 3114 / 15 / 112): no motion */
+[data-distress-level='1'],
+[data-distress-level='2'],
+[data-distress-level='1'] *,
+[data-distress-level='2'] * {
+  animation: none !important;
+  transition: none !important;
+}
+
+[data-distress-level='1'] .ios-press:active,
+[data-distress-level='2'] .ios-press:active,
+[data-distress-level='1'] .ios-press[data-pressed='true'],
+[data-distress-level='2'] .ios-press[data-pressed='true'] {
+  transform: none !important;
+  opacity: 1 !important;
+}
+
+/* Forms / inputs: never animate typed values or field chrome */
+input,
+textarea,
+select,
+[contenteditable='true'],
+.rg-no-motion,
+.rg-no-motion * {
+  animation: none !important;
 }
 
 @keyframes skeleton-shimmer {
@@ -1915,9 +2099,18 @@ body {
   .ios-fade-up-delay-3,
   .rg-reveal,
   .rg-reveal--in,
+  .rg-mask-reveal,
+  .rg-mask-reveal--in,
   .rg-blur-in,
   .rg-blur-in--in,
   .rg-blur-in--settled,
+  .rg-blur-word,
+  .rg-soft-blur,
+  .rg-soft-blur--in,
+  .rg-soft-blur--settled,
+  .rg-text-flip__word,
+  .rg-text-flip__word--out,
+  .rg-text-flip__word--in,
   .skeleton-shimmer,
   .arena-glow,
   .streak-card--lit,
@@ -1937,16 +2130,25 @@ body {
 
   .rg-reveal,
   .rg-reveal--in,
+  .rg-mask-reveal,
+  .rg-mask-reveal--in,
   .rg-blur-in,
   .rg-blur-in--in,
-  .rg-blur-in--settled {
+  .rg-blur-in--settled,
+  .rg-blur-word,
+  .rg-soft-blur,
+  .rg-soft-blur--in,
+  .rg-soft-blur--settled,
+  .rg-text-flip__word {
     opacity: 1 !important;
     transform: none !important;
     filter: none !important;
+    clip-path: none !important;
     will-change: auto !important;
   }
 
-  .ios-press:active {
+  .ios-press:active,
+  .ios-press[data-pressed='true'] {
     transform: none;
   }
 

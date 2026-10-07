@@ -203,8 +203,9 @@ export function PersonalInformationScreen({
           </p>
         </div>
 
+        {/* SAFETY (PM / Vérificateur): body weight is a form input — never CountUpNumber. */}
         {showBodyMetrics ? (
-          <div className="grid grid-cols-2 gap-3" data-testid="personal-info-body-metrics">
+          <div className="rg-no-motion grid grid-cols-2 gap-3" data-testid="personal-info-body-metrics">
             <label className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80 px-4 py-3">
               <span className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-[#8E8E93]">
                 <Scale className="h-3.5 w-3.5" aria-hidden />

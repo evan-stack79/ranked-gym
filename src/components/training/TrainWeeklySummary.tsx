@@ -1,4 +1,5 @@
 import type { SportSummaryFilter, WeeklySummary } from '../../utils/trainHub'
+import { CountUpNumber } from '../motion'
 
 const FILTERS: { id: SportSummaryFilter; label: string }[] = [
   { id: 'all', label: 'Tout' },
@@ -26,19 +27,21 @@ export function TrainWeeklySummary({
     const sessions = summary.sessionCount
     const timeMetric = summary.metrics.find((m) => m.id === 'active_min' || m.id === 'duration')
     const timeLabel = timeMetric?.display
-    const line =
-      sessions <= 0
-        ? 'Aucune séance cette semaine'
-        : timeLabel
-          ? `${sessions} séance${sessions > 1 ? 's' : ''} · ${timeLabel}`
-          : `${sessions} séance${sessions > 1 ? 's' : ''}`
     return (
       <p
         className="text-[13px] text-[#8E8E93]"
         aria-label="Résumé de la semaine"
         data-week-summary
       >
-        {line}
+        {sessions <= 0 ? (
+          'Aucune séance cette semaine'
+        ) : (
+          <>
+            <CountUpNumber kind="sessions" value={sessions} className="tabular-nums" />
+            {` séance${sessions > 1 ? 's' : ''}`}
+            {timeLabel ? ` · ${timeLabel}` : ''}
+          </>
+        )}
       </p>
     )
   }
@@ -82,7 +85,22 @@ export function TrainWeeklySummary({
           >
             <p className="text-[11px] font-medium text-[#8E8E93]">{m.label}</p>
             <p className="mt-1 text-[24px] font-bold tabular-nums leading-none tracking-tight text-white">
-              {m.display}
+              {m.id === 'sessions' && m.value != null ? (
+                <CountUpNumber kind="sessions" value={m.value} />
+              ) : m.id === 'ex_sets' && m.value != null ? (
+                <CountUpNumber
+                  kind="successful_sets"
+                  value={m.value}
+                  format={(n) => {
+                    const sets = Math.round(n)
+                    const slash = m.display.indexOf('/')
+                    const exos = slash >= 0 ? m.display.slice(0, slash) : String(sets)
+                    return `${exos}/${sets}`
+                  }}
+                />
+              ) : (
+                m.display
+              )}
             </p>
           </div>
         ))}

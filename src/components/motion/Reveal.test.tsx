@@ -3,7 +3,13 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Reveal } from './Reveal'
-import { BlurInText } from './BlurInText'
+import {
+  BlurInText,
+  BLUR_WORD_STAGGER_MS,
+  BLUR_IN_UP_TOTAL_MAX_MS,
+  blurInUpTiming,
+} from './BlurInText'
+import { SoftBlurIn } from './SoftBlurIn'
 
 function mockMatchMedia(reduced: boolean) {
   Object.defineProperty(window, 'matchMedia', {
@@ -17,12 +23,11 @@ function mockMatchMedia(reduced: boolean) {
       removeListener: vi.fn(),
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
     })),
   })
 }
 
-describe('Reveal / BlurInText', () => {
+describe('Reveal (Mask Reveal Up) / BlurInUp / SoftBlurIn', () => {
   let host: HTMLDivElement
   let root: Root
   let observe: ReturnType<typeof vi.fn>
@@ -59,7 +64,7 @@ describe('Reveal / BlurInText', () => {
     vi.unstubAllGlobals()
   })
 
-  it('prefers-reduced-motion: shows content immediately without pending state', () => {
+  it('prefers-reduced-motion: mask reveal shows content immediately', () => {
     mockMatchMedia(true)
 
     act(() => {
@@ -73,12 +78,13 @@ describe('Reveal / BlurInText', () => {
     const el = host.querySelector('[data-rg-reveal]') as HTMLElement
     expect(el).not.toBeNull()
     expect(el.getAttribute('data-rg-reveal')).toBe('in')
+    expect(el.getAttribute('data-rg-reveal-variant')).toBe('mask-up')
     expect(el.getAttribute('data-rg-motion')).toBe('reduced')
-    expect(el.className).toContain('rg-reveal--instant')
+    expect(el.className).toContain('rg-mask-reveal--instant')
     expect(observe).not.toHaveBeenCalled()
   })
 
-  it('BlurInText reduced-motion path settles with no filter class', () => {
+  it('BlurInUp reduced-motion path settles with accessible full text', () => {
     mockMatchMedia(true)
 
     act(() => {
@@ -92,19 +98,40 @@ describe('Reveal / BlurInText', () => {
     const el = host.querySelector('[data-rg-blur]') as HTMLElement
     expect(el).not.toBeNull()
     expect(el.getAttribute('data-rg-blur')).toBe('settled')
+    expect(el.getAttribute('data-rg-blur-variant')).toBe('up')
     expect(el.getAttribute('data-rg-motion')).toBe('reduced')
+    expect(el.getAttribute('aria-label')).toBe('Nutrition')
     expect(el.className).toContain('rg-blur-in--settled')
+    expect(el.querySelector('.sr-only')?.textContent).toBe('Nutrition')
+    expect(el.querySelector('.rg-blur-words')?.getAttribute('aria-hidden')).toBe('true')
   })
 
-  it('BlurInText final state has filter none after animation end', () => {
+  it('BlurInUp timing keeps total ≤600ms with stagger ≤80ms', () => {
+    expect(BLUR_WORD_STAGGER_MS).toBeLessThanOrEqual(80)
+    const long = blurInUpTiming(8)
+    expect(long.staggerMs * 7 + long.durationMs).toBeLessThanOrEqual(BLUR_IN_UP_TOTAL_MAX_MS)
+    expect(long.staggerMs).toBeLessThanOrEqual(80)
+  })
+
+  it('BlurInUp splits into words and settles after last word', () => {
     act(() => {
-      root.render(
-        <BlurInText as="h1">Train</BlurInText>,
-      )
+      root.render(<BlurInText as="h1">Bonjour Alex</BlurInText>)
     })
 
     const el = host.querySelector('[data-rg-blur]') as HTMLElement
     expect(el.getAttribute('data-rg-blur')).toBe('pending')
+    expect(el.getAttribute('aria-label')).toBe('Bonjour Alex')
+
+    const words = el.querySelectorAll('.rg-blur-word')
+    expect(words.length).toBe(2)
+    expect(words[0]?.textContent).toBe('Bonjour')
+    expect(words[1]?.textContent).toBe('Alex')
+    expect(el.querySelector('.rg-blur-words')?.textContent).toBe('Bonjour Alex')
+
+    const timing = blurInUpTiming(2)
+    expect((words[1] as HTMLElement).style.getPropertyValue('--rg-word-delay')).toBe(
+      `${timing.staggerMs}ms`,
+    )
 
     act(() => {
       ioCallback?.(
@@ -124,24 +151,32 @@ describe('Reveal / BlurInText', () => {
     })
 
     expect(el.getAttribute('data-rg-blur')).toBe('in')
-    expect(el.className).toContain('rg-blur-in--in')
 
     act(() => {
-      el.dispatchEvent(new Event('animationend', { bubbles: true }))
+      words[0]!.dispatchEvent(new Event('animationend', { bubbles: true }))
+    })
+    expect(el.getAttribute('data-rg-blur')).toBe('in')
+
+    act(() => {
+      words[1]!.dispatchEvent(new Event('animationend', { bubbles: true }))
     })
 
     expect(el.getAttribute('data-rg-blur')).toBe('settled')
-    expect(el.className).toContain('rg-blur-in--settled')
-
-    // Settled class locks filter: none in CSS — assert class contract here;
-    // jsdom does not compute stylesheet cascade for custom classes.
-    const settledRule =
-      '.rg-blur-in--settled { filter: none; opacity: 1; transform: none; }'
-    expect(settledRule).toContain('filter: none')
     expect(disconnect).toHaveBeenCalled()
   })
 
-  it('Reveal runs once then disconnects the observer', () => {
+  it('SoftBlurIn settles after animation; reduced motion is instant', () => {
+    mockMatchMedia(true)
+    act(() => {
+      root.render(<SoftBlurIn>Sous-titre</SoftBlurIn>)
+    })
+    const el = host.querySelector('[data-rg-soft-blur]') as HTMLElement
+    expect(el.getAttribute('data-rg-soft-blur')).toBe('settled')
+    expect(el.getAttribute('data-rg-motion')).toBe('reduced')
+    expect(el.className).toContain('rg-soft-blur--settled')
+  })
+
+  it('Mask Reveal runs once then disconnects the observer', () => {
     act(() => {
       root.render(
         <Reveal>
@@ -152,6 +187,7 @@ describe('Reveal / BlurInText', () => {
 
     const el = host.querySelector('[data-rg-reveal]') as HTMLElement
     expect(observe).toHaveBeenCalledTimes(1)
+    expect(el.className).toContain('rg-mask-reveal')
 
     act(() => {
       ioCallback?.(

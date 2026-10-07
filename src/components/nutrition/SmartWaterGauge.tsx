@@ -28,6 +28,7 @@ import {
   remainingMlFromKey,
   remainingMlFromPointerY,
 } from '../../utils/bottleCalibrationPointer'
+import { CountUpNumber, SoftBlurIn } from '../motion'
 
 /**
  * Journal d’hydratation : jauge + raccourcis (badges ×N) + liste « Aujourd’hui »
@@ -462,11 +463,17 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
           <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#8E8E93]">
             Hydratation
           </p>
-          <h2 className="mt-1 text-[22px] font-semibold tracking-tight text-white">Eau</h2>
+          <h2 className="mt-1 text-[22px] font-semibold tracking-tight text-white">
+            <SoftBlurIn as="span">Eau</SoftBlurIn>
+          </h2>
         </div>
         <p className="text-right text-[15px] font-medium tabular-nums text-[#AEAEB2]">
           <span className="text-[22px] font-semibold tracking-tight text-white">
-            {displayTotal}
+            {awaitingConfirm || dragging ? (
+              displayTotal
+            ) : (
+              <CountUpNumber kind="water" value={displayTotal} />
+            )}
           </span>
           <span className="text-[#8E8E93]"> / {formatWaterMl(dailyGoalMl)}</span>
         </p>
