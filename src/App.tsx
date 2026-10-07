@@ -21,6 +21,8 @@ import type { TabId } from './types'
 import { safeWarn } from './utils/safeLog'
 import { getTrainingState } from './services/trainingStorage'
 import { isSportsOnboardingEnabled } from './backend/trainingFeatureFlags'
+import { OPEN_BETA_FEEDBACK_EVENT } from './services/betaFeedbackNav'
+import { canAccessBetaFeedback } from './services/betaFeedbackAccess'
 
 type AppPhase = 'loading' | 'onboarding' | 'sports' | 'main'
 
@@ -163,6 +165,19 @@ export function AppShell() {
       setResumeActiveWorkout(false)
     }
   }, [isAuthenticated])
+
+  useEffect(() => {
+    const onOpenFeedback = () => {
+      if (!canAccessBetaFeedback()) return
+      if (!isAuthenticated) {
+        openAuth()
+        return
+      }
+      setActiveTab('profile')
+    }
+    window.addEventListener(OPEN_BETA_FEEDBACK_EVENT, onOpenFeedback)
+    return () => window.removeEventListener(OPEN_BETA_FEEDBACK_EVENT, onOpenFeedback)
+  }, [isAuthenticated, openAuth])
 
   useEffect(() => {
     const syncActiveWorkout = () => setHasActiveWorkout(Boolean(getTrainingState().activeWorkoutDraft))

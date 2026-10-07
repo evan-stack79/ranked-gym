@@ -42,8 +42,9 @@ class FakeDb {
     return Promise.resolve(row._id)
   }
 
-  query(table: TableName) {
-    return new FakeQuery(this.rows[table])
+  query(table: TableName | string) {
+    const rows = (this.rows as Record<string, StoredRow[]>)[table] ?? []
+    return new FakeQuery(rows)
   }
 
   get(id: string) {

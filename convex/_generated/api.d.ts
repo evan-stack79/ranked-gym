@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as authPrivateData from "../authPrivateData.js";
+import type * as avisBeta from "../avisBeta.js";
 import type * as files from "../files.js";
 import type * as health from "../health.js";
 import type * as lib_auth from "../lib/auth.js";
@@ -34,6 +35,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   authPrivateData: typeof authPrivateData;
+  avisBeta: typeof avisBeta;
   files: typeof files;
   health: typeof health;
   "lib/auth": typeof lib_auth;
