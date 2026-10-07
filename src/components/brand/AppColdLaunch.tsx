@@ -328,7 +328,7 @@ export function AppColdLaunch({ children }: { children: React.ReactNode }) {
     }
     const flyer = flyerMarkRef.current
     const target = document.querySelector<HTMLElement>(
-      '[data-cold-launch-target="compact"] [data-brand-mark-image="compact"]',
+      '[data-cold-launch-target="compact"] [data-brand-mark-svg="compact"], [data-cold-launch-target="compact"] [data-brand-mark-image="compact"]',
     )
     if (!flyer || !target) return
 
