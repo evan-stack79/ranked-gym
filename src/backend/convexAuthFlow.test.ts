@@ -46,6 +46,7 @@ type TableName =
   | 'user_follows'
   | 'activity_comments'
   | 'activity_reactions'
+  | 'avis_beta'
 
 type StoredRow = Record<string, unknown> & { _id: string }
 
@@ -81,6 +82,7 @@ class FakeDb {
     user_follows: [],
     activity_comments: [],
     activity_reactions: [],
+    avis_beta: [],
   }
 
   insert(table: TableName, value: Record<string, unknown>) {

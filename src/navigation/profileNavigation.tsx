@@ -16,6 +16,7 @@ export type ProfileRoute =
   | 'needToTalk'
   | 'healthSituations'
   | 'energyInfo'
+  | 'giveFeedback'
 
 interface ProfileNavigationContextValue {
   route: ProfileRoute

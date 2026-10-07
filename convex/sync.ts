@@ -1,6 +1,7 @@
 import { v } from 'convex/values'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
+import { sanitizeSyncedNutritionProfileJson } from './avisBeta'
 
 /**
  * Cloud backup/sync for PR-F domains: profile lobby, workouts, nutrition
@@ -391,8 +392,12 @@ async function upsertNutrition(
   const existing = await findNutritionDoc(ctx, userId)
   if (existing) {
     assertUserOwnership(existing.userId, userId)
+    const profileJson =
+      nutrition.profileJson !== undefined
+        ? sanitizeSyncedNutritionProfileJson(existing.profileJson, nutrition.profileJson)
+        : undefined
     await ctx.db.patch(existing._id, {
-      ...(nutrition.profileJson !== undefined ? { profileJson: nutrition.profileJson } : {}),
+      ...(profileJson !== undefined ? { profileJson } : {}),
       ...(nutrition.journalJson !== undefined ? { journalJson: nutrition.journalJson } : {}),
       updatedAt: now,
     })

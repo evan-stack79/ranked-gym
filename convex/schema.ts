@@ -412,6 +412,45 @@ export const convexTables = {
     updatedAt: v.number(),
     source: v.literal('supabase_user_backups'),
   }).index('by_userId', ['userId']),
+
+  /**
+   * Avis bêta (« Donner mon avis ») — SPEC_AVIS_BETA.
+   * Pas d’âge, poids, e-mail, IP ni donnée de santé en colonnes.
+   * Garde 18+ : âge lu côté serveur dans `nutrition_state.profileJson` (jamais stocké ici).
+   */
+  avis_beta: defineTable({
+    userId: v.string(),
+    type: v.union(v.literal('bug'), v.literal('idee'), v.literal('autre')),
+    texte: v.string(),
+    texteMasque: v.optional(v.string()),
+    page: v.string(),
+    version: v.string(),
+    creeLe: v.number(),
+    consentementDate: v.number(),
+    consentementVersion: v.string(),
+    statut: v.union(
+      v.literal('nouveau'),
+      v.literal('urgent'),
+      v.literal('garde'),
+      v.literal('mis_de_cote'),
+      v.literal('transmis'),
+      v.literal('traite'),
+    ),
+    signalUrgent: v.boolean(),
+    /** 1 = TCA/mal-être · 2 = idées suicidaires (jamais de diagnostic stocké au-delà). */
+    signalNiveau: v.optional(v.union(v.literal(1), v.literal(2))),
+    motsMasques: v.boolean(),
+    notif: v.union(v.literal('a_envoyer'), v.literal('envoyee'), v.literal('echec')),
+    notifEssais: v.number(),
+    cleAntiDoublon: v.string(),
+    decision: v.optional(v.string()),
+    noteTri: v.optional(v.string()),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_userId_creeLe', ['userId', 'creeLe'])
+    .index('by_cleAntiDoublon', ['cleAntiDoublon'])
+    .index('by_notif', ['notif'])
+    .index('by_statut', ['statut']),
 }
 
 export default defineSchema(convexTables)

@@ -5,6 +5,7 @@ import { PersonalInformationScreen } from '../settings/PersonalInformationScreen
 import { SecurityScreen } from '../settings/SecurityScreen'
 import { CameraHeartRateScreen } from '../settings/CameraHeartRateScreen'
 import { NeedToTalkScreen } from '../settings/NeedToTalkScreen'
+import { BetaFeedbackScreen } from '../settings/BetaFeedbackScreen'
 import { EnergyRecoveryInfo } from '../settings/EnergyRecoveryInfo'
 import {
   HealthSituationsForm,
@@ -29,6 +30,14 @@ import {
   ProfileNavigationProvider,
   useProfileNavigation,
 } from '../../navigation/profileNavigation'
+import {
+  OPEN_BETA_FEEDBACK_EVENT,
+  consumeBetaFeedbackPendingOpen,
+  setBetaFeedbackPrefillPage,
+  type OpenBetaFeedbackDetail,
+} from '../../services/betaFeedbackNav'
+import { canOpenBetaFeedback } from '../../services/betaFeedbackAccess'
+import { confirmSignOutClearingAvisQueue } from '../../services/avisBetaLogoutWarn'
 
 function ProfileViewContent() {
   const {
@@ -56,6 +65,29 @@ function ProfileViewContent() {
       void refreshProfile()
     }
   }, [isAuthenticated, refreshProfile])
+
+  useEffect(() => {
+    const openFeedback = (page?: string) => {
+      if (!canOpenBetaFeedback()) return
+      if (page) setBetaFeedbackPrefillPage(page)
+      if (!isAuthenticated) {
+        requireAuth(() => navigate('giveFeedback'))
+        return
+      }
+      navigate('giveFeedback')
+    }
+
+    if (consumeBetaFeedbackPendingOpen()) {
+      openFeedback()
+    }
+
+    const onOpenFeedback = (event: Event) => {
+      const detail = (event as CustomEvent<OpenBetaFeedbackDetail>).detail
+      openFeedback(detail?.page?.trim())
+    }
+    window.addEventListener(OPEN_BETA_FEEDBACK_EVENT, onOpenFeedback)
+    return () => window.removeEventListener(OPEN_BETA_FEEDBACK_EVENT, onOpenFeedback)
+  }, [isAuthenticated, navigate, requireAuth])
 
   useEffect(() => {
     if (profile?.discipline) {
@@ -116,6 +148,7 @@ function ProfileViewContent() {
           void handleGhostModeChange(enabled)
         }}
         onSignOut={() => {
+          if (!confirmSignOutClearingAvisQueue()) return
           void signOut()
         }}
       />
@@ -128,6 +161,25 @@ function ProfileViewContent() {
 
   if (route === 'needToTalk') {
     return <NeedToTalkScreen onBack={goBack} />
+  }
+
+  if (route === 'giveFeedback') {
+    if (!canOpenBetaFeedback()) {
+      goBack()
+      return null
+    }
+    if (!isAuthenticated || !user) {
+      requireAuth(() => navigate('giveFeedback'))
+      goBack()
+      return null
+    }
+    return (
+      <BetaFeedbackScreen
+        onBack={goBack}
+        onOpenNeedToTalk={() => navigate('needToTalk')}
+        onOpenProfile={() => navigate('personalInfo')}
+      />
+    )
   }
 
   if (route === 'energyInfo') {
@@ -187,6 +239,7 @@ function ProfileViewContent() {
           onOpenNeedToTalk={() => navigate('needToTalk')}
           onOpenHealthSituations={() => navigate('healthSituations')}
           onOpenEnergyInfo={() => navigate('energyInfo')}
+          onOpenGiveFeedback={() => requireAuth(() => navigate('giveFeedback'))}
         />
         <CloudBackupCard />
       </div>
@@ -212,6 +265,7 @@ function ProfileViewContent() {
         onOpenNeedToTalk={() => navigate('needToTalk')}
         onOpenHealthSituations={() => navigate('healthSituations')}
         onOpenEnergyInfo={() => navigate('energyInfo')}
+        onOpenGiveFeedback={() => navigate('giveFeedback')}
         onRequireAuth={() => requireAuth(() => undefined)}
         onDisciplineChange={(label) => {
           setDisciplineId(disciplineFromLabel(label))
@@ -222,6 +276,7 @@ function ProfileViewContent() {
           void refreshProfile()
         }}
         onSignOut={() => {
+          if (!confirmSignOutClearingAvisQueue()) return
           void signOut()
         }}
         showSignOut

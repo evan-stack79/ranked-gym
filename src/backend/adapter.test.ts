@@ -44,6 +44,7 @@ const PHASE_E_TABLES = [
   'user_follows',
   'activity_comments',
   'activity_reactions',
+  'avis_beta',
 ] as const
 
 describe('Convex Phase A feature flag', () => {

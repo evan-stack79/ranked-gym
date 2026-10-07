@@ -589,6 +589,11 @@ export async function deleteAccountAndUserData(
     await ctx.db.query('auth_private_notes').withIndex('by_userId', (q) => q.eq('userId', user.userId)).collect(),
     deletedDocIds,
   )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('avis_beta').withIndex('by_userId', (q) => q.eq('userId', user.userId)).collect(),
+    deletedDocIds,
+  )
 
   const userFiles = await ctx.db
     .query('user_files')
