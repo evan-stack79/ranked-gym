@@ -22,7 +22,8 @@ interface HomeViewProps {
 }
 
 /**
- * Accueil shell — gallery preview when `VITE_ENABLE_ACCUEIL_GALLERY` is on (OFF by default).
+ * Accueil shell — gallery + floating pill when `VITE_ENABLE_ACCUEIL_GALLERY`
+ * is on (default ON; set false for legacy dashboard + dock nav).
  */
 export function HomeView({
   onStartTraining,

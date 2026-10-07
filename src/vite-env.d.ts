@@ -25,8 +25,8 @@ interface ImportMetaEnv {
   /** Onboarding multisport. Unset = ON en DEV/test, OFF en prod. */
   readonly VITE_ENABLE_SPORTS_ONBOARDING?: string
   /**
-   * Preview Accueil gallery + floating pill nav.
-   * Unset/false = OFF (dashboard Accueil + dock nav actuels).
+   * Accueil gallery + floating pill nav.
+   * Unset/empty = ON. Explicit false restores legacy dashboard + dock nav.
    */
   readonly VITE_ENABLE_ACCUEIL_GALLERY?: string
 }

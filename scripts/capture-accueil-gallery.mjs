@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Captures Accueil gallery + floating pill nav at iPhone 390×844.
- * Prefers WebKit; falls back to Chromium with simulated safe areas.
+ * Captures Accueil gallery + floating pill on REAL tabs (390×844 WebKit).
+ * Seeded training/nutrition data via harness — no placeholder stubs.
  */
 import { mkdir, copyFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -15,7 +15,7 @@ const projectRoot = join(scriptsDir, '..')
 const outDir = join(scriptsDir, 'screenshots', 'accueil-gallery')
 const artifactsDir = '/opt/cursor/artifacts'
 const captureConfig = join(scriptsDir, 'accueil-gallery-capture', 'vite.config.ts')
-const port = 4198
+const port = 4211
 
 const chromiumLaunchOptions = existsSync('/usr/local/bin/google-chrome')
   ? { executablePath: '/usr/local/bin/google-chrome', args: ['--no-sandbox'] }
@@ -30,7 +30,7 @@ async function startServer() {
   )
   await new Promise((resolve, reject) => {
     let output = ''
-    const timer = setTimeout(() => reject(new Error(`Vite timeout\n${output}`)), 30_000)
+    const timer = setTimeout(() => reject(new Error(`Vite timeout\n${output}`)), 45_000)
     const onData = (chunk) => {
       output += chunk.toString()
       if (output.includes('Local:')) {
@@ -68,17 +68,56 @@ async function launchBrowser() {
   }
 }
 
-async function assertNoForbiddenCopy(page) {
-  const text = await page.locator('body').innerText()
+async function gotoTab(page, tab) {
+  const response = await page.goto(`http://127.0.0.1:${port}/?tab=${tab}`, {
+    waitUntil: 'domcontentloaded',
+  })
+  console.log(`goto ${tab} status=${response?.status()}`)
+  await page.waitForSelector('[data-harness-ready]', { state: 'attached', timeout: 30_000 })
+  try {
+    await page.waitForSelector('[data-bottom-nav-variant="floating-pill"]', {
+      state: 'attached',
+      timeout: 15_000,
+    })
+  } catch (error) {
+    const probe = await page.evaluate(() => ({
+      url: location.href,
+      preview: document.documentElement.dataset.bottomNavPreview,
+      navs: [...document.querySelectorAll('nav')].map((n) => ({
+        variant: n.getAttribute('data-bottom-nav-variant'),
+        label: n.getAttribute('aria-label'),
+      })),
+      gallery: !!document.querySelector('[data-accueil-gallery]'),
+      body: document.body?.innerText?.slice(0, 240) ?? '',
+    }))
+    console.error('pill missing probe', probe)
+    throw error
+  }
+  await page.waitForTimeout(250)
+}
+
+async function assertAccueilClean(page) {
+  const text = await page.locator('[data-accueil-gallery]').innerText()
   if (/\bkcal\b/i.test(text) || /calories?/i.test(text)) {
     throw new Error('Forbidden calorie copy on Accueil gallery')
   }
   if (/\bRPE\b/.test(text)) {
-    throw new Error('Forbidden RPE copy — use Effort')
+    throw new Error('Forbidden RPE copy')
   }
   if (/body\s*fat|%.*gras|poids perdu/i.test(text)) {
     throw new Error('Forbidden body-metric percentage copy')
   }
+  if (!text.includes('Accueil')) throw new Error('Missing Accueil title')
+  if (!text.includes('Récent')) throw new Error('Missing Récent section')
+  if (!text.includes('Séance du jour') && !text.includes('Mon programme')) {
+    throw new Error('Missing hero cards')
+  }
+}
+
+async function saveShot(page, name) {
+  const local = join(outDir, name)
+  await page.screenshot({ path: local, fullPage: false })
+  await copyFile(local, join(artifactsDir, name))
 }
 
 async function main() {
@@ -98,50 +137,85 @@ async function main() {
       hasTouch: true,
     })
     const page = await context.newPage()
+    page.on('pageerror', (error) => console.warn('pageerror:', error.message))
     await page.emulateMedia({ reducedMotion: 'reduce' })
-
-    // Inject CSS safe-area simulation for Chromium (WebKit uses harness :root vars)
     await page.addInitScript(() => {
-      document.documentElement.style.setProperty('--app-safe-area-top', '47px')
-      document.documentElement.style.setProperty('--app-safe-area-bottom', '34px')
+      const apply = () => {
+        const root = document.documentElement
+        if (!root?.style) return
+        root.style.setProperty('--app-safe-area-top', '47px')
+        root.style.setProperty('--app-safe-area-bottom', '34px')
+      }
+      apply()
+      document.addEventListener('DOMContentLoaded', apply)
     })
 
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'networkidle' })
-    await page.waitForSelector('[data-harness-ready]')
-    await page.waitForSelector('[data-accueil-gallery]')
-    await page.waitForSelector('[data-bottom-nav-variant="floating-pill"]')
-    await assertNoForbiddenCopy(page)
+    // Accueil top
+    await gotoTab(page, 'home')
+    await page.waitForSelector('[data-accueil-gallery]', { state: 'attached' })
+    await page.waitForSelector('[data-accueil-carousel]', { state: 'attached' })
+    await page.waitForSelector('[data-bottom-nav-variant="floating-pill"]', {
+      state: 'attached',
+    })
+    await assertAccueilClean(page)
+    await saveShot(page, 'accueil_final_haut.png')
 
-    const topPath = join(outDir, 'accueil_nouveau_haut.png')
-    await page.screenshot({ path: topPath, fullPage: false })
-    await copyFile(topPath, join(artifactsDir, 'accueil_nouveau_haut.png'))
-
-    // Scroll main so Récent sits near the top and the floating pill stays visible.
+    // Accueil scrolled to Récent / Programme + pill
     await page.evaluate(() => {
       const main = document.querySelector('[data-app-scroll-main]')
       const recent = document.querySelector('[data-accueil-recent]')
       if (main instanceof HTMLElement && recent instanceof HTMLElement) {
-        const top = recent.offsetTop - 12
-        main.scrollTo({ top: Math.max(0, top), behavior: 'instant' })
+        main.scrollTo({ top: Math.max(0, recent.offsetTop - 12), behavior: 'instant' })
       }
     })
-    await page.waitForTimeout(250)
-    const recentPath = join(outDir, 'accueil_nouveau_recent.png')
-    await page.screenshot({ path: recentPath, fullPage: false })
-    await copyFile(recentPath, join(artifactsDir, 'accueil_nouveau_recent.png'))
+    await page.waitForTimeout(300)
+    await saveShot(page, 'accueil_final_bas.png')
 
-    await page.goto(`http://127.0.0.1:${port}/?tab=training`, { waitUntil: 'networkidle' })
-    await page.waitForSelector('[data-train-stub]')
-    await page.waitForSelector('[data-bottom-nav-variant="floating-pill"]')
+    // Train (real hub)
+    await gotoTab(page, 'training')
+    await page.waitForSelector('h1')
     await page.waitForSelector('[aria-current="page"][aria-label="Train"]')
-    const trainPath = join(outDir, 'nav_pilule_train.png')
-    await page.screenshot({ path: trainPath, fullPage: false })
-    await copyFile(trainPath, join(artifactsDir, 'nav_pilule_train.png'))
+    // Ensure we're on hub, not history/notebook from leftover state
+    const trainText = await page.locator('[data-app-scroll-main]').innerText()
+    if (!trainText || trainText.length < 10) throw new Error('Train screen empty')
+    await saveShot(page, 'nav_train_reel.png')
+
+    // Nutri (real) — scroll so repas sit above the floating pill
+    await gotoTab(page, 'nutrition')
+    await page.waitForSelector('[aria-current="page"][aria-label="Nutri"]')
+    await page.waitForTimeout(400)
+    await page.evaluate(() => {
+      const main = document.querySelector('[data-app-scroll-main]')
+      if (main instanceof HTMLElement) {
+        main.scrollTo({ top: Math.min(220, main.scrollHeight - main.clientHeight), behavior: 'instant' })
+      }
+    })
+    await page.waitForTimeout(200)
+    await saveShot(page, 'nav_nutri_reel.png')
+
+    // Profil (real) — scroll to end so Aide rows clear the floating pill
+    await gotoTab(page, 'profile')
+    await page.waitForSelector('[aria-current="page"][aria-label="Profil"]')
+    await page.waitForTimeout(400)
+    await page.evaluate(() => {
+      const main = document.querySelector('[data-app-scroll-main]')
+      if (main instanceof HTMLElement) {
+        main.scrollTo({ top: main.scrollHeight, behavior: 'instant' })
+      }
+    })
+    await page.waitForTimeout(200)
+    await saveShot(page, 'nav_profil_reel.png')
 
     console.log('Artifacts written:')
-    console.log(' - /opt/cursor/artifacts/accueil_nouveau_haut.png')
-    console.log(' - /opt/cursor/artifacts/accueil_nouveau_recent.png')
-    console.log(' - /opt/cursor/artifacts/nav_pilule_train.png')
+    for (const name of [
+      'accueil_final_haut.png',
+      'accueil_final_bas.png',
+      'nav_train_reel.png',
+      'nav_nutri_reel.png',
+      'nav_profil_reel.png',
+    ]) {
+      console.log(` - ${join(artifactsDir, name)}`)
+    }
   } finally {
     await browser?.close()
     await stopServer(server)

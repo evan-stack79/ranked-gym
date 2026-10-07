@@ -1,13 +1,16 @@
 import { parseBooleanFlag } from './featureFlag'
 
 /**
- * Preview Accueil gallery + floating pill bottom nav.
+ * Accueil gallery + floating pill bottom nav.
  *
- * OFF by default — current Accueil / dock nav stay production default.
- * Enable only with VITE_ENABLE_ACCUEIL_GALLERY=true at build time (Evan GO).
+ * ON by default (Evan GO) — unset / empty ⇒ enabled.
+ * Explicit `false` / `0` / `no` turns it off (legacy dashboard + dock nav).
  */
 export function isAccueilGalleryEnabled(
   raw: string | undefined = import.meta.env.VITE_ENABLE_ACCUEIL_GALLERY,
 ): boolean {
-  return parseBooleanFlag(raw)
+  if (typeof raw === 'string' && raw.trim() !== '') {
+    return parseBooleanFlag(raw)
+  }
+  return true
 }

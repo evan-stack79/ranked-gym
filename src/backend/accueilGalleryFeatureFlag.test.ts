@@ -2,11 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { isAccueilGalleryEnabled } from './accueilGalleryFeatureFlag'
 
 describe('VITE_ENABLE_ACCUEIL_GALLERY', () => {
-  it('defaults OFF when unset / empty / false', () => {
-    expect(isAccueilGalleryEnabled(undefined)).toBe(false)
-    expect(isAccueilGalleryEnabled('')).toBe(false)
+  it('defaults ON when unset / empty', () => {
+    expect(isAccueilGalleryEnabled(undefined)).toBe(true)
+    expect(isAccueilGalleryEnabled('')).toBe(true)
+    expect(isAccueilGalleryEnabled('   ')).toBe(true)
+  })
+
+  it('disables on false / 0 / no', () => {
     expect(isAccueilGalleryEnabled('false')).toBe(false)
     expect(isAccueilGalleryEnabled('0')).toBe(false)
+    expect(isAccueilGalleryEnabled('no')).toBe(false)
   })
 
   it('enables on true / 1 / yes', () => {

@@ -60,10 +60,13 @@ export function BottomNav({
 
   return (
     <nav
-      className={`fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-3 right-3 z-50 mx-auto rounded-[22px] border border-[#38383D] bg-[#171719] px-1.5 py-1.5 transition-[max-width,padding] duration-180 ease-out motion-reduce:transition-none ${compact ? 'max-w-[22rem]' : 'max-w-lg'}`}
+      className={`fixed left-3 right-3 z-50 mx-auto rounded-[22px] border border-[#38383D] bg-[#171719] px-1.5 py-1.5 transition-[max-width,padding] duration-180 ease-out motion-reduce:transition-none ${compact ? 'max-w-[22rem]' : 'max-w-lg'}`}
       aria-label="Navigation principale"
       data-bottom-nav-mode={compact ? 'compact' : 'expanded'}
       data-bottom-nav-variant="dock"
+      style={{
+        bottom: 'max(0.75rem, var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px)))',
+      }}
       onClick={(event) => {
         if (event.target === event.currentTarget) onExpand?.()
       }}
@@ -125,11 +128,12 @@ function FloatingPillBottomNav({
 
   return (
     <nav
-      className="bottom-nav-pill fixed bottom-[max(0.5rem,env(safe-area-inset-bottom,0px))] left-1/2 z-50 -translate-x-1/2 rounded-full border border-white/12 px-2 py-1.5 shadow-[0_10px_40px_rgb(0_0_0_/_0.45)]"
+      className="bottom-nav-pill fixed left-1/2 z-50 -translate-x-1/2 rounded-full border border-white/12 px-2 py-1.5 shadow-[0_10px_40px_rgb(0_0_0_/_0.45)]"
       aria-label="Navigation principale"
       data-bottom-nav-mode="pill"
       data-bottom-nav-variant="floating-pill"
       style={{
+        bottom: 'max(0.5rem, var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px)))',
         backgroundColor: 'rgb(23 23 25 / 0.72)',
         backdropFilter: 'blur(20px) saturate(1.4)',
         WebkitBackdropFilter: 'blur(20px) saturate(1.4)',

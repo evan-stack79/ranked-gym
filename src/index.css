@@ -62,7 +62,7 @@ body {
   --rest-island-h: 3.25rem;
   --rest-island-gap: 10px;
   /* Ancrage fixed : juste au-dessus de la nav */
-  --rest-bar-bottom: calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px));
+  --rest-bar-bottom: calc(var(--app-bottom-nav) + var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
   /* Espace scroll supplémentaire sous le contenu Train */
   --rest-content-clearance: calc(var(--rest-island-h) + var(--rest-island-gap));
   /* Surchageables par le harness navigateur; production = vraies safe areas. */
@@ -140,9 +140,9 @@ body {
   display: none;
 }
 
-/* Floating pill nav — slightly shorter clearance than dock */
+/* Floating pill nav — clearance for pill + elevated red centre CTA + safe area */
 :root[data-bottom-nav-preview='floating-pill'] {
-  --app-bottom-nav: 72px;
+  --app-bottom-nav: 108px;
 }
 
 .xp-fill {
