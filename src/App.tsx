@@ -40,11 +40,13 @@ function renderActiveView(
   onStartTraining: (routineId: string) => void,
   onOpenTraining: () => void,
   onOpenNutrition: () => void,
+  onOpenHistory: () => void,
   launchRoutineId: string | null,
   resumeActiveWorkout: boolean,
   onLaunchConsumed: () => void,
   onAfterSession: () => void,
   openActivitySheet: boolean,
+  openHistory: boolean,
 ) {
   switch (tab) {
     case 'home':
@@ -53,6 +55,7 @@ function renderActiveView(
           onStartTraining={onStartTraining}
           onOpenTraining={onOpenTraining}
           onOpenNutrition={onOpenNutrition}
+          onOpenHistory={onOpenHistory}
         />
       )
     case 'training':
@@ -63,6 +66,7 @@ function renderActiveView(
           onLaunchConsumed={onLaunchConsumed}
           onGoToLobby={onAfterSession}
           openActivitySheet={openActivitySheet}
+          openHistory={openHistory}
         />
       )
     case 'nutrition':
@@ -119,6 +123,7 @@ export function AppShell() {
   const [launchRoutineId, setLaunchRoutineId] = useState<string | null>(null)
   const [resumeActiveWorkout, setResumeActiveWorkout] = useState(false)
   const [openActivitySheet, setOpenActivitySheet] = useState(false)
+  const [openHistory, setOpenHistory] = useState(false)
   const [hasActiveWorkout, setHasActiveWorkout] = useState(() => Boolean(getTrainingState().activeWorkoutDraft))
   const { openAuth, isAuthenticated, isLoading, bootIssue, retryHydrate } = useAuth()
   const online = useOnlineStatus()
@@ -214,6 +219,19 @@ export function AppShell() {
     }
     setLaunchRoutineId(null)
     setResumeActiveWorkout(false)
+    setOpenHistory(false)
+    setActiveTab('training')
+  }
+
+  const handleOpenHistory = () => {
+    if (!isAuthenticated) {
+      openAuth()
+      return
+    }
+    setLaunchRoutineId(null)
+    setResumeActiveWorkout(false)
+    setOpenActivitySheet(false)
+    setOpenHistory(true)
     setActiveTab('training')
   }
 
@@ -248,6 +266,7 @@ export function AppShell() {
     setLaunchRoutineId(null)
     setResumeActiveWorkout(false)
     setOpenActivitySheet(false)
+    setOpenHistory(false)
   }
 
   const handleOnboardingComplete = () => {
@@ -344,11 +363,13 @@ export function AppShell() {
           handleStartTraining,
           handleOpenTraining,
           handleOpenNutrition,
+          handleOpenHistory,
           launchRoutineId,
           resumeActiveWorkout,
           handleLaunchConsumed,
           () => setActiveTab('home'),
           openActivitySheet,
+          openHistory,
         )}
       </AppLayout>
       <AuthBottomSheet />

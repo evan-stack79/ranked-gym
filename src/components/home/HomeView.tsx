@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
+import { isAccueilGalleryEnabled } from '../../backend/accueilGalleryFeatureFlag'
 import { useAuth } from '../../context/AuthContext'
 import { getTrainingState } from '../../services/trainingStorage'
 import { getHomeGreeting, resolveDisplayFirstName } from '../../utils/homeGreeting'
 import { getTodayWorkout } from '../../utils/todayWorkout'
 import { BlurInText, Reveal } from '../motion'
 import { DailyStreak } from './DailyStreak'
+import { HomeGalleryView } from './HomeGalleryView'
 import { TodayWorkoutCard } from './TodayWorkoutCard'
 import { NutritionSnapshot } from './NutritionSnapshot'
 import { SleepSnapshot } from './SleepSnapshot'
@@ -13,14 +15,51 @@ interface HomeViewProps {
   onStartTraining: (routineId: string) => void
   onOpenTraining: () => void
   onOpenNutrition: () => void
+  onOpenHistory?: () => void
 }
 
 /**
- * Accueil = dashboard quotidien.
+ * Accueil shell — gallery preview when `VITE_ENABLE_ACCUEIL_GALLERY` is on (OFF by default).
+ */
+export function HomeView({
+  onStartTraining,
+  onOpenTraining,
+  onOpenNutrition,
+  onOpenHistory = onOpenTraining,
+}: HomeViewProps) {
+  if (isAccueilGalleryEnabled()) {
+    return (
+      <HomeGalleryView
+        onStartTraining={onStartTraining}
+        onOpenTraining={onOpenTraining}
+        onOpenHistory={onOpenHistory}
+      />
+    )
+  }
+
+  return (
+    <HomeDashboardView
+      onStartTraining={onStartTraining}
+      onOpenTraining={onOpenTraining}
+      onOpenNutrition={onOpenNutrition}
+    />
+  )
+}
+
+/**
+ * Accueil = dashboard quotidien (default).
  * Ordre : Nutrition (calories + eau) → Séance → Sommeil → Série → Alertes (si besoin).
  * Ghost mode / Lobby / feed social : hors nav principale (infra conservée).
  */
-export function HomeView({ onStartTraining, onOpenTraining, onOpenNutrition }: HomeViewProps) {
+function HomeDashboardView({
+  onStartTraining,
+  onOpenTraining,
+  onOpenNutrition,
+}: {
+  onStartTraining: (routineId: string) => void
+  onOpenTraining: () => void
+  onOpenNutrition: () => void
+}) {
   const { user, profile } = useAuth()
   const [trainingTick, setTrainingTick] = useState(0)
   const [coldEntering, setColdEntering] = useState(() => {
