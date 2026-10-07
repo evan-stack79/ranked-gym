@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * WebKit 390×844 — preuves hint « dernière fois » + tap-to-copy.
- * Sortie : /opt/cursor/artifacts/derniere_fois_seance.png
- *           /opt/cursor/artifacts/derniere_fois_copie.png
+ * WebKit 390×844 — preuves placeholders gris « dernière fois » + rempli au tap.
+ * Sortie : /opt/cursor/artifacts/derniere_fois_gris.png
+ *           /opt/cursor/artifacts/derniere_fois_rempli.png
  */
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -71,23 +71,34 @@ async function main() {
     })
     await page.waitForSelector('[data-harness-ready]')
     await page.waitForSelector('[data-immersive-session]')
-    await page.waitForSelector('[data-last-performance="0"]')
-    await page.waitForSelector('text=La dernière fois : 60 kg × 8 · Effort 8')
+    await page.waitForSelector('[data-last-hint="1"]')
+    await page.waitForSelector('input[aria-label="kg, la dernière fois 60"]')
+    await page.waitForSelector('input[aria-label="reps, la dernière fois 8"]')
 
-    const seancePath = join(outDir, 'derniere_fois_seance.png')
-    await page.screenshot({ path: seancePath, fullPage: false })
-    console.log('wrote', seancePath)
+    // Ensure no legacy text line
+    const bodyText = await page.locator('body').innerText()
+    if (bodyText.includes('La dernière fois :')) {
+      throw new Error('Legacy hint text still visible')
+    }
 
-    await page.click('[data-last-performance="0"]')
+    const grisPath = join(outDir, 'derniere_fois_gris.png')
+    await page.screenshot({ path: grisPath, fullPage: false })
+    console.log('wrote', grisPath)
+
+    await page.click('input[aria-label="kg, la dernière fois 60"]')
     await page.waitForFunction(() => {
       const weight = document.querySelector('input[aria-label="Série 1 poids"]')
       const reps = document.querySelector('input[aria-label="Série 1 reps"]')
       return weight?.value === '60' && reps?.value === '8'
     })
 
-    const copiePath = join(outDir, 'derniere_fois_copie.png')
-    await page.screenshot({ path: copiePath, fullPage: false })
-    console.log('wrote', copiePath)
+    // Blur so caret / focus ring doesn’t dominate the shot
+    await page.locator('input[aria-label="Série 1 poids"]').evaluate((el) => el.blur())
+    await page.waitForTimeout(100)
+
+    const rempliPath = join(outDir, 'derniere_fois_rempli.png')
+    await page.screenshot({ path: rempliPath, fullPage: false })
+    console.log('wrote', rempliPath)
 
     await context.close()
   } finally {

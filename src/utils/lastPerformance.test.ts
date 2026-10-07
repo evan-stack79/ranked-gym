@@ -3,8 +3,11 @@ import type { WorkoutNote, WorkoutSet } from '../types/training'
 import {
   exerciseMatches,
   findLastPerformance,
-  formatLastPerformanceAriaLabel,
-  formatLastPerformanceHint,
+  formatLastRepsAriaLabel,
+  formatLastRepsPlaceholder,
+  formatLastWeightAriaLabel,
+  formatLastWeightPlaceholder,
+  isSetLoadBlank,
   lastPerformanceToSetPatch,
   nextSetFromPrevious,
   pickSetForIndex,
@@ -62,7 +65,6 @@ describe('findLastPerformance', () => {
     expect(perf).toEqual({
       weightKg: 60,
       reps: 8,
-      rpe: 8,
       dateKey: '2026-10-05',
       sourceSetIndex: 0,
     })
@@ -112,6 +114,15 @@ describe('findLastPerformance', () => {
     expect(perf?.dateKey).toBe('2026-09-28')
     expect(perf?.weightKg).toBe(50)
   })
+
+  it('n’expose pas Effort / rpe (jamais affiché)', () => {
+    const perf = findLastPerformance(
+      history,
+      { name: 'Développé couché', canonicalExerciseId: 'bench_press' },
+      0,
+    )
+    expect(perf).not.toHaveProperty('rpe')
+  })
 })
 
 describe('pickSetForIndex', () => {
@@ -144,32 +155,35 @@ describe('exerciseMatches', () => {
   })
 })
 
-describe('format + copy-to-fields', () => {
+describe('placeholders + copy-to-fields', () => {
   const perf = {
     weightKg: 60,
     reps: 8,
-    rpe: 8,
     dateKey: '2026-10-05',
     sourceSetIndex: 0,
   }
 
-  it('formate le hint FR avec Effort optionnel', () => {
-    expect(formatLastPerformanceHint(perf)).toBe('La dernière fois : 60 kg × 8 · Effort 8')
-    expect(formatLastPerformanceHint({ ...perf, rpe: undefined })).toBe(
-      'La dernière fois : 60 kg × 8',
-    )
-    expect(formatLastPerformanceHint(perf)).not.toMatch(/RPE/i)
+  it('placeholders gris : chiffres seuls, sans Effort / RPE', () => {
+    expect(formatLastWeightPlaceholder(perf.weightKg)).toBe('60')
+    expect(formatLastRepsPlaceholder(perf.reps)).toBe('8')
+    expect(formatLastWeightPlaceholder(82.5)).toBe('82.5')
   })
 
-  it('aria-label accessible pour reprendre', () => {
-    expect(formatLastPerformanceAriaLabel(perf)).toBe(
-      'Reprendre 60 kg × 8 de la dernière fois',
-    )
+  it('aria-labels accessibles sur champs vides', () => {
+    expect(formatLastWeightAriaLabel(60)).toBe('kg, la dernière fois 60')
+    expect(formatLastRepsAriaLabel(8)).toBe('reps, la dernière fois 8')
   })
 
   it('copy-to-fields : poids + reps uniquement (pas Effort)', () => {
     expect(lastPerformanceToSetPatch(perf)).toEqual({ weightKg: 60, reps: 8 })
     expect(lastPerformanceToSetPatch(perf)).not.toHaveProperty('rpe')
+  })
+
+  it('isSetLoadBlank : série 0/0 vide, sinon non', () => {
+    expect(isSetLoadBlank({ weightKg: 0, reps: 0 })).toBe(true)
+    expect(isSetLoadBlank({ weightKg: 60, reps: 0 })).toBe(false)
+    expect(isSetLoadBlank({ weightKg: 0, reps: 8 })).toBe(false)
+    expect(isSetLoadBlank({ weightKg: 0, reps: 0, done: true })).toBe(false)
   })
 })
 

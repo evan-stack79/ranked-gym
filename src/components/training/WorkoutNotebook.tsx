@@ -27,8 +27,11 @@ import {
 } from '../../utils/workoutHistory'
 import {
   findLastPerformance,
-  formatLastPerformanceAriaLabel,
-  formatLastPerformanceHint,
+  formatLastRepsAriaLabel,
+  formatLastRepsPlaceholder,
+  formatLastWeightAriaLabel,
+  formatLastWeightPlaceholder,
+  isSetLoadBlank,
   lastPerformanceToSetPatch,
   nextSetFromPrevious,
 } from '../../utils/lastPerformance'
@@ -992,93 +995,111 @@ export function WorkoutNotebook({
                     const lastPerf = findLastPerformance(history, ex, idx, {
                       excludeNoteId: editingNote?.id,
                     })
+                    const showLastHint = Boolean(lastPerf && isSetLoadBlank(set))
+                    const applyLast = () => {
+                      if (!lastPerf || !isSetLoadBlank(set)) return
+                      updateSet(ex.id, idx, lastPerformanceToSetPatch(lastPerf))
+                    }
                     return (
-                      <div key={idx}>
-                        <div className="grid grid-cols-[auto_1fr_1fr_auto_auto] items-end gap-2">
-                          <span
-                            className={`pb-2 text-[11px] font-bold ${
-                              set.done ? 'text-[#30D158]' : 'text-[#8E8E93]'
-                            }`}
-                          >
-                            {idx + 1}
-                          </span>
-                          <label className="block">
-                            <span className="mb-0.5 block text-[10px] text-[#636366]">kg</span>
-                            <ClearableNumberInput
-                              value={set.weightKg}
-                              onChange={(v) => updateSet(ex.id, idx, { weightKg: v ?? 0 })}
-                              min={0}
-                              max={500}
-                              step={0.5}
-                              aria-label="Poids"
-                              className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
-                            />
-                          </label>
-                          <label className="block">
-                            <span className="mb-0.5 block text-[10px] text-[#636366]">Reps</span>
-                            <ClearableNumberInput
-                              value={set.reps}
-                              onChange={(v) =>
-                                updateSet(ex.id, idx, { reps: v != null ? Math.round(v) : 0 })
-                              }
-                              min={1}
-                              max={50}
-                              aria-label="Reps"
-                              className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
-                            />
-                          </label>
-                          <label className="block w-[3.75rem]">
-                            <span className="mb-0.5 block text-[10px] text-[#636366]">Effort</span>
-                            <ClearableNumberInput
-                              value={set.rpe ?? null}
-                              onChange={(v) =>
-                                updateSet(ex.id, idx, {
-                                  rpe:
-                                    v != null
-                                      ? Math.min(10, Math.max(1, Math.round(v)))
-                                      : undefined,
-                                })
-                              }
-                              min={1}
-                              max={10}
-                              required={false}
-                              deferAmbiguousIntegerPrefix
-                              placeholder="1–10"
-                              placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2 text-[12px] font-semibold text-[#636366]"
-                              aria-label="Effort facultatif, 1 à 10"
-                              className="w-full rounded-xl border border-white/10 bg-black/40 px-2 py-2 text-[13px] font-semibold text-[#AEAEB2] outline-none"
-                            />
-                          </label>
-                          {ex.sets.length > 1 ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                updateExercise(ex.id, {
-                                  sets: ex.sets.filter((_, i) => i !== idx),
-                                })
-                              }
-                              className="mb-2 flex min-h-11 min-w-11 items-center justify-center text-[#636366]"
-                              aria-label="Supprimer série"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          ) : (
-                            <span className="w-11" />
-                          )}
-                        </div>
-                        {lastPerf ? (
+                      <div
+                        key={idx}
+                        data-last-hint={showLastHint ? '1' : undefined}
+                        className="grid grid-cols-[auto_1fr_1fr_auto_auto] items-end gap-2"
+                      >
+                        <span
+                          className={`pb-2 text-[11px] font-bold ${
+                            set.done ? 'text-[#30D158]' : 'text-[#8E8E93]'
+                          }`}
+                        >
+                          {idx + 1}
+                        </span>
+                        <label className="block">
+                          <span className="mb-0.5 block text-[10px] text-[#636366]">kg</span>
+                          <ClearableNumberInput
+                            value={showLastHint ? null : set.weightKg}
+                            onChange={(v) => updateSet(ex.id, idx, { weightKg: v ?? 0 })}
+                            onFocus={showLastHint ? applyLast : undefined}
+                            min={0}
+                            max={500}
+                            step={0.5}
+                            required={!showLastHint}
+                            placeholder={
+                              showLastHint && lastPerf
+                                ? formatLastWeightPlaceholder(lastPerf.weightKg)
+                                : undefined
+                            }
+                            placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2.5 text-[15px] font-semibold tabular-nums text-[#636366]"
+                            aria-label={
+                              showLastHint && lastPerf
+                                ? formatLastWeightAriaLabel(lastPerf.weightKg)
+                                : 'Poids'
+                            }
+                            className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="mb-0.5 block text-[10px] text-[#636366]">Reps</span>
+                          <ClearableNumberInput
+                            value={showLastHint ? null : set.reps}
+                            onChange={(v) =>
+                              updateSet(ex.id, idx, { reps: v != null ? Math.round(v) : 0 })
+                            }
+                            onFocus={showLastHint ? applyLast : undefined}
+                            min={1}
+                            max={50}
+                            required={!showLastHint}
+                            placeholder={
+                              showLastHint && lastPerf
+                                ? formatLastRepsPlaceholder(lastPerf.reps)
+                                : undefined
+                            }
+                            placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2.5 text-[15px] font-semibold tabular-nums text-[#636366]"
+                            aria-label={
+                              showLastHint && lastPerf
+                                ? formatLastRepsAriaLabel(lastPerf.reps)
+                                : 'Reps'
+                            }
+                            className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
+                          />
+                        </label>
+                        <label className="block w-[3.75rem]">
+                          <span className="mb-0.5 block text-[10px] text-[#636366]">Effort</span>
+                          <ClearableNumberInput
+                            value={set.rpe ?? null}
+                            onChange={(v) =>
+                              updateSet(ex.id, idx, {
+                                rpe:
+                                  v != null
+                                    ? Math.min(10, Math.max(1, Math.round(v)))
+                                    : undefined,
+                              })
+                            }
+                            min={1}
+                            max={10}
+                            required={false}
+                            deferAmbiguousIntegerPrefix
+                            placeholder="1–10"
+                            placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2 text-[12px] font-semibold text-[#636366]"
+                            aria-label="Effort facultatif, 1 à 10"
+                            className="w-full rounded-xl border border-white/10 bg-black/40 px-2 py-2 text-[13px] font-semibold text-[#AEAEB2] outline-none"
+                          />
+                        </label>
+                        {ex.sets.length > 1 ? (
                           <button
                             type="button"
-                            data-last-performance={idx}
                             onClick={() =>
-                              updateSet(ex.id, idx, lastPerformanceToSetPatch(lastPerf))
+                              updateExercise(ex.id, {
+                                sets: ex.sets.filter((_, i) => i !== idx),
+                              })
                             }
-                            className="ios-press motion-reduce:transition-none mt-0.5 flex min-h-11 w-full items-center pl-6 text-left text-[11px] tabular-nums text-[#8E8E93] transition-colors duration-150 hover:text-[#AEAEB2]"
-                            aria-label={formatLastPerformanceAriaLabel(lastPerf)}
+                            className="mb-2 flex min-h-11 min-w-11 items-center justify-center text-[#636366]"
+                            aria-label="Supprimer série"
                           >
-                            {formatLastPerformanceHint(lastPerf)}
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
-                        ) : null}
+                        ) : (
+                          <span className="w-11" />
+                        )}
                       </div>
                     )
                   })}

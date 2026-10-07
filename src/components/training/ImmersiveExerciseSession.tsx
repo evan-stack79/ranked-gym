@@ -11,8 +11,11 @@ import { useRestTimerContext } from '../../context/RestTimerContext'
 import { isSetReadyForAutoValidate } from '../../utils/autoValidateSet'
 import {
   findLastPerformance,
-  formatLastPerformanceAriaLabel,
-  formatLastPerformanceHint,
+  formatLastRepsAriaLabel,
+  formatLastRepsPlaceholder,
+  formatLastWeightAriaLabel,
+  formatLastWeightPlaceholder,
+  isSetLoadBlank,
   lastPerformanceToSetPatch,
 } from '../../utils/lastPerformance'
 import { CANONICAL_REST_SEC, resolveRestDuration } from '../../utils/restDuration'
@@ -59,6 +62,9 @@ function formatEffort(set: WorkoutSet): string | null {
 
 const FIELD =
   'min-h-11 w-full rounded-lg border border-white/12 bg-[#1c1c1e] px-2 text-center text-[15px] font-semibold tabular-nums text-white outline-none focus-visible:border-[#FF2B2B]/55'
+
+const LAST_PLACEHOLDER =
+  'pointer-events-none absolute inset-0 flex items-center justify-center text-[15px] font-semibold tabular-nums text-[#636366]'
 
 const EMPTY_HISTORY: WorkoutNote[] = []
 
@@ -301,99 +307,118 @@ export function ImmersiveExerciseSession({
             const upcoming = !done && idx !== pendingIdx
             const effortDone = formatEffort(set)
             const last = lastHints[idx] ?? null
+            const showLastHint = Boolean(last && isSetLoadBlank(set))
+            const applyLast = () => {
+              if (!last || !isSetLoadBlank(set)) return
+              patchSet(idx, lastPerformanceToSetPatch(last))
+            }
 
             return (
               <div
                 key={idx}
                 role="listitem"
                 data-set-row={done ? 'done' : active ? 'active' : 'upcoming'}
-                className={upcoming ? 'opacity-45' : ''}
+                data-last-hint={showLastHint ? '1' : undefined}
+                className={`relative grid grid-cols-[2.25rem_1fr_1fr_1fr_2.5rem] items-center gap-x-2 ${
+                  upcoming ? 'opacity-45' : ''
+                }`}
               >
-                <div className="relative grid grid-cols-[2.25rem_1fr_1fr_1fr_2.5rem] items-center gap-x-2">
-                  {active ? (
-                    <span
-                      className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#FF2B2B]"
-                      aria-hidden="true"
-                    />
-                  ) : null}
+                {active ? (
                   <span
-                    className={`text-center text-[13px] font-bold tabular-nums ${
-                      done ? 'text-white' : active ? 'text-white' : 'text-[#8E8E93]'
-                    }`}
-                  >
-                    {idx + 1}
-                  </span>
-                  <ClearableNumberInput
-                    value={set.weightKg}
-                    onChange={(v) => patchSet(idx, { weightKg: v ?? 0 })}
-                    min={0}
-                    max={500}
-                    step={0.5}
-                    aria-label={`Série ${idx + 1} poids`}
-                    className={FIELD}
+                    className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#FF2B2B]"
+                    aria-hidden="true"
                   />
+                ) : null}
+                <span
+                  className={`text-center text-[13px] font-bold tabular-nums ${
+                    done ? 'text-white' : active ? 'text-white' : 'text-[#8E8E93]'
+                  }`}
+                >
+                  {idx + 1}
+                </span>
+                <ClearableNumberInput
+                  value={showLastHint ? null : set.weightKg}
+                  onChange={(v) => patchSet(idx, { weightKg: v ?? 0 })}
+                  onFocus={showLastHint ? applyLast : undefined}
+                  min={0}
+                  max={500}
+                  step={0.5}
+                  required={!showLastHint}
+                  placeholder={
+                    showLastHint && last
+                      ? formatLastWeightPlaceholder(last.weightKg)
+                      : undefined
+                  }
+                  placeholderClassName={LAST_PLACEHOLDER}
+                  aria-label={
+                    showLastHint && last
+                      ? formatLastWeightAriaLabel(last.weightKg)
+                      : `Série ${idx + 1} poids`
+                  }
+                  className={FIELD}
+                />
+                <ClearableNumberInput
+                  value={showLastHint ? null : set.reps}
+                  onChange={(v) =>
+                    patchSet(idx, { reps: v != null ? Math.round(v) : 0 })
+                  }
+                  onFocus={showLastHint ? applyLast : undefined}
+                  min={1}
+                  max={50}
+                  required={!showLastHint}
+                  placeholder={
+                    showLastHint && last
+                      ? formatLastRepsPlaceholder(last.reps)
+                      : undefined
+                  }
+                  placeholderClassName={LAST_PLACEHOLDER}
+                  aria-label={
+                    showLastHint && last
+                      ? formatLastRepsAriaLabel(last.reps)
+                      : `Série ${idx + 1} reps`
+                  }
+                  className={FIELD}
+                />
+                {done && effortDone ? (
+                  <div
+                    className={`${FIELD} flex items-center justify-center text-[13px] text-[#AEAEB2]`}
+                    aria-label={`Série ${idx + 1} effort ${effortDone}`}
+                  >
+                    {effortDone}
+                  </div>
+                ) : (
                   <ClearableNumberInput
-                    value={set.reps}
+                    value={set.rpe ?? null}
                     onChange={(v) =>
-                      patchSet(idx, { reps: v != null ? Math.round(v) : 0 })
+                      patchSet(idx, {
+                        rpe: v != null ? Math.min(10, Math.max(1, Math.round(v))) : undefined,
+                      })
                     }
                     min={1}
-                    max={50}
-                    aria-label={`Série ${idx + 1} reps`}
-                    className={FIELD}
+                    max={10}
+                    required={false}
+                    deferAmbiguousIntegerPrefix
+                    placeholder="1–10"
+                    placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#636366]"
+                    aria-label={`Série ${idx + 1} effort facultatif`}
+                    className={`${FIELD} text-[13px] text-[#AEAEB2]`}
                   />
-                  {done && effortDone ? (
-                    <div
-                      className={`${FIELD} flex items-center justify-center text-[13px] text-[#AEAEB2]`}
-                      aria-label={`Série ${idx + 1} effort ${effortDone}`}
+                )}
+                <div className="flex items-center justify-center">
+                  {done ? (
+                    <span
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-white"
+                      aria-label={`Série ${idx + 1} validée`}
                     >
-                      {effortDone}
-                    </div>
+                      <Check className="h-3.5 w-3.5 text-black" strokeWidth={3} />
+                    </span>
                   ) : (
-                    <ClearableNumberInput
-                      value={set.rpe ?? null}
-                      onChange={(v) =>
-                        patchSet(idx, {
-                          rpe: v != null ? Math.min(10, Math.max(1, Math.round(v))) : undefined,
-                        })
-                      }
-                      min={1}
-                      max={10}
-                      required={false}
-                      deferAmbiguousIntegerPrefix
-                      placeholder="1–10"
-                      placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#636366]"
-                      aria-label={`Série ${idx + 1} effort facultatif`}
-                      className={`${FIELD} text-[13px] text-[#AEAEB2]`}
+                    <span
+                      className="h-7 w-7 rounded-full border border-[#3a3a3c]"
+                      aria-hidden="true"
                     />
                   )}
-                  <div className="flex items-center justify-center">
-                    {done ? (
-                      <span
-                        className="flex h-7 w-7 items-center justify-center rounded-full bg-white"
-                        aria-label={`Série ${idx + 1} validée`}
-                      >
-                        <Check className="h-3.5 w-3.5 text-black" strokeWidth={3} />
-                      </span>
-                    ) : (
-                      <span
-                        className="h-7 w-7 rounded-full border border-[#3a3a3c]"
-                        aria-hidden="true"
-                      />
-                    )}
-                  </div>
                 </div>
-                {last ? (
-                  <button
-                    type="button"
-                    data-last-performance={idx}
-                    onClick={() => patchSet(idx, lastPerformanceToSetPatch(last))}
-                    className="ios-press motion-reduce:transition-none mt-0.5 flex min-h-11 w-full items-center px-0.5 pl-[2.25rem] text-left text-[11px] tabular-nums text-[#8E8E93] transition-colors duration-150 hover:text-[#AEAEB2]"
-                    aria-label={formatLastPerformanceAriaLabel(last)}
-                  >
-                    {formatLastPerformanceHint(last)}
-                  </button>
-                ) : null}
               </div>
             )
           })}

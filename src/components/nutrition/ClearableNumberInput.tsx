@@ -27,6 +27,8 @@ interface ClearableNumberInputProps {
   deferAmbiguousIntegerPrefix?: boolean
   /** Select all text on focus (handy when default is prefilled). */
   selectOnFocus?: boolean
+  /** Called on focus — e.g. apply « dernière fois » placeholders into the value. */
+  onFocus?: () => void
   enterKeyHint?: 'done' | 'enter' | 'go' | 'next' | 'previous' | 'search' | 'send'
   'aria-label'?: string
 }
@@ -71,6 +73,7 @@ export function ClearableNumberInput({
   sanitizeUnits = false,
   deferAmbiguousIntegerPrefix = false,
   selectOnFocus = false,
+  onFocus,
   enterKeyHint,
   'aria-label': ariaLabel,
 }: ClearableNumberInputProps) {
@@ -78,8 +81,15 @@ export function ClearableNumberInput({
   const [focused, setFocused] = useState(false)
 
   useEffect(() => {
-    if (!focused) setText(formatValue(value, step))
-  }, [value, focused, step])
+    if (!focused) {
+      setText(formatValue(value, step))
+      return
+    }
+    // External fill while focused on an empty field (ex. « dernière fois »).
+    if (text === '' && value != null && Number.isFinite(value)) {
+      setText(formatValue(value, step))
+    }
+  }, [value, focused, step, text])
 
   const showPlaceholder = Boolean(placeholder) && text === '' && !focused
 
@@ -106,6 +116,7 @@ export function ClearableNumberInput({
         placeholder={focused ? placeholder : undefined}
         onFocus={(e) => {
           setFocused(true)
+          onFocus?.()
           if (selectOnFocus) {
             const target = e.currentTarget
             window.requestAnimationFrame(() => target.select())
