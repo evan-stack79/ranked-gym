@@ -14,7 +14,6 @@ import {
 import type { BodyMorphology, MealEntry, MealType } from '../../types/nutrition'
 import { MEAL_TYPE_LABELS } from '../../utils/calories'
 import { remainingMealBudget } from '../../utils/portionGuide'
-import type { PortionMode } from '../../utils/morphology'
 import {
   addMealToToday,
   getCalorieProfile,
@@ -222,7 +221,6 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     fatG: number | null
     grams: number
     pieces?: number
-    portionMode: PortionMode
   }) => {
     const journal = addMealToToday({
       name: entry.name,
@@ -233,23 +231,11 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
       fatG: entry.fatG ?? undefined,
       grams: entry.grams,
       pieces: entry.pieces,
-      portionMode: entry.portionMode,
     })
     setMeals(journal.meals)
     setScannedProduct(null)
+    setPendingMealType(null)
     resetForm()
-
-    const remain = remainingMealBudget(
-      targetCalories,
-      entry.mealType,
-      journal.meals,
-      morphology,
-    )
-    if (entry.portionMode === 'with_sides' && remain > 60) {
-      setPendingMealType(entry.mealType)
-    } else if (remain <= 60) {
-      setPendingMealType(null)
-    }
   }
 
   const handleToggleFavorite = useCallback(

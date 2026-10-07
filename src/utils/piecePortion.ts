@@ -37,13 +37,16 @@ export const PIECE_KIND_LABELS: Record<PieceFoodKind, string> = {
 
 export function detectPieceKind(productName: string): PieceFoodKind {
   const n = productName.toLowerCase()
-  if (/nugget|chicken\s*bite|poulet\s*pan[eé]/.test(n)) return 'nugget'
-  if (/boulette|meatball|boule\s*de\s*viande|kefta/.test(n)) return 'meatball'
-  if (/croquette/.test(n)) return 'croquette'
-  if (/finger|stick|goujon|tenders?/.test(n)) return 'finger'
-  if (/wing|aile/.test(n)) return 'wing'
-  if (/ravioli|gyoza|dumpling|wan\s*tan|wonton/.test(n)) return 'dumpling'
-  if (/cookie|biscuit|sabl[eé]/.test(n)) return 'cookie'
+  if (/\bnuggets?\b|chicken\s*bites?|poulet\s*pan[eé]/.test(n)) return 'nugget'
+  if (/\bboulettes?\b|\bmeatballs?\b|boule\s*de\s*viande|\bkefta\b/.test(n)) return 'meatball'
+  if (/\bcroquettes?\b/.test(n)) return 'croquette'
+  if (/\bfingers?\b|\bsticks?\b|\bgoujons?\b|\btenders?\b/.test(n)) return 'finger'
+  // Ancré : « Baileys » ne doit pas matcher « aile » (AR-20).
+  if (/\bwings?\b|\bail(e|es)\b|chicken\s*wings?/.test(n)) return 'wing'
+  if (/\braviolis?\b|\bgyozas?\b|\bdumplings?\b|wan\s*tans?|\bwontons?\b/.test(n)) {
+    return 'dumpling'
+  }
+  if (/\bcookies?\b|\bbiscuits?\b|\bsabl[eé]s?\b/.test(n)) return 'cookie'
   return 'generic'
 }
 

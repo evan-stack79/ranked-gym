@@ -1,7 +1,7 @@
 import { Coffee, Cookie, Moon, Sun } from 'lucide-react'
 import type { BodyMorphology, MealType } from '../../types/nutrition'
 import { MEAL_TYPE_LABELS } from '../../utils/calories'
-import { allMealBudgets } from '../../utils/portionGuide'
+import { allMealBudgets, formatFrInteger } from '../../utils/portionGuide'
 
 const ICONS: Record<MealType, typeof Coffee> = {
   breakfast: Coffee,
@@ -17,7 +17,7 @@ interface MealBudgetsCardProps {
 }
 
 export function MealBudgetsCard({ targetCalories, morphology, meals }: MealBudgetsCardProps) {
-  // Sans cible journalière valide, la carte affiche des « 0 kcal / zone 80–0 » absurdes.
+  // Sans cible journalière valide, la carte affiche des « 0 kcal » absurdes.
   if (!(Number.isFinite(targetCalories) && targetCalories > 0)) {
     return null
   }
@@ -28,11 +28,11 @@ export function MealBudgetsCard({ targetCalories, morphology, meals }: MealBudge
     <section className="glass-card space-y-3 rounded-3xl p-4">
       <div>
         <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
-          Objectifs par repas
+          Repères par repas
         </p>
-        <h3 className="text-[17px] font-bold text-white">Combien manger à chaque repas</h3>
-        <p className="mt-1 text-[12px] leading-relaxed text-[#AEAEB2]">
-          La somme des 4 repas = exactement ta cible du jour ({dailyTarget} kcal).
+        <h3 className="text-[17px] font-bold text-white">Répartition indicative</h3>
+        <p className="mt-1 text-[13px] leading-relaxed text-[#AEAEB2]">
+          Repères pour les 4 repas (environ {formatFrInteger(dailyTarget)} kcal au total).
         </p>
       </div>
 
@@ -53,48 +53,35 @@ export function MealBudgetsCard({ targetCalories, morphology, meals }: MealBudge
                   </p>
                 </div>
                 <p className="text-[13px] font-bold text-white">
-                  {row.budget}{' '}
+                  {formatFrInteger(row.budget)}{' '}
                   <span className="font-medium text-[#636366]">kcal</span>
                 </p>
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
                 <div
-                  className="motion-progress-fill h-full rounded-full"
+                  className="motion-progress-fill h-full rounded-full bg-[#AEAEB2]"
                   style={{
                     transform: `scaleX(${Math.max(progress, row.used > 0 ? 0.06 : 0)})`,
-                    background:
-                      progress > 1.05
-                        ? 'linear-gradient(90deg, #FF2B2B, #FF9F0A)'
-                        : 'linear-gradient(90deg, #00B4FF, #30D158)',
                   }}
                 />
               </div>
-              <p className="mt-1.5 text-[11px] text-[#8E8E93]">
-                Zone {row.range.min}–{row.range.max} · mangé {row.used}
-                {row.remaining > 0 ? (
-                  <>
-                    {' '}
-                    · reste repas{' '}
-                    <span className="font-semibold text-[#30D158]">{row.remaining} kcal</span>
-                  </>
-                ) : (
-                  <>
-                    {' '}
-                    · <span className="font-semibold text-[#FF9F0A]">budget OK</span>
-                  </>
-                )}
+              <p className="mt-1.5 text-[12px] text-[#8E8E93]">
+                Noté {formatFrInteger(row.used)} kcal
+                {row.remaining > 0
+                  ? ` · reste indicatif ${formatFrInteger(row.remaining)} kcal`
+                  : ' · repas au repère'}
               </p>
             </li>
           )
         })}
       </ul>
 
-      <p className="text-center text-[12px] text-[#AEAEB2]">
-        Total repas{' '}
-        <span className="font-semibold text-white">{sumBudgets} kcal</span>
-        {' = '}
-        cible jour{' '}
-        <span className="font-semibold text-[#30D158]">{dailyTarget} kcal</span>
+      <p className="text-center text-[13px] text-[#AEAEB2]">
+        Total repères{' '}
+        <span className="font-semibold text-white">{formatFrInteger(sumBudgets)} kcal</span>
+        {' · '}
+        jour{' '}
+        <span className="font-semibold text-white">{formatFrInteger(dailyTarget)} kcal</span>
       </p>
     </section>
   )
