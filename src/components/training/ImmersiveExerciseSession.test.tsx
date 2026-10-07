@@ -976,4 +976,100 @@ describe('ImmersiveExerciseSession', () => {
     expect(onAddSet).not.toHaveBeenCalled()
     expect(host.querySelectorAll('[data-set-row]')).toHaveLength(1)
   })
+
+  it('hint « dernière fois » : affiche et copie poids/reps au tap', async () => {
+    const onUpdateSet = vi.fn()
+    const history = [
+      {
+        id: 'past',
+        title: 'Push',
+        dateKey: '2026-10-01',
+        createdAt: 1_000,
+        estimatedKcal: 200,
+        exercises: [
+          {
+            id: 'e0',
+            name: 'DÉVELOPPER',
+            sets: [
+              { reps: 8, weightKg: 60, rpe: 8 },
+              { reps: 6, weightKg: 65 },
+            ],
+          },
+        ],
+      },
+    ]
+    const emptySets: ExerciseEntry[] = [
+      {
+        id: 'ex-live-1',
+        name: 'DÉVELOPPER',
+        sets: [
+          { reps: 0, weightKg: 0 },
+          { reps: 0, weightKg: 0 },
+        ],
+      },
+    ]
+
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <ImmersiveExerciseSession
+            exercises={emptySets}
+            activeIndex={0}
+            onActiveIndexChange={vi.fn()}
+            sessionClockLabel="00:12"
+            sessionPaused={false}
+            onBack={vi.fn()}
+            onUpdateSet={onUpdateSet}
+            onAddSet={vi.fn()}
+            onValidateSet={vi.fn()}
+            onFinishSession={vi.fn()}
+            history={history}
+          />
+        </RestTimerProvider>,
+      )
+    })
+
+    expect(host.textContent).toContain('La dernière fois : 60 kg × 8 · Effort 8')
+    expect(host.textContent).toContain('La dernière fois : 65 kg × 6')
+    expect(host.textContent).not.toContain('RPE')
+
+    const hint0 = host.querySelector('[data-last-performance="0"]') as HTMLButtonElement
+    expect(hint0).toBeTruthy()
+    expect(hint0.getAttribute('aria-label')).toBe(
+      'Reprendre 60 kg × 8 de la dernière fois',
+    )
+    expect(hint0.className).toMatch(/min-h-11/)
+
+    await act(async () => {
+      hint0.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(onUpdateSet).toHaveBeenCalledWith('ex-live-1', 0, {
+      weightKg: 60,
+      reps: 8,
+    })
+  })
+
+  it('sans historique : aucun hint « dernière fois »', async () => {
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <ImmersiveExerciseSession
+            exercises={realSessionExercises}
+            activeIndex={0}
+            onActiveIndexChange={vi.fn()}
+            sessionClockLabel="00:12"
+            sessionPaused={false}
+            onBack={vi.fn()}
+            onUpdateSet={vi.fn()}
+            onAddSet={vi.fn()}
+            onValidateSet={vi.fn()}
+            onFinishSession={vi.fn()}
+            history={[]}
+          />
+        </RestTimerProvider>,
+      )
+    })
+    expect(host.querySelector('[data-last-performance]')).toBeNull()
+    expect(host.textContent).not.toContain('La dernière fois')
+  })
 })

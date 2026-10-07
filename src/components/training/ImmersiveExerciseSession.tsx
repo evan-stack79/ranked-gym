@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Check, ChevronLeft, Minus, Pause, Play, Plus, Timer } from 'lucide-react'
-import type { ExerciseEntry, WorkoutSet } from '../../types/training'
+import type { ExerciseEntry, WorkoutNote, WorkoutSet } from '../../types/training'
 import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
 import { BRAND_MARK_COMPACT_SRC } from '../brand/BrandMark'
 import {
@@ -9,6 +9,12 @@ import {
 } from '../../utils/exerciseMedia'
 import { useRestTimerContext } from '../../context/RestTimerContext'
 import { isSetReadyForAutoValidate } from '../../utils/autoValidateSet'
+import {
+  findLastPerformance,
+  formatLastPerformanceAriaLabel,
+  formatLastPerformanceHint,
+  lastPerformanceToSetPatch,
+} from '../../utils/lastPerformance'
 import { CANONICAL_REST_SEC, resolveRestDuration } from '../../utils/restDuration'
 import { RecoveryTimerPanel } from './RecoveryTimerPanel'
 
@@ -33,6 +39,10 @@ export interface ImmersiveExerciseSessionProps {
   autoValidate?: boolean
   undoVisible?: boolean
   onUndoValidation?: () => void
+  /** Séances complétées déjà chargées — hint « dernière fois » client-side. */
+  history?: WorkoutNote[]
+  /** Exclure une note (édition d’historique). */
+  excludeHistoryNoteId?: string
 }
 
 function formatClock(totalSec: number): string {
@@ -49,6 +59,8 @@ function formatEffort(set: WorkoutSet): string | null {
 
 const FIELD =
   'min-h-11 w-full rounded-lg border border-white/12 bg-[#1c1c1e] px-2 text-center text-[15px] font-semibold tabular-nums text-white outline-none focus-visible:border-[#FF2B2B]/55'
+
+const EMPTY_HISTORY: WorkoutNote[] = []
 
 /**
  * Immersive single-exercise session canvas (bench-press reference layout).
@@ -73,6 +85,8 @@ export function ImmersiveExerciseSession({
   autoValidate = false,
   undoVisible = false,
   onUndoValidation,
+  history = EMPTY_HISTORY,
+  excludeHistoryNoteId,
 }: ImmersiveExerciseSessionProps) {
   const rest = useRestTimerContext()
   const safeIndex = Math.min(Math.max(0, activeIndex), Math.max(0, exercises.length - 1))
@@ -88,6 +102,15 @@ export function ImmersiveExerciseSession({
   const muscleLine = formatExerciseMuscles(media.muscles)
   const [imgFailedFor, setImgFailedFor] = useState<string | null>(null)
   const showImage = Boolean(media.imageSrc) && imgFailedFor !== media.imageSrc
+
+  const lastHints = useMemo(() => {
+    if (!exercise || history.length === 0) return [] as Array<ReturnType<typeof findLastPerformance>>
+    return exercise.sets.map((_, idx) =>
+      findLastPerformance(history, exercise, idx, {
+        excludeNoteId: excludeHistoryNoteId,
+      }),
+    )
+  }, [exercise, history, excludeHistoryNoteId])
 
   if (!exercise) return null
 
@@ -277,88 +300,100 @@ export function ImmersiveExerciseSession({
             const active = !done && idx === pendingIdx
             const upcoming = !done && idx !== pendingIdx
             const effortDone = formatEffort(set)
+            const last = lastHints[idx] ?? null
 
             return (
               <div
                 key={idx}
                 role="listitem"
                 data-set-row={done ? 'done' : active ? 'active' : 'upcoming'}
-                className={`relative grid grid-cols-[2.25rem_1fr_1fr_1fr_2.5rem] items-center gap-x-2 ${
-                  upcoming ? 'opacity-45' : ''
-                }`}
+                className={upcoming ? 'opacity-45' : ''}
               >
-                {active ? (
-                  <span
-                    className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#FF2B2B]"
-                    aria-hidden="true"
-                  />
-                ) : null}
-                <span
-                  className={`text-center text-[13px] font-bold tabular-nums ${
-                    done ? 'text-white' : active ? 'text-white' : 'text-[#8E8E93]'
-                  }`}
-                >
-                  {idx + 1}
-                </span>
-                <ClearableNumberInput
-                  value={set.weightKg}
-                  onChange={(v) => patchSet(idx, { weightKg: v ?? 0 })}
-                  min={0}
-                  max={500}
-                  step={0.5}
-                  aria-label={`Série ${idx + 1} poids`}
-                  className={FIELD}
-                />
-                <ClearableNumberInput
-                  value={set.reps}
-                  onChange={(v) =>
-                    patchSet(idx, { reps: v != null ? Math.round(v) : 0 })
-                  }
-                  min={1}
-                  max={50}
-                  aria-label={`Série ${idx + 1} reps`}
-                  className={FIELD}
-                />
-                {done && effortDone ? (
-                  <div
-                    className={`${FIELD} flex items-center justify-center text-[13px] text-[#AEAEB2]`}
-                    aria-label={`Série ${idx + 1} effort ${effortDone}`}
-                  >
-                    {effortDone}
-                  </div>
-                ) : (
-                  <ClearableNumberInput
-                    value={set.rpe ?? null}
-                    onChange={(v) =>
-                      patchSet(idx, {
-                        rpe: v != null ? Math.min(10, Math.max(1, Math.round(v))) : undefined,
-                      })
-                    }
-                    min={1}
-                    max={10}
-                    required={false}
-                    deferAmbiguousIntegerPrefix
-                    placeholder="1–10"
-                    placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#636366]"
-                    aria-label={`Série ${idx + 1} effort facultatif`}
-                    className={`${FIELD} text-[13px] text-[#AEAEB2]`}
-                  />
-                )}
-                <div className="flex items-center justify-center">
-                  {done ? (
+                <div className="relative grid grid-cols-[2.25rem_1fr_1fr_1fr_2.5rem] items-center gap-x-2">
+                  {active ? (
                     <span
-                      className="flex h-7 w-7 items-center justify-center rounded-full bg-white"
-                      aria-label={`Série ${idx + 1} validée`}
-                    >
-                      <Check className="h-3.5 w-3.5 text-black" strokeWidth={3} />
-                    </span>
-                  ) : (
-                    <span
-                      className="h-7 w-7 rounded-full border border-[#3a3a3c]"
+                      className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#FF2B2B]"
                       aria-hidden="true"
                     />
+                  ) : null}
+                  <span
+                    className={`text-center text-[13px] font-bold tabular-nums ${
+                      done ? 'text-white' : active ? 'text-white' : 'text-[#8E8E93]'
+                    }`}
+                  >
+                    {idx + 1}
+                  </span>
+                  <ClearableNumberInput
+                    value={set.weightKg}
+                    onChange={(v) => patchSet(idx, { weightKg: v ?? 0 })}
+                    min={0}
+                    max={500}
+                    step={0.5}
+                    aria-label={`Série ${idx + 1} poids`}
+                    className={FIELD}
+                  />
+                  <ClearableNumberInput
+                    value={set.reps}
+                    onChange={(v) =>
+                      patchSet(idx, { reps: v != null ? Math.round(v) : 0 })
+                    }
+                    min={1}
+                    max={50}
+                    aria-label={`Série ${idx + 1} reps`}
+                    className={FIELD}
+                  />
+                  {done && effortDone ? (
+                    <div
+                      className={`${FIELD} flex items-center justify-center text-[13px] text-[#AEAEB2]`}
+                      aria-label={`Série ${idx + 1} effort ${effortDone}`}
+                    >
+                      {effortDone}
+                    </div>
+                  ) : (
+                    <ClearableNumberInput
+                      value={set.rpe ?? null}
+                      onChange={(v) =>
+                        patchSet(idx, {
+                          rpe: v != null ? Math.min(10, Math.max(1, Math.round(v))) : undefined,
+                        })
+                      }
+                      min={1}
+                      max={10}
+                      required={false}
+                      deferAmbiguousIntegerPrefix
+                      placeholder="1–10"
+                      placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#636366]"
+                      aria-label={`Série ${idx + 1} effort facultatif`}
+                      className={`${FIELD} text-[13px] text-[#AEAEB2]`}
+                    />
                   )}
+                  <div className="flex items-center justify-center">
+                    {done ? (
+                      <span
+                        className="flex h-7 w-7 items-center justify-center rounded-full bg-white"
+                        aria-label={`Série ${idx + 1} validée`}
+                      >
+                        <Check className="h-3.5 w-3.5 text-black" strokeWidth={3} />
+                      </span>
+                    ) : (
+                      <span
+                        className="h-7 w-7 rounded-full border border-[#3a3a3c]"
+                        aria-hidden="true"
+                      />
+                    )}
+                  </div>
                 </div>
+                {last ? (
+                  <button
+                    type="button"
+                    data-last-performance={idx}
+                    onClick={() => patchSet(idx, lastPerformanceToSetPatch(last))}
+                    className="ios-press motion-reduce:transition-none mt-0.5 flex min-h-11 w-full items-center px-0.5 pl-[2.25rem] text-left text-[11px] tabular-nums text-[#8E8E93] transition-colors duration-150 hover:text-[#AEAEB2]"
+                    aria-label={formatLastPerformanceAriaLabel(last)}
+                  >
+                    {formatLastPerformanceHint(last)}
+                  </button>
+                ) : null}
               </div>
             )
           })}
