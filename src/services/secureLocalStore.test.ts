@@ -67,7 +67,7 @@ describe('secureLocalStore encrypted blobs', () => {
     nativeOn.value = true
     const sleep = await import('./sleepStorage')
     const nutrition = await import('./nutritionStorage')
-    const lobby = await import('./lobbyStorage')
+    const profile = await import('./profileStorage')
     const local = await import('./secureLocalStore')
 
     sleep.saveSleepNight(
@@ -89,11 +89,14 @@ describe('secureLocalStore encrypted blobs', () => {
       },
       { skipCloud: true },
     )
-    lobby.saveLastLocationLabel('Salle Test', 'gps', { lat: 48.8566, lng: 2.3522 }, { skipCloud: true })
+    profile.saveProfileProgress(
+      { level: 12, currentXp: 340, xpToNextLevel: 1000 },
+      { skipCloud: true },
+    )
 
     expect(store.get('ranked-gym:sleep-log:u:athlete-1') ?? '').toContain('23:00')
     expect(store.get('ranked-gym:nutrition-profile:u:athlete-1') ?? '').toContain('"weightKg":81')
-    expect(store.get('ranked-gym:last-location:u:athlete-1') ?? '').toContain('48.8566')
+    expect(store.get('ranked-gym:profile:u:athlete-1') ?? '').toContain('"level":12')
 
     await local.initSecureLocalStore()
     await local.flushSecureLocalStore()
@@ -103,18 +106,18 @@ describe('secureLocalStore encrypted blobs', () => {
 
     const sleepRaw = store.get('ranked-gym:sleep-log:u:athlete-1') ?? ''
     const profileRaw = store.get('ranked-gym:nutrition-profile:u:athlete-1') ?? ''
-    const locationRaw = store.get('ranked-gym:last-location:u:athlete-1') ?? ''
+    const progressRaw = store.get('ranked-gym:profile:u:athlete-1') ?? ''
     expect(sleepRaw).not.toContain('23:00')
     expect(sleepRaw).not.toContain('tstHours')
     expect(profileRaw).not.toContain('weightKg')
     expect(profileRaw).not.toContain('goalWeightKg')
     expect(profileRaw.startsWith('{')).toBe(false)
-    expect(locationRaw).not.toContain('48.8566')
-    expect(locationRaw).not.toContain('Salle Test')
+    expect(progressRaw).not.toContain('"level":12')
+    expect(progressRaw).not.toContain('340')
 
     expect(sleep.getLatestSleepNight()?.bedtime).toBe('23:00')
     expect(nutrition.getCalorieProfile().weightKg).toBe(81)
-    expect(lobby.getLastLocationLabel()?.lat).toBe(48.8566)
+    expect(profile.getProfileProgress().level).toBe(12)
   })
 
   it('keeps skipCloud hydrate working through encrypted local reads', async () => {

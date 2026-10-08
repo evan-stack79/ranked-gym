@@ -4,8 +4,6 @@ import { getConvexSessionToken } from './convexAuthService'
 import type { CalorieProfile, DayJournal } from '../types/nutrition'
 import type { TrainingState } from '../types/training'
 import type { StoredProfileProgress } from './profileStorage'
-import type { NearbyGym } from '../types'
-import type { StoredCheckIn } from './lobbyStorage'
 import type { SleepNightEntry } from './sleepStorage'
 
 const api = generatedApi as any
@@ -19,9 +17,10 @@ export type ConvexBackupPayload = {
   }
   training: TrainingState
   profileProgress?: StoredProfileProgress | null
+  /** Legacy shape kept for parsers; always empty on push/pull. */
   lobby?: {
-    customGyms: NearbyGym[]
-    checkIn: StoredCheckIn | null
+    customGyms: unknown[]
+    checkIn: unknown | null
   }
   sleep?: SleepNightEntry[]
 }
@@ -83,10 +82,8 @@ export function snapshotToBackupPayload(
   const nutritionJournal = (asObject(snapshot.nutrition?.journalJson) ?? {}) as Record<string, DayJournal>
   const training = asObject(snapshot.workouts?.stateJson) as TrainingState | null
   const progress = asObject(snapshot.workouts?.progressJson) as StoredProfileProgress | null
-  const customGyms = Array.isArray(snapshot.lobby.customGyms)
-    ? (snapshot.lobby.customGyms as NearbyGym[])
-    : []
-  const checkIn = (snapshot.lobby.checkIn ?? null) as StoredCheckIn | null
+  // Never hydrate legacy Lobby location from Convex into the backup payload.
+  void snapshot.lobby
   const sleep: SleepNightEntry[] = (snapshot.sleep ?? []).map((night) => ({
     id: `sleep-${night.dateKey}`,
     dateKey: night.dateKey,
@@ -99,9 +96,7 @@ export function snapshotToBackupPayload(
   const hasAnything =
     Boolean(snapshot.nutrition) ||
     Boolean(snapshot.workouts) ||
-    sleep.length > 0 ||
-    customGyms.length > 0 ||
-    Boolean(checkIn)
+    sleep.length > 0
 
   if (!hasAnything) return null
 
@@ -115,8 +110,8 @@ export function snapshotToBackupPayload(
     training: training ?? fallbackTraining,
     profileProgress: progress,
     lobby: {
-      customGyms,
-      checkIn,
+      customGyms: [],
+      checkIn: null,
     },
     sleep,
   }
@@ -143,9 +138,10 @@ export function backupPayloadToPushArgs(
       tstHours: night.tstHours,
       createdAt: Date.parse(night.createdAt) || undefined,
     })),
+    // Omit lobby location — server ignores writes; keep empty for old parsers if needed.
     lobby: {
-      customGyms: payload.lobby?.customGyms ?? [],
-      checkIn: payload.lobby?.checkIn ?? null,
+      customGyms: [],
+      checkIn: null,
     },
   }
 }

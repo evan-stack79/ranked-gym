@@ -4,8 +4,12 @@ import { assertUserOwnership, requireSessionUser } from './lib/auth'
 import { sanitizeSyncedNutritionProfileJson } from './avisBeta'
 
 /**
- * Cloud backup/sync for PR-F domains: profile lobby, workouts, nutrition
- * (hydration nested in journal), sleep, plus optional streak snapshot.
+ * Cloud backup/sync for PR-F domains: workouts, nutrition (hydration nested
+ * in journal), sleep, plus optional streak snapshot.
+ *
+ * Legacy Lobby tables (`custom_spots`, `active_checkins`) remain readable in
+ * bootstrap snapshots for backward compatibility, but pushSync no longer
+ * writes them. Use internal `legacyLocation:purge` after GO to clear rows.
  *
  * Isolation: session user is the only trusted userId. Client-supplied userId
  * is ignored.
@@ -192,8 +196,7 @@ export function isMeaningfulSyncPayload(input: SyncPushInput): boolean {
       })
     : false
   const sleep = (input.sleep?.length ?? 0) > 0
-  const spots = arrayLen(input.lobby?.customGyms)
-  const checkIn = Boolean(asRecord(input.lobby?.checkIn)?.gym)
+  // Lobby custom_spots / active_checkins are legacy — never treat as meaningful sync data.
   const streak = (input.streak?.currentStreak ?? 0) > 0
   return (
     journalHasMeals(input.nutrition?.journalJson) ||
@@ -204,8 +207,6 @@ export function isMeaningfulSyncPayload(input: SyncPushInput): boolean {
     routines ||
     onboarded ||
     sleep ||
-    spots > 0 ||
-    checkIn ||
     streak
   )
 }
@@ -452,87 +453,6 @@ async function replaceSleepNights(
   }
 }
 
-function gymId(value: unknown, fallbackIndex: number): string {
-  const row = asRecord(value)
-  const id = row?.id
-  if (typeof id === 'string' && id.trim()) return id
-  return `spot-${fallbackIndex}`
-}
-
-async function replaceCustomSpots(
-  ctx: MutationCtx,
-  userId: string,
-  customGyms: unknown,
-  now: number,
-) {
-  const incoming = Array.isArray(customGyms) ? customGyms : []
-  const existing = await ctx.db
-    .query('custom_spots')
-    .withIndex('by_userId_updatedAt', (q) => q.eq('userId', userId))
-    .collect()
-  const incomingIds = new Set(incoming.map((gym, index) => gymId(gym, index)))
-  for (const row of existing) {
-    assertUserOwnership(row.userId, userId)
-    if (!incomingIds.has(row.spotId)) {
-      await ctx.db.delete(row._id)
-    }
-  }
-  for (let index = 0; index < incoming.length; index += 1) {
-    const gym = incoming[index]
-    const row = asRecord(gym) ?? {}
-    const spotId = gymId(gym, index)
-    const found = existing.find((candidate) => candidate.spotId === spotId)
-    const name = typeof row.name === 'string' ? row.name : 'Spot'
-    const lat = typeof row.lat === 'number' ? row.lat : 0
-    const lng = typeof row.lng === 'number' ? row.lng : 0
-    const address = typeof row.address === 'string' ? row.address : undefined
-    const fields = {
-      name,
-      lat,
-      lng,
-      address,
-      metadata: row,
-      updatedAt: now,
-    }
-    if (found) {
-      await ctx.db.patch(found._id, fields)
-    } else {
-      await ctx.db.insert('custom_spots', {
-        userId,
-        spotId,
-        createdAt: now,
-        ...fields,
-      })
-    }
-  }
-}
-
-async function upsertActiveCheckin(
-  ctx: MutationCtx,
-  userId: string,
-  checkIn: unknown,
-  now: number,
-) {
-  const existing = await findActiveCheckinDoc(ctx, userId)
-  if (checkIn == null) {
-    if (existing) {
-      assertUserOwnership(existing.userId, userId)
-      await ctx.db.delete(existing._id)
-    }
-    return
-  }
-  if (existing) {
-    assertUserOwnership(existing.userId, userId)
-    await ctx.db.patch(existing._id, { checkinJson: checkIn, updatedAt: now })
-    return
-  }
-  await ctx.db.insert('active_checkins', {
-    userId,
-    checkinJson: checkIn,
-    updatedAt: now,
-  })
-}
-
 export async function pushSyncForSession(
   ctx: MutationCtx,
   sessionToken: string,
@@ -585,10 +505,9 @@ export async function pushSyncForSession(
   if (input.sleep) {
     await replaceSleepNights(ctx, user.userId, input.sleep, now)
   }
-  if (input.lobby) {
-    await replaceCustomSpots(ctx, user.userId, input.lobby.customGyms, now)
-    await upsertActiveCheckin(ctx, user.userId, input.lobby.checkIn, now)
-  }
+  // Legacy Lobby location tables: ignore client lobby payloads (no writes to
+  // custom_spots / active_checkins). Rows are cleared via internal legacyLocation:purge.
+  void input.lobby
   if (input.streak) {
     const existing = await findStreakDoc(ctx, user.userId)
     const fields = {

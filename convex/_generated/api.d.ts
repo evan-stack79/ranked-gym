@@ -14,6 +14,7 @@ import type * as avisBeta from "../avisBeta.js";
 import type * as avisDistress from "../avisDistress.js";
 import type * as files from "../files.js";
 import type * as health from "../health.js";
+import type * as legacyLocation from "../legacyLocation.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_authConfig from "../lib/authConfig.js";
 import type * as lib_authCrypto from "../lib/authCrypto.js";
@@ -40,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   avisDistress: typeof avisDistress;
   files: typeof files;
   health: typeof health;
+  legacyLocation: typeof legacyLocation;
   "lib/auth": typeof lib_auth;
   "lib/authConfig": typeof lib_authConfig;
   "lib/authCrypto": typeof lib_authCrypto;

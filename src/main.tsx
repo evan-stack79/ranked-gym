@@ -16,6 +16,7 @@ import { legalKindFromPath } from './components/legal/legalRoutes.ts'
 import { ConvexClientProvider } from './lib/ConvexClientProvider.tsx'
 import { initSecureAuthStorage } from './services/secureAuthStorage'
 import { initSecureLocalStore } from './services/secureLocalStore'
+import { purgeLegacyLobbyLocationKeys } from './services/legacyLobbyLocationCleanup'
 import { getActiveAuthBackend } from './backend/authFeatureFlag.ts'
 import { ConvexResetPasswordScreen } from './components/auth/ConvexResetPasswordScreen.tsx'
 
@@ -71,6 +72,8 @@ async function boot() {
   try {
     await initSecureAuthStorage()
     await initSecureLocalStore()
+    // One-time local wipe of retired Lobby gym location blobs (all user scopes).
+    purgeLegacyLobbyLocationKeys()
   } catch {
     /* least-bad web fallback already used by storage adapters */
   }

@@ -101,10 +101,10 @@ export const LAUNCH_OPERATIONS = [
     symbols: ['getProfileProgress'],
   },
   {
-    id: 'lobby-checkin',
-    label: 'Check-in / spots locaux',
-    files: ['src/services/lobbyStorage.ts'],
-    symbols: ['getActiveCheckIn', 'getCustomGyms'],
+    id: 'lobby-location-cleanup',
+    label: 'Purge locale des clés Lobby (location)',
+    files: ['src/services/legacyLobbyLocationCleanup.ts'],
+    symbols: ['purgeLegacyLobbyLocationKeys'],
   },
   {
     id: 'cloud-collect-local',
@@ -116,8 +116,6 @@ export const LAUNCH_OPERATIONS = [
       'getTrainingState',
       'getSleepLog',
       'getProfileProgress',
-      'getActiveCheckIn',
-      'getCustomGyms',
       'collectLocalBackup',
     ],
   },
