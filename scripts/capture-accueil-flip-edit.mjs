@@ -158,6 +158,12 @@ function createFrameRecorder(page, framesDir) {
         await page.waitForTimeout(FRAME_MS)
       }
     },
+    /** Fixed frame count — screenshot time must not starve the burst. */
+    async burst(n) {
+      for (let i = 0; i < n; i++) {
+        await this.snap()
+      }
+    },
     count: () => idx,
   }
 }
@@ -212,7 +218,7 @@ async function touchLongPress(page, x, y, holdMs, recorder) {
     { clientX: x, clientY: y, holdMs },
   )
   // Wiggle / chrome settle frames after enter.
-  await recorder.hold(Math.min(700, holdMs))
+  await recorder.burst(12)
 }
 
 /**
@@ -464,7 +470,7 @@ async function main() {
     })()
 
     // Beat of settled Accueil before long-press
-    await recorder.hold(400)
+    await recorder.burst(8)
 
     // 1) Long-press Eau
     const eauBox = await page.locator('[data-accueil-edit-slot="eau"]').boundingBox()
@@ -479,7 +485,7 @@ async function main() {
     await page.waitForSelector('[data-accueil-edit-ok]', { state: 'visible', timeout: 5_000 })
     log.steps.push('edit-entered')
     await pinEditWidgets(page)
-    await recorder.hold(600)
+    await recorder.burst(12)
 
     // 2) Drag Eau up onto week (vertical FLIP of siblings)
     await pinEditWidgets(page)
@@ -555,16 +561,16 @@ async function main() {
       main.scrollTo({ top: Math.max(0, main.scrollTop + (r.top - desired)), behavior: 'instant' })
     })
     await page.waitForTimeout(160)
-    await recorder.hold(200)
+    await recorder.burst(6)
     await page.locator('[data-accueil-tile-trash="series_jour"]').tap({ force: true })
     // Exit anim ~180ms + sibling FLIP
-    await recorder.hold(500)
+    await recorder.burst(12)
     await page.waitForSelector('[data-accueil-edit-slot="series_jour"]', {
       state: 'detached',
       timeout: 4_000,
     })
     log.steps.push('removed-series')
-    await recorder.hold(500)
+    await recorder.burst(10)
 
     // 4) + Ajouter → re-add
     await page.locator('[data-accueil-edit-add]').tap()
@@ -572,7 +578,7 @@ async function main() {
       state: 'visible',
       timeout: 8_000,
     })
-    await recorder.hold(400)
+    await recorder.burst(10)
     await page.locator('[data-accueil-add-item="series_jour"]').tap()
     await page.waitForSelector('[data-accueil-edit-slot="series_jour"]', {
       state: 'visible',
@@ -585,13 +591,13 @@ async function main() {
       .then(() => true)
       .catch(() => metricLog.some((s) => (s.entering || []).length > 0))
     log.steps.push(sawEntering ? 'enter-anim-seen' : 'enter-anim-missed')
-    await recorder.hold(700)
+    await recorder.burst(14)
 
     // 5) OK
     await page.locator('[data-accueil-edit-ok]').tap()
     await page.waitForSelector('[data-accueil-edit-open="0"]', { timeout: 5_000 })
     log.steps.push('ok')
-    await recorder.hold(600)
+    await recorder.burst(12)
 
     metricPollActive = false
     await metricPoll.catch(() => {})
