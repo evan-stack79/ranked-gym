@@ -47,6 +47,12 @@ type TableName =
   | 'activity_comments'
   | 'activity_reactions'
   | 'avis_beta'
+  | 'gym_places'
+  | 'gym_memberships'
+  | 'gym_visit_days'
+  | 'gym_leaderboard_snapshots'
+  | 'gym_places_search_daily'
+  | 'gym_moderation_reports'
 
 type StoredRow = Record<string, unknown> & { _id: string }
 
@@ -83,6 +89,12 @@ class FakeDb {
     activity_comments: [],
     activity_reactions: [],
     avis_beta: [],
+    gym_places: [],
+    gym_memberships: [],
+    gym_visit_days: [],
+    gym_leaderboard_snapshots: [],
+    gym_places_search_daily: [],
+    gym_moderation_reports: [],
   }
 
   insert(table: TableName, value: Record<string, unknown>) {

@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react'
-import { KeyRound, Loader2, LogOut, Trash2 } from 'lucide-react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { KeyRound, Loader2, LogOut, MapPin, Trash2 } from 'lucide-react'
 import { GhostModeToggle } from '../profile/GhostModeToggle'
 import { IosSheet } from '../ui/IosSheet'
 import {
@@ -9,6 +9,13 @@ import {
 import { changePassword, deleteOwnAccount, signInWithEmail } from '../../services/authService'
 import { useAuth } from '../../context/AuthContext'
 import { toUserFacingError } from '../../utils/userFacingError'
+import { isGymLeaderboardEnabled } from '../../backend/gymLeaderboardFeatureFlag'
+import {
+  SETTINGS_LOCATION_CONSENT,
+  SETTINGS_LOCATION_CONSENT_HELP,
+} from '../../lib/gymLeaderboard/texts'
+
+const LOCATION_CONSENT_KEY = 'ranked-gym:gym-location-consent'
 
 interface SecurityScreenProps {
   onBack: () => void
@@ -28,6 +35,27 @@ export function SecurityScreen({
   const { user, signOut } = useAuth()
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const gymLeaderboardOn = isGymLeaderboardEnabled()
+  const [locationConsent, setLocationConsent] = useState(false)
+
+  useEffect(() => {
+    if (!gymLeaderboardOn) return
+    try {
+      setLocationConsent(localStorage.getItem(LOCATION_CONSENT_KEY) === '1')
+    } catch {
+      setLocationConsent(false)
+    }
+  }, [gymLeaderboardOn])
+
+  const toggleLocationConsent = () => {
+    const next = !locationConsent
+    setLocationConsent(next)
+    try {
+      localStorage.setItem(LOCATION_CONSENT_KEY, next ? '1' : '0')
+    } catch {
+      /* ignore */
+    }
+  }
 
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -138,6 +166,23 @@ export function SecurityScreen({
           d&apos;entraînement restent privées.
         </p>
       </div>
+
+      {gymLeaderboardOn ? (
+        <div className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80">
+          <SettingsActionRow
+            icon={MapPin}
+            label={SETTINGS_LOCATION_CONSENT}
+            showChevron={false}
+            onClick={toggleLocationConsent}
+          />
+          <p className="border-t border-[#2C2C2E] px-4 py-3 text-[13px] leading-relaxed text-[#8E8E93]">
+            {SETTINGS_LOCATION_CONSENT_HELP}{' '}
+            <span className="text-white">
+              {locationConsent ? 'Activé' : 'Désactivé'}
+            </span>
+          </p>
+        </div>
+      ) : null}
 
       <div className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80">
         <div className="border-b border-[#2C2C2E]">

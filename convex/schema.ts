@@ -452,6 +452,91 @@ export const convexTables = {
     .index('by_cleAntiDoublon', ['cleAntiDoublon'])
     .index('by_notif', ['notif'])
     .index('by_statut', ['statut']),
+
+  /**
+   * Gym places for « Classement de ma salle ».
+   * Google: store place_id forever; lat/lng max 30 days; NEVER name/address.
+   * Manual: name+city moderated like a pseudo; point set once on site.
+   */
+  gym_places: defineTable({
+    gymKey: v.string(),
+    source: v.union(v.literal('google'), v.literal('manual')),
+    googlePlaceId: v.optional(v.string()),
+    lat: v.optional(v.union(v.number(), v.null())),
+    lng: v.optional(v.union(v.number(), v.null())),
+    locFetchedAt: v.optional(v.union(v.number(), v.null())),
+    manualName: v.optional(v.string()),
+    manualCity: v.optional(v.string()),
+    pointSetAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_gymKey', ['gymKey'])
+    .index('by_googlePlaceId', ['googlePlaceId'])
+    .index('by_locFetchedAt', ['locFetchedAt']),
+
+  /** Opt-in leaderboard membership (pseudo + chosen gym + location consent). */
+  gym_memberships: defineTable({
+    userId: v.string(),
+    gymKey: v.string(),
+    pseudo: v.string(),
+    joinedAt: v.number(),
+    lastGymChangeAt: v.number(),
+    locationConsent: v.boolean(),
+    locationConsentAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_gymKey', ['gymKey'])
+    .index('by_gymKey_userId', ['gymKey', 'userId']),
+
+  /**
+   * Validated gym presence: account + gym + date (no time).
+   * Coordinates never stored. Max 1 row per (userId, gymKey, dateKey).
+   */
+  gym_visit_days: defineTable({
+    userId: v.string(),
+    gymKey: v.string(),
+    dateKey: v.string(),
+    createdAt: v.number(),
+  })
+    .index('by_userId_gymKey_dateKey', ['userId', 'gymKey', 'dateKey'])
+    .index('by_userId', ['userId'])
+    .index('by_gymKey_dateKey', ['gymKey', 'dateKey'])
+    .index('by_dateKey', ['dateKey']),
+
+  /** Nightly recomputed scores (never live). */
+  gym_leaderboard_snapshots: defineTable({
+    gymKey: v.string(),
+    period: v.union(v.literal('week'), v.literal('month')),
+    periodKey: v.string(),
+    userId: v.string(),
+    pseudo: v.string(),
+    points: v.number(),
+    computedAt: v.number(),
+  })
+    .index('by_gym_period', ['gymKey', 'period', 'periodKey'])
+    .index('by_userId', ['userId'])
+    .index('by_gymKey_userId_period', ['gymKey', 'userId', 'period', 'periodKey']),
+
+  /** Per-user Google Places search quota (20/day). */
+  gym_places_search_daily: defineTable({
+    userId: v.string(),
+    dateKey: v.string(),
+    count: v.number(),
+    updatedAt: v.number(),
+  }).index('by_userId_dateKey', ['userId', 'dateKey']),
+
+  /** Reportable pseudo / manual gym name (SEC-MOD-01). */
+  gym_moderation_reports: defineTable({
+    reporterUserId: v.string(),
+    targetKind: v.union(v.literal('pseudo'), v.literal('manual_gym')),
+    targetKey: v.string(),
+    createdAt: v.number(),
+  })
+    .index('by_reporter', ['reporterUserId'])
+    .index('by_target', ['targetKind', 'targetKey']),
 }
 
 export default defineSchema(convexTables)

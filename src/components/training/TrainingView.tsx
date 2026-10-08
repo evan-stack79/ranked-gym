@@ -98,6 +98,9 @@ import {
 } from '../../utils/sessionBackNav'
 import { deriveSessionDisplayTitle } from '../../utils/sessionDisplayTitle'
 import { BlurInText, Reveal } from '../motion'
+import { isGymLeaderboardEnabled } from '../../backend/gymLeaderboardFeatureFlag'
+import { GymLeaderboardEntryCard } from '../classement/GymLeaderboardEntryCard'
+import { GymLeaderboardFlow } from '../classement/GymLeaderboardFlow'
 
 type TrainPanel = 'hub' | 'notebook' | 'endurance' | 'agenda' | 'history' | 'steps'
 
@@ -144,6 +147,8 @@ export function TrainingView({
   const [disciplineTick, setDisciplineTick] = useState(0)
   const [pumpCheckSession, setPumpCheckSession] = useState<VictorySessionStats | null>(null)
   const [panel, setPanel] = useState<TrainPanel>('hub')
+  const [classementOpen, setClassementOpen] = useState(false)
+  const gymLeaderboardOn = isGymLeaderboardEnabled()
   const [notebookLaunchId, setNotebookLaunchId] = useState<string | null>(null)
   const [notebookResume, setNotebookResume] = useState(false)
   const [notebookEditNote, setNotebookEditNote] = useState<WorkoutNote | null>(null)
@@ -755,6 +760,10 @@ export function TrainingView({
             </p>
           ) : null}
 
+          {gymLeaderboardOn ? (
+            <GymLeaderboardEntryCard onOpen={() => setClassementOpen(true)} />
+          ) : null}
+
           <Reveal>
             <TrainWeeklySummary
               summary={weeklySummary}
@@ -1087,6 +1096,10 @@ export function TrainingView({
             onGoToLobby?.()
           }}
         />
+      ) : null}
+
+      {gymLeaderboardOn ? (
+        <GymLeaderboardFlow open={classementOpen} onClose={() => setClassementOpen(false)} />
       ) : null}
     </div>
   )

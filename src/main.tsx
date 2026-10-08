@@ -11,6 +11,7 @@ import { AuthWelcomeSheetFixture } from './fixtures/AuthWelcomeSheetFixture.tsx'
 import { NutritionAiErrorFixture } from './fixtures/NutritionAiErrorFixture.tsx'
 import { TrainUxFixture } from './fixtures/TrainUxFixture.tsx'
 import { WaterGoalFixture } from './fixtures/WaterGoalFixture.tsx'
+import { ClassementFixture } from './fixtures/ClassementFixture.tsx'
 import { LegalDocumentScreen } from './components/legal/LegalDocumentScreen.tsx'
 import { legalKindFromPath } from './components/legal/legalRoutes.ts'
 import { ConvexClientProvider } from './lib/ConvexClientProvider.tsx'
@@ -44,6 +45,7 @@ function resolveBootTree() {
   if (QA_FIXTURES_ENABLED && path === '/nutrition-fixture') return <NutritionUxFixture />
   if (QA_FIXTURES_ENABLED && path === '/water-goal-fixture') return <WaterGoalFixture />
   if (QA_FIXTURES_ENABLED && path === '/train-fixture') return <TrainUxFixture />
+  if (QA_FIXTURES_ENABLED && path === '/classement-fixture') return <ClassementFixture />
   if (QA_FIXTURES_ENABLED && path === '/nutrition-ai-error-fixture') return <NutritionAiErrorFixture />
   if (QA_FIXTURES_ENABLED && path === '/auth-welcome-logged-in-fixture')
     return <AuthWelcomeLoggedInFixture />
@@ -64,6 +66,7 @@ function isColdLaunchPath() {
   if (QA_FIXTURES_ENABLED && path === '/nutrition-fixture') return false
   if (QA_FIXTURES_ENABLED && path === '/water-goal-fixture') return false
   if (QA_FIXTURES_ENABLED && path === '/train-fixture') return false
+  if (QA_FIXTURES_ENABLED && path === '/classement-fixture') return false
   return true
 }
 
