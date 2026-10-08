@@ -156,17 +156,16 @@ export function runFlipFromFirst(
     const { dx, dy } = flipDelta(prev, last)
     if (!shouldAnimateFlip(dx, dy)) continue
     el.style.zIndex = '2'
+    el.dataset.accueilFlipping = '1'
     const anim = playFlipTranslate(el, dx, dy, { ms })
-    if (anim) {
-      anim.finished
-        .then(() => {
-          el.style.zIndex = ''
-        })
-        .catch(() => {
-          el.style.zIndex = ''
-        })
-    } else {
+    const clearFlipMark = () => {
       el.style.zIndex = ''
+      delete el.dataset.accueilFlipping
+    }
+    if (anim) {
+      anim.finished.then(clearFlipMark).catch(clearFlipMark)
+    } else {
+      clearFlipMark()
     }
   }
 }

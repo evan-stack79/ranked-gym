@@ -509,6 +509,11 @@ img {
   will-change: transform;
 }
 
+.accueil-edit-slot[data-accueil-flipping='1'] {
+  will-change: transform;
+  pointer-events: none;
+}
+
 @keyframes accueil-tile-exit {
   from {
     opacity: 1;

@@ -146,21 +146,31 @@ async function touchDrag(page, fromX, fromY, toX, toY, steps = 40, stepDelayMs =
           }),
         )
 
-      /** Sample sibling visual tops during drag for FLIP proof. */
+      /** Sample sibling visual rects + in-flight FLIP marks during drag. */
       const samples = []
       const sample = (label) => {
         const week = document.querySelector('[data-accueil-edit-slot="seances_semaine"]')
         const series = document.querySelector('[data-accueil-edit-slot="series_jour"]')
         const eau = document.querySelector('[data-accueil-edit-slot="eau"]')
         const dragging = document.querySelector('[data-accueil-dragging="1"]')
+        const flipping = [...document.querySelectorAll('[data-accueil-flipping="1"]')].map((el) =>
+          el.getAttribute('data-accueil-edit-slot'),
+        )
+        const order = [...document.querySelectorAll('[data-accueil-edit-slot]')].map((el) =>
+          el.getAttribute('data-accueil-edit-slot'),
+        )
+        const wr = week?.getBoundingClientRect()
         samples.push({
           label,
           t: performance.now(),
-          weekTop: week?.getBoundingClientRect().top ?? null,
+          weekTop: wr?.top ?? null,
+          weekLeft: wr?.left ?? null,
           seriesTop: series?.getBoundingClientRect().top ?? null,
           eauTop: eau?.getBoundingClientRect().top ?? null,
           dragging: dragging?.getAttribute('data-accueil-edit-slot') ?? null,
           settling: !!document.querySelector('[data-accueil-settling="1"]'),
+          flipping,
+          order,
         })
       }
 
@@ -222,6 +232,8 @@ async function main() {
       recordVideo: { dir: videoDir, size: VIEWPORT },
     })
     const page = await context.newPage()
+    // Video clock — trim boot/value settle before the long-press.
+    const videoT0 = Date.now()
     await page.emulateMedia({ reducedMotion: 'no-preference', colorScheme: 'dark' })
 
     await page.addInitScript(
@@ -263,7 +275,7 @@ async function main() {
     })
 
     await pinEditWidgets(page)
-    // Harness seeds Eau 1200 + week 2 — wait before any drag.
+    // Harness seeds Eau 1200 + week 2 — wait before any drag / before action clock.
     await page.waitForFunction(() => {
       const norm = (s) => (s || '').replace(/[\s\u00a0\u202f]/g, '')
       const eau = document.querySelector('[data-accueil-metric-tile="eau"] [data-rg-count="water"]')
@@ -272,12 +284,9 @@ async function main() {
       )
       return norm(eau?.textContent) === '1200' && norm(week?.textContent) === '2'
     }, { timeout: 12_000 })
-    await page.waitForTimeout(400)
+    await page.waitForTimeout(500)
 
-    const videoT0 = Date.now()
-    const actionStartMs = Date.now() - videoT0
-
-    // Metric poll
+    // Metric poll (starts after settle so boot 0→1200 is outside the action window)
     const metricLog = []
     let metricPollActive = true
     const metricPoll = (async () => {
@@ -305,14 +314,19 @@ async function main() {
               entering: [...document.querySelectorAll('[data-accueil-entering="1"]')].map((el) =>
                 el.getAttribute('data-accueil-edit-slot'),
               ),
+              flipping: [...document.querySelectorAll('[data-accueil-flipping="1"]')].map((el) =>
+                el.getAttribute('data-accueil-edit-slot'),
+              ),
               seriesVisible: !!document.querySelector('[data-accueil-edit-slot="series_jour"]'),
             }
           })
           .catch(() => null)
         if (snap) metricLog.push(snap)
-        await new Promise((r) => setTimeout(r, 200))
+        await new Promise((r) => setTimeout(r, 160))
       }
     })()
+
+    const actionStartMs = Date.now() - videoT0
 
     // 1) Long-press Eau
     const eauBox = await page.locator('[data-accueil-edit-slot="eau"]').boundingBox()
@@ -323,32 +337,71 @@ async function main() {
     await pinEditWidgets(page)
     await page.waitForTimeout(700)
 
-    // 2) Drag Eau across 2 positions (onto seances_semaine)
+    // 2) Drag Eau up onto « Séances de la semaine » (vertical cross of ≥1 wide tile)
     await pinEditWidgets(page)
+    const orderBefore = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-accueil-edit-slot]')].map((el) =>
+        el.getAttribute('data-accueil-edit-slot'),
+      ),
+    )
     const weekBox = await page.locator('[data-accueil-edit-slot="seances_semaine"]').boundingBox()
     const eauNow = await page.locator('[data-accueil-edit-slot="eau"]').boundingBox()
     if (!weekBox || !eauNow) throw new Error('drag targets missing')
+    if (eauNow.y <= weekBox.y) {
+      throw new Error(`Expected Eau below week before drag (eau.y=${eauNow.y}, week.y=${weekBox.y})`)
+    }
     const flipSamples = await touchDrag(
       page,
       eauNow.x + eauNow.width / 2,
       eauNow.y + eauNow.height / 2,
       weekBox.x + weekBox.width / 2,
-      weekBox.y + Math.min(40, weekBox.height * 0.28),
-      42,
-      42,
+      weekBox.y + Math.min(48, weekBox.height * 0.3),
+      48,
+      45,
     )
     log.flipSamples = flipSamples
     log.steps.push('drag-drop')
 
-    // Prove siblings moved through intermediate tops (not a single jump)
-    const weekTops = flipSamples.map((s) => s.weekTop).filter((v) => typeof v === 'number')
-    const uniqueWeek = new Set(weekTops.map((v) => Math.round(v)))
-    if (uniqueWeek.size < 3) {
+    const orderAfter = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-accueil-edit-slot]')].map((el) =>
+        el.getAttribute('data-accueil-edit-slot'),
+      ),
+    )
+    log.orderBefore = orderBefore
+    log.orderAfter = orderAfter
+    if (orderBefore.join('|') === orderAfter.join('|')) {
+      throw new Error(`Reorder did not change order: ${orderBefore.join(',')}`)
+    }
+    const eauIdxBefore = orderBefore.indexOf('eau')
+    const eauIdxAfter = orderAfter.indexOf('eau')
+    if (eauIdxAfter < 0 || eauIdxBefore - eauIdxAfter < 1) {
       throw new Error(
-        `FLIP weak: weekTop unique rounded positions=${[...uniqueWeek].join(',')} (need ≥3)`,
+        `Eau did not move up ≥1 slot (before=${eauIdxBefore}, after=${eauIdxAfter})`,
       )
     }
-    log.steps.push(`flip-intermediates:${uniqueWeek.size}`)
+    log.steps.push(`order-eau:${eauIdxBefore}→${eauIdxAfter}`)
+
+    // Prove siblings slid: weekTop range ≥ 40px OR FLIP marks observed mid-drag
+    const weekTops = flipSamples.map((s) => s.weekTop).filter((v) => typeof v === 'number')
+    const weekMin = Math.min(...weekTops)
+    const weekMax = Math.max(...weekTops)
+    const weekRange = weekMax - weekMin
+    const uniqueWeek = new Set(weekTops.map((v) => Math.round(v / 2) * 2))
+    const sawFlipping = flipSamples.some((s) => (s.flipping || []).length > 0)
+    if (weekRange < 40 && !sawFlipping) {
+      throw new Error(
+        `FLIP weak: weekTop range=${weekRange.toFixed(1)}px unique≈${[...uniqueWeek].join(',')} flipping=${sawFlipping}`,
+      )
+    }
+    // Intermediate tops between first and last (not a 2-frame teleport)
+    if (uniqueWeek.size < 3) {
+      throw new Error(
+        `FLIP teleport?: weekTop unique(2px)=${[...uniqueWeek].join(',')} (need ≥3)`,
+      )
+    }
+    log.steps.push(
+      `flip-intermediates:${uniqueWeek.size}:range=${Math.round(weekRange)}:flipping=${sawFlipping}`,
+    )
 
     // Drop glide / settle clear
     await page.waitForFunction(

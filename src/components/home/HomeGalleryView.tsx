@@ -411,44 +411,44 @@ export function HomeGalleryView({
       if (origin) {
         setDragDelta({ x: clientX - origin.x, y: clientY - origin.y })
       }
-      setDraggingId((current) => {
-        if (!current) return current
-        const hit = hitTestWidgetId(clientX, clientY, collectHitRects())
-        if (!hit || hit === current) return current
-        const visible = resolveVisibleAccueilWidgets(prefsRef.current)
-        if (!(visible as string[]).includes(hit)) return current
-        captureFlipFirst()
-        // Keep the dragged tile under the finger after layout shift.
-        // Measure the layout slot (placeholder), not the fixed floating body.
-        const slot = widgetsRootRef.current?.querySelector(
+      const current = draggingIdRef.current
+      if (!current) return
+      const hit = hitTestWidgetId(clientX, clientY, collectHitRects())
+      if (!hit || hit === current) return
+      const visible = resolveVisibleAccueilWidgets(prefsRef.current)
+      if (!(visible as string[]).includes(hit)) return
+
+      // First = current visual positions (incl. mid-FLIP) before layout commits.
+      captureFlipFirst()
+      // Keep the dragged tile under the finger after layout shift.
+      // Measure the layout slot (placeholder), not the fixed floating body.
+      const slot = widgetsRootRef.current?.querySelector(
+        `[data-accueil-edit-slot="${current}"]`,
+      ) as HTMLElement | null
+      const before = slot?.getBoundingClientRect()
+      commitPrefs(
+        reorderVisibleAccueilWidget(
+          prefsRef.current,
+          current,
+          hit as AccueilWidgetId,
+          Date.now(),
+        ),
+      )
+      requestAnimationFrame(() => {
+        const afterEl = widgetsRootRef.current?.querySelector(
           `[data-accueil-edit-slot="${current}"]`,
         ) as HTMLElement | null
-        const before = slot?.getBoundingClientRect()
-        commitPrefs(
-          reorderVisibleAccueilWidget(
-            prefsRef.current,
-            current,
-            hit as AccueilWidgetId,
-            Date.now(),
-          ),
-        )
-        requestAnimationFrame(() => {
-          const afterEl = widgetsRootRef.current?.querySelector(
-            `[data-accueil-edit-slot="${current}"]`,
-          ) as HTMLElement | null
-          const after = afterEl?.getBoundingClientRect()
-          if (before && after && dragOriginRef.current) {
-            dragOriginRef.current = {
-              x: dragOriginRef.current.x + (after.left - before.left),
-              y: dragOriginRef.current.y + (after.top - before.top),
-            }
-            setDragDelta({
-              x: clientX - dragOriginRef.current.x,
-              y: clientY - dragOriginRef.current.y,
-            })
+        const after = afterEl?.getBoundingClientRect()
+        if (before && after && dragOriginRef.current) {
+          dragOriginRef.current = {
+            x: dragOriginRef.current.x + (after.left - before.left),
+            y: dragOriginRef.current.y + (after.top - before.top),
           }
-        })
-        return current
+          setDragDelta({
+            x: clientX - dragOriginRef.current.x,
+            y: clientY - dragOriginRef.current.y,
+          })
+        }
       })
     },
     [captureFlipFirst, collectHitRects, commitPrefs],
