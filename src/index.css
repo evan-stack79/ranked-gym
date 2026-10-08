@@ -606,18 +606,58 @@ img {
   }
 }
 
-.accueil-gallery--editing > header {
-  position: sticky;
+/*
+ * Accueil edit chrome — pinned OUTSIDE [data-app-scroll-main] (portaled into
+ * [data-app-top-pin-host]), same strategy as the brand header. Fixed so the
+ * flex shell does not resize when entering/leaving edit.
+ *
+ * pointer-events: none on the plate — only buttons capture taps, so tile drag
+ * near the top edge is not stolen by the glass bar.
+ */
+.accueil-edit-chrome-pin {
+  position: fixed;
   top: 0;
-  z-index: 30;
-  margin: 0 -1.25rem;
+  left: 0;
+  right: 0;
+  z-index: 45;
+  pointer-events: none;
+  padding-top: var(--app-safe-area-top, env(safe-area-inset-top, 0px));
+}
+
+.accueil-edit-chrome-pin__glass {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+  background-color: rgb(12 12 14 / 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .accueil-edit-chrome-pin__glass {
+    background-color: rgb(12 12 14 / 0.94);
+  }
+}
+
+.accueil-edit-chrome-pin__inner {
+  position: relative;
+  z-index: 1;
+  margin: 0 auto;
+  max-width: 32rem; /* match max-w-lg */
   padding: 0.65rem 1.25rem 0.75rem;
-  background: linear-gradient(
-    to bottom,
-    #0c0c0e 70%,
-    rgb(12 12 14 / 0.92) 88%,
-    rgb(12 12 14 / 0)
-  );
+}
+
+.accueil-edit-chrome-pin .accueil-edit-chrome__ok,
+.accueil-edit-chrome-pin .accueil-edit-chrome__add {
+  pointer-events: auto;
+}
+
+.accueil-edit-chrome-spacer {
+  /* Match pin inner vertical padding + button min-height — no safe-area here
+     (page wrapper already pads the notch; pin owns safe-area). */
+  min-height: calc(0.65rem + 2.5rem + 0.75rem);
 }
 
 /*

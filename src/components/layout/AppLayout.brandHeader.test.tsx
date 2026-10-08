@@ -98,10 +98,15 @@ describe('AppLayout — barre marque sticky Nutrition / Train', () => {
     const main = host.querySelector('[data-app-scroll-main="1"]') as HTMLElement | null
     expect(header).not.toBeNull()
     expect(main).not.toBeNull()
+    const topPin = host.querySelector('[data-app-top-pin-host="1"]') as HTMLElement | null
+    expect(topPin).not.toBeNull()
     // Pin réel : hors du conteneur de scroll (pas un sticky fragile dans main).
     expect(main?.contains(header)).toBe(false)
     expect(header?.previousElementSibling).toBeNull()
-    expect(header?.nextElementSibling).toBe(main)
+    // Accueil edit chrome host sits between brand header and scroll main.
+    expect(header?.nextElementSibling).toBe(topPin)
+    expect(topPin?.nextElementSibling).toBe(main)
+    expect(main?.contains(topPin)).toBe(false)
     expect(header?.className).toContain('sticky')
     expect(header?.className).toContain('top-0')
     expect(header?.className).toContain('shrink-0')
