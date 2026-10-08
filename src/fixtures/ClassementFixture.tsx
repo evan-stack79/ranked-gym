@@ -163,8 +163,8 @@ export function ClassementFixture() {
   const scene = readScene()
   const [period, setPeriod] = useState<'week' | 'month'>('month')
   const [pseudo, setPseudo] = useState('')
-  const [name, setName] = useState('')
-  const [city, setCity] = useState('')
+  const [name, setName] = useState(scene === 'ajout_manuel' ? 'Salle Exemple' : '')
+  const [city, setCity] = useState(scene === 'ajout_manuel' ? 'Tergnier' : '')
   const rows = useMemo(() => fakeRows(), [])
 
   if (scene === 'train_carte') {

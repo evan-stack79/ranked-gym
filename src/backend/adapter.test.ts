@@ -45,6 +45,12 @@ const PHASE_E_TABLES = [
   'activity_comments',
   'activity_reactions',
   'avis_beta',
+  'gym_places',
+  'gym_memberships',
+  'gym_visit_days',
+  'gym_leaderboard_snapshots',
+  'gym_places_search_daily',
+  'gym_moderation_reports',
 ] as const
 
 describe('Convex Phase A feature flag', () => {
