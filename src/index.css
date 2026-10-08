@@ -1816,7 +1816,7 @@ select,
   transform: translate3d(0, 0, 0) scale(1.04);
 }
 
-/* ——— Cold launch Ranked Gym ——— */
+/* ——— Cold launch Shockwave Ranked Gym ——— */
 .app-cold-launch {
   position: fixed;
   inset: 0;
@@ -1825,38 +1825,29 @@ select,
   align-items: center;
   justify-content: center;
   background: transparent;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: default;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .app-cold-launch__dimmer {
   position: absolute;
   inset: 0;
-  background: #000;
+  /* Même fond que theme-color / body / splash HTML — pas de flash blanc iOS */
+  background: #0c0c0e;
   opacity: 1;
   transition: opacity 280ms var(--ease-out);
 }
 
-.app-cold-launch[data-phase='morphing'] .app-cold-launch__dimmer {
-  opacity: 0.4;
-}
-
-.app-cold-launch[data-phase='handoff'] .app-cold-launch__dimmer,
 .app-cold-launch[data-phase='exiting'] .app-cold-launch__dimmer {
-  opacity: 0;
-}
-
-.app-cold-launch[data-phase='handoff'] [data-cold-launch-panther-flyer],
-.app-cold-launch[data-phase='exiting'] [data-cold-launch-panther-flyer] {
-  opacity: 0;
-}
-
-:root[data-cold-launch-handoff='done'] .app-cold-launch [data-cold-launch-panther-flyer] {
   opacity: 0;
 }
 
 .app-cold-launch[data-phase='exiting'] {
   opacity: 0;
-  transition: opacity 80ms linear;
+  transition: opacity 280ms var(--ease-out);
+  pointer-events: none;
 }
 
 .app-cold-launch__safe {
@@ -1866,7 +1857,7 @@ select,
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.7rem;
+  gap: 1rem;
   padding:
     var(--app-safe-area-top, env(safe-area-inset-top, 0px))
     var(--app-safe-area-right, env(safe-area-inset-right, 0px))
@@ -1874,77 +1865,120 @@ select,
     var(--app-safe-area-left, env(safe-area-inset-left, 0px));
 }
 
+/* Scène centrée — taille = boot-splash index.html (180) pour handoff sans saut */
+.app-cold-launch__stage {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .app-cold-launch__mark {
-  width: 132px;
-  height: 132px;
+  position: relative;
+  z-index: 1;
+  width: 180px;
+  height: 180px;
   object-fit: contain;
   user-select: none;
-}
-
-.app-cold-launch__flyer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.65rem;
-}
-
-.app-cold-launch__stack {
-  position: relative;
-  width: 132px;
-  height: 132px;
-  margin: 0 auto;
-  transform-origin: center center;
-  will-change: transform, opacity;
-  transition: opacity 50ms linear;
-}
-
-.app-cold-launch__stack .app-cold-launch__mark {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transform: scale(0.98);
-  transition:
-    opacity var(--dur-ui) var(--ease-out),
-    transform var(--dur-ui) var(--ease-out);
-}
-
-.app-cold-launch__mark--calm[data-active='true'] {
-  opacity: 1;
+  display: block;
   transform: scale(1);
 }
 
-.app-cold-launch__mark--roar[data-active='true'] {
-  opacity: 1;
-  transform: scale(1.025);
+.app-cold-launch[data-phase='playing'][data-reduced='false'] .app-cold-launch__mark {
+  animation: shockwave-impact 480ms var(--ease-out) both;
 }
 
-.app-cold-launch[data-phase='roar'] .app-cold-launch__mark--calm {
+.app-cold-launch__ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 120px;
+  height: 120px;
+  margin-left: -60px;
+  margin-top: -60px;
+  border-radius: 50%;
+  border: 2.5px solid color-mix(in srgb, var(--color-brand, #ff2b2b) 75%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--color-brand, #ff2b2b) 35%, transparent);
   opacity: 0;
+  transform: scale(0.55);
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.app-cold-launch[data-phase='playing'][data-reduced='false'] .app-cold-launch__ring--1 {
+  animation: shockwave-ring 720ms var(--ease-out) 60ms both;
+}
+
+.app-cold-launch[data-phase='playing'][data-reduced='false'] .app-cold-launch__ring--2 {
+  border-color: color-mix(in srgb, var(--color-brand, #ff2b2b) 55%, transparent);
+  animation: shockwave-ring 720ms var(--ease-out) 160ms both;
+}
+
+.app-cold-launch[data-phase='playing'][data-reduced='false'] .app-cold-launch__ring--3 {
+  border-width: 1.5px;
+  border-color: color-mix(in srgb, var(--color-brand-deep, #b91c1c) 50%, transparent);
+  animation: shockwave-ring 720ms var(--ease-out) 260ms both;
+}
+
+@keyframes shockwave-ring {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.55);
+  }
+  18% {
+    opacity: 0.75;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.85);
+  }
+}
+
+@keyframes shockwave-impact {
+  0% {
+    transform: scale(1);
+  }
+  22% {
+    transform: scale(1.07);
+  }
+  48% {
+    transform: scale(0.985);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .app-cold-launch__wordmark {
   margin: 0;
   text-align: center;
-  font-size: 1.9rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 1.125rem;
   font-weight: 600;
   letter-spacing: -0.02em;
   color: #ffffff;
   opacity: 1;
-  transition: opacity 140ms var(--ease-out);
-}
-
-.app-cold-launch__wordmark[data-visible='false'] {
-  opacity: 0;
 }
 
 .app-cold-launch__wordmark span {
   color: #ff2b2b;
 }
 
+.app-cold-launch[data-phase='exiting'] .app-cold-launch__wordmark,
+.app-cold-launch[data-phase='exiting'] .app-cold-launch__mark {
+  opacity: 0;
+  transition: opacity 220ms var(--ease-out);
+}
+
 .app-cold-launch[data-reduced='true'] .app-cold-launch__mark {
   animation: none !important;
-  transition: opacity 120ms linear !important;
   transform: scale(1) !important;
+}
+
+.app-cold-launch[data-reduced='true'] .app-cold-launch__ring {
+  display: none !important;
 }
 
 .app-cold-launch[data-reduced='true'] .app-cold-launch__dimmer {
@@ -1970,14 +2004,13 @@ select,
   transition: opacity 140ms var(--ease-out);
 }
 
-:root:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-wordmark='compact'] {
+:root:not([data-cold-launch-played='1']):not([data-cold-launch-handoff='done'])
+  [data-cold-launch-target='compact']
+  [data-brand-wordmark='compact'] {
   opacity: 0;
 }
 
-:root[data-cold-launch-header-wordmark='1']:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-wordmark='compact'] {
-  opacity: 1;
-}
-
+:root[data-cold-launch-handoff='done'] [data-cold-launch-target='compact'] [data-brand-wordmark='compact'],
 :root[data-cold-launch-played='1'] [data-cold-launch-target='compact'] [data-brand-wordmark='compact'] {
   opacity: unset;
   transition: none;
@@ -2079,8 +2112,12 @@ select,
 
   .app-cold-launch__mark {
     animation: none !important;
-    transition: opacity 120ms linear !important;
     transform: scale(1) !important;
+  }
+
+  .app-cold-launch__ring {
+    display: none !important;
+    animation: none !important;
   }
 
   .home-cold-enter--active .home-cold-enter__group,

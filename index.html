@@ -23,21 +23,22 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="preload" as="image" href="/brand-splash-calm.png" />
-    <link rel="preload" as="image" href="/brand-splash-roar.png" />
     <title>Ranked Gym</title>
     <script src="/boot-t0.js"></script>
     <style>
+      /* Fond unique #0C0C0E = theme-color / manifest / body / Shockwave (anti flash blanc iOS) */
       html,
       body {
         margin: 0;
-        background-color: #000000;
+        background-color: #0c0c0e;
         color: #ffffff;
       }
       #root {
         min-height: 100vh;
         min-height: 100dvh;
+        background-color: #0c0c0e;
       }
-      /* Splash natif immédiat — fond noir, panthère calme, safe areas */
+      /* Splash natif immédiat — même composition que le 1er frame Shockwave */
       .boot-splash {
         position: fixed;
         inset: 0;
@@ -45,7 +46,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #000000;
+        background: #0c0c0e;
         padding:
           env(safe-area-inset-top, 0px)
           env(safe-area-inset-right, 0px)
@@ -86,7 +87,7 @@
       </div>
     </div>
     <noscript>
-      <p style="padding: 2rem; font-family: system-ui, sans-serif; color: #fff; background: #000">
+      <p style="padding: 2rem; font-family: system-ui, sans-serif; color: #fff; background: #0c0c0e">
         Ranked Gym nécessite JavaScript. Active-le pour utiliser l’application.
       </p>
     </noscript>
