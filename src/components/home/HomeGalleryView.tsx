@@ -18,7 +18,7 @@ import {
 import { getHomeGreetingSubtitle, resolveDisplayFirstName } from '../../utils/homeGreeting'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { findActiveStrengthSession } from '../../utils/trainHub'
-import { BlurInText, CountUpNumber, Reveal, SoftBlurIn } from '../motion'
+import { BlurInText, CountUpNumber, Reveal, SoftBlurIn, TiltCard } from '../motion'
 import { HistorySessionThumb } from '../training/HistorySessionThumb'
 import { AccueilEditSheet } from './AccueilEditSheet'
 
@@ -152,79 +152,81 @@ export function HomeGalleryView({
             instant={coldEntering || prefersReducedMotion}
             className={`accueil-gallery__snap shrink-0 ${index > 0 ? 'accueil-gallery__tile-gap' : ''}`}
           >
-            <button
-              type="button"
-              onClick={() => handleHero(card)}
-              data-accueil-hero={card.id}
-              className="accueil-gallery__hero ios-press relative overflow-hidden rounded-[24px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/50"
-              aria-label={`${card.title}, ${card.progressPercent} pour cent`}
-            >
-              {card.imageSrc ? (
-                <img
-                  src={card.imageSrc}
-                  alt=""
-                  draggable={false}
-                  decoding="async"
-                  className="absolute inset-0 h-full w-full object-cover object-center"
-                  data-accueil-hero-img="cover"
-                />
-              ) : (
-                <>
-                  <span
-                    aria-hidden="true"
-                    className={`absolute inset-0 ${
-                      card.accent === 'brand'
-                        ? 'accueil-gallery__hero-bg--brand'
-                        : 'accueil-gallery__hero-bg--graphite'
-                    }`}
+            <TiltCard className="accueil-gallery__hero-tilt">
+              <button
+                type="button"
+                onClick={() => handleHero(card)}
+                data-accueil-hero={card.id}
+                className="accueil-gallery__hero ios-press relative overflow-hidden rounded-[24px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/50"
+                aria-label={`${card.title}, ${card.progressPercent} pour cent`}
+              >
+                {card.imageSrc ? (
+                  <img
+                    src={card.imageSrc}
+                    alt=""
+                    draggable={false}
+                    decoding="async"
+                    className="absolute inset-0 h-full w-full object-cover object-center"
+                    data-accueil-hero-img="cover"
                   />
-                  <span
-                    aria-hidden="true"
-                    className="absolute inset-0 flex items-center justify-center opacity-25"
-                  >
-                    <Dumbbell className="h-24 w-24 text-white" strokeWidth={1.25} />
-                  </span>
-                </>
-              )}
-
-              <span className="absolute left-3 top-3 rounded-full bg-black/35 px-2.5 py-1 text-[12px] font-semibold text-white backdrop-blur-md">
-                {card.progressPercent}&nbsp;%
-              </span>
-
-              <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3.5 pb-3.5 pt-16">
-                <span className="flex items-end gap-2.5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/12 ring-1 ring-white/15 backdrop-blur-sm">
-                    <Dumbbell className="h-5 w-5 text-white" strokeWidth={2} aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[16px] font-bold leading-tight text-white">
-                      {card.title}
+                ) : (
+                  <>
+                    <span
+                      aria-hidden="true"
+                      className={`absolute inset-0 ${
+                        card.accent === 'brand'
+                          ? 'accueil-gallery__hero-bg--brand'
+                          : 'accueil-gallery__hero-bg--graphite'
+                      }`}
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-0 flex items-center justify-center opacity-25"
+                    >
+                      <Dumbbell className="h-24 w-24 text-white" strokeWidth={1.25} />
                     </span>
-                    {card.id === 'session' && active ? (
-                      <span className="mt-0.5 block truncate text-[13px] text-white/70">
-                        {active.title} ·{' '}
-                        <CountUpNumber
-                          kind="successful_sets"
-                          value={active.doneSetCount}
-                          instant={coldEntering || prefersReducedMotion}
-                        />{' '}
-                        série{active.doneSetCount > 1 ? 's' : ''} faite
-                        {active.doneSetCount > 1 ? 's' : ''}
+                  </>
+                )}
+
+                <span className="absolute left-3 top-3 rounded-full bg-black/35 px-2.5 py-1 text-[12px] font-semibold text-white backdrop-blur-md">
+                  {card.progressPercent}&nbsp;%
+                </span>
+
+                <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3.5 pb-3.5 pt-16">
+                  <span className="flex items-end gap-2.5">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/12 ring-1 ring-white/15 backdrop-blur-sm">
+                      <Dumbbell className="h-5 w-5 text-white" strokeWidth={2} aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[16px] font-bold leading-tight text-white">
+                        {card.title}
                       </span>
-                    ) : (
-                      <span className="mt-0.5 block truncate text-[13px] text-white/70">
-                        <SoftBlurIn
-                          delayMs={prefersReducedMotion ? 0 : 40}
-                          instant={coldEntering || prefersReducedMotion}
-                        >
-                          {card.secondary}
-                        </SoftBlurIn>
-                      </span>
-                    )}
+                      {card.id === 'session' && active ? (
+                        <span className="mt-0.5 block truncate text-[13px] text-white/70">
+                          {active.title} ·{' '}
+                          <CountUpNumber
+                            kind="successful_sets"
+                            value={active.doneSetCount}
+                            instant={coldEntering || prefersReducedMotion}
+                          />{' '}
+                          série{active.doneSetCount > 1 ? 's' : ''} faite
+                          {active.doneSetCount > 1 ? 's' : ''}
+                        </span>
+                      ) : (
+                        <span className="mt-0.5 block truncate text-[13px] text-white/70">
+                          <SoftBlurIn
+                            delayMs={prefersReducedMotion ? 0 : 40}
+                            instant={coldEntering || prefersReducedMotion}
+                          >
+                            {card.secondary}
+                          </SoftBlurIn>
+                        </span>
+                      )}
+                    </span>
                   </span>
                 </span>
-              </span>
-            </button>
+              </button>
+            </TiltCard>
           </Reveal>
         ))}
         <GalleryEdgeSpacer end />

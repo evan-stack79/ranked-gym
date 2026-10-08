@@ -1,5 +1,15 @@
 export { Reveal, MaskReveal, type RevealProps } from './Reveal'
 export {
+  TiltCard,
+  computeTiltVars,
+  TILT_MAX_DEG,
+  TILT_ACTIVE_SCALE,
+  TILT_SWIPE_CANCEL_PX,
+  TILT_RESET_MS,
+  type TiltCardProps,
+  type TiltVars,
+} from './TiltCard'
+export {
   BlurInText,
   BlurInUp,
   BLUR_WORD_STAGGER_MS,
