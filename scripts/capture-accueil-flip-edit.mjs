@@ -24,6 +24,8 @@ import { chromium } from 'playwright'
 const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const projectRoot = join(scriptsDir, '..')
 const artifactsDir = '/opt/cursor/artifacts'
+/** Scratch frames on local disk — artifact store can EIO on hundreds of rapid PNG writes. */
+const workDir = '/tmp/accueil-flip-edit-capture'
 const captureConfig = join(scriptsDir, 'accueil-gallery-capture', 'vite.config.ts')
 const port = 4236
 const VIEWPORT = { width: 402, height: 874 }
@@ -31,7 +33,8 @@ const PREFS_KEY = 'ranked-gym:accueil-widget-prefs'
 const WATER_GOAL_KEY = 'ranked-gym:water-goal'
 const FPS = 30
 const FRAME_MS = Math.round(1000 / FPS)
-const PAUSE_MS = 1000
+/** Video-time pause (~1s at 30fps) — burst frames, not wall-clock (screenshots are slow). */
+const PAUSE_FRAMES = 30
 const DRAG_MS = 600
 
 const DEFAULT_PREFS = {
@@ -424,8 +427,10 @@ async function touchDrag(page, fromX, fromY, toX, toY, recorder, samples) {
       `Dragged tile vanished mid-drag: ${JSON.stringify(missingFloat.slice(0, 4))}`,
     )
   }
-  console.log(`screencast frames: ${castFrames.length}`)
-  for (const buf of castFrames) await recorder.writePng(buf)
+  // Keep cast frames (workDir is local disk — artifact store gets finals only).
+  const picked = castFrames.slice(0, 72)
+  console.log(`screencast frames: ${castFrames.length} → kept ${picked.length}`)
+  for (const buf of picked) await recorder.writePng(buf)
 
   await moveFinger(page, moved.dropX, moved.dropY, true)
   await page.evaluate(
@@ -471,12 +476,13 @@ async function touchDrag(page, fromX, fromY, toX, toY, recorder, samples) {
 
 async function main() {
   await mkdir(artifactsDir, { recursive: true })
-  const framesDir = join(artifactsDir, 'accueil_flip_edit_frames')
   try {
-    await rm(framesDir, { recursive: true, force: true })
+    await rm(workDir, { recursive: true, force: true })
   } catch {
-    /* busy FS */
+    /* ignore */
   }
+  await mkdir(workDir, { recursive: true })
+  const framesDir = join(workDir, 'frames')
   await mkdir(framesDir, { recursive: true })
 
   const server = await startServer()
@@ -486,7 +492,8 @@ async function main() {
     const browser = await chromium.launch(chromiumLaunchOptions)
     const context = await browser.newContext({
       viewport: VIEWPORT,
-      deviceScaleFactor: 2,
+      // dsf 1 keeps screenshot bursts fast enough for a ≥12s 30fps demo.
+      deviceScaleFactor: 1,
       hasTouch: true,
       isMobile: true,
       colorScheme: 'dark',
@@ -584,8 +591,8 @@ async function main() {
       }
     })()
 
-    // Settled Accueil
-    await recorder.hold(PAUSE_MS)
+    // Settled Accueil (~1s video)
+    await recorder.burst(PAUSE_FRAMES)
 
     // 1) Long-press Eau
     const eauBox = await page.locator('[data-accueil-edit-slot="eau"]').boundingBox()
@@ -601,7 +608,7 @@ async function main() {
     log.steps.push('edit-entered')
     await pinEditWidgets(page)
     await moveFinger(page, 0, 0, false)
-    await recorder.hold(PAUSE_MS)
+    await recorder.burst(PAUSE_FRAMES)
 
     // 2) Drag Eau up across week (FLIP siblings) — ~600ms move
     await pinEditWidgets(page)
@@ -666,7 +673,7 @@ async function main() {
     )
     const sawSettling = flipSamples.some((s) => s.settling)
     log.steps.push(sawSettling ? 'drop-glide-seen' : 'drop-glide-missed')
-    await recorder.hold(PAUSE_MS)
+    await recorder.burst(PAUSE_FRAMES)
 
     // 3) − remove series_jour (fade out + siblings slide up)
     await page.evaluate(() => {
@@ -682,24 +689,24 @@ async function main() {
     const trashBox = await page.locator('[data-accueil-tile-trash="series_jour"]').boundingBox()
     if (trashBox) {
       await moveFinger(page, trashBox.x + trashBox.width / 2, trashBox.y + trashBox.height / 2, true)
-      await recorder.burst(4)
+      await recorder.burst(6)
     }
     await page.locator('[data-accueil-tile-trash="series_jour"]').tap({ force: true })
     await moveFinger(page, 0, 0, false)
-    // Exit ~180ms + sibling FLIP — record the fade
-    await recorder.hold(700)
+    // Exit ~180ms + sibling FLIP — ~24 frames (~0.8s video)
+    await recorder.burst(24)
     await page.waitForSelector('[data-accueil-edit-slot="series_jour"]', {
       state: 'detached',
       timeout: 4_000,
     })
     log.steps.push('removed-series')
-    await recorder.hold(PAUSE_MS)
+    await recorder.burst(PAUSE_FRAMES)
 
     // 4) + Ajouter → pick Séries du jour (fade in)
     const addBox = await page.locator('[data-accueil-edit-add]').boundingBox()
     if (addBox) {
       await moveFinger(page, addBox.x + addBox.width / 2, addBox.y + addBox.height / 2, true)
-      await recorder.burst(3)
+      await recorder.burst(6)
     }
     await page.locator('[data-accueil-edit-add]').tap()
     await moveFinger(page, 0, 0, false)
@@ -707,11 +714,11 @@ async function main() {
       state: 'visible',
       timeout: 8_000,
     })
-    await recorder.hold(PAUSE_MS)
+    await recorder.burst(PAUSE_FRAMES)
     const addItem = await page.locator('[data-accueil-add-item="series_jour"]').boundingBox()
     if (addItem) {
       await moveFinger(page, addItem.x + addItem.width / 2, addItem.y + addItem.height / 2, true)
-      await recorder.burst(3)
+      await recorder.burst(6)
     }
     await page.locator('[data-accueil-add-item="series_jour"]').tap()
     await moveFinger(page, 0, 0, false)
@@ -726,19 +733,20 @@ async function main() {
       .then(() => true)
       .catch(() => metricLog.some((s) => (s.entering || []).length > 0))
     log.steps.push(sawEntering ? 'enter-anim-seen' : 'enter-anim-missed')
-    await recorder.hold(PAUSE_MS)
+    // Enter fade + settle (~1s video)
+    await recorder.burst(PAUSE_FRAMES)
 
     // 5) OK — jiggle stops, no stuck tile
     const okBox = await page.locator('[data-accueil-edit-ok]').boundingBox()
     if (okBox) {
       await moveFinger(page, okBox.x + okBox.width / 2, okBox.y + okBox.height / 2, true)
-      await recorder.burst(3)
+      await recorder.burst(6)
     }
     await page.locator('[data-accueil-edit-ok]').tap()
     await moveFinger(page, 0, 0, false)
     await page.waitForSelector('[data-accueil-edit-open="0"]', { timeout: 5_000 })
     log.steps.push('ok')
-    await recorder.hold(PAUSE_MS)
+    await recorder.burst(PAUSE_FRAMES)
 
     metricPollActive = false
     await metricPoll.catch(() => {})
@@ -779,7 +787,7 @@ async function main() {
       throw new Error(`Too few screenshot frames: ${frameFiles.length}`)
     }
 
-    const dest = join(artifactsDir, 'accueil_flip_edit.mp4')
+    const destTmp = join(workDir, 'accueil_flip_edit.mp4')
     runFfmpeg([
       '-y',
       '-framerate',
@@ -793,11 +801,13 @@ async function main() {
       'yuv420p',
       '-movflags',
       '+faststart',
-      dest,
+      destTmp,
     ])
 
+    const dest = join(artifactsDir, 'accueil_flip_edit.mp4')
     const demo = join(artifactsDir, 'accueil_flip_edit_recording_demo.mp4')
-    await copyFile(dest, demo)
+    await copyFile(destTmp, dest)
+    await copyFile(destTmp, demo)
 
     // Contact sheet of drag+drop window at 10 fps
     const win = recorder.dragWindow()
@@ -807,12 +817,7 @@ async function main() {
       contactStart = 1
       contactEnd = frameFiles.length
     }
-    const dragFramesDir = join(artifactsDir, 'accueil_flip_edit_drag_frames')
-    try {
-      await rm(dragFramesDir, { recursive: true, force: true })
-    } catch {
-      /* ignore */
-    }
+    const dragFramesDir = join(workDir, 'drag_frames')
     await mkdir(dragFramesDir, { recursive: true })
     // Sample every 3rd frame from 30fps → 10fps
     let sheetIdx = 0
@@ -825,6 +830,7 @@ async function main() {
     if (sheetIdx < 4) {
       throw new Error(`Contact sheet too short: ${sheetIdx} frames`)
     }
+    const contactTmp = join(workDir, 'accueil_flip_edit_drag_contact.png')
     const contactPath = join(artifactsDir, 'accueil_flip_edit_drag_contact.png')
     // Tile into a contact sheet (max ~8 columns)
     const cols = Math.min(8, sheetIdx)
@@ -836,8 +842,26 @@ async function main() {
       `scale=201:-1,tile=${cols}x${Math.ceil(sheetIdx / cols)}`,
       '-frames:v',
       '1',
-      contactPath,
+      contactTmp,
     ])
+    await copyFile(contactTmp, contactPath)
+
+    // Also publish a short 30fps extract of the drag window for ffmpeg verify
+    const framesOut = join(artifactsDir, 'accueil_flip_edit_frames')
+    try {
+      await rm(framesOut, { recursive: true, force: true })
+    } catch {
+      /* ignore */
+    }
+    await mkdir(framesOut, { recursive: true })
+    // Copy drag-window frames only (keeps artifact store light)
+    let pub = 0
+    for (let i = contactStart; i <= contactEnd; i++) {
+      const src = join(framesDir, `frame-${String(i).padStart(4, '0')}.png`)
+      if (!existsSync(src)) continue
+      pub++
+      await copyFile(src, join(framesOut, `frame-${String(pub).padStart(4, '0')}.png`))
+    }
 
     // Luminance check — reject near-black frames after the first few
     const { createRequire } = await import('node:module')

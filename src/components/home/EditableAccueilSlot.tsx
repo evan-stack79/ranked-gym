@@ -105,11 +105,9 @@ export function EditableAccueilSlot({
   const [slotSize, setSlotSize] = useState<{ width: number; height: number } | null>(null)
   const [settling, setSettling] = useState(false)
   const dropGlideGenRef = useRef(0)
-  const [portalReady, setPortalReady] = useState(false)
-
-  useEffect(() => {
-    setPortalReady(typeof document !== 'undefined')
-  }, [])
+  // Client-only portal host — must be true on the first client paint after a
+  // remount mid-drag (useEffect-deferred true caused a one-frame vanish).
+  const portalReady = typeof document !== 'undefined'
 
   const clearPressTimer = () => {
     const p = pressRef.current
@@ -319,15 +317,17 @@ export function EditableAccueilSlot({
         top: absFloat.top,
         width: absFloat.width,
         height: absFloat.height,
-        zIndex: 80,
+        zIndex: 200,
         margin: 0,
         transform: 'scale(1.03)',
         transition: 'none',
         boxShadow: '0 16px 36px rgb(0 0 0 / 0.55)',
         pointerEvents: 'none',
+        backgroundColor: '#111113',
         background: '#111113',
         borderRadius: '1.5rem',
         overflow: 'hidden',
+        isolation: 'isolate',
         opacity: 1,
         visibility: 'visible',
       }
