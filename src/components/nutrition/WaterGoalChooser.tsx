@@ -12,6 +12,8 @@ interface WaterGoalChooserProps {
   onSaved?: (goalMl: number) => void
   /** Start with the input open (screenshot / deep-link). */
   defaultOpen?: boolean
+  /** Unique input id when several choosers are on screen. */
+  inputId?: string
   className?: string
 }
 
@@ -21,6 +23,7 @@ interface WaterGoalChooserProps {
 export function WaterGoalChooser({
   onSaved,
   defaultOpen = false,
+  inputId = 'water-goal-input',
   className = '',
 }: WaterGoalChooserProps) {
   const [open, setOpen] = useState(defaultOpen)
@@ -55,12 +58,12 @@ export function WaterGoalChooser({
         </button>
       ) : (
         <form onSubmit={submit} className="space-y-2">
-          <label className="block text-[12px] font-medium text-[#AEAEB2]" htmlFor="water-goal-input">
+          <label className="block text-[12px] font-medium text-[#AEAEB2]" htmlFor={inputId}>
             Objectif (ml ou L)
           </label>
           <div className="flex items-center gap-2">
             <input
-              id="water-goal-input"
+              id={inputId}
               type="text"
               inputMode="decimal"
               autoComplete="off"

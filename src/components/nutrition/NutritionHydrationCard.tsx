@@ -14,6 +14,7 @@ interface NutritionHydrationCardProps {
   onAdd250: () => void
   onGoalSaved?: (goalMl: number) => void
   saving?: boolean
+  chooserInputId?: string
 }
 
 function formatLiters(ml: number): string {
@@ -26,6 +27,7 @@ export function NutritionHydrationCard({
   onAdd250,
   onGoalSaved,
   saving = false,
+  chooserInputId,
 }: NutritionHydrationCardProps) {
   const hasGoal = goalMl != null && goalMl > 0
   const canAdd = canSubmitHomeQuickWater(saving)
@@ -58,7 +60,11 @@ export function NutritionHydrationCard({
             +{HOME_QUICK_WATER_ML} ml
           </button>
         </div>
-        <WaterGoalChooser className="mt-3" onSaved={onGoalSaved} />
+        <WaterGoalChooser
+          className="mt-3"
+          onSaved={onGoalSaved}
+          inputId={chooserInputId ?? 'water-goal-input-card'}
+        />
       </div>
     )
   }
