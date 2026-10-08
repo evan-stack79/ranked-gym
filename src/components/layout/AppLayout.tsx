@@ -105,7 +105,7 @@ export function AppLayout({
 
       <main
         ref={mainRef}
-        className={`relative z-10 min-h-0 w-full flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch] ${
+        className={`relative z-10 min-h-0 w-full flex-1 overflow-x-clip overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch] ${
           chromeHidden ? 'max-w-none' : ''
         }`}
         style={

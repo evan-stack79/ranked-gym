@@ -76,6 +76,22 @@ a,
   -webkit-touch-callout: none;
 }
 
+/*
+ * Accueil vertical scroll precision (iPhone Safari PWA):
+ * overflow-y:auto alone computes overflow-x to auto too — the page can pan
+ * left on a diagonal swipe. Clip X on the main scroller + gallery shell.
+ * #99 user-select lock must NOT set touch-action: none globally (it doesn't).
+ */
+[data-app-scroll-main] {
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+}
+
+.accueil-gallery {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
 /* Keep caret, selection, and copy/paste in fields you type in */
 input,
 textarea,
@@ -193,6 +209,19 @@ img {
   /* Align snap stops with the gutter spacers (iOS ignores padding on overflow flex) */
   scroll-padding-left: var(--accueil-gutter);
   scroll-padding-right: var(--accueil-gutter-end);
+  /* Keep sideways rubber-band inside the strip — never shift the page left. */
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
+  /* Prefer horizontal when the gesture is clearly sideways; vertical still pans the page. */
+  touch-action: pan-x pan-y;
+}
+
+/* Vertical-dominant gesture: freeze the strip so scroll-snap cannot yank left. */
+.accueil-gallery__carousel[data-accueil-axis='y'],
+.accueil-gallery__tiles[data-accueil-axis='y'] {
+  overflow-x: hidden;
+  scroll-snap-type: none !important;
+  touch-action: pan-y;
 }
 
 .accueil-gallery__carousel::-webkit-scrollbar,
@@ -411,6 +440,12 @@ img {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
+  /*
+   * Outside edit: allow native pan (manipulation = pan + no double-tap zoom).
+   * Prefer manipulation over pan-y so a stationary long-press is not pointercancel’d
+   * when the browser claims a vertical gesture; carousel axis-lock + overflow-x:clip
+   * stop the “bas gauche” jerk.
+   */
   touch-action: manipulation;
 }
 
@@ -420,6 +455,7 @@ img {
 }
 
 .accueil-edit-slot--editing {
+  /* Reorder drag needs full pointer freedom. */
   touch-action: none;
 }
 
