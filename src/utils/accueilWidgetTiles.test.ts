@@ -110,7 +110,16 @@ describe('accueilWidgetTiles — sets goal from planned sets', () => {
           dateKey: '2026-10-07',
           createdAt: FIXED.getTime(),
           estimatedKcal: 180,
-          exercises: [{ id: 'e1', name: 'Curl', sets: [{ reps: 10 }, { reps: 10 }] }],
+          exercises: [
+            {
+              id: 'e1',
+              name: 'Curl',
+              sets: [
+                { reps: 10, weightKg: 12 },
+                { reps: 10, weightKg: 12 },
+              ],
+            },
+          ],
         },
       ],
     })
