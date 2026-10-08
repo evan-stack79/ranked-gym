@@ -5,12 +5,26 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { WorkoutNote } from '../../types/training'
 import { HistorySessionThumb } from './HistorySessionThumb'
 
-function note(partial: Partial<WorkoutNote> & Pick<WorkoutNote, 'id' | 'title'>): WorkoutNote {
+type NoteFixture = Pick<WorkoutNote, 'id' | 'title'> &
+  Partial<Omit<WorkoutNote, 'id' | 'title'>>
+
+function note({
+  id,
+  title,
+  dateKey = '2026-10-06',
+  createdAt = 1,
+  exercises = [],
+  estimatedKcal = 0,
+  ...rest
+}: NoteFixture): WorkoutNote {
   return {
-    dateKey: '2026-10-06',
-    createdAt: 1,
-    exercises: [],
-    ...partial,
+    id,
+    title,
+    dateKey,
+    createdAt,
+    exercises,
+    estimatedKcal,
+    ...rest,
   }
 }
 

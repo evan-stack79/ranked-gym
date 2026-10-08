@@ -1,4 +1,5 @@
 import { Dumbbell, Home, Play, Salad, User } from 'lucide-react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { isAccueilGalleryEnabled } from '../../backend/accueilGalleryFeatureFlag'
 import type { TabId } from '../../types'
 
@@ -19,6 +20,9 @@ const tabs: { id: TabId; label: string; icon: typeof Home }[] = [
   { id: 'nutrition', label: 'Nutri', icon: Salad },
   { id: 'profile', label: 'Profil', icon: User },
 ]
+
+/** Soft active bubble diameter — keep in sync with `.bottom-nav-pill__bubble` width. */
+const PILL_BUBBLE_SIZE_PX = 36
 
 export function BottomNav({
   activeTab,
@@ -112,11 +116,44 @@ function FloatingPillBottomNav({
   onStartTraining: () => void
   hasActiveWorkout: boolean
 }) {
+  const trackRef = useRef<HTMLDivElement>(null)
+  const tabRefs = useRef<Partial<Record<TabId, HTMLButtonElement | null>>>({})
+  const [bubbleX, setBubbleX] = useState(0)
+  const [bubbleReady, setBubbleReady] = useState(false)
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const track = trackRef.current
+      const tab = tabRefs.current[activeTab]
+      if (!track || !tab) return
+      const trackRect = track.getBoundingClientRect()
+      const tabRect = tab.getBoundingClientRect()
+      const x = tabRect.left - trackRect.left + (tabRect.width - PILL_BUBBLE_SIZE_PX) / 2
+      setBubbleX(x)
+      setBubbleReady(true)
+    }
+
+    measure()
+    const track = trackRef.current
+    if (!track || typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure)
+      return () => window.removeEventListener('resize', measure)
+    }
+
+    const ro = new ResizeObserver(measure)
+    ro.observe(track)
+    window.addEventListener('resize', measure)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [activeTab])
+
   const centralAction = (
     <button
       type="button"
       onClick={onStartTraining}
-      className="ios-press relative z-10 flex h-11 min-h-11 min-w-11 flex-1 items-center justify-center rounded-full px-1"
+      className="ios-press bottom-nav-pill__center relative z-10 flex h-11 min-h-11 min-w-11 flex-1 items-center justify-center rounded-full px-1"
       aria-label={hasActiveWorkout ? 'Reprendre' : 'Nouvelle séance'}
       data-nav-center={hasActiveWorkout ? 'resume' : 'new'}
     >
@@ -128,37 +165,44 @@ function FloatingPillBottomNav({
 
   return (
     <nav
-      className="bottom-nav-pill fixed left-1/2 z-50 -translate-x-1/2 rounded-full border border-white/12 px-2 py-1.5 shadow-[0_10px_40px_rgb(0_0_0_/_0.45)]"
+      className="bottom-nav-pill fixed left-1/2 z-50 -translate-x-1/2 rounded-full px-2 py-1.5"
       aria-label="Navigation principale"
       data-bottom-nav-mode="pill"
       data-bottom-nav-variant="floating-pill"
       style={{
         bottom: 'max(0.5rem, var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px)))',
-        backgroundColor: 'rgb(23 23 25 / 0.72)',
-        backdropFilter: 'blur(20px) saturate(1.4)',
-        WebkitBackdropFilter: 'blur(20px) saturate(1.4)',
         width: 'min(22.5rem, calc(100vw - 2.5rem))',
       }}
     >
-      <div className="flex items-center justify-between gap-0.5">
+      <div ref={trackRef} className="bottom-nav-pill__track relative flex items-center justify-between gap-0.5">
+        <span
+          className="bottom-nav-pill__bubble"
+          aria-hidden="true"
+          data-nav-bubble
+          data-ready={bubbleReady ? 'true' : 'false'}
+          style={{
+            transform: `translate3d(${bubbleX}px, -50%, 0)`,
+            opacity: bubbleReady ? 1 : 0,
+          }}
+        />
         {tabs.map(({ id, label, icon: Icon }) => {
           const isActive = activeTab === id
           const item = (
             <button
               key={id}
               type="button"
+              ref={(el) => {
+                tabRefs.current[id] = el
+              }}
               onClick={() => onTabChange(id)}
-              className={`ios-press flex h-11 min-h-11 min-w-11 flex-1 items-center justify-center rounded-full px-1 transition-colors duration-150 motion-reduce:transition-none ${
-                isActive ? 'text-[#FF2B2B]' : 'text-[#AEAEB2]'
+              className={`ios-press bottom-nav-pill__tab relative z-[1] flex h-11 min-h-11 min-w-11 flex-1 items-center justify-center rounded-full px-1 transition-colors duration-150 motion-reduce:transition-none ${
+                isActive ? 'text-[#FF2B2B]' : 'text-[#EBEBF5]'
               }`}
               aria-current={isActive ? 'page' : undefined}
               aria-label={label}
+              data-nav-tab={id}
             >
-              <span
-                className={`flex h-9 w-9 items-center justify-center rounded-full ${
-                  isActive ? 'bg-[#FF2B2B]/15' : ''
-                }`}
-              >
+              <span className="flex h-9 w-9 items-center justify-center rounded-full">
                 <Icon className="h-[22px] w-[22px]" strokeWidth={isActive ? 2.35 : 1.75} aria-hidden="true" />
               </span>
             </button>

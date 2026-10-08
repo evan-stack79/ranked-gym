@@ -74,4 +74,76 @@ describe('BottomNav centre', () => {
     // No visible tab labels in the pill (aria-label only)
     expect(host.textContent).not.toMatch(/Accueil|Train|Nutri|Profil/)
   })
+
+  it('floating pill : liquid-glass bubble slides to active tab (skips centre play)', async () => {
+    const tabLeft: Record<string, number> = {
+      home: 8,
+      training: 72,
+      nutrition: 200,
+      profile: 264,
+    }
+    const rect = (left: number, width: number, height = 44) =>
+      ({
+        x: left,
+        y: 0,
+        top: 0,
+        left,
+        bottom: height,
+        right: left + width,
+        width,
+        height,
+        toJSON: () => ({}),
+      }) satisfies DOMRect
+
+    const gbr = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      if (this.classList.contains('bottom-nav-pill__track')) return rect(0, 320)
+      const tabId = this.getAttribute('data-nav-tab')
+      if (tabId && tabId in tabLeft) return rect(tabLeft[tabId]!, 56)
+      return rect(0, 0)
+    })
+
+    try {
+      await act(async () => {
+        root.render(
+          <BottomNav
+            activeTab="home"
+            onTabChange={vi.fn()}
+            hasActiveWorkout={false}
+            floatingPill
+          />,
+        )
+      })
+
+      const bubble = host.querySelector('[data-nav-bubble]') as HTMLElement | null
+      expect(bubble).toBeTruthy()
+      expect(bubble?.getAttribute('aria-hidden')).toBe('true')
+      expect(bubble?.getAttribute('data-ready')).toBe('true')
+      expect(host.querySelector('[data-nav-center]')).toBeTruthy()
+      expect(host.querySelectorAll('[data-nav-tab]')).toHaveLength(4)
+
+      // home: left 8 + (56-36)/2 = 18
+      expect(bubble!.style.transform).toBe('translate3d(18px, -50%, 0)')
+
+      await act(async () => {
+        root.render(
+          <BottomNav
+            activeTab="profile"
+            onTabChange={vi.fn()}
+            hasActiveWorkout={false}
+            floatingPill
+          />,
+        )
+      })
+
+      expect(host.querySelector('[aria-current="page"]')?.getAttribute('aria-label')).toBe('Profil')
+      // profile: left 264 + (56-36)/2 = 274
+      expect((host.querySelector('[data-nav-bubble]') as HTMLElement).style.transform).toBe(
+        'translate3d(274px, -50%, 0)',
+      )
+    } finally {
+      gbr.mockRestore()
+    }
+  })
 })

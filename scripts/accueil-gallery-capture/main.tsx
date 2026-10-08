@@ -89,7 +89,18 @@ const routines: WorkoutRoutine[] = [
     accent: '#00B4FF',
     updatedAt: FIXED_MS,
     exercises: [
-      { id: 'e3', name: 'Tractions', sets: [{ reps: 6, weightKg: 0 }, { reps: 6, weightKg: 0 }] },
+      {
+        id: 'e3',
+        name: 'Tractions',
+        canonicalExerciseId: 'pull_up',
+        sets: [{ reps: 6, weightKg: 0 }, { reps: 6, weightKg: 0 }],
+      },
+      {
+        id: 'e3b',
+        name: 'Rowing barre',
+        canonicalExerciseId: 'barbell_row',
+        sets: [{ reps: 8, weightKg: 50 }, { reps: 8, weightKg: 50 }],
+      },
     ],
   },
   {
@@ -105,6 +116,12 @@ const routines: WorkoutRoutine[] = [
         canonicalExerciseId: 'back_squat',
         sets: [{ reps: 5, weightKg: 100 }, { reps: 5, weightKg: 100 }],
       },
+      {
+        id: 'e4b',
+        name: 'Soulevé de terre',
+        canonicalExerciseId: 'deadlift',
+        sets: [{ reps: 5, weightKg: 120 }, { reps: 5, weightKg: 120 }],
+      },
     ],
   },
   {
@@ -113,7 +130,14 @@ const routines: WorkoutRoutine[] = [
     subtitle: 'Full body',
     accent: '#FF2B2B',
     updatedAt: FIXED_MS,
-    exercises: [],
+    exercises: [
+      {
+        id: 'e6',
+        name: 'Développé couché haltères',
+        canonicalExerciseId: 'dumbbell_bench_press',
+        sets: [{ reps: 10, weightKg: 28 }, { reps: 10, weightKg: 28 }],
+      },
+    ],
   },
 ]
 
@@ -155,7 +179,7 @@ const notes: WorkoutNote[] = [
     ],
   },
   {
-    id: 'n-old',
+    id: 'n-pull',
     title: 'Tractions',
     dateKey: dateKeyOffset(3),
     createdAt: atHour(3, 12, 0),
@@ -163,7 +187,32 @@ const notes: WorkoutNote[] = [
     durationMin: 25,
     sessionKind: 'strength',
     sportId: 'musculation',
-    exercises: [{ id: 'e3', name: 'Tractions', sets: [{ reps: 6, weightKg: 0 }] }],
+    exercises: [
+      {
+        id: 'e3',
+        name: 'Tractions',
+        canonicalExerciseId: 'pull_up',
+        sets: [{ reps: 6, weightKg: 0 }, { reps: 6, weightKg: 0 }],
+      },
+    ],
+  },
+  {
+    id: 'n-dead',
+    title: 'Soulevé de terre',
+    dateKey: dateKeyOffset(4),
+    createdAt: atHour(4, 18, 20),
+    estimatedKcal: 320,
+    durationMin: 45,
+    sessionKind: 'strength',
+    sportId: 'musculation',
+    exercises: [
+      {
+        id: 'e5',
+        name: 'Soulevé de terre',
+        canonicalExerciseId: 'deadlift',
+        sets: [{ reps: 5, weightKg: 120 }, { reps: 5, weightKg: 120 }],
+      },
+    ],
   },
   {
     id: 'n-older',
