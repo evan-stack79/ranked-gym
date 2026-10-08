@@ -3,13 +3,18 @@ import {
   canSubmitHomeQuickWater,
   HOME_QUICK_WATER_ML,
 } from '../../utils/homeNutritionQuickActions'
+import { formatWaterMl } from '../../utils/waterGoal'
 import { CountUpNumber, SoftBlurIn } from '../motion'
+import { WaterGoalChooser } from './WaterGoalChooser'
 
 interface NutritionHydrationCardProps {
   consumedMl: number
-  goalMl: number
+  /** User-chosen goal in ml, or null when none. */
+  goalMl: number | null
   onAdd250: () => void
+  onGoalSaved?: (goalMl: number) => void
   saving?: boolean
+  chooserInputId?: string
 }
 
 function formatLiters(ml: number): string {
@@ -20,11 +25,52 @@ export function NutritionHydrationCard({
   consumedMl,
   goalMl,
   onAdd250,
+  onGoalSaved,
   saving = false,
+  chooserInputId,
 }: NutritionHydrationCardProps) {
-  const safeGoal = Math.max(100, goalMl)
-  const progress = Math.min(Math.max(0, consumedMl) / safeGoal, 1)
+  const hasGoal = goalMl != null && goalMl > 0
   const canAdd = canSubmitHomeQuickWater(saving)
+
+  if (!hasGoal) {
+    return (
+      <div className="rounded-2xl border border-white/[0.08] bg-[#141416]/92 px-3.5 py-3">
+        <div className="flex items-center gap-3">
+          <GlassWater className="h-6 w-6 shrink-0 text-white" strokeWidth={1.75} aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-semibold text-white">
+              <SoftBlurIn>Hydratation</SoftBlurIn>
+            </p>
+            <p className="mt-0.5 text-[13px] font-medium tabular-nums text-[#AEAEB2]">
+              <CountUpNumber
+                kind="water"
+                value={consumedMl}
+                format={(n) => formatWaterMl(Math.round(n))}
+              />{' '}
+              bus aujourd&apos;hui
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onAdd250}
+            disabled={!canAdd}
+            aria-label={`Ajouter ${HOME_QUICK_WATER_ML} ml`}
+            className="ios-press shrink-0 rounded-xl bg-[#FF2B2B] px-3.5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
+          >
+            +{HOME_QUICK_WATER_ML} ml
+          </button>
+        </div>
+        <WaterGoalChooser
+          className="mt-3"
+          onSaved={onGoalSaved}
+          inputId={chooserInputId ?? 'water-goal-input-card'}
+        />
+      </div>
+    )
+  }
+
+  const safeGoal = goalMl
+  const progress = Math.min(Math.max(0, consumedMl) / safeGoal, 1)
 
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-[#141416]/92 px-3.5 py-3">

@@ -16,13 +16,14 @@ import {
   WATER_BOTTLE_CAPACITY_ML,
 } from '../../services/nutritionStorage'
 import { resolveBottleVisual } from '../../utils/deriveBottleProgress'
+import { formatWaterMl } from '../../utils/waterGoal'
 import {
-  formatWaterMl,
-  getDailyWaterGoalMl,
-  isTrainingDayToday,
-} from '../../utils/waterGoal'
+  getUserWaterGoalMl,
+  WATER_GOAL_CHANGED_EVENT,
+} from '../../utils/userWaterGoal'
 import { CompletedBottles } from './CompletedBottles'
 import { HydrationProgressBar } from './HydrationProgressBar'
+import { WaterGoalChooser } from './WaterGoalChooser'
 import {
   clampRemainingMl,
   remainingMlFromKey,
@@ -58,10 +59,6 @@ export const WATER_SMART_PRESETS: ReadonlyArray<{
   { id: 'shaker', label: 'Shaker', detail: '500 ml', ml: 500, Icon: FlaskConical },
   { id: 'bottle', label: 'Bouteille', detail: '1,5 L', ml: 1500, Icon: Droplets },
 ]
-
-interface SmartWaterGaugeProps {
-  weightKg?: number
-}
 
 type DragSample = { y: number; t: number; visual: number }
 
@@ -125,7 +122,7 @@ function resolveReleaseVisual(samples: DragSample[]): number | null {
   return samples[endIdx].visual
 }
 
-export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
+export function SmartWaterGauge() {
   const bottleRef = useRef<HTMLDivElement>(null)
   const pointerIdRef = useRef<number | null>(null)
   const hapticBucketRef = useRef(0)
@@ -147,16 +144,20 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
     number | null
   >(null)
   const [calibrationToast, setCalibrationToast] = useState(false)
+  const [goalTick, setGoalTick] = useState(0)
   const fillAreaRef = useRef<HTMLDivElement>(null)
 
-  const isTrainingDay = isTrainingDayToday()
-  const dailyGoalMl = getDailyWaterGoalMl(weightKg ?? 70, isTrainingDay)
+  const dailyGoalMl = useMemo(() => {
+    void goalTick
+    return getUserWaterGoalMl()
+  }, [goalTick])
+  const hasGoal = dailyGoalMl != null && dailyGoalMl > 0
   const isCalibrated = isTodayWaterBottleCalibrated()
 
   const resolveVisual = useCallback(
     (total: number) => {
       const journal = getTodayJournal()
-      return resolveBottleVisual(total, dailyGoalMl, {
+      return resolveBottleVisual(total, dailyGoalMl ?? 0, {
         capacityMl: WATER_BOTTLE_CAPACITY_ML,
         bottleLevelMl: journal.waterBottleLevelMl,
         calibrationTotalMl: journal.waterBottleCalibrationTotalMl,
@@ -197,15 +198,16 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
   }, [syncFromStorage])
 
   useEffect(() => {
+    const onGoalChanged = () => setGoalTick((n) => n + 1)
     window.addEventListener('ranked-gym:backup-restored', syncFromStorage)
     window.addEventListener('ranked-gym:water-changed', syncFromStorage)
     window.addEventListener('ranked-gym:profile-changed', syncFromStorage)
-    window.addEventListener('ranked-gym:training-changed', syncFromStorage)
+    window.addEventListener(WATER_GOAL_CHANGED_EVENT, onGoalChanged)
     return () => {
       window.removeEventListener('ranked-gym:backup-restored', syncFromStorage)
       window.removeEventListener('ranked-gym:water-changed', syncFromStorage)
       window.removeEventListener('ranked-gym:profile-changed', syncFromStorage)
-      window.removeEventListener('ranked-gym:training-changed', syncFromStorage)
+      window.removeEventListener(WATER_GOAL_CHANGED_EVENT, onGoalChanged)
     }
   }, [syncFromStorage])
 
@@ -475,7 +477,11 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
               <CountUpNumber kind="water" value={displayTotal} />
             )}
           </span>
-          <span className="text-[#8E8E93]"> / {formatWaterMl(dailyGoalMl)}</span>
+          {hasGoal ? (
+            <span className="text-[#8E8E93]"> / {formatWaterMl(dailyGoalMl)}</span>
+          ) : (
+            <span className="text-[#8E8E93]"> ml</span>
+          )}
         </p>
       </div>
 
@@ -660,7 +666,7 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
               aria-hidden
             />
           </div>
-        ) : bottleProgress.goalReached ? (
+        ) : hasGoal && bottleProgress.goalReached ? (
           <p className="max-w-[300px] text-center text-[13px] leading-relaxed text-[#7DD3FC]">
             Objectif atteint — {formatWaterMl(displayTotal)} enregistrés aujourd&apos;hui.
           </p>
@@ -723,13 +729,15 @@ export function SmartWaterGauge({ weightKg }: SmartWaterGaugeProps) {
           </p>
         ) : null}
 
-        <div className="w-full max-w-[340px]">
-          <HydrationProgressBar
-            consumedMl={displayTotal}
-            goalMl={dailyGoalMl}
-            isTrainingDay={isTrainingDay}
-          />
-        </div>
+        {hasGoal ? (
+          <div className="w-full max-w-[340px]">
+            <HydrationProgressBar consumedMl={displayTotal} goalMl={dailyGoalMl ?? 0} />
+          </div>
+        ) : (
+          <div className="w-full max-w-[340px]">
+            <WaterGoalChooser onSaved={() => setGoalTick((n) => n + 1)} />
+          </div>
+        )}
 
         <div className="w-full max-w-[340px]">
           <p className="mb-2 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8E8E93]">
