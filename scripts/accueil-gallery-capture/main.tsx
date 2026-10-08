@@ -137,6 +137,24 @@ const notes: WorkoutNote[] = [
     ],
   },
   {
+    id: 'n-bench',
+    title: 'Développé couché',
+    dateKey: dateKeyOffset(2),
+    createdAt: atHour(2, 18, 30),
+    estimatedKcal: 220,
+    durationMin: 28,
+    sessionKind: 'strength',
+    sportId: 'musculation',
+    exercises: [
+      {
+        id: 'e1',
+        name: 'Développé couché',
+        canonicalExerciseId: 'bench_press',
+        sets: [{ reps: 8, weightKg: 60 }, { reps: 8, weightKg: 60 }],
+      },
+    ],
+  },
+  {
     id: 'n-old',
     title: 'Tractions',
     dateKey: dateKeyOffset(3),
@@ -163,6 +181,11 @@ const notes: WorkoutNote[] = [
         name: 'Développé couché',
         canonicalExerciseId: 'bench_press',
         sets: [{ reps: 8, weightKg: 60 }],
+      },
+      {
+        id: 'e2',
+        name: 'Développé militaire',
+        sets: [{ reps: 10, weightKg: 30 }],
       },
     ],
   },
