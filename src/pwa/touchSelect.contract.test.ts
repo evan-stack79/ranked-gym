@@ -48,4 +48,32 @@ describe('PWA touch selection / scroll CSS contract', () => {
   it('card images are not webkit-draggable', () => {
     expect(css).toMatch(/img\s*\{[\s\S]*?-webkit-user-drag:\s*none/)
   })
+
+  it('#99 selection lock does not set touch-action: none globally on shell', () => {
+    // The shared #root / .mesh-bg / button selection rule must not disable touch-action.
+    const idx = css.indexOf('#root,\n.mesh-bg,')
+    expect(idx).toBeGreaterThanOrEqual(0)
+    const ruleEnd = css.indexOf('}', idx)
+    const selectionRule = css.slice(idx, ruleEnd + 1)
+    expect(selectionRule).toMatch(/user-select:\s*none/)
+    expect(selectionRule).not.toMatch(/touch-action:/)
+  })
+
+  it('main scroller clips horizontal overflow (no page pan-left)', () => {
+    expect(css).toMatch(/\[data-app-scroll-main\]\s*\{[^}]*overflow-x:\s*clip/s)
+  })
+
+  it('Accueil edit slots use pan-y outside edit and none only while editing', () => {
+    expect(css).toMatch(/\.accueil-edit-slot\s*\{[^}]*touch-action:\s*pan-y/s)
+    expect(css).toMatch(/\.accueil-edit-slot--editing\s*\{[^}]*touch-action:\s*none/s)
+  })
+
+  it('horizontal Accueil strips contain overscroll-x and freeze on vertical axis lock', () => {
+    expect(css).toMatch(
+      /\.accueil-gallery__carousel,\s*\n\.accueil-gallery__tiles\s*\{[^}]*overscroll-behavior-x:\s*contain/s,
+    )
+    expect(css).toMatch(
+      /\[data-accueil-axis='y'\][^}]*overflow-x:\s*hidden/s,
+    )
+  })
 })

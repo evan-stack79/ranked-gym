@@ -23,6 +23,7 @@ import {
   type GalleryHeroCard,
 } from '../../utils/accueilGallery'
 import { hitTestWidgetId } from '../../utils/accueilEditGestures'
+import { attachHorizontalScrollAxisLock } from '../../utils/horizontalScrollAxisLock'
 import {
   ACCUEIL_WIDGET_SIZE,
   hideAccueilWidget,
@@ -265,6 +266,26 @@ export function HomeGalleryView({
   const visibleWidgets = useMemo(() => resolveVisibleAccueilWidgets(prefs), [prefs])
   const packs = useMemo(() => packAccueilWidgets(visibleWidgets), [visibleWidgets])
   const visibleOrderKey = visibleWidgets.join('|')
+
+  // Horizontal carousels: lock to vertical when the swipe is vertical-dominant
+  // so scroll-snap cannot jerk the page “bas gauche” on Accueil scroll.
+  useEffect(() => {
+    if (editMode || prefersReducedMotion) return
+    const root =
+      widgetsRootRef.current?.closest('[data-accueil-gallery]') ??
+      document.querySelector('[data-accueil-gallery]')
+    if (!(root instanceof HTMLElement)) return
+    const strips = [
+      ...root.querySelectorAll<HTMLElement>(
+        '[data-accueil-carousel], .accueil-gallery__tiles',
+      ),
+    ]
+    const handles = strips.map((el) => attachHorizontalScrollAxisLock(el))
+    return () => {
+      for (const h of handles) h.destroy()
+    }
+  }, [editMode, prefersReducedMotion, visibleOrderKey])
+
   const motion = useMemo(
     () => ({
       coldEntering,
@@ -442,12 +463,13 @@ export function HomeGalleryView({
     [captureFlipFirst, commitPrefs, prefersReducedMotion],
   )
 
+  // proximity (not mandatory): diagonal vertical swipes must not yank the strip sideways.
   const snapStyle = {
     scrollSnapType: prefersReducedMotion || editMode ? ('none' as const) : ('x proximity' as const),
     WebkitOverflowScrolling: 'touch' as const,
   }
   const heroSnapStyle = {
-    scrollSnapType: prefersReducedMotion || editMode ? ('none' as const) : ('x mandatory' as const),
+    scrollSnapType: prefersReducedMotion || editMode ? ('none' as const) : ('x proximity' as const),
     WebkitOverflowScrolling: 'touch' as const,
   }
 
