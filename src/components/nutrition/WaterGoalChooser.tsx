@@ -3,8 +3,6 @@ import {
   parseWaterGoalInput,
   setUserWaterGoalMl,
   WATER_GOAL_CHOICE_ADVICE,
-  WATER_GOAL_MAX_ML,
-  WATER_GOAL_MIN_ML,
 } from '../../utils/userWaterGoal'
 
 interface WaterGoalChooserProps {
@@ -34,7 +32,7 @@ export function WaterGoalChooser({
     event.preventDefault()
     const ml = parseWaterGoalInput(raw)
     if (ml == null || !setUserWaterGoalMl(ml)) {
-      setError(`Entre un objectif entre ${WATER_GOAL_MIN_ML} et ${WATER_GOAL_MAX_ML} ml`)
+      setError('Objectif invalide. Entre une quantité en ml ou en L.')
       return
     }
     setError(null)
@@ -73,7 +71,7 @@ export function WaterGoalChooser({
                 setRaw(e.target.value)
                 setError(null)
               }}
-              placeholder="ex. 2000 ou 2 L"
+              placeholder="En ml ou en L"
               className="min-h-11 flex-1 rounded-xl border border-white/12 bg-black/35 px-3 text-[15px] text-white placeholder:text-[#636366] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/40"
             />
             <button

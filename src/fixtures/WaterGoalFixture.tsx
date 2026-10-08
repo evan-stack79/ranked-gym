@@ -101,7 +101,8 @@ function WaterGoalFixtureShell() {
       >
         <div className="mx-auto flex w-full max-w-lg flex-col gap-6 px-5 py-6">
           <section data-capture="accueil-snapshot" aria-label="Accueil nutrition">
-            <NutritionSnapshot />
+            {/* onOpenNutrition required so « Ajouter un repas » is enabled (same as HomeView). */}
+            <NutritionSnapshot onOpenNutrition={() => undefined} />
           </section>
           <section data-capture="hydration-card" aria-label="Carte hydratation">
             <NutritionHydrationCard
