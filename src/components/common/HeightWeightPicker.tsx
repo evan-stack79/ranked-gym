@@ -164,7 +164,7 @@ export function HeightWeightPicker({
                 type="button"
                 onClick={() => setUnit(opt.id)}
                 className={`ios-press flex-1 rounded-lg py-1.5 text-[13px] font-semibold ${
-                  unit === opt.id ? 'bg-[#FFD60A] text-black' : 'text-[#8E8E93]'
+                  unit === opt.id ? 'bg-brand text-white' : 'text-[#8E8E93]'
                 }`}
                 data-testid={`weight-unit-${opt.id}`}
               >
@@ -180,13 +180,20 @@ export function HeightWeightPicker({
             onChange={handleWeightDisplayChange}
             unit={unit}
             aria-label={`Poids en ${unit}`}
+            validateParsed={(display) => {
+              // Bounds always validated in kg (lb is display-only).
+              const kg = unit === 'kg' ? display : lbToKgStorage(display)
+              return sanitizeWeightKg(kg) != null
+            }}
           />
           <p className="text-center text-[12px] text-[#636366]">
             {weightKg == null
-              ? 'Fais glisser pour choisir'
+              ? 'Fais glisser ou tape pour choisir'
               : unit === 'lb'
                 ? `${kgToLbDisplay(weightKg)} lb`
-                : `${Math.round(weightKg)} kg`}
+                : Number.isInteger(weightKg)
+                  ? `${weightKg} kg`
+                  : `${weightKg.toFixed(1).replace(/\.0$/, '')} kg`}
           </p>
         </div>
       ) : (
@@ -199,9 +206,10 @@ export function HeightWeightPicker({
             onChange={handleHeightChange}
             unit="cm"
             aria-label="Taille en cm"
+            validateParsed={(cm) => sanitizeHeightCm(cm) != null}
           />
           <p className="text-center text-[12px] text-[#636366]">
-            {heightCm == null ? 'Fais glisser pour choisir' : `${Math.round(heightCm)} cm`}
+            {heightCm == null ? 'Fais glisser ou tape pour choisir' : `${Math.round(heightCm)} cm`}
           </p>
         </div>
       )}
@@ -215,7 +223,7 @@ export function HeightWeightPicker({
               if (!canSave || weightKg == null || heightCm == null) return
               onSave({ weightKg, heightCm })
             }}
-            className="ios-press w-full rounded-2xl bg-[#FFD60A] py-3.5 text-[15px] font-bold uppercase tracking-wide text-black disabled:opacity-40"
+            className="btn-brand ios-press w-full rounded-2xl py-3.5 text-[15px] font-bold uppercase tracking-wide text-white disabled:opacity-40"
             data-testid="height-weight-continue"
           >
             Continuer

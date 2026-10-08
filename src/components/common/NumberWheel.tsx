@@ -13,8 +13,17 @@ import { playWheelTickSound } from '../../utils/wheelTickSound'
 const ITEM_H = 56
 const VISIBLE = 5
 const VIEWPORT_H = ITEM_H * VISIBLE
-const FRICTION = 0.925
-const MIN_VELOCITY = 0.18
+/** Higher friction → longer coast (fast flick travels farther). */
+const FRICTION = 0.972
+const MIN_VELOCITY = 0.12
+const MAX_VELOCITY = 95
+const VELOCITY_SCALE = 3.4
+const TICK_MIN_MS = 35
+const TAP_MOVE_PX = 10
+const TAP_MAX_MS = 320
+
+/** Message unique hors bornes — pas de conseil « idéal ». */
+export const WHEEL_OUT_OF_RANGE_MESSAGE = 'Ce chiffre ne semble pas bon.'
 
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
@@ -31,6 +40,21 @@ function indexFromOffset(offset: number, count: number): number {
   return clampIndex(raw, count)
 }
 
+function formatCenter(v: number, step: number): string {
+  if (Number.isInteger(step) || Number.isInteger(v)) return String(Math.round(v))
+  return v.toFixed(1)
+}
+
+/** Parse keypad text: comma or dot decimal; '' → null; garbage → invalid. */
+export function parseWheelKeypadInput(raw: string): number | null | 'invalid' {
+  const trimmed = raw.trim().replace(/\u00a0/g, '').replace(',', '.')
+  if (trimmed === '' || trimmed === '.') return null
+  if (!/^\d+(\.\d+)?$|^\.\d+$/.test(trimmed)) return 'invalid'
+  const n = Number.parseFloat(trimmed)
+  if (!Number.isFinite(n)) return 'invalid'
+  return n
+}
+
 export interface NumberWheelProps {
   min: number
   max: number
@@ -41,11 +65,16 @@ export interface NumberWheelProps {
   'aria-label': string
   className?: string
   disabled?: boolean
+  /**
+   * Extra validation after parsing (e.g. lb → kg bounds).
+   * Return false to refuse the value with the out-of-range message.
+   */
+  validateParsed?: (displayValue: number) => boolean
 }
 
 /**
  * Vertical rolling number wheel — big center digit, faded neighbours, side markers.
- * Touch + mouse + keyboard; momentum + snap; identical tick feedback every value.
+ * Touch + mouse + keyboard; momentum + snap; tap-to-type keypad; throttled tick feedback.
  */
 export function NumberWheel({
   min,
@@ -57,6 +86,7 @@ export function NumberWheel({
   'aria-label': ariaLabel,
   className = '',
   disabled = false,
+  validateParsed,
 }: NumberWheelProps) {
   const list = useMemo(() => {
     const items: number[] = []
@@ -67,6 +97,7 @@ export function NumberWheel({
     return items
   }, [min, max, step])
   const count = list.length
+  const midIndex = Math.floor(count / 2)
 
   const findIndex = useCallback(
     (v: number | null): number => {
@@ -93,18 +124,27 @@ export function NumberWheel({
     return idx < 0 ? 0 : offsetForIndex(idx)
   })
   const [tickPulse, setTickPulse] = useState(0)
+  const [editing, setEditing] = useState(false)
+  const [editText, setEditText] = useState('')
+  const [keypadError, setKeypadError] = useState<string | null>(null)
   const offsetRef = useRef(offset)
   const valueRef = useRef(value)
   const dragging = useRef(false)
+  const seededFromEmpty = useRef(false)
+  const pointerStart = useRef({ y: 0, t: 0, moved: false })
   const lastY = useRef(0)
   const lastT = useRef(0)
   const velocity = useRef(0)
+  const samples = useRef<Array<{ dy: number; dt: number }>>([])
   const raf = useRef<number | null>(null)
   const lastEmittedIndex = useRef(findIndex(value))
+  const lastTickAt = useRef(0)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const suppressClick = useRef(false)
 
   useEffect(() => {
     valueRef.current = value
-    if (dragging.current) return
+    if (dragging.current || editing) return
     const idx = findIndex(value)
     if (idx < 0) {
       offsetRef.current = 0
@@ -116,7 +156,7 @@ export function NumberWheel({
     offsetRef.current = next
     setOffset(next)
     lastEmittedIndex.current = idx
-  }, [value, findIndex])
+  }, [value, findIndex, editing])
 
   const stopRaf = () => {
     if (raf.current != null) {
@@ -126,6 +166,9 @@ export function NumberWheel({
   }
 
   const fireTickFeedback = useCallback(() => {
+    const now = performance.now()
+    if (now - lastTickAt.current < TICK_MIN_MS) return
+    lastTickAt.current = now
     vibrate(8)
     playWheelTickSound()
     if (!prefersReducedMotion()) {
@@ -159,22 +202,37 @@ export function NumberWheel({
     [count, emitIndex],
   )
 
+  const seedMidIfEmpty = useCallback(() => {
+    if (valueRef.current != null || seededFromEmpty.current) return
+    seededFromEmpty.current = true
+    const midOff = offsetForIndex(midIndex)
+    offsetRef.current = midOff
+    setOffset(midOff)
+    emitIndex(midIndex, true)
+  }, [emitIndex, midIndex])
+
   const runMomentum = useCallback(() => {
     stopRaf()
     if (prefersReducedMotion()) {
+      // Instant snap — no coast, no tick animation.
       snapToNearest(true)
       return
     }
+    let v = velocity.current * VELOCITY_SCALE
+    if (v > MAX_VELOCITY) v = MAX_VELOCITY
+    if (v < -MAX_VELOCITY) v = -MAX_VELOCITY
+    velocity.current = v
+
     const stepFrame = () => {
       if (dragging.current) return
-      let v = velocity.current
-      if (Math.abs(v) < MIN_VELOCITY) {
+      let speed = velocity.current
+      if (Math.abs(speed) < MIN_VELOCITY) {
         snapToNearest(true)
         return
       }
-      v *= FRICTION
-      velocity.current = v
-      let next = offsetRef.current + v
+      speed *= FRICTION
+      velocity.current = speed
+      let next = offsetRef.current + speed
       const minOff = offsetForIndex(count - 1)
       const maxOff = offsetForIndex(0)
       if (next > maxOff) {
@@ -195,31 +253,92 @@ export function NumberWheel({
 
   useEffect(() => () => stopRaf(), [])
 
-  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+  const openKeypad = useCallback(() => {
     if (disabled) return
+    stopRaf()
+    dragging.current = false
+    setKeypadError(null)
+    setEditText(valueRef.current == null ? '' : String(valueRef.current).replace('.', ','))
+    setEditing(true)
+    window.requestAnimationFrame(() => {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    })
+  }, [disabled])
+
+  const closeKeypad = useCallback(() => {
+    setEditing(false)
+    setKeypadError(null)
+    setEditText('')
+  }, [])
+
+  const commitKeypad = useCallback(() => {
+    const parsed = parseWheelKeypadInput(editText)
+    if (parsed === 'invalid') {
+      setKeypadError(WHEEL_OUT_OF_RANGE_MESSAGE)
+      return
+    }
+    if (parsed == null) {
+      // Empty → null, never 0
+      onChange(null)
+      closeKeypad()
+      return
+    }
+    const inRange = parsed >= min && parsed <= max
+    const extraOk = validateParsed ? validateParsed(parsed) : true
+    if (!inRange || !extraOk) {
+      setKeypadError(WHEEL_OUT_OF_RANGE_MESSAGE)
+      // Keep previous value (or empty) — do not apply; stay in keypad to correct.
+      window.requestAnimationFrame(() => inputRef.current?.focus())
+      return
+    }
+    onChange(parsed)
+    closeKeypad()
+  }, [editText, min, max, onChange, validateParsed, closeKeypad])
+
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (disabled || editing) return
+    // Don't start drag when targeting the keypad input
+    if ((e.target as HTMLElement).closest?.('[data-testid="number-wheel-keypad"]')) return
     e.currentTarget.setPointerCapture(e.pointerId)
     dragging.current = true
+    seededFromEmpty.current = false
+    suppressClick.current = false
     stopRaf()
+    const now = performance.now()
+    pointerStart.current = { y: e.clientY, t: now, moved: false }
     lastY.current = e.clientY
-    lastT.current = performance.now()
+    lastT.current = now
     velocity.current = 0
-    if (valueRef.current == null) {
-      const mid = Math.floor(count / 2)
-      const midOff = offsetForIndex(mid)
-      offsetRef.current = midOff
-      setOffset(midOff)
-      emitIndex(mid, true)
-    }
+    samples.current = []
   }
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!dragging.current || disabled) return
+    if (!dragging.current || disabled || editing) return
     const now = performance.now()
     const dy = e.clientY - lastY.current
     const dt = Math.max(1, now - lastT.current)
+    const totalMove = Math.abs(e.clientY - pointerStart.current.y)
+    if (totalMove > TAP_MOVE_PX) {
+      if (!pointerStart.current.moved) {
+        pointerStart.current.moved = true
+        // First real drag from empty → mid of hidden bounds (140 kg / 175 cm).
+        seedMidIfEmpty()
+      }
+    } else if (!pointerStart.current.moved) {
+      lastY.current = e.clientY
+      lastT.current = now
+      return
+    }
+
     lastY.current = e.clientY
     lastT.current = now
-    velocity.current = dy / (dt / 16.67)
+    samples.current.push({ dy, dt })
+    if (samples.current.length > 6) samples.current.shift()
+    const sumDy = samples.current.reduce((a, s) => a + s.dy, 0)
+    const sumDt = samples.current.reduce((a, s) => a + s.dt, 0)
+    velocity.current = sumDy / (sumDt / 16.67)
+
     let next = offsetRef.current + dy
     const minOff = offsetForIndex(count - 1)
     const maxOff = offsetForIndex(0)
@@ -238,12 +357,19 @@ export function NumberWheel({
     } catch {
       /* ignore */
     }
+    const elapsed = performance.now() - pointerStart.current.t
+    const wasTap = !pointerStart.current.moved && elapsed <= TAP_MAX_MS
+    if (wasTap) {
+      suppressClick.current = true
+      openKeypad()
+      return
+    }
     runMomentum()
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (disabled) return
-    const currentIdx = value == null ? Math.floor(count / 2) : findIndex(value)
+    if (disabled || editing) return
+    const currentIdx = value == null ? midIndex : findIndex(value)
     let nextIdx = currentIdx
     if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
       e.preventDefault()
@@ -263,30 +389,40 @@ export function NumberWheel({
     } else if (e.key === 'PageDown') {
       e.preventDefault()
       nextIdx = clampIndex(currentIdx + 5, count)
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      openKeypad()
+      return
     } else {
       return
     }
     stopRaf()
+    if (value == null) {
+      // Keyboard from empty lands on mid first then steps
+      seededFromEmpty.current = true
+    }
     const snapped = offsetForIndex(nextIdx)
     offsetRef.current = snapped
     setOffset(snapped)
     emitIndex(nextIdx, true)
   }
 
-  const isEmpty = value == null
-  const activeIndex = isEmpty ? -1 : findIndex(value)
-  const ariaNow = isEmpty ? undefined : (value ?? undefined)
-  const ariaText = isEmpty ? 'non renseigné' : `${value} ${unit}`
+  const isEmpty = value == null && !editing
+  const activeIndex = value == null ? -1 : findIndex(value)
+  const ariaNow = value == null ? undefined : value
+  const ariaText = value == null ? 'non renseigné' : `${value} ${unit}`
 
-  const centerIdx = isEmpty ? Math.floor(count / 2) : indexFromOffset(offset, count)
+  const centerIdx =
+    value == null && !editing ? midIndex : indexFromOffset(offset, count)
   const from = Math.max(0, centerIdx - 5)
   const to = Math.min(count - 1, centerIdx + 5)
+  const reduced = prefersReducedMotion()
 
   return (
     <div className={`relative select-none ${className}`} data-testid="number-wheel">
       <div
         role="slider"
-        tabIndex={disabled ? -1 : 0}
+        tabIndex={disabled || editing ? -1 : 0}
         aria-label={ariaLabel}
         aria-valuemin={min}
         aria-valuemax={max}
@@ -310,7 +446,7 @@ export function NumberWheel({
             height: 0,
             borderTop: '7px solid transparent',
             borderBottom: '7px solid transparent',
-            borderLeft: '9px solid #FFD60A',
+            borderLeft: '9px solid var(--color-brand)',
           }}
         />
         <span
@@ -321,7 +457,7 @@ export function NumberWheel({
             height: 0,
             borderTop: '7px solid transparent',
             borderBottom: '7px solid transparent',
-            borderRight: '9px solid #FFD60A',
+            borderRight: '9px solid var(--color-brand)',
           }}
         />
 
@@ -336,14 +472,72 @@ export function NumberWheel({
           style={{ background: 'linear-gradient(to top, #0c0c0e 5%, transparent)' }}
         />
 
-        {isEmpty ? (
+        {editing ? (
           <div
+            className="absolute inset-x-0 z-30 flex items-center justify-center"
+            style={{ top: centerPad, height: ITEM_H }}
+          >
+            <input
+              ref={inputRef}
+              type="text"
+              inputMode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
+              enterKeyHint="done"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              aria-label={`${ariaLabel} — saisie clavier`}
+              data-testid="number-wheel-keypad"
+              value={editText}
+              onChange={(e) => {
+                const raw = e.target.value
+                if (raw !== '' && !/^\d*[.,]?\d*$/.test(raw)) return
+                setEditText(raw)
+                setKeypadError(null)
+              }}
+              onKeyDown={(e) => {
+                e.stopPropagation()
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  commitKeypad()
+                } else if (e.key === 'Escape') {
+                  e.preventDefault()
+                  closeKeypad()
+                }
+              }}
+              onBlur={() => {
+                // Blur without change / Escape path: if text equals previous display, no-op
+                const prev =
+                  valueRef.current == null ? '' : String(valueRef.current).replace('.', ',')
+                const normalized = editText.trim().replace('.', ',')
+                if (normalized === prev || (normalized === '' && valueRef.current == null)) {
+                  closeKeypad()
+                  return
+                }
+                commitKeypad()
+              }}
+              className="w-full bg-transparent text-center font-bold tabular-nums text-white outline-none caret-brand"
+              style={{ fontSize: 64, letterSpacing: '-0.03em', height: ITEM_H }}
+            />
+          </div>
+        ) : isEmpty ? (
+          <button
+            type="button"
             className="absolute inset-x-0 flex items-center justify-center font-bold text-white"
             style={{ top: centerPad, height: ITEM_H, fontSize: 64, letterSpacing: '-0.03em' }}
             data-testid="number-wheel-empty"
+            aria-label={`${ariaLabel} — taper pour saisir`}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (suppressClick.current) {
+                suppressClick.current = false
+                return
+              }
+              openKeypad()
+            }}
           >
             —
-          </div>
+          </button>
         ) : (
           <div
             className="absolute inset-x-0"
@@ -363,14 +557,27 @@ export function NumberWheel({
               const scale = isCenter ? 1 : Math.max(0.52, 1 - dist * 0.2)
               const fontSize = isCenter ? 64 : Math.max(22, 42 - dist * 10)
               const color = isCenter ? '#ffffff' : '#636366'
-              const pulse =
-                isCenter && tickPulse > 0 && !prefersReducedMotion() ? 1.04 : 1
+              const pulse = isCenter && tickPulse > 0 && !reduced ? 1.04 : 1
               return (
                 <div
                   key={`${v}-${idx}`}
                   className="absolute inset-x-0 flex items-center justify-center font-bold tabular-nums"
                   data-testid={isCenter ? 'number-wheel-center' : undefined}
                   data-wheel-tick={isCenter ? tickPulse : undefined}
+                  onClick={
+                    isCenter
+                      ? (ev) => {
+                          ev.stopPropagation()
+                          if (suppressClick.current) {
+                            suppressClick.current = false
+                            return
+                          }
+                          openKeypad()
+                        }
+                      : undefined
+                  }
+                  role={isCenter ? 'button' : undefined}
+                  aria-label={isCenter ? `${ariaLabel} — taper pour saisir` : undefined}
                   style={{
                     top: idx * ITEM_H,
                     height: ITEM_H,
@@ -378,19 +585,29 @@ export function NumberWheel({
                     color,
                     opacity,
                     transform: `scale(${scale * pulse})`,
-                    transition: prefersReducedMotion()
+                    transition: reduced
                       ? undefined
                       : 'transform 90ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1))',
                     letterSpacing: '-0.03em',
+                    cursor: isCenter ? 'text' : undefined,
                   }}
                 >
-                  {Number.isInteger(step) || Number.isInteger(v) ? String(Math.round(v)) : v.toFixed(1)}
+                  {formatCenter(v, step)}
                 </div>
               )
             })}
           </div>
         )}
       </div>
+      {keypadError ? (
+        <p
+          className="mt-2 text-center text-[13px] text-[#FF6961]"
+          role="alert"
+          data-testid="number-wheel-error"
+        >
+          {keypadError}
+        </p>
+      ) : null}
     </div>
   )
 }

@@ -106,6 +106,10 @@ describe('NumberWheel', () => {
     })
 
     const slider = container.querySelector('[role="slider"]') as HTMLElement
+    // Tick throttle is 35ms — advance performance.now between presses.
+    let now = 1_000
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
+
     act(() => {
       slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
     })
@@ -116,11 +120,12 @@ describe('NumberWheel', () => {
     const callsVibrate = (vibrate as ReturnType<typeof vi.fn>).mock.calls.length
     const callsSound = (playWheelTickSound as ReturnType<typeof vi.fn>).mock.calls.length
 
+    now += 40
     act(() => {
       slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
     })
     expect(value).toBe(72)
-    // Identical feedback — same vibrate + sound for every tick
+    // Identical feedback — same vibrate + sound for every tick (color never varies by value)
     expect((vibrate as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsVibrate + 1)
     expect((playWheelTickSound as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsSound + 1)
     expect((vibrate as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0]).toBe(

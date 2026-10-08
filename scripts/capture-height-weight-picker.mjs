@@ -120,10 +120,23 @@ async function capture() {
     await page.waitForSelector('[data-testid="height-weight-noted"]')
     await shot(page, 'hw-cest-note.png')
 
-    // 6) Profil Effacer
+    // 6) Profil Effacer (text link, not a second red button)
     await openMode(page, 'erase')
     await page.waitForSelector('[data-testid="height-weight-erase"]')
     await shot(page, 'hw-profil-effacer.png')
+
+    // 7) Tap-to-type keypad
+    await openMode(page, 'weight')
+    await page.waitForSelector('[data-testid="number-wheel-center"]')
+    await page.locator('[data-testid="number-wheel-center"]').click({ force: true })
+    await page.waitForSelector('[data-testid="number-wheel-keypad"]')
+    await shot(page, 'hw-keypad.png')
+
+    // 8) Out-of-range keypad error
+    await page.fill('[data-testid="number-wheel-keypad"]', '999')
+    await page.locator('[data-testid="number-wheel-keypad"]').press('Enter')
+    await page.waitForSelector('[data-testid="number-wheel-error"]')
+    await shot(page, 'hw-keypad-oor.png')
 
     await context.close()
 
