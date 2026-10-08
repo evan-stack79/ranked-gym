@@ -7,9 +7,11 @@ import {
 } from './accueilWidgetPrefs'
 import {
   deriveNextSessionTile,
+  deriveProgramTileModel,
   deriveSetsTileModel,
   deriveWaterTileModel,
   deriveWeekSessionBars,
+  formatWaterGoalHint,
   waterRingFromPrefs,
 } from './accueilWidgetTiles'
 
@@ -196,8 +198,8 @@ describe('accueilWidgetTiles — week bars & next session', () => {
     expect(tue!.heightRatio).toBe(0.5)
   })
 
-  it('next session exposes Démarrer when routine can start', () => {
-    const state = baseState({
+  it('next session: Démarrer when not started, Reprendre when in progress', () => {
+    const planned = baseState({
       schedule: [
         {
           id: 'sch-1',
@@ -211,10 +213,64 @@ describe('accueilWidgetTiles — week bars & next session', () => {
         },
       ],
       routines: [routine('push', 4, 0)],
+      activeWorkoutDraft: null,
     })
-    const next = deriveNextSessionTile(state, FIXED)
+    const next = deriveNextSessionTile(planned, FIXED)
     expect(next.title).toBe('Push')
     expect(next.canStart).toBe(true)
+    expect(next.inProgress).toBe(false)
     expect(next.routineId).toBe('push')
+
+    const inProgress = baseState({
+      activeWorkoutDraft: {
+        routineId: 'push',
+        sportId: 'musculation',
+        startedAt: FIXED.getTime() - 1000,
+        updatedAt: FIXED.getTime(),
+      },
+      routines: [routine('push', 4, 1)],
+    })
+    const resume = deriveNextSessionTile(inProgress, FIXED)
+    expect(resume.inProgress).toBe(true)
+    expect(resume.subtitle).toBe('Séance en cours')
+    expect(resume.canStart).toBe(true)
+  })
+
+  it('programme subtitle is X / Y séances, not a repeated %', () => {
+    const state = baseState({
+      schedule: [
+        {
+          id: 'sch-1',
+          templateId: 'tpl-push',
+          title: 'Push',
+          days: [1, 3, 5],
+          time: '18:00',
+          enabled: true,
+          sportId: 'musculation',
+          sessionKind: 'strength',
+        },
+      ],
+      workoutNotes: [
+        {
+          id: 'n1',
+          title: 'Push',
+          dateKey: '2026-10-06',
+          createdAt: new Date('2026-10-06T12:00:00').getTime(),
+          estimatedKcal: 200,
+          exercises: [{ id: 'e', name: 'Exo', sets: [{ reps: 8, weightKg: 40 }] }],
+        },
+      ],
+    })
+    const model = deriveProgramTileModel(state, FIXED)
+    expect(model.plannedSessions).toBe(3)
+    expect(model.doneSessions).toBe(1)
+    expect(model.label).toBe('1 / 3 séances cette semaine')
+    expect(model.label).not.toMatch(/%/)
+  })
+
+  it('formats water goal hint on one compact line', () => {
+    expect(formatWaterGoalHint(2500)).toBe('sur 2,5 L')
+    expect(formatWaterGoalHint(2000)).toBe('sur 2 L')
+    expect(formatWaterGoalHint(750)).toBe('sur 750 ml')
   })
 })

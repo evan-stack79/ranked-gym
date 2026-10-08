@@ -2,12 +2,13 @@ import { Droplets, Layers } from 'lucide-react'
 import type { CSSProperties, ReactNode } from 'react'
 import { CountUpNumber } from '../motion'
 import { AccueilProgressRing } from './AccueilProgressRing'
-import type {
-  NextSessionTileModel,
-  ProgramTileModel,
-  SetsTileModel,
-  WaterTileModel,
-  WeekSessionBar,
+import {
+  formatWaterGoalHint,
+  type NextSessionTileModel,
+  type ProgramTileModel,
+  type SetsTileModel,
+  type WaterTileModel,
+  type WeekSessionBar,
 } from '../../utils/accueilWidgetTiles'
 
 type MotionOpts = {
@@ -158,8 +159,10 @@ export function EauTile({
             </span>
             <span className="accueil-metric-tile__unit">ml</span>
           </div>
-          <p className="mt-1 text-[11px] text-[#8E8E93]">
-            {model.showRing ? `Objectif ${model.goalMl} ml` : 'Définir un objectif'}
+          <p className="mt-1 truncate text-[11px] text-[#8E8E93]">
+            {model.showRing && model.goalMl != null
+              ? formatWaterGoalHint(model.goalMl)
+              : 'Définir un objectif'}
           </p>
         </div>
         {model.showRing ? (
@@ -263,8 +266,9 @@ export function ProchaineSeanceTile({
             onClick={() => onStart(model.routineId!)}
             className="accueil-metric-tile__cta ios-press"
             data-accueil-next-start
+            data-accueil-next-cta={model.inProgress ? 'reprendre' : 'demarrer'}
           >
-            Démarrer
+            {model.inProgress ? 'Reprendre' : 'Démarrer'}
           </button>
         ) : (
           <button

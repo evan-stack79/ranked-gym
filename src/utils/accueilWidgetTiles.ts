@@ -22,7 +22,11 @@ import {
   type WeekDayCell,
 } from './trainHub'
 import { getTodayWorkout } from './todayWorkout'
+import { formatWaterMl } from './waterGoal'
+import { getLocalWeekBounds, isTimestampInLocalWeek, workoutValidationMs } from './weekBounds'
 import { dedupeWorkoutNotes } from './workoutHistory'
+import { detectProgramSplit, filterRoutinesForProgram } from './workoutProgram'
+
 const WEEKDAY_SHORT_FR = ['D', 'L', 'M', 'M', 'J', 'V', 'S'] as const
 
 export type WeekSessionBar = {
@@ -156,6 +160,8 @@ export type NextSessionTileModel = {
   subtitle: string
   routineId: string | null
   canStart: boolean
+  /** True when an active strength session is already in progress → CTA « Reprendre ». */
+  inProgress: boolean
   /** ISO-ish date key of the planned day (today or future). */
   dateKey: string | null
 }
@@ -195,6 +201,7 @@ export function deriveNextSessionTile(
       subtitle: 'Séance en cours',
       routineId: active.routineId,
       canStart: true,
+      inProgress: true,
       dateKey: todayKey(now),
     }
   }
@@ -206,8 +213,9 @@ export function deriveNextSessionTile(
       subtitle: today.canStart
         ? `${today.exerciseCount} exercice${today.exerciseCount > 1 ? 's' : ''} · ${today.time}`
         : `Planifiée · ${today.time}`,
-      routineId: today.canStart ? today.routineId : today.routineId,
+      routineId: today.routineId,
       canStart: today.canStart,
+      inProgress: false,
       dateKey: todayKey(now),
     }
   }
@@ -230,6 +238,7 @@ export function deriveNextSessionTile(
       subtitle: `${dayLabel} · ${slot.time}`,
       routineId,
       canStart,
+      inProgress: false,
       dateKey: todayKey(d),
     }
   }
@@ -239,24 +248,76 @@ export function deriveNextSessionTile(
     subtitle: 'Planifie dans Train',
     routineId: null,
     canStart: false,
+    inProgress: false,
     dateKey: null,
   }
 }
 
 export type ProgramTileModel = {
   percent: number
+  /** Useful secondary line — not a repeat of the big %. */
   label: string
+  doneSessions: number
+  plannedSessions: number
 }
 
+/**
+ * Programme tile — % from existing helper; subtitle = X / Y séances cette semaine
+ * (agenda occurrences), or routines prêtes when no schedule.
+ */
 export function deriveProgramTileModel(
   state: TrainingState,
   now = new Date(),
 ): ProgramTileModel {
   const percent = computeProgramProgressPercent(state, now)
+  const { start, end } = getLocalWeekBounds(now)
+  const schedule = (state.schedule ?? []).filter((s) => s.enabled)
+
+  let plannedSessions = 0
+  for (let t = start.getTime(); t <= end.getTime(); t += 86_400_000) {
+    const weekday = new Date(t).getDay() as Weekday
+    for (const slot of schedule) {
+      if (slot.days.includes(weekday)) plannedSessions += 1
+    }
+  }
+
+  if (plannedSessions > 0) {
+    const notes = dedupeWorkoutNotes(state.workoutNotes)
+    const doneSessions = notes.filter((note) => {
+      const ms = workoutValidationMs(note)
+      return ms != null && isTimestampInLocalWeek(ms, now)
+    }).length
+    const capped = Math.min(doneSessions, plannedSessions)
+    return {
+      percent,
+      doneSessions: capped,
+      plannedSessions,
+      label: `${capped} / ${plannedSessions} séance${plannedSessions > 1 ? 's' : ''} cette semaine`,
+    }
+  }
+
+  const split = detectProgramSplit(state.schedule ?? [], state.routines)
+  const programRoutines = filterRoutinesForProgram(state.routines, split)
+  if (programRoutines.length === 0) {
+    return {
+      percent,
+      doneSessions: 0,
+      plannedSessions: 0,
+      label: 'Pas encore de progression',
+    }
+  }
+  const ready = programRoutines.filter((r) => (r.exercises?.length ?? 0) > 0).length
   return {
     percent,
-    label: percent > 0 ? `${percent} % cette semaine` : 'Pas encore de progression',
+    doneSessions: ready,
+    plannedSessions: programRoutines.length,
+    label: `${ready} / ${programRoutines.length} routine${programRoutines.length > 1 ? 's' : ''} prête${ready > 1 ? 's' : ''}`,
   }
+}
+
+/** Compact goal line for the Eau tile — stays on one line at 402px. */
+export function formatWaterGoalHint(goalMl: number): string {
+  return `sur ${formatWaterMl(goalMl)}`
 }
 
 export type WaterTileRingDecision = {
