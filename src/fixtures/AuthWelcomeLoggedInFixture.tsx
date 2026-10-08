@@ -99,6 +99,15 @@ export function AuthWelcomeLoggedInFixture() {
   return (
     <AuthStateProvider value={value}>
       <RestTimerProvider>
+        {/*
+          Fixture-only : masque le bandeau config backend (Convex/Supabase absents
+          en local/QA). Ne change pas le comportement app en production.
+        */}
+        <style>{`
+          [data-logged-in-fixture="1"] [role="alert"].sticky {
+            display: none !important;
+          }
+        `}</style>
         <div data-logged-in-fixture="1" className="h-[100dvh]">
           <AppShell />
         </div>

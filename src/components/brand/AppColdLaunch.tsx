@@ -165,6 +165,7 @@ export function AppColdLaunch({ children }: { children: React.ReactNode }) {
             <div className="app-cold-launch__stage" aria-hidden="true">
               {!reduced.current ? (
                 <>
+                  <span className="app-cold-launch__flash" />
                   <span className="app-cold-launch__ring app-cold-launch__ring--1" />
                   <span className="app-cold-launch__ring app-cold-launch__ring--2" />
                   <span className="app-cold-launch__ring app-cold-launch__ring--3" />

@@ -79,6 +79,7 @@ describe('AppColdLaunch Shockwave', () => {
     expect(splash?.getAttribute('data-phase')).toBe('playing')
     expect(splash?.getAttribute('data-reduced')).toBe('false')
     expect(host.querySelectorAll('.app-cold-launch__ring')).toHaveLength(3)
+    expect(host.querySelector('.app-cold-launch__flash')).toBeTruthy()
     const logo = host.querySelector('.app-cold-launch__mark') as HTMLImageElement
     expect(logo?.getAttribute('src')).toBe(COLD_LAUNCH_LOGO_SRC)
     expect(host.querySelector('[data-testid="app-shell"]')).toBeTruthy()
@@ -194,6 +195,7 @@ describe('AppColdLaunch Shockwave', () => {
     const splash = host.querySelector('.app-cold-launch')
     expect(splash?.getAttribute('data-reduced')).toBe('true')
     expect(host.querySelectorAll('.app-cold-launch__ring')).toHaveLength(0)
+    expect(host.querySelector('.app-cold-launch__flash')).toBeNull()
     expect(host.querySelector('.app-cold-launch__mark')).toBeTruthy()
 
     act(() => {

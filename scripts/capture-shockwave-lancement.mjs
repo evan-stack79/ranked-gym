@@ -130,9 +130,12 @@ async function main() {
     // Frame: start
     await page.screenshot({ path: join(artifactsDir, 'shockwave_start.png') })
 
-    // Frame: wave peak (~250ms into playing)
-    await page.waitForTimeout(280)
-    await page.screenshot({ path: join(artifactsDir, 'shockwave_peak.png') })
+    // Frame: wave peak (~220ms into playing — rings + flash visibles)
+    await page.waitForTimeout(220)
+    await page.screenshot({
+      path: join(artifactsDir, 'shockwave_peak.png'),
+      animations: 'allow',
+    })
 
     await waitSplashGone(page)
     await page.waitForSelector('[data-accueil-gallery], nav[aria-label="Navigation principale"]', {
@@ -159,9 +162,24 @@ async function main() {
     await page.getByRole('navigation', { name: 'Navigation principale' })
       .getByRole('button', { name: 'Accueil' })
       .click()
-    await page.waitForTimeout(500)
+    await page.waitForSelector('[data-accueil-gallery="1"]', { timeout: 8_000 })
+    await page.waitForFunction(
+      () => {
+        const heroes = [...document.querySelectorAll('[data-accueil-hero]')]
+        if (heroes.length < 1) return false
+        return heroes.every((hero) => {
+          const wrap = hero.closest('[data-rg-reveal]')
+          return wrap?.getAttribute('data-rg-reveal') === 'in'
+        })
+      },
+      { timeout: 4_000 },
+    )
+    await page.waitForTimeout(400)
     const replayed2 = await page.evaluate(() => Boolean(document.querySelector('.app-cold-launch')))
     if (replayed2) throw new Error('Shockwave rejoué en revenant sur Accueil')
+    const heroCount = await page.locator('[data-accueil-hero]').count()
+    if (heroCount < 1) throw new Error('Séance du jour absente après retour Accueil')
+    await page.screenshot({ path: join(artifactsDir, 'shockwave_accueil_apres_onglet.png') })
 
     const videoPath = await page.video().path()
     await context.close()
