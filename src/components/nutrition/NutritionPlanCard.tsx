@@ -29,8 +29,8 @@ function Field({
   icon,
 }: {
   label: string
-  value: number
-  onChange: (value: number) => void
+  value: number | null
+  onChange: (value: number | null) => void
   min: number
   max: number
   step?: number
@@ -46,12 +46,11 @@ function Field({
       <div className="flex items-end gap-1">
         <ClearableNumberInput
           value={value}
-          onChange={(v) => {
-            if (v != null) onChange(v)
-          }}
+          onChange={onChange}
           min={min}
           max={max}
           step={step}
+          required={false}
           aria-label={label}
           className="w-full bg-transparent text-[26px] font-bold tracking-tight text-white outline-none"
         />
@@ -84,6 +83,7 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
   const nutrition = useMemo(() => getNutritionTarget(profile), [profile, trainingTick])
 
   const deltaKg = useMemo(() => {
+    if (profile.goalWeightKg == null || profile.weightKg == null) return 0
     return Math.round((profile.goalWeightKg - profile.weightKg) * 10) / 10
   }, [profile.goalWeightKg, profile.weightKg])
 
@@ -95,9 +95,10 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
   const progressToGoal = useMemo(() => {
     const start = profile.weightKg
     const goal = profile.goalWeightKg
+    if (start == null || goal == null) return 0
     if (Math.abs(start - goal) < 0.05) return 1
     const total = Math.abs(start - goal)
-    const remaining = Math.abs(profile.weightKg - goal)
+    const remaining = Math.abs(start - goal)
     return Math.max(0, Math.min(1, 1 - remaining / Math.max(total, 0.1)))
   }, [profile])
 
@@ -252,8 +253,8 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
           />
           <Field
             label="Âge"
-            value={draft.age}
-            onChange={(v) => setDraft((p) => ({ ...p, age: v }))}
+            value={draft.age > 0 ? draft.age : null}
+            onChange={(v) => setDraft((p) => ({ ...p, age: v ?? 0 }))}
             min={10}
             max={120}
             suffix="ans"
@@ -275,7 +276,7 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
             value={draft.weeklyPaceKg > 0 ? draft.weeklyPaceKg : 0.5}
             onChange={(weeklyPaceKg) => setDraft((p) => ({ ...p, weeklyPaceKg }))}
             goal={draft.goal}
-            weightKg={draft.weightKg}
+            weightKg={draft.weightKg ?? 70}
           />
 
           <div className="flex gap-1 rounded-xl border border-white/10 bg-black/30 p-1">

@@ -22,6 +22,8 @@ import {
   applySafetyToProfile,
   clampWeeklyPaceKg,
   isPlausibleOnboardingAge,
+  sanitizeHeightCm,
+  sanitizeWeightKg,
 } from './nutritionSafetyRules'
 import type { Sex } from '../types/nutrition'
 import { clearQueuedConvexNutritionOpsForUser } from './convexNutritionQueue'
@@ -140,9 +142,9 @@ function scopedKey(base: string): string {
 
 /** Empty shell for first-time onboarding — never auto-pushed as “real” data. */
 export const BLANK_PROFILE: CalorieProfile = {
-  weightKg: 0,
-  goalWeightKg: 0,
-  heightCm: 0,
+  weightKg: null,
+  goalWeightKg: null,
+  heightCm: null,
   age: 0,
   sex: null,
   activity: 'moderate',
@@ -154,6 +156,7 @@ export const BLANK_PROFILE: CalorieProfile = {
   declaredBreastfeeding: false,
   declaredEatingDisorder: false,
   preferNotAnswerHealth: false,
+  bodyMetricsClearedAt: null,
 }
 
 /** @deprecated Use BLANK_PROFILE — kept for imports that still reference the name. */
@@ -184,6 +187,17 @@ function asFiniteNumber(value: unknown, fallback: number): number {
   return fallback
 }
 
+/** Parse optional body metric — empty/0/invalid → null (never coerced to 0). */
+function asOptionalBodyMetric(value: unknown): number | null {
+  if (value == null) return null
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = parseFloat(value.replace(',', '.'))
+    return Number.isFinite(n) ? n : null
+  }
+  return null
+}
+
 function normalizeGoal(value: unknown, fallback: NutritionGoal): NutritionGoal {
   return typeof value === 'string' && VALID_GOALS.includes(value as NutritionGoal)
     ? (value as NutritionGoal)
@@ -198,10 +212,12 @@ function normalizeSex(value: unknown): Sex | null {
 /** Persist exactly what the user entered — bornes sécurité via nutritionSafetyRules. */
 export function normalizeCalorieProfile(input: CalorieProfile): CalorieProfile {
   const goal = normalizeGoal(input.goal, 'maintain')
-  const weightKg = asFiniteNumber(input.weightKg, 0)
+  const weightKg = sanitizeWeightKg(asOptionalBodyMetric(input.weightKg))
+  const heightCm = sanitizeHeightCm(asOptionalBodyMetric(input.heightCm))
+  const goalWeightKg = sanitizeWeightKg(asOptionalBodyMetric(input.goalWeightKg))
   const rawPace = asFiniteNumber(input.weeklyPaceKg, 0)
   const weeklyPaceKg =
-    goal === 'maintain' ? 0 : clampWeeklyPaceKg(rawPace > 0 ? rawPace : 0.5, weightKg || 70)
+    goal === 'maintain' ? 0 : clampWeeklyPaceKg(rawPace > 0 ? rawPace : 0.5, weightKg ?? 70)
 
   let age = Math.round(asFiniteNumber(input.age, 0))
   if (age !== 0 && !isPlausibleOnboardingAge(age)) {
@@ -209,10 +225,15 @@ export function normalizeCalorieProfile(input: CalorieProfile): CalorieProfile {
     age = 0
   }
 
+  const clearedAt =
+    typeof input.bodyMetricsClearedAt === 'number' && Number.isFinite(input.bodyMetricsClearedAt)
+      ? input.bodyMetricsClearedAt
+      : null
+
   const draft: CalorieProfile = {
     weightKg,
-    goalWeightKg: asFiniteNumber(input.goalWeightKg, 0),
-    heightCm: asFiniteNumber(input.heightCm, 0),
+    goalWeightKg,
+    heightCm,
     age,
     sex: normalizeSex(input.sex),
     activity: input.activity || 'moderate',
@@ -224,6 +245,7 @@ export function normalizeCalorieProfile(input: CalorieProfile): CalorieProfile {
     declaredBreastfeeding: Boolean(input.declaredBreastfeeding),
     declaredEatingDisorder: Boolean(input.declaredEatingDisorder),
     preferNotAnswerHealth: Boolean(input.preferNotAnswerHealth),
+    bodyMetricsClearedAt: clearedAt,
   }
 
   return applySafetyToProfile(draft)
@@ -237,19 +259,20 @@ export function getCalorieProfile(): CalorieProfile {
 
   const hasAnyUserData =
     Boolean(stored.onboardingComplete) ||
-    asFiniteNumber(stored.weightKg, 0) > 0 ||
-    asFiniteNumber(stored.goalWeightKg, 0) > 0 ||
-    asFiniteNumber(stored.heightCm, 0) > 0 ||
-    asFiniteNumber(stored.age, 0) > 0
+    sanitizeWeightKg(asOptionalBodyMetric(stored.weightKg)) != null ||
+    sanitizeWeightKg(asOptionalBodyMetric(stored.goalWeightKg)) != null ||
+    sanitizeHeightCm(asOptionalBodyMetric(stored.heightCm)) != null ||
+    asFiniteNumber(stored.age, 0) > 0 ||
+    (typeof stored.bodyMetricsClearedAt === 'number' && stored.bodyMetricsClearedAt > 0)
 
   if (!hasAnyUserData) {
     return { ...BLANK_PROFILE }
   }
 
   return normalizeCalorieProfile({
-    weightKg: asFiniteNumber(stored.weightKg, 0),
-    goalWeightKg: asFiniteNumber(stored.goalWeightKg, asFiniteNumber(stored.weightKg, 0)),
-    heightCm: asFiniteNumber(stored.heightCm, 0),
+    weightKg: asOptionalBodyMetric(stored.weightKg),
+    goalWeightKg: asOptionalBodyMetric(stored.goalWeightKg),
+    heightCm: asOptionalBodyMetric(stored.heightCm),
     age: asFiniteNumber(stored.age, 0),
     sex: normalizeSex(stored.sex),
     activity: stored.activity || 'moderate',
@@ -261,7 +284,60 @@ export function getCalorieProfile(): CalorieProfile {
     declaredBreastfeeding: Boolean(stored.declaredBreastfeeding),
     declaredEatingDisorder: Boolean(stored.declaredEatingDisorder),
     preferNotAnswerHealth: Boolean(stored.preferNotAnswerHealth),
+    bodyMetricsClearedAt:
+      typeof stored.bodyMetricsClearedAt === 'number' ? stored.bodyMetricsClearedAt : null,
   })
+}
+
+/**
+ * Efface taille + poids localement (null, jamais 0) et pose un tombstone pour
+ * que la copie cloud ne les ressuscite pas au prochain sync.
+ */
+export function clearBodyMetrics(opts?: StorageSaveOptions): CalorieProfile {
+  const current = getCalorieProfile()
+  const next = normalizeCalorieProfile({
+    ...current,
+    weightKg: null,
+    heightCm: null,
+    goalWeightKg: null,
+    bodyMetricsClearedAt: Date.now(),
+  })
+  saveCalorieProfile(next, opts)
+  return next
+}
+
+/**
+ * Fusionne un profil cloud avec le local : un effacement local plus récent
+ * (ou un 0 legacy distant) ne doit jamais ressusciter des mensurations.
+ */
+export function mergeCalorieProfilesForSync(
+  local: CalorieProfile,
+  remote: CalorieProfile,
+): CalorieProfile {
+  const localNorm = normalizeCalorieProfile(local)
+  const remoteNorm = normalizeCalorieProfile(remote)
+  const localCleared = localNorm.bodyMetricsClearedAt ?? 0
+  const remoteCleared = remoteNorm.bodyMetricsClearedAt ?? 0
+
+  if (localCleared > remoteCleared) {
+    return normalizeCalorieProfile({
+      ...remoteNorm,
+      weightKg: null,
+      heightCm: null,
+      goalWeightKg: null,
+      bodyMetricsClearedAt: localCleared,
+      // Preserve other local onboarding flags when erase is local-authoritative.
+      onboardingComplete: localNorm.onboardingComplete || remoteNorm.onboardingComplete,
+      age: localNorm.age > 0 ? localNorm.age : remoteNorm.age,
+      sex: localNorm.sex ?? remoteNorm.sex,
+      declaredPregnancy: localNorm.declaredPregnancy,
+      declaredBreastfeeding: localNorm.declaredBreastfeeding,
+      declaredEatingDisorder: localNorm.declaredEatingDisorder,
+      preferNotAnswerHealth: localNorm.preferNotAnswerHealth,
+    })
+  }
+
+  return remoteNorm
 }
 
 export function saveCalorieProfile(

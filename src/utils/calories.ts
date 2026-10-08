@@ -63,10 +63,36 @@ export function calorieAdjustmentForGoal(
 }
 
 export function computeCaloriePlan(profile: CalorieProfile): CalorieResult {
-  const weight = parseFloat(String(profile.weightKg)) || 0
-  const height = parseFloat(String(profile.heightCm)) || 0
+  const weight =
+    typeof profile.weightKg === 'number' && Number.isFinite(profile.weightKg) && profile.weightKg > 0
+      ? profile.weightKg
+      : 0
+  const height =
+    typeof profile.heightCm === 'number' && Number.isFinite(profile.heightCm) && profile.heightCm > 0
+      ? profile.heightCm
+      : 0
   const age = parseFloat(String(profile.age)) || 0
-  const goalWeight = parseFloat(String(profile.goalWeightKg)) || weight
+  const goalWeight =
+    typeof profile.goalWeightKg === 'number' &&
+    Number.isFinite(profile.goalWeightKg) &&
+    profile.goalWeightKg > 0
+      ? profile.goalWeightKg
+      : weight
+  // Empty height/weight → no Mifflin / plan (never compute with 0).
+  if (weight <= 0 || height <= 0) {
+    return {
+      bmr: 0,
+      tdee: 0,
+      targetCalories: 0,
+      proteinG: 0,
+      carbsG: 0,
+      fatG: 0,
+      goal: profile.goal,
+      deltaKg: 0,
+      weeklyChangeKg: 0,
+      estimatedWeeks: null,
+    }
+  }
   // Legacy helper — ne calcule pas sans sexe renseigné (pas de défaut homme).
   if (profile.sex !== 'male' && profile.sex !== 'female') {
     return {

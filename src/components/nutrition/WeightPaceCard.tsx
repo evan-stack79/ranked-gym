@@ -8,6 +8,7 @@ interface WeightPaceCardProps {
 }
 
 export function WeightPaceCard({ profile }: WeightPaceCardProps) {
+  if (profile.weightKg == null || profile.goalWeightKg == null) return null
   const pace = computeWeightPace({
     currentKg: profile.weightKg,
     goalKg: profile.goalWeightKg,

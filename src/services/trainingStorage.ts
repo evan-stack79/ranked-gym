@@ -683,7 +683,7 @@ export function saveWorkoutNote(
 ): TrainingState {
   const state = read()
   const existing = note.id ? state.workoutNotes.find((n) => n.id === note.id) : undefined
-  const bodyWeightKg = getCalorieProfile().weightKg
+  const bodyWeightKg = getCalorieProfile().weightKg ?? 70
   const isLift = note.exercises.some((e) => e.sets.some((s) => s.weightKg > 0))
   const stats = computeStrengthSessionStats(note.exercises, bodyWeightKg)
 

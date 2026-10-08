@@ -204,7 +204,7 @@ export function TrainingView({
   ])
   const nutrition = useMemo(() => getNutritionTarget(profile), [profile])
 
-  const stepsKcal = stepsToKcal(state.stepsToday, profile.weightKg)
+  const stepsKcal = stepsToKcal(state.stepsToday, profile.weightKg ?? 70)
   const workoutKcal = todayWorkoutKcal(state)
 
   const disciplineId = useMemo(() => getStoredDisciplineId(), [disciplineTick, state.primarySportId])
@@ -515,7 +515,7 @@ export function TrainingView({
   const openPumpCheck = useCallback((note: Parameters<typeof saveWorkoutNote>[0]) => {
     const priorNotes = getTrainingState().workoutNotes
     const prCount = countSessionPersonalRecords(note.exercises, priorNotes, note.id)
-    const bodyWeightKg = getCalorieProfile().weightKg
+    const bodyWeightKg = getCalorieProfile().weightKg ?? 70
     const liftStats = computeStrengthSessionStats(note.exercises, bodyWeightKg)
     setPumpCheckSession({
       title: deriveSessionDisplayTitle(note),
@@ -598,7 +598,7 @@ export function TrainingView({
 
   const confirmCardio = async () => {
     const kcalPerHour = sport?.kcalPerHour ?? 500
-    const estimated = estimateSessionKcal(durationMin, kcalPerHour, profile.weightKg)
+    const estimated = estimateSessionKcal(durationMin, kcalPerHour, profile.weightKg ?? 70)
     const meta = manualSessionMeta(activeSportId, activeSessionKind)
 
     let details =
@@ -783,7 +783,7 @@ export function TrainingView({
           <WorkoutNotebook
             key={`notebook-${notebookLaunchId ?? 'boot'}-${notebookEditNote?.id ?? 'live'}-${activeSportId}-${notebookStartEmpty ? 'empty' : 'fill'}`}
             id="workout-notebook"
-            bodyWeightKg={profile.weightKg}
+            bodyWeightKg={profile.weightKg ?? 70}
             routines={state.routines}
             schedule={state.schedule}
             history={state.workoutNotes}
@@ -841,7 +841,7 @@ export function TrainingView({
         showEnduranceTools ? (
           <EnduranceSessionCard
             disciplineId={disciplineId}
-            bodyWeightKg={profile.weightKg}
+            bodyWeightKg={profile.weightKg ?? 70}
             onLog={(entry) => {
               const meta = manualSessionMeta(activeSportId, 'endurance')
               const details = buildEnduranceDetails(entry.distanceKm)
