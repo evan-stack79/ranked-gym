@@ -138,29 +138,31 @@ async function capture() {
     const videoPage = await videoContext.newPage()
     await openMode(videoPage, 'empty')
     await videoPage.waitForSelector('[data-testid="number-wheel-empty"]')
+    await videoPage.waitForTimeout(700)
 
     const vb = await videoPage.locator('[data-testid="number-wheel"]').boundingBox()
     if (vb) {
-      await videoPage.mouse.move(vb.x + vb.width / 2, vb.y + vb.height * 0.72)
+      // Slower finger-like drag with momentum settle
+      await videoPage.mouse.move(vb.x + vb.width / 2, vb.y + vb.height * 0.78)
       await videoPage.mouse.down()
-      await videoPage.mouse.move(vb.x + vb.width / 2, vb.y + vb.height * 0.18, { steps: 10 })
+      await videoPage.mouse.move(vb.x + vb.width / 2, vb.y + vb.height * 0.22, { steps: 18 })
       await videoPage.mouse.up()
-      await videoPage.waitForTimeout(800)
+      await videoPage.waitForTimeout(1200)
 
       await videoPage.locator('[data-testid="height-weight-tab-height"]').click({ force: true })
-      await videoPage.waitForTimeout(250)
+      await videoPage.waitForTimeout(450)
       const hb = await videoPage.locator('[data-testid="number-wheel"]').boundingBox()
       if (hb) {
-        await videoPage.mouse.move(hb.x + hb.width / 2, hb.y + hb.height * 0.68)
+        await videoPage.mouse.move(hb.x + hb.width / 2, hb.y + hb.height * 0.7)
         await videoPage.mouse.down()
-        await videoPage.mouse.move(hb.x + hb.width / 2, hb.y + hb.height * 0.32, { steps: 8 })
+        await videoPage.mouse.move(hb.x + hb.width / 2, hb.y + hb.height * 0.28, { steps: 14 })
         await videoPage.mouse.up()
-        await videoPage.waitForTimeout(600)
+        await videoPage.waitForTimeout(900)
       }
 
       await videoPage.locator('[data-testid="height-weight-continue"]').click({ force: true })
       await videoPage.waitForSelector('[data-testid="height-weight-noted"]', { timeout: 5000 })
-      await videoPage.waitForTimeout(700)
+      await videoPage.waitForTimeout(1400)
     }
 
     await videoPage.close()
