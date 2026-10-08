@@ -1,4 +1,5 @@
-import { useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
+import { isAccueilGalleryEnabled } from '../../backend/accueilGalleryFeatureFlag'
 import { useAuth } from '../../context/AuthContext'
 import { BrandMark } from '../brand/BrandMark'
 import { BottomNav } from './BottomNav'
@@ -47,6 +48,18 @@ export function AppLayout({
   const showBottomNav = !chromeHidden && !hideBottomNav && !keyboardOpen
   const bottomNavObscured = streakCelebrationActive
   const showReadyBar = !chromeHidden && activeTab === 'training' && readyBarEnabled
+  const floatingPillNav = isAccueilGalleryEnabled()
+
+  useEffect(() => {
+    if (floatingPillNav) {
+      document.documentElement.dataset.bottomNavPreview = 'floating-pill'
+    } else {
+      delete document.documentElement.dataset.bottomNavPreview
+    }
+    return () => {
+      delete document.documentElement.dataset.bottomNavPreview
+    }
+  }, [floatingPillNav])
 
   return (
     <div
@@ -103,8 +116,8 @@ export function AppLayout({
                   bottomNavObscured
                     ? '1.5rem'
                     : isBarVisible
-                      ? `calc(var(--app-bottom-nav) + ${REST_BAR_CONTENT_PAD} + env(safe-area-inset-bottom, 0px) + 1.5rem)`
-                      : 'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 1.5rem)',
+                      ? `calc(var(--app-bottom-nav) + ${REST_BAR_CONTENT_PAD} + var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 1.75rem)`
+                      : 'calc(var(--app-bottom-nav) + var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 1.75rem)',
               }
         }
         aria-hidden={streakCelebrationActive ? true : undefined}
