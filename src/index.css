@@ -599,6 +599,17 @@ img {
   );
 }
 
+/*
+ * Scroll anchoring can retarget scrollTop when tiles reorder, cancelling the
+ * visual FLIP slide (siblings look like they teleport). Opt out on the widget
+ * tree; the scroll scroller is toggled from HomeGalleryView (ancestor node).
+ */
+.accueil-gallery--editing,
+.accueil-gallery--editing .accueil-widgets,
+.accueil-gallery--editing .accueil-edit-slot {
+  overflow-anchor: none;
+}
+
 .accueil-edit-chrome {
   display: flex;
   align-items: center;

@@ -287,6 +287,21 @@ export function HomeGalleryView({
     if (addOpen || waterGoalOpen) finishDrag({ skipGlide: true })
   }, [addOpen, waterGoalOpen, finishDrag])
 
+  // Disable scroll anchoring on the page scroller while editing — otherwise the
+  // browser retargets scrollTop on reorder and FLIP slides look like teleports.
+  useEffect(() => {
+    const main = document.querySelector('[data-app-scroll-main]')
+    if (!(main instanceof HTMLElement)) return
+    if (!editMode) {
+      main.style.overflowAnchor = ''
+      return
+    }
+    main.style.overflowAnchor = 'none'
+    return () => {
+      main.style.overflowAnchor = ''
+    }
+  }, [editMode])
+
   const state = useMemo(() => getTrainingState(), [trainingTick])
   const heroCards = useMemo(() => deriveGalleryHeroCards(state), [state])
   const recent = useMemo(() => deriveGalleryRecent(state, new Date(), 8), [state])
