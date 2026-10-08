@@ -196,6 +196,22 @@ async function setPrefs(page, partial = {}) {
   )
 }
 
+/** Keep week + eau + series above the bottom nav (and under edit chrome). */
+async function pinEditWidgets(page) {
+  await page.evaluate(() => {
+    const main = document.querySelector('[data-app-scroll-main]')
+    const week = document.querySelector('[data-accueil-edit-slot="seances_semaine"]')
+    if (!(main instanceof HTMLElement) || !(week instanceof HTMLElement)) return
+    const mainRect = main.getBoundingClientRect()
+    const weekRect = week.getBoundingClientRect()
+    // Leave room for OK / + Ajouter chrome (~110px) so Eau+Séries stay on camera.
+    const desiredTop = mainRect.top + 108
+    const delta = weekRect.top - desiredTop
+    main.scrollTo({ top: Math.max(0, main.scrollTop + delta), behavior: 'instant' })
+  })
+  await page.waitForTimeout(200)
+}
+
 /** Touch long-press that keeps the finger down long enough for the 500ms timer. */
 async function touchLongPress(page, x, y, holdMs = 620) {
   // Real hold: pointerdown → wait → pointerup on the slot (touch-primary).
@@ -459,18 +475,8 @@ async function main() {
       })
     })
 
-    // Pin scroll so week + eau + series sit above the bottom nav (stable viewport)
-    await vpage.evaluate(() => {
-      const main = document.querySelector('[data-app-scroll-main]')
-      const eau = document.querySelector('[data-accueil-edit-slot="eau"]')
-      if (!(main instanceof HTMLElement) || !(eau instanceof HTMLElement)) return
-      const mainRect = main.getBoundingClientRect()
-      const eauRect = eau.getBoundingClientRect()
-      const desiredCenterY = mainRect.top + mainRect.height * 0.48
-      const delta = eauRect.top + eauRect.height / 2 - desiredCenterY
-      main.scrollTo({ top: Math.max(0, main.scrollTop + delta), behavior: 'instant' })
-    })
-    await vpage.waitForTimeout(120)
+    // Pin week near top so Eau + Séries stay fully on camera (incl. after edit chrome).
+    await pinEditWidgets(vpage)
 
     const eauBox = await vpage.locator('[data-accueil-edit-slot="eau"]').boundingBox()
     if (!eauBox) throw new Error('eau slot missing for video')
@@ -485,6 +491,14 @@ async function main() {
     )
     if (hit !== 'eau') {
       throw new Error(`Long-press target blocked (hit=${hit}); eau must clear bottom nav`)
+    }
+    // Eau must be fully above the floating nav for the whole clip.
+    const navTop = await vpage.evaluate(() => {
+      const nav = document.querySelector('[data-app-bottom-nav], nav, [data-bottom-nav]')
+      return nav instanceof HTMLElement ? nav.getBoundingClientRect().top : 800
+    })
+    if (eauBox.y + eauBox.height > navTop - 8) {
+      throw new Error(`Eau overlaps nav (bottom=${eauBox.y + eauBox.height}, navTop=${navTop})`)
     }
 
     // Action clock — trim ffmpeg from just before the long-press.
@@ -502,7 +516,7 @@ async function main() {
       return norm(eau?.textContent) === '1200' && norm(week?.textContent) === '2'
     }, { timeout: 12_000 })
 
-    /** Poll DOM every 250ms for the whole action clip — catches data flashes. */
+    /** Poll DOM every 250ms — use performance.now (HarnessDate freezes Date.now). */
     const metricLog = []
     let metricPollActive = true
     const metricPoll = (async () => {
@@ -520,16 +534,20 @@ async function main() {
             const dragging = [
               ...document.querySelectorAll('[data-accueil-dragging="1"]'),
             ].map((el) => el.getAttribute('data-accueil-edit-slot'))
+            const seriesVisible = !!document.querySelector('[data-accueil-edit-slot="series_jour"]')
+            const addOpen = !!document.querySelector('[data-accueil-add-list], [data-accueil-add-item]')
             return {
-              t: Date.now(),
+              t: performance.now(),
               eau: placeholder ? '—' : norm(eauEl?.textContent),
               week: norm(weekEl?.textContent),
               dragging,
+              seriesVisible,
+              addOpen,
             }
           })
           .catch(() => null)
         if (snap) metricLog.push(snap)
-        await vpage.waitForTimeout(250).catch(() => {})
+        await new Promise((r) => setTimeout(r, 250))
       }
     })()
     await vpage.waitForTimeout(1000)
@@ -538,23 +556,26 @@ async function main() {
     await touchLongPress(vpage, eauX, eauY, 900)
     await vpage.waitForSelector('[data-accueil-edit-ok]', { state: 'visible', timeout: 5_000 })
     await vpage.waitForSelector('[data-accueil-tile-trash="eau"]', { state: 'visible', timeout: 3_000 })
-    await vpage.waitForTimeout(1200)
+    await pinEditWidgets(vpage)
+    await vpage.waitForTimeout(1100)
 
     // 2) Drag Eau above « Séances de la semaine » (slow finger-follow + FLIP)
+    await pinEditWidgets(vpage)
     const weekBox = await vpage.locator('[data-accueil-edit-slot="seances_semaine"]').boundingBox()
     if (!weekBox) throw new Error('seances_semaine missing for drag target')
     const targetX = weekBox.x + weekBox.width / 2
     const targetY = weekBox.y + Math.min(36, weekBox.height * 0.25)
     const eauNow = await vpage.locator('[data-accueil-edit-slot="eau"]').boundingBox()
     if (!eauNow) throw new Error('eau slot lost before drag')
+    if (eauNow.y > 700) throw new Error(`Eau off-camera before drag (y=${eauNow.y})`)
     await touchDrag(
       vpage,
       eauNow.x + eauNow.width / 2,
       eauNow.y + eauNow.height / 2,
       targetX,
       targetY,
-      40,
-      45,
+      36,
+      48,
     )
     // Drop settle — confirm not stuck in dragging state (force-clear if remount ate pointerup)
     await vpage
@@ -575,9 +596,14 @@ async function main() {
     await vpage.waitForTimeout(1100)
 
     // 3) Tap − on « Séries du jour » (must be visible on camera ~1s)
+    await pinEditWidgets(vpage)
     const seriesTrash = vpage.locator('[data-accueil-tile-trash="series_jour"]')
     await seriesTrash.waitFor({ state: 'visible', timeout: 5_000 })
-    await vpage.waitForTimeout(400)
+    const seriesBox = await vpage.locator('[data-accueil-edit-slot="series_jour"]').boundingBox()
+    if (!seriesBox || seriesBox.y > 720) {
+      throw new Error(`Séries off-camera before trash tap (y=${seriesBox?.y})`)
+    }
+    await vpage.waitForTimeout(500)
     await seriesTrash.tap({ force: true })
     await vpage.waitForSelector('[data-accueil-edit-slot="series_jour"]', {
       state: 'detached',
@@ -588,7 +614,7 @@ async function main() {
     // 4) Tap + Ajouter (must be visible) → sheet opens
     const addBtn = vpage.locator('[data-accueil-edit-add]')
     await addBtn.waitFor({ state: 'visible', timeout: 5_000 })
-    await vpage.waitForTimeout(400)
+    await vpage.waitForTimeout(500)
     await addBtn.tap()
     await vpage.waitForSelector('[data-accueil-add-item="series_jour"]', {
       state: 'visible',
@@ -599,7 +625,7 @@ async function main() {
       () => document.querySelector('[data-accueil-edit-slot="eau"]')?.getAttribute('data-accueil-dragging'),
     )
     if (stuck === '1') throw new Error('Eau still dragging after Ajouter sheet opened')
-    await vpage.waitForTimeout(1100)
+    await vpage.waitForTimeout(1200)
 
     // 5) Re-add Séries
     await vpage.locator('[data-accueil-add-item="series_jour"]').tap()
@@ -609,6 +635,7 @@ async function main() {
       state: 'visible',
       timeout: 5_000,
     })
+    await pinEditWidgets(vpage)
     await vpage.waitForTimeout(1100)
 
     // 6) OK — sample Reveal health to prove no mask re-hide / black flash
@@ -647,7 +674,25 @@ async function main() {
         `Data flash during edit video: ${JSON.stringify(badMetrics.slice(0, 8))}`,
       )
     }
-    console.log(`metric poll ok: ${metricLog.length} samples @250ms, eau=1200 week=2`)
+    const sawSeriesGone = metricLog.some((s) => s.seriesVisible === false)
+    const sawAddOpen = metricLog.some((s) => s.addOpen === true)
+    const sawSeriesBack = metricLog.some(
+      (s, i) => s.seriesVisible === true && metricLog.slice(0, i).some((p) => p.seriesVisible === false),
+    )
+    if (!sawSeriesGone || !sawAddOpen || !sawSeriesBack) {
+      throw new Error(
+        `Missing on-camera steps: seriesGone=${sawSeriesGone} addOpen=${sawAddOpen} seriesBack=${sawSeriesBack}`,
+      )
+    }
+    // Drag must end: no sample in the last 2s still dragging
+    const tMax = Math.max(...metricLog.map((s) => s.t))
+    const lateDrag = metricLog.filter((s) => s.t > tMax - 2000 && (s.dragging || []).length > 0)
+    if (lateDrag.length > 0) {
+      throw new Error(`Stuck drag near end of clip: ${JSON.stringify(lateDrag.slice(0, 3))}`)
+    }
+    console.log(
+      `metric poll ok: ${metricLog.length} samples, eau=1200 week=2, series remove/add + sheet seen`,
+    )
 
     const video = vpage.video()
     await videoContext.close()
