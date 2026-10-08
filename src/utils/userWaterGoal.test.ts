@@ -3,6 +3,7 @@ import {
   clearUserWaterGoal,
   getUserWaterGoalMl,
   isValidUserWaterGoalMl,
+  migrateAccueilWaterGoalFromPrefs,
   parseUserWaterGoalRecord,
   parseWaterGoalInput,
   setUserWaterGoalMl,
@@ -11,6 +12,8 @@ import {
   WATER_GOAL_MAX_ML,
   WATER_GOAL_MIN_ML,
 } from './userWaterGoal'
+
+const ACCUEIL_PREFS_KEY = 'ranked-gym:accueil-widget-prefs'
 
 const store = new Map<string, string>()
 
@@ -106,5 +109,61 @@ describe('userWaterGoal', () => {
     expect(WATER_GOAL_CHOICE_ADVICE).toBe(
       "Choisis ton objectif. Ce dont tu as besoin change selon toi, la chaleur et l'effort. En cas de doute, demande à un médecin.",
     )
+  })
+
+  it('migre prefs.waterGoalMl → userWaterGoal puis retire le champ des prefs', () => {
+    store.set(
+      ACCUEIL_PREFS_KEY,
+      JSON.stringify({
+        version: 2,
+        order: ['eau'],
+        hidden: [],
+        updatedAt: 1,
+        waterGoalMl: 2500,
+      }),
+    )
+    expect(migrateAccueilWaterGoalFromPrefs(99)).toBe(true)
+    expect(getUserWaterGoalMl()).toBe(2500)
+    const prefs = JSON.parse(store.get(ACCUEIL_PREFS_KEY)!)
+    expect(prefs.waterGoalMl).toBeUndefined()
+    const goal = JSON.parse(store.get(USER_WATER_GOAL_KEY)!)
+    expect(goal).toMatchObject({ goalMl: 2500, source: 'user', version: 1, updatedAt: 99 })
+
+    // Idempotent — second pass does not overwrite
+    expect(migrateAccueilWaterGoalFromPrefs(200)).toBe(false)
+    expect(getUserWaterGoalMl()).toBe(2500)
+  })
+
+  it('ne migre pas si userWaterGoal existe déjà — strip seulement le champ prefs', () => {
+    setUserWaterGoalMl(1800, 1)
+    store.set(
+      ACCUEIL_PREFS_KEY,
+      JSON.stringify({
+        version: 2,
+        order: ['eau'],
+        hidden: [],
+        updatedAt: 1,
+        waterGoalMl: 3000,
+      }),
+    )
+    expect(migrateAccueilWaterGoalFromPrefs(50)).toBe(false)
+    expect(getUserWaterGoalMl()).toBe(1800)
+    expect(JSON.parse(store.get(ACCUEIL_PREFS_KEY)!).waterGoalMl).toBeUndefined()
+  })
+
+  it('droppe un prefs.waterGoalMl hors bornes sans créer de userWaterGoal', () => {
+    store.set(
+      ACCUEIL_PREFS_KEY,
+      JSON.stringify({
+        version: 2,
+        order: ['eau'],
+        hidden: [],
+        updatedAt: 1,
+        waterGoalMl: 50,
+      }),
+    )
+    expect(migrateAccueilWaterGoalFromPrefs()).toBe(false)
+    expect(getUserWaterGoalMl()).toBeNull()
+    expect(JSON.parse(store.get(ACCUEIL_PREFS_KEY)!).waterGoalMl).toBeUndefined()
   })
 })

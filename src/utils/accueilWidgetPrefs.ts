@@ -1,35 +1,87 @@
 /**
  * Accueil widget preferences — stored separately from profile/settings (R-04).
- * Shape: { version, order, hidden, updatedAt }. localStorage only for this PR.
+ * Shape: { version, order, hidden, updatedAt }. localStorage only.
+ *
+ * v1 → v2: new metric tiles.
+ * Water goal lives in `userWaterGoal.ts` (`ranked-gym:water-goal`). Legacy
+ * `waterGoalMl` on prefs is migrated once via `migrateAccueilWaterGoalFromPrefs`.
  */
 
-export const ACCUEIL_WIDGET_PREFS_KEY = 'ranked-gym:accueil-widget-prefs'
-export const ACCUEIL_WIDGET_PREFS_VERSION = 1 as const
+import {
+  clearUserWaterGoal,
+  getUserWaterGoalMl,
+  migrateAccueilWaterGoalFromPrefs,
+  normalizeUserWaterGoalMl,
+  setUserWaterGoalMl,
+} from './userWaterGoal'
 
-/** Known Accueil gallery blocks — training-related only; never kcal/weight/body. */
-export const ACCUEIL_WIDGET_IDS = ['seance', 'recent', 'programme'] as const
+export const ACCUEIL_WIDGET_PREFS_KEY = 'ranked-gym:accueil-widget-prefs'
+export const ACCUEIL_WIDGET_PREFS_VERSION = 2 as const
+
+/** Known Accueil gallery blocks — training / water only; never kcal/weight/body. */
+export const ACCUEIL_WIDGET_IDS = [
+  'seance',
+  'seances_semaine',
+  'eau',
+  'series_jour',
+  'prochaine_seance',
+  'recent',
+  'programme',
+] as const
 
 export type AccueilWidgetId = (typeof ACCUEIL_WIDGET_IDS)[number]
 
 export type AccueilWidgetPrefs = {
-  version: typeof ACCUEIL_WIDGET_PREFS_VERSION
+  version: number
   order: string[]
   hidden: string[]
   updatedAt: number
+  /**
+   * @deprecated Legacy field — water goal is `ranked-gym:water-goal`.
+   * Kept optional so old payloads parse; always normalized to null on write.
+   */
+  waterGoalMl?: number | null
 }
 
 export const ACCUEIL_WIDGET_LABELS: Record<AccueilWidgetId, string> = {
   seance: 'Séance du jour',
+  seances_semaine: 'Séances de la semaine',
+  eau: 'Eau',
+  series_jour: 'Séries du jour',
+  prochaine_seance: 'Prochaine séance',
   recent: 'Récent',
   programme: 'Programme',
 }
 
-/** Default Accueil: Séance du jour → Récent → Programme, all visible. */
+/** Wide tiles span the Accueil grid; small ones share a 2-column row. */
+export const ACCUEIL_WIDGET_SIZE: Record<AccueilWidgetId, 'wide' | 'small'> = {
+  seance: 'wide',
+  seances_semaine: 'wide',
+  eau: 'small',
+  series_jour: 'small',
+  prochaine_seance: 'wide',
+  recent: 'wide',
+  programme: 'wide',
+}
+
+/** Default Accueil: heroes → week → water/sets → next → programme → recent. */
 export const DEFAULT_ACCUEIL_WIDGET_ORDER: AccueilWidgetId[] = [
   'seance',
-  'recent',
+  'seances_semaine',
+  'eau',
+  'series_jour',
+  'prochaine_seance',
   'programme',
+  'recent',
 ]
+
+/** Clamp a user water goal; returns null when unset / invalid. */
+export function normalizeWaterGoalMl(value: unknown): number | null {
+  if (value == null || value === '') return null
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n) || n <= 0) return null
+  return Math.min(20_000, Math.round(n))
+}
 
 export function createDefaultAccueilWidgetPrefs(now = Date.now()): AccueilWidgetPrefs {
   return {
@@ -37,6 +89,7 @@ export function createDefaultAccueilWidgetPrefs(now = Date.now()): AccueilWidget
     order: [...DEFAULT_ACCUEIL_WIDGET_ORDER],
     hidden: [],
     updatedAt: now,
+    waterGoalMl: null,
   }
 }
 
@@ -46,7 +99,7 @@ function isKnownWidgetId(id: string): id is AccueilWidgetId {
 
 /**
  * Drop unknown ids silently; append any new known widgets missing from `order`
- * in their default relative position. Dedupes order/hidden.
+ * in their default relative position. Dedupes order/hidden. Migrates older versions.
  */
 export function normalizeAccueilWidgetPrefs(
   input: Partial<AccueilWidgetPrefs> | null | undefined,
@@ -96,6 +149,8 @@ export function normalizeAccueilWidgetPrefs(
     order,
     hidden,
     updatedAt,
+    // Never persist a goal here — single source is userWaterGoal.
+    waterGoalMl: null,
   }
 }
 
@@ -167,6 +222,92 @@ export function moveAccueilWidget(
   return { ...normalized, order, updatedAt: now }
 }
 
+/**
+ * Drag-reorder among visible tiles: move `draggedId` to `targetId`'s visible slot.
+ * Hidden ids keep their relative places in `order`.
+ */
+export function reorderVisibleAccueilWidget(
+  prefs: AccueilWidgetPrefs,
+  draggedId: AccueilWidgetId,
+  targetId: AccueilWidgetId,
+  now = Date.now(),
+): AccueilWidgetPrefs {
+  const normalized = normalizeAccueilWidgetPrefs(prefs, now)
+  if (draggedId === targetId) return { ...normalized, updatedAt: now }
+  if (!isKnownWidgetId(draggedId) || !isKnownWidgetId(targetId)) {
+    return { ...normalized, updatedAt: now }
+  }
+  const hidden = new Set(normalized.hidden)
+  const visible = normalized.order.filter(
+    (id): id is AccueilWidgetId => isKnownWidgetId(id) && !hidden.has(id),
+  )
+  const from = visible.indexOf(draggedId)
+  const to = visible.indexOf(targetId)
+  if (from < 0 || to < 0) return { ...normalized, updatedAt: now }
+  const nextVisible = [...visible]
+  const [item] = nextVisible.splice(from, 1)
+  nextVisible.splice(to, 0, item!)
+  let v = 0
+  const order = normalized.order.map((id) => {
+    if (hidden.has(id) || !isKnownWidgetId(id)) return id
+    return nextVisible[v++]!
+  })
+  return { ...normalized, order, updatedAt: now }
+}
+
+export function hideAccueilWidget(
+  prefs: AccueilWidgetPrefs,
+  id: AccueilWidgetId,
+  now = Date.now(),
+): AccueilWidgetPrefs {
+  const normalized = normalizeAccueilWidgetPrefs(prefs, now)
+  if (normalized.hidden.includes(id)) return { ...normalized, updatedAt: now }
+  return toggleAccueilWidgetHidden(normalized, id, now)
+}
+
+export function showAccueilWidget(
+  prefs: AccueilWidgetPrefs,
+  id: AccueilWidgetId,
+  now = Date.now(),
+): AccueilWidgetPrefs {
+  const normalized = normalizeAccueilWidgetPrefs(prefs, now)
+  if (!normalized.hidden.includes(id)) return { ...normalized, updatedAt: now }
+  return toggleAccueilWidgetHidden(normalized, id, now)
+}
+
+/** Hidden widgets in order (for « + Ajouter »). */
+export function resolveHiddenAccueilWidgets(prefs: AccueilWidgetPrefs): AccueilWidgetId[] {
+  const normalized = normalizeAccueilWidgetPrefs(prefs)
+  const hidden = new Set(normalized.hidden)
+  return normalized.order.filter((id): id is AccueilWidgetId => isKnownWidgetId(id) && hidden.has(id))
+}
+
+/**
+ * @deprecated Prefer `setUserWaterGoalMl`. Writes the shared water-goal key and
+ * returns prefs with `waterGoalMl` cleared (single source of truth).
+ */
+export function setAccueilWaterGoalMl(
+  prefs: AccueilWidgetPrefs,
+  waterGoalMl: number | null,
+  now = Date.now(),
+): AccueilWidgetPrefs {
+  const goal = normalizeUserWaterGoalMl(
+    waterGoalMl == null ? null : typeof waterGoalMl === 'number' ? waterGoalMl : Number(waterGoalMl),
+  )
+  if (goal != null) setUserWaterGoalMl(goal, now)
+  else clearUserWaterGoal()
+  return {
+    ...normalizeAccueilWidgetPrefs(prefs, now),
+    waterGoalMl: null,
+    updatedAt: now,
+  }
+}
+
+/** True when the shared user water goal is set (prefs field ignored). */
+export function hasUserWaterGoal(_prefs?: AccueilWidgetPrefs): boolean {
+  return getUserWaterGoalMl() != null
+}
+
 function parseStoredPrefs(raw: string | null): AccueilWidgetPrefs | null {
   if (!raw) return null
   try {
@@ -181,6 +322,8 @@ function parseStoredPrefs(raw: string | null): AccueilWidgetPrefs | null {
 export function loadAccueilWidgetPrefs(now = Date.now()): AccueilWidgetPrefs {
   if (typeof localStorage === 'undefined') return createDefaultAccueilWidgetPrefs(now)
   try {
+    // Migrate legacy prefs.waterGoalMl → ranked-gym:water-goal before normalize strips it.
+    migrateAccueilWaterGoalFromPrefs(now)
     const stored = parseStoredPrefs(localStorage.getItem(ACCUEIL_WIDGET_PREFS_KEY))
     return stored ?? createDefaultAccueilWidgetPrefs(now)
   } catch {

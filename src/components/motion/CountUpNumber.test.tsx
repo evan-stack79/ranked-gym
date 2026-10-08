@@ -2,7 +2,11 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { CountUpNumber, COUNT_UP_ALLOWED_KINDS } from './CountUpNumber'
+import {
+  CountUpNumber,
+  COUNT_UP_ALLOWED_KINDS,
+  resetCountUpStableCacheForTests,
+} from './CountUpNumber'
 
 function mockMatchMedia(reduced: boolean) {
   Object.defineProperty(window, 'matchMedia', {
@@ -54,6 +58,7 @@ describe('CountUpNumber', () => {
     act(() => root.unmount())
     host.remove()
     vi.unstubAllGlobals()
+    resetCountUpStableCacheForTests()
   })
 
   it('allowlist is water / sessions / successful_sets only', () => {
@@ -105,5 +110,49 @@ describe('CountUpNumber', () => {
     })
 
     expect(el.textContent).toBe('900')
+  })
+
+  it('stableId remount never paints 0 when a value exists (Eau tile)', async () => {
+    act(() => {
+      root.render(
+        <CountUpNumber kind="water" value={1200} instant stableId="accueil-eau-test" />,
+      )
+    })
+    expect(host.querySelector('[data-rg-count="water"]')?.textContent).toBe('1\u202f200')
+
+    // Unmount + remount (simulates Accueil drag reorder / edit exit).
+    act(() => {
+      root.render(<span />)
+    })
+    act(() => {
+      root.render(
+        <CountUpNumber kind="water" value={1200} instant stableId="accueil-eau-test" />,
+      )
+    })
+    const el = host.querySelector('[data-rg-count="water"]') as HTMLElement
+    expect(el.textContent).toBe('1\u202f200')
+    expect(el.textContent).not.toMatch(/^0$/)
+    expect(el.getAttribute('data-rg-count-stable')).toBe('accueil-eau-test')
+  })
+
+  it('stableId remount without instant still skips 0 when cache is warm', async () => {
+    act(() => {
+      root.render(
+        <CountUpNumber kind="water" value={1200} instant stableId="accueil-eau-warm" />,
+      )
+    })
+    expect(host.textContent?.replace(/\s/g, '')).toContain('1200')
+
+    act(() => {
+      root.render(<span />)
+    })
+    act(() => {
+      root.render(
+        <CountUpNumber kind="water" value={1200} stableId="accueil-eau-warm" />,
+      )
+    })
+    // First paint after remount must already be 1200 (not 0).
+    const el = host.querySelector('[data-rg-count="water"]') as HTMLElement
+    expect(el.textContent?.replace(/\s/g, '')).toBe('1200')
   })
 })

@@ -2,8 +2,8 @@
  * Single source of truth for the user’s daily water goal (ml).
  * localStorage only — never derived from body weight.
  *
- * Accueil tiles PR (#97) currently stores a water goal inside
- * `ranked-gym:accueil-widget-prefs`; that branch should switch to this module later.
+ * One-time migration from Accueil widget prefs (`waterGoalMl`) lives in
+ * `migrateAccueilWaterGoalFromPrefs` — call on prefs load / Accueil mount.
  */
 
 export const USER_WATER_GOAL_KEY = 'ranked-gym:water-goal'
@@ -160,4 +160,70 @@ export function parseWaterGoalInput(raw: string): number | null {
   if (hasLiterUnit) return Math.round(value * 1000)
   if (value <= 20) return Math.round(value * 1000)
   return Math.round(value)
+}
+
+const ACCUEIL_WIDGET_PREFS_KEY = 'ranked-gym:accueil-widget-prefs'
+
+/**
+ * One-time migration: if Accueil widget prefs still carry `waterGoalMl` and
+ * no `userWaterGoal` exists, move it into `ranked-gym:water-goal` (source:'user'),
+ * then delete it from widget prefs.
+ * Returns true when a goal was migrated.
+ */
+export function migrateAccueilWaterGoalFromPrefs(now = Date.now()): boolean {
+  try {
+    if (typeof localStorage === 'undefined') return false
+    if (getUserWaterGoalMl() != null) {
+      // Still strip a stale prefs goal so there is a single source of truth.
+      stripAccueilPrefsWaterGoal()
+      return false
+    }
+    const raw = localStorage.getItem(ACCUEIL_WIDGET_PREFS_KEY)
+    if (!raw) return false
+    let parsed: { waterGoalMl?: unknown } | null = null
+    try {
+      parsed = JSON.parse(raw) as { waterGoalMl?: unknown }
+    } catch {
+      return false
+    }
+    if (!parsed || typeof parsed !== 'object') return false
+    if (!('waterGoalMl' in parsed) || parsed.waterGoalMl == null) return false
+    const goalMl = normalizeUserWaterGoalMl(
+      typeof parsed.waterGoalMl === 'number'
+        ? parsed.waterGoalMl
+        : Number(parsed.waterGoalMl),
+    )
+    if (goalMl == null) {
+      // Out of shared bounds or invalid — drop the legacy field, do not invent a goal.
+      stripAccueilPrefsWaterGoal()
+      return false
+    }
+    const saved = setUserWaterGoalMl(goalMl, now)
+    if (saved) stripAccueilPrefsWaterGoal()
+    return saved
+  } catch {
+    return false
+  }
+}
+
+/** Remove `waterGoalMl` from Accueil widget prefs if present. */
+export function stripAccueilPrefsWaterGoal(): boolean {
+  try {
+    if (typeof localStorage === 'undefined') return false
+    const raw = localStorage.getItem(ACCUEIL_WIDGET_PREFS_KEY)
+    if (!raw) return false
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(raw) as Record<string, unknown>
+    } catch {
+      return false
+    }
+    if (!parsed || typeof parsed !== 'object') return false
+    if (!('waterGoalMl' in parsed) || parsed.waterGoalMl == null) return false
+    delete parsed.waterGoalMl
+    localStorage.setItem(ACCUEIL_WIDGET_PREFS_KEY, JSON.stringify(parsed))
+    return true
+  } catch {
+    return false
+  }
 }

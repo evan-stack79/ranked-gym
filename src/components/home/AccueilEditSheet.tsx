@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import {
+  ACCUEIL_WIDGET_IDS,
   ACCUEIL_WIDGET_LABELS,
   isAccueilWidgetVisible,
   moveAccueilWidget,
@@ -11,6 +12,7 @@ import {
   type AccueilWidgetId,
   type AccueilWidgetPrefs,
 } from '../../utils/accueilWidgetPrefs'
+import { WaterGoalChooser } from '../nutrition/WaterGoalChooser'
 import { IosSheet } from '../ui/IosSheet'
 
 interface AccueilEditSheetProps {
@@ -21,18 +23,19 @@ interface AccueilEditSheetProps {
 }
 
 /**
- * Edit Accueil blocks — show/hide + move up/down.
+ * Edit Accueil blocks — show/hide + move up/down + optional water goal.
  * No motion inside the form (audit + reduced-motion friendly).
  */
 export function AccueilEditSheet({ open, prefs, onClose, onSave }: AccueilEditSheetProps) {
   const [draft, setDraft] = useState<AccueilWidgetPrefs>(() => normalizeAccueilWidgetPrefs(prefs))
 
   useEffect(() => {
-    if (open) setDraft(normalizeAccueilWidgetPrefs(prefs))
+    if (!open) return
+    setDraft(normalizeAccueilWidgetPrefs(prefs))
   }, [open, prefs])
 
   const order = draft.order.filter((id): id is AccueilWidgetId =>
-    id === 'seance' || id === 'recent' || id === 'programme',
+    (ACCUEIL_WIDGET_IDS as readonly string[]).includes(id),
   )
 
   const commit = (next: AccueilWidgetPrefs) => {
@@ -41,7 +44,7 @@ export function AccueilEditSheet({ open, prefs, onClose, onSave }: AccueilEditSh
   }
 
   const handleDone = () => {
-    commit({ ...draft, updatedAt: Date.now() })
+    commit(draft)
     onClose()
   }
 
@@ -140,7 +143,18 @@ export function AccueilEditSheet({ open, prefs, onClose, onSave }: AccueilEditSh
         })}
       </ul>
 
-      <p className="px-1 pb-4 pt-2 text-[12px] leading-snug text-[#8E8E93]">
+      <div
+        className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3"
+        data-accueil-edit-water-goal
+      >
+        <p className="text-[15px] font-semibold text-white">Objectif d&apos;eau</p>
+        <p className="mt-0.5 mb-3 text-[12px] text-[#8E8E93]">
+          Optionnel — sans objectif, la tuile Eau n&apos;affiche pas d&apos;anneau.
+        </p>
+        <WaterGoalChooser inputId="accueil-edit-sheet-water-goal" />
+      </div>
+
+      <p className="px-1 pb-4 pt-3 text-[12px] leading-snug text-[#8E8E93]">
         Pas de calories, poids ou mesures du corps sur l&apos;Accueil.
       </p>
     </IosSheet>

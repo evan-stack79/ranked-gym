@@ -12,7 +12,14 @@ import { buildAuthContextValue, FIXTURE_AUTH_USER } from '../../src/test/authFix
 import type { TabId } from '../../src/types'
 import type { TrainingState, WorkoutNote, WorkoutRoutine } from '../../src/types/training'
 import { todayKey } from '../../src/utils/calories'
-import { saveCalorieProfile } from '../../src/services/nutritionStorage'
+import {
+  addWaterEntryForDate,
+  saveCalorieProfile,
+} from '../../src/services/nutritionStorage'
+import {
+  ACCUEIL_WIDGET_PREFS_KEY,
+  createDefaultAccueilWidgetPrefs,
+} from '../../src/utils/accueilWidgetPrefs'
 
 const FIXED_ISO = '2026-10-07T18:30:00.000'
 const FIXED_MS = new Date(FIXED_ISO).getTime()
@@ -294,6 +301,22 @@ saveCalorieProfile(
   },
   { skipCloud: true },
 )
+
+// Realistic water journal for Eau tile screenshots (idempotent across reloads).
+const waterSeedKey = 'ranked-gym:accueil-capture-water-seeded'
+if (localStorage.getItem(waterSeedKey) !== '1') {
+  addWaterEntryForDate(TODAY, { amountMl: 500, type: 'glass', label: 'Verre' }, { skipCloud: true })
+  addWaterEntryForDate(TODAY, { amountMl: 700, type: 'bottle', label: 'Bouteille' }, { skipCloud: true })
+  localStorage.setItem(waterSeedKey, '1')
+}
+
+// Default Accueil prefs only when absent — capture scripts may set waterGoalMl.
+if (!localStorage.getItem(ACCUEIL_WIDGET_PREFS_KEY)) {
+  localStorage.setItem(
+    ACCUEIL_WIDGET_PREFS_KEY,
+    JSON.stringify(createDefaultAccueilWidgetPrefs(FIXED_MS)),
+  )
+}
 
 document.documentElement.style.setProperty('--app-safe-area-top', '47px')
 document.documentElement.style.setProperty('--app-safe-area-bottom', '34px')
