@@ -28,7 +28,7 @@ const PREFS_KEY = 'ranked-gym:accueil-widget-prefs'
 const WATER_GOAL_KEY = 'ranked-gym:water-goal'
 const FPS = 30
 const FRAME_MS = Math.round(1000 / FPS)
-const PAUSE_FRAMES = 24
+const PAUSE_FRAMES = 30
 
 const DEFAULT_PREFS = {
   version: 2,
@@ -252,9 +252,25 @@ async function main() {
 
     await recorder.burst(PAUSE_FRAMES)
 
+    // Pin Eau mid-viewport (above bottom nav) so long-press is not cancelled.
+    await page.evaluate(() => {
+      const main = document.querySelector('[data-app-scroll-main]')
+      const eau = document.querySelector('[data-accueil-edit-slot="eau"]')
+      if (!(main instanceof HTMLElement) || !(eau instanceof HTMLElement)) return
+      const mainRect = main.getBoundingClientRect()
+      const desired = mainRect.top + 280
+      const r = eau.getBoundingClientRect()
+      main.scrollTo({ top: Math.max(0, main.scrollTop + (r.top - desired)), behavior: 'instant' })
+    })
+    await page.waitForTimeout(200)
+    await recorder.burst(8)
+
     // 1) Long-press Eau → edit
     const eauBox = await page.locator('[data-accueil-edit-slot="eau"]').boundingBox()
     if (!eauBox) throw new Error('eau missing')
+    if (eauBox.y < 80 || eauBox.y > 620) {
+      throw new Error(`Eau not in long-press zone: y=${eauBox.y}`)
+    }
     await touchLongPress(
       page,
       eauBox.x + eauBox.width / 2,
@@ -266,7 +282,7 @@ async function main() {
       state: 'attached',
       timeout: 5_000,
     })
-    log.steps.push('edit-entered')
+    log.steps.push('edit-entered-via-longpress')
     await recorder.burst(PAUSE_FRAMES)
 
     // 2) Scroll to bottom of Accueil
