@@ -262,8 +262,9 @@ export type ProgramTileModel = {
 }
 
 /**
- * Programme tile — % from existing helper; subtitle = X / Y séances cette semaine
- * (agenda occurrences), or routines prêtes when no schedule.
+ * Programme tile — % from existing helper.
+ * Subtitle counts **planned program** sessions (agenda), not all logged sessions
+ * (those appear on « Séances de la semaine »). Wording makes that distinction clear.
  */
 export function deriveProgramTileModel(
   state: TrainingState,
@@ -292,7 +293,7 @@ export function deriveProgramTileModel(
       percent,
       doneSessions: capped,
       plannedSessions,
-      label: `${capped} / ${plannedSessions} séance${plannedSessions > 1 ? 's' : ''} cette semaine`,
+      label: `${capped} / ${plannedSessions} séance${plannedSessions > 1 ? 's' : ''} du programme`,
     }
   }
 

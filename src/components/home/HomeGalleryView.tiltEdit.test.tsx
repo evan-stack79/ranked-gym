@@ -96,7 +96,7 @@ describe('packAccueilWidgets', () => {
   })
 })
 
-describe('TiltCard disabled in Modifier l’accueil', () => {
+describe('TiltCard disabled in Accueil edit mode', () => {
   let host: HTMLDivElement
   let root: Root
 
@@ -114,7 +114,7 @@ describe('TiltCard disabled in Modifier l’accueil', () => {
     host.remove()
   })
 
-  it('passes disabled to TiltCard while edit sheet is open', async () => {
+  it('disables Tilt while in-place edit mode is on', async () => {
     const { HomeGalleryView } = await import('./HomeGalleryView')
 
     await act(async () => {
@@ -128,20 +128,17 @@ describe('TiltCard disabled in Modifier l’accueil', () => {
     })
 
     expect(host.querySelector('[data-accueil-edit-open="0"]')).toBeTruthy()
-    const tiltBefore = host.querySelector('[data-rg-tilt]')
-    expect(tiltBefore).toBeTruthy()
-    expect(tiltBefore?.getAttribute('data-rg-tilt')).toBe('on')
+    expect(host.querySelector('[data-rg-tilt]')?.getAttribute('data-rg-tilt')).toBe('on')
 
     const openBtn = host.querySelector('[data-accueil-edit-open-footer]') as HTMLButtonElement
-    expect(openBtn).toBeTruthy()
     await act(async () => {
       openBtn.click()
     })
 
     expect(host.querySelector('[data-accueil-edit-open="1"]')).toBeTruthy()
-    // IosSheet portals to document.body
-    expect(document.body.querySelector('[data-accueil-edit-list]')).toBeTruthy()
-    const tiltDuring = host.querySelector('[data-rg-tilt]')
-    expect(tiltDuring?.getAttribute('data-rg-tilt')).toBe('off')
+    expect(host.querySelector('[data-accueil-edit-ok]')).toBeTruthy()
+    expect(host.querySelector('[data-accueil-edit-add]')).toBeTruthy()
+    expect(host.querySelector('[data-accueil-tile-trash]')).toBeTruthy()
+    expect(host.querySelector('[data-rg-tilt]')?.getAttribute('data-rg-tilt')).toBe('off')
   })
 })

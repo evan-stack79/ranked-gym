@@ -212,6 +212,66 @@ export function moveAccueilWidget(
   return { ...normalized, order, updatedAt: now }
 }
 
+/**
+ * Drag-reorder among visible tiles: move `draggedId` to `targetId`'s visible slot.
+ * Hidden ids keep their relative places in `order`.
+ */
+export function reorderVisibleAccueilWidget(
+  prefs: AccueilWidgetPrefs,
+  draggedId: AccueilWidgetId,
+  targetId: AccueilWidgetId,
+  now = Date.now(),
+): AccueilWidgetPrefs {
+  const normalized = normalizeAccueilWidgetPrefs(prefs, now)
+  if (draggedId === targetId) return { ...normalized, updatedAt: now }
+  if (!isKnownWidgetId(draggedId) || !isKnownWidgetId(targetId)) {
+    return { ...normalized, updatedAt: now }
+  }
+  const hidden = new Set(normalized.hidden)
+  const visible = normalized.order.filter(
+    (id): id is AccueilWidgetId => isKnownWidgetId(id) && !hidden.has(id),
+  )
+  const from = visible.indexOf(draggedId)
+  const to = visible.indexOf(targetId)
+  if (from < 0 || to < 0) return { ...normalized, updatedAt: now }
+  const nextVisible = [...visible]
+  const [item] = nextVisible.splice(from, 1)
+  nextVisible.splice(to, 0, item!)
+  let v = 0
+  const order = normalized.order.map((id) => {
+    if (hidden.has(id) || !isKnownWidgetId(id)) return id
+    return nextVisible[v++]!
+  })
+  return { ...normalized, order, updatedAt: now }
+}
+
+export function hideAccueilWidget(
+  prefs: AccueilWidgetPrefs,
+  id: AccueilWidgetId,
+  now = Date.now(),
+): AccueilWidgetPrefs {
+  const normalized = normalizeAccueilWidgetPrefs(prefs, now)
+  if (normalized.hidden.includes(id)) return { ...normalized, updatedAt: now }
+  return toggleAccueilWidgetHidden(normalized, id, now)
+}
+
+export function showAccueilWidget(
+  prefs: AccueilWidgetPrefs,
+  id: AccueilWidgetId,
+  now = Date.now(),
+): AccueilWidgetPrefs {
+  const normalized = normalizeAccueilWidgetPrefs(prefs, now)
+  if (!normalized.hidden.includes(id)) return { ...normalized, updatedAt: now }
+  return toggleAccueilWidgetHidden(normalized, id, now)
+}
+
+/** Hidden widgets in order (for « + Ajouter »). */
+export function resolveHiddenAccueilWidgets(prefs: AccueilWidgetPrefs): AccueilWidgetId[] {
+  const normalized = normalizeAccueilWidgetPrefs(prefs)
+  const hidden = new Set(normalized.hidden)
+  return normalized.order.filter((id): id is AccueilWidgetId => isKnownWidgetId(id) && hidden.has(id))
+}
+
 /** Persist a user-chosen water goal inside Accueil prefs (bumps updatedAt). */
 export function setAccueilWaterGoalMl(
   prefs: AccueilWidgetPrefs,

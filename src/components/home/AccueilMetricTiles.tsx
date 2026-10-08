@@ -133,10 +133,13 @@ export function EauTile({
   model,
   motion,
   onSetGoal,
+  interactive = true,
 }: {
   model: WaterTileModel
   motion: MotionOpts
   onSetGoal: () => void
+  /** False in Accueil edit mode — no water-goal sheet. */
+  interactive?: boolean
 }) {
   const instant = motion.coldEntering || motion.prefersReducedMotion
   return (
@@ -149,37 +152,36 @@ export function EauTile({
           : `Eau, ${model.waterMl} millilitres`
       }
       dataAttr="eau"
-      onClick={onSetGoal}
+      onClick={interactive ? onSetGoal : undefined}
     >
-      <div className="mt-1 flex flex-1 items-end justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-baseline gap-1">
-            <span className="accueil-metric-tile__value">
-              <CountUpNumber kind="water" value={model.waterMl} instant={instant} />
-            </span>
-            <span className="accueil-metric-tile__unit">ml</span>
-          </div>
-          <p className="mt-1 truncate text-[11px] text-[#8E8E93]">
-            {model.showRing && model.goalMl != null
-              ? formatWaterGoalHint(model.goalMl)
-              : 'Définir un objectif'}
-          </p>
-        </div>
+      {/* Visual pinned top-right so number / unit / hint never overlap at 375–402px */}
+      <span className="accueil-metric-tile__corner" aria-hidden="true">
         {model.showRing ? (
           <AccueilProgressRing
             progress={model.progress}
             accent="#0A84FF"
             instant={instant}
-            size={64}
+            size={44}
+            strokeWidth={5}
           />
         ) : (
-          <span
-            className="flex h-14 w-14 items-center justify-center rounded-full bg-[#0A84FF]/12 text-[#0A84FF]"
-            aria-hidden="true"
-          >
-            <Droplets className="h-6 w-6" strokeWidth={1.75} />
+          <span className="accueil-metric-tile__drop">
+            <Droplets className="h-3.5 w-3.5" strokeWidth={1.75} />
           </span>
         )}
+      </span>
+      <div className="accueil-metric-tile__stack mt-auto">
+        <div className="accueil-metric-tile__value-row">
+          <span className="accueil-metric-tile__value">
+            <CountUpNumber kind="water" value={model.waterMl} instant={instant} />
+          </span>
+          <span className="accueil-metric-tile__unit">ml</span>
+        </div>
+        <p className="accueil-metric-tile__hint">
+          {model.showRing && model.goalMl != null
+            ? formatWaterGoalHint(model.goalMl)
+            : 'Définir un objectif'}
+        </p>
       </div>
     </TileShell>
   )
@@ -242,10 +244,12 @@ export function ProchaineSeanceTile({
   model,
   onStart,
   onOpenTrain,
+  interactive = true,
 }: {
   model: NextSessionTileModel
   onStart: (routineId: string) => void
   onOpenTrain: () => void
+  interactive?: boolean
 }) {
   return (
     <TileShell
@@ -263,8 +267,12 @@ export function ProchaineSeanceTile({
         {model.canStart && model.routineId ? (
           <button
             type="button"
-            onClick={() => onStart(model.routineId!)}
-            className="accueil-metric-tile__cta ios-press"
+            disabled={!interactive}
+            onClick={() => {
+              if (!interactive) return
+              onStart(model.routineId!)
+            }}
+            className="accueil-metric-tile__cta ios-press disabled:opacity-60"
             data-accueil-next-start
             data-accueil-next-cta={model.inProgress ? 'reprendre' : 'demarrer'}
           >
@@ -273,8 +281,12 @@ export function ProchaineSeanceTile({
         ) : (
           <button
             type="button"
-            onClick={onOpenTrain}
-            className="accueil-metric-tile__cta accueil-metric-tile__cta--ghost ios-press"
+            disabled={!interactive}
+            onClick={() => {
+              if (!interactive) return
+              onOpenTrain()
+            }}
+            className="accueil-metric-tile__cta accueil-metric-tile__cta--ghost ios-press disabled:opacity-60"
             data-accueil-next-open
           >
             Ouvrir Train
@@ -289,10 +301,12 @@ export function ProgrammeProgressTile({
   model,
   onOpenTrain,
   motion,
+  interactive = true,
 }: {
   model: ProgramTileModel
   onOpenTrain: () => void
   motion: MotionOpts
+  interactive?: boolean
 }) {
   void motion
   return (
@@ -302,7 +316,7 @@ export function ProgrammeProgressTile({
       ariaLabel={`Programme, ${model.percent} pour cent`}
       wide
       dataAttr="programme"
-      onClick={onOpenTrain}
+      onClick={interactive ? onOpenTrain : undefined}
     >
       <div className="mt-2 flex items-baseline gap-1.5">
         <span className="accueil-metric-tile__value" data-accueil-program-percent>

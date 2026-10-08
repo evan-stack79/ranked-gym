@@ -264,8 +264,9 @@ describe('accueilWidgetTiles — week bars & next session', () => {
     const model = deriveProgramTileModel(state, FIXED)
     expect(model.plannedSessions).toBe(3)
     expect(model.doneSessions).toBe(1)
-    expect(model.label).toBe('1 / 3 séances cette semaine')
+    expect(model.label).toBe('1 / 3 séances du programme')
     expect(model.label).not.toMatch(/%/)
+    expect(model.label).not.toMatch(/cette semaine/)
   })
 
   it('formats water goal hint on one compact line', () => {
