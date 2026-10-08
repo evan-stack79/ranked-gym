@@ -24,6 +24,11 @@ interface ImportMetaEnv {
   readonly VITE_ENABLE_AUTO_SET_VALIDATION?: string
   /** Onboarding multisport. Unset = ON en DEV/test, OFF en prod. */
   readonly VITE_ENABLE_SPORTS_ONBOARDING?: string
+  /**
+   * Accueil gallery + floating pill nav.
+   * Unset/empty = ON. Explicit false restores legacy dashboard + dock nav.
+   */
+  readonly VITE_ENABLE_ACCUEIL_GALLERY?: string
 }
 
 interface ImportMeta {

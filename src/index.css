@@ -62,7 +62,7 @@ body {
   --rest-island-h: 3.25rem;
   --rest-island-gap: 10px;
   /* Ancrage fixed : juste au-dessus de la nav */
-  --rest-bar-bottom: calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px));
+  --rest-bar-bottom: calc(var(--app-bottom-nav) + var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
   /* Espace scroll supplémentaire sous le contenu Train */
   --rest-content-clearance: calc(var(--rest-island-h) + var(--rest-island-gap));
   /* Surchageables par le harness navigateur; production = vraies safe areas. */
@@ -114,6 +114,35 @@ body {
 
 .mesh-bg {
   background-color: #0c0c0e;
+}
+
+/* Accueil gallery preview — hero gradients (no body photos) */
+.accueil-gallery__hero-bg--brand {
+  background:
+    radial-gradient(120% 80% at 20% 10%, rgb(255 43 43 / 0.55), transparent 55%),
+    linear-gradient(160deg, #3a1212 0%, #1a0c0c 45%, #0c0c0e 100%);
+}
+
+.accueil-gallery__hero-bg--graphite {
+  background:
+    radial-gradient(120% 80% at 80% 0%, rgb(125 211 252 / 0.18), transparent 50%),
+    linear-gradient(160deg, #2a2a2e 0%, #161618 50%, #0c0c0e 100%);
+}
+
+.accueil-gallery__carousel,
+.accueil-gallery__tiles {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.accueil-gallery__carousel::-webkit-scrollbar,
+.accueil-gallery__tiles::-webkit-scrollbar {
+  display: none;
+}
+
+/* Floating pill nav — clearance for pill + elevated red centre CTA + safe area */
+:root[data-bottom-nav-preview='floating-pill'] {
+  --app-bottom-nav: 108px;
 }
 
 .xp-fill {

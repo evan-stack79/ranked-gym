@@ -107,6 +107,7 @@ export function TrainingView({
   onLaunchConsumed,
   onGoToLobby,
   openActivitySheet = false,
+  openHistory = false,
 }: {
   launchRoutineId?: string | null
   resumeActiveWorkout?: boolean
@@ -114,6 +115,8 @@ export function TrainingView({
   onGoToLobby?: () => void
   /** Navbar « Nouvelle séance » — ouvre le sheet, sans créer de 2e brouillon. */
   openActivitySheet?: boolean
+  /** Accueil gallery « Récent » — ouvre le panneau Historique. */
+  openHistory?: boolean
 }) {
   const { isLoading: isBootLoading, isAuthenticated, requireAuth } = useAuth()
   const [state, setState] = useState<TrainingState>(() => getTrainingState())
@@ -333,6 +336,12 @@ export function TrainingView({
     }
     onLaunchConsumed?.()
   }, [openActivitySheet, onLaunchConsumed, openNotebook])
+
+  useEffect(() => {
+    if (!openHistory) return
+    setPanel('history')
+    onLaunchConsumed?.()
+  }, [openHistory, onLaunchConsumed])
 
   /** Cold start / remount OS : rouvrir la séance sauf soft-leave volontaire. */
   useEffect(() => {

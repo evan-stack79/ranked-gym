@@ -19,25 +19,59 @@ afterEach(async () => {
 })
 
 describe('BottomNav centre', () => {
-  it('Nouvelle séance s’il n’y a pas de brouillon', async () => {
+  it('Nouvelle séance s’il n’y a pas de brouillon (dock)', async () => {
     await act(async () => {
       root.render(
-        <BottomNav activeTab="training" onTabChange={vi.fn()} hasActiveWorkout={false} />,
+        <BottomNav
+          activeTab="training"
+          onTabChange={vi.fn()}
+          hasActiveWorkout={false}
+          floatingPill={false}
+        />,
       )
     })
     expect(host.textContent).toContain('Nouvelle séance')
     expect(host.querySelector('[data-nav-center="new"]')).toBeTruthy()
     expect(host.textContent).not.toContain('Démarrer')
+    expect(host.querySelector('[data-bottom-nav-variant="dock"]')).toBeTruthy()
   })
 
-  it('Reprendre si une séance est active', async () => {
+  it('Reprendre si une séance est active (dock)', async () => {
     await act(async () => {
       root.render(
-        <BottomNav activeTab="training" onTabChange={vi.fn()} hasActiveWorkout />,
+        <BottomNav
+          activeTab="training"
+          onTabChange={vi.fn()}
+          hasActiveWorkout
+          floatingPill={false}
+        />,
       )
     })
     expect(host.textContent).toContain('Reprendre')
     expect(host.querySelector('[data-nav-center="resume"]')).toBeTruthy()
     expect(host.textContent).not.toContain('Nouvelle séance')
+  })
+
+  it('floating pill : icons only, same tabs + aria-labels, prominent centre', async () => {
+    await act(async () => {
+      root.render(
+        <BottomNav
+          activeTab="training"
+          onTabChange={vi.fn()}
+          hasActiveWorkout={false}
+          floatingPill
+        />,
+      )
+    })
+    const nav = host.querySelector('[data-bottom-nav-variant="floating-pill"]')
+    expect(nav).toBeTruthy()
+    expect(host.querySelector('[aria-label="Accueil"]')).toBeTruthy()
+    expect(host.querySelector('[aria-label="Train"]')).toBeTruthy()
+    expect(host.querySelector('[aria-label="Nutri"]')).toBeTruthy()
+    expect(host.querySelector('[aria-label="Profil"]')).toBeTruthy()
+    expect(host.querySelector('[aria-label="Nouvelle séance"]')).toBeTruthy()
+    expect(host.querySelector('[aria-current="page"]')?.getAttribute('aria-label')).toBe('Train')
+    // No visible tab labels in the pill (aria-label only)
+    expect(host.textContent).not.toMatch(/Accueil|Train|Nutri|Profil/)
   })
 })
