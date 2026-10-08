@@ -230,19 +230,25 @@ async function main() {
     await gotoHome(page)
     await assertNoSelection(page, 'home-ready')
 
-    // Confirm inputs stay selectable (CSS re-enable) via a probe field
+    // Confirm inputs stay selectable (CSS re-enable) via a probe field inside #root
     const inputOk = await page.evaluate(() => {
+      const root = document.querySelector('#root') ?? document.body
       const input = document.createElement('input')
       input.type = 'search'
-      input.value = 'probe'
-      document.body.appendChild(input)
+      input.value = 'hello probe'
+      root.appendChild(input)
+      input.focus()
+      input.setSelectionRange(0, 5)
       const style = getComputedStyle(input)
-      const ok =
-        style.userSelect === 'text' ||
-        style.webkitUserSelect === 'text' ||
-        style.getPropertyValue('user-select') === 'text'
+      const userSelect =
+        style.getPropertyValue('user-select') ||
+        style.userSelect ||
+        style.webkitUserSelect ||
+        ''
+      const selected = input.selectionEnd - input.selectionStart
+      const ok = (userSelect === 'text' || userSelect === 'auto') && selected === 5
       input.remove()
-      return { ok, userSelect: style.userSelect, webkitUserSelect: style.webkitUserSelect }
+      return { ok, userSelect, selected }
     })
     console.log('input re-enable', inputOk)
     if (!inputOk.ok) {
