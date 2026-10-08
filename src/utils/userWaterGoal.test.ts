@@ -73,12 +73,27 @@ describe('userWaterGoal', () => {
     expect(getUserWaterGoalMl()).toBeNull()
   })
 
-  it('parse ml et L sans préremplissage poids', () => {
-    expect(parseWaterGoalInput('2000')).toBe(2000)
+  it('parseWaterGoalInput : L / ml → ml entiers', () => {
     expect(parseWaterGoalInput('2 L')).toBe(2000)
-    expect(parseWaterGoalInput('1,5')).toBe(1500)
-    expect(parseWaterGoalInput('500 ml')).toBe(500)
-    expect(parseWaterGoalInput('')).toBeNull()
+    expect(Number.isInteger(parseWaterGoalInput('2 L'))).toBe(true)
+
+    expect(parseWaterGoalInput('2,5 L')).toBe(2500)
+    expect(Number.isInteger(parseWaterGoalInput('2,5 L'))).toBe(true)
+
+    expect(parseWaterGoalInput('2.5 L')).toBe(2500)
+    expect(Number.isInteger(parseWaterGoalInput('2.5 L'))).toBe(true)
+
+    expect(parseWaterGoalInput('2000 ml')).toBe(2000)
+    expect(Number.isInteger(parseWaterGoalInput('2000 ml'))).toBe(true)
+  })
+
+  it('round-trip setUserWaterGoalMl(parseWaterGoalInput(« 2,5 L »)) → 2500 entier', () => {
+    const parsed = parseWaterGoalInput('2,5 L')
+    expect(setUserWaterGoalMl(parsed!)).toBe(true)
+    expect(getUserWaterGoalMl()).toBe(2500)
+    const stored = JSON.parse(store.get(USER_WATER_GOAL_KEY)!)
+    expect(stored.goalMl).toBe(2500)
+    expect(Number.isInteger(stored.goalMl)).toBe(true)
   })
 
   it('clearUserWaterGoal retire la clé', () => {

@@ -9,6 +9,7 @@
 export const USER_WATER_GOAL_KEY = 'ranked-gym:water-goal'
 export const USER_WATER_GOAL_VERSION = 1 as const
 
+/** Bornes techniques anti-faute de frappe : choix de prudence, non sourcé. Ne jamais afficher ces chiffres à l'utilisateur. */
 export const WATER_GOAL_MIN_ML = 250
 export const WATER_GOAL_MAX_ML = 6000
 
@@ -25,8 +26,19 @@ export type UserWaterGoalRecord = {
   updatedAt: number
 }
 
+/**
+ * Round to an integer ml and accept only values inside the technical bounds.
+ * Every persist / parse path must go through this so stored `goalMl` is always an integer.
+ */
+export function normalizeUserWaterGoalMl(ml: unknown): number | null {
+  if (typeof ml !== 'number' || !Number.isFinite(ml)) return null
+  const goalMl = Math.round(ml)
+  if (goalMl < WATER_GOAL_MIN_ML || goalMl > WATER_GOAL_MAX_ML) return null
+  return goalMl
+}
+
 export function isValidUserWaterGoalMl(ml: unknown): ml is number {
-  return typeof ml === 'number' && Number.isFinite(ml) && ml >= WATER_GOAL_MIN_ML && ml <= WATER_GOAL_MAX_ML
+  return normalizeUserWaterGoalMl(ml) != null
 }
 
 function emitWaterGoalChanged(): void {
@@ -61,7 +73,8 @@ export function parseUserWaterGoalRecord(raw: string | null): UserWaterGoalRecor
       clearStoredGoal()
       return null
     }
-    if (!isValidUserWaterGoalMl(parsed.goalMl)) {
+    const goalMl = normalizeUserWaterGoalMl(parsed.goalMl)
+    if (goalMl == null) {
       clearStoredGoal()
       return null
     }
@@ -69,12 +82,23 @@ export function parseUserWaterGoalRecord(raw: string | null): UserWaterGoalRecor
       typeof parsed.updatedAt === 'number' && Number.isFinite(parsed.updatedAt)
         ? parsed.updatedAt
         : Date.now()
-    return {
+    const record: UserWaterGoalRecord = {
       version: USER_WATER_GOAL_VERSION,
-      goalMl: Math.round(parsed.goalMl),
+      goalMl,
       source: 'user',
       updatedAt,
     }
+    // Re-write if the stored payload had a non-integer goalMl
+    if (parsed.goalMl !== goalMl) {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(USER_WATER_GOAL_KEY, JSON.stringify(record))
+        }
+      } catch {
+        // ignore quota / private mode
+      }
+    }
+    return record
   } catch {
     clearStoredGoal()
     return null
@@ -92,12 +116,13 @@ export function getUserWaterGoalMl(): number | null {
   }
 }
 
-/** Persist a user-chosen goal. Rejects out-of-range values. */
+/** Persist a user-chosen goal. Rejects out-of-range values. Stored `goalMl` is always an integer. */
 export function setUserWaterGoalMl(ml: number, now = Date.now()): boolean {
-  if (!isValidUserWaterGoalMl(ml)) return false
+  const goalMl = normalizeUserWaterGoalMl(ml)
+  if (goalMl == null) return false
   const record: UserWaterGoalRecord = {
     version: USER_WATER_GOAL_VERSION,
-    goalMl: Math.round(ml),
+    goalMl,
     source: 'user',
     updatedAt: now,
   }
@@ -120,6 +145,7 @@ export function clearUserWaterGoal(): void {
  * Parse a free-form amount typed by the user (ml or L).
  * Values ≤ 20 are treated as liters (e.g. "2" → 2000, "1,5" → 1500).
  * Values > 20 are treated as milliliters.
+ * Always returns an integer number of ml (or null).
  */
 export function parseWaterGoalInput(raw: string): number | null {
   const trimmed = raw.trim().replace(/\s/g, '').replace(',', '.')
