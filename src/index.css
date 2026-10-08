@@ -222,7 +222,7 @@ body {
 .rg-tilt {
   position: relative;
   touch-action: pan-x pan-y;
-  perspective: 900px;
+  perspective: 640px;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -230,15 +230,19 @@ body {
   position: relative;
   overflow: hidden;
   border-radius: 24px;
-  transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))
+  transform: perspective(640px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))
     scale(var(--tilt-scale, 1));
   transform-style: preserve-3d;
-  transition: transform var(--tilt-reset-ms, 360ms) var(--ease-out);
+  box-shadow: var(--sx, 0px) var(--sy, 0px) 28px rgb(0 0 0 / 0);
+  transition:
+    transform var(--tilt-reset-ms, 360ms) var(--ease-out),
+    box-shadow var(--tilt-reset-ms, 360ms) var(--ease-out);
 }
 
 .rg-tilt--active .rg-tilt__plane {
   will-change: transform;
   transition: none;
+  box-shadow: var(--sx, 0px) var(--sy, 0px) 28px rgb(0 0 0 / 0.45);
 }
 
 .rg-tilt__glare {
@@ -248,11 +252,12 @@ body {
   border-radius: inherit;
   pointer-events: none;
   opacity: 0;
+  mix-blend-mode: soft-light;
   background: radial-gradient(
     circle at var(--gx, 50%) var(--gy, 50%),
-    rgb(255 255 255 / 0.16) 0%,
-    rgb(255 255 255 / 0.06) 28%,
-    transparent 58%
+    rgb(255 255 255 / 0.18) 0%,
+    rgb(255 255 255 / 0.08) 32%,
+    transparent 60%
   );
   transition: opacity var(--tilt-reset-ms, 360ms) var(--ease-out);
 }
@@ -708,7 +713,8 @@ body {
 .rg-mask-reveal--instant,
 .rg-mask-reveal--instant.rg-mask-reveal--in {
   animation: none !important;
-  clip-path: inset(0);
+  /* none (not inset(0)) so post-reveal 3D tilt can paint outside the box */
+  clip-path: none;
   transform: none;
   will-change: auto;
 }
@@ -719,7 +725,8 @@ body {
     transform: translate3d(0, 10px, 0);
   }
   to {
-    clip-path: inset(0);
+    /* Drop clipping when settled — inset(0) still clips tilted descendants */
+    clip-path: none;
     transform: none;
   }
 }
@@ -736,7 +743,7 @@ body {
 .rg-reveal--instant,
 .rg-reveal--instant.rg-reveal--in {
   animation: none !important;
-  clip-path: inset(0);
+  clip-path: none;
   transform: none;
 }
 

@@ -120,8 +120,10 @@ describe('TiltCard', () => {
     const corner = computeTiltVars(200, 0, rect)
     expect(corner.ry).toBeCloseTo(TILT_MAX_DEG, 5)
     expect(corner.rx).toBeCloseTo(TILT_MAX_DEG, 5)
-    expect(Math.abs(corner.rx)).toBeLessThanOrEqual(8)
-    expect(Math.abs(corner.ry)).toBeLessThanOrEqual(8)
+    expect(Math.abs(corner.rx)).toBeLessThanOrEqual(TILT_MAX_DEG)
+    expect(Math.abs(corner.ry)).toBeLessThanOrEqual(TILT_MAX_DEG)
+    expect(TILT_MAX_DEG).toBeGreaterThanOrEqual(6)
+    expect(TILT_MAX_DEG).toBeLessThanOrEqual(8)
   })
 
   it('sets tilt CSS vars on pointer move and resets on pointerup', () => {

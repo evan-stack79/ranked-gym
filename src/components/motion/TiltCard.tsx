@@ -1,14 +1,8 @@
-import {
-  useEffect,
-  useRef,
-  type CSSProperties,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-} from 'react'
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 
-export const TILT_MAX_DEG = 7
-export const TILT_ACTIVE_SCALE = 1.015
+export const TILT_MAX_DEG = 8
+export const TILT_ACTIVE_SCALE = 1.02
 /** Horizontal move beyond this cancels tilt so the carousel can swipe. */
 export const TILT_SWIPE_CANCEL_PX = 12
 export const TILT_RESET_MS = 360
@@ -67,6 +61,9 @@ function applyTiltVars(plane: HTMLElement, vars: TiltVars, scale: number) {
   plane.style.setProperty('--gx', `${vars.gx.toFixed(2)}%`)
   plane.style.setProperty('--gy', `${vars.gy.toFixed(2)}%`)
   plane.style.setProperty('--tilt-scale', String(scale))
+  // Soft depth cue (px) — helps the 3D read without raising degrees
+  plane.style.setProperty('--sx', `${(vars.ry * 0.55).toFixed(2)}px`)
+  plane.style.setProperty('--sy', `${(-vars.rx * 0.55).toFixed(2)}px`)
 }
 
 function clearTiltVars(plane: HTMLElement) {
@@ -75,12 +72,15 @@ function clearTiltVars(plane: HTMLElement) {
   plane.style.setProperty('--gx', '50%')
   plane.style.setProperty('--gy', '50%')
   plane.style.setProperty('--tilt-scale', '1')
+  plane.style.setProperty('--sx', '0px')
+  plane.style.setProperty('--sy', '0px')
 }
 
 /**
  * Subtle 3D tilt + glare for Accueil hero cards.
- * Writes CSS vars via rAF (no React state per move). Does not preventDefault
- * on touch — horizontal carousel swipe still wins past a small threshold.
+ * Writes CSS vars via rAF (no React state per move). Native pointer listeners
+ * (not React synthetic) so Playwright / touch sims work. Does not preventDefault
+ * — horizontal carousel swipe still wins past a small threshold.
  * Transform lives on an inner plane so Reveal / clip-path stay untouched.
  */
 export function TiltCard({ children, className = '', disabled = false }: TiltCardProps) {
@@ -89,88 +89,130 @@ export function TiltCard({ children, className = '', disabled = false }: TiltCar
 
   const rootRef = useRef<HTMLDivElement>(null)
   const planeRef = useRef<HTMLDivElement>(null)
-  const rafRef = useRef(0)
-  const pendingRef = useRef<{ x: number; y: number } | null>(null)
-  const activeRef = useRef(false)
-  const cancelledRef = useRef(false)
-  const startRef = useRef<{ x: number; y: number } | null>(null)
-  const touchTrackingRef = useRef(false)
-
-  const setActiveClass = (on: boolean) => {
-    const root = rootRef.current
-    if (!root) return
-    root.classList.toggle('rg-tilt--active', on)
-    root.dataset.rgTiltActive = on ? '1' : '0'
-  }
-
-  const resetTilt = () => {
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current)
-      rafRef.current = 0
-    }
-    pendingRef.current = null
-    activeRef.current = false
-    touchTrackingRef.current = false
-    startRef.current = null
-    const plane = planeRef.current
-    if (plane) clearTiltVars(plane)
-    setActiveClass(false)
-  }
-
-  const flushTilt = () => {
-    rafRef.current = 0
-    const pending = pendingRef.current
-    const plane = planeRef.current
-    if (!pending || !plane || cancelledRef.current) return
-    const rect = plane.getBoundingClientRect()
-    const vars = computeTiltVars(pending.x, pending.y, rect)
-    applyTiltVars(plane, vars, TILT_ACTIVE_SCALE)
-    if (!activeRef.current) {
-      activeRef.current = true
-      setActiveClass(true)
-    }
-  }
-
-  const scheduleTilt = (clientX: number, clientY: number) => {
-    if (off || cancelledRef.current) return
-    pendingRef.current = { x: clientX, y: clientY }
-    if (rafRef.current) return
-    rafRef.current = requestAnimationFrame(flushTilt)
-  }
 
   useEffect(() => {
-    if (off) return
-
     const root = rootRef.current
-    const scroller = closestHorizontalScroller(root)
-    if (!scroller) return
+    const plane = planeRef.current
+    if (!root || !plane || off) return
 
-    const onScroll = () => {
-      if (!activeRef.current && !touchTrackingRef.current) return
-      cancelledRef.current = true
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current)
-        rafRef.current = 0
-      }
-      pendingRef.current = null
-      activeRef.current = false
-      touchTrackingRef.current = false
-      startRef.current = null
-      const plane = planeRef.current
-      if (plane) clearTiltVars(plane)
-      root?.classList.remove('rg-tilt--active')
-      if (root) root.dataset.rgTiltActive = '0'
+    let rafId = 0
+    let pending: { x: number; y: number } | null = null
+    let active = false
+    let cancelled = false
+    let touchTracking = false
+    let start: { x: number; y: number } | null = null
+
+    const setActiveClass = (on: boolean) => {
+      root.classList.toggle('rg-tilt--active', on)
+      root.dataset.rgTiltActive = on ? '1' : '0'
     }
-    scroller.addEventListener('scroll', onScroll, { passive: true })
-    return () => scroller.removeEventListener('scroll', onScroll)
-  }, [off])
 
-  useEffect(
-    () => () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-    },
-    [],
-  )
+    const resetTilt = () => {
+      if (rafId) {
+        cancelAnimationFrame(rafId)
+        rafId = 0
+      }
+      pending = null
+      active = false
+      touchTracking = false
+      start = null
+      clearTiltVars(plane)
+      setActiveClass(false)
+    }
+
+    const flushTilt = () => {
+      rafId = 0
+      if (!pending || cancelled) return
+      const rect = plane.getBoundingClientRect()
+      const vars = computeTiltVars(pending.x, pending.y, rect)
+      applyTiltVars(plane, vars, TILT_ACTIVE_SCALE)
+      if (!active) {
+        active = true
+        setActiveClass(true)
+      }
+    }
+
+    const scheduleTilt = (clientX: number, clientY: number) => {
+      if (cancelled) return
+      pending = { x: clientX, y: clientY }
+      if (rafId) return
+      rafId = requestAnimationFrame(flushTilt)
+    }
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.pointerType !== 'touch') return
+      cancelled = false
+      touchTracking = true
+      start = { x: event.clientX, y: event.clientY }
+      scheduleTilt(event.clientX, event.clientY)
+    }
+
+    const onPointerMove = (event: PointerEvent) => {
+      if (event.pointerType === 'touch') {
+        if (!touchTracking || cancelled) return
+        if (start) {
+          const dx = event.clientX - start.x
+          const dy = event.clientY - start.y
+          if (Math.abs(dx) > TILT_SWIPE_CANCEL_PX && Math.abs(dx) > Math.abs(dy)) {
+            cancelled = true
+            resetTilt()
+            return
+          }
+        }
+        scheduleTilt(event.clientX, event.clientY)
+        return
+      }
+
+      if (event.pointerType === 'mouse' || event.pointerType === 'pen') {
+        cancelled = false
+        scheduleTilt(event.clientX, event.clientY)
+      }
+    }
+
+    const onPointerUp = (event: PointerEvent) => {
+      if (event.pointerType === 'touch') {
+        cancelled = false
+        resetTilt()
+      }
+    }
+
+    const onPointerCancel = () => {
+      cancelled = false
+      resetTilt()
+    }
+
+    const onPointerLeave = (event: PointerEvent) => {
+      if (event.pointerType === 'mouse' || event.pointerType === 'pen') {
+        resetTilt()
+      }
+    }
+
+    root.addEventListener('pointerdown', onPointerDown)
+    root.addEventListener('pointermove', onPointerMove)
+    root.addEventListener('pointerup', onPointerUp)
+    root.addEventListener('pointercancel', onPointerCancel)
+    root.addEventListener('pointerleave', onPointerLeave)
+
+    const scroller = closestHorizontalScroller(root)
+    const onScroll = () => {
+      if (!active && !touchTracking) return
+      cancelled = true
+      resetTilt()
+    }
+    scroller?.addEventListener('scroll', onScroll, { passive: true })
+
+    return () => {
+      root.removeEventListener('pointerdown', onPointerDown)
+      root.removeEventListener('pointermove', onPointerMove)
+      root.removeEventListener('pointerup', onPointerUp)
+      root.removeEventListener('pointercancel', onPointerCancel)
+      root.removeEventListener('pointerleave', onPointerLeave)
+      scroller?.removeEventListener('scroll', onScroll)
+      if (rafId) cancelAnimationFrame(rafId)
+      clearTiltVars(plane)
+      setActiveClass(false)
+    }
+  }, [off])
 
   if (off) {
     return (
@@ -180,63 +222,14 @@ export function TiltCard({ children, className = '', disabled = false }: TiltCar
     )
   }
 
-  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.pointerType === 'touch') {
-      cancelledRef.current = false
-      touchTrackingRef.current = true
-      startRef.current = { x: event.clientX, y: event.clientY }
-      scheduleTilt(event.clientX, event.clientY)
-    }
-  }
-
-  const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.pointerType === 'touch') {
-      if (!touchTrackingRef.current || cancelledRef.current) return
-      const start = startRef.current
-      if (start) {
-        const dx = event.clientX - start.x
-        const dy = event.clientY - start.y
-        if (Math.abs(dx) > TILT_SWIPE_CANCEL_PX && Math.abs(dx) > Math.abs(dy)) {
-          cancelledRef.current = true
-          resetTilt()
-          return
-        }
-      }
-      scheduleTilt(event.clientX, event.clientY)
-      return
-    }
-
-    // Desktop: hover tilt (no press required)
-    if (event.pointerType === 'mouse' || event.pointerType === 'pen') {
-      cancelledRef.current = false
-      scheduleTilt(event.clientX, event.clientY)
-    }
-  }
-
-  const onPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.pointerType === 'touch') {
-      cancelledRef.current = false
-      resetTilt()
-    }
-  }
-
-  const onPointerCancel = () => {
-    cancelledRef.current = false
-    resetTilt()
-  }
-
-  const onPointerLeave = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.pointerType === 'mouse' || event.pointerType === 'pen') {
-      resetTilt()
-    }
-  }
-
   const planeStyle = {
     '--rx': '0deg',
     '--ry': '0deg',
     '--gx': '50%',
     '--gy': '50%',
     '--tilt-scale': '1',
+    '--sx': '0px',
+    '--sy': '0px',
     '--tilt-reset-ms': `${TILT_RESET_MS}ms`,
   } as CSSProperties
 
@@ -246,11 +239,6 @@ export function TiltCard({ children, className = '', disabled = false }: TiltCar
       className={['rg-tilt', className].filter(Boolean).join(' ')}
       data-rg-tilt="on"
       data-rg-tilt-active="0"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
-      onPointerLeave={onPointerLeave}
     >
       <div ref={planeRef} className="rg-tilt__plane" style={planeStyle} data-rg-tilt-plane>
         {children}

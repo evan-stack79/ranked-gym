@@ -17,9 +17,11 @@ describe('Evan motion CSS contract', () => {
     expect(css).toMatch(/\.rg-soft-blur[\s\S]*?translate3d\(0,\s*4px,\s*0\)/)
   })
 
-  it('Mask Reveal Up uses clip-path inset from 100% to 0', () => {
+  it('Mask Reveal Up clips from inset(100%) then releases clip-path', () => {
     expect(css).toMatch(/\.rg-mask-reveal[\s\S]*?clip-path:\s*inset\(100%\s+0\s+0\s+0\)/)
-    expect(css).toMatch(/@keyframes\s+rg-mask-reveal-up[\s\S]*?clip-path:\s*inset\(0\)/)
+    // Settled state must be clip-path: none so post-reveal 3D (tilt) can paint
+    expect(css).toMatch(/@keyframes\s+rg-mask-reveal-up[\s\S]*?clip-path:\s*none/)
+    expect(css).toMatch(/\.rg-mask-reveal--instant[\s\S]*?clip-path:\s*none/)
   })
 
   it('Text Flip uses rotateX and stable-width measure', () => {
