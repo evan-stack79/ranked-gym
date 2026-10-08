@@ -70,7 +70,7 @@ describe('QA BUG-10 — purge locale à la suppression de compte', () => {
     expect(after.onboardingComplete).toBe(false)
     expect(after.declaredPregnancy).toBe(false)
     expect(after.declaredEatingDisorder).toBe(false)
-    expect(after.weightKg).toBe(0)
+    expect(after.weightKg).toBeNull()
     expect(Object.keys(getMealJournal())).toHaveLength(0)
     expect(localStorage.getItem('ranked-gym:piece-presets')).toBeNull()
     expect(localStorage.getItem('ranked-gym:convex-nutrition-queue:u:user-qa-10')).toBeNull()

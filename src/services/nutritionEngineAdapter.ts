@@ -59,13 +59,15 @@ export function profileToEngineInput(
   const training = getTrainingState()
   const { deficit_kcal, surplus_kcal } = paceToDeficitSurplus(profile, opts)
   const sex = profile.sex === 'female' ? 'female' : 'male'
+  const weightKg = typeof profile.weightKg === 'number' ? profile.weightKg : 0
+  const heightCm = typeof profile.heightCm === 'number' ? profile.heightCm : 0
 
   return {
     sex,
     // Ne plus remonter les mineurs à 18 — l'âge réel est transmis ; le moteur refuse < 18.
     age: profile.age,
-    weight_kg: profile.weightKg,
-    height_m: profile.heightCm / 100,
+    weight_kg: weightKg,
+    height_m: heightCm / 100,
     activity: PROFILE_ACTIVITY_TO_IOM[profile.activity],
     goal: profile.goal === 'cut' && deficit_kcal === 0 ? 'maintain' : profile.goal,
     deficit_kcal,
@@ -121,7 +123,12 @@ export function clampEngineTargetCalories(
   if (profile.sex !== 'male' && profile.sex !== 'female') {
     return { targetCalories: 0, softBandWarning: false }
   }
-  const rmr = estimateRmrKcal(profile.weightKg, profile.heightCm, profile.age, profile.sex)
+  const weightKg = typeof profile.weightKg === 'number' ? profile.weightKg : 0
+  const heightCm = typeof profile.heightCm === 'number' ? profile.heightCm : 0
+  if (weightKg <= 0 || heightCm <= 0) {
+    return { targetCalories: 0, softBandWarning: false }
+  }
+  const rmr = estimateRmrKcal(weightKg, heightCm, profile.age, profile.sex)
   const decision = evaluateCalorieTarget({
     targetCalories,
     maintenanceKcal,

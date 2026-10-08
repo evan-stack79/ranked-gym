@@ -36,6 +36,15 @@ export const PLAUSIBLE_AGE_MIN = 10
 export const PLAUSIBLE_AGE_MAX = 120
 export const MANUAL_PREGNANCY_FLOOR_KCAL = 1500
 
+/** Bornes typo corps — source unique (SEC-NUT). Jamais affichées comme conseil. */
+export const WEIGHT_KG_MIN = 30
+export const WEIGHT_KG_MAX = 250
+export const HEIGHT_CM_MIN = 100
+export const HEIGHT_CM_MAX = 250
+
+/** Exact SI conversion — lb is display-only; storage stays kg. */
+export const KG_PER_LB = 0.45359237
+
 export type LossEligibilityReason =
   | 'eligible'
   | 'incomplete_profile'
@@ -129,18 +138,55 @@ export function lossBmiThreshold(age: number): number {
   return age >= 70 ? BMI_LOSS_MIN_AGE_70_PLUS : BMI_LOSS_MIN_UNDER_70
 }
 
+/**
+ * Lit un poids stocké : 0 / non-fini / hors plage → vide (null).
+ * Les comptes legacy avec 0 ne doivent jamais être traités comme un vrai poids.
+ */
+export function sanitizeWeightKg(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value === 0) return null
+  if (value < WEIGHT_KG_MIN || value > WEIGHT_KG_MAX) return null
+  return value
+}
+
+/** Lit une taille stockée : 0 / non-fini / hors plage → vide (null). */
+export function sanitizeHeightCm(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value === 0) return null
+  if (value < HEIGHT_CM_MIN || value > HEIGHT_CM_MAX) return null
+  return value
+}
+
+/** Clamp typo à la saisie roue — ne convertit jamais le vide en 0. */
+export function clampWeightKg(value: number): number {
+  return Math.min(WEIGHT_KG_MAX, Math.max(WEIGHT_KG_MIN, value))
+}
+
+export function clampHeightCm(value: number): number {
+  return Math.min(HEIGHT_CM_MAX, Math.max(HEIGHT_CM_MIN, value))
+}
+
+export function kgToLbDisplay(kg: number): number {
+  return Math.round(kg / KG_PER_LB)
+}
+
+export function lbToKgStorage(lb: number): number {
+  return lb * KG_PER_LB
+}
+
+/**
+ * Affiche le picker taille/poids uniquement aux adultes hors grossesse /
+ * allaitement / TCA. Âge inconnu → masqué (protecteur).
+ */
+export function shouldShowHeightWeightPicker(input: SafetyProfileInput): boolean {
+  if (!isValidAge(input.age) || isMinorAge(input.age)) return false
+  const d = readHealthDeclarations(input)
+  if (d.pregnancy || d.breastfeeding || d.eatingDisorder) return false
+  return true
+}
+
 export function isProfileCompleteForNutrition(input: SafetyProfileInput): boolean {
   const ageOk = isValidAge(input.age)
-  const weightOk =
-    typeof input.weightKg === 'number' &&
-    Number.isFinite(input.weightKg) &&
-    input.weightKg >= 30 &&
-    input.weightKg <= 250
-  const heightOk =
-    typeof input.heightCm === 'number' &&
-    Number.isFinite(input.heightCm) &&
-    input.heightCm >= 100 &&
-    input.heightCm <= 250
+  const weightOk = sanitizeWeightKg(input.weightKg) != null
+  const heightOk = sanitizeHeightCm(input.heightCm) != null
   const sexOk = input.sex === 'male' || input.sex === 'female'
   return ageOk && weightOk && heightOk && sexOk
 }
@@ -397,7 +443,7 @@ export function applySafetyToProfile(
   let goal: NutritionGoal = profile.goal
   let weeklyPaceKg = profile.weeklyPaceKg
 
-  const weightKg = Number.isFinite(profile.weightKg) ? profile.weightKg : 0
+  const weightKg = sanitizeWeightKg(profile.weightKg) ?? 0
   if (goal !== 'maintain' && weeklyPaceKg > 0) {
     weeklyPaceKg = clampWeeklyPaceKg(weeklyPaceKg, weightKg)
   }

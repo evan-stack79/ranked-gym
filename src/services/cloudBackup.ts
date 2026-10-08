@@ -9,6 +9,7 @@ import { isActiveCloudBackendConfigured, isConvexDomainActive } from '../backend
 import {
   getCalorieProfile,
   getMealJournal,
+  mergeCalorieProfilesForSync,
   saveCalorieProfile,
   saveMealJournal,
 } from './nutritionStorage'
@@ -287,7 +288,9 @@ function applyBackup(
 ) {
   const skipNutritionJournal = Boolean(options?.skipNutritionJournal)
   if (payload.nutrition?.profile) {
-    saveCalorieProfile(payload.nutrition.profile, { skipCloud: true })
+    // Field-level body-metric merge: local erase / legacy remote 0 must not resurrect.
+    const merged = mergeCalorieProfilesForSync(getCalorieProfile(), payload.nutrition.profile)
+    saveCalorieProfile(merged, { skipCloud: true })
   }
   if (!skipNutritionJournal && payload.nutrition?.journal) {
     saveMealJournal(payload.nutrition.journal, { skipCloud: true })

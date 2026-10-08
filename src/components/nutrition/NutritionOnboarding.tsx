@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronRight, Ruler, Scale, Sparkles, Target, UserRound } from 'lucide-react'
+import { ChevronRight, Sparkles, Target, UserRound } from 'lucide-react'
 import type { ActivityLevel, BodyMorphology, CalorieProfile, NutritionGoal, Sex } from '../../types/nutrition'
 import { GOAL_LABELS } from '../../utils/calories'
 import { getNutritionTarget } from '../../services/nutritionActivity'
@@ -7,6 +7,7 @@ import { MORPHOLOGY_LABELS } from '../../utils/morphology'
 import { normalizeCalorieProfile } from '../../services/nutritionStorage'
 import { IconBadge } from '../ui/IconBadge'
 import { ClearableNumberInput } from './ClearableNumberInput'
+import { HeightWeightPicker } from '../common/HeightWeightPicker'
 import { ActivityLevelPicker } from './ActivityLevelPicker'
 import { MorphologyPicker } from './MorphologyPicker'
 import { GoalPicker, WeeklyPacePicker } from './GoalPacePickers'
@@ -20,6 +21,7 @@ import {
   PLAUSIBLE_AGE_MAX,
   PLAUSIBLE_AGE_MIN,
   readHealthDeclarations,
+  shouldShowHeightWeightPicker,
 } from '../../services/nutritionSafetyRules'
 import {
   HealthSituationsForm,
@@ -93,15 +95,15 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
   const [weeklyPaceKg, setWeeklyPaceKg] = useState(
     initial.weeklyPaceKg > 0
       ? initial.weeklyPaceKg
-      : initial.weightKg > 0
+      : initial.weightKg != null && initial.weightKg > 0
         ? defaultWeeklyPaceKg(initial.weightKg)
         : 0,
   )
   const [goalWeightKg, setGoalWeightKg] = useState<number | null>(
-    seedNumber(initial.goalWeightKg),
+    seedNumber(initial.goalWeightKg ?? 0),
   )
-  const [weightKg, setWeightKg] = useState<number | null>(seedNumber(initial.weightKg))
-  const [heightCm, setHeightCm] = useState<number | null>(seedNumber(initial.heightCm))
+  const [weightKg, setWeightKg] = useState<number | null>(seedNumber(initial.weightKg ?? 0))
+  const [heightCm, setHeightCm] = useState<number | null>(seedNumber(initial.heightCm ?? 0))
   const [age, setAge] = useState<number | null>(seedNumber(initial.age))
   const [sex, setSex] = useState<Sex | null>(initial.sex)
   const [activity, setActivity] = useState<ActivityLevel>(initial.activity || 'moderate')
@@ -171,7 +173,14 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
     !isRestrictedHealth &&
     (measurementsComplete ? lossGate.eligible : true)
 
-  const showBodyFields = age != null && !isMinorAge(age)
+  const showBodyFields = shouldShowHeightWeightPicker({
+    age,
+    weightKg,
+    heightCm,
+    sex,
+    declarations,
+  })
+  const [bodyNoted, setBodyNoted] = useState(false)
 
   const draft: CalorieProfile | null = useMemo(() => {
     if (!calorieGoalEnabled) return null
@@ -229,6 +238,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
 
   const estimatedWeeks = useMemo(() => {
     if (!draft || draft.goal === 'maintain' || draft.weeklyPaceKg <= 0) return null
+    if (draft.goalWeightKg == null || draft.weightKg == null) return null
     const deltaKg = Math.round((draft.goalWeightKg - draft.weightKg) * 10) / 10
     if (deltaKg === 0) return null
     return Math.max(1, Math.ceil(Math.abs(deltaKg) / draft.weeklyPaceKg))
@@ -237,11 +247,9 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
   const buildLiteProfile = (): CalorieProfile | null => {
     if (age == null || sex == null || age <= 0) return null
     const minor = isMinorAge(age)
-    if (!minor && (weightKg == null || heightCm == null || weightKg <= 0 || heightCm <= 0)) {
-      return null
-    }
-    const w = minor ? 0 : (weightKg as number)
-    const h = minor ? 0 : (heightCm as number)
+    // Plus tard / mineur / restricted : poids/taille peuvent rester vides (null, jamais 0).
+    const w = minor || isRestrictedHealth ? null : weightKg
+    const h = minor || isRestrictedHealth ? null : heightCm
     return normalizeCalorieProfile({
       weightKg: w,
       goalWeightKg: w,
@@ -259,14 +267,11 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
 
   const buildRestrictedProfile = (): CalorieProfile | null => {
     if (age == null || sex == null || age <= 0) return null
-    const minor = isMinorAge(age)
-    // Sortie anticipée (TCA/grossesse) : poids/taille optionnels
-    const w = minor ? 0 : Math.max(0, weightKg ?? 0)
-    const h = minor ? 0 : Math.max(0, heightCm ?? 0)
+    // Sortie anticipée (TCA/grossesse/mineur) : poids/taille optionnels → null
     return normalizeCalorieProfile({
-      weightKg: w,
-      goalWeightKg: w,
-      heightCm: h,
+      weightKg: null,
+      goalWeightKg: null,
+      heightCm: null,
       age,
       sex,
       activity: activity || 'moderate',
@@ -333,7 +338,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
     setStep('activity')
   }
 
-  const goActivity = () => {
+  const goActivity = (bodyOverride?: { weightKg: number; heightCm: number }) => {
     if (age == null || sex == null) {
       setError('Remplis âge et sexe.')
       return
@@ -350,8 +355,10 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
       setStep('exit')
       return
     }
-    if (weightKg == null || heightCm == null || weightKg <= 0 || heightCm <= 0) {
-      setError('Remplis poids actuel et taille.')
+    const w = bodyOverride?.weightKg ?? weightKg
+    const h = bodyOverride?.heightCm ?? heightCm
+    if (w == null || h == null || w <= 0 || h <= 0) {
+      setError('Choisis taille et poids, ou appuie sur Plus tard.')
       return
     }
     // BUG-04 : éligibilité perte une fois les mensurations connues.
@@ -411,7 +418,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
     onComplete(profile)
   }
 
-  const continueLite = () => {
+  const continueLite = (bodyOverride?: { weightKg: number; heightCm: number }) => {
     if (age == null || sex == null) {
       setError('Remplis âge et sexe.')
       return
@@ -431,11 +438,59 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
       setStep('exit')
       return
     }
-    if (weightKg == null || heightCm == null || weightKg <= 0 || heightCm <= 0) {
-      setError('Remplis poids actuel et taille.')
+    const w = bodyOverride?.weightKg ?? weightKg
+    const h = bodyOverride?.heightCm ?? heightCm
+    if (w == null || h == null) {
+      setError('Choisis taille et poids, ou appuie sur Plus tard.')
       return
     }
-    submitLiteOrExit()
+    setWeightKg(w)
+    setHeightCm(h)
+    setBodyNoted(true)
+    window.setTimeout(() => {
+      setBodyNoted(false)
+      const profile = normalizeCalorieProfile({
+        weightKg: w,
+        goalWeightKg: w,
+        heightCm: h,
+        age,
+        sex,
+        activity: 'moderate',
+        morphology: 'mesomorph',
+        goal: 'maintain',
+        weeklyPaceKg: 0,
+        onboardingComplete: true,
+        ...health,
+      })
+      onComplete(profile)
+    }, 700)
+  }
+
+  const skipBodyMetrics = () => {
+    // Plus tard : ne sauvegarde rien — laisse null, n'écrit pas encore le profil.
+    setWeightKg(null)
+    setHeightCm(null)
+    setError(null)
+    if (!calorieGoalEnabled) {
+      if (age != null && sex != null) {
+        const profile = normalizeCalorieProfile({
+          weightKg: null,
+          goalWeightKg: null,
+          heightCm: null,
+          age,
+          sex,
+          activity: 'moderate',
+          morphology: 'mesomorph',
+          goal: 'maintain',
+          weeklyPaceKg: 0,
+          onboardingComplete: true,
+          ...health,
+        })
+        onComplete(profile)
+      }
+      return
+    }
+    setStep('exit')
   }
 
   if (showNeedToTalk) {
@@ -507,15 +562,20 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               sex={sex}
               setSex={setSex}
               showBodyFields={showBodyFields}
+              bodyNoted={bodyNoted}
+              onSkipBody={skipBodyMetrics}
+              onSaveBody={(next) => continueLite(next)}
             />
-            <button
-              type="button"
-              onClick={continueLite}
-              className="btn-brand ios-press flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[16px] font-semibold text-white"
-            >
-              Continuer
-              <ChevronRight className="h-5 w-5" />
-            </button>
+            {!showBodyFields ? (
+              <button
+                type="button"
+                onClick={() => continueLite()}
+                className="btn-brand ios-press flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[16px] font-semibold text-white"
+              >
+                Continuer
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            ) : null}
           </div>
         )}
 
@@ -659,6 +719,17 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               sex={sex}
               setSex={setSex}
               showBodyFields={showBodyFields}
+              bodyNoted={bodyNoted}
+              onSkipBody={skipBodyMetrics}
+              onSaveBody={(next) => {
+                setWeightKg(next.weightKg)
+                setHeightCm(next.heightCm)
+                setBodyNoted(true)
+                window.setTimeout(() => {
+                  setBodyNoted(false)
+                  goActivity(next)
+                }, 700)
+              }}
             />
             <div className="flex gap-2 pt-1">
               <button
@@ -668,14 +739,16 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               >
                 Retour
               </button>
-              <button
-                type="button"
-                onClick={goActivity}
-                className="btn-brand ios-press flex flex-[1.4] items-center justify-center gap-1 rounded-2xl py-3.5 text-[15px] font-semibold text-white"
-              >
-                Continuer
-                <ChevronRight className="h-4 w-4" />
-              </button>
+              {!showBodyFields ? (
+                <button
+                  type="button"
+                  onClick={() => goActivity()}
+                  className="btn-brand ios-press flex flex-[1.4] items-center justify-center gap-1 rounded-2xl py-3.5 text-[15px] font-semibold text-white"
+                >
+                  Continuer
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              ) : null}
             </div>
           </div>
         )}
@@ -870,6 +943,9 @@ function MeasurementsFields({
   sex,
   setSex,
   showBodyFields,
+  onSkipBody,
+  bodyNoted,
+  onSaveBody,
 }: {
   weightKg: number | null
   setWeightKg: (v: number | null) => void
@@ -880,6 +956,9 @@ function MeasurementsFields({
   sex: Sex | null
   setSex: (v: Sex) => void
   showBodyFields: boolean
+  onSkipBody?: () => void
+  bodyNoted?: boolean
+  onSaveBody?: (next: { weightKg: number; heightCm: number }) => void
 }) {
   return (
     <>
@@ -921,46 +1000,17 @@ function MeasurementsFields({
       </div>
 
       {showBodyFields ? (
-        <div className="grid grid-cols-2 gap-3" data-testid="onboarding-body-fields">
-          <label className="glass-card block rounded-2xl p-3.5">
-            <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
-              <Scale className="h-3.5 w-3.5 text-[#FF9F0A]" />
-              Poids actuel
-            </span>
-            <div className="flex items-end gap-1">
-              <ClearableNumberInput
-                value={weightKg}
-                onChange={setWeightKg}
-                min={35}
-                max={250}
-                step={0.1}
-                required={false}
-                placeholder="70.5"
-                aria-label="Poids actuel"
-                className="w-full bg-transparent text-[28px] font-bold text-white outline-none"
-              />
-              <span className="pb-1 text-[13px] text-[#8E8E93]">kg</span>
-            </div>
-          </label>
-          <label className="glass-card block rounded-2xl p-3.5">
-            <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
-              <Ruler className="h-3.5 w-3.5 text-[#00B4FF]" />
-              Taille
-            </span>
-            <div className="flex items-end gap-1">
-              <ClearableNumberInput
-                value={heightCm}
-                onChange={setHeightCm}
-                min={120}
-                max={230}
-                required={false}
-                placeholder="175"
-                aria-label="Taille"
-                className="w-full bg-transparent text-[28px] font-bold text-white outline-none"
-              />
-              <span className="pb-1 text-[13px] text-[#8E8E93]">cm</span>
-            </div>
-          </label>
+        <div data-testid="onboarding-body-fields">
+          <HeightWeightPicker
+            value={{ weightKg, heightCm }}
+            onChange={(next) => {
+              setWeightKg(next.weightKg)
+              setHeightCm(next.heightCm)
+            }}
+            onSave={onSaveBody}
+            onSkip={onSkipBody}
+            confirmMessage={bodyNoted ? 'C’est noté.' : null}
+          />
         </div>
       ) : null}
     </>

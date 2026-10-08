@@ -6,9 +6,16 @@ export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
 export type BodyMorphology = 'ectomorph' | 'mesomorph' | 'endomorph'
 
 export interface CalorieProfile {
-  weightKg: number
-  goalWeightKg: number
-  heightCm: number
+  /**
+   * Poids en kg. `null` = vide (jamais 0). À la lecture, 0/hors-plage legacy → null.
+   */
+  weightKg: number | null
+  /** Poids cible en kg — `null` si non renseigné. */
+  goalWeightKg: number | null
+  /**
+   * Taille en cm. `null` = vide (jamais 0). À la lecture, 0/hors-plage legacy → null.
+   */
+  heightCm: number | null
   age: number
   /** Null si non renseigné — plus de défaut « homme » (SEC-POP / profil incomplet). */
   sex: Sex | null
@@ -27,6 +34,11 @@ export interface CalorieProfile {
   declaredBreastfeeding?: boolean
   declaredEatingDisorder?: boolean
   preferNotAnswerHealth?: boolean
+  /**
+   * Tombstone effacement taille/poids — empêche une copie cloud stale (0 ou
+   * ancienne valeur) de ressusciter les mensurations après « Effacer ».
+   */
+  bodyMetricsClearedAt?: number | null
 }
 
 export interface CalorieResult {

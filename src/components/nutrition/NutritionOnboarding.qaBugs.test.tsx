@@ -46,11 +46,37 @@ function fillAgeSex(host: HTMLElement, ageYears: number) {
   male?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
 }
 
-function fillBody(host: HTMLElement, opts?: { weight?: number; height?: number }) {
-  const weight = host.querySelector('input[aria-label="Poids actuel"]') as HTMLInputElement
-  const height = host.querySelector('input[aria-label="Taille"]') as HTMLInputElement
-  setNative(weight, String(opts?.weight ?? 60))
-  setNative(height, String(opts?.height ?? 170))
+/** Drive NumberWheel via keyboard (Home → ArrowDown × N). */
+async function setWheelTo(host: HTMLElement, ariaLabel: string, target: number, min: number) {
+  const slider = () => host.querySelector(`[role="slider"][aria-label="${ariaLabel}"]`) as HTMLElement
+  expect(slider()).toBeTruthy()
+  await act(async () => {
+    slider().dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
+  })
+  const steps = Math.max(0, Math.round(target - min))
+  for (let i = 0; i < steps; i += 1) {
+    await act(async () => {
+      slider().dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+    })
+  }
+}
+
+async function fillBody(host: HTMLElement, opts?: { weight?: number; height?: number }) {
+  const weight = opts?.weight ?? 60
+  const height = opts?.height ?? 170
+  // Ensure weight tab
+  const weightTab = host.querySelector('[data-testid="height-weight-tab-weight"]') as HTMLButtonElement | null
+  if (weightTab) {
+    await act(async () => {
+      weightTab.click()
+    })
+  }
+  await setWheelTo(host, 'Poids en kg', weight, 30)
+  const heightTab = host.querySelector('[data-testid="height-weight-tab-height"]') as HTMLButtonElement
+  await act(async () => {
+    heightTab.click()
+  })
+  await setWheelTo(host, 'Taille en cm', height, 100)
 }
 
 async function fillAdultMeasurements(
@@ -60,9 +86,7 @@ async function fillAdultMeasurements(
   await act(async () => {
     fillAgeSex(host, opts.age)
   })
-  await act(async () => {
-    fillBody(host, opts)
-  })
+  await fillBody(host, opts)
 }
 
 describe('QA BUG-01 — drapeau OFF coupe l’assistant calories', () => {
@@ -89,11 +113,16 @@ describe('QA BUG-01 — drapeau OFF coupe l’assistant calories', () => {
 
     await fillAdultMeasurements(host, { age: 30, weight: 80, height: 180 })
 
-    const continuer = Array.from(host.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Continuer'),
-    )
+    const continuer = host.querySelector(
+      '[data-testid="height-weight-continue"]',
+    ) as HTMLButtonElement | null
+    expect(continuer).toBeTruthy()
     await act(async () => {
       continuer?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    // « C’est noté. » puis sauvegarde async (~700ms)
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 800))
     })
 
     expect(saved.current).not.toBeNull()
@@ -103,6 +132,8 @@ describe('QA BUG-01 — drapeau OFF coupe l’assistant calories', () => {
     expect(saved.current!.age).toBe(30)
     // Pas d’objectif de perte / rythme stocké comme plan calorique
     expect(saved.current!.goalWeightKg).toBe(saved.current!.weightKg)
+    expect(saved.current!.weightKg).toBe(80)
+    expect(saved.current!.heightCm).toBe(180)
 
     cleanup()
   })
@@ -167,8 +198,8 @@ describe('QA BUG-02 — mineur 17 ans peut s’inscrire', () => {
 
     expect(saved.current).not.toBeNull()
     expect(saved.current!.age).toBe(17)
-    expect(saved.current!.weightKg).toBe(0)
-    expect(saved.current!.heightCm).toBe(0)
+    expect(saved.current!.weightKg).toBeNull()
+    expect(saved.current!.heightCm).toBeNull()
     expect(saved.current!.onboardingComplete).toBe(true)
     expect(saved.current!.goal).toBe('maintain')
 
@@ -203,7 +234,11 @@ describe('QA BUG-03 — grossesse / TCA : sortie vers l’app', () => {
     })
     expect(checkbox.checked).toBe(true)
 
-    await fillAdultMeasurements(host, { age: 28, weight: 65, height: 165 })
+    // Grossesse → roue corps masquée ; âge + sexe suffisent
+    await act(async () => {
+      fillAgeSex(host, 28)
+    })
+    expect(host.querySelector('[data-testid="height-weight-picker"]')).toBeNull()
 
     const continuer = Array.from(host.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Continuer'),
@@ -239,7 +274,10 @@ describe('QA BUG-03 — grossesse / TCA : sortie vers l’app', () => {
     })
     expect(host.textContent).toContain(M_TCA_1)
 
-    await fillAdultMeasurements(host, { age: 25, weight: 60, height: 170 })
+    await act(async () => {
+      fillAgeSex(host, 25)
+    })
+    expect(host.querySelector('[data-testid="height-weight-picker"]')).toBeNull()
 
     const continuer = Array.from(host.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Continuer'),
@@ -374,8 +412,9 @@ describe('QA BUG-36 — adulte à risque OFF sans poids/taille peut terminer', (
       await act(async () => {
         fillAgeSex(host, 30)
       })
-      // Poids / taille laissés vides volontairement
-      expect(host.querySelector('input[aria-label="Poids actuel"]')).toBeTruthy()
+      // Situations à risque : roue taille/poids masquée (pas de saisie corps)
+      expect(host.querySelector('[data-testid="height-weight-picker"]')).toBeNull()
+      expect(host.querySelector('[data-testid="onboarding-body-fields"]')).toBeNull()
 
       const continuer = Array.from(host.querySelectorAll('button')).find((b) =>
         b.textContent?.includes('Continuer'),
@@ -398,8 +437,8 @@ describe('QA BUG-36 — adulte à risque OFF sans poids/taille peut terminer', (
       expect(saved.current![field]).toBe(true)
       expect(saved.current!.onboardingComplete).toBe(true)
       expect(saved.current!.age).toBe(30)
-      expect(saved.current!.weightKg).toBe(0)
-      expect(saved.current!.heightCm).toBe(0)
+      expect(saved.current!.weightKg).toBeNull()
+      expect(saved.current!.heightCm).toBeNull()
 
       cleanup()
     },
@@ -444,7 +483,7 @@ describe('QA BUG-08 ON — pas de poids objectif / rythme avant l’âge', () =>
     await act(async () => {
       fillAgeSex(host, 17)
     })
-    expect(host.querySelector('input[aria-label="Poids actuel"]')).toBeNull()
+    expect(host.querySelector('[data-testid="height-weight-picker"]')).toBeNull()
 
     const continuer2 = Array.from(host.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Continuer'),
@@ -466,7 +505,7 @@ describe('QA BUG-08 ON — pas de poids objectif / rythme avant l’âge', () =>
 
     expect(saved.current?.age).toBe(17)
     expect(saved.current?.goal).toBe('maintain')
-    expect(saved.current?.goalWeightKg).toBe(0)
+    expect(saved.current?.goalWeightKg).toBeNull()
 
     cleanup()
   })
