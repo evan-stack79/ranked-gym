@@ -196,7 +196,7 @@ function FloatingPillBottomNav({
               }}
               onClick={() => onTabChange(id)}
               className={`ios-press bottom-nav-pill__tab relative z-[1] flex h-11 min-h-11 min-w-11 flex-1 items-center justify-center rounded-full px-1 transition-colors duration-150 motion-reduce:transition-none ${
-                isActive ? 'text-[#FF2B2B]' : 'text-[#AEAEB2]'
+                isActive ? 'text-[#FF2B2B]' : 'text-[#EBEBF5]'
               }`}
               aria-current={isActive ? 'page' : undefined}
               aria-label={label}
