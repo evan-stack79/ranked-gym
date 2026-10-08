@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '../../context/AuthContext'
 import { getTodayWaterMl } from '../../services/nutritionStorage'
 import {
@@ -826,6 +827,54 @@ export function HomeGalleryView({
     }
   }
 
+  // Prefer AppLayout pin host (outside scroll main). Without it (unit tests),
+  // keep the chrome in-flow so queries on the gallery host still work.
+  const editChromeHost =
+    typeof document !== 'undefined'
+      ? ((document.querySelector('[data-app-top-pin-host]') as HTMLElement | null) ??
+        (document.querySelector('[data-app-shell]') as HTMLElement | null))
+      : null
+
+  const editChromeButtons = (
+    <div className="accueil-edit-chrome w-full" data-accueil-edit-chrome>
+      <button
+        type="button"
+        onClick={exitEdit}
+        className="accueil-edit-chrome__ok ios-press"
+        data-accueil-edit-ok
+      >
+        OK
+      </button>
+      <button
+        type="button"
+        onClick={() => setAddOpen(true)}
+        className="accueil-edit-chrome__add ios-press inline-flex items-center gap-1.5"
+        data-accueil-edit-add
+      >
+        <Plus className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
+        Ajouter
+      </button>
+    </div>
+  )
+
+  const editChromeBar =
+    editMode && editChromeHost
+      ? createPortal(
+          <div
+            className="accueil-edit-chrome-pin"
+            data-accueil-edit-chrome-pin="1"
+          >
+            {/*
+              Glass in a sibling absolute layer — never backdrop-filter on an
+              ancestor of the buttons (WebKit text rasterisation).
+            */}
+            <div className="accueil-edit-chrome-pin__glass" aria-hidden="true" />
+            <div className="accueil-edit-chrome-pin__inner">{editChromeButtons}</div>
+          </div>,
+          editChromeHost,
+        )
+      : null
+
   return (
     <div
       className={`accueil-gallery flex flex-col gap-7 ${coldEntering ? 'home-cold-enter home-cold-enter--active' : ''} ${
@@ -842,27 +891,34 @@ export function HomeGalleryView({
         exitEdit()
       }}
     >
-      <header className="home-cold-enter__group home-cold-enter__group--0 flex items-start justify-between gap-3">
+      {editChromeBar}
+      <header
+        className={[
+          'home-cold-enter__group home-cold-enter__group--0 flex items-start justify-between gap-3',
+          editMode && editChromeHost ? 'accueil-edit-chrome-spacer' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        aria-hidden={editMode && editChromeHost ? true : undefined}
+        data-accueil-edit-chrome-spacer={editMode && editChromeHost ? '1' : undefined}
+      >
         {editMode ? (
-          <div className="accueil-edit-chrome w-full" data-accueil-edit-chrome>
-            <button
-              type="button"
-              onClick={exitEdit}
-              className="accueil-edit-chrome__ok ios-press"
-              data-accueil-edit-ok
+          editChromeHost ? (
+            // In-flow spacer matching the pin bar content height (safe-area is
+            // on the fixed pin). Keeps widgets from jumping under the bar.
+            <div
+              className="accueil-edit-chrome w-full opacity-0 pointer-events-none"
+              aria-hidden="true"
             >
-              OK
-            </button>
-            <button
-              type="button"
-              onClick={() => setAddOpen(true)}
-              className="accueil-edit-chrome__add ios-press inline-flex items-center gap-1.5"
-              data-accueil-edit-add
-            >
-              <Plus className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
-              Ajouter
-            </button>
-          </div>
+              <span className="accueil-edit-chrome__ok">OK</span>
+              <span className="accueil-edit-chrome__add inline-flex items-center gap-1.5">
+                <Plus className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
+                Ajouter
+              </span>
+            </div>
+          ) : (
+            editChromeButtons
+          )
         ) : (
           <>
             <div className="min-w-0 flex-1">

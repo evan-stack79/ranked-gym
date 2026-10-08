@@ -65,6 +65,7 @@ export function AppLayout({
     <div
       ref={shellRef}
       className="relative flex h-[100dvh] min-h-0 flex-col overflow-hidden mesh-bg font-sans"
+      data-app-shell="1"
       data-streak-celebration-active={streakCelebrationActive ? '' : undefined}
       inert={streakCelebrationActive ? true : undefined}
     >
@@ -102,6 +103,14 @@ export function AppLayout({
           </div>
         </header>
       ) : null}
+
+      {/*
+        Accueil edit chrome (OK / + Ajouter) portals here — outside
+        [data-app-scroll-main], same pin strategy as the brand header.
+        Host stays zero-height in the flex column; the portaled bar is fixed
+        so entering/leaving edit does not resize `main`.
+      */}
+      <div data-app-top-pin-host="1" className="relative z-40 shrink-0" />
 
       <main
         ref={mainRef}
