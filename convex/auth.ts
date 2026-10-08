@@ -24,6 +24,7 @@ import {
   revokeAllUserSessions,
   revokeSessionByToken,
 } from './lib/auth'
+import { deleteGymLeaderboardDataForUser } from './gymLeaderboard'
 import {
   getResetRedirectBaseUrl,
   getResetTokenTtlMinutes,
@@ -594,6 +595,9 @@ export async function deleteAccountAndUserData(
     await ctx.db.query('avis_beta').withIndex('by_userId', (q) => q.eq('userId', user.userId)).collect(),
     deletedDocIds,
   )
+
+  // « Classement de ma salle » — leave/delete wipes membership, visits, scores, search quota, reports
+  await deleteGymLeaderboardDataForUser(ctx, user.userId, deletedDocIds)
 
   const userFiles = await ctx.db
     .query('user_files')

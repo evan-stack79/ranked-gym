@@ -29,6 +29,14 @@ interface ImportMetaEnv {
    * Unset/empty = ON. Explicit false restores legacy dashboard + dock nav.
    */
   readonly VITE_ENABLE_ACCUEIL_GALLERY?: string
+  /**
+   * « Classement de ma salle ».
+   * Unset/empty = ON in DEV/test, OFF in production (safe merge).
+   * Explicit true/false always honored. Fixture route enables UI regardless.
+   */
+  readonly VITE_ENABLE_GYM_LEADERBOARD?: string
+  /** QA fixture routes (`/classement-fixture`, …). */
+  readonly VITE_ENABLE_QA_FIXTURES?: string
 }
 
 interface ImportMeta {
