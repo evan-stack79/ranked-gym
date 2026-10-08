@@ -21,6 +21,19 @@ interface HomeGalleryViewProps {
   onOpenHistory: () => void
 }
 
+function GalleryEdgeSpacer({ end = false }: { end?: boolean }) {
+  return (
+    <span
+      className={
+        end
+          ? 'accueil-gallery__edge-spacer accueil-gallery__edge-spacer--end'
+          : 'accueil-gallery__edge-spacer'
+      }
+      aria-hidden="true"
+    />
+  )
+}
+
 /**
  * Accueil gallery (iOS Photos-inspired) — default Accueil.
  * No calories, no weight, no body photos — progress % = session/program only.
@@ -87,6 +100,15 @@ export function HomeGalleryView({
     onOpenTraining()
   }
 
+  const snapStyle = {
+    scrollSnapType: prefersReducedMotion ? ('none' as const) : ('x proximity' as const),
+    WebkitOverflowScrolling: 'touch' as const,
+  }
+  const heroSnapStyle = {
+    scrollSnapType: prefersReducedMotion ? ('none' as const) : ('x mandatory' as const),
+    WebkitOverflowScrolling: 'touch' as const,
+  }
+
   return (
     <div
       className={`accueil-gallery flex flex-col gap-7 ${coldEntering ? 'home-cold-enter home-cold-enter--active' : ''}`}
@@ -118,53 +140,60 @@ export function HomeGalleryView({
 
       <section aria-label="À la une" className="home-cold-enter__group home-cold-enter__group--1 -mx-5">
         <div
-          className="accueil-gallery__carousel flex gap-3 overflow-x-auto px-5 pb-1"
+          className="accueil-gallery__carousel flex overflow-x-auto pb-1"
           data-accueil-carousel
-          style={{
-            scrollSnapType: prefersReducedMotion ? 'none' : 'x mandatory',
-            WebkitOverflowScrolling: 'touch',
-          }}
+          style={heroSnapStyle}
         >
+          <GalleryEdgeSpacer />
           {heroCards.map((card, index) => (
             <Reveal
               key={card.id}
               as="div"
               delayMs={Math.min(index * 60, 80)}
               instant={coldEntering}
-              className="shrink-0"
+              className={`accueil-gallery__snap shrink-0 ${index > 0 ? 'accueil-gallery__tile-gap' : ''}`}
             >
               <button
                 type="button"
                 onClick={() => handleHero(card)}
                 data-accueil-hero={card.id}
                 className="accueil-gallery__hero ios-press relative overflow-hidden rounded-[24px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/50"
-                style={{
-                  width: 'min(78vw, 18.5rem)',
-                  aspectRatio: '3 / 4',
-                  scrollSnapAlign: 'start',
-                }}
                 aria-label={`${card.title}, ${card.progressPercent} pour cent`}
               >
-                <span
-                  aria-hidden="true"
-                  className={`absolute inset-0 ${
-                    card.accent === 'brand'
-                      ? 'accueil-gallery__hero-bg--brand'
-                      : 'accueil-gallery__hero-bg--graphite'
-                  }`}
-                />
-                <span
-                  aria-hidden="true"
-                  className="absolute inset-0 flex items-center justify-center opacity-25"
-                >
-                  <Dumbbell className="h-24 w-24 text-white" strokeWidth={1.25} />
-                </span>
+                {card.imageSrc ? (
+                  <img
+                    src={card.imageSrc}
+                    alt=""
+                    draggable={false}
+                    decoding="async"
+                    className="absolute inset-0 h-full w-full object-cover object-center"
+                    data-accueil-hero-img="cover"
+                  />
+                ) : (
+                  <>
+                    <span
+                      aria-hidden="true"
+                      className={`absolute inset-0 ${
+                        card.accent === 'brand'
+                          ? 'accueil-gallery__hero-bg--brand'
+                          : 'accueil-gallery__hero-bg--graphite'
+                      }`}
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-0 flex items-center justify-center opacity-25"
+                    >
+                      <Dumbbell className="h-24 w-24 text-white" strokeWidth={1.25} />
+                    </span>
+                  </>
+                )}
 
                 <span className="absolute left-3 top-3 rounded-full bg-black/35 px-2.5 py-1 text-[12px] font-semibold text-white backdrop-blur-md">
                   {card.progressPercent}&nbsp;%
                 </span>
 
-                <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/35 to-transparent px-3.5 pb-3.5 pt-16">
+                {/* Gradient only when text overlays media (hero always overlays). */}
+                <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3.5 pb-3.5 pt-16">
                   <span className="flex items-end gap-2.5">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/12 ring-1 ring-white/15 backdrop-blur-sm">
                       <Dumbbell className="h-5 w-5 text-white" strokeWidth={2} aria-hidden="true" />
@@ -197,7 +226,7 @@ export function HomeGalleryView({
               </button>
             </Reveal>
           ))}
-          <span className="w-2 shrink-0" aria-hidden="true" />
+          <GalleryEdgeSpacer end />
         </div>
       </section>
 
@@ -231,29 +260,26 @@ export function HomeGalleryView({
           </p>
         ) : (
           <div
-            className="accueil-gallery__tiles -mx-5 flex gap-3 overflow-x-auto px-5 pb-1"
-            style={{
-              scrollSnapType: prefersReducedMotion ? 'none' : 'x proximity',
-              WebkitOverflowScrolling: 'touch',
-            }}
+            className="accueil-gallery__tiles -mx-5 flex overflow-x-auto pb-1"
+            style={snapStyle}
           >
+            <GalleryEdgeSpacer />
             {recent.map((item, index) => (
               <Reveal
                 key={item.id}
                 as="div"
                 delayMs={Math.min(index * 60, 80)}
                 instant={coldEntering}
-                className="shrink-0"
+                className={`accueil-gallery__snap shrink-0 ${index > 0 ? 'accueil-gallery__tile-gap' : ''}`}
               >
                 <button
                   type="button"
                   onClick={onOpenHistory}
                   data-accueil-recent-tile={item.id}
-                  className="ios-press flex w-[7.75rem] flex-col gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/40"
-                  style={{ scrollSnapAlign: 'start' }}
+                  className="accueil-gallery__tile ios-press flex flex-col gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/40"
                 >
-                  <span className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-[18px] bg-[#1C1C1E] ring-1 ring-white/8">
-                    <HistorySessionThumb note={item.note} />
+                  <span className="accueil-gallery__tile-media relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-[18px] bg-[#1C1C1E] ring-1 ring-white/8">
+                    <HistorySessionThumb note={item.note} variant="tile" />
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-[13px] font-semibold text-white">
@@ -266,6 +292,7 @@ export function HomeGalleryView({
                 </button>
               </Reveal>
             ))}
+            <GalleryEdgeSpacer end />
           </div>
         )}
       </section>
@@ -298,29 +325,41 @@ export function HomeGalleryView({
           </p>
         ) : (
           <div
-            className="accueil-gallery__tiles -mx-5 flex gap-3 overflow-x-auto px-5 pb-1"
-            style={{
-              scrollSnapType: prefersReducedMotion ? 'none' : 'x proximity',
-              WebkitOverflowScrolling: 'touch',
-            }}
+            className="accueil-gallery__tiles -mx-5 flex overflow-x-auto pb-1"
+            style={snapStyle}
           >
+            <GalleryEdgeSpacer />
             {programTiles.map((tile, index) => (
               <Reveal
                 key={tile.id}
                 as="div"
                 delayMs={Math.min(index * 60, 80)}
                 instant={coldEntering}
-                className="shrink-0"
+                className={`accueil-gallery__snap shrink-0 ${index > 0 ? 'accueil-gallery__tile-gap' : ''}`}
               >
                 <button
                   type="button"
                   onClick={onOpenTraining}
                   data-accueil-program-tile={tile.id}
-                  className="ios-press flex w-[7.75rem] flex-col gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/40"
-                  style={{ scrollSnapAlign: 'start' }}
+                  className="accueil-gallery__tile ios-press flex flex-col gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/40"
                 >
-                  <span className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-[18px] bg-gradient-to-br from-[#2A2A2E] to-[#141416] ring-1 ring-white/8">
-                    <Dumbbell className="h-7 w-7 text-[#AEAEB2]" strokeWidth={1.75} aria-hidden="true" />
+                  <span className="accueil-gallery__tile-media relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-[18px] bg-gradient-to-br from-[#2A2A2E] to-[#141416] ring-1 ring-white/8">
+                    {tile.imageSrc ? (
+                      <img
+                        src={tile.imageSrc}
+                        alt=""
+                        draggable={false}
+                        decoding="async"
+                        className="absolute inset-0 h-full w-full object-cover object-center"
+                        data-accueil-program-img="cover"
+                      />
+                    ) : (
+                      <Dumbbell
+                        className="h-7 w-7 text-[#AEAEB2]"
+                        strokeWidth={1.75}
+                        aria-hidden="true"
+                      />
+                    )}
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-[13px] font-semibold text-white">
@@ -333,6 +372,7 @@ export function HomeGalleryView({
                 </button>
               </Reveal>
             ))}
+            <GalleryEdgeSpacer end />
           </div>
         )}
       </section>

@@ -116,6 +116,22 @@ body {
   background-color: #0c0c0e;
 }
 
+/* Accueil gallery — gutters match page px-5; safe-area aware for notched devices */
+:root {
+  --accueil-gutter: max(
+    1.25rem,
+    var(--app-safe-area-left, env(safe-area-inset-left, 0px))
+  );
+  --accueil-gutter-end: max(
+    1.25rem,
+    var(--app-safe-area-right, env(safe-area-inset-right, 0px))
+  );
+  --accueil-tile-gap: 0.75rem;
+  /* Clean tile size across iPhone 14–17 widths (~390–440px) */
+  --accueil-tile-size: clamp(7.5rem, 31.5vw, 8.25rem);
+  --accueil-hero-width: min(78vw, 18.5rem);
+}
+
 /* Accueil gallery preview — hero gradients (no body photos) */
 .accueil-gallery__hero-bg--brand {
   background:
@@ -133,6 +149,9 @@ body {
 .accueil-gallery__tiles {
   scrollbar-width: none;
   -ms-overflow-style: none;
+  /* Align snap stops with the gutter spacers (iOS ignores padding on overflow flex) */
+  scroll-padding-left: var(--accueil-gutter);
+  scroll-padding-right: var(--accueil-gutter-end);
 }
 
 .accueil-gallery__carousel::-webkit-scrollbar,
@@ -140,9 +159,51 @@ body {
   display: none;
 }
 
+/* Edge spacers — reliable left/right inset on WebKit overflow flex (padding often collapses) */
+.accueil-gallery__edge-spacer {
+  flex: 0 0 var(--accueil-gutter);
+  width: var(--accueil-gutter);
+  min-width: var(--accueil-gutter);
+  pointer-events: none;
+}
+
+.accueil-gallery__edge-spacer--end {
+  flex-basis: var(--accueil-gutter-end);
+  width: var(--accueil-gutter-end);
+  min-width: var(--accueil-gutter-end);
+}
+
+.accueil-gallery__tile-gap {
+  margin-left: var(--accueil-tile-gap);
+}
+
+.accueil-gallery__snap {
+  scroll-snap-align: start;
+}
+
+.accueil-gallery__tile {
+  width: var(--accueil-tile-size);
+}
+
+.accueil-gallery__tile-media {
+  /* Ensure cover images clip to rounded tile */
+  isolation: isolate;
+}
+
+.accueil-gallery__hero {
+  width: var(--accueil-hero-width);
+  aspect-ratio: 3 / 4;
+  scroll-snap-align: start;
+}
+
+.history-thumb--tile {
+  position: absolute;
+  inset: 0;
+}
+
 /* Floating pill nav — clearance for pill + elevated red centre CTA + safe area */
 :root[data-bottom-nav-preview='floating-pill'] {
-  --app-bottom-nav: 108px;
+  --app-bottom-nav: 120px;
 }
 
 .xp-fill {

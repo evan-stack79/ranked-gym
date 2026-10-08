@@ -10,6 +10,23 @@ import { getTodayWorkout, type TodayWorkoutPlan } from './todayWorkout'
 import { detectProgramSplit, filterRoutinesForProgram } from './workoutProgram'
 import { dedupeWorkoutNotes } from './workoutHistory'
 import { getLocalWeekBounds, isTimestampInLocalWeek, workoutValidationMs } from './weekBounds'
+import { resolvePickerIllustrationSrc } from './exercisePickerIllustrations'
+import { namedSessionExercises } from './sessionDisplayTitle'
+import type { ExerciseEntry } from '../types/training'
+
+/**
+ * Accueil gallery cover: first named exercise with a bundled illustration.
+ * Unlike history-row thumbs, multi-exo sessions still get a cover (first hit).
+ */
+export function resolveGalleryCoverSrc(
+  exercises: ExerciseEntry[] | null | undefined,
+): string | null {
+  for (const ex of namedSessionExercises(exercises)) {
+    const src = resolvePickerIllustrationSrc(ex.canonicalExerciseId)
+    if (src) return src
+  }
+  return null
+}
 
 /** Compte les séries d’une routine (total planifié). */
 export function countTotalSets(routine: WorkoutRoutine): number {
@@ -107,6 +124,8 @@ export type GalleryHeroCard = {
   accent: 'brand' | 'graphite'
   cta: 'start' | 'open_train' | 'open_notebook'
   routineId: string | null
+  /** Optional cover illustration — fills the hero tile when present. */
+  imageSrc: string | null
 }
 
 export function deriveGalleryHeroCards(
@@ -143,6 +162,13 @@ export function deriveGalleryHeroCards(
       ? 'Configure ton carnet'
       : `${withExos}/${programRoutines.length} routines prêtes`
 
+  const sessionRoutine = routineId
+    ? state.routines.find((r) => r.id === routineId)
+    : null
+  const sessionImageSrc = sessionRoutine
+    ? resolveGalleryCoverSrc(sessionRoutine.exercises)
+    : null
+
   return [
     {
       id: 'session',
@@ -152,6 +178,7 @@ export function deriveGalleryHeroCards(
       accent: 'brand',
       cta: sessionCta,
       routineId,
+      imageSrc: sessionImageSrc,
     },
     {
       id: 'program',
@@ -161,6 +188,7 @@ export function deriveGalleryHeroCards(
       accent: 'graphite',
       cta: 'open_notebook',
       routineId: null,
+      imageSrc: null,
     },
   ]
 }
@@ -169,6 +197,8 @@ export type GalleryProgramTile = {
   id: string
   title: string
   meta: string
+  /** Optional cover — fills the tile when present; otherwise dumbbell placeholder. */
+  imageSrc: string | null
 }
 
 export function deriveGalleryProgramTiles(state: TrainingState): GalleryProgramTile[] {
@@ -182,6 +212,7 @@ export function deriveGalleryProgramTiles(state: TrainingState): GalleryProgramT
         id: r.id,
         title: r.label,
         meta: exo > 0 ? `${exo} exercice${exo > 1 ? 's' : ''}` : 'À remplir',
+        imageSrc: resolveGalleryCoverSrc(r.exercises),
       }
     })
 }
