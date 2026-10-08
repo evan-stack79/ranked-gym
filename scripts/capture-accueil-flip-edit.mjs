@@ -1,18 +1,20 @@
 #!/usr/bin/env node
 /**
  * Accueil edit FLIP proof at iPhone 17 (402×874, hasTouch/isMobile):
- * long-press → drag a tile across 2 positions (siblings slide) → drop glide →
- * − remove → + Ajouter re-add → OK.
+ * long-press → slow drag Eau across 2 slots (siblings slide) → drop glide →
+ * − remove Séries → + Ajouter → pick Séries (fade in) → OK.
  *
- * Encodes a 30fps screenshot-burst video (not Chromium screencast) so WAAPI
- * transform FLIP frames are present in the artifact.
+ * ~1 s pause between steps; drag move ~600 ms; synthetic finger overlay.
+ * Encodes 30fps screenshot-burst video so WAAPI FLIP frames are present.
  *
  * Artifacts:
  *   /opt/cursor/artifacts/accueil_flip_edit.mp4
+ *   /opt/cursor/artifacts/accueil_flip_edit_recording_demo.mp4
  *   /opt/cursor/artifacts/accueil_flip_edit_frames/ (30 fps)
+ *   /opt/cursor/artifacts/accueil_flip_edit_drag_contact.png (10 fps sheet)
  *   /opt/cursor/artifacts/accueil_flip_edit_log.json
  */
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, rm, writeFile, copyFile } from 'node:fs/promises'
 import { existsSync, readdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -29,6 +31,8 @@ const PREFS_KEY = 'ranked-gym:accueil-widget-prefs'
 const WATER_GOAL_KEY = 'ranked-gym:water-goal'
 const FPS = 30
 const FRAME_MS = Math.round(1000 / FPS)
+const PAUSE_MS = 1000
+const DRAG_MS = 600
 
 const DEFAULT_PREFS = {
   version: 2,
@@ -95,15 +99,12 @@ async function pinEditWidgets(page) {
     const week = document.querySelector('[data-accueil-edit-slot="seances_semaine"]')
     if (!(main instanceof HTMLElement) || !(week instanceof HTMLElement)) return
     const mainRect = main.getBoundingClientRect()
-    // Keep week + Eau (+ Séries) on camera under the edit chrome — not so high
-    // that Eau can jump into the off-screen gap above week when reordered.
     const desiredTop = mainRect.top + 200
     const weekRect = week.getBoundingClientRect()
     const delta = weekRect.top - desiredTop
     main.scrollTo({ top: Math.max(0, main.scrollTop + delta), behavior: 'instant' })
   })
   await page.waitForTimeout(160)
-  // Hard fail if week/eau are still off-screen — drag would be a no-op.
   const boxes = await page.evaluate(() => {
     const week = document.querySelector('[data-accueil-edit-slot="seances_semaine"]')
     const eau = document.querySelector('[data-accueil-edit-slot="eau"]')
@@ -128,10 +129,51 @@ async function pinEditWidgets(page) {
   }
 }
 
-/** Screenshot / screencast frame recorder (compositor/WAAPI included). */
+async function ensureFinger(page) {
+  await page.evaluate(() => {
+    if (document.getElementById('accueil-flip-demo-finger')) return
+    const el = document.createElement('div')
+    el.id = 'accueil-flip-demo-finger'
+    el.setAttribute('aria-hidden', 'true')
+    Object.assign(el.style, {
+      position: 'fixed',
+      width: '34px',
+      height: '34px',
+      marginLeft: '-17px',
+      marginTop: '-17px',
+      borderRadius: '999px',
+      border: '2px solid rgba(255,255,255,0.9)',
+      background: 'rgba(255,43,43,0.4)',
+      boxShadow: '0 0 0 8px rgba(255,43,43,0.14)',
+      zIndex: '99999',
+      pointerEvents: 'none',
+      opacity: '0',
+      left: '0px',
+      top: '0px',
+    })
+    document.body.appendChild(el)
+  })
+}
+
+async function moveFinger(page, x, y, visible = true) {
+  await page.evaluate(
+    ({ x: cx, y: cy, visible: on }) => {
+      const el = document.getElementById('accueil-flip-demo-finger')
+      if (!el) return
+      el.style.left = `${cx}px`
+      el.style.top = `${cy}px`
+      el.style.opacity = on ? '1' : '0'
+    },
+    { x, y, visible },
+  )
+}
+
 function createFrameRecorder(page, framesDir) {
   let idx = 0
   let busy = Promise.resolve()
+  /** Marks for contact-sheet window (drag start → drop settle). */
+  let dragStartIdx = null
+  let dragEndIdx = null
   const writePng = async (buf) => {
     const n = ++idx
     const name = `frame-${String(n).padStart(4, '0')}.png`
@@ -143,8 +185,18 @@ function createFrameRecorder(page, framesDir) {
     return writePng(buf)
   }
   return {
+    markDragStart() {
+      dragStartIdx = idx + 1
+    },
+    markDragEnd() {
+      dragEndIdx = idx
+    },
+    dragWindow: () => ({ start: dragStartIdx, end: dragEndIdx }),
     writePng: async (buf) => {
-      busy = busy.then(() => writePng(buf), () => writePng(buf))
+      busy = busy.then(
+        () => writePng(buf),
+        () => writePng(buf),
+      )
       return busy
     },
     async snap() {
@@ -158,7 +210,6 @@ function createFrameRecorder(page, framesDir) {
         await page.waitForTimeout(FRAME_MS)
       }
     },
-    /** Fixed frame count — screenshot time must not starve the burst. */
     async burst(n) {
       for (let i = 0; i < n; i++) {
         await this.snap()
@@ -171,11 +222,16 @@ function createFrameRecorder(page, framesDir) {
 async function sampleFlip(page) {
   return page.evaluate(() => {
     const week = document.querySelector('[data-accueil-edit-slot="seances_semaine"]')
+    const floatBody = document.querySelector('[data-accueil-drag-float="1"]')
     const wr = week?.getBoundingClientRect()
+    const fr = floatBody?.getBoundingClientRect()
     return {
       t: performance.now(),
       weekTop: wr?.top ?? null,
       weekLeft: wr?.left ?? null,
+      floatTop: fr?.top ?? null,
+      floatLeft: fr?.left ?? null,
+      floatVisible: !!floatBody,
       flipping: [...document.querySelectorAll('[data-accueil-flipping="1"]')].map((el) =>
         el.getAttribute('data-accueil-edit-slot'),
       ),
@@ -190,8 +246,8 @@ async function sampleFlip(page) {
   })
 }
 
-/** In-page long-press (reliable edit enter); approximate hold with post-snaps. */
 async function touchLongPress(page, x, y, holdMs, recorder) {
+  await moveFinger(page, x, y, true)
   await recorder.snap()
   await page.evaluate(
     async ({ clientX, clientY, holdMs: hold }) => {
@@ -217,15 +273,16 @@ async function touchLongPress(page, x, y, holdMs, recorder) {
     },
     { clientX: x, clientY: y, holdMs },
   )
-  // Wiggle / chrome settle frames after enter.
-  await recorder.burst(12)
+  await recorder.burst(10)
 }
 
 /**
- * In-page pointer drag; CDP screencast runs through the FLIP hold so the
- * ease-out front (most of the 164px) is recorded before Node round-trips.
+ * Slow ~600ms drag with CDP screencast + screenshot samples.
+ * Keeps lifted tile under a visible synthetic finger.
  */
-async function touchDrag(page, fromX, fromY, toX, toY, steps, recorder, samples) {
+async function touchDrag(page, fromX, fromY, toX, toY, recorder, samples) {
+  const steps = 18
+  const stepDelay = Math.round(DRAG_MS / steps)
   const cdp = await page.context().newCDPSession(page)
   await cdp.send('Page.enable').catch(() => {})
   const castFrames = []
@@ -234,21 +291,29 @@ async function touchDrag(page, fromX, fromY, toX, toY, steps, recorder, samples)
     cdp.send('Page.screencastFrameAck', { sessionId: frame.sessionId }).catch(() => {})
   }
   cdp.on('Page.screencastFrame', onFrame)
-  await cdp.send('Page.startScreencast', { format: 'png', quality: 80, everyNthFrame: 1 })
+  await cdp.send('Page.startScreencast', { format: 'png', quality: 82, everyNthFrame: 1 })
+
+  await moveFinger(page, fromX, fromY, true)
+  await recorder.snap()
 
   let moved
   try {
     moved = await page.evaluate(
-      async ({ x0, y0, x1, y1, steps: n }) => {
+      async ({ x0, y0, x1, y1, steps: n, stepDelay: delay }) => {
         const samplesLocal = []
         const sample = (label) => {
           const week = document.querySelector('[data-accueil-edit-slot="seances_semaine"]')
+          const floatBody = document.querySelector('[data-accueil-drag-float="1"]')
           const wr = week?.getBoundingClientRect()
+          const fr = floatBody?.getBoundingClientRect()
           samplesLocal.push({
             label,
             t: performance.now(),
             weekTop: wr?.top ?? null,
             weekLeft: wr?.left ?? null,
+            floatTop: fr?.top ?? null,
+            floatLeft: fr?.left ?? null,
+            floatVisible: !!floatBody,
             flipping: [...document.querySelectorAll('[data-accueil-flipping="1"]')].map((el) =>
               el.getAttribute('data-accueil-edit-slot'),
             ),
@@ -260,6 +325,13 @@ async function touchDrag(page, fromX, fromY, toX, toY, steps, recorder, samples)
               el.getAttribute('data-accueil-edit-slot'),
             ),
           })
+        }
+        const finger = document.getElementById('accueil-flip-demo-finger')
+        const setFinger = (x, y) => {
+          if (!finger) return
+          finger.style.left = `${x}px`
+          finger.style.top = `${y}px`
+          finger.style.opacity = '1'
         }
         const el = document.elementFromPoint(x0, y0)
         const target = el?.closest('[data-accueil-edit-slot]') ?? el
@@ -282,7 +354,21 @@ async function touchDrag(page, fromX, fromY, toX, toY, steps, recorder, samples)
               buttons,
             }),
           )
+          // Also feed window listeners (remount loses element capture).
+          window.dispatchEvent(
+            new PointerEvent(type, {
+              bubbles: true,
+              cancelable: true,
+              clientX: x,
+              clientY: y,
+              pointerId: 7,
+              pointerType: 'touch',
+              isPrimary: true,
+              buttons,
+            }),
+          )
         }
+        setFinger(x0, y0)
         fire('pointerdown', x0, y0, 1)
         sample('down')
         let dropX = x1
@@ -293,9 +379,10 @@ async function touchDrag(page, fromX, fromY, toX, toY, steps, recorder, samples)
           const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
           const x = x0 + (x1 - x0) * e
           const y = y0 + (y1 - y0) * e
+          setFinger(x, y)
           fire('pointermove', x, y, 1)
-          if (i % 3 === 0 || i === n) sample(`move-${i}`)
-          await new Promise((r) => setTimeout(r, 40))
+          if (i % 2 === 0 || i === n) sample(`move-${i}`)
+          await new Promise((r) => setTimeout(r, delay))
           const orderNow = [...document.querySelectorAll('[data-accueil-edit-slot]')].map((node) =>
             node.getAttribute('data-accueil-edit-slot'),
           )
@@ -306,9 +393,9 @@ async function touchDrag(page, fromX, fromY, toX, toY, steps, recorder, samples)
             dropY = y
             movedUp = true
             sample(`moved-up-at-${i}`)
-            // Stay in-page for the full FLIP so screencast catches ease-out front.
-            for (let h = 0; h < 12; h++) {
-              await new Promise((r) => setTimeout(r, 20))
+            // Hold in-page for FLIP ease-out (~250ms) while screencast runs.
+            for (let h = 0; h < 10; h++) {
+              await new Promise((r) => setTimeout(r, 25))
               sample(`flip-hold-${h}`)
             }
             break
@@ -316,11 +403,12 @@ async function touchDrag(page, fromX, fromY, toX, toY, steps, recorder, samples)
         }
         return { samplesLocal, dropX, dropY, movedUp }
       },
-      { x0: fromX, y0: fromY, x1: toX, y1: toY, steps },
+      { x0: fromX, y0: fromY, x1: toX, y1: toY, steps, stepDelay },
     )
   } finally {
     await cdp.send('Page.stopScreencast').catch(() => {})
     cdp.off('Page.screencastFrame', onFrame)
+    await cdp.stabilize?.().catch?.(() => {})
     await cdp.detach().catch(() => {})
   }
 
@@ -328,9 +416,18 @@ async function touchDrag(page, fromX, fromY, toX, toY, steps, recorder, samples)
   if (!moved.movedUp) {
     throw new Error('Drag finished without Eau moving above Séances')
   }
+  const missingFloat = moved.samplesLocal.filter(
+    (s) => s.label.startsWith('move-') || s.label.startsWith('flip-') || s.label.startsWith('moved-'),
+  ).filter((s) => !s.floatVisible)
+  if (missingFloat.length > 0) {
+    throw new Error(
+      `Dragged tile vanished mid-drag: ${JSON.stringify(missingFloat.slice(0, 4))}`,
+    )
+  }
   console.log(`screencast frames: ${castFrames.length}`)
   for (const buf of castFrames) await recorder.writePng(buf)
 
+  await moveFinger(page, moved.dropX, moved.dropY, true)
   await page.evaluate(
     ({ dropX, dropY }) => {
       const live =
@@ -365,10 +462,11 @@ async function touchDrag(page, fromX, fromY, toX, toY, steps, recorder, samples)
     { dropX: moved.dropX, dropY: moved.dropY },
   )
 
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 12; i++) {
     samples.push({ label: `settle-${i}`, ...(await sampleFlip(page)) })
     await recorder.snap()
   }
+  await moveFinger(page, moved.dropX, moved.dropY, false)
 }
 
 async function main() {
@@ -435,6 +533,7 @@ async function main() {
         el.setAttribute('data-rg-reveal', 'in')
       })
     })
+    await ensureFinger(page)
 
     await pinEditWidgets(page)
     await page.waitForFunction(() => {
@@ -445,7 +544,7 @@ async function main() {
       )
       return norm(eau?.textContent) === '1200' && norm(week?.textContent) === '2'
     }, { timeout: 12_000 })
-    await page.waitForTimeout(400)
+    await page.waitForTimeout(300)
 
     const metricLog = []
     let metricPollActive = true
@@ -461,10 +560,12 @@ async function main() {
               '[data-accueil-metric-tile="seances_semaine"] [data-rg-count="sessions"]',
             )
             const placeholder = document.querySelector('[data-accueil-eau-placeholder="1"]')
+            const floatBody = document.querySelector('[data-accueil-drag-float="1"]')
             return {
               t: performance.now(),
               eau: placeholder ? '—' : norm(eauEl?.textContent),
               week: norm(weekEl?.textContent),
+              floatVisible: !!floatBody,
               dragging: [...document.querySelectorAll('[data-accueil-dragging="1"]')].map((el) =>
                 el.getAttribute('data-accueil-edit-slot'),
               ),
@@ -483,8 +584,8 @@ async function main() {
       }
     })()
 
-    // Beat of settled Accueil before long-press
-    await recorder.burst(8)
+    // Settled Accueil
+    await recorder.hold(PAUSE_MS)
 
     // 1) Long-press Eau
     const eauBox = await page.locator('[data-accueil-edit-slot="eau"]').boundingBox()
@@ -499,9 +600,10 @@ async function main() {
     await page.waitForSelector('[data-accueil-edit-ok]', { state: 'visible', timeout: 5_000 })
     log.steps.push('edit-entered')
     await pinEditWidgets(page)
-    await recorder.burst(12)
+    await moveFinger(page, 0, 0, false)
+    await recorder.hold(PAUSE_MS)
 
-    // 2) Drag Eau up onto week (vertical FLIP of siblings)
+    // 2) Drag Eau up across week (FLIP siblings) — ~600ms move
     await pinEditWidgets(page)
     const orderBefore = await page.evaluate(() =>
       [...document.querySelectorAll('[data-accueil-edit-slot]')].map((el) =>
@@ -519,7 +621,9 @@ async function main() {
     const toX = weekBox.x + weekBox.width / 2
     const toY = weekBox.y + Math.min(48, weekBox.height * 0.3)
     const flipSamples = []
-    await touchDrag(page, fromX, fromY, toX, toY, 36, recorder, flipSamples)
+    recorder.markDragStart()
+    await touchDrag(page, fromX, fromY, toX, toY, recorder, flipSamples)
+    recorder.markDragEnd()
     log.flipSamples = flipSamples
     log.steps.push('drag-drop')
 
@@ -562,9 +666,9 @@ async function main() {
     )
     const sawSettling = flipSamples.some((s) => s.settling)
     log.steps.push(sawSettling ? 'drop-glide-seen' : 'drop-glide-missed')
-    await recorder.hold(500)
+    await recorder.hold(PAUSE_MS)
 
-    // 3) Remove series_jour — soft pin (Eau may sit above week after reorder)
+    // 3) − remove series_jour (fade out + siblings slide up)
     await page.evaluate(() => {
       const main = document.querySelector('[data-app-scroll-main]')
       const series = document.querySelector('[data-accueil-edit-slot="series_jour"]')
@@ -575,25 +679,42 @@ async function main() {
       main.scrollTo({ top: Math.max(0, main.scrollTop + (r.top - desired)), behavior: 'instant' })
     })
     await page.waitForTimeout(160)
-    await recorder.burst(6)
+    const trashBox = await page.locator('[data-accueil-tile-trash="series_jour"]').boundingBox()
+    if (trashBox) {
+      await moveFinger(page, trashBox.x + trashBox.width / 2, trashBox.y + trashBox.height / 2, true)
+      await recorder.burst(4)
+    }
     await page.locator('[data-accueil-tile-trash="series_jour"]').tap({ force: true })
-    // Exit anim ~180ms + sibling FLIP
-    await recorder.burst(12)
+    await moveFinger(page, 0, 0, false)
+    // Exit ~180ms + sibling FLIP — record the fade
+    await recorder.hold(700)
     await page.waitForSelector('[data-accueil-edit-slot="series_jour"]', {
       state: 'detached',
       timeout: 4_000,
     })
     log.steps.push('removed-series')
-    await recorder.burst(10)
+    await recorder.hold(PAUSE_MS)
 
-    // 4) + Ajouter → re-add
+    // 4) + Ajouter → pick Séries du jour (fade in)
+    const addBox = await page.locator('[data-accueil-edit-add]').boundingBox()
+    if (addBox) {
+      await moveFinger(page, addBox.x + addBox.width / 2, addBox.y + addBox.height / 2, true)
+      await recorder.burst(3)
+    }
     await page.locator('[data-accueil-edit-add]').tap()
+    await moveFinger(page, 0, 0, false)
     await page.waitForSelector('[data-accueil-add-item="series_jour"]', {
       state: 'visible',
       timeout: 8_000,
     })
-    await recorder.burst(10)
+    await recorder.hold(PAUSE_MS)
+    const addItem = await page.locator('[data-accueil-add-item="series_jour"]').boundingBox()
+    if (addItem) {
+      await moveFinger(page, addItem.x + addItem.width / 2, addItem.y + addItem.height / 2, true)
+      await recorder.burst(3)
+    }
     await page.locator('[data-accueil-add-item="series_jour"]').tap()
+    await moveFinger(page, 0, 0, false)
     await page.waitForSelector('[data-accueil-edit-slot="series_jour"]', {
       state: 'visible',
       timeout: 5_000,
@@ -605,13 +726,19 @@ async function main() {
       .then(() => true)
       .catch(() => metricLog.some((s) => (s.entering || []).length > 0))
     log.steps.push(sawEntering ? 'enter-anim-seen' : 'enter-anim-missed')
-    await recorder.burst(14)
+    await recorder.hold(PAUSE_MS)
 
-    // 5) OK
+    // 5) OK — jiggle stops, no stuck tile
+    const okBox = await page.locator('[data-accueil-edit-ok]').boundingBox()
+    if (okBox) {
+      await moveFinger(page, okBox.x + okBox.width / 2, okBox.y + okBox.height / 2, true)
+      await recorder.burst(3)
+    }
     await page.locator('[data-accueil-edit-ok]').tap()
+    await moveFinger(page, 0, 0, false)
     await page.waitForSelector('[data-accueil-edit-open="0"]', { timeout: 5_000 })
     log.steps.push('ok')
-    await recorder.burst(12)
+    await recorder.hold(PAUSE_MS)
 
     metricPollActive = false
     await metricPoll.catch(() => {})
@@ -635,6 +762,12 @@ async function main() {
     if (lateDrag.length > 0) {
       throw new Error(`Stuck drag near end: ${JSON.stringify(lateDrag.slice(0, 2))}`)
     }
+    const midDragMissing = metricLog.filter(
+      (s) => (s.dragging || []).includes('eau') && s.floatVisible === false,
+    )
+    if (midDragMissing.length > 0) {
+      throw new Error(`Float missing while dragging: ${JSON.stringify(midDragMissing.slice(0, 3))}`)
+    }
 
     await context.close()
     await browser.close()
@@ -642,7 +775,7 @@ async function main() {
     const frameFiles = readdirSync(framesDir)
       .filter((f) => f.endsWith('.png'))
       .sort()
-    if (frameFiles.length < 30) {
+    if (frameFiles.length < 80) {
       throw new Error(`Too few screenshot frames: ${frameFiles.length}`)
     }
 
@@ -661,6 +794,49 @@ async function main() {
       '-movflags',
       '+faststart',
       dest,
+    ])
+
+    const demo = join(artifactsDir, 'accueil_flip_edit_recording_demo.mp4')
+    await copyFile(dest, demo)
+
+    // Contact sheet of drag+drop window at 10 fps
+    const win = recorder.dragWindow()
+    let contactStart = win.start ?? 1
+    let contactEnd = win.end ?? frameFiles.length
+    if (contactEnd < contactStart) {
+      contactStart = 1
+      contactEnd = frameFiles.length
+    }
+    const dragFramesDir = join(artifactsDir, 'accueil_flip_edit_drag_frames')
+    try {
+      await rm(dragFramesDir, { recursive: true, force: true })
+    } catch {
+      /* ignore */
+    }
+    await mkdir(dragFramesDir, { recursive: true })
+    // Sample every 3rd frame from 30fps → 10fps
+    let sheetIdx = 0
+    for (let i = contactStart; i <= contactEnd; i += 3) {
+      const src = join(framesDir, `frame-${String(i).padStart(4, '0')}.png`)
+      if (!existsSync(src)) continue
+      sheetIdx++
+      await copyFile(src, join(dragFramesDir, `sheet-${String(sheetIdx).padStart(3, '0')}.png`))
+    }
+    if (sheetIdx < 4) {
+      throw new Error(`Contact sheet too short: ${sheetIdx} frames`)
+    }
+    const contactPath = join(artifactsDir, 'accueil_flip_edit_drag_contact.png')
+    // Tile into a contact sheet (max ~8 columns)
+    const cols = Math.min(8, sheetIdx)
+    runFfmpeg([
+      '-y',
+      '-i',
+      join(dragFramesDir, 'sheet-%03d.png'),
+      '-vf',
+      `scale=201:-1,tile=${cols}x${Math.ceil(sheetIdx / cols)}`,
+      '-frames:v',
+      '1',
+      contactPath,
     ])
 
     // Luminance check — reject near-black frames after the first few
@@ -696,12 +872,21 @@ async function main() {
       { encoding: 'utf8' },
     ).trim()
 
+    const durationSec = Number(dur)
+    if (!(durationSec >= 10)) {
+      throw new Error(`Video too short for full flow: ${durationSec}s (need ≥10s)`)
+    }
+
     log.video = {
       path: dest,
-      durationSec: Number(dur),
+      demoPath: demo,
+      contactSheet: contactPath,
+      durationSec,
       frames30: frameFiles.length,
+      dragContactFrames: sheetIdx,
+      dragWindow: win,
       blackFrames,
-      method: 'screenshot-burst',
+      method: 'screenshot-burst+screencast',
     }
     log.badMetrics = badMetrics
     await writeFile(join(artifactsDir, 'accueil_flip_edit_log.json'), JSON.stringify(log, null, 2))

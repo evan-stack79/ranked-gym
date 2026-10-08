@@ -61,7 +61,11 @@ import {
   SeancesSemaineTile,
   SeriesJourTile,
 } from './AccueilMetricTiles'
-import { EditableAccueilSlot, type DragPoint } from './EditableAccueilSlot'
+import {
+  EditableAccueilSlot,
+  type DragFloatRect,
+  type DragPoint,
+} from './EditableAccueilSlot'
 import { WaterGoalSheet } from './WaterGoalSheet'
 
 interface HomeGalleryViewProps {
@@ -136,7 +140,8 @@ export function HomeGalleryView({
   const [addOpen, setAddOpen] = useState(false)
   const [waterGoalOpen, setWaterGoalOpen] = useState(false)
   const [draggingId, setDraggingId] = useState<AccueilWidgetId | null>(null)
-  const [dragDelta, setDragDelta] = useState<{ x: number; y: number } | null>(null)
+  /** Absolute viewport rect of the lifted tile (finger − grab offset). */
+  const [dragFloat, setDragFloat] = useState<DragFloatRect | null>(null)
   const [exitingId, setExitingId] = useState<AccueilWidgetId | null>(null)
   const [enteringId, setEnteringId] = useState<AccueilWidgetId | null>(null)
   /** Drop glide: dragged tile slides into its slot instead of snapping. */
@@ -159,7 +164,9 @@ export function HomeGalleryView({
   prefsRef.current = prefs
   const draggingIdRef = useRef<AccueilWidgetId | null>(null)
   draggingIdRef.current = draggingId
-  const dragOriginRef = useRef<{ x: number; y: number } | null>(null)
+  /** Grab offset inside the tile — float = client − offset (no slotBox race). */
+  const dragOffsetRef = useRef<{ x: number; y: number } | null>(null)
+  const dragSizeRef = useRef<{ width: number; height: number } | null>(null)
   const flipFirstRef = useRef<Map<string, DOMRect> | null>(null)
   const enterTimerRef = useRef<number | null>(null)
 
@@ -234,8 +241,9 @@ export function HomeGalleryView({
 
   const clearDrag = useCallback(() => {
     setDraggingId(null)
-    setDragDelta(null)
-    dragOriginRef.current = null
+    setDragFloat(null)
+    dragOffsetRef.current = null
+    dragSizeRef.current = null
   }, [])
 
   /** End drag: optional drop-glide into the final slot, then clear lift state. */
@@ -246,7 +254,8 @@ export function HomeGalleryView({
       // Synchronous guard — slot pointerup + window pointerup can both fire.
       draggingIdRef.current = null
       if (!opts?.skipGlide && !prefersReducedMotion) {
-        const body = widgetsRootRef.current?.querySelector(
+        // Floating body is portaled to document.body — not under widgetsRoot.
+        const body = document.querySelector(
           `[data-accueil-edit-body="${id}"]`,
         ) as HTMLElement | null
         if (body) {
@@ -416,15 +425,43 @@ export function HomeGalleryView({
     setDropGlide(null)
     setDraggingId(id)
     draggingIdRef.current = id
-    dragOriginRef.current = { x: point.clientX, y: point.clientY }
-    setDragDelta({ x: 0, y: 0 })
+    dragOffsetRef.current = { x: point.offsetX, y: point.offsetY }
+    const slot = widgetsRootRef.current?.querySelector(
+      `[data-accueil-edit-slot="${id}"]`,
+    ) as HTMLElement | null
+    const r = slot?.getBoundingClientRect()
+    const width = r && r.width > 0 ? r.width : 0
+    const height = r && r.height > 0 ? r.height : 0
+    if (width > 0 && height > 0) {
+      dragSizeRef.current = { width, height }
+      setDragFloat({
+        left: point.clientX - point.offsetX,
+        top: point.clientY - point.offsetY,
+        width,
+        height,
+      })
+    } else {
+      setDragFloat({
+        left: point.clientX - point.offsetX,
+        top: point.clientY - point.offsetY,
+        width: dragSizeRef.current?.width ?? 0,
+        height: dragSizeRef.current?.height ?? 0,
+      })
+    }
   }, [])
 
   const handleDragMove = useCallback(
     (clientX: number, clientY: number) => {
-      const origin = dragOriginRef.current
-      if (origin) {
-        setDragDelta({ x: clientX - origin.x, y: clientY - origin.y })
+      const offset = dragOffsetRef.current
+      const size = dragSizeRef.current
+      if (offset && size) {
+        // Absolute finger tracking — reorder remount cannot yank the lift.
+        setDragFloat({
+          left: clientX - offset.x,
+          top: clientY - offset.y,
+          width: size.width,
+          height: size.height,
+        })
       }
       const current = draggingIdRef.current
       if (!current) return
@@ -435,12 +472,6 @@ export function HomeGalleryView({
 
       // First = current visual positions (incl. mid-FLIP) before layout commits.
       captureFlipFirst()
-      // Keep the dragged tile under the finger after layout shift.
-      // Measure the layout slot (placeholder), not the fixed floating body.
-      const slot = widgetsRootRef.current?.querySelector(
-        `[data-accueil-edit-slot="${current}"]`,
-      ) as HTMLElement | null
-      const before = slot?.getBoundingClientRect()
       commitPrefs(
         reorderVisibleAccueilWidget(
           prefsRef.current,
@@ -449,22 +480,6 @@ export function HomeGalleryView({
           Date.now(),
         ),
       )
-      requestAnimationFrame(() => {
-        const afterEl = widgetsRootRef.current?.querySelector(
-          `[data-accueil-edit-slot="${current}"]`,
-        ) as HTMLElement | null
-        const after = afterEl?.getBoundingClientRect()
-        if (before && after && dragOriginRef.current) {
-          dragOriginRef.current = {
-            x: dragOriginRef.current.x + (after.left - before.left),
-            y: dragOriginRef.current.y + (after.top - before.top),
-          }
-          setDragDelta({
-            x: clientX - dragOriginRef.current.x,
-            y: clientY - dragOriginRef.current.y,
-          })
-        }
-      })
     },
     [captureFlipFirst, collectHitRects, commitPrefs],
   )
@@ -538,7 +553,7 @@ export function HomeGalleryView({
       exiting={exitingId === id}
       entering={enteringId === id}
       dropGlide={dropGlide?.id === id ? dropGlide : null}
-      dragDelta={draggingId === id ? dragDelta : null}
+      dragFloat={draggingId === id ? dragFloat : null}
       onEnterEdit={enterEdit}
       onHide={handleHide}
       onDragStart={handleDragStart}
