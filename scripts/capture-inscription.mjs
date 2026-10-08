@@ -136,6 +136,12 @@ async function capture() {
 
       await page.locator('[data-testid="inscription-continue"]').click({ force: true })
       await page.waitForSelector('[data-testid="inscription-ready"]')
+      // Wait for progress width transition (220ms) so the bar is fully 100%
+      await page.waitForFunction(() => {
+        const el = document.querySelector('[data-progress]')
+        return el?.getAttribute('data-progress') === '1' && el.style.width === '100%'
+      })
+      await page.waitForTimeout(280)
       await shot(page, 'inscription-cest-pret.png')
 
       await context.close()
@@ -165,6 +171,11 @@ async function capture() {
       await page.locator('[data-testid="inscription-continue"]').click({ force: true })
       // Should skip weight → ready
       await page.waitForSelector('[data-testid="inscription-ready"]')
+      await page.waitForFunction(() => {
+        const el = document.querySelector('[data-progress]')
+        return el?.getAttribute('data-progress') === '1' && el.style.width === '100%'
+      })
+      await page.waitForTimeout(280)
       await shot(page, 'inscription-tca-sans-poids.png')
       await context.close()
     }
@@ -199,13 +210,13 @@ async function capture() {
       await page.locator('[data-testid="inscription-continue"]').click({ force: true })
       await page.waitForTimeout(400)
 
-      // Santé multi-select then exclusive clear
+      // Santé: multi-select (hold on checkboxes) then exclusive clear (hold on Aucune)
       await page.locator('[data-testid="inscription-health-pregnancy"]').click({ force: true })
-      await page.waitForTimeout(350)
+      await page.waitForTimeout(700)
       await page.locator('[data-testid="inscription-health-tca"]').click({ force: true })
-      await page.waitForTimeout(450)
+      await page.waitForTimeout(1100)
       await page.locator('[data-testid="inscription-health-none"]').click({ force: true })
-      await page.waitForTimeout(450)
+      await page.waitForTimeout(1100)
       await page.locator('[data-testid="inscription-continue"]').click({ force: true })
       await page.waitForTimeout(400)
 
@@ -235,7 +246,12 @@ async function capture() {
         await page.locator('[data-testid="inscription-continue"]').click({ force: true }).catch(() => {})
         await page.waitForSelector('[data-testid="inscription-ready"]', { timeout: 5000 })
       }
-      await page.waitForTimeout(1100)
+      await page.waitForTimeout(900)
+      await page.waitForFunction(() => {
+        const el = document.querySelector('[data-progress]')
+        return el?.getAttribute('data-progress') === '1'
+      })
+      await page.waitForTimeout(700)
       await page.locator('[data-testid="inscription-continue"]').click({ force: true })
       await page.waitForTimeout(900)
 
