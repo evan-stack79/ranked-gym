@@ -5,9 +5,10 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  formatWheelValue,
   NumberWheel,
   parseWheelKeypadInput,
-  WHEEL_OUT_OF_RANGE_MESSAGE,
+  WHEEL_INVALID_MESSAGE,
 } from './NumberWheel'
 import {
   KG_PER_LB,
@@ -27,24 +28,38 @@ function setInput(el: HTMLInputElement, value: string) {
 }
 
 describe('parseWheelKeypadInput', () => {
-  it('accepts comma and dot decimals', () => {
-    expect(parseWheelKeypadInput('72,5')).toBe(72.5)
-    expect(parseWheelKeypadInput('72.5')).toBe(72.5)
+  it('« 70,5 » and « 70.5 » → exactly 70.5', () => {
+    expect(parseWheelKeypadInput('70,5')).toBe(70.5)
+    expect(parseWheelKeypadInput('70.5')).toBe(70.5)
   })
 
-  it('empty stays null (never 0)', () => {
+  it('empty → null (never 0)', () => {
     expect(parseWheelKeypadInput('')).toBeNull()
     expect(parseWheelKeypadInput('   ')).toBeNull()
-    expect(parseWheelKeypadInput('.')).toBeNull()
   })
 
-  it('rejects garbage', () => {
+  it('garbage → invalid (never 0)', () => {
     expect(parseWheelKeypadInput('abc')).toBe('invalid')
+    expect(parseWheelKeypadInput('70,5,2')).toBe('invalid')
+    expect(parseWheelKeypadInput(',')).toBe('invalid')
+    expect(parseWheelKeypadInput('.')).toBe('invalid')
     expect(parseWheelKeypadInput('12.3.4')).toBe('invalid')
+  })
+
+  it('rejects more than 1 decimal (no silent round)', () => {
+    expect(parseWheelKeypadInput('70,55')).toBe('invalid')
+    expect(parseWheelKeypadInput('70.55')).toBe('invalid')
   })
 })
 
-describe('NumberWheel keypad', () => {
+describe('formatWheelValue', () => {
+  it('shows French comma for one decimal', () => {
+    expect(formatWheelValue(70.5)).toBe('70,5')
+    expect(formatWheelValue(70)).toBe('70')
+  })
+})
+
+describe('NumberWheel keypad (team rules)', () => {
   let container: HTMLDivElement
   let root: Root
   let value: number | null
@@ -84,13 +99,27 @@ describe('NumberWheel keypad', () => {
     container.remove()
   })
 
-  it('empty keypad → stays null (never 0)', () => {
+  it('« 70,5 » → 70.5 kg, center shows « 70,5 »', () => {
     render()
     act(() => {
       ;(container.querySelector('[data-testid="number-wheel-empty"]') as HTMLButtonElement).click()
     })
     const input = container.querySelector('[data-testid="number-wheel-keypad"]') as HTMLInputElement
-    expect(input).toBeTruthy()
+    act(() => {
+      setInput(input, '70,5')
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
+    expect(value).toBe(70.5)
+    expect(onChange).toHaveBeenCalledWith(70.5)
+    expect(container.querySelector('[data-testid="number-wheel-center"]')?.textContent).toBe('70,5')
+  })
+
+  it('empty → stays null, nothing saved as 0', () => {
+    render()
+    act(() => {
+      ;(container.querySelector('[data-testid="number-wheel-empty"]') as HTMLButtonElement).click()
+    })
+    const input = container.querySelector('[data-testid="number-wheel-keypad"]') as HTMLInputElement
     act(() => {
       setInput(input, '')
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
@@ -100,7 +129,7 @@ describe('NumberWheel keypad', () => {
     expect(onChange.mock.calls.some((c) => c[0] === 0)).toBe(false)
   })
 
-  it('out-of-range → refused, value unchanged, error shown', () => {
+  it('out of range → « Valeur invalide. », nothing saved', () => {
     value = 72
     render()
     act(() => {
@@ -115,21 +144,58 @@ describe('NumberWheel keypad', () => {
     expect(value).toBe(72)
     expect(onChange.mock.calls.length).toBe(callsBefore)
     expect(container.querySelector('[data-testid="number-wheel-error"]')?.textContent).toBe(
-      WHEEL_OUT_OF_RANGE_MESSAGE,
+      WHEEL_INVALID_MESSAGE,
     )
+    expect(WHEEL_INVALID_MESSAGE).toBe('Valeur invalide.')
   })
 
-  it('comma decimal is parsed', () => {
+  it('garbage → « Valeur invalide. », never 0', () => {
+    value = null
+    render()
+    act(() => {
+      ;(container.querySelector('[data-testid="number-wheel-empty"]') as HTMLButtonElement).click()
+    })
+    const input = container.querySelector('[data-testid="number-wheel-keypad"]') as HTMLInputElement
+    for (const garbage of ['abc', '70,5,2', ',']) {
+      onChange.mockClear()
+      act(() => {
+        setInput(input, garbage)
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      })
+      expect(value).toBeNull()
+      expect(onChange).not.toHaveBeenCalled()
+      expect(container.querySelector('[data-testid="number-wheel-error"]')?.textContent).toBe(
+        'Valeur invalide.',
+      )
+    }
+  })
+
+  it('« 70.5 » also stores 70.5 and displays « 70,5 »', () => {
     render()
     act(() => {
       ;(container.querySelector('[data-testid="number-wheel-empty"]') as HTMLButtonElement).click()
     })
     const input = container.querySelector('[data-testid="number-wheel-keypad"]') as HTMLInputElement
     act(() => {
-      setInput(input, '72,5')
+      setInput(input, '70.5')
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     })
-    expect(value).toBe(72.5)
+    expect(value).toBe(70.5)
+    expect(container.querySelector('[data-testid="number-wheel-center"]')?.textContent).toBe('70,5')
+  })
+
+  it('spin after typed decimal snaps to nearest wheel step', () => {
+    value = 70.5
+    render()
+    expect(container.querySelector('[data-testid="number-wheel-center"]')?.textContent).toBe('70,5')
+    const slider = container.querySelector('[role="slider"]') as HTMLElement
+    act(() => {
+      slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+    })
+    // Nearest step was 70; ArrowDown advances one step → 71 (integer step).
+    expect(value).toBe(71)
+    expect(Number.isInteger(value)).toBe(true)
+    expect(container.querySelector('[data-testid="number-wheel-center"]')?.textContent).toBe('71')
   })
 
   it('Escape without change keeps previous value', () => {
@@ -150,15 +216,11 @@ describe('NumberWheel keypad', () => {
 
 describe('NumberWheel lb keypad → kg storage without drift', () => {
   it('stores exact lb * KG_PER_LB via validateParsed path', () => {
-    let storedKg: number | null = null
     const lb = 160
     const expectedKg = lb * KG_PER_LB
-    // Mirror HeightWeightPicker conversion
-    const display = lb
-    expect(sanitizeWeightKg(lbToKgStorage(display))).toBe(expectedKg)
-    storedKg = lbToKgStorage(display)
+    expect(sanitizeWeightKg(lbToKgStorage(lb))).toBe(expectedKg)
+    const storedKg = lbToKgStorage(lb)
     expect(storedKg).toBe(160 * KG_PER_LB)
-    // Round-trip display stable
     expect(Math.round(storedKg / KG_PER_LB)).toBe(160)
   })
 })
@@ -183,7 +245,6 @@ describe('NumberWheel prefers-reduced-motion', () => {
         dispatchEvent: () => false,
       } as MediaQueryList
     })
-    // jsdom lacks PointerEvent — minimal polyfill for drag simulation.
     if (typeof globalThis.PointerEvent === 'undefined') {
       class PointerEventPolyfill extends MouseEvent {
         pointerId: number
@@ -240,14 +301,11 @@ describe('NumberWheel prefers-reduced-motion', () => {
         new PointerEvent('pointerup', { clientY: 80, pointerId: 1, bubbles: true }),
       )
     })
-    // Reduced motion: snapToNearest only — no momentum rAF coast loop.
     expect(value).not.toBeNull()
     expect(value!).toBeGreaterThanOrEqual(WEIGHT_KG_MIN)
     expect(value!).toBeLessThanOrEqual(WEIGHT_KG_MAX)
     expect(Number.isInteger(value)).toBe(true)
-    // No coasting frames after pointerup (openKeypad uses rAF only on tap, not drag).
-    const rafAfterDrag = rafSpy.mock.calls.length
-    expect(rafAfterDrag).toBe(0)
+    expect(rafSpy.mock.calls.length).toBe(0)
     rafSpy.mockRestore()
   })
 })

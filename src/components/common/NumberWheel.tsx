@@ -22,8 +22,10 @@ const TICK_MIN_MS = 35
 const TAP_MOVE_PX = 10
 const TAP_MAX_MS = 320
 
-/** Message unique hors bornes — pas de conseil « idéal ». */
-export const WHEEL_OUT_OF_RANGE_MESSAGE = 'Ce chiffre ne semble pas bon.'
+/** Unique invalid keypad message — no “ideal” tip. */
+export const WHEEL_INVALID_MESSAGE = 'Valeur invalide.'
+/** @deprecated Use WHEEL_INVALID_MESSAGE */
+export const WHEEL_OUT_OF_RANGE_MESSAGE = WHEEL_INVALID_MESSAGE
 
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
@@ -40,19 +42,30 @@ function indexFromOffset(offset: number, count: number): number {
   return clampIndex(raw, count)
 }
 
-function formatCenter(v: number, step: number): string {
-  if (Number.isInteger(step) || Number.isInteger(v)) return String(Math.round(v))
-  return v.toFixed(1)
+/** French UI: integers as-is, one decimal with comma (« 70,5 »). */
+export function formatWheelValue(v: number): string {
+  if (!Number.isFinite(v)) return '—'
+  const rounded = Math.round(v * 10) / 10
+  if (Number.isInteger(rounded)) return String(rounded)
+  return rounded.toFixed(1).replace('.', ',')
 }
 
-/** Parse keypad text: comma or dot decimal; '' → null; garbage → invalid. */
+/**
+ * Parse keypad text.
+ * - '' / whitespace → null (empty, never 0)
+ * - « 70,5 » / « 70.5 » → 70.5 (at most 1 decimal; more decimals → invalid, not rounded)
+ * - garbage (« abc », « 70,5,2 », « , ») → 'invalid'
+ */
 export function parseWheelKeypadInput(raw: string): number | null | 'invalid' {
-  const trimmed = raw.trim().replace(/\u00a0/g, '').replace(',', '.')
-  if (trimmed === '' || trimmed === '.') return null
-  if (!/^\d+(\.\d+)?$|^\.\d+$/.test(trimmed)) return 'invalid'
-  const n = Number.parseFloat(trimmed)
+  const trimmed = raw.trim().replace(/\u00a0/g, '')
+  if (trimmed === '') return null
+  // Lone separators are invalid (not empty).
+  if (trimmed === ',' || trimmed === '.') return 'invalid'
+  // At most one decimal digit; comma or dot. Reject 70,55 / 70.55 / trailing sep.
+  if (!/^\d+([.,]\d)?$/.test(trimmed)) return 'invalid'
+  const n = Number.parseFloat(trimmed.replace(',', '.'))
   if (!Number.isFinite(n)) return 'invalid'
-  return n
+  return Math.round(n * 10) / 10
 }
 
 export interface NumberWheelProps {
@@ -275,7 +288,9 @@ export function NumberWheel({
   const commitKeypad = useCallback(() => {
     const parsed = parseWheelKeypadInput(editText)
     if (parsed === 'invalid') {
-      setKeypadError(WHEEL_OUT_OF_RANGE_MESSAGE)
+      // Nothing saved — previous value / empty kept.
+      setKeypadError(WHEEL_INVALID_MESSAGE)
+      window.requestAnimationFrame(() => inputRef.current?.focus())
       return
     }
     if (parsed == null) {
@@ -287,8 +302,8 @@ export function NumberWheel({
     const inRange = parsed >= min && parsed <= max
     const extraOk = validateParsed ? validateParsed(parsed) : true
     if (!inRange || !extraOk) {
-      setKeypadError(WHEEL_OUT_OF_RANGE_MESSAGE)
-      // Keep previous value (or empty) — do not apply; stay in keypad to correct.
+      // Out of range → Valeur invalide., nothing saved.
+      setKeypadError(WHEEL_INVALID_MESSAGE)
       window.requestAnimationFrame(() => inputRef.current?.focus())
       return
     }
@@ -490,9 +505,8 @@ export function NumberWheel({
               data-testid="number-wheel-keypad"
               value={editText}
               onChange={(e) => {
-                const raw = e.target.value
-                if (raw !== '' && !/^\d*[.,]?\d*$/.test(raw)) return
-                setEditText(raw)
+                // Allow any text; commitKeypad rejects garbage with « Valeur invalide. »
+                setEditText(e.target.value)
                 setKeypadError(null)
               }}
               onKeyDown={(e) => {
@@ -558,6 +572,10 @@ export function NumberWheel({
               const fontSize = isCenter ? 64 : Math.max(22, 42 - dist * 10)
               const color = isCenter ? '#ffffff' : '#636366'
               const pulse = isCenter && tickPulse > 0 && !reduced ? 1.04 : 1
+              // Center shows the live value (e.g. typed « 70,5 ») even when off-step;
+              // a later spin snaps to the nearest wheel step (integers when step=1).
+              const label =
+                isCenter && value != null ? formatWheelValue(value) : formatWheelValue(v)
               return (
                 <div
                   key={`${v}-${idx}`}
@@ -592,7 +610,7 @@ export function NumberWheel({
                     cursor: isCenter ? 'text' : undefined,
                   }}
                 >
-                  {formatCenter(v, step)}
+                  {label}
                 </div>
               )
             })}

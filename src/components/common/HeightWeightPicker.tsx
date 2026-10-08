@@ -12,7 +12,7 @@ import {
   sanitizeHeightCm,
   sanitizeWeightKg,
 } from '../../services/nutritionSafetyRules'
-import { NumberWheel } from './NumberWheel'
+import { formatWheelValue, NumberWheel } from './NumberWheel'
 
 export type WeightUnit = 'kg' | 'lb'
 
@@ -67,7 +67,9 @@ export function HeightWeightPicker({
 
   const weightDisplay = useMemo(() => {
     if (weightKg == null) return null
-    return unit === 'kg' ? Math.round(weightKg) : kgToLbDisplay(weightKg)
+    // Preserve typed one-decimal kg (e.g. 70.5); lb stays integer display.
+    if (unit === 'kg') return Math.round(weightKg * 10) / 10
+    return kgToLbDisplay(weightKg)
   }, [weightKg, unit])
 
   const weightWheelMin = unit === 'kg' ? WEIGHT_KG_MIN : LB_MIN
@@ -84,7 +86,7 @@ export function HeightWeightPicker({
     if (weightKg != null) {
       const sameDisplay =
         unit === 'kg'
-          ? Math.round(weightKg) === Math.round(nextKg)
+          ? Math.round(weightKg * 10) / 10 === Math.round(nextKg * 10) / 10
           : kgToLbDisplay(weightKg) === display
       if (sameDisplay) {
         onChange({ weightKg, heightCm })
@@ -191,9 +193,7 @@ export function HeightWeightPicker({
               ? 'Fais glisser ou tape pour choisir'
               : unit === 'lb'
                 ? `${kgToLbDisplay(weightKg)} lb`
-                : Number.isInteger(weightKg)
-                  ? `${weightKg} kg`
-                  : `${weightKg.toFixed(1).replace(/\.0$/, '')} kg`}
+                : `${formatWheelValue(weightKg)} kg`}
           </p>
         </div>
       ) : (
