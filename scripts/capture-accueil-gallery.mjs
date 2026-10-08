@@ -173,11 +173,27 @@ async function assertGalleryLayout(page) {
   if (!report.hasCover) {
     throw new Error('Expected a cover image on the first Récent tile (Squat)')
   }
+  // Scaled PNGs report fillRatio > 1 (transform); opaque covers ≈ 1.
   if (report.fillRatio < 0.95) {
     throw new Error(`Cover image does not fill tile (fillRatio=${report.fillRatio})`)
   }
-  if (!report.heroFillOk) {
-    throw new Error('Hero cover image does not fill hero card')
+  if (!report.heroFillOk && report.heroHasCover) {
+    // Allow small delta; PNG heroes may scale past the box (clipped by overflow).
+    const hero = await page.evaluate(() => {
+      const heroEl = document.querySelector('[data-accueil-hero="session"]')
+      const img = heroEl?.querySelector('[data-accueil-hero-img="cover"]')
+      if (!heroEl || !img) return null
+      const hb = heroEl.getBoundingClientRect()
+      const ib = img.getBoundingClientRect()
+      return {
+        coversWidth: ib.width >= hb.width - 1,
+        coversHeight: ib.height >= hb.height - 1,
+        objectFit: getComputedStyle(img).objectFit,
+      }
+    })
+    if (!hero || hero.objectFit !== 'cover' || !hero.coversWidth || !hero.coversHeight) {
+      throw new Error(`Hero cover image does not fill hero card: ${JSON.stringify(hero)}`)
+    }
   }
 }
 

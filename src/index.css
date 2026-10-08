@@ -190,6 +190,28 @@ body {
   isolation: isolate;
 }
 
+/*
+ * Wave-1 PNGs ship with transparent padding around the figure.
+ * object-cover alone still shows the empty alpha as the tile bg —
+ * a light zoom crops that padding so the subject fills the square.
+ * Opaque photos (e.g. developpe-couche.webp) are unaffected.
+ */
+.accueil-gallery__tile-media img[src*='.png'],
+.history-thumb--tile img[src*='.png'],
+.accueil-gallery__hero img[src*='.png'] {
+  transform: scale(1.52);
+  transform-origin: center center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .accueil-gallery__tile-media img[src*='.png'],
+  .history-thumb--tile img[src*='.png'],
+  .accueil-gallery__hero img[src*='.png'] {
+    /* Keep the static crop; no animated transition on the zoom */
+    transition: none;
+  }
+}
+
 .accueil-gallery__hero {
   width: var(--accueil-hero-width);
   aspect-ratio: 3 / 4;
