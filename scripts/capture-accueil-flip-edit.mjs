@@ -502,7 +502,11 @@ async function main() {
 
     // 30 fps frames for intermediate-position audit
     const framesDir = join(artifactsDir, 'accueil_flip_edit_frames')
-    await rm(framesDir, { recursive: true, force: true })
+    try {
+      await rm(framesDir, { recursive: true, force: true })
+    } catch {
+      /* EIO on busy artifact FS — fall through and overwrite */
+    }
     await mkdir(framesDir, { recursive: true })
     runFfmpeg(['-y', '-i', dest, '-vf', 'fps=30', join(framesDir, 'frame-%04d.png')])
     const frames = readdirSync(framesDir).filter((f) => f.endsWith('.png')).sort()
