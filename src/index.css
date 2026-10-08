@@ -440,8 +440,13 @@ img {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
-  /* Outside edit: vertical page scroll only — never capture diagonal as drag. */
-  touch-action: pan-y;
+  /*
+   * Outside edit: allow native pan (manipulation = pan + no double-tap zoom).
+   * Prefer manipulation over pan-y so a stationary long-press is not pointercancel’d
+   * when the browser claims a vertical gesture; carousel axis-lock + overflow-x:clip
+   * stop the “bas gauche” jerk.
+   */
+  touch-action: manipulation;
 }
 
 .accueil-edit-slot__body {

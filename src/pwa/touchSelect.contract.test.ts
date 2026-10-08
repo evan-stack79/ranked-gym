@@ -63,8 +63,10 @@ describe('PWA touch selection / scroll CSS contract', () => {
     expect(css).toMatch(/\[data-app-scroll-main\]\s*\{[^}]*overflow-x:\s*clip/s)
   })
 
-  it('Accueil edit slots use pan-y outside edit and none only while editing', () => {
-    expect(css).toMatch(/\.accueil-edit-slot\s*\{[^}]*touch-action:\s*pan-y/s)
+  it('Accueil edit slots allow pan outside edit and none only while editing', () => {
+    expect(css).toMatch(
+      /\.accueil-edit-slot\s*\{[^}]*touch-action:\s*(pan-y|manipulation)/s,
+    )
     expect(css).toMatch(/\.accueil-edit-slot--editing\s*\{[^}]*touch-action:\s*none/s)
   })
 

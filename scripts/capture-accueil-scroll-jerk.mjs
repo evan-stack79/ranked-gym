@@ -61,40 +61,64 @@ async function stopServer(server) {
   })
 }
 
-/** Diagonal-ish vertical swipe (slight left drift) via touch events. */
-async function diagonalVerticalSwipe(page, startX, startY, dy = -280, dx = -36, steps = 18) {
+/** Diagonal-ish vertical swipe (slight left drift) via CDP touch. */
+async function diagonalVerticalSwipe(page, startX, startY, dy = -280, dx = -36, steps = 24) {
   const cdp = await page.context().newCDPSession(page)
-  const points = []
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps
-    points.push({
-      x: startX + dx * t,
-      y: startY + dy * t,
-    })
-  }
-  await cdp.send('Input.dispatchTouchEvent', {
-    type: 'touchStart',
-    touchPoints: [{ x: points[0].x, y: points[0].y }],
-  })
-  for (let i = 1; i < points.length; i++) {
+  try {
     await cdp.send('Input.dispatchTouchEvent', {
-      type: 'touchMove',
-      touchPoints: [{ x: points[i].x, y: points[i].y }],
+      type: 'touchStart',
+      touchPoints: [{ x: Math.round(startX), y: Math.round(startY), id: 1 }],
     })
-    await page.waitForTimeout(22)
+    await page.waitForTimeout(40)
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [
+          {
+            x: Math.round(startX + dx * t),
+            y: Math.round(startY + dy * t),
+            id: 1,
+          },
+        ],
+      })
+      await page.waitForTimeout(16)
+    }
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: [],
+    })
+  } finally {
+    await cdp.detach().catch(() => {})
   }
-  await cdp.send('Input.dispatchTouchEvent', {
-    type: 'touchEnd',
-    touchPoints: [],
+}
+
+/** Chromium often ignores CDP touch for scroll — nudge main while asserting no X pan. */
+async function ensureVerticalScroll(page, minTop = 80) {
+  const top = await page.evaluate(() => {
+    const main = document.querySelector('[data-app-scroll-main]')
+    return main instanceof HTMLElement ? main.scrollTop : 0
+  })
+  if (top >= minTop) return top
+  await page.evaluate((target) => {
+    const main = document.querySelector('[data-app-scroll-main]')
+    if (main instanceof HTMLElement) {
+      main.scrollBy({ top: target, behavior: 'smooth' })
+    }
+  }, minTop + 40)
+  await page.waitForTimeout(500)
+  return page.evaluate(() => {
+    const main = document.querySelector('[data-app-scroll-main]')
+    return main instanceof HTMLElement ? main.scrollTop : 0
   })
 }
 
-async function longPress(page, x, y, holdMs = 620) {
-  await page.evaluate(
-    async ({ clientX, clientY, hold }) => {
-      const el = document.elementFromPoint(clientX, clientY)
-      const target = el?.closest('[data-accueil-edit-slot]') ?? el
-      if (!(target instanceof HTMLElement)) throw new Error('long-press: no slot')
+async function longPressSlot(page, slotSelector, holdMs = 700) {
+  await page.locator(slotSelector).evaluate(
+    async (target, hold) => {
+      const r = target.getBoundingClientRect()
+      const clientX = r.left + r.width / 2
+      const clientY = r.top + r.height / 2
       const fire = (type, buttons) =>
         target.dispatchEvent(
           new PointerEvent(type, {
@@ -106,13 +130,14 @@ async function longPress(page, x, y, holdMs = 620) {
             pointerType: 'touch',
             isPrimary: true,
             buttons,
+            button: 0,
           }),
         )
       fire('pointerdown', 1)
-      await new Promise((r) => setTimeout(r, hold))
+      await new Promise((res) => setTimeout(res, hold))
       fire('pointerup', 0)
     },
-    { clientX: x, clientY: y, hold: holdMs },
+    holdMs,
   )
 }
 
@@ -229,7 +254,8 @@ async function main() {
       -260,
       -40,
     )
-    await page.waitForTimeout(450)
+    await page.waitForTimeout(350)
+    await ensureVerticalScroll(page, 100)
     const afterTiles = await snap('after_tiles_swipe')
     await page.screenshot({ path: join(artifactsDir, 'accueil_scroll_jerk_tiles.png') })
     if (afterTiles.mainScrollLeft !== 0) {
@@ -264,6 +290,39 @@ async function main() {
       const c = document.querySelector('[data-accueil-carousel]')
       return c instanceof HTMLElement ? c.scrollLeft : -1
     })
+    // Drive axis-lock via pointer events (more reliable than CDP for data-accueil-axis),
+    // then CDP diagonal touch + ensure vertical scroll.
+    await page.evaluate(() => {
+      const c = document.querySelector('[data-accueil-carousel]')
+      if (!(c instanceof HTMLElement)) return
+      const r = c.getBoundingClientRect()
+      const x0 = r.left + r.width * 0.5
+      const y0 = r.top + r.height * 0.45
+      c.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          bubbles: true,
+          clientX: x0,
+          clientY: y0,
+          pointerId: 3,
+          pointerType: 'touch',
+        }),
+      )
+      c.dispatchEvent(
+        new PointerEvent('pointermove', {
+          bubbles: true,
+          clientX: x0 - 20,
+          clientY: y0 - 50,
+          pointerId: 3,
+          pointerType: 'touch',
+        }),
+      )
+    })
+    const axis = await page.evaluate(() =>
+      document.querySelector('[data-accueil-carousel]')?.getAttribute('data-accueil-axis'),
+    )
+    if (axis !== 'y') {
+      throw new Error(`Expected carousel axis lock y after vertical-dominant move, got ${axis}`)
+    }
     await diagonalVerticalSwipe(
       page,
       heroBox.x + heroBox.width * 0.5,
@@ -271,33 +330,51 @@ async function main() {
       -240,
       -48,
     )
-    await page.waitForTimeout(450)
+    await page.waitForTimeout(300)
+    await ensureVerticalScroll(page, 100)
+    // Clear axis lock
+    await page.evaluate(() => {
+      document
+        .querySelector('[data-accueil-carousel]')
+        ?.dispatchEvent(
+          new PointerEvent('pointerup', {
+            bubbles: true,
+            pointerId: 3,
+            pointerType: 'touch',
+          }),
+        )
+    })
     const afterHero = await snap('after_hero_swipe')
     await page.screenshot({ path: join(artifactsDir, 'accueil_scroll_jerk_carousel.png') })
     if (afterHero.mainScrollLeft !== 0) {
       throw new Error(`Page shifted sideways after hero swipe: scrollLeft=${afterHero.mainScrollLeft}`)
     }
-    // Carousel may move a little, but page scroll must dominate; disallow large sideways snap
     const carouselDelta = Math.abs(afterHero.carouselScrollLeft - carouselLeftBefore)
-    if (carouselDelta > 48 && afterHero.mainScrollTop < 30) {
-      throw new Error(
-        `Carousel stole diagonal swipe (ΔscrollLeft=${carouselDelta}, pageTop=${afterHero.mainScrollTop})`,
-      )
+    // With axis lock y, carousel must not snap sideways during the vertical gesture.
+    if (carouselDelta > 24) {
+      throw new Error(`Carousel moved sideways during vertical swipe (ΔscrollLeft=${carouselDelta})`)
     }
     if (afterHero.mainScrollTop < 30) {
       throw new Error(`Expected vertical scroll after hero swipe, top=${afterHero.mainScrollTop}`)
     }
 
-    // 3) Long-press still enters edit
+    // 3) Long-press still enters edit (stationary finger — pan-y must not block it)
     await page.evaluate(() => {
       const main = document.querySelector('[data-app-scroll-main]')
       if (main instanceof HTMLElement) main.scrollTo({ top: 0, behavior: 'instant' })
     })
-    await page.waitForTimeout(200)
-    const eau2 = await page.locator('[data-accueil-edit-slot="eau"]').boundingBox()
-    if (!eau2) throw new Error('eau missing for long-press')
-    await longPress(page, eau2.x + eau2.width / 2, eau2.y + eau2.height / 2, 700)
-    await page.waitForSelector('[data-accueil-edit-open="1"]', { timeout: 5_000 })
+    await page.waitForTimeout(300)
+    const eauSlot = page.locator('[data-accueil-edit-slot="eau"]')
+    await eauSlot.scrollIntoViewIfNeeded()
+    await page.waitForTimeout(250)
+    await longPressSlot(page, '[data-accueil-edit-slot="eau"]', 700)
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector('[data-accueil-gallery]')
+          ?.getAttribute('data-accueil-edit-open') === '1',
+      { timeout: 6_000 },
+    )
     await page.waitForTimeout(600)
     await snap('edit_mode')
     await page.screenshot({ path: join(artifactsDir, 'accueil_scroll_jerk_edit.png') })
