@@ -228,7 +228,6 @@ async function main() {
       ({ prefsKey, goalKey, prefs, top, bottom }) => {
         try {
           localStorage.setItem(prefsKey, JSON.stringify(prefs))
-          localStorage.setItem('ranked-gym:water-ml', JSON.stringify({ date: new Date().toISOString().slice(0, 10), ml: 1200 }))
           localStorage.removeItem(goalKey)
         } catch {
           /* ignore */
@@ -251,8 +250,8 @@ async function main() {
       },
     )
 
-    // Seed water via harness-friendly path if present
     await page.goto(`http://127.0.0.1:${port}/?tab=home`, { waitUntil: 'domcontentloaded' })
+    await page.waitForSelector('[data-harness-ready]', { state: 'attached', timeout: 30_000 })
     await page.waitForSelector('[data-accueil-edit-slot="eau"]', { state: 'visible', timeout: 20_000 })
     await page.evaluate(() => {
       document.querySelectorAll('.rg-mask-reveal').forEach((el) => {
@@ -263,19 +262,17 @@ async function main() {
       })
     })
 
-    // Ensure water + week counts via storage APIs the app reads
-    await page.evaluate(async () => {
-      try {
-        const { setTodayWaterMl } = await import('/src/services/nutritionStorage.ts')
-        setTodayWaterMl(1200)
-        window.dispatchEvent(new Event('ranked-gym:water-changed'))
-      } catch {
-        /* harness may already seed */
-      }
-    })
-
     await pinEditWidgets(page)
-    await page.waitForTimeout(600)
+    // Harness seeds Eau 1200 + week 2 — wait before any drag.
+    await page.waitForFunction(() => {
+      const norm = (s) => (s || '').replace(/[\s\u00a0\u202f]/g, '')
+      const eau = document.querySelector('[data-accueil-metric-tile="eau"] [data-rg-count="water"]')
+      const week = document.querySelector(
+        '[data-accueil-metric-tile="seances_semaine"] [data-rg-count="sessions"]',
+      )
+      return norm(eau?.textContent) === '1200' && norm(week?.textContent) === '2'
+    }, { timeout: 12_000 })
+    await page.waitForTimeout(400)
 
     const videoT0 = Date.now()
     const actionStartMs = Date.now() - videoT0
@@ -409,11 +406,12 @@ async function main() {
 
     const badMetrics = metricLog.filter(
       (s) =>
-        (s.eau && s.eau !== '1200' && s.eau !== '—' && s.eau !== '900' && !/^\d+$/.test(s.eau)) ||
-        (s.eau === '0') ||
-        (s.week === '1' && false), // week can vary; only flag empty→wrong later
+        (s.eau && s.eau !== '1200' && s.eau !== '—') ||
+        (s.week && s.week !== '2' && s.week !== ''),
     )
-    // Hard flash guards
+    if (badMetrics.length > 0) {
+      throw new Error(`Value flash during edit: ${JSON.stringify(badMetrics.slice(0, 6))}`)
+    }
     const zeroFlash = metricLog.filter((s) => s.eau === '0')
     if (zeroFlash.length > 0) {
       throw new Error(`Eau 0 ml flash: ${JSON.stringify(zeroFlash.slice(0, 3))}`)
