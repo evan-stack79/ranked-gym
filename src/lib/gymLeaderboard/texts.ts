@@ -49,7 +49,7 @@ export const MANUAL_ADD_CITY_LABEL = 'Ville'
 export const MANUAL_SEARCH_PAUSED =
   'La recherche est en pause. Réessaie demain, ou ajoute ta salle à la main.'
 export const MANUAL_FALLBACK_HINT =
-  'Sans clé Google, ajoute ta salle à la main (nom + ville).'
+  'Tu ne trouves pas ta salle ? Ajoute-la à la main, avec son nom et sa ville.'
 
 export const POSITION_IMPRECISE =
   'Position pas assez précise. Réessaie près de l\'entrée.'

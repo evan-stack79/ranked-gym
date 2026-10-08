@@ -57,7 +57,7 @@ export function GymLeaderboardFlow({
       }
       setGymPoint({ lat: pos.reading.lat, lng: pos.reading.lng })
       setToast(
-        'Point de la salle enregistré sur cet appareil. La validation comptera une fois synchronisée.',
+        'Point de la salle enregistré. Ta présence comptera ce soir dans le classement.',
       )
       return
     }
