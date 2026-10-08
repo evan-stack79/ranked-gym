@@ -18,10 +18,13 @@ import { readHealthDeclarations } from '../../services/nutritionSafetyRules'
 import { M_CAL_2, M_INFO_1 } from '../../content/safetyCopy'
 import { NeedToTalkScreen } from '../settings/NeedToTalkScreen'
 import { SafetyNote } from './SafetyNote'
-import { getDailyWaterGoalMl, isTrainingDayToday } from '../../utils/waterGoal'
 import {
   canSubmitHomeQuickWater,
 } from '../../utils/homeNutritionQuickActions'
+import {
+  getUserWaterGoalMl,
+  WATER_GOAL_CHANGED_EVENT,
+} from '../../utils/userWaterGoal'
 import {
   listPersonalFoods,
   setPersonalFoodFavorite,
@@ -55,7 +58,6 @@ import { IosSheet } from '../ui/IosSheet'
 import { SectionSkeleton } from '../ui/AppBootScreen'
 import { BlurInText, Reveal } from '../motion'
 import {
-  dateFromKey,
   formatNutritionDate,
   nutritionDateLabel,
   shiftDateKey,
@@ -163,14 +165,14 @@ export function NutritionDashboard({
     }
     window.addEventListener('ranked-gym:backup-restored', sync)
     window.addEventListener('ranked-gym:water-changed', sync)
+    window.addEventListener(WATER_GOAL_CHANGED_EVENT, sync)
     window.addEventListener('ranked-gym:profile-changed', sync)
-    window.addEventListener('ranked-gym:training-changed', sync)
     window.addEventListener('focus', sync)
     return () => {
       window.removeEventListener('ranked-gym:backup-restored', sync)
       window.removeEventListener('ranked-gym:water-changed', sync)
+      window.removeEventListener(WATER_GOAL_CHANGED_EVENT, sync)
       window.removeEventListener('ranked-gym:profile-changed', sync)
-      window.removeEventListener('ranked-gym:training-changed', sync)
       window.removeEventListener('focus', sync)
     }
   }, [selectedDateKey])
@@ -278,12 +280,11 @@ export function NutritionDashboard({
 
   const hydration = useMemo(() => {
     void tick
-    const isTrainingDay = isTrainingDayToday(undefined, dateFromKey(selectedDateKey))
     return {
       consumedMl: getWaterMlForDate(selectedDateKey),
-      goalMl: getDailyWaterGoalMl(profile.weightKg, isTrainingDay),
+      goalMl: getUserWaterGoalMl(),
     }
-  }, [tick, profile.weightKg, selectedDateKey])
+  }, [tick, selectedDateKey])
 
   const dataDateKeys = useMemo(() => Object.keys(getMealJournal()), [tick])
 
@@ -627,6 +628,7 @@ export function NutritionDashboard({
             consumedMl={hydration.consumedMl}
             goalMl={hydration.goalMl}
             onAdd250={handleQuickWater}
+            onGoalSaved={() => setTick((n) => n + 1)}
             saving={waterSaving}
           />
         </Reveal>
@@ -711,7 +713,7 @@ export function NutritionDashboard({
                 <WeightPaceCard profile={profile} />
               </>
             ) : null}
-            <SmartWaterGauge weightKg={profile.weightKg} />
+            <SmartWaterGauge />
           </div>
         ) : null}
       </div>

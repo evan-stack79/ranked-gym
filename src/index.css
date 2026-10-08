@@ -52,6 +52,45 @@ body {
   touch-action: manipulation;
 }
 
+/*
+ * PWA shell: no text selection / iOS long-press callout while scrolling Accueil.
+ * Covers shell, cards, nav, tilt surfaces — typing fields re-enabled below.
+ */
+#root,
+.mesh-bg,
+[data-app-scroll-main],
+[data-app-brand-header],
+[data-bottom-nav-host],
+.accueil-gallery__hero,
+.accueil-gallery__tile,
+.rg-tilt,
+.ios-press,
+.bottom-nav-pill,
+button,
+a,
+[role='button'] {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Keep caret, selection, and copy/paste in fields you type in */
+input,
+textarea,
+select,
+[contenteditable],
+[contenteditable='true'] {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+/* Cards / heroes: no drag ghost or iOS long-press save */
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
 /* Layout dock — BottomNav + îlot repos (Train) */
 :root {
   /* Hauteur utile BottomNav (hors safe-area), ~70–80px */
@@ -599,9 +638,21 @@ body {
 /* Accueil hero — subtle 3D tilt + glare (inner plane; Reveal/clip-path untouched) */
 .rg-tilt {
   position: relative;
+  /* Inside horizontal carousel: browser keeps vertical + horizontal pan; JS never preventDefault */
   touch-action: pan-x pan-y;
   perspective: 640px;
   -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.rg-tilt img,
+.accueil-gallery__hero img,
+.accueil-gallery__tile-media img {
+  -webkit-user-drag: none;
+  user-drag: none;
+  pointer-events: none;
 }
 
 .rg-tilt__plane {

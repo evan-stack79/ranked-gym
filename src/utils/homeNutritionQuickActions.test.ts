@@ -111,11 +111,12 @@ describe('homeNutritionQuickActions', () => {
     expect(storage.getTodayWaterMl()).toBe(0)
   })
 
-  it('objectif atteint → bouton rapide masqué', async () => {
+  it('bouton rapide toujours visible (sans dépendre d’un objectif)', async () => {
     const { shouldShowHomeQuickWaterButton } = await import('./homeNutritionQuickActions')
-    expect(shouldShowHomeQuickWaterButton(2100, 2100)).toBe(false)
-    expect(shouldShowHomeQuickWaterButton(2200, 2100)).toBe(false)
-    expect(shouldShowHomeQuickWaterButton(2099, 2100)).toBe(true)
+    expect(shouldShowHomeQuickWaterButton(2100, 2100)).toBe(true)
+    expect(shouldShowHomeQuickWaterButton(2200, 2100)).toBe(true)
+    expect(shouldShowHomeQuickWaterButton(0, null)).toBe(true)
+    expect(shouldShowHomeQuickWaterButton()).toBe(true)
   })
 
   it('bouton désactivé pendant l’écriture', async () => {
