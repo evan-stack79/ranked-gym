@@ -14,6 +14,8 @@ import {
 type MotionOpts = {
   coldEntering: boolean
   prefersReducedMotion: boolean
+  /** Skip CountUp restart (edit mode / freezeReveals) — no 0→value flash. */
+  freezeCountUp?: boolean
 }
 
 function TileShell({
@@ -82,7 +84,8 @@ export function SeancesSemaineTile({
   sessionCount: number
   motion: MotionOpts
 }) {
-  const instant = motion.coldEntering || motion.prefersReducedMotion
+  const instant =
+    motion.coldEntering || motion.prefersReducedMotion || Boolean(motion.freezeCountUp)
   return (
     <TileShell
       accent="#34C759"
@@ -93,7 +96,12 @@ export function SeancesSemaineTile({
     >
       <div className="mt-2 flex items-baseline gap-1.5">
         <span className="accueil-metric-tile__value">
-          <CountUpNumber kind="sessions" value={sessionCount} instant={instant} />
+          <CountUpNumber
+            kind="sessions"
+            value={sessionCount}
+            instant={instant}
+            stableId="accueil-seances-semaine"
+          />
         </span>
         <span className="accueil-metric-tile__unit">séance{sessionCount > 1 ? 's' : ''}</span>
       </div>
@@ -141,22 +149,28 @@ export function EauTile({
   /** False in Accueil edit mode — no water-goal sheet. */
   interactive?: boolean
 }) {
-  const instant = motion.coldEntering || motion.prefersReducedMotion
+  const instant =
+    motion.coldEntering || motion.prefersReducedMotion || Boolean(motion.freezeCountUp)
+  const ready = model.ready !== false
+  // While loading: never paint « 0 ml » (neutral en-dash placeholder).
+  const showValue = ready
   return (
     <TileShell
       accent="#0A84FF"
       label="Eau"
       ariaLabel={
-        model.showRing
-          ? `Eau, ${model.waterMl} millilitres sur ${model.goalMl}`
-          : `Eau, ${model.waterMl} millilitres`
+        !showValue
+          ? 'Eau, chargement'
+          : model.showRing
+            ? `Eau, ${model.waterMl} millilitres sur ${model.goalMl}`
+            : `Eau, ${model.waterMl} millilitres`
       }
       dataAttr="eau"
       onClick={interactive ? onSetGoal : undefined}
     >
       {/* Visual pinned top-right so number / unit / hint never overlap at 375–402px */}
       <span className="accueil-metric-tile__corner" aria-hidden="true">
-        {model.showRing ? (
+        {showValue && model.showRing ? (
           <AccueilProgressRing
             progress={model.progress}
             accent="#0A84FF"
@@ -172,15 +186,34 @@ export function EauTile({
       </span>
       <div className="accueil-metric-tile__stack mt-auto">
         <div className="accueil-metric-tile__value-row">
-          <span className="accueil-metric-tile__value">
-            <CountUpNumber kind="water" value={model.waterMl} instant={instant} />
-          </span>
-          <span className="accueil-metric-tile__unit">ml</span>
+          {showValue ? (
+            <>
+              <span className="accueil-metric-tile__value">
+                <CountUpNumber
+                  kind="water"
+                  value={model.waterMl}
+                  instant={instant}
+                  stableId="accueil-eau"
+                />
+              </span>
+              <span className="accueil-metric-tile__unit">ml</span>
+            </>
+          ) : (
+            <span
+              className="accueil-metric-tile__value"
+              data-accueil-eau-placeholder="1"
+              aria-hidden="true"
+            >
+              —
+            </span>
+          )}
         </div>
         <p className="accueil-metric-tile__hint">
-          {model.showRing && model.goalMl != null
-            ? formatWaterGoalHint(model.goalMl)
-            : 'Choisir mon objectif'}
+          {!showValue
+            ? ' '
+            : model.showRing && model.goalMl != null
+              ? formatWaterGoalHint(model.goalMl)
+              : 'Choisir mon objectif'}
         </p>
       </div>
     </TileShell>
@@ -194,7 +227,8 @@ export function SeriesJourTile({
   model: SetsTileModel
   motion: MotionOpts
 }) {
-  const instant = motion.coldEntering || motion.prefersReducedMotion
+  const instant =
+    motion.coldEntering || motion.prefersReducedMotion || Boolean(motion.freezeCountUp)
   return (
     <TileShell
       accent="#FF9F0A"
@@ -210,7 +244,12 @@ export function SeriesJourTile({
         <div className="min-w-0">
           <div className="flex items-baseline gap-1">
             <span className="accueil-metric-tile__value">
-              <CountUpNumber kind="successful_sets" value={model.doneSets} instant={instant} />
+              <CountUpNumber
+                kind="successful_sets"
+                value={model.doneSets}
+                instant={instant}
+                stableId="accueil-series-jour"
+              />
             </span>
             <span className="accueil-metric-tile__unit">
               {model.showRing ? `/ ${model.plannedSets}` : 'séries'}

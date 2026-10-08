@@ -487,15 +487,58 @@ async function main() {
       throw new Error(`Long-press target blocked (hit=${hit}); eau must clear bottom nav`)
     }
 
-    // Action clock — trim ffmpeg from just before the long-press
+    // Action clock — trim ffmpeg from just before the long-press.
+    // Every step stays on camera ~1s+ (no jumps/cuts between taps).
     const actionStartMs = Date.now() - videoT0
 
-    // 1) Long-press Eau → enter edit (hold so the press reads, then wiggle + −)
-    await vpage.waitForTimeout(900)
-    await touchLongPress(vpage, eauX, eauY, 820)
+    // Baseline metrics must be settled before any drag (no mid-count flash).
+    await vpage.waitForFunction(() => {
+      const eau = document.querySelector('[data-accueil-metric-tile="eau"] [data-rg-count="water"]')
+      const week = document.querySelector(
+        '[data-accueil-metric-tile="seances_semaine"] [data-rg-count="sessions"]',
+      )
+      const eauTxt = (eau?.textContent || '').replace(/\s/g, '')
+      const weekTxt = (week?.textContent || '').replace(/\s/g, '')
+      return eauTxt === '1200' && weekTxt === '2'
+    }, { timeout: 8_000 })
+
+    /** Poll DOM every 250ms for the whole action clip — catches data flashes. */
+    const metricLog = []
+    let metricPollActive = true
+    const metricPoll = (async () => {
+      while (metricPollActive) {
+        const snap = await vpage
+          .evaluate(() => {
+            const norm = (s) => (s || '').replace(/\s/g, '')
+            const eauEl = document.querySelector(
+              '[data-accueil-metric-tile="eau"] [data-rg-count="water"]',
+            )
+            const weekEl = document.querySelector(
+              '[data-accueil-metric-tile="seances_semaine"] [data-rg-count="sessions"]',
+            )
+            const placeholder = document.querySelector('[data-accueil-eau-placeholder="1"]')
+            const dragging = [
+              ...document.querySelectorAll('[data-accueil-dragging="1"]'),
+            ].map((el) => el.getAttribute('data-accueil-edit-slot'))
+            return {
+              t: Date.now(),
+              eau: placeholder ? '—' : norm(eauEl?.textContent),
+              week: norm(weekEl?.textContent),
+              dragging,
+            }
+          })
+          .catch(() => null)
+        if (snap) metricLog.push(snap)
+        await vpage.waitForTimeout(250).catch(() => {})
+      }
+    })()
+    await vpage.waitForTimeout(1000)
+
+    // 1) Long-press Eau → wiggle (~1s hold visible)
+    await touchLongPress(vpage, eauX, eauY, 900)
     await vpage.waitForSelector('[data-accueil-edit-ok]', { state: 'visible', timeout: 5_000 })
     await vpage.waitForSelector('[data-accueil-tile-trash="eau"]', { state: 'visible', timeout: 3_000 })
-    await vpage.waitForTimeout(2200)
+    await vpage.waitForTimeout(1200)
 
     // 2) Drag Eau above « Séances de la semaine » (slow finger-follow + FLIP)
     const weekBox = await vpage.locator('[data-accueil-edit-slot="seances_semaine"]').boundingBox()
@@ -510,37 +553,54 @@ async function main() {
       eauNow.y + eauNow.height / 2,
       targetX,
       targetY,
-      48,
-      52,
+      40,
+      45,
     )
-    await vpage.waitForTimeout(1400)
+    // Drop settle — confirm not stuck in dragging state
+    await vpage.waitForFunction(
+      () => document.querySelectorAll('[data-accueil-dragging="1"]').length === 0,
+      { timeout: 3_000 },
+    )
+    await vpage.waitForTimeout(1100)
 
-    // 3) Tap − on « Séries du jour » (shrink/fade)
-    await vpage.locator('[data-accueil-tile-trash="series_jour"]').tap({ force: true })
+    // 3) Tap − on « Séries du jour » (must be visible on camera ~1s)
+    const seriesTrash = vpage.locator('[data-accueil-tile-trash="series_jour"]')
+    await seriesTrash.waitFor({ state: 'visible', timeout: 5_000 })
+    await vpage.waitForTimeout(400)
+    await seriesTrash.tap({ force: true })
     await vpage.waitForSelector('[data-accueil-edit-slot="series_jour"]', {
       state: 'detached',
       timeout: 3_000,
     })
-    await vpage.waitForTimeout(900)
+    await vpage.waitForTimeout(1100)
 
-    // 4) + Ajouter → put Séries du jour back
-    await vpage.locator('[data-accueil-edit-add]').tap()
+    // 4) Tap + Ajouter (must be visible) → sheet opens
+    const addBtn = vpage.locator('[data-accueil-edit-add]')
+    await addBtn.waitFor({ state: 'visible', timeout: 5_000 })
+    await vpage.waitForTimeout(400)
+    await addBtn.tap()
     await vpage.waitForSelector('[data-accueil-add-item="series_jour"]', {
       state: 'visible',
       timeout: 8_000,
     })
+    // Stuck-drag guard: Eau must not stay lifted after sheet opens
+    const stuck = await vpage.evaluate(
+      () => document.querySelector('[data-accueil-edit-slot="eau"]')?.getAttribute('data-accueil-dragging'),
+    )
+    if (stuck === '1') throw new Error('Eau still dragging after Ajouter sheet opened')
     await vpage.waitForTimeout(1100)
+
+    // 5) Re-add Séries
     await vpage.locator('[data-accueil-add-item="series_jour"]').tap()
     await vpage.waitForSelector('.ios-sheet-backdrop', { state: 'detached', timeout: 5_000 }).catch(() => {})
     await vpage.waitForSelector('[data-accueil-add-list]', { state: 'detached', timeout: 5_000 })
-    await vpage.waitForTimeout(900)
     await vpage.waitForSelector('[data-accueil-edit-slot="series_jour"]', {
       state: 'visible',
       timeout: 5_000,
     })
-    await vpage.waitForTimeout(700)
+    await vpage.waitForTimeout(1100)
 
-    // 5) OK — sample Reveal health to prove no mask re-hide / black flash
+    // 6) OK — sample Reveal health to prove no mask re-hide / black flash
     const exitSamplesPromise = (async () => {
       await vpage.waitForTimeout(16)
       return sampleExitRevealHealth(vpage, 14, 28)
@@ -552,13 +612,31 @@ async function main() {
     if (bad.length > 0) {
       throw new Error(`Black flash on edit exit: ${JSON.stringify(bad)}`)
     }
-    // Finish on Accueil with all default tiles visible
+    // Finish on Accueil with all default tiles visible + stable Eau 1200
     for (const id of ['seance', 'seances_semaine', 'eau', 'series_jour', 'prochaine_seance', 'programme', 'recent']) {
       if ((await vpage.locator(`[data-accueil-edit-slot="${id}"]`).count()) < 1) {
         throw new Error(`Missing tile after OK: ${id}`)
       }
     }
-    await vpage.waitForTimeout(2200)
+    await vpage.waitForFunction(() => {
+      const eau = document.querySelector('[data-accueil-metric-tile="eau"] [data-rg-count="water"]')
+      return (eau?.textContent || '').replace(/\s/g, '') === '1200'
+    }, { timeout: 5_000 })
+    await vpage.waitForTimeout(1200)
+
+    metricPollActive = false
+    await metricPoll.catch(() => {})
+    const badMetrics = metricLog.filter(
+      (s) =>
+        (s.eau && s.eau !== '1200' && s.eau !== '—') ||
+        (s.week && s.week !== '2' && s.week !== ''),
+    )
+    if (badMetrics.length > 0) {
+      throw new Error(
+        `Data flash during edit video: ${JSON.stringify(badMetrics.slice(0, 8))}`,
+      )
+    }
+    console.log(`metric poll ok: ${metricLog.length} samples @250ms, eau=1200 week=2`)
 
     const video = vpage.video()
     await videoContext.close()
@@ -589,6 +667,67 @@ async function main() {
     ).trim()
     console.log('saved', dest, `trimStart=${trimStart.toFixed(2)}s duration=${dur}s`)
     console.log('exit reveal health', exitSamples[0], '…', exitSamples[exitSamples.length - 1])
+
+    // Extract frames every 0.25s and OCR-check Eau / Séances digits when tesseract exists.
+    const framesDir = join(artifactsDir, 'tuiles_edition_frames')
+    await rm(framesDir, { recursive: true, force: true })
+    await mkdir(framesDir, { recursive: true })
+    runFfmpeg(['-y', '-i', dest, '-vf', 'fps=4', join(framesDir, 'frame-%04d.png')])
+    const { readdirSync, writeFileSync } = await import('node:fs')
+    const frames = readdirSync(framesDir)
+      .filter((f) => f.endsWith('.png'))
+      .sort()
+    writeFileSync(
+      join(artifactsDir, 'tuiles_edition_metric_poll.json'),
+      JSON.stringify({ samples: metricLog, badMetrics }, null, 2),
+    )
+    console.log(`frame extract: ${frames.length} frames @ 4fps → ${framesDir}`)
+
+    let tesseractOk = false
+    try {
+      execFileSync('tesseract', ['--version'], { stdio: 'pipe' })
+      tesseractOk = true
+    } catch {
+      tesseractOk = false
+    }
+    if (tesseractOk && frames.length > 0) {
+      const ocrHits = { eau1200: 0, eauBad: [], week2: 0, weekBad: [] }
+      // Crop lower-mid band where metric tiles sit after scroll; OCR whole frame as fallback.
+      for (let i = 0; i < frames.length; i++) {
+        const name = frames[i]
+        const path = join(framesDir, name)
+        let text = ''
+        try {
+          text = execFileSync(
+            'tesseract',
+            [path, 'stdout', '-l', 'eng', '--psm', '6'],
+            { encoding: 'utf8' },
+          )
+        } catch {
+          continue
+        }
+        const compact = text.replace(/\s/g, '')
+        // Accept 1200 / 1 200 / 1,200
+        if (/1[,.]?200|1200/.test(compact)) ocrHits.eau1200++
+        if (/\b716\b/.test(text) || /(?:^|[^\d])0ml/i.test(compact)) {
+          ocrHits.eauBad.push({ frame: name, text: text.slice(0, 120) })
+        }
+        if (/\b2\b/.test(text) && /s[eé]ance/i.test(text)) ocrHits.week2++
+        if (/\b1\s*s[eé]ance/i.test(text) && !/\b2\s*s[eé]ance/i.test(text)) {
+          ocrHits.weekBad.push({ frame: name, text: text.slice(0, 120) })
+        }
+      }
+      if (ocrHits.eauBad.length > 0 || ocrHits.weekBad.length > 0) {
+        throw new Error(
+          `OCR frame audit failed: ${JSON.stringify({ eauBad: ocrHits.eauBad, weekBad: ocrHits.weekBad })}`,
+        )
+      }
+      console.log(
+        `OCR frame audit ok: eau1200=${ocrHits.eau1200}/${frames.length} week2hits=${ocrHits.week2}`,
+      )
+    } else {
+      console.log('tesseract unavailable — relied on live 250ms DOM metric poll')
+    }
 
     console.log('All Accueil tile artifacts captured.')
   } finally {

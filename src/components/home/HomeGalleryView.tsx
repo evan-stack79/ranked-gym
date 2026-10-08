@@ -115,9 +115,11 @@ export function HomeGalleryView({
   onOpenTraining,
   onOpenHistory,
 }: HomeGalleryViewProps) {
-  const { user, profile } = useAuth()
+  const { user, profile, isLoading: authLoading } = useAuth()
   const [trainingTick, setTrainingTick] = useState(0)
   const [waterTick, setWaterTick] = useState(0)
+  /** Last confirmed positive water total — suppresses 0-flash across remounts. */
+  const lastKnownWaterMlRef = useRef<number | null>(null)
   const [prefs, setPrefs] = useState<AccueilWidgetPrefs>(() => loadAccueilWidgetPrefs())
   const [editMode, setEditMode] = useState(false)
   /**
@@ -213,14 +215,23 @@ export function HomeGalleryView({
     setWaterGoalOpen(false)
   }, [])
 
+  const clearDrag = useCallback(() => {
+    setDraggingId(null)
+    setDragDelta(null)
+    dragOriginRef.current = null
+  }, [])
+
   const exitEdit = useCallback(() => {
     setEditMode(false)
     setAddOpen(false)
-    setDraggingId(null)
-    setDragDelta(null)
+    clearDrag()
     setExitingId(null)
-    dragOriginRef.current = null
-  }, [])
+  }, [clearDrag])
+
+  // Sheet open must never leave a tile stuck in the lifted drag state.
+  useEffect(() => {
+    if (addOpen || waterGoalOpen) clearDrag()
+  }, [addOpen, waterGoalOpen, clearDrag])
 
   const state = useMemo(() => getTrainingState(), [trainingTick])
   const heroCards = useMemo(() => deriveGalleryHeroCards(state), [state])
@@ -234,16 +245,34 @@ export function HomeGalleryView({
   const setsModel = useMemo(() => deriveSetsTileModel(state), [state])
   const nextSession = useMemo(() => deriveNextSessionTile(state), [state])
   const programModel = useMemo(() => deriveProgramTileModel(state), [state])
-  const waterModel = useMemo(
-    () => deriveWaterTileModel(getTodayWaterMl(), getUserWaterGoalMl()),
-    [waterTick],
-  )
+  const waterModel = useMemo(() => {
+    // Accueil Eau is read-only: getTodayWaterMl / getUserWaterGoalMl only.
+    // Never call addWaterEntry / setWaterTotal / saveJournal from this view.
+    const ml = getTodayWaterMl()
+    const goal = getUserWaterGoalMl()
+    if (ml > 0) lastKnownWaterMlRef.current = ml
+    // Ready once hydrate finished, or we already have a positive local total.
+    const ready = ml > 0 || !authLoading
+    // During edit / freeze: never substitute a 0 over a known positive total
+    // (avoids painting « 0 ml » if a remount races a storage tick).
+    const freeze = editMode || freezeReveals
+    const displayMl =
+      freeze && ml === 0 && lastKnownWaterMlRef.current != null
+        ? lastKnownWaterMlRef.current
+        : ml
+    return deriveWaterTileModel(displayMl, goal, ready)
+  }, [waterTick, authLoading, editMode, freezeReveals])
   const visibleWidgets = useMemo(() => resolveVisibleAccueilWidgets(prefs), [prefs])
   const packs = useMemo(() => packAccueilWidgets(visibleWidgets), [visibleWidgets])
   const visibleOrderKey = visibleWidgets.join('|')
   const motion = useMemo(
-    () => ({ coldEntering, prefersReducedMotion }),
-    [coldEntering, prefersReducedMotion],
+    () => ({
+      coldEntering,
+      prefersReducedMotion,
+      // During edit / after freeze, never restart CountUp from 0 on remount.
+      freezeCountUp: editMode || freezeReveals,
+    }),
+    [coldEntering, prefersReducedMotion, editMode, freezeReveals],
   )
 
   /** FLIP: after visible order changes in edit mode, slide siblings into place. */
@@ -259,19 +288,22 @@ export function HomeGalleryView({
       if (!id || id === draggingId) continue
       const prev = first.get(id)
       if (!prev) continue
-      const body = el.querySelector<HTMLElement>('[data-accueil-edit-body]') ?? el
+      // Animate the layout slot (not the floating body) so text never ghosts
+      // under the dragged tile.
       const last = el.getBoundingClientRect()
       const dx = prev.left - last.left
       const dy = prev.top - last.top
       if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue
-      body.style.transition = 'none'
-      body.style.transform = `translate3d(${dx}px, ${dy}px, 0)`
-      // Force reflow then animate to identity
-      void body.offsetWidth
-      body.style.transition = `transform ${FLIP_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`
-      body.style.transform = ''
+      el.style.transition = 'none'
+      el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`
+      el.style.zIndex = '2'
+      void el.offsetWidth
+      el.style.transition = `transform ${FLIP_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`
+      el.style.transform = ''
       window.setTimeout(() => {
-        body.style.transition = ''
+        el.style.transition = ''
+        el.style.zIndex = ''
+        el.style.transform = ''
       }, FLIP_MS + 40)
     }
   }, [visibleOrderKey, editMode, prefersReducedMotion, draggingId])
@@ -331,10 +363,11 @@ export function HomeGalleryView({
         const visible = resolveVisibleAccueilWidgets(prefsRef.current)
         if (!(visible as string[]).includes(hit)) return current
         captureFlipFirst()
-        // Keep the dragged tile under the finger after layout shift
+        // Keep the dragged tile under the finger after layout shift.
+        // Measure the layout slot (placeholder), not the fixed floating body.
         const slot = widgetsRootRef.current?.querySelector(
           `[data-accueil-edit-slot="${current}"]`,
-        )
+        ) as HTMLElement | null
         const before = slot?.getBoundingClientRect()
         commitPrefs(
           reorderVisibleAccueilWidget(
@@ -344,12 +377,11 @@ export function HomeGalleryView({
             Date.now(),
           ),
         )
-        // After React commit + FLIP layout, re-baseline drag origin so the
-        // floating transform stays continuous under the finger.
         requestAnimationFrame(() => {
-          const after = widgetsRootRef.current
-            ?.querySelector(`[data-accueil-edit-slot="${current}"]`)
-            ?.getBoundingClientRect()
+          const afterEl = widgetsRootRef.current?.querySelector(
+            `[data-accueil-edit-slot="${current}"]`,
+          ) as HTMLElement | null
+          const after = afterEl?.getBoundingClientRect()
           if (before && after && dragOriginRef.current) {
             dragOriginRef.current = {
               x: dragOriginRef.current.x + (after.left - before.left),
@@ -368,10 +400,8 @@ export function HomeGalleryView({
   )
 
   const handleDragEnd = useCallback(() => {
-    setDraggingId(null)
-    setDragDelta(null)
-    dragOriginRef.current = null
-  }, [])
+    clearDrag()
+  }, [clearDrag])
 
   const handleHide = useCallback(
     (id: AccueilWidgetId) => {
@@ -759,17 +789,17 @@ export function HomeGalleryView({
       </header>
 
       <div ref={widgetsRootRef} className="accueil-widgets flex flex-col gap-3">
-        {packs.map((pack, packIndex) => {
+        {packs.map((pack) => {
           if (pack.kind === 'wide') {
             return (
-              <div key={`wide-${pack.id}-${packIndex}`} className="accueil-widgets__wide">
+              <div key={`wide-${pack.id}`} className="accueil-widgets__wide">
                 {wrapEditable(pack.id, renderWidgetBody(pack.id))}
               </div>
             )
           }
           return (
             <div
-              key={`row-${pack.ids.join('-')}-${packIndex}`}
+              key={`row-${pack.ids.join('-')}`}
               className="accueil-widgets__row"
               data-accueil-widget-row
             >

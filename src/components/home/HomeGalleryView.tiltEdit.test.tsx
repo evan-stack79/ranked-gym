@@ -16,6 +16,7 @@ vi.mock('../../context/AuthContext', () => ({
   useAuth: () => ({
     user: { firstName: 'Alex', displayName: 'Alex' },
     profile: { pseudo: 'Alex' },
+    isLoading: false,
   }),
 }))
 

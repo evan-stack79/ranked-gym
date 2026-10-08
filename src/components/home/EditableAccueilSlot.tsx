@@ -1,7 +1,9 @@
 import { Minus } from 'lucide-react'
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
+  useState,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -34,6 +36,9 @@ interface EditableAccueilSlotProps {
 /**
  * Wraps an Accueil widget for iOS-style home edit:
  * long-press to enter, wiggle / dashed outline, trash badge, drag reorder.
+ *
+ * While dragging, the layout slot stays as an empty placeholder and the tile
+ * body is position:fixed under the finger (no sibling text ghosting under it).
  */
 export function EditableAccueilSlot({
   id,
@@ -57,6 +62,12 @@ export function EditableAccueilSlot({
     pointerId: number | null
     dragging: boolean
   }>({ timer: null, startX: 0, startY: 0, pointerId: null, dragging: false })
+  const [slotBox, setSlotBox] = useState<{
+    left: number
+    top: number
+    width: number
+    height: number
+  } | null>(null)
 
   const clearPressTimer = () => {
     const p = pressRef.current
@@ -67,6 +78,39 @@ export function EditableAccueilSlot({
   }
 
   useEffect(() => () => clearPressTimer(), [])
+
+  // Parent clearDrag (sheet open / exit) must drop local press + slot box.
+  useLayoutEffect(() => {
+    if (!dragging) {
+      pressRef.current.dragging = false
+      setSlotBox(null)
+      return
+    }
+    const el = rootRef.current
+    if (!el) return
+    // Prefer the pre-drag measure from pointerdown; only fill if missing.
+    setSlotBox((prev) => {
+      if (prev) return prev
+      const r = el.getBoundingClientRect()
+      return { left: r.left, top: r.top, width: r.width, height: r.height }
+    })
+  }, [dragging])
+
+  const endDrag = (pointerId: number | null) => {
+    clearPressTimer()
+    const p = pressRef.current
+    const wasDragging = p.dragging
+    p.dragging = false
+    p.pointerId = null
+    if (pointerId != null) {
+      try {
+        rootRef.current?.releasePointerCapture(pointerId)
+      } catch {
+        /* ignore */
+      }
+    }
+    if (wasDragging) onDragEnd()
+  }
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
@@ -81,6 +125,14 @@ export function EditableAccueilSlot({
 
     if (editMode) {
       const rect = rootRef.current?.getBoundingClientRect()
+      if (rect) {
+        setSlotBox({
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+        })
+      }
       pressRef.current.dragging = true
       onDragStart(id, {
         clientX: e.clientX,
@@ -129,27 +181,53 @@ export function EditableAccueilSlot({
   const endPointer = (e: ReactPointerEvent<HTMLDivElement>) => {
     const p = pressRef.current
     if (p.pointerId !== e.pointerId) return
-    clearPressTimer()
-    if (editMode && p.dragging) {
-      onDragEnd()
-    }
-    p.dragging = false
-    p.pointerId = null
-    try {
-      rootRef.current?.releasePointerCapture(e.pointerId)
-    } catch {
-      /* ignore */
-    }
+    endDrag(e.pointerId)
   }
 
-  const bodyStyle: CSSProperties | undefined =
-    dragging && dragDelta && !reducedMotion
+  // Lost capture (sheet / scroll / OS) must clear drag.
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    const onLost = () => {
+      if (pressRef.current.dragging) endDrag(pressRef.current.pointerId)
+    }
+    el.addEventListener('lostpointercapture', onLost)
+    return () => el.removeEventListener('lostpointercapture', onLost)
+  })
+
+  const dx = dragDelta?.x ?? 0
+  const dy = dragDelta?.y ?? 0
+  // While dragging: body is position:fixed under the finger; the layout hole
+  // is an empty placeholder so sibling FLIP text never ghosts underneath.
+  const floating: CSSProperties | undefined =
+    dragging && slotBox && !reducedMotion
       ? {
-          transform: `translate3d(${dragDelta.x}px, ${dragDelta.y}px, 0) scale(1.04)`,
-          zIndex: 8,
+          position: 'fixed',
+          left: slotBox.left + dx,
+          top: slotBox.top + dy,
+          width: slotBox.width,
+          height: slotBox.height,
+          zIndex: 40,
+          margin: 0,
+          transform: 'scale(1.04)',
           transition: 'none',
           boxShadow: '0 16px 36px rgb(0 0 0 / 0.55)',
+          pointerEvents: 'none',
         }
+      : dragging && !reducedMotion
+        ? // One frame before measure — keep out of layout flow, invisible.
+          {
+            position: 'fixed',
+            left: -9999,
+            top: -9999,
+            visibility: 'hidden',
+            pointerEvents: 'none',
+          }
+        : undefined
+
+  const rootStyle: CSSProperties | undefined =
+    dragging && slotBox
+      ? { minHeight: slotBox.height, height: slotBox.height }
       : undefined
 
   return (
@@ -158,22 +236,45 @@ export function EditableAccueilSlot({
       className={[
         'accueil-edit-slot',
         editMode ? 'accueil-edit-slot--editing' : '',
-        editMode && !reducedMotion ? 'accueil-edit-slot--wiggle' : '',
+        editMode && !reducedMotion && !dragging ? 'accueil-edit-slot--wiggle' : '',
         editMode && reducedMotion ? 'accueil-edit-slot--dashed' : '',
         dragging ? 'accueil-edit-slot--dragging' : '',
         exiting ? 'accueil-edit-slot--exiting' : '',
       ]
         .filter(Boolean)
         .join(' ')}
+      style={rootStyle}
       data-accueil-edit-slot={id}
       data-accueil-editing={editMode ? '1' : '0'}
+      data-accueil-dragging={dragging ? '1' : '0'}
       data-accueil-exiting={exiting ? '1' : '0'}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endPointer}
       onPointerCancel={endPointer}
     >
-      <div className="accueil-edit-slot__body" style={bodyStyle} data-accueil-edit-body={id}>
+      {dragging ? (
+        <div
+          className="accueil-edit-slot__placeholder"
+          aria-hidden="true"
+          data-accueil-drag-placeholder={id}
+          style={
+            slotBox
+              ? { minHeight: slotBox.height, height: slotBox.height }
+              : undefined
+          }
+        />
+      ) : null}
+      <div
+        className={[
+          'accueil-edit-slot__body',
+          dragging && !reducedMotion ? 'accueil-edit-slot__body--floating' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        style={floating}
+        data-accueil-edit-body={id}
+      >
         {editMode ? (
           <button
             type="button"

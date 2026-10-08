@@ -435,15 +435,21 @@ img {
 }
 
 .accueil-edit-slot--dragging {
-  z-index: 5;
-  opacity: 0.92;
+  z-index: 1;
 }
 
-.accueil-edit-slot--dragging .accueil-edit-slot__body {
-  animation: none;
-  /* Live drag uses inline translate3d; keep a light lift when JS hasn't set one. */
-  will-change: transform;
-  box-shadow: 0 12px 28px rgb(0 0 0 / 0.45);
+/* Empty layout hole while the body is position:fixed under the finger. */
+.accueil-edit-slot__placeholder {
+  width: 100%;
+  border-radius: 1.5rem;
+  border: 1.5px dashed rgb(255 255 255 / 0.22);
+  background: rgb(255 255 255 / 0.03);
+  box-sizing: border-box;
+}
+
+.accueil-edit-slot__body--floating {
+  animation: none !important;
+  will-change: left, top, transform;
 }
 
 .accueil-edit-slot--exiting {

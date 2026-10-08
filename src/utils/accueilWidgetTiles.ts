@@ -75,15 +75,22 @@ export type WaterTileModel = {
   goalMl: number | null
   showRing: boolean
   progress: number
+  /**
+   * False while auth/cloud hydrate is still pending and no local total is known.
+   * Eau tile must show a neutral placeholder — never paint « 0 ml » in that window.
+   */
+  ready: boolean
 }
 
 /**
  * Eau tile model. Ring ONLY when `userWaterGoal` has an explicit user goal.
  * Never calls weight-based formulas; never reads prefs.waterGoalMl.
+ * Read-only — never writes journal / water entries / cloud backup.
  */
 export function deriveWaterTileModel(
   waterMl: number = getTodayWaterMl(),
   goalMl: number | null = getUserWaterGoalMl(),
+  ready = true,
 ): WaterTileModel {
   const normalizedGoal =
     typeof goalMl === 'number' && Number.isFinite(goalMl) && goalMl > 0 ? Math.round(goalMl) : null
@@ -94,6 +101,7 @@ export function deriveWaterTileModel(
     goalMl: normalizedGoal,
     showRing,
     progress: showRing && normalizedGoal! > 0 ? Math.min(1, Math.max(0, safeMl / normalizedGoal!)) : 0,
+    ready,
   }
 }
 
