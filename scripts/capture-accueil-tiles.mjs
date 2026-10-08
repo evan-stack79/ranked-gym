@@ -558,7 +558,7 @@ async function main() {
         throw new Error(`Missing tile after OK: ${id}`)
       }
     }
-    await vpage.waitForTimeout(1600)
+    await vpage.waitForTimeout(2200)
 
     const video = vpage.video()
     await videoContext.close()
