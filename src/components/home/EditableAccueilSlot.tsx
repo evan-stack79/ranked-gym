@@ -77,7 +77,30 @@ export function EditableAccueilSlot({
     }
   }
 
+  const endDrag = (pointerId: number | null) => {
+    clearPressTimer()
+    const p = pressRef.current
+    const wasDragging = p.dragging
+    p.dragging = false
+    p.pointerId = null
+    if (pointerId != null) {
+      try {
+        rootRef.current?.releasePointerCapture(pointerId)
+      } catch {
+        /* ignore */
+      }
+    }
+    if (wasDragging) onDragEnd()
+  }
+
   useEffect(() => () => clearPressTimer(), [])
+
+  // Remount mid-drag: re-sync local press flag from parent dragging prop.
+  useEffect(() => {
+    if (dragging) {
+      pressRef.current.dragging = true
+    }
+  }, [dragging])
 
   // Parent clearDrag (sheet open / exit) must drop local press + slot box.
   useLayoutEffect(() => {
@@ -95,22 +118,6 @@ export function EditableAccueilSlot({
       return { left: r.left, top: r.top, width: r.width, height: r.height }
     })
   }, [dragging])
-
-  const endDrag = (pointerId: number | null) => {
-    clearPressTimer()
-    const p = pressRef.current
-    const wasDragging = p.dragging
-    p.dragging = false
-    p.pointerId = null
-    if (pointerId != null) {
-      try {
-        rootRef.current?.releasePointerCapture(pointerId)
-      } catch {
-        /* ignore */
-      }
-    }
-    if (wasDragging) onDragEnd()
-  }
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return

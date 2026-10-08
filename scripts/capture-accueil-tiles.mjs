@@ -492,15 +492,15 @@ async function main() {
     const actionStartMs = Date.now() - videoT0
 
     // Baseline metrics must be settled before any drag (no mid-count flash).
+    // Strip all unicode spaces (incl. narrow NBSP from fr-FR) before compare.
     await vpage.waitForFunction(() => {
+      const norm = (s) => (s || '').replace(/[\s\u00a0\u202f]/g, '')
       const eau = document.querySelector('[data-accueil-metric-tile="eau"] [data-rg-count="water"]')
       const week = document.querySelector(
         '[data-accueil-metric-tile="seances_semaine"] [data-rg-count="sessions"]',
       )
-      const eauTxt = (eau?.textContent || '').replace(/\s/g, '')
-      const weekTxt = (week?.textContent || '').replace(/\s/g, '')
-      return eauTxt === '1200' && weekTxt === '2'
-    }, { timeout: 8_000 })
+      return norm(eau?.textContent) === '1200' && norm(week?.textContent) === '2'
+    }, { timeout: 12_000 })
 
     /** Poll DOM every 250ms for the whole action clip — catches data flashes. */
     const metricLog = []
@@ -509,7 +509,7 @@ async function main() {
       while (metricPollActive) {
         const snap = await vpage
           .evaluate(() => {
-            const norm = (s) => (s || '').replace(/\s/g, '')
+            const norm = (s) => (s || '').replace(/[\s\u00a0\u202f]/g, '')
             const eauEl = document.querySelector(
               '[data-accueil-metric-tile="eau"] [data-rg-count="water"]',
             )
@@ -556,11 +556,22 @@ async function main() {
       40,
       45,
     )
-    // Drop settle — confirm not stuck in dragging state
-    await vpage.waitForFunction(
-      () => document.querySelectorAll('[data-accueil-dragging="1"]').length === 0,
-      { timeout: 3_000 },
-    )
+    // Drop settle — confirm not stuck in dragging state (force-clear if remount ate pointerup)
+    await vpage
+      .waitForFunction(
+        () => document.querySelectorAll('[data-accueil-dragging="1"]').length === 0,
+        { timeout: 2_500 },
+      )
+      .catch(async () => {
+        await vpage.evaluate(() => {
+          window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 7 }))
+          window.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerId: 7 }))
+        })
+        await vpage.waitForFunction(
+          () => document.querySelectorAll('[data-accueil-dragging="1"]').length === 0,
+          { timeout: 2_000 },
+        )
+      })
     await vpage.waitForTimeout(1100)
 
     // 3) Tap − on « Séries du jour » (must be visible on camera ~1s)

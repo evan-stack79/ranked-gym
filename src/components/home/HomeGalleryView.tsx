@@ -403,6 +403,24 @@ export function HomeGalleryView({
     clearDrag()
   }, [clearDrag])
 
+  // Reorder remounts the slot under the finger — keep drag alive via window
+  // pointermove, and always clear on pointerup/cancel (no stuck lift).
+  useEffect(() => {
+    if (!draggingId) return
+    const onMove = (e: PointerEvent) => {
+      handleDragMove(e.clientX, e.clientY)
+    }
+    const onUp = () => clearDrag()
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+    }
+  }, [draggingId, clearDrag, handleDragMove])
+
   const handleHide = useCallback(
     (id: AccueilWidgetId) => {
       if (prefersReducedMotion) {
