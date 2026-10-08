@@ -3,7 +3,7 @@
  * GPU-only (transform); First = visual position, Last = layout after clearing transforms.
  */
 
-export const ACCUEIL_FLIP_MS = 220
+export const ACCUEIL_FLIP_MS = 250
 export const ACCUEIL_DROP_MS = 200
 export const ACCUEIL_ENTER_MS = 220
 export const ACCUEIL_EXIT_MS = 180

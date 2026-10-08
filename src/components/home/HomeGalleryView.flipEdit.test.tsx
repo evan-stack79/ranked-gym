@@ -88,7 +88,7 @@ describe('Accueil edit FLIP / reduced motion', () => {
     const a = reorderVisibleAccueilWidget(base, 'eau', 'seances_semaine', 1)
     const b = reorderVisibleAccueilWidget(base, 'eau', 'seances_semaine', 1)
     expect(resolveVisibleAccueilWidgets(a)).toEqual(resolveVisibleAccueilWidgets(b))
-    expect(ACCUEIL_FLIP_MS).toBe(220)
+    expect(ACCUEIL_FLIP_MS).toBe(250)
     expect(shouldAnimateFlip(40, 0)).toBe(true)
   })
 
