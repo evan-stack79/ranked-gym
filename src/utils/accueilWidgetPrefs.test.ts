@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ACCUEIL_WIDGET_PREFS_VERSION,
   applyRemoteAccueilWidgetPrefs,
@@ -13,6 +13,32 @@ import {
   toggleAccueilWidgetHidden,
   type AccueilWidgetPrefs,
 } from './accueilWidgetPrefs'
+import { getUserWaterGoalMl, USER_WATER_GOAL_KEY } from './userWaterGoal'
+
+const store = new Map<string, string>()
+
+beforeEach(() => {
+  store.clear()
+  vi.stubGlobal('localStorage', {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => {
+      store.set(k, v)
+    },
+    removeItem: (k: string) => {
+      store.delete(k)
+    },
+    clear: () => store.clear(),
+  })
+  vi.stubGlobal('window', {
+    dispatchEvent: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  })
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 function prefs(
   partial: Partial<AccueilWidgetPrefs> & Pick<AccueilWidgetPrefs, 'updatedAt'>,
@@ -74,22 +100,24 @@ describe('accueilWidgetPrefs', () => {
     expect(migrated.updatedAt).toBe(42)
   })
 
-  it('water goal: only positive finite values; setAccueilWaterGoalMl bumps updatedAt', () => {
+  it('water goal: setAccueilWaterGoalMl writes shared userWaterGoal, clears prefs field', () => {
     let p = createDefaultAccueilWidgetPrefs(1)
     expect(hasUserWaterGoal(p)).toBe(false)
+    expect(getUserWaterGoalMl()).toBeNull()
 
     p = setAccueilWaterGoalMl(p, 2500, 10)
-    expect(p.waterGoalMl).toBe(2500)
+    expect(p.waterGoalMl).toBeNull()
     expect(p.updatedAt).toBe(10)
     expect(hasUserWaterGoal(p)).toBe(true)
+    expect(getUserWaterGoalMl()).toBe(2500)
+    expect(store.has(USER_WATER_GOAL_KEY)).toBe(true)
 
     p = setAccueilWaterGoalMl(p, 0, 11)
     expect(p.waterGoalMl).toBeNull()
     expect(hasUserWaterGoal(p)).toBe(false)
+    expect(getUserWaterGoalMl()).toBeNull()
 
-    p = setAccueilWaterGoalMl(p, -100, 12)
-    expect(p.waterGoalMl).toBeNull()
-
+    // normalize strips legacy prefs field (goal lives in userWaterGoal)
     const fromRaw = normalizeAccueilWidgetPrefs({
       version: 2,
       order: ['eau'],
@@ -97,23 +125,21 @@ describe('accueilWidgetPrefs', () => {
       updatedAt: 1,
       waterGoalMl: '3000' as unknown as number,
     })
-    expect(fromRaw.waterGoalMl).toBe(3000)
+    expect(fromRaw.waterGoalMl).toBeNull()
   })
 
-  it('merge: latest updatedAt wins (remote newer), including waterGoalMl', () => {
+  it('merge: latest updatedAt wins (remote newer)', () => {
     const local = prefs({
       updatedAt: 10,
       hidden: ['recent'],
-      waterGoalMl: 2000,
     })
     const remote = prefs({
       updatedAt: 20,
       order: ['programme', 'recent', 'seance'],
       hidden: ['seance'],
-      waterGoalMl: 3000,
     })
     const merged = mergeAccueilWidgetPrefs(local, remote)
-    expect(merged.waterGoalMl).toBe(3000)
+    expect(merged.waterGoalMl).toBeNull()
     expect(merged.hidden).toEqual(['seance'])
   })
 
@@ -121,21 +147,18 @@ describe('accueilWidgetPrefs', () => {
     const local = prefs({
       updatedAt: 50,
       hidden: ['programme'],
-      waterGoalMl: 1800,
     })
     const remote = prefs({
       updatedAt: 40,
       hidden: ['recent'],
-      waterGoalMl: 4000,
     })
-    expect(mergeAccueilWidgetPrefs(local, remote).waterGoalMl).toBe(1800)
+    expect(mergeAccueilWidgetPrefs(local, remote).hidden).toEqual(['programme'])
   })
 
   it('merge: equal updatedAt prefers local (never blind remote overwrite)', () => {
-    const local = prefs({ updatedAt: 7, hidden: ['recent'], waterGoalMl: 1500 })
-    const remote = prefs({ updatedAt: 7, hidden: ['programme'], waterGoalMl: 9000 })
+    const local = prefs({ updatedAt: 7, hidden: ['recent'] })
+    const remote = prefs({ updatedAt: 7, hidden: ['programme'] })
     expect(mergeAccueilWidgetPrefs(local, remote).hidden).toEqual(['recent'])
-    expect(mergeAccueilWidgetPrefs(local, remote).waterGoalMl).toBe(1500)
   })
 
   it('merge: missing side falls back to the other, both missing → default', () => {
@@ -177,11 +200,10 @@ describe('accueilWidgetPrefs', () => {
       updatedAt: 5,
       order: ['programme', 'seance', 'recent'],
       hidden: ['seance', 'recent'],
-      waterGoalMl: 2500,
     })
     const reset = resetAccueilWidgetPrefs(42)
     expect(reset).toEqual(createDefaultAccueilWidgetPrefs(42))
-    expect(dirty.waterGoalMl).toBe(2500)
+    expect(dirty.waterGoalMl).toBeNull()
     expect(reset.waterGoalMl).toBeNull()
   })
 
@@ -198,32 +220,18 @@ describe('accueilWidgetPrefs', () => {
   })
 
   it('applyRemoteAccueilWidgetPrefs keeps newer local', () => {
-    const storage: Record<string, string> = {}
-    vi.stubGlobal('localStorage', {
-      getItem: (k: string) => storage[k] ?? null,
-      setItem: (k: string, v: string) => {
-        storage[k] = v
-      },
-      removeItem: (k: string) => {
-        delete storage[k]
-      },
-    })
-
     const local = prefs({
       updatedAt: 100,
       hidden: ['recent'],
       order: ['programme', 'recent', 'seance'],
-      waterGoalMl: 2200,
     })
-    storage['ranked-gym:accueil-widget-prefs'] = JSON.stringify(local)
+    store.set('ranked-gym:accueil-widget-prefs', JSON.stringify(local))
 
     const result = applyRemoteAccueilWidgetPrefs(
-      prefs({ updatedAt: 50, hidden: ['programme'], waterGoalMl: 5000 }),
+      prefs({ updatedAt: 50, hidden: ['programme'] }),
       200,
     )
     expect(result.hidden).toEqual(['recent'])
-    expect(result.waterGoalMl).toBe(2200)
-
-    vi.unstubAllGlobals()
+    expect(result.waterGoalMl).toBeNull()
   })
 })

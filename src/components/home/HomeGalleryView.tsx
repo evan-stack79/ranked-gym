@@ -10,6 +10,11 @@ import {
 } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { getTodayWaterMl } from '../../services/nutritionStorage'
+import {
+  getUserWaterGoalMl,
+  migrateAccueilWaterGoalFromPrefs,
+  WATER_GOAL_CHANGED_EVENT,
+} from '../../utils/userWaterGoal'
 import { getTrainingState } from '../../services/trainingStorage'
 import {
   deriveGalleryHeroCards,
@@ -156,11 +161,19 @@ export function HomeGalleryView({
   useEffect(() => {
     const syncWater = () => setWaterTick((n) => n + 1)
     window.addEventListener('ranked-gym:water-changed', syncWater)
+    window.addEventListener(WATER_GOAL_CHANGED_EVENT, syncWater)
     window.addEventListener('ranked-gym:backup-restored', syncWater)
     return () => {
       window.removeEventListener('ranked-gym:water-changed', syncWater)
+      window.removeEventListener(WATER_GOAL_CHANGED_EVENT, syncWater)
       window.removeEventListener('ranked-gym:backup-restored', syncWater)
     }
+  }, [])
+
+  useEffect(() => {
+    // One-time migrate prefs.waterGoalMl → ranked-gym:water-goal
+    migrateAccueilWaterGoalFromPrefs()
+    setWaterTick((n) => n + 1)
   }, [])
 
   useEffect(() => {
@@ -222,8 +235,8 @@ export function HomeGalleryView({
   const nextSession = useMemo(() => deriveNextSessionTile(state), [state])
   const programModel = useMemo(() => deriveProgramTileModel(state), [state])
   const waterModel = useMemo(
-    () => deriveWaterTileModel(prefs, getTodayWaterMl()),
-    [prefs, waterTick],
+    () => deriveWaterTileModel(getTodayWaterMl(), getUserWaterGoalMl()),
+    [waterTick],
   )
   const visibleWidgets = useMemo(() => resolveVisibleAccueilWidgets(prefs), [prefs])
   const packs = useMemo(() => packAccueilWidgets(visibleWidgets), [visibleWidgets])
@@ -794,12 +807,7 @@ export function HomeGalleryView({
       />
       <WaterGoalSheet
         open={waterGoalOpen && !editMode}
-        prefs={prefs}
         onClose={() => setWaterGoalOpen(false)}
-        onSave={(next) => {
-          setPrefs(next)
-          window.dispatchEvent(new Event('ranked-gym:accueil-widgets-changed'))
-        }}
       />
     </div>
   )

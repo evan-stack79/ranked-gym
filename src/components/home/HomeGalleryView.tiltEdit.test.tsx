@@ -142,6 +142,34 @@ describe('TiltCard disabled in Accueil edit mode', () => {
     expect(host.querySelector('[data-rg-tilt]')?.getAttribute('data-rg-tilt')).toBe('off')
   })
 
+  it('keeps Tilt off and edit chrome while long-press edit is open (#99 compatible)', async () => {
+    const { HomeGalleryView } = await import('./HomeGalleryView')
+    const { ACCUEIL_LONG_PRESS_MS, ACCUEIL_LONG_PRESS_MOVE_PX } = await import(
+      '../../utils/accueilEditGestures'
+    )
+    expect(ACCUEIL_LONG_PRESS_MS).toBe(500)
+    expect(ACCUEIL_LONG_PRESS_MOVE_PX).toBe(10)
+
+    await act(async () => {
+      root.render(
+        <HomeGalleryView
+          onStartTraining={() => {}}
+          onOpenTraining={() => {}}
+          onOpenHistory={() => {}}
+        />,
+      )
+    })
+
+    const openBtn = host.querySelector('[data-accueil-edit-open-footer]') as HTMLButtonElement
+    await act(async () => {
+      openBtn.click()
+    })
+
+    expect(host.querySelector('[data-accueil-edit-open="1"]')).toBeTruthy()
+    expect(host.querySelector('[data-rg-tilt]')?.getAttribute('data-rg-tilt')).toBe('off')
+    expect(host.querySelector('.accueil-edit-slot--editing')).toBeTruthy()
+  })
+
   it('keeps Reveal instant after leaving edit (no mask re-hide / black flash)', async () => {
     const { HomeGalleryView } = await import('./HomeGalleryView')
 

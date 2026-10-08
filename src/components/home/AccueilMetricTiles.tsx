@@ -180,7 +180,7 @@ export function EauTile({
         <p className="accueil-metric-tile__hint">
           {model.showRing && model.goalMl != null
             ? formatWaterGoalHint(model.goalMl)
-            : 'Définir un objectif'}
+            : 'Choisir mon objectif'}
         </p>
       </div>
     </TileShell>

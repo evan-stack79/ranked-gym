@@ -20,6 +20,7 @@ const port = 4213
 
 const VIEWPORT = { width: 402, height: 874 }
 const PREFS_KEY = 'ranked-gym:accueil-widget-prefs'
+const WATER_GOAL_KEY = 'ranked-gym:water-goal'
 
 const DEFAULT_PREFS = {
   version: 2,
@@ -34,7 +35,6 @@ const DEFAULT_PREFS = {
   ],
   hidden: [],
   updatedAt: Date.now(),
-  waterGoalMl: null,
 }
 
 const chromiumLaunchOptions = existsSync('/usr/local/bin/google-chrome')
@@ -137,8 +137,11 @@ async function assertEauLayoutClean(page) {
     if (hintText.includes('…') || hintText.includes('...')) {
       return { ok: false, reason: `truncated hint: ${hintText}` }
     }
-    if (/Définir un obj…?$/.test(hintText)) {
+    if (/Choisir mon obj…?$/.test(hintText) || /Définir un obj…?$/.test(hintText)) {
       return { ok: false, reason: `truncated hint: ${hintText}` }
+    }
+    if (/\b250\b/.test(hintText) || /\b6000\b/.test(hintText)) {
+      return { ok: false, reason: `bound numbers leaked: ${hintText}` }
     }
     if (hint.scrollWidth > hint.clientWidth + 1) {
       return { ok: false, reason: `hint overflow scrollWidth=${hint.scrollWidth}` }
@@ -165,12 +168,31 @@ async function scrollToEau(page) {
   await page.waitForTimeout(250)
 }
 
-async function setPrefs(page, partial) {
+async function setPrefs(page, partial = {}) {
+  const { waterGoalMl, ...prefsPartial } = partial
   await page.evaluate(
-    ({ key, prefs }) => {
-      localStorage.setItem(key, JSON.stringify(prefs))
+    ({ prefsKey, goalKey, prefs, waterGoalMl: goal }) => {
+      localStorage.setItem(prefsKey, JSON.stringify(prefs))
+      if (goal == null) {
+        localStorage.removeItem(goalKey)
+      } else {
+        localStorage.setItem(
+          goalKey,
+          JSON.stringify({
+            version: 1,
+            goalMl: goal,
+            source: 'user',
+            updatedAt: Date.now(),
+          }),
+        )
+      }
     },
-    { key: PREFS_KEY, prefs: { ...DEFAULT_PREFS, updatedAt: Date.now(), ...partial } },
+    {
+      prefsKey: PREFS_KEY,
+      goalKey: WATER_GOAL_KEY,
+      prefs: { ...DEFAULT_PREFS, updatedAt: Date.now(), ...prefsPartial },
+      waterGoalMl,
+    },
   )
 }
 
@@ -397,11 +419,12 @@ async function main() {
     })
     const vpage = await videoContext.newPage()
     await vpage.emulateMedia({ reducedMotion: 'no-preference', colorScheme: 'dark' })
-    const seedPrefs = { ...DEFAULT_PREFS, waterGoalMl: null, hidden: [], updatedAt: Date.now() }
+    const seedPrefs = { ...DEFAULT_PREFS, hidden: [], updatedAt: Date.now() }
     await vpage.addInitScript(
-      ({ key, prefs, top, bottom }) => {
+      ({ prefsKey, goalKey, prefs, top, bottom }) => {
         try {
-          localStorage.setItem(key, JSON.stringify(prefs))
+          localStorage.setItem(prefsKey, JSON.stringify(prefs))
+          localStorage.removeItem(goalKey)
         } catch {
           /* ignore */
         }
@@ -415,7 +438,13 @@ async function main() {
         apply()
         document.addEventListener('DOMContentLoaded', apply)
       },
-      { key: PREFS_KEY, prefs: seedPrefs, top: '47px', bottom: '34px' },
+      {
+        prefsKey: PREFS_KEY,
+        goalKey: WATER_GOAL_KEY,
+        prefs: seedPrefs,
+        top: '47px',
+        bottom: '34px',
+      },
     )
 
     const videoT0 = Date.now()

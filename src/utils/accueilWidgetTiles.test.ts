@@ -1,18 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { TrainingState, WorkoutRoutine } from '../types/training'
 import {
-  createDefaultAccueilWidgetPrefs,
-  normalizeAccueilWidgetPrefs,
-  setAccueilWaterGoalMl,
-} from './accueilWidgetPrefs'
-import {
   deriveNextSessionTile,
   deriveProgramTileModel,
   deriveSetsTileModel,
   deriveWaterTileModel,
   deriveWeekSessionBars,
   formatWaterGoalHint,
-  waterRingFromPrefs,
+  waterRingFromGoal,
 } from './accueilWidgetTiles'
 
 const FIXED = new Date('2026-10-07T18:30:00') // mercredi
@@ -55,33 +50,22 @@ function baseState(partial: Partial<TrainingState> = {}): TrainingState {
   }
 }
 
-describe('accueilWidgetTiles — water ring', () => {
-  it('shows ring only when prefs have an explicit user goal', () => {
-    const noGoal = createDefaultAccueilWidgetPrefs()
-    expect(waterRingFromPrefs(noGoal).showRing).toBe(false)
-    expect(deriveWaterTileModel(noGoal, 1200).showRing).toBe(false)
-    expect(deriveWaterTileModel(noGoal, 1200).waterMl).toBe(1200)
+describe('accueilWidgetTiles — water ring (userWaterGoal)', () => {
+  it('shows ring only when an explicit user goal is provided', () => {
+    expect(waterRingFromGoal(null).showRing).toBe(false)
+    expect(deriveWaterTileModel(1200, null).showRing).toBe(false)
+    expect(deriveWaterTileModel(1200, null).waterMl).toBe(1200)
 
-    const withGoal = setAccueilWaterGoalMl(noGoal, 2500, 1)
-    const model = deriveWaterTileModel(withGoal, 1200)
+    const model = deriveWaterTileModel(1200, 2500)
     expect(model.showRing).toBe(true)
     expect(model.goalMl).toBe(2500)
     expect(model.progress).toBeCloseTo(1200 / 2500)
-
-    // Migrated v1 prefs without waterGoalMl → no ring
-    const migrated = normalizeAccueilWidgetPrefs({
-      version: 1,
-      order: ['seance', 'recent', 'programme'],
-      hidden: [],
-      updatedAt: 1,
-    })
-    expect(waterRingFromPrefs(migrated).showRing).toBe(false)
+    expect(waterRingFromGoal(2500).showRing).toBe(true)
   })
 
-  it('never treats weight-based auto goal as a user goal (prefs only)', () => {
-    // Even if someone passes a huge water total, ring stays off without prefs goal
-    const prefs = createDefaultAccueilWidgetPrefs()
-    expect(deriveWaterTileModel(prefs, 5000).showRing).toBe(false)
+  it('never treats a water total alone as a goal (no gauge without goal)', () => {
+    expect(deriveWaterTileModel(5000, null).showRing).toBe(false)
+    expect(deriveWaterTileModel(5000, null).progress).toBe(0)
   })
 })
 

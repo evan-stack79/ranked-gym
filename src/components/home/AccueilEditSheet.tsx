@@ -6,14 +6,13 @@ import {
   isAccueilWidgetVisible,
   moveAccueilWidget,
   normalizeAccueilWidgetPrefs,
-  normalizeWaterGoalMl,
   resetAccueilWidgetPrefs,
   saveAccueilWidgetPrefs,
-  setAccueilWaterGoalMl,
   toggleAccueilWidgetHidden,
   type AccueilWidgetId,
   type AccueilWidgetPrefs,
 } from '../../utils/accueilWidgetPrefs'
+import { WaterGoalChooser } from '../nutrition/WaterGoalChooser'
 import { IosSheet } from '../ui/IosSheet'
 
 interface AccueilEditSheetProps {
@@ -29,14 +28,10 @@ interface AccueilEditSheetProps {
  */
 export function AccueilEditSheet({ open, prefs, onClose, onSave }: AccueilEditSheetProps) {
   const [draft, setDraft] = useState<AccueilWidgetPrefs>(() => normalizeAccueilWidgetPrefs(prefs))
-  const [waterDraft, setWaterDraft] = useState('')
 
   useEffect(() => {
     if (!open) return
-    const next = normalizeAccueilWidgetPrefs(prefs)
-    setDraft(next)
-    const goal = normalizeWaterGoalMl(next.waterGoalMl)
-    setWaterDraft(goal != null ? String(goal) : '')
+    setDraft(normalizeAccueilWidgetPrefs(prefs))
   }, [open, prefs])
 
   const order = draft.order.filter((id): id is AccueilWidgetId =>
@@ -49,19 +44,13 @@ export function AccueilEditSheet({ open, prefs, onClose, onSave }: AccueilEditSh
   }
 
   const handleDone = () => {
-    const withGoal = setAccueilWaterGoalMl(
-      draft,
-      waterDraft.trim() === '' ? null : Number(waterDraft.replace(',', '.')),
-      Date.now(),
-    )
-    commit(withGoal)
+    commit(draft)
     onClose()
   }
 
   const handleReset = () => {
     const next = resetAccueilWidgetPrefs(Date.now())
     setDraft(next)
-    setWaterDraft('')
     commit(next)
   }
 
@@ -158,22 +147,11 @@ export function AccueilEditSheet({ open, prefs, onClose, onSave }: AccueilEditSh
         className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3"
         data-accueil-edit-water-goal
       >
-        <p className="text-[15px] font-semibold text-white">Objectif d&apos;eau (ml)</p>
-        <p className="mt-0.5 text-[12px] text-[#8E8E93]">
-          Optionnel — sans valeur, la tuile Eau n&apos;affiche pas d&apos;anneau.
+        <p className="text-[15px] font-semibold text-white">Objectif d&apos;eau</p>
+        <p className="mt-0.5 mb-3 text-[12px] text-[#8E8E93]">
+          Optionnel — sans objectif, la tuile Eau n&apos;affiche pas d&apos;anneau.
         </p>
-        <input
-          type="number"
-          inputMode="numeric"
-          min={0}
-          max={20000}
-          step={50}
-          value={waterDraft}
-          onChange={(e) => setWaterDraft(e.target.value)}
-          placeholder="Aucun"
-          className="mt-3 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-[16px] font-semibold tabular-nums text-white outline-none focus:border-[#0A84FF]/50"
-          data-accueil-edit-water-input
-        />
+        <WaterGoalChooser inputId="accueil-edit-sheet-water-goal" />
       </div>
 
       <p className="px-1 pb-4 pt-3 text-[12px] leading-snug text-[#8E8E93]">

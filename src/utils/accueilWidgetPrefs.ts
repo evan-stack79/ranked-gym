@@ -1,9 +1,19 @@
 /**
  * Accueil widget preferences — stored separately from profile/settings (R-04).
- * Shape: { version, order, hidden, updatedAt, waterGoalMl? }. localStorage only.
+ * Shape: { version, order, hidden, updatedAt }. localStorage only.
  *
- * v1 → v2: new metric tiles + optional user-chosen water goal (never weight-based).
+ * v1 → v2: new metric tiles.
+ * Water goal lives in `userWaterGoal.ts` (`ranked-gym:water-goal`). Legacy
+ * `waterGoalMl` on prefs is migrated once via `migrateAccueilWaterGoalFromPrefs`.
  */
+
+import {
+  clearUserWaterGoal,
+  getUserWaterGoalMl,
+  migrateAccueilWaterGoalFromPrefs,
+  normalizeUserWaterGoalMl,
+  setUserWaterGoalMl,
+} from './userWaterGoal'
 
 export const ACCUEIL_WIDGET_PREFS_KEY = 'ranked-gym:accueil-widget-prefs'
 export const ACCUEIL_WIDGET_PREFS_VERSION = 2 as const
@@ -27,9 +37,8 @@ export type AccueilWidgetPrefs = {
   hidden: string[]
   updatedAt: number
   /**
-   * User-chosen daily water goal (ml).
-   * `null` / omitted / ≤ 0 → no ring on the Eau tile.
-   * Never derived from weight (`waterGoal.ts` auto goal is forbidden here).
+   * @deprecated Legacy field — water goal is `ranked-gym:water-goal`.
+   * Kept optional so old payloads parse; always normalized to null on write.
    */
   waterGoalMl?: number | null
 }
@@ -140,7 +149,8 @@ export function normalizeAccueilWidgetPrefs(
     order,
     hidden,
     updatedAt,
-    waterGoalMl: normalizeWaterGoalMl(input?.waterGoalMl),
+    // Never persist a goal here — single source is userWaterGoal.
+    waterGoalMl: null,
   }
 }
 
@@ -272,24 +282,30 @@ export function resolveHiddenAccueilWidgets(prefs: AccueilWidgetPrefs): AccueilW
   return normalized.order.filter((id): id is AccueilWidgetId => isKnownWidgetId(id) && hidden.has(id))
 }
 
-/** Persist a user-chosen water goal inside Accueil prefs (bumps updatedAt). */
+/**
+ * @deprecated Prefer `setUserWaterGoalMl`. Writes the shared water-goal key and
+ * returns prefs with `waterGoalMl` cleared (single source of truth).
+ */
 export function setAccueilWaterGoalMl(
   prefs: AccueilWidgetPrefs,
   waterGoalMl: number | null,
   now = Date.now(),
 ): AccueilWidgetPrefs {
-  const normalized = normalizeAccueilWidgetPrefs(prefs, now)
+  const goal = normalizeUserWaterGoalMl(
+    waterGoalMl == null ? null : typeof waterGoalMl === 'number' ? waterGoalMl : Number(waterGoalMl),
+  )
+  if (goal != null) setUserWaterGoalMl(goal, now)
+  else clearUserWaterGoal()
   return {
-    ...normalized,
-    waterGoalMl: normalizeWaterGoalMl(waterGoalMl),
+    ...normalizeAccueilWidgetPrefs(prefs, now),
+    waterGoalMl: null,
     updatedAt: now,
   }
 }
 
-/** True only when the user explicitly set a positive water goal in prefs. */
-export function hasUserWaterGoal(prefs: AccueilWidgetPrefs): boolean {
-  const goal = normalizeWaterGoalMl(prefs.waterGoalMl)
-  return goal != null && goal > 0
+/** True when the shared user water goal is set (prefs field ignored). */
+export function hasUserWaterGoal(_prefs?: AccueilWidgetPrefs): boolean {
+  return getUserWaterGoalMl() != null
 }
 
 function parseStoredPrefs(raw: string | null): AccueilWidgetPrefs | null {
@@ -306,6 +322,8 @@ function parseStoredPrefs(raw: string | null): AccueilWidgetPrefs | null {
 export function loadAccueilWidgetPrefs(now = Date.now()): AccueilWidgetPrefs {
   if (typeof localStorage === 'undefined') return createDefaultAccueilWidgetPrefs(now)
   try {
+    // Migrate legacy prefs.waterGoalMl → ranked-gym:water-goal before normalize strips it.
+    migrateAccueilWaterGoalFromPrefs(now)
     const stored = parseStoredPrefs(localStorage.getItem(ACCUEIL_WIDGET_PREFS_KEY))
     return stored ?? createDefaultAccueilWidgetPrefs(now)
   } catch {

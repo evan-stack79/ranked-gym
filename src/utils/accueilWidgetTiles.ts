@@ -11,17 +11,13 @@ import {
   computeProgramProgressPercent,
 } from './accueilGallery'
 import {
-  hasUserWaterGoal,
-  normalizeWaterGoalMl,
-  type AccueilWidgetPrefs,
-} from './accueilWidgetPrefs'
-import {
   countDoneSets,
   deriveWeekStrip,
   findActiveStrengthSession,
   type WeekDayCell,
 } from './trainHub'
 import { getTodayWorkout } from './todayWorkout'
+import { getUserWaterGoalMl } from './userWaterGoal'
 import { formatWaterMl } from './waterGoal'
 import { getLocalWeekBounds, isTimestampInLocalWeek, workoutValidationMs } from './weekBounds'
 import { dedupeWorkoutNotes } from './workoutHistory'
@@ -82,21 +78,22 @@ export type WaterTileModel = {
 }
 
 /**
- * Eau tile model. Ring ONLY when prefs carry an explicit user goal.
- * Never calls calculateDailyWaterGoal / getDailyWaterGoalMl.
+ * Eau tile model. Ring ONLY when `userWaterGoal` has an explicit user goal.
+ * Never calls weight-based formulas; never reads prefs.waterGoalMl.
  */
 export function deriveWaterTileModel(
-  prefs: AccueilWidgetPrefs,
   waterMl: number = getTodayWaterMl(),
+  goalMl: number | null = getUserWaterGoalMl(),
 ): WaterTileModel {
-  const goalMl = hasUserWaterGoal(prefs) ? normalizeWaterGoalMl(prefs.waterGoalMl) : null
-  const showRing = goalMl != null && goalMl > 0
+  const normalizedGoal =
+    typeof goalMl === 'number' && Number.isFinite(goalMl) && goalMl > 0 ? Math.round(goalMl) : null
+  const showRing = normalizedGoal != null
   const safeMl = Number.isFinite(waterMl) ? Math.max(0, Math.round(waterMl)) : 0
   return {
     waterMl: safeMl,
-    goalMl,
+    goalMl: normalizedGoal,
     showRing,
-    progress: showRing && goalMl! > 0 ? Math.min(1, Math.max(0, safeMl / goalMl!)) : 0,
+    progress: showRing && normalizedGoal! > 0 ? Math.min(1, Math.max(0, safeMl / normalizedGoal!)) : 0,
   }
 }
 
@@ -326,8 +323,8 @@ export type WaterTileRingDecision = {
   goalMl: number | null
 }
 
-/** Test helper — ring decision from prefs alone (no storage). */
-export function waterRingFromPrefs(prefs: AccueilWidgetPrefs): WaterTileRingDecision {
-  const model = deriveWaterTileModel(prefs, 0)
+/** Test helper — ring decision from an explicit goal (no storage). */
+export function waterRingFromGoal(goalMl: number | null): WaterTileRingDecision {
+  const model = deriveWaterTileModel(0, goalMl)
   return { showRing: model.showRing, goalMl: model.goalMl }
 }
