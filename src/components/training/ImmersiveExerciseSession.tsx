@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Check, ChevronLeft, Minus, Pause, Play, Plus, Timer } from 'lucide-react'
-import type { ExerciseEntry, WorkoutSet } from '../../types/training'
+import type { ExerciseEntry, WorkoutNote, WorkoutSet } from '../../types/training'
 import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
 import { BRAND_MARK_COMPACT_SRC } from '../brand/BrandMark'
 import {
@@ -9,6 +9,15 @@ import {
 } from '../../utils/exerciseMedia'
 import { useRestTimerContext } from '../../context/RestTimerContext'
 import { isSetReadyForAutoValidate } from '../../utils/autoValidateSet'
+import {
+  findLastPerformance,
+  formatLastRepsAriaLabel,
+  formatLastRepsPlaceholder,
+  formatLastWeightAriaLabel,
+  formatLastWeightPlaceholder,
+  isSetLoadBlank,
+  lastPerformanceToSetPatch,
+} from '../../utils/lastPerformance'
 import { CANONICAL_REST_SEC, resolveRestDuration } from '../../utils/restDuration'
 import { RecoveryTimerPanel } from './RecoveryTimerPanel'
 
@@ -33,6 +42,10 @@ export interface ImmersiveExerciseSessionProps {
   autoValidate?: boolean
   undoVisible?: boolean
   onUndoValidation?: () => void
+  /** Séances complétées déjà chargées — hint « dernière fois » client-side. */
+  history?: WorkoutNote[]
+  /** Exclure une note (édition d’historique). */
+  excludeHistoryNoteId?: string
 }
 
 function formatClock(totalSec: number): string {
@@ -49,6 +62,11 @@ function formatEffort(set: WorkoutSet): string | null {
 
 const FIELD =
   'min-h-11 w-full rounded-lg border border-white/12 bg-[#1c1c1e] px-2 text-center text-[15px] font-semibold tabular-nums text-white outline-none focus-visible:border-[#FF2B2B]/55'
+
+const LAST_PLACEHOLDER =
+  'pointer-events-none absolute inset-0 flex items-center justify-center text-[15px] font-semibold tabular-nums text-[#636366]'
+
+const EMPTY_HISTORY: WorkoutNote[] = []
 
 /**
  * Immersive single-exercise session canvas (bench-press reference layout).
@@ -73,6 +91,8 @@ export function ImmersiveExerciseSession({
   autoValidate = false,
   undoVisible = false,
   onUndoValidation,
+  history = EMPTY_HISTORY,
+  excludeHistoryNoteId,
 }: ImmersiveExerciseSessionProps) {
   const rest = useRestTimerContext()
   const safeIndex = Math.min(Math.max(0, activeIndex), Math.max(0, exercises.length - 1))
@@ -88,6 +108,15 @@ export function ImmersiveExerciseSession({
   const muscleLine = formatExerciseMuscles(media.muscles)
   const [imgFailedFor, setImgFailedFor] = useState<string | null>(null)
   const showImage = Boolean(media.imageSrc) && imgFailedFor !== media.imageSrc
+
+  const lastHints = useMemo(() => {
+    if (!exercise || history.length === 0) return [] as Array<ReturnType<typeof findLastPerformance>>
+    return exercise.sets.map((_, idx) =>
+      findLastPerformance(history, exercise, idx, {
+        excludeNoteId: excludeHistoryNoteId,
+      }),
+    )
+  }, [exercise, history, excludeHistoryNoteId])
 
   if (!exercise) return null
 
@@ -277,12 +306,19 @@ export function ImmersiveExerciseSession({
             const active = !done && idx === pendingIdx
             const upcoming = !done && idx !== pendingIdx
             const effortDone = formatEffort(set)
+            const last = lastHints[idx] ?? null
+            const showLastHint = Boolean(last && isSetLoadBlank(set))
+            const applyLast = () => {
+              if (!last || !isSetLoadBlank(set)) return
+              patchSet(idx, lastPerformanceToSetPatch(last))
+            }
 
             return (
               <div
                 key={idx}
                 role="listitem"
                 data-set-row={done ? 'done' : active ? 'active' : 'upcoming'}
+                data-last-hint={showLastHint ? '1' : undefined}
                 className={`relative grid grid-cols-[2.25rem_1fr_1fr_1fr_2.5rem] items-center gap-x-2 ${
                   upcoming ? 'opacity-45' : ''
                 }`}
@@ -301,22 +337,46 @@ export function ImmersiveExerciseSession({
                   {idx + 1}
                 </span>
                 <ClearableNumberInput
-                  value={set.weightKg}
+                  value={showLastHint ? null : set.weightKg}
                   onChange={(v) => patchSet(idx, { weightKg: v ?? 0 })}
+                  onFocus={showLastHint ? applyLast : undefined}
                   min={0}
                   max={500}
                   step={0.5}
-                  aria-label={`Série ${idx + 1} poids`}
+                  required={!showLastHint}
+                  placeholder={
+                    showLastHint && last
+                      ? formatLastWeightPlaceholder(last.weightKg)
+                      : undefined
+                  }
+                  placeholderClassName={LAST_PLACEHOLDER}
+                  aria-label={
+                    showLastHint && last
+                      ? formatLastWeightAriaLabel(last.weightKg)
+                      : `Série ${idx + 1} poids`
+                  }
                   className={FIELD}
                 />
                 <ClearableNumberInput
-                  value={set.reps}
+                  value={showLastHint ? null : set.reps}
                   onChange={(v) =>
                     patchSet(idx, { reps: v != null ? Math.round(v) : 0 })
                   }
+                  onFocus={showLastHint ? applyLast : undefined}
                   min={1}
                   max={50}
-                  aria-label={`Série ${idx + 1} reps`}
+                  required={!showLastHint}
+                  placeholder={
+                    showLastHint && last
+                      ? formatLastRepsPlaceholder(last.reps)
+                      : undefined
+                  }
+                  placeholderClassName={LAST_PLACEHOLDER}
+                  aria-label={
+                    showLastHint && last
+                      ? formatLastRepsAriaLabel(last.reps)
+                      : `Série ${idx + 1} reps`
+                  }
                   className={FIELD}
                 />
                 {done && effortDone ? (

@@ -976,4 +976,140 @@ describe('ImmersiveExerciseSession', () => {
     expect(onAddSet).not.toHaveBeenCalled()
     expect(host.querySelectorAll('[data-set-row]')).toHaveLength(1)
   })
+
+  it('placeholders « dernière fois » gris + remplit kg/reps au focus', async () => {
+    function Harness() {
+      const [exercises, setExercises] = useState<ExerciseEntry[]>([
+        {
+          id: 'ex-live-1',
+          name: 'DÉVELOPPER',
+          sets: [
+            { reps: 0, weightKg: 0 },
+            { reps: 0, weightKg: 0 },
+          ],
+        },
+      ])
+      const onUpdateSet = (exerciseId: string, setIndex: number, patch: Partial<ExerciseEntry['sets'][number]>) => {
+        setExercises((prev) =>
+          prev.map((e) =>
+            e.id === exerciseId
+              ? {
+                  ...e,
+                  sets: e.sets.map((s, i) => (i === setIndex ? { ...s, ...patch } : s)),
+                }
+              : e,
+          ),
+        )
+      }
+      return (
+        <ImmersiveExerciseSession
+          exercises={exercises}
+          activeIndex={0}
+          onActiveIndexChange={vi.fn()}
+          sessionClockLabel="00:12"
+          sessionPaused={false}
+          onBack={vi.fn()}
+          onUpdateSet={onUpdateSet}
+          onAddSet={vi.fn()}
+          onValidateSet={vi.fn()}
+          onFinishSession={vi.fn()}
+          history={[
+            {
+              id: 'past',
+              title: 'Push',
+              dateKey: '2026-10-01',
+              createdAt: 1_000,
+              estimatedKcal: 200,
+              exercises: [
+                {
+                  id: 'e0',
+                  name: 'DÉVELOPPER',
+                  sets: [
+                    { reps: 8, weightKg: 60, rpe: 8 },
+                    { reps: 6, weightKg: 65 },
+                  ],
+                },
+              ],
+            },
+          ]}
+        />
+      )
+    }
+
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <Harness />
+        </RestTimerProvider>,
+      )
+    })
+
+    expect(host.textContent).not.toContain('La dernière fois :')
+    expect(host.textContent).not.toContain('RPE')
+    expect(host.querySelectorAll('[data-last-hint="1"]')).toHaveLength(2)
+
+    const weight = host.querySelector(
+      'input[aria-label="kg, la dernière fois 60"]',
+    ) as HTMLInputElement
+    const reps = host.querySelector(
+      'input[aria-label="reps, la dernière fois 8"]',
+    ) as HTMLInputElement
+    expect(weight).toBeTruthy()
+    expect(reps).toBeTruthy()
+    expect(weight.value).toBe('')
+    expect(reps.value).toBe('')
+    // Placeholders gris visibles (spans aria-hidden à côté des inputs vides)
+    const placeholders = [...host.querySelectorAll('[aria-hidden="true"]')].map(
+      (el) => el.textContent,
+    )
+    expect(placeholders).toContain('60')
+    expect(placeholders).toContain('8')
+    expect(placeholders).toContain('65')
+    expect(placeholders).toContain('6')
+
+    await act(async () => {
+      weight.focus()
+      weight.dispatchEvent(new FocusEvent('focus', { bubbles: true }))
+    })
+
+    const filledWeight = host.querySelector(
+      'input[aria-label="Série 1 poids"]',
+    ) as HTMLInputElement
+    const filledReps = host.querySelector(
+      'input[aria-label="Série 1 reps"]',
+    ) as HTMLInputElement
+    expect(filledWeight?.value).toBe('60')
+    expect(filledReps?.value).toBe('8')
+    expect(host.querySelector('[data-set-row="active"]')?.getAttribute('data-last-hint')).toBeNull()
+  })
+
+  it('sans historique : pas de placeholder dernière fois', async () => {
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <ImmersiveExerciseSession
+            exercises={[
+              {
+                id: 'ex-live-1',
+                name: 'DÉVELOPPER',
+                sets: [{ reps: 0, weightKg: 0 }],
+              },
+            ]}
+            activeIndex={0}
+            onActiveIndexChange={vi.fn()}
+            sessionClockLabel="00:12"
+            sessionPaused={false}
+            onBack={vi.fn()}
+            onUpdateSet={vi.fn()}
+            onAddSet={vi.fn()}
+            onValidateSet={vi.fn()}
+            onFinishSession={vi.fn()}
+            history={[]}
+          />
+        </RestTimerProvider>,
+      )
+    })
+    expect(host.querySelector('[data-last-hint]')).toBeNull()
+    expect(host.querySelector('input[aria-label*="la dernière fois"]')).toBeNull()
+  })
 })
