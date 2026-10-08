@@ -8,8 +8,6 @@ interface HydrationProgressBarProps {
   showHeader?: boolean
   /** Barre plus fine (Accueil). */
   compact?: boolean
-  /** Indique le bonus séance du jour. */
-  isTrainingDay?: boolean
   /** Masque la note longue « Objectif atteint » (Accueil). */
   showGoalReachedNote?: boolean
   className?: string
@@ -20,11 +18,12 @@ export function HydrationProgressBar({
   goalMl,
   showHeader = true,
   compact = false,
-  isTrainingDay = false,
   showGoalReachedNote = true,
   className = '',
 }: HydrationProgressBarProps) {
-  const safeGoal = Math.max(100, goalMl)
+  if (!(goalMl > 0)) return null
+
+  const safeGoal = goalMl
   const progress = Math.min(Math.max(0, consumedMl) / safeGoal, 1)
   const remaining = Math.max(0, safeGoal - consumedMl)
   const overGoal = consumedMl > safeGoal
@@ -105,16 +104,10 @@ export function HydrationProgressBar({
               compact ? 'text-[11px]' : 'text-sm'
             }`}
           >
-            Objectif atteint ! Mais l&apos;algorithme n&apos;est qu&apos;une base. Reste à l&apos;écoute
-            de ton corps : si tu as soif, continue de t&apos;hydrater.
+            Objectif atteint. Reste à l&apos;écoute de ton corps : si tu as soif, continue de
+            t&apos;hydrater.
           </p>
         </div>
-      ) : null}
-
-      {!compact && isTrainingDay && !goalReached ? (
-        <p className="mt-1.5 text-[11px] text-[#636366]">
-          +700 ml bonus séance · objectif adapté à ton entraînement
-        </p>
       ) : null}
 
       {compact ? (
@@ -126,7 +119,6 @@ export function HydrationProgressBar({
               <span className="font-medium text-[#67E8F9]">{formatWaterMl(remaining)}</span> restants
             </>
           )}
-          {isTrainingDay ? ' · jour Train' : null}
         </p>
       ) : null}
     </div>
