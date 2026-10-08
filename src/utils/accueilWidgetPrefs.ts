@@ -1,35 +1,78 @@
 /**
  * Accueil widget preferences — stored separately from profile/settings (R-04).
- * Shape: { version, order, hidden, updatedAt }. localStorage only for this PR.
+ * Shape: { version, order, hidden, updatedAt, waterGoalMl? }. localStorage only.
+ *
+ * v1 → v2: new metric tiles + optional user-chosen water goal (never weight-based).
  */
 
 export const ACCUEIL_WIDGET_PREFS_KEY = 'ranked-gym:accueil-widget-prefs'
-export const ACCUEIL_WIDGET_PREFS_VERSION = 1 as const
+export const ACCUEIL_WIDGET_PREFS_VERSION = 2 as const
 
-/** Known Accueil gallery blocks — training-related only; never kcal/weight/body. */
-export const ACCUEIL_WIDGET_IDS = ['seance', 'recent', 'programme'] as const
+/** Known Accueil gallery blocks — training / water only; never kcal/weight/body. */
+export const ACCUEIL_WIDGET_IDS = [
+  'seance',
+  'seances_semaine',
+  'eau',
+  'series_jour',
+  'prochaine_seance',
+  'recent',
+  'programme',
+] as const
 
 export type AccueilWidgetId = (typeof ACCUEIL_WIDGET_IDS)[number]
 
 export type AccueilWidgetPrefs = {
-  version: typeof ACCUEIL_WIDGET_PREFS_VERSION
+  version: number
   order: string[]
   hidden: string[]
   updatedAt: number
+  /**
+   * User-chosen daily water goal (ml).
+   * `null` / omitted / ≤ 0 → no ring on the Eau tile.
+   * Never derived from weight (`waterGoal.ts` auto goal is forbidden here).
+   */
+  waterGoalMl?: number | null
 }
 
 export const ACCUEIL_WIDGET_LABELS: Record<AccueilWidgetId, string> = {
   seance: 'Séance du jour',
+  seances_semaine: 'Séances de la semaine',
+  eau: 'Eau',
+  series_jour: 'Séries du jour',
+  prochaine_seance: 'Prochaine séance',
   recent: 'Récent',
   programme: 'Programme',
 }
 
-/** Default Accueil: Séance du jour → Récent → Programme, all visible. */
+/** Wide tiles span the Accueil grid; small ones share a 2-column row. */
+export const ACCUEIL_WIDGET_SIZE: Record<AccueilWidgetId, 'wide' | 'small'> = {
+  seance: 'wide',
+  seances_semaine: 'wide',
+  eau: 'small',
+  series_jour: 'small',
+  prochaine_seance: 'wide',
+  recent: 'wide',
+  programme: 'wide',
+}
+
+/** Default Accueil: heroes → week → water/sets → next → programme → recent. */
 export const DEFAULT_ACCUEIL_WIDGET_ORDER: AccueilWidgetId[] = [
   'seance',
-  'recent',
+  'seances_semaine',
+  'eau',
+  'series_jour',
+  'prochaine_seance',
   'programme',
+  'recent',
 ]
+
+/** Clamp a user water goal; returns null when unset / invalid. */
+export function normalizeWaterGoalMl(value: unknown): number | null {
+  if (value == null || value === '') return null
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n) || n <= 0) return null
+  return Math.min(20_000, Math.round(n))
+}
 
 export function createDefaultAccueilWidgetPrefs(now = Date.now()): AccueilWidgetPrefs {
   return {
@@ -37,6 +80,7 @@ export function createDefaultAccueilWidgetPrefs(now = Date.now()): AccueilWidget
     order: [...DEFAULT_ACCUEIL_WIDGET_ORDER],
     hidden: [],
     updatedAt: now,
+    waterGoalMl: null,
   }
 }
 
@@ -46,7 +90,7 @@ function isKnownWidgetId(id: string): id is AccueilWidgetId {
 
 /**
  * Drop unknown ids silently; append any new known widgets missing from `order`
- * in their default relative position. Dedupes order/hidden.
+ * in their default relative position. Dedupes order/hidden. Migrates older versions.
  */
 export function normalizeAccueilWidgetPrefs(
   input: Partial<AccueilWidgetPrefs> | null | undefined,
@@ -96,6 +140,7 @@ export function normalizeAccueilWidgetPrefs(
     order,
     hidden,
     updatedAt,
+    waterGoalMl: normalizeWaterGoalMl(input?.waterGoalMl),
   }
 }
 
@@ -165,6 +210,26 @@ export function moveAccueilWidget(
   order[target] = id
   order[index] = swap
   return { ...normalized, order, updatedAt: now }
+}
+
+/** Persist a user-chosen water goal inside Accueil prefs (bumps updatedAt). */
+export function setAccueilWaterGoalMl(
+  prefs: AccueilWidgetPrefs,
+  waterGoalMl: number | null,
+  now = Date.now(),
+): AccueilWidgetPrefs {
+  const normalized = normalizeAccueilWidgetPrefs(prefs, now)
+  return {
+    ...normalized,
+    waterGoalMl: normalizeWaterGoalMl(waterGoalMl),
+    updatedAt: now,
+  }
+}
+
+/** True only when the user explicitly set a positive water goal in prefs. */
+export function hasUserWaterGoal(prefs: AccueilWidgetPrefs): boolean {
+  const goal = normalizeWaterGoalMl(prefs.waterGoalMl)
+  return goal != null && goal > 0
 }
 
 function parseStoredPrefs(raw: string | null): AccueilWidgetPrefs | null {

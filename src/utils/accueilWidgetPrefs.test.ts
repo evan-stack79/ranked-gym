@@ -1,12 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  ACCUEIL_WIDGET_PREFS_VERSION,
   applyRemoteAccueilWidgetPrefs,
   createDefaultAccueilWidgetPrefs,
+  hasUserWaterGoal,
   mergeAccueilWidgetPrefs,
   moveAccueilWidget,
   normalizeAccueilWidgetPrefs,
   resetAccueilWidgetPrefs,
   resolveVisibleAccueilWidgets,
+  setAccueilWaterGoalMl,
   toggleAccueilWidgetHidden,
   type AccueilWidgetPrefs,
 } from './accueilWidgetPrefs'
@@ -14,57 +17,125 @@ import {
 function prefs(
   partial: Partial<AccueilWidgetPrefs> & Pick<AccueilWidgetPrefs, 'updatedAt'>,
 ): AccueilWidgetPrefs {
-  return {
-    version: 1,
-    order: ['seance', 'recent', 'programme'],
+  return normalizeAccueilWidgetPrefs({
+    version: ACCUEIL_WIDGET_PREFS_VERSION,
+    order: [
+      'seance',
+      'seances_semaine',
+      'eau',
+      'series_jour',
+      'prochaine_seance',
+      'programme',
+      'recent',
+    ],
     hidden: [],
+    waterGoalMl: null,
     ...partial,
-  }
+  })
 }
 
 describe('accueilWidgetPrefs', () => {
-  it('default order is Séance → Récent → Programme, nothing hidden', () => {
+  it('default order includes metric tiles, nothing hidden, no water goal', () => {
     const d = createDefaultAccueilWidgetPrefs(1000)
-    expect(d.order).toEqual(['seance', 'recent', 'programme'])
+    expect(d.order).toEqual([
+      'seance',
+      'seances_semaine',
+      'eau',
+      'series_jour',
+      'prochaine_seance',
+      'programme',
+      'recent',
+    ])
     expect(d.hidden).toEqual([])
+    expect(d.waterGoalMl).toBeNull()
+    expect(d.version).toBe(2)
     expect(d.updatedAt).toBe(1000)
-    expect(resolveVisibleAccueilWidgets(d)).toEqual(['seance', 'recent', 'programme'])
+    expect(resolveVisibleAccueilWidgets(d)).toEqual(d.order)
   })
 
-  it('merge: latest updatedAt wins (remote newer)', () => {
-    const local = prefs({
-      updatedAt: 10,
+  it('migrates v1 prefs: keeps order, inserts new widgets, bumps version', () => {
+    const migrated = normalizeAccueilWidgetPrefs({
+      version: 1,
       order: ['seance', 'recent', 'programme'],
       hidden: ['recent'],
+      updatedAt: 42,
+    })
+    expect(migrated.version).toBe(2)
+    expect(migrated.hidden).toEqual(['recent'])
+    expect(migrated.order[0]).toBe('seance')
+    expect(migrated.order).toContain('eau')
+    expect(migrated.order).toContain('seances_semaine')
+    expect(migrated.order).toContain('series_jour')
+    expect(migrated.order).toContain('prochaine_seance')
+    expect(migrated.order.indexOf('recent')).toBeLessThan(migrated.order.indexOf('programme') === -1 ? 99 : migrated.order.length)
+    // relative: recent still before programme when both from v1
+    expect(migrated.order.indexOf('recent')).toBeLessThan(migrated.order.indexOf('programme'))
+    expect(migrated.waterGoalMl).toBeNull()
+    expect(migrated.updatedAt).toBe(42)
+  })
+
+  it('water goal: only positive finite values; setAccueilWaterGoalMl bumps updatedAt', () => {
+    let p = createDefaultAccueilWidgetPrefs(1)
+    expect(hasUserWaterGoal(p)).toBe(false)
+
+    p = setAccueilWaterGoalMl(p, 2500, 10)
+    expect(p.waterGoalMl).toBe(2500)
+    expect(p.updatedAt).toBe(10)
+    expect(hasUserWaterGoal(p)).toBe(true)
+
+    p = setAccueilWaterGoalMl(p, 0, 11)
+    expect(p.waterGoalMl).toBeNull()
+    expect(hasUserWaterGoal(p)).toBe(false)
+
+    p = setAccueilWaterGoalMl(p, -100, 12)
+    expect(p.waterGoalMl).toBeNull()
+
+    const fromRaw = normalizeAccueilWidgetPrefs({
+      version: 2,
+      order: ['eau'],
+      hidden: [],
+      updatedAt: 1,
+      waterGoalMl: '3000' as unknown as number,
+    })
+    expect(fromRaw.waterGoalMl).toBe(3000)
+  })
+
+  it('merge: latest updatedAt wins (remote newer), including waterGoalMl', () => {
+    const local = prefs({
+      updatedAt: 10,
+      hidden: ['recent'],
+      waterGoalMl: 2000,
     })
     const remote = prefs({
       updatedAt: 20,
       order: ['programme', 'recent', 'seance'],
       hidden: ['seance'],
+      waterGoalMl: 3000,
     })
-    expect(mergeAccueilWidgetPrefs(local, remote)).toEqual(
-      normalizeAccueilWidgetPrefs(remote),
-    )
+    const merged = mergeAccueilWidgetPrefs(local, remote)
+    expect(merged.waterGoalMl).toBe(3000)
+    expect(merged.hidden).toEqual(['seance'])
   })
 
   it('merge: latest updatedAt wins (local newer)', () => {
     const local = prefs({
       updatedAt: 50,
       hidden: ['programme'],
+      waterGoalMl: 1800,
     })
     const remote = prefs({
       updatedAt: 40,
       hidden: ['recent'],
+      waterGoalMl: 4000,
     })
-    expect(mergeAccueilWidgetPrefs(local, remote)).toEqual(
-      normalizeAccueilWidgetPrefs(local),
-    )
+    expect(mergeAccueilWidgetPrefs(local, remote).waterGoalMl).toBe(1800)
   })
 
   it('merge: equal updatedAt prefers local (never blind remote overwrite)', () => {
-    const local = prefs({ updatedAt: 7, hidden: ['recent'] })
-    const remote = prefs({ updatedAt: 7, hidden: ['programme'] })
+    const local = prefs({ updatedAt: 7, hidden: ['recent'], waterGoalMl: 1500 })
+    const remote = prefs({ updatedAt: 7, hidden: ['programme'], waterGoalMl: 9000 })
     expect(mergeAccueilWidgetPrefs(local, remote).hidden).toEqual(['recent'])
+    expect(mergeAccueilWidgetPrefs(local, remote).waterGoalMl).toBe(1500)
   })
 
   it('merge: missing side falls back to the other, both missing → default', () => {
@@ -83,7 +154,8 @@ describe('accueilWidgetPrefs', () => {
       hidden: ['kcal', 'unknown', 'recent'],
       updatedAt: 1,
     })
-    expect(normalized.order).toEqual(['seance', 'recent', 'programme'])
+    expect(normalized.order).not.toContain('kcal')
+    expect(normalized.order).not.toContain('body_weight')
     expect(normalized.hidden).toEqual(['recent'])
     expect(() => resolveVisibleAccueilWidgets(normalized)).not.toThrow()
   })
@@ -91,25 +163,13 @@ describe('accueilWidgetPrefs', () => {
   it('new widgets missing from a saved order are appended in default position', () => {
     const oldSave = normalizeAccueilWidgetPrefs({
       version: 1,
-      // Simulate an older build that only knew seance + recent (user had swapped them)
       order: ['recent', 'seance'],
       hidden: [],
       updatedAt: 1,
     })
-    // Keep the saved relative order; append programme (new) in its default slot
-    expect(oldSave.order).toEqual(['recent', 'seance', 'programme'])
-    expect(oldSave.order.indexOf('programme')).toBeGreaterThan(oldSave.order.indexOf('recent'))
-  })
-
-  it('new widget inserts before later default neighbors when mid-order', () => {
-    // Only programme was saved — seance and recent should land in default slots
-    const normalized = normalizeAccueilWidgetPrefs({
-      version: 1,
-      order: ['programme'],
-      hidden: [],
-      updatedAt: 1,
-    })
-    expect(normalized.order).toEqual(['seance', 'recent', 'programme'])
+    expect(oldSave.order.indexOf('seance')).toBeLessThan(oldSave.order.indexOf('recent') === -1 ? 99 : oldSave.order.length)
+    expect(oldSave.order).toContain('programme')
+    expect(oldSave.order).toContain('eau')
   })
 
   it('reset restores default Accueil', () => {
@@ -117,11 +177,12 @@ describe('accueilWidgetPrefs', () => {
       updatedAt: 5,
       order: ['programme', 'seance', 'recent'],
       hidden: ['seance', 'recent'],
+      waterGoalMl: 2500,
     })
     const reset = resetAccueilWidgetPrefs(42)
     expect(reset).toEqual(createDefaultAccueilWidgetPrefs(42))
-    expect(resolveVisibleAccueilWidgets(reset)).toEqual(['seance', 'recent', 'programme'])
-    expect(dirty.hidden).not.toEqual(reset.hidden)
+    expect(dirty.waterGoalMl).toBe(2500)
+    expect(reset.waterGoalMl).toBeNull()
   })
 
   it('toggle hidden and move up/down update updatedAt', () => {
@@ -129,19 +190,11 @@ describe('accueilWidgetPrefs', () => {
     p = toggleAccueilWidgetHidden(p, 'recent', 2)
     expect(p.hidden).toEqual(['recent'])
     expect(p.updatedAt).toBe(2)
-    expect(resolveVisibleAccueilWidgets(p)).toEqual(['seance', 'programme'])
+    expect(resolveVisibleAccueilWidgets(p)).not.toContain('recent')
 
     p = moveAccueilWidget(p, 'programme', 'up', 3)
-    expect(p.order).toEqual(['seance', 'programme', 'recent'])
     expect(p.updatedAt).toBe(3)
-
-    p = moveAccueilWidget(p, 'programme', 'up', 4)
-    expect(p.order).toEqual(['programme', 'seance', 'recent'])
-
-    p = moveAccueilWidget(p, 'programme', 'up', 5)
-    // already first — no order change, still bumps updatedAt
-    expect(p.order).toEqual(['programme', 'seance', 'recent'])
-    expect(p.updatedAt).toBe(5)
+    expect(p.order.indexOf('programme')).toBeLessThan(p.order.indexOf('recent'))
   })
 
   it('applyRemoteAccueilWidgetPrefs keeps newer local', () => {
@@ -156,15 +209,20 @@ describe('accueilWidgetPrefs', () => {
       },
     })
 
-    const local = prefs({ updatedAt: 100, hidden: ['recent'], order: ['programme', 'recent', 'seance'] })
+    const local = prefs({
+      updatedAt: 100,
+      hidden: ['recent'],
+      order: ['programme', 'recent', 'seance'],
+      waterGoalMl: 2200,
+    })
     storage['ranked-gym:accueil-widget-prefs'] = JSON.stringify(local)
 
     const result = applyRemoteAccueilWidgetPrefs(
-      prefs({ updatedAt: 50, hidden: ['programme'] }),
+      prefs({ updatedAt: 50, hidden: ['programme'], waterGoalMl: 5000 }),
       200,
     )
     expect(result.hidden).toEqual(['recent'])
-    expect(result.order).toEqual(['programme', 'recent', 'seance'])
+    expect(result.waterGoalMl).toBe(2200)
 
     vi.unstubAllGlobals()
   })

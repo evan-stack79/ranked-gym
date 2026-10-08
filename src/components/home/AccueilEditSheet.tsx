@@ -1,12 +1,15 @@
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import {
+  ACCUEIL_WIDGET_IDS,
   ACCUEIL_WIDGET_LABELS,
   isAccueilWidgetVisible,
   moveAccueilWidget,
   normalizeAccueilWidgetPrefs,
+  normalizeWaterGoalMl,
   resetAccueilWidgetPrefs,
   saveAccueilWidgetPrefs,
+  setAccueilWaterGoalMl,
   toggleAccueilWidgetHidden,
   type AccueilWidgetId,
   type AccueilWidgetPrefs,
@@ -21,18 +24,23 @@ interface AccueilEditSheetProps {
 }
 
 /**
- * Edit Accueil blocks — show/hide + move up/down.
+ * Edit Accueil blocks — show/hide + move up/down + optional water goal.
  * No motion inside the form (audit + reduced-motion friendly).
  */
 export function AccueilEditSheet({ open, prefs, onClose, onSave }: AccueilEditSheetProps) {
   const [draft, setDraft] = useState<AccueilWidgetPrefs>(() => normalizeAccueilWidgetPrefs(prefs))
+  const [waterDraft, setWaterDraft] = useState('')
 
   useEffect(() => {
-    if (open) setDraft(normalizeAccueilWidgetPrefs(prefs))
+    if (!open) return
+    const next = normalizeAccueilWidgetPrefs(prefs)
+    setDraft(next)
+    const goal = normalizeWaterGoalMl(next.waterGoalMl)
+    setWaterDraft(goal != null ? String(goal) : '')
   }, [open, prefs])
 
   const order = draft.order.filter((id): id is AccueilWidgetId =>
-    id === 'seance' || id === 'recent' || id === 'programme',
+    (ACCUEIL_WIDGET_IDS as readonly string[]).includes(id),
   )
 
   const commit = (next: AccueilWidgetPrefs) => {
@@ -41,13 +49,19 @@ export function AccueilEditSheet({ open, prefs, onClose, onSave }: AccueilEditSh
   }
 
   const handleDone = () => {
-    commit({ ...draft, updatedAt: Date.now() })
+    const withGoal = setAccueilWaterGoalMl(
+      draft,
+      waterDraft.trim() === '' ? null : Number(waterDraft.replace(',', '.')),
+      Date.now(),
+    )
+    commit(withGoal)
     onClose()
   }
 
   const handleReset = () => {
     const next = resetAccueilWidgetPrefs(Date.now())
     setDraft(next)
+    setWaterDraft('')
     commit(next)
   }
 
@@ -140,7 +154,29 @@ export function AccueilEditSheet({ open, prefs, onClose, onSave }: AccueilEditSh
         })}
       </ul>
 
-      <p className="px-1 pb-4 pt-2 text-[12px] leading-snug text-[#8E8E93]">
+      <div
+        className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3"
+        data-accueil-edit-water-goal
+      >
+        <p className="text-[15px] font-semibold text-white">Objectif d&apos;eau (ml)</p>
+        <p className="mt-0.5 text-[12px] text-[#8E8E93]">
+          Optionnel — sans valeur, la tuile Eau n&apos;affiche pas d&apos;anneau.
+        </p>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={20000}
+          step={50}
+          value={waterDraft}
+          onChange={(e) => setWaterDraft(e.target.value)}
+          placeholder="Aucun"
+          className="mt-3 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-[16px] font-semibold tabular-nums text-white outline-none focus:border-[#0A84FF]/50"
+          data-accueil-edit-water-input
+        />
+      </div>
+
+      <p className="px-1 pb-4 pt-3 text-[12px] leading-snug text-[#8E8E93]">
         Pas de calories, poids ou mesures du corps sur l&apos;Accueil.
       </p>
     </IosSheet>
