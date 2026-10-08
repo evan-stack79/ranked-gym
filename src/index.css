@@ -454,6 +454,14 @@ img {
   height: 100%;
 }
 
+/* Opaque plate in edit — FLIP siblings never show foreign text through. */
+.accueil-edit-slot__body--edit-solid {
+  background-color: #111113;
+  border-radius: 1.5rem;
+  overflow: hidden;
+  isolation: isolate;
+}
+
 .accueil-edit-slot--editing {
   /* Reorder drag needs full pointer freedom. */
   touch-action: none;
@@ -472,6 +480,8 @@ img {
 
 .accueil-edit-slot--dragging {
   z-index: 1;
+  /* Placeholder only — never paint tile content in the layout hole. */
+  background: transparent;
 }
 
 /* Empty layout hole while the body is position:fixed under the finger. */
@@ -479,13 +489,15 @@ img {
   width: 100%;
   border-radius: 1.5rem;
   border: 1.5px dashed rgb(255 255 255 / 0.22);
-  background: rgb(255 255 255 / 0.03);
+  background: rgb(17 17 19 / 0.55);
   box-sizing: border-box;
 }
 
 .accueil-edit-slot__body--floating {
   animation: none !important;
   will-change: left, top, transform;
+  background-color: #111113 !important;
+  opacity: 1 !important;
 }
 
 .accueil-edit-slot--exiting {
@@ -494,8 +506,33 @@ img {
 }
 
 .accueil-edit-slot--exiting .accueil-edit-slot__body {
-  animation: accueil-tile-exit 180ms cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+  animation: accueil-tile-exit var(--dur-fast) var(--ease-out) forwards !important;
   transform-origin: center center;
+}
+
+.accueil-edit-slot--entering .accueil-edit-slot__body {
+  animation: accueil-tile-enter var(--dur-ui) var(--ease-out) both !important;
+  transform-origin: center center;
+}
+
+.accueil-edit-slot--settling .accueil-edit-slot__body {
+  /* Drop glide owns transform — keep wiggle off. */
+  animation: none !important;
+  will-change: transform;
+}
+
+.accueil-edit-slot[data-accueil-flipping='1'] {
+  will-change: transform;
+  pointer-events: none;
+  /* Solid slot during FLIP so overlapping slides never ghost text. */
+  background-color: #111113;
+  border-radius: 1.5rem;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.accueil-edit-slot[data-accueil-flipping='1'] .accueil-edit-slot__body {
+  background-color: #111113;
 }
 
 @keyframes accueil-tile-exit {
@@ -506,6 +543,17 @@ img {
   to {
     opacity: 0;
     transform: scale(0.88);
+  }
+}
+
+@keyframes accueil-tile-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -545,6 +593,17 @@ img {
     opacity: 0;
     transform: none;
   }
+
+  .accueil-edit-slot--entering .accueil-edit-slot__body {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+
+  .accueil-edit-slot--settling .accueil-edit-slot__body {
+    animation: none !important;
+    transform: none;
+  }
 }
 
 .accueil-gallery--editing > header {
@@ -559,6 +618,17 @@ img {
     rgb(12 12 14 / 0.92) 88%,
     rgb(12 12 14 / 0)
   );
+}
+
+/*
+ * Scroll anchoring can retarget scrollTop when tiles reorder, cancelling the
+ * visual FLIP slide (siblings look like they teleport). Opt out on the widget
+ * tree; the scroll scroller is toggled from HomeGalleryView (ancestor node).
+ */
+.accueil-gallery--editing,
+.accueil-gallery--editing .accueil-widgets,
+.accueil-gallery--editing .accueil-edit-slot {
+  overflow-anchor: none;
 }
 
 .accueil-edit-chrome {
