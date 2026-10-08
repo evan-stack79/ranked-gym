@@ -173,11 +173,17 @@ async function main() {
     await page.reload({ waitUntil: 'domcontentloaded' })
     await settleReveals(page)
     await assertClean(page)
+    // Frame heroes + week tile + water/sets row above the floating pill.
     await page.evaluate(() => {
       const main = document.querySelector('[data-app-scroll-main]')
-      if (main instanceof HTMLElement) main.scrollTo({ top: 0, behavior: 'instant' })
+      const week = document.querySelector('[data-accueil-widget="seances_semaine"]')
+      if (main instanceof HTMLElement && week instanceof HTMLElement) {
+        main.scrollTo({ top: Math.max(0, week.offsetTop - 210), behavior: 'instant' })
+      } else if (main instanceof HTMLElement) {
+        main.scrollTo({ top: 120, behavior: 'instant' })
+      }
     })
-    await page.waitForTimeout(200)
+    await page.waitForTimeout(250)
     await saveShot(page, 'tuiles_accueil.png')
 
     // --- tuiles_eau_sans_objectif.png ---

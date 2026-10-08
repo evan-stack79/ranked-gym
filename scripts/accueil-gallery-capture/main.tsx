@@ -302,15 +302,21 @@ saveCalorieProfile(
   { skipCloud: true },
 )
 
-// Realistic water journal for Eau tile screenshots (no auto goal in prefs).
-addWaterEntryForDate(TODAY, { amountMl: 500, type: 'glass', label: 'Verre' }, { skipCloud: true })
-addWaterEntryForDate(TODAY, { amountMl: 700, type: 'bottle', label: 'Bouteille' }, { skipCloud: true })
+// Realistic water journal for Eau tile screenshots (idempotent across reloads).
+const waterSeedKey = 'ranked-gym:accueil-capture-water-seeded'
+if (localStorage.getItem(waterSeedKey) !== '1') {
+  addWaterEntryForDate(TODAY, { amountMl: 500, type: 'glass', label: 'Verre' }, { skipCloud: true })
+  addWaterEntryForDate(TODAY, { amountMl: 700, type: 'bottle', label: 'Bouteille' }, { skipCloud: true })
+  localStorage.setItem(waterSeedKey, '1')
+}
 
-// Default Accueil prefs: no user water goal (ring off until capture sets one).
-localStorage.setItem(
-  ACCUEIL_WIDGET_PREFS_KEY,
-  JSON.stringify(createDefaultAccueilWidgetPrefs(FIXED_MS)),
-)
+// Default Accueil prefs only when absent — capture scripts may set waterGoalMl.
+if (!localStorage.getItem(ACCUEIL_WIDGET_PREFS_KEY)) {
+  localStorage.setItem(
+    ACCUEIL_WIDGET_PREFS_KEY,
+    JSON.stringify(createDefaultAccueilWidgetPrefs(FIXED_MS)),
+  )
+}
 
 document.documentElement.style.setProperty('--app-safe-area-top', '47px')
 document.documentElement.style.setProperty('--app-safe-area-bottom', '34px')
