@@ -114,7 +114,14 @@ async function capture() {
 
       await page.locator('[data-testid="inscription-continue"]').click({ force: true })
       await page.waitForSelector('[data-testid="inscription-health"]')
+      // Multi-select checkboxes (square)
+      await page.locator('[data-testid="inscription-health-pregnancy"]').click({ force: true })
+      await page.locator('[data-testid="inscription-health-tca"]').click({ force: true })
+      await page.waitForTimeout(150)
+      await shot(page, 'inscription-sante-multi.png')
+      // Exclusive radio clears multi
       await page.locator('[data-testid="inscription-health-none"]').click({ force: true })
+      await page.waitForTimeout(120)
       await shot(page, 'inscription-sante-aucune.png')
 
       await page.locator('[data-testid="inscription-continue"]').click({ force: true })
@@ -192,8 +199,10 @@ async function capture() {
       await page.locator('[data-testid="inscription-continue"]').click({ force: true })
       await page.waitForTimeout(400)
 
-      // Santé exclusivity demo
+      // Santé multi-select then exclusive clear
       await page.locator('[data-testid="inscription-health-pregnancy"]').click({ force: true })
+      await page.waitForTimeout(350)
+      await page.locator('[data-testid="inscription-health-tca"]').click({ force: true })
       await page.waitForTimeout(450)
       await page.locator('[data-testid="inscription-health-none"]').click({ force: true })
       await page.waitForTimeout(450)

@@ -19,7 +19,11 @@ import {
   shouldShowWeightScreen,
   shouldShowHeightWeightPicker,
 } from './nutritionSafetyRules'
-import { buildInscriptionSteps, type DraftAnswers } from '../components/onboarding/InscriptionFlow'
+import {
+  buildInscriptionSteps,
+  computeInscriptionProgress,
+  type DraftAnswers,
+} from '../components/onboarding/InscriptionFlow'
 
 function base(over: Partial<CalorieProfile> = {}): CalorieProfile {
   return normalizeCalorieProfile({
@@ -329,5 +333,33 @@ describe('weight screen + progress bar', () => {
     expect(steps).toEqual(['welcome', 'age', 'sex', 'health', 'height', 'ready'])
     expect(steps[steps.length - 1]).toBe('ready')
     expect(steps.includes('weight')).toBe(false)
+  })
+
+  it('progress bar advances past Poids and is 100% on C’est prêt', () => {
+    const adultNone: DraftAnswers = {
+      age: 28,
+      sex: 'female',
+      healthAnswer: 'none',
+      pregnancy: false,
+      breastfeeding: false,
+      eatingDisorder: false,
+      heightCm: 170,
+      weightKg: 65,
+    }
+    const steps = buildInscriptionSteps(adultNone)
+    const onWeight = computeInscriptionProgress('weight', steps)
+    const onReady = computeInscriptionProgress('ready', steps)
+    expect(onReady).toBe(1)
+    expect(onWeight).toBeLessThan(1)
+    expect(onWeight).toBeGreaterThan(computeInscriptionProgress('height', steps))
+    expect(computeInscriptionProgress('welcome', steps)).toBe(0)
+
+    const tcaSteps = buildInscriptionSteps({
+      ...adultNone,
+      healthAnswer: 'situations',
+      eatingDisorder: true,
+    })
+    expect(computeInscriptionProgress('ready', tcaSteps)).toBe(1)
+    expect(computeInscriptionProgress('height', tcaSteps)).toBeLessThan(1)
   })
 })

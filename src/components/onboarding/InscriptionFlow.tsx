@@ -78,6 +78,20 @@ export function buildInscriptionSteps(draft: DraftAnswers): InscriptionStep[] {
   return steps
 }
 
+/**
+ * Progress 0→1 across only the screens the person will see.
+ * First screen = 0; final « C'est prêt » = 1 (100%).
+ */
+export function computeInscriptionProgress(
+  activeStep: InscriptionStep,
+  steps: InscriptionStep[],
+): number {
+  if (steps.length <= 1) return 1
+  const idx = steps.indexOf(activeStep)
+  if (idx < 0) return 0
+  return idx / (steps.length - 1)
+}
+
 export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
   const [draft, setDraft] = useState<DraftAnswers>(() => ({
     age: sanitizeAge(initial.age),
@@ -101,7 +115,7 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
 
   const activeStep = steps.includes(step) ? step : (steps[steps.length - 1] ?? 'ready')
   const stepIndex = Math.max(0, steps.indexOf(activeStep))
-  const progress = (stepIndex + 1) / steps.length
+  const progress = computeInscriptionProgress(activeStep, steps)
   const reduced = prefersReducedMotion()
   const showPregBreast = shouldShowPregnancyBreastfeedingChoices(draft.sex)
 
@@ -505,16 +519,41 @@ function HealthChoice({
       }`}
       data-testid={testId}
       data-exclusive={exclusive || undefined}
+      data-choice-style={exclusive ? 'radio' : 'checkbox'}
       aria-pressed={checked}
     >
-      <span
-        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-          checked ? 'border-brand bg-brand' : 'border-white/30'
-        }`}
-        aria-hidden
-      >
-        {checked ? <span className="h-2 w-2 rounded-full bg-white" /> : null}
-      </span>
+      {exclusive ? (
+        <span
+          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+            checked ? 'border-brand bg-brand' : 'border-white/30'
+          }`}
+          aria-hidden
+          data-testid={`${testId}-radio`}
+        >
+          {checked ? <span className="h-2 w-2 rounded-full bg-white" /> : null}
+        </span>
+      ) : (
+        <span
+          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] border ${
+            checked ? 'border-brand bg-brand' : 'border-white/30 bg-transparent'
+          }`}
+          aria-hidden
+          data-testid={`${testId}-checkbox`}
+        >
+          {checked ? (
+            <svg viewBox="0 0 12 12" className="h-3 w-3 text-white" aria-hidden>
+              <path
+                d="M2.5 6.2 5 8.7 9.5 3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          ) : null}
+        </span>
+      )}
       <span className="text-[14px] font-medium text-white">{label}</span>
     </button>
   )
