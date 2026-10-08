@@ -374,6 +374,7 @@ body {
 }
 
 .accueil-edit-slot__body {
+  position: relative;
   height: 100%;
 }
 
@@ -461,6 +462,20 @@ body {
     opacity: 0;
     transform: none;
   }
+}
+
+.accueil-gallery--editing > header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  margin: 0 -1.25rem;
+  padding: 0.65rem 1.25rem 0.75rem;
+  background: linear-gradient(
+    to bottom,
+    #0c0c0e 70%,
+    rgb(12 12 14 / 0.92) 88%,
+    rgb(12 12 14 / 0)
+  );
 }
 
 .accueil-edit-chrome {

@@ -237,47 +237,27 @@ async function touchDrag(page, fromX, fromY, toX, toY, steps = 28, stepDelayMs =
   )
 }
 
-/** Sample widget-area luminance around OK exit — catches Reveal black flash. */
-async function sampleExitLuminance(page, samples = 12, gapMs = 32) {
+/**
+ * Sample Reveal health around OK exit — catches real mask re-hides.
+ * Returns { pending, clipped, instant, total } per tick (not raw luminance:
+ * transparent rgba(0,0,0,0) parents made a luminance heuristic always read 0).
+ */
+async function sampleExitRevealHealth(page, samples = 12, gapMs = 32) {
   const values = []
   for (let i = 0; i < samples; i++) {
-    const lum = await page.evaluate(() => {
+    const snap = await page.evaluate(() => {
       const root = document.querySelector('[data-accueil-gallery]')
-      const widgets = document.querySelector('.accueil-widgets')
-      if (!(widgets instanceof HTMLElement)) return -1
-      const r = widgets.getBoundingClientRect()
-      const x = Math.floor(r.left + r.width / 2)
-      const y = Math.floor(r.top + Math.min(120, r.height / 3))
-      const el = document.elementFromPoint(x, y)
-      if (!el) return 0
-      const cs = getComputedStyle(el)
-      // Walk up for a non-transparent background approximation
-      let node = el
-      for (let d = 0; d < 6 && node; d++) {
-        const bg = getComputedStyle(node).backgroundColor
-        const m = bg?.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/)
-        if (m) {
-          const rr = Number(m[1])
-          const gg = Number(m[2])
-          const bb = Number(m[3])
-          if (rr + gg + bb > 0 || bg.startsWith('rgb(')) {
-            return 0.2126 * rr + 0.7152 * gg + 0.0722 * bb
-          }
-        }
-        node = node.parentElement
-      }
-      // Mask pending / fully clipped reveals leave the dark app shell visible —
-      // also flag any pending Reveal in the gallery.
-      const pending = root?.querySelectorAll('[data-rg-reveal="pending"]').length ?? 0
       const masks = [...(root?.querySelectorAll('.rg-mask-reveal') ?? [])]
-      const clipped = masks.some((m) => {
-        const cp = getComputedStyle(m).clipPath || getComputedStyle(m).webkitClipPath
-        return cp && cp !== 'none' && /inset\(100%/.test(cp)
-      })
-      if (pending > 0 || clipped) return 0
-      return 40
+      const pending = root?.querySelectorAll('[data-rg-reveal="pending"]').length ?? 0
+      const clipped = masks.filter((m) => {
+        if (m.classList.contains('rg-mask-reveal--instant')) return false
+        const cp = getComputedStyle(m).clipPath || ''
+        return /inset\(100%/.test(cp)
+      }).length
+      const instant = masks.filter((m) => m.classList.contains('rg-mask-reveal--instant')).length
+      return { pending, clipped, instant, total: masks.length }
     })
-    values.push(lum)
+    values.push(snap)
     await page.waitForTimeout(gapMs)
   }
   return values
@@ -394,9 +374,14 @@ async function main() {
       )
     })
 
+    // Warm Vite + settle WITHOUT recording, then film a tight action clip.
+    await setPrefs(page, { waterGoalMl: null, hidden: [] })
+    await page.goto(`http://127.0.0.1:${port}/?tab=home`, { waitUntil: 'domcontentloaded' })
+    await settleReveals(page)
+    const storageState = await context.storageState()
     await context.close()
 
-    // --- Video only: tight 15–20s clip, motion ON, touch path ---
+    // --- Video only: ~15–20s, motion ON, touch path ---
     const videoTmp = join(artifactsDir, 'video-tmp')
     await rm(videoTmp, { recursive: true, force: true })
     await mkdir(videoTmp, { recursive: true })
@@ -407,6 +392,7 @@ async function main() {
       deviceScaleFactor: 2,
       isMobile: true,
       hasTouch: true,
+      storageState,
       recordVideo: { dir: videoTmp, size: VIEWPORT },
     })
     const vpage = await videoContext.newPage()
@@ -423,6 +409,8 @@ async function main() {
           const root = document.documentElement
           root.style.setProperty('--app-safe-area-top', top)
           root.style.setProperty('--app-safe-area-bottom', bottom)
+          // Skip cold-launch mask so the clip starts on a settled Accueil.
+          delete root.dataset.coldLaunchLanding
         }
         apply()
         document.addEventListener('DOMContentLoaded', apply)
@@ -430,35 +418,61 @@ async function main() {
       { key: PREFS_KEY, prefs: seedPrefs, top: '47px', bottom: '34px' },
     )
 
+    const videoT0 = Date.now()
     await vpage.goto(`http://127.0.0.1:${port}/?tab=home`, { waitUntil: 'domcontentloaded' })
-    await settleReveals(vpage)
+    await vpage.waitForSelector('[data-accueil-edit-slot="eau"]', { state: 'visible', timeout: 15_000 })
+    await vpage.evaluate(() => {
+      document.querySelectorAll('.rg-mask-reveal').forEach((el) => {
+        el.classList.add('rg-mask-reveal--in', 'rg-mask-reveal--instant')
+      })
+      document.querySelectorAll('[data-rg-reveal="pending"]').forEach((el) => {
+        el.setAttribute('data-rg-reveal', 'in')
+      })
+    })
 
-    // Pin scroll so viewport stays stable (week + eau + series in frame)
+    // Pin scroll so week + eau + series sit above the bottom nav (stable viewport)
     await vpage.evaluate(() => {
       const main = document.querySelector('[data-app-scroll-main]')
-      const week = document.querySelector('[data-accueil-widget="seances_semaine"]')
-      if (main instanceof HTMLElement && week instanceof HTMLElement) {
-        main.scrollTo({ top: Math.max(0, week.offsetTop - 160), behavior: 'instant' })
-      }
+      const eau = document.querySelector('[data-accueil-edit-slot="eau"]')
+      if (!(main instanceof HTMLElement) || !(eau instanceof HTMLElement)) return
+      const mainRect = main.getBoundingClientRect()
+      const eauRect = eau.getBoundingClientRect()
+      const desiredCenterY = mainRect.top + mainRect.height * 0.48
+      const delta = eauRect.top + eauRect.height / 2 - desiredCenterY
+      main.scrollTo({ top: Math.max(0, main.scrollTop + delta), behavior: 'instant' })
     })
-    await vpage.waitForTimeout(180)
+    await vpage.waitForTimeout(120)
 
     const eauBox = await vpage.locator('[data-accueil-edit-slot="eau"]').boundingBox()
     if (!eauBox) throw new Error('eau slot missing for video')
     const eauX = eauBox.x + eauBox.width / 2
     const eauY = eauBox.y + eauBox.height / 2
+    const hit = await vpage.evaluate(
+      ({ x, y }) => {
+        const el = document.elementFromPoint(x, y)
+        return el?.closest('[data-accueil-edit-slot]')?.getAttribute('data-accueil-edit-slot') ?? null
+      },
+      { x: eauX, y: eauY },
+    )
+    if (hit !== 'eau') {
+      throw new Error(`Long-press target blocked (hit=${hit}); eau must clear bottom nav`)
+    }
 
-    // 1) Long-press Eau → enter edit (wiggle + − badges)
-    await touchLongPress(vpage, eauX, eauY, 640)
+    // Action clock — trim ffmpeg from just before the long-press
+    const actionStartMs = Date.now() - videoT0
+
+    // 1) Long-press Eau → enter edit (hold so the press reads, then wiggle + −)
+    await vpage.waitForTimeout(900)
+    await touchLongPress(vpage, eauX, eauY, 820)
     await vpage.waitForSelector('[data-accueil-edit-ok]', { state: 'visible', timeout: 5_000 })
     await vpage.waitForSelector('[data-accueil-tile-trash="eau"]', { state: 'visible', timeout: 3_000 })
-    await vpage.waitForTimeout(450)
+    await vpage.waitForTimeout(2200)
 
-    // 2) Drag Eau above « Séances de la semaine »
+    // 2) Drag Eau above « Séances de la semaine » (slow finger-follow + FLIP)
     const weekBox = await vpage.locator('[data-accueil-edit-slot="seances_semaine"]').boundingBox()
     if (!weekBox) throw new Error('seances_semaine missing for drag target')
     const targetX = weekBox.x + weekBox.width / 2
-    const targetY = weekBox.y + weekBox.height * 0.35
+    const targetY = weekBox.y + Math.min(36, weekBox.height * 0.25)
     const eauNow = await vpage.locator('[data-accueil-edit-slot="eau"]').boundingBox()
     if (!eauNow) throw new Error('eau slot lost before drag')
     await touchDrag(
@@ -467,18 +481,18 @@ async function main() {
       eauNow.y + eauNow.height / 2,
       targetX,
       targetY,
-      30,
-      40,
+      48,
+      52,
     )
-    await vpage.waitForTimeout(380)
+    await vpage.waitForTimeout(1400)
 
     // 3) Tap − on « Séries du jour » (shrink/fade)
-    await vpage.locator('[data-accueil-tile-trash="series_jour"]').tap()
+    await vpage.locator('[data-accueil-tile-trash="series_jour"]').tap({ force: true })
     await vpage.waitForSelector('[data-accueil-edit-slot="series_jour"]', {
       state: 'detached',
       timeout: 3_000,
     })
-    await vpage.waitForTimeout(280)
+    await vpage.waitForTimeout(900)
 
     // 4) + Ajouter → put Séries du jour back
     await vpage.locator('[data-accueil-edit-add]').tap()
@@ -486,30 +500,28 @@ async function main() {
       state: 'visible',
       timeout: 8_000,
     })
-    await vpage.waitForTimeout(280)
+    await vpage.waitForTimeout(1100)
     await vpage.locator('[data-accueil-add-item="series_jour"]').tap()
+    await vpage.waitForSelector('.ios-sheet-backdrop', { state: 'detached', timeout: 5_000 }).catch(() => {})
     await vpage.waitForSelector('[data-accueil-add-list]', { state: 'detached', timeout: 5_000 })
-    // Wait sheet backdrop unmount (280ms) so it cannot paint a black frame
-    await vpage.waitForTimeout(320)
+    await vpage.waitForTimeout(900)
     await vpage.waitForSelector('[data-accueil-edit-slot="series_jour"]', {
       state: 'visible',
       timeout: 5_000,
     })
-    await vpage.waitForTimeout(200)
+    await vpage.waitForTimeout(700)
 
-    // 5) OK — sample luminance to prove no Reveal black flash
+    // 5) OK — sample Reveal health to prove no mask re-hide / black flash
     const exitSamplesPromise = (async () => {
       await vpage.waitForTimeout(16)
-      return sampleExitLuminance(vpage, 14, 28)
+      return sampleExitRevealHealth(vpage, 14, 28)
     })()
     await vpage.locator('[data-accueil-edit-ok]').tap()
     await vpage.waitForSelector('[data-accueil-edit-open="0"]', { timeout: 5_000 })
     const exitSamples = await exitSamplesPromise
-    const blackFrames = exitSamples.filter((v) => v >= 0 && v < 8).length
-    if (blackFrames > 0) {
-      throw new Error(
-        `Black flash on edit exit: ${blackFrames}/${exitSamples.length} dark samples ${JSON.stringify(exitSamples)}`,
-      )
+    const bad = exitSamples.filter((s) => s.pending > 0 || s.clipped > 0 || s.instant < s.total)
+    if (bad.length > 0) {
+      throw new Error(`Black flash on edit exit: ${JSON.stringify(bad)}`)
     }
     // Finish on Accueil with all default tiles visible
     for (const id of ['seance', 'seances_semaine', 'eau', 'series_jour', 'prochaine_seance', 'programme', 'recent']) {
@@ -517,20 +529,21 @@ async function main() {
         throw new Error(`Missing tile after OK: ${id}`)
       }
     }
-    await vpage.waitForTimeout(550)
+    await vpage.waitForTimeout(1600)
 
     const video = vpage.video()
     await videoContext.close()
     if (!video) throw new Error('No Playwright video handle')
     const rawPath = await video.path()
     const dest = join(artifactsDir, 'tuiles_edition.mp4')
-    // Drop leading settle idle; keep a tight demo clip
+    // Trim settle/boot; keep a short beat before the long-press
+    const trimStart = Math.max(0, actionStartMs / 1000 - 0.35)
     runFfmpeg([
       '-y',
-      '-ss',
-      '0.8',
       '-i',
       rawPath,
+      '-ss',
+      trimStart.toFixed(2),
       '-an',
       '-c:v',
       'libx264',
@@ -540,8 +553,13 @@ async function main() {
       '+faststart',
       dest,
     ])
-    console.log('saved', dest)
-    console.log('exit luminance samples', exitSamples)
+    const dur = execFileSync(
+      'ffprobe',
+      ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nw=1:nk=1', dest],
+      { encoding: 'utf8' },
+    ).trim()
+    console.log('saved', dest, `trimStart=${trimStart.toFixed(2)}s duration=${dur}s`)
+    console.log('exit reveal health', exitSamples[0], '…', exitSamples[exitSamples.length - 1])
 
     console.log('All Accueil tile artifacts captured.')
   } finally {

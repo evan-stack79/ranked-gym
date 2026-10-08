@@ -173,22 +173,22 @@ export function EditableAccueilSlot({
       onPointerUp={endPointer}
       onPointerCancel={endPointer}
     >
-      {editMode ? (
-        <button
-          type="button"
-          className="accueil-edit-slot__trash"
-          aria-label="Masquer ce bloc"
-          data-accueil-tile-trash={id}
-          onClick={(ev) => {
-            ev.stopPropagation()
-            onHide(id)
-          }}
-          onPointerDown={(ev) => ev.stopPropagation()}
-        >
-          <Minus className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" />
-        </button>
-      ) : null}
       <div className="accueil-edit-slot__body" style={bodyStyle} data-accueil-edit-body={id}>
+        {editMode ? (
+          <button
+            type="button"
+            className="accueil-edit-slot__trash"
+            aria-label="Masquer ce bloc"
+            data-accueil-tile-trash={id}
+            onClick={(ev) => {
+              ev.stopPropagation()
+              onHide(id)
+            }}
+            onPointerDown={(ev) => ev.stopPropagation()}
+          >
+            <Minus className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" />
+          </button>
+        ) : null}
         {children}
       </div>
     </div>
