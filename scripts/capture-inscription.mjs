@@ -173,54 +173,62 @@ async function capture() {
       })
       const page = await videoContext.newPage()
       await openFixture(page)
-      await page.waitForTimeout(500)
+      await page.waitForTimeout(700)
 
       // Bienvenue → Continuer
       await page.locator('[data-testid="inscription-continue"]').click({ force: true })
-      await page.waitForTimeout(400)
+      await page.waitForTimeout(550)
 
       // Âge wheel
       await page.waitForSelector('[data-testid="inscription-age"]')
       await dragWheel(page, -130)
-      await page.locator('[data-testid="inscription-continue"]').click({ force: true })
       await page.waitForTimeout(350)
+      await page.locator('[data-testid="inscription-continue"]').click({ force: true })
+      await page.waitForTimeout(450)
 
       // Sexe
       await page.locator('[data-testid="inscription-sex-female"]').click({ force: true })
-      await page.waitForTimeout(250)
+      await page.waitForTimeout(400)
       await page.locator('[data-testid="inscription-continue"]').click({ force: true })
-      await page.waitForTimeout(300)
+      await page.waitForTimeout(400)
 
       // Santé exclusivity demo
       await page.locator('[data-testid="inscription-health-pregnancy"]').click({ force: true })
-      await page.waitForTimeout(300)
+      await page.waitForTimeout(450)
       await page.locator('[data-testid="inscription-health-none"]').click({ force: true })
-      await page.waitForTimeout(350)
+      await page.waitForTimeout(450)
       await page.locator('[data-testid="inscription-continue"]').click({ force: true })
-      await page.waitForTimeout(300)
+      await page.waitForTimeout(400)
 
       // Back arrow demo
       await page.waitForSelector('[data-testid="inscription-height"]')
       await page.locator('[data-testid="inscription-back"]').click({ force: true })
-      await page.waitForTimeout(350)
+      await page.waitForTimeout(500)
       await page.locator('[data-testid="inscription-continue"]').click({ force: true })
-      await page.waitForTimeout(250)
+      await page.waitForTimeout(350)
 
       // Taille
       await dragWheel(page, -90)
-      await page.locator('[data-testid="inscription-continue"]').click({ force: true })
       await page.waitForTimeout(300)
+      await page.locator('[data-testid="inscription-continue"]').click({ force: true })
+      await page.waitForTimeout(400)
 
-      // Poids + Plus tard demo on a restart? Just continue weight
+      // Poids — show Plus tard briefly then Continuer
       await page.waitForSelector('[data-testid="inscription-weight"]')
       await dragWheel(page, -70)
-      await page.waitForTimeout(200)
-      // Plus tard briefly then we already have value — use Continuer
+      await page.waitForTimeout(400)
+      await page.locator('[data-testid="inscription-later"]').click({ force: true })
+      // Plus tard clears weight and may advance — if still on weight, Continuer
+      const ready = await page
+        .waitForSelector('[data-testid="inscription-ready"]', { timeout: 2500 })
+        .catch(() => null)
+      if (!ready) {
+        await page.locator('[data-testid="inscription-continue"]').click({ force: true }).catch(() => {})
+        await page.waitForSelector('[data-testid="inscription-ready"]', { timeout: 5000 })
+      }
+      await page.waitForTimeout(1100)
       await page.locator('[data-testid="inscription-continue"]').click({ force: true })
-      await page.waitForSelector('[data-testid="inscription-ready"]')
       await page.waitForTimeout(900)
-      await page.locator('[data-testid="inscription-continue"]').click({ force: true })
-      await page.waitForTimeout(700)
 
       await page.close()
       await videoContext.close()
