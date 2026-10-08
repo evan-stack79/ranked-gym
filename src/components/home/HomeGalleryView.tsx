@@ -1,5 +1,13 @@
 import { ChevronRight, Dumbbell, NotebookPen, Plus, SlidersHorizontal } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { getTodayWaterMl } from '../../services/nutritionStorage'
 import { getTrainingState } from '../../services/trainingStorage'
@@ -40,8 +48,11 @@ import {
   SeancesSemaineTile,
   SeriesJourTile,
 } from './AccueilMetricTiles'
-import { EditableAccueilSlot } from './EditableAccueilSlot'
+import { EditableAccueilSlot, type DragPoint } from './EditableAccueilSlot'
 import { WaterGoalSheet } from './WaterGoalSheet'
+
+const EDIT_REMOVE_MS = 180
+const FLIP_MS = 220
 
 interface HomeGalleryViewProps {
   onStartTraining: (routineId: string) => void
@@ -104,18 +115,29 @@ export function HomeGalleryView({
   const [waterTick, setWaterTick] = useState(0)
   const [prefs, setPrefs] = useState<AccueilWidgetPrefs>(() => loadAccueilWidgetPrefs())
   const [editMode, setEditMode] = useState(false)
+  /**
+   * Once edit mode has been entered, keep Reveal on `instant` forever for this
+   * mount. Toggling `instant` false→true→false restarts mask-reveal from
+   * clip-path: inset(100%) (black flash — same class of bug as #95 remount).
+   */
+  const [freezeReveals, setFreezeReveals] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [waterGoalOpen, setWaterGoalOpen] = useState(false)
   const [draggingId, setDraggingId] = useState<AccueilWidgetId | null>(null)
+  const [dragDelta, setDragDelta] = useState<{ x: number; y: number } | null>(null)
+  const [exitingId, setExitingId] = useState<AccueilWidgetId | null>(null)
   const [coldEntering, setColdEntering] = useState(() => {
     if (typeof document === 'undefined') return false
     return document.documentElement.dataset.coldLaunchLanding === '1'
   })
   const prefersReducedMotion = usePrefersReducedMotion()
   const tiltDisabled = editMode || prefersReducedMotion
+  const revealInstant = coldEntering || prefersReducedMotion || freezeReveals
   const widgetsRootRef = useRef<HTMLDivElement>(null)
   const prefsRef = useRef(prefs)
   prefsRef.current = prefs
+  const dragOriginRef = useRef<{ x: number; y: number } | null>(null)
+  const flipFirstRef = useRef<Map<string, DOMRect> | null>(null)
 
   useEffect(() => {
     const sync = () => setTrainingTick((n) => n + 1)
@@ -171,6 +193,8 @@ export function HomeGalleryView({
   }, [])
 
   const enterEdit = useCallback(() => {
+    // Lock reveals BEFORE editMode flips so instant never toggles back off.
+    setFreezeReveals(true)
     setEditMode(true)
     setAddOpen(false)
     setWaterGoalOpen(false)
@@ -180,6 +204,9 @@ export function HomeGalleryView({
     setEditMode(false)
     setAddOpen(false)
     setDraggingId(null)
+    setDragDelta(null)
+    setExitingId(null)
+    dragOriginRef.current = null
   }, [])
 
   const state = useMemo(() => getTrainingState(), [trainingTick])
@@ -200,10 +227,41 @@ export function HomeGalleryView({
   )
   const visibleWidgets = useMemo(() => resolveVisibleAccueilWidgets(prefs), [prefs])
   const packs = useMemo(() => packAccueilWidgets(visibleWidgets), [visibleWidgets])
+  const visibleOrderKey = visibleWidgets.join('|')
   const motion = useMemo(
     () => ({ coldEntering, prefersReducedMotion }),
     [coldEntering, prefersReducedMotion],
   )
+
+  /** FLIP: after visible order changes in edit mode, slide siblings into place. */
+  useLayoutEffect(() => {
+    const first = flipFirstRef.current
+    flipFirstRef.current = null
+    if (!first || prefersReducedMotion || !editMode) return
+    const root = widgetsRootRef.current
+    if (!root) return
+    const slots = [...root.querySelectorAll<HTMLElement>('[data-accueil-edit-slot]')]
+    for (const el of slots) {
+      const id = el.getAttribute('data-accueil-edit-slot')
+      if (!id || id === draggingId) continue
+      const prev = first.get(id)
+      if (!prev) continue
+      const body = el.querySelector<HTMLElement>('[data-accueil-edit-body]') ?? el
+      const last = el.getBoundingClientRect()
+      const dx = prev.left - last.left
+      const dy = prev.top - last.top
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue
+      body.style.transition = 'none'
+      body.style.transform = `translate3d(${dx}px, ${dy}px, 0)`
+      // Force reflow then animate to identity
+      void body.offsetWidth
+      body.style.transition = `transform ${FLIP_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`
+      body.style.transform = ''
+      window.setTimeout(() => {
+        body.style.transition = ''
+      }, FLIP_MS + 40)
+    }
+  }, [visibleOrderKey, editMode, prefersReducedMotion, draggingId])
   const subtitle = getHomeGreetingSubtitle()
   const firstName = resolveDisplayFirstName({
     firstName: user?.firstName,
@@ -230,18 +288,41 @@ export function HomeGalleryView({
     })
   }, [])
 
-  const handleDragStart = useCallback((id: AccueilWidgetId) => {
+  const captureFlipFirst = useCallback(() => {
+    const root = widgetsRootRef.current
+    if (!root || prefersReducedMotion) return
+    const map = new Map<string, DOMRect>()
+    for (const el of root.querySelectorAll('[data-accueil-edit-slot]')) {
+      const id = el.getAttribute('data-accueil-edit-slot')
+      if (id) map.set(id, el.getBoundingClientRect())
+    }
+    flipFirstRef.current = map
+  }, [prefersReducedMotion])
+
+  const handleDragStart = useCallback((id: AccueilWidgetId, point: DragPoint) => {
     setDraggingId(id)
+    dragOriginRef.current = { x: point.clientX, y: point.clientY }
+    setDragDelta({ x: 0, y: 0 })
   }, [])
 
   const handleDragMove = useCallback(
     (clientX: number, clientY: number) => {
+      const origin = dragOriginRef.current
+      if (origin) {
+        setDragDelta({ x: clientX - origin.x, y: clientY - origin.y })
+      }
       setDraggingId((current) => {
         if (!current) return current
         const hit = hitTestWidgetId(clientX, clientY, collectHitRects())
         if (!hit || hit === current) return current
         const visible = resolveVisibleAccueilWidgets(prefsRef.current)
         if (!(visible as string[]).includes(hit)) return current
+        captureFlipFirst()
+        // Keep the dragged tile under the finger after layout shift
+        const slot = widgetsRootRef.current?.querySelector(
+          `[data-accueil-edit-slot="${current}"]`,
+        )
+        const before = slot?.getBoundingClientRect()
         commitPrefs(
           reorderVisibleAccueilWidget(
             prefsRef.current,
@@ -250,21 +331,50 @@ export function HomeGalleryView({
             Date.now(),
           ),
         )
+        // After React commit + FLIP layout, re-baseline drag origin so the
+        // floating transform stays continuous under the finger.
+        requestAnimationFrame(() => {
+          const after = widgetsRootRef.current
+            ?.querySelector(`[data-accueil-edit-slot="${current}"]`)
+            ?.getBoundingClientRect()
+          if (before && after && dragOriginRef.current) {
+            dragOriginRef.current = {
+              x: dragOriginRef.current.x + (after.left - before.left),
+              y: dragOriginRef.current.y + (after.top - before.top),
+            }
+            setDragDelta({
+              x: clientX - dragOriginRef.current.x,
+              y: clientY - dragOriginRef.current.y,
+            })
+          }
+        })
         return current
       })
     },
-    [collectHitRects, commitPrefs],
+    [captureFlipFirst, collectHitRects, commitPrefs],
   )
 
   const handleDragEnd = useCallback(() => {
     setDraggingId(null)
+    setDragDelta(null)
+    dragOriginRef.current = null
   }, [])
 
   const handleHide = useCallback(
     (id: AccueilWidgetId) => {
-      commitPrefs(hideAccueilWidget(prefs, id, Date.now()))
+      if (prefersReducedMotion) {
+        captureFlipFirst()
+        commitPrefs(hideAccueilWidget(prefsRef.current, id, Date.now()))
+        return
+      }
+      setExitingId(id)
+      window.setTimeout(() => {
+        captureFlipFirst()
+        commitPrefs(hideAccueilWidget(prefsRef.current, id, Date.now()))
+        setExitingId(null)
+      }, EDIT_REMOVE_MS)
     },
-    [commitPrefs, prefs],
+    [captureFlipFirst, commitPrefs, prefersReducedMotion],
   )
 
   const snapStyle = {
@@ -283,6 +393,8 @@ export function HomeGalleryView({
       editMode={editMode}
       reducedMotion={prefersReducedMotion}
       dragging={draggingId === id}
+      exiting={exitingId === id}
+      dragDelta={draggingId === id ? dragDelta : null}
       onEnterEdit={enterEdit}
       onHide={handleHide}
       onDragStart={handleDragStart}
@@ -309,8 +421,8 @@ export function HomeGalleryView({
           <Reveal
             key={card.id}
             as="div"
-            delayMs={prefersReducedMotion || editMode ? 0 : Math.min(index * 60, 80)}
-            instant={coldEntering || prefersReducedMotion || editMode}
+            delayMs={revealInstant ? 0 : Math.min(index * 60, 80)}
+            instant={revealInstant}
             className={`accueil-gallery__snap shrink-0 ${index > 0 ? 'accueil-gallery__tile-gap' : ''}`}
           >
             <TiltCard className="accueil-gallery__hero-tilt" disabled={tiltDisabled}>
@@ -407,8 +519,8 @@ export function HomeGalleryView({
         <h2 className="text-[20px] font-bold tracking-tight text-white">
           <BlurInText
             as="span"
-            delayMs={prefersReducedMotion ? 0 : 40}
-            instant={coldEntering || prefersReducedMotion || editMode}
+            delayMs={revealInstant ? 0 : 40}
+            instant={revealInstant}
             label="Récent"
           >
             Récent
@@ -445,8 +557,8 @@ export function HomeGalleryView({
             <Reveal
               key={item.id}
               as="div"
-              delayMs={prefersReducedMotion || editMode ? 0 : Math.min(index * 60, 80)}
-              instant={coldEntering || prefersReducedMotion || editMode}
+              delayMs={revealInstant ? 0 : Math.min(index * 60, 80)}
+              instant={revealInstant}
               className={`accueil-gallery__snap shrink-0 ${index > 0 ? 'accueil-gallery__tile-gap' : ''}`}
             >
               <button
@@ -482,8 +594,8 @@ export function HomeGalleryView({
       className="home-cold-enter__group min-w-0 h-full"
     >
       <Reveal
-        instant={coldEntering || prefersReducedMotion || editMode}
-        delayMs={prefersReducedMotion || editMode ? 0 : 40}
+        instant={revealInstant}
+        delayMs={revealInstant ? 0 : 40}
         className="h-full min-w-0"
       >
         {child}

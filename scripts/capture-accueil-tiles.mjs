@@ -5,9 +5,9 @@
  * tuiles_eau_avec_objectif.png, tuiles_mode_edition.png, tuiles_ajouter.png
  * Video: tuiles_edition.mp4 (long-press → drag → trash → re-add → OK)
  */
-import { mkdir, copyFile } from 'node:fs/promises'
+import { mkdir, copyFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { spawn } from 'node:child_process'
+import { spawn, execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { chromium, webkit } from 'playwright'
@@ -174,6 +174,119 @@ async function setPrefs(page, partial) {
   )
 }
 
+/** Touch long-press that keeps the finger down long enough for the 500ms timer. */
+async function touchLongPress(page, x, y, holdMs = 620) {
+  // Real hold: pointerdown → wait → pointerup on the slot (touch-primary).
+  await page.evaluate(
+    async ({ clientX, clientY, holdMs: hold }) => {
+      const el = document.elementFromPoint(clientX, clientY)
+      const target = el?.closest('[data-accueil-edit-slot]') ?? el
+      if (!(target instanceof HTMLElement)) throw new Error('long-press: no slot')
+      const fire = (type, buttons) =>
+        target.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            clientX,
+            clientY,
+            pointerId: 1,
+            pointerType: 'touch',
+            isPrimary: true,
+            buttons,
+          }),
+        )
+      fire('pointerdown', 1)
+      await new Promise((r) => setTimeout(r, hold))
+      fire('pointerup', 0)
+    },
+    { clientX: x, clientY: y, holdMs },
+  )
+}
+
+/** Slow drag so FLIP + finger-follow are visible in ~25fps video. */
+async function touchDrag(page, fromX, fromY, toX, toY, steps = 28, stepDelayMs = 38) {
+  await page.evaluate(
+    async ({ fromX: x0, fromY: y0, toX: x1, toY: y1, steps: n, stepDelayMs: delay }) => {
+      const el = document.elementFromPoint(x0, y0)
+      const target = el?.closest('[data-accueil-edit-slot]') ?? el
+      if (!(target instanceof HTMLElement)) throw new Error('drag: no slot')
+      const fire = (type, x, y, buttons = 1) =>
+        target.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            clientX: x,
+            clientY: y,
+            pointerId: 7,
+            pointerType: 'touch',
+            isPrimary: true,
+            buttons,
+          }),
+        )
+      fire('pointerdown', x0, y0, 1)
+      for (let i = 1; i <= n; i++) {
+        const t = i / n
+        // Ease-in-out so the tile visibly accelerates then settles
+        const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
+        fire('pointermove', x0 + (x1 - x0) * e, y0 + (y1 - y0) * e, 1)
+        await new Promise((r) => setTimeout(r, delay))
+      }
+      fire('pointerup', x1, y1, 0)
+    },
+    { fromX, fromY, toX, toY, steps, stepDelayMs },
+  )
+}
+
+/** Sample widget-area luminance around OK exit — catches Reveal black flash. */
+async function sampleExitLuminance(page, samples = 12, gapMs = 32) {
+  const values = []
+  for (let i = 0; i < samples; i++) {
+    const lum = await page.evaluate(() => {
+      const root = document.querySelector('[data-accueil-gallery]')
+      const widgets = document.querySelector('.accueil-widgets')
+      if (!(widgets instanceof HTMLElement)) return -1
+      const r = widgets.getBoundingClientRect()
+      const x = Math.floor(r.left + r.width / 2)
+      const y = Math.floor(r.top + Math.min(120, r.height / 3))
+      const el = document.elementFromPoint(x, y)
+      if (!el) return 0
+      const cs = getComputedStyle(el)
+      // Walk up for a non-transparent background approximation
+      let node = el
+      for (let d = 0; d < 6 && node; d++) {
+        const bg = getComputedStyle(node).backgroundColor
+        const m = bg?.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/)
+        if (m) {
+          const rr = Number(m[1])
+          const gg = Number(m[2])
+          const bb = Number(m[3])
+          if (rr + gg + bb > 0 || bg.startsWith('rgb(')) {
+            return 0.2126 * rr + 0.7152 * gg + 0.0722 * bb
+          }
+        }
+        node = node.parentElement
+      }
+      // Mask pending / fully clipped reveals leave the dark app shell visible —
+      // also flag any pending Reveal in the gallery.
+      const pending = root?.querySelectorAll('[data-rg-reveal="pending"]').length ?? 0
+      const masks = [...(root?.querySelectorAll('.rg-mask-reveal') ?? [])]
+      const clipped = masks.some((m) => {
+        const cp = getComputedStyle(m).clipPath || getComputedStyle(m).webkitClipPath
+        return cp && cp !== 'none' && /inset\(100%/.test(cp)
+      })
+      if (pending > 0 || clipped) return 0
+      return 40
+    })
+    values.push(lum)
+    await page.waitForTimeout(gapMs)
+  }
+  return values
+}
+
+function runFfmpeg(args) {
+  execFileSync('ffmpeg', args, { stdio: 'inherit' })
+}
+
 async function main() {
   await mkdir(artifactsDir, { recursive: true })
   const server = await startServer()
@@ -189,10 +302,6 @@ async function main() {
       deviceScaleFactor: 2,
       isMobile: true,
       hasTouch: true,
-      recordVideo: {
-        dir: join(artifactsDir, 'video-tmp'),
-        size: VIEWPORT,
-      },
     })
     const page = await context.newPage()
     // Screenshots: reduced motion → dashed outline instead of wiggle (still shows edit chrome)
@@ -285,132 +394,154 @@ async function main() {
       )
     })
 
-    // --- Video: long-press, drag, trash, re-add, OK ---
-    // Fresh page with motion ON so wiggle is visible in the recording
     await context.close()
+
+    // --- Video only: tight 15–20s clip, motion ON, touch path ---
+    const videoTmp = join(artifactsDir, 'video-tmp')
+    await rm(videoTmp, { recursive: true, force: true })
+    await mkdir(videoTmp, { recursive: true })
+
     const videoContext = await browser.newContext({
       viewport: VIEWPORT,
       colorScheme: 'dark',
       deviceScaleFactor: 2,
       isMobile: true,
       hasTouch: true,
-      recordVideo: { dir: join(artifactsDir, 'video-tmp'), size: VIEWPORT },
+      recordVideo: { dir: videoTmp, size: VIEWPORT },
     })
     const vpage = await videoContext.newPage()
     await vpage.emulateMedia({ reducedMotion: 'no-preference', colorScheme: 'dark' })
-    await vpage.addInitScript(() => {
-      const root = document.documentElement
-      root.style.setProperty('--app-safe-area-top', '47px')
-      root.style.setProperty('--app-safe-area-bottom', '34px')
-    })
+    const seedPrefs = { ...DEFAULT_PREFS, waterGoalMl: null, hidden: [], updatedAt: Date.now() }
+    await vpage.addInitScript(
+      ({ key, prefs, top, bottom }) => {
+        try {
+          localStorage.setItem(key, JSON.stringify(prefs))
+        } catch {
+          /* ignore */
+        }
+        const apply = () => {
+          const root = document.documentElement
+          root.style.setProperty('--app-safe-area-top', top)
+          root.style.setProperty('--app-safe-area-bottom', bottom)
+        }
+        apply()
+        document.addEventListener('DOMContentLoaded', apply)
+      },
+      { key: PREFS_KEY, prefs: seedPrefs, top: '47px', bottom: '34px' },
+    )
+
     await vpage.goto(`http://127.0.0.1:${port}/?tab=home`, { waitUntil: 'domcontentloaded' })
-    await setPrefs(vpage, { waterGoalMl: null, hidden: [] })
-    await vpage.reload({ waitUntil: 'domcontentloaded' })
     await settleReveals(vpage)
 
-    const eauSlot = vpage.locator('[data-accueil-edit-slot="eau"]')
-    await eauSlot.scrollIntoViewIfNeeded()
-    const box = await eauSlot.boundingBox()
-    if (!box) throw new Error('eau slot missing for video')
-    const cx = box.x + box.width / 2
-    const cy = box.y + box.height / 2
+    // Pin scroll so viewport stays stable (week + eau + series in frame)
+    await vpage.evaluate(() => {
+      const main = document.querySelector('[data-app-scroll-main]')
+      const week = document.querySelector('[data-accueil-widget="seances_semaine"]')
+      if (main instanceof HTMLElement && week instanceof HTMLElement) {
+        main.scrollTo({ top: Math.max(0, week.offsetTop - 160), behavior: 'instant' })
+      }
+    })
+    await vpage.waitForTimeout(180)
 
-    // Long-press via native PointerEvents (500ms+, no move) — same path as production
-    await vpage.evaluate(
-      async ({ x, y }) => {
-        const el = document.elementFromPoint(x, y)
-        const target = el?.closest('[data-accueil-edit-slot]') ?? el
-        if (!(target instanceof HTMLElement)) throw new Error('no edit slot under point')
-        const opts = {
-          bubbles: true,
-          cancelable: true,
-          clientX: x,
-          clientY: y,
-          pointerId: 1,
-          pointerType: 'touch',
-          isPrimary: true,
-          buttons: 1,
-        }
-        target.dispatchEvent(new PointerEvent('pointerdown', opts))
-        await new Promise((r) => setTimeout(r, 560))
-        target.dispatchEvent(
-          new PointerEvent('pointerup', { ...opts, buttons: 0 }),
-        )
-      },
-      { x: cx, y: cy },
+    const eauBox = await vpage.locator('[data-accueil-edit-slot="eau"]').boundingBox()
+    if (!eauBox) throw new Error('eau slot missing for video')
+    const eauX = eauBox.x + eauBox.width / 2
+    const eauY = eauBox.y + eauBox.height / 2
+
+    // 1) Long-press Eau → enter edit (wiggle + − badges)
+    await touchLongPress(vpage, eauX, eauY, 640)
+    await vpage.waitForSelector('[data-accueil-edit-ok]', { state: 'visible', timeout: 5_000 })
+    await vpage.waitForSelector('[data-accueil-tile-trash="eau"]', { state: 'visible', timeout: 3_000 })
+    await vpage.waitForTimeout(450)
+
+    // 2) Drag Eau above « Séances de la semaine »
+    const weekBox = await vpage.locator('[data-accueil-edit-slot="seances_semaine"]').boundingBox()
+    if (!weekBox) throw new Error('seances_semaine missing for drag target')
+    const targetX = weekBox.x + weekBox.width / 2
+    const targetY = weekBox.y + weekBox.height * 0.35
+    const eauNow = await vpage.locator('[data-accueil-edit-slot="eau"]').boundingBox()
+    if (!eauNow) throw new Error('eau slot lost before drag')
+    await touchDrag(
+      vpage,
+      eauNow.x + eauNow.width / 2,
+      eauNow.y + eauNow.height / 2,
+      targetX,
+      targetY,
+      30,
+      40,
     )
-    await vpage
-      .waitForSelector('[data-accueil-edit-ok]', { state: 'visible', timeout: 5_000 })
-      .catch(async () => {
-        // Fallback accessibility entry if pointer synth failed in headless
-        await vpage.click('[data-accueil-edit-open-footer]')
-        await vpage.waitForSelector('[data-accueil-edit-ok]', { state: 'visible', timeout: 5_000 })
-      })
-    await vpage.waitForTimeout(400)
+    await vpage.waitForTimeout(380)
 
-    // Drag eau toward series_jour (pointer path on the slot)
-    const seriesBox = await vpage.locator('[data-accueil-edit-slot="series_jour"]').boundingBox()
-    if (seriesBox) {
-      const tx = seriesBox.x + seriesBox.width / 2
-      const ty = seriesBox.y + seriesBox.height / 2
-      await vpage.evaluate(
-        async ({ fromX, fromY, toX, toY }) => {
-          const el = document.querySelector('[data-accueil-edit-slot="eau"]')
-          if (!(el instanceof HTMLElement)) return
-          const fire = (type, x, y, buttons = 1) =>
-            el.dispatchEvent(
-              new PointerEvent(type, {
-                bubbles: true,
-                cancelable: true,
-                clientX: x,
-                clientY: y,
-                pointerId: 2,
-                pointerType: 'touch',
-                isPrimary: true,
-                buttons,
-              }),
-            )
-          fire('pointerdown', fromX, fromY)
-          const steps = 10
-          for (let i = 1; i <= steps; i++) {
-            const t = i / steps
-            fire('pointermove', fromX + (toX - fromX) * t, fromY + (toY - fromY) * t)
-            await new Promise((r) => setTimeout(r, 30))
-          }
-          fire('pointerup', toX, toY, 0)
-        },
-        { fromX: cx, fromY: cy, toX: tx, toY: ty },
-      )
-    }
-    await vpage.waitForTimeout(400)
+    // 3) Tap − on « Séries du jour » (shrink/fade)
+    await vpage.locator('[data-accueil-tile-trash="series_jour"]').tap()
+    await vpage.waitForSelector('[data-accueil-edit-slot="series_jour"]', {
+      state: 'detached',
+      timeout: 3_000,
+    })
+    await vpage.waitForTimeout(280)
 
-    // Remove prochaine_seance
-    await vpage.click('[data-accueil-tile-trash="prochaine_seance"]')
-    await vpage.waitForTimeout(400)
-
-    // Re-add via + Ajouter
-    await vpage.click('[data-accueil-edit-add]')
-    await vpage.waitForSelector('[data-accueil-add-item="prochaine_seance"]', {
+    // 4) + Ajouter → put Séries du jour back
+    await vpage.locator('[data-accueil-edit-add]').tap()
+    await vpage.waitForSelector('[data-accueil-add-item="series_jour"]', {
       state: 'visible',
       timeout: 8_000,
     })
-    await vpage.click('[data-accueil-add-item="prochaine_seance"]')
-    await vpage.waitForTimeout(300)
-    await vpage.keyboard.press('Escape').catch(() => {})
+    await vpage.waitForTimeout(280)
+    await vpage.locator('[data-accueil-add-item="series_jour"]').tap()
+    await vpage.waitForSelector('[data-accueil-add-list]', { state: 'detached', timeout: 5_000 })
+    // Wait sheet backdrop unmount (280ms) so it cannot paint a black frame
+    await vpage.waitForTimeout(320)
+    await vpage.waitForSelector('[data-accueil-edit-slot="series_jour"]', {
+      state: 'visible',
+      timeout: 5_000,
+    })
     await vpage.waitForTimeout(200)
 
-    await vpage.click('[data-accueil-edit-ok]')
+    // 5) OK — sample luminance to prove no Reveal black flash
+    const exitSamplesPromise = (async () => {
+      await vpage.waitForTimeout(16)
+      return sampleExitLuminance(vpage, 14, 28)
+    })()
+    await vpage.locator('[data-accueil-edit-ok]').tap()
     await vpage.waitForSelector('[data-accueil-edit-open="0"]', { timeout: 5_000 })
-    await vpage.waitForTimeout(500)
+    const exitSamples = await exitSamplesPromise
+    const blackFrames = exitSamples.filter((v) => v >= 0 && v < 8).length
+    if (blackFrames > 0) {
+      throw new Error(
+        `Black flash on edit exit: ${blackFrames}/${exitSamples.length} dark samples ${JSON.stringify(exitSamples)}`,
+      )
+    }
+    // Finish on Accueil with all default tiles visible
+    for (const id of ['seance', 'seances_semaine', 'eau', 'series_jour', 'prochaine_seance', 'programme', 'recent']) {
+      if ((await vpage.locator(`[data-accueil-edit-slot="${id}"]`).count()) < 1) {
+        throw new Error(`Missing tile after OK: ${id}`)
+      }
+    }
+    await vpage.waitForTimeout(550)
 
     const video = vpage.video()
     await videoContext.close()
-    if (video) {
-      const tmpPath = await video.path()
-      const dest = join(artifactsDir, 'tuiles_edition.mp4')
-      await copyFile(tmpPath, dest)
-      console.log('saved', dest)
-    }
+    if (!video) throw new Error('No Playwright video handle')
+    const rawPath = await video.path()
+    const dest = join(artifactsDir, 'tuiles_edition.mp4')
+    // Drop leading settle idle; keep a tight demo clip
+    runFfmpeg([
+      '-y',
+      '-ss',
+      '0.8',
+      '-i',
+      rawPath,
+      '-an',
+      '-c:v',
+      'libx264',
+      '-pix_fmt',
+      'yuv420p',
+      '-movflags',
+      '+faststart',
+      dest,
+    ])
+    console.log('saved', dest)
+    console.log('exit luminance samples', exitSamples)
 
     console.log('All Accueil tile artifacts captured.')
   } finally {

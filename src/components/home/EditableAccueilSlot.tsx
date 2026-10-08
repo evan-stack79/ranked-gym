@@ -2,6 +2,7 @@ import { Minus } from 'lucide-react'
 import {
   useEffect,
   useRef,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react'
@@ -12,14 +13,19 @@ import {
 } from '../../utils/accueilEditGestures'
 import type { AccueilWidgetId } from '../../utils/accueilWidgetPrefs'
 
+export type DragPoint = { clientX: number; clientY: number; offsetX: number; offsetY: number }
+
 interface EditableAccueilSlotProps {
   id: AccueilWidgetId
   editMode: boolean
   reducedMotion: boolean
   dragging: boolean
+  exiting?: boolean
+  /** Live finger offset while this slot is the drag source. */
+  dragDelta?: { x: number; y: number } | null
   onEnterEdit: () => void
   onHide: (id: AccueilWidgetId) => void
-  onDragStart: (id: AccueilWidgetId, clientX: number, clientY: number) => void
+  onDragStart: (id: AccueilWidgetId, point: DragPoint) => void
   onDragMove: (clientX: number, clientY: number) => void
   onDragEnd: () => void
   children: ReactNode
@@ -34,6 +40,8 @@ export function EditableAccueilSlot({
   editMode,
   reducedMotion,
   dragging,
+  exiting = false,
+  dragDelta = null,
   onEnterEdit,
   onHide,
   onDragStart,
@@ -62,7 +70,6 @@ export function EditableAccueilSlot({
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
-    // Trash / add chrome handle their own clicks
     const target = e.target as HTMLElement | null
     if (target?.closest('[data-accueil-tile-trash]')) return
 
@@ -73,8 +80,14 @@ export function EditableAccueilSlot({
     clearPressTimer()
 
     if (editMode) {
+      const rect = rootRef.current?.getBoundingClientRect()
       pressRef.current.dragging = true
-      onDragStart(id, e.clientX, e.clientY)
+      onDragStart(id, {
+        clientX: e.clientX,
+        clientY: e.clientY,
+        offsetX: rect ? e.clientX - rect.left : 0,
+        offsetY: rect ? e.clientY - rect.top : 0,
+      })
       try {
         rootRef.current?.setPointerCapture(e.pointerId)
       } catch {
@@ -129,6 +142,16 @@ export function EditableAccueilSlot({
     }
   }
 
+  const bodyStyle: CSSProperties | undefined =
+    dragging && dragDelta && !reducedMotion
+      ? {
+          transform: `translate3d(${dragDelta.x}px, ${dragDelta.y}px, 0) scale(1.04)`,
+          zIndex: 8,
+          transition: 'none',
+          boxShadow: '0 16px 36px rgb(0 0 0 / 0.55)',
+        }
+      : undefined
+
   return (
     <div
       ref={rootRef}
@@ -138,11 +161,13 @@ export function EditableAccueilSlot({
         editMode && !reducedMotion ? 'accueil-edit-slot--wiggle' : '',
         editMode && reducedMotion ? 'accueil-edit-slot--dashed' : '',
         dragging ? 'accueil-edit-slot--dragging' : '',
+        exiting ? 'accueil-edit-slot--exiting' : '',
       ]
         .filter(Boolean)
         .join(' ')}
       data-accueil-edit-slot={id}
       data-accueil-editing={editMode ? '1' : '0'}
+      data-accueil-exiting={exiting ? '1' : '0'}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endPointer}
@@ -163,7 +188,9 @@ export function EditableAccueilSlot({
           <Minus className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" />
         </button>
       ) : null}
-      <div className="accueil-edit-slot__body">{children}</div>
+      <div className="accueil-edit-slot__body" style={bodyStyle} data-accueil-edit-body={id}>
+        {children}
+      </div>
     </div>
   )
 }

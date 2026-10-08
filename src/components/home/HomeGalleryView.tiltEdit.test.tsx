@@ -141,4 +141,47 @@ describe('TiltCard disabled in Accueil edit mode', () => {
     expect(host.querySelector('[data-accueil-tile-trash]')).toBeTruthy()
     expect(host.querySelector('[data-rg-tilt]')?.getAttribute('data-rg-tilt')).toBe('off')
   })
+
+  it('keeps Reveal instant after leaving edit (no mask re-hide / black flash)', async () => {
+    const { HomeGalleryView } = await import('./HomeGalleryView')
+
+    await act(async () => {
+      root.render(
+        <HomeGalleryView
+          onStartTraining={() => {}}
+          onOpenTraining={() => {}}
+          onOpenHistory={() => {}}
+        />,
+      )
+    })
+
+    const openBtn = host.querySelector('[data-accueil-edit-open-footer]') as HTMLButtonElement
+    await act(async () => {
+      openBtn.click()
+    })
+
+    const masksWhileEditing = [...host.querySelectorAll('.rg-mask-reveal')]
+    expect(masksWhileEditing.length).toBeGreaterThan(0)
+    for (const mask of masksWhileEditing) {
+      expect(mask.className).toContain('rg-mask-reveal--instant')
+      expect(mask.className).toContain('rg-mask-reveal--in')
+    }
+    expect(host.querySelectorAll('[data-rg-reveal="pending"]').length).toBe(0)
+
+    const okBtn = host.querySelector('[data-accueil-edit-ok]') as HTMLButtonElement
+    await act(async () => {
+      okBtn.click()
+    })
+
+    expect(host.querySelector('[data-accueil-edit-open="0"]')).toBeTruthy()
+    expect(host.querySelectorAll('[data-rg-reveal="pending"]').length).toBe(0)
+    const masksAfterExit = [...host.querySelectorAll('.rg-mask-reveal')]
+    expect(masksAfterExit.length).toBeGreaterThan(0)
+    for (const mask of masksAfterExit) {
+      // freezeReveals stays true — dropping --instant would restart
+      // rg-mask-reveal-up from inset(100%) (black frame).
+      expect(mask.className).toContain('rg-mask-reveal--instant')
+      expect(mask.className).toContain('rg-mask-reveal--in')
+    }
+  })
 })

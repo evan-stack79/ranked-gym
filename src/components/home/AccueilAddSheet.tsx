@@ -29,6 +29,7 @@ export function AccueilAddSheet({ open, prefs, onClose, onSave }: AccueilAddShee
 
   const handleAdd = (id: AccueilWidgetId) => {
     commit(showAccueilWidget(prefs, id, Date.now()))
+    onClose()
   }
 
   const handleReset = () => {

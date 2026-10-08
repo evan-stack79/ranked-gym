@@ -399,8 +399,30 @@ body {
 
 .accueil-edit-slot--dragging .accueil-edit-slot__body {
   animation: none;
-  transform: scale(1.03);
+  /* Live drag uses inline translate3d; keep a light lift when JS hasn't set one. */
+  will-change: transform;
   box-shadow: 0 12px 28px rgb(0 0 0 / 0.45);
+}
+
+.accueil-edit-slot--exiting {
+  pointer-events: none;
+  z-index: 1;
+}
+
+.accueil-edit-slot--exiting .accueil-edit-slot__body {
+  animation: accueil-tile-exit 180ms cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+  transform-origin: center center;
+}
+
+@keyframes accueil-tile-exit {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.88);
+  }
 }
 
 .accueil-edit-slot__trash {
@@ -432,6 +454,12 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .accueil-edit-slot--wiggle .accueil-edit-slot__body {
     animation: none;
+  }
+
+  .accueil-edit-slot--exiting .accueil-edit-slot__body {
+    animation: none !important;
+    opacity: 0;
+    transform: none;
   }
 }
 
