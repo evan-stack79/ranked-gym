@@ -4,7 +4,6 @@ import { toUserFacingError } from '../utils/userFacingError'
 import type { Json } from '../types/database'
 import type { CalorieProfile, DayJournal } from '../types/nutrition'
 import type { ActiveWorkoutDraft, TrainingState } from '../types/training'
-import type { NearbyGym } from '../types'
 import { isActiveCloudBackendConfigured, isConvexDomainActive } from '../backend/adapter'
 import {
   getCalorieProfile,
@@ -18,14 +17,6 @@ import {
   saveProfileProgress,
   type StoredProfileProgress,
 } from './profileStorage'
-import {
-  getActiveCheckIn,
-  getCustomGyms,
-  saveCheckIn,
-  saveCustomGyms,
-  clearCheckIn,
-  type StoredCheckIn,
-} from './lobbyStorage'
 import {
   getSleepLog,
   replaceSleepLog,
@@ -44,9 +35,13 @@ export type CloudBackupPayload = {
   }
   training: TrainingState
   profileProgress?: StoredProfileProgress | null
+  /**
+   * Legacy Lobby gym fields — kept optional for backward-compatible parsing of
+   * older cloud payloads. Never collected or applied by current clients.
+   */
   lobby?: {
-    customGyms: NearbyGym[]
-    checkIn: StoredCheckIn | null
+    customGyms: unknown[]
+    checkIn: unknown | null
   }
   /** First-class sleep nights (gap fix vs backup v3). */
   sleep?: SleepNightEntry[]
@@ -189,9 +184,10 @@ export function collectLocalBackup(): CloudBackupPayload {
     },
     training: getTrainingState(),
     profileProgress: getProfileProgress(),
+    // Legacy Lobby location data is no longer synced (empty for old parsers).
     lobby: {
-      customGyms: getCustomGyms(),
-      checkIn: getActiveCheckIn(),
+      customGyms: [],
+      checkIn: null,
     },
     sleep: getSleepLog(),
   }
@@ -298,17 +294,8 @@ function applyBackup(
   if (payload.profileProgress) {
     saveProfileProgress(payload.profileProgress, { skipCloud: true })
   }
-  if (payload.lobby) {
-    saveCustomGyms(payload.lobby.customGyms ?? [], { skipCloud: true })
-    if (payload.lobby.checkIn?.gym) {
-      saveCheckIn(payload.lobby.checkIn.gym, {
-        skipCloud: true,
-        checkedInAt: payload.lobby.checkIn.checkedInAt,
-      })
-    } else {
-      clearCheckIn({ skipCloud: true })
-    }
-  }
+  // Ignore legacy lobby/check-in blobs from older cloud payloads — never restore location.
+  void payload.lobby
   if (payload.sleep) {
     replaceSleepLog(payload.sleep, { skipCloud: true })
   }
@@ -372,13 +359,8 @@ function payloadFromTables(input: {
   const workoutStateObj = asObject(input.workouts?.state)
   const hasNutrition = Boolean(nutritionProfileObj && Object.keys(nutritionProfileObj).length > 0)
   const hasWorkouts = Boolean(workoutStateObj && Object.keys(workoutStateObj).length > 0)
-  const hasLobby = Boolean(
-    input.profile &&
-      ((Array.isArray(input.profile.custom_spots) && input.profile.custom_spots.length > 0) ||
-        input.profile.active_checkin),
-  )
 
-  if (!hasNutrition && !hasWorkouts && !hasLobby && !input.nutrition && !input.workouts) {
+  if (!hasNutrition && !hasWorkouts && !input.nutrition && !input.workouts) {
     return null
   }
 
@@ -389,10 +371,6 @@ function payloadFromTables(input: {
   const progress = (progressObj && Object.keys(progressObj).length > 0
     ? progressObj
     : null) as StoredProfileProgress | null
-  const customGyms = (Array.isArray(input.profile?.custom_spots)
-    ? (input.profile?.custom_spots as unknown as NearbyGym[])
-    : []) as NearbyGym[]
-  const activeCheckin = (input.profile?.active_checkin ?? null) as unknown as StoredCheckIn | null
 
   const stamps = [
     input.nutrition?.updated_at,
@@ -411,9 +389,10 @@ function payloadFromTables(input: {
     },
     training: training ?? getTrainingState(),
     profileProgress: progress,
+    // Do not pull legacy location from profiles into local backup payloads.
     lobby: {
-      customGyms,
-      checkIn: activeCheckin,
+      customGyms: [],
+      checkIn: null,
     },
   }
 }
@@ -425,10 +404,8 @@ export function hasMeaningfulCloudData(payload: CloudBackupPayload): boolean {
   const schedule = (payload.training?.schedule?.length ?? 0) > 0
   const routines = (payload.training?.routines ?? []).some((r) => (r.exercises?.length ?? 0) > 0)
   const onboarded = Boolean(payload.nutrition.profile?.onboardingComplete)
-  const spots = (payload.lobby?.customGyms?.length ?? 0) > 0
-  const checkIn = Boolean(payload.lobby?.checkIn?.gym)
   const sleep = (payload.sleep?.length ?? 0) > 0
-  return meals || notes || completed || schedule || routines || onboarded || spots || checkIn || sleep
+  return meals || notes || completed || schedule || routines || onboarded || sleep
 }
 
 export function isCloudSyncReady(): boolean {
@@ -579,11 +556,12 @@ async function upsertTables(userId: string, payload: CloudBackupPayload): Promis
         },
         { onConflict: 'user_id' },
       ),
+      // Clear legacy Lobby location columns on every sync (never re-upload coords).
       supabase
         .from('profiles')
         .update({
-          custom_spots: json(payload.lobby?.customGyms ?? []),
-          active_checkin: json(payload.lobby?.checkIn ?? null),
+          custom_spots: json([]),
+          active_checkin: json(null),
           updated_at: now,
         })
         .eq('id', userId),

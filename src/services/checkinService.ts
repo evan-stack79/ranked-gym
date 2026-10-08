@@ -1,6 +1,5 @@
 import { getSupabase } from '../lib/supabase'
 import type { CheckinRow, Json } from '../types/database'
-import type { NearbyGym } from '../types'
 import { runWithDomainBackend } from '../backend/domainBackend'
 import {
   countConvexCheckins,
@@ -12,18 +11,21 @@ import { recordActivityEvent } from './activityFeedService'
 export async function createCheckin(input: {
   userId: string
   salleNom: string
+  /** @deprecated Ignored — location no longer stored. */
   salleLat?: number
+  /** @deprecated Ignored — location no longer stored. */
   salleLng?: number
-  gym?: NearbyGym
+  /** @deprecated Ignored — gym payload may contain lat/lng. */
+  gym?: unknown
 }): Promise<CheckinRow> {
+  void input.salleLat
+  void input.salleLng
+  void input.gym
   const created = await runWithDomainBackend<CheckinRow>({
     operation: 'checkins.create',
     convex: () =>
       createConvexCheckin({
         salleNom: input.salleNom,
-        salleLat: input.salleLat,
-        salleLng: input.salleLng,
-        gym: input.gym,
       }),
     supabase: async () => {
       const supabase = getSupabase()
@@ -32,9 +34,9 @@ export async function createCheckin(input: {
         .insert({
           user_id: input.userId,
           salle_nom: input.salleNom,
-          salle_lat: input.salleLat ?? null,
-          salle_lng: input.salleLng ?? null,
-          gym_payload: (input.gym ?? null) as Json | null,
+          salle_lat: null,
+          salle_lng: null,
+          gym_payload: null as Json | null,
         })
         .select('*')
         .single()
@@ -48,8 +50,8 @@ export async function createCheckin(input: {
     activityType: 'checkin',
     actionText: `a check-in à ${input.salleNom}`,
     xpEarned: 90,
-    originLat: input.salleLat ?? null,
-    originLng: input.salleLng ?? null,
+    originLat: null,
+    originLng: null,
   })
   return created
 }
@@ -73,7 +75,7 @@ export async function listRecentCheckins(userId: string, limit = 20): Promise<Ch
   })
 }
 
-/** Nombre total de check-ins (Lobby) pour l’utilisateur. */
+/** Nombre total de check-ins (historique, sans coords) pour l’utilisateur. */
 export async function countCheckins(userId: string): Promise<number> {
   return runWithDomainBackend<number>({
     operation: 'checkins.count',

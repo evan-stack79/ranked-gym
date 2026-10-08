@@ -2,7 +2,6 @@ import { api as generatedApi } from '../../convex/_generated/api'
 import { getConvex } from '../lib/convex'
 import { getConvexSessionToken } from './convexAuthService'
 import type { CheckinRow, Json } from '../types/database'
-import type { NearbyGym } from '../types'
 
 const api = generatedApi as any
 
@@ -36,17 +35,12 @@ function mapCheckin(view: ConvexCheckinView): CheckinRow {
 
 export async function createConvexCheckin(input: {
   salleNom: string
-  salleLat?: number
-  salleLng?: number
-  gym?: NearbyGym
 }): Promise<CheckinRow> {
   const sessionToken = await requireToken()
+  // Do not send salleLat/salleLng/gymPayload — server also strips if present.
   const view = (await getConvex().mutation(api.rpc.createCheckin, {
     sessionToken,
     salleNom: input.salleNom,
-    salleLat: input.salleLat ?? null,
-    salleLng: input.salleLng ?? null,
-    gymPayload: input.gym ?? null,
   })) as ConvexCheckinView
   return mapCheckin(view)
 }
