@@ -13,9 +13,21 @@ import {
   ACCUEIL_LONG_PRESS_MS,
   movementExceedsThreshold,
 } from '../../utils/accueilEditGestures'
+import {
+  ACCUEIL_DROP_MS,
+  cancelElementAnimations,
+  playFlipTranslate,
+} from '../../utils/accueilFlip'
 import type { AccueilWidgetId } from '../../utils/accueilWidgetPrefs'
 
 export type DragPoint = { clientX: number; clientY: number; offsetX: number; offsetY: number }
+
+export type DropGlideFrom = {
+  left: number
+  top: number
+  width: number
+  height: number
+}
 
 interface EditableAccueilSlotProps {
   id: AccueilWidgetId
@@ -23,6 +35,9 @@ interface EditableAccueilSlotProps {
   reducedMotion: boolean
   dragging: boolean
   exiting?: boolean
+  entering?: boolean
+  /** Visual rect of the floating body at drop — glide into the layout slot. */
+  dropGlide?: DropGlideFrom | null
   /** Live finger offset while this slot is the drag source. */
   dragDelta?: { x: number; y: number } | null
   onEnterEdit: () => void
@@ -30,6 +45,7 @@ interface EditableAccueilSlotProps {
   onDragStart: (id: AccueilWidgetId, point: DragPoint) => void
   onDragMove: (clientX: number, clientY: number) => void
   onDragEnd: () => void
+  onDropGlideDone?: (id: AccueilWidgetId) => void
   children: ReactNode
 }
 
@@ -39,6 +55,7 @@ interface EditableAccueilSlotProps {
  *
  * While dragging, the layout slot stays as an empty placeholder and the tile
  * body is position:fixed under the finger (no sibling text ghosting under it).
+ * On drop, the body glides into the slot via transform (FLIP) before wiggle resumes.
  */
 export function EditableAccueilSlot({
   id,
@@ -46,15 +63,19 @@ export function EditableAccueilSlot({
   reducedMotion,
   dragging,
   exiting = false,
+  entering = false,
+  dropGlide = null,
   dragDelta = null,
   onEnterEdit,
   onHide,
   onDragStart,
   onDragMove,
   onDragEnd,
+  onDropGlideDone,
   children,
 }: EditableAccueilSlotProps) {
   const rootRef = useRef<HTMLDivElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
   const pressRef = useRef<{
     timer: number | null
     startX: number
@@ -68,6 +89,8 @@ export function EditableAccueilSlot({
     width: number
     height: number
   } | null>(null)
+  const [settling, setSettling] = useState(false)
+  const dropGlideGenRef = useRef(0)
 
   const clearPressTimer = () => {
     const p = pressRef.current
@@ -118,6 +141,46 @@ export function EditableAccueilSlot({
       return { left: r.left, top: r.top, width: r.width, height: r.height }
     })
   }, [dragging])
+
+  // Drop glide: invert from the last floating rect → play into the layout slot.
+  useLayoutEffect(() => {
+    if (!dropGlide || reducedMotion) {
+      if (!dropGlide) setSettling(false)
+      return
+    }
+    const body = bodyRef.current
+    const root = rootRef.current
+    if (!body || !root) {
+      onDropGlideDone?.(id)
+      return
+    }
+
+    const gen = ++dropGlideGenRef.current
+    setSettling(true)
+
+    const to = root.getBoundingClientRect()
+    const dx = dropGlide.left - to.left
+    const dy = dropGlide.top - to.top
+
+    cancelElementAnimations(body)
+    const anim = playFlipTranslate(body, dx, dy, {
+      ms: ACCUEIL_DROP_MS,
+      fromScale: 1.04,
+      toScale: 1,
+    })
+
+    const done = () => {
+      if (dropGlideGenRef.current !== gen) return
+      setSettling(false)
+      onDropGlideDone?.(id)
+    }
+
+    if (!anim) {
+      done()
+      return
+    }
+    anim.finished.then(done).catch(done)
+  }, [dropGlide, reducedMotion, id, onDropGlideDone])
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
@@ -237,16 +300,27 @@ export function EditableAccueilSlot({
       ? { minHeight: slotBox.height, height: slotBox.height }
       : undefined
 
+  const wiggling =
+    editMode &&
+    !reducedMotion &&
+    !dragging &&
+    !settling &&
+    !dropGlide &&
+    !exiting &&
+    !entering
+
   return (
     <div
       ref={rootRef}
       className={[
         'accueil-edit-slot',
         editMode ? 'accueil-edit-slot--editing' : '',
-        editMode && !reducedMotion && !dragging ? 'accueil-edit-slot--wiggle' : '',
+        wiggling ? 'accueil-edit-slot--wiggle' : '',
         editMode && reducedMotion ? 'accueil-edit-slot--dashed' : '',
         dragging ? 'accueil-edit-slot--dragging' : '',
         exiting ? 'accueil-edit-slot--exiting' : '',
+        entering ? 'accueil-edit-slot--entering' : '',
+        settling ? 'accueil-edit-slot--settling' : '',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -255,6 +329,8 @@ export function EditableAccueilSlot({
       data-accueil-editing={editMode ? '1' : '0'}
       data-accueil-dragging={dragging ? '1' : '0'}
       data-accueil-exiting={exiting ? '1' : '0'}
+      data-accueil-entering={entering ? '1' : '0'}
+      data-accueil-settling={settling ? '1' : '0'}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endPointer}
@@ -273,6 +349,7 @@ export function EditableAccueilSlot({
         />
       ) : null}
       <div
+        ref={bodyRef}
         className={[
           'accueil-edit-slot__body',
           dragging && !reducedMotion ? 'accueil-edit-slot__body--floating' : '',

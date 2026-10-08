@@ -23,6 +23,13 @@ import {
   type GalleryHeroCard,
 } from '../../utils/accueilGallery'
 import { hitTestWidgetId } from '../../utils/accueilEditGestures'
+import {
+  ACCUEIL_ENTER_MS,
+  ACCUEIL_EXIT_MS,
+  ACCUEIL_FLIP_MS,
+  captureSlotRects,
+  runFlipFromFirst,
+} from '../../utils/accueilFlip'
 import { attachHorizontalScrollAxisLock } from '../../utils/horizontalScrollAxisLock'
 import {
   ACCUEIL_WIDGET_SIZE,
@@ -56,9 +63,6 @@ import {
 } from './AccueilMetricTiles'
 import { EditableAccueilSlot, type DragPoint } from './EditableAccueilSlot'
 import { WaterGoalSheet } from './WaterGoalSheet'
-
-const EDIT_REMOVE_MS = 180
-const FLIP_MS = 220
 
 interface HomeGalleryViewProps {
   onStartTraining: (routineId: string) => void
@@ -134,6 +138,15 @@ export function HomeGalleryView({
   const [draggingId, setDraggingId] = useState<AccueilWidgetId | null>(null)
   const [dragDelta, setDragDelta] = useState<{ x: number; y: number } | null>(null)
   const [exitingId, setExitingId] = useState<AccueilWidgetId | null>(null)
+  const [enteringId, setEnteringId] = useState<AccueilWidgetId | null>(null)
+  /** Drop glide: dragged tile slides into its slot instead of snapping. */
+  const [dropGlide, setDropGlide] = useState<{
+    id: AccueilWidgetId
+    left: number
+    top: number
+    width: number
+    height: number
+  } | null>(null)
   const [coldEntering, setColdEntering] = useState(() => {
     if (typeof document === 'undefined') return false
     return document.documentElement.dataset.coldLaunchLanding === '1'
@@ -144,8 +157,11 @@ export function HomeGalleryView({
   const widgetsRootRef = useRef<HTMLDivElement>(null)
   const prefsRef = useRef(prefs)
   prefsRef.current = prefs
+  const draggingIdRef = useRef<AccueilWidgetId | null>(null)
+  draggingIdRef.current = draggingId
   const dragOriginRef = useRef<{ x: number; y: number } | null>(null)
   const flipFirstRef = useRef<Map<string, DOMRect> | null>(null)
+  const enterTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     const sync = () => setTrainingTick((n) => n + 1)
@@ -222,17 +238,54 @@ export function HomeGalleryView({
     dragOriginRef.current = null
   }, [])
 
+  /** End drag: optional drop-glide into the final slot, then clear lift state. */
+  const finishDrag = useCallback(
+    (opts?: { skipGlide?: boolean }) => {
+      const id = draggingIdRef.current
+      if (!id) return
+      // Synchronous guard — slot pointerup + window pointerup can both fire.
+      draggingIdRef.current = null
+      if (!opts?.skipGlide && !prefersReducedMotion) {
+        const body = widgetsRootRef.current?.querySelector(
+          `[data-accueil-edit-body="${id}"]`,
+        ) as HTMLElement | null
+        if (body) {
+          const from = body.getBoundingClientRect()
+          if (from.width > 0 && from.height > 0) {
+            setDropGlide({
+              id,
+              left: from.left,
+              top: from.top,
+              width: from.width,
+              height: from.height,
+            })
+          }
+        }
+      } else {
+        setDropGlide(null)
+      }
+      clearDrag()
+    },
+    [clearDrag, prefersReducedMotion],
+  )
+
   const exitEdit = useCallback(() => {
     setEditMode(false)
     setAddOpen(false)
+    setDropGlide(null)
     clearDrag()
     setExitingId(null)
+    setEnteringId(null)
+    if (enterTimerRef.current != null) {
+      window.clearTimeout(enterTimerRef.current)
+      enterTimerRef.current = null
+    }
   }, [clearDrag])
 
   // Sheet open must never leave a tile stuck in the lifted drag state.
   useEffect(() => {
-    if (addOpen || waterGoalOpen) clearDrag()
-  }, [addOpen, waterGoalOpen, clearDrag])
+    if (addOpen || waterGoalOpen) finishDrag({ skipGlide: true })
+  }, [addOpen, waterGoalOpen, finishDrag])
 
   const state = useMemo(() => getTrainingState(), [trainingTick])
   const heroCards = useMemo(() => deriveGalleryHeroCards(state), [state])
@@ -303,30 +356,12 @@ export function HomeGalleryView({
     if (!first || prefersReducedMotion || !editMode) return
     const root = widgetsRootRef.current
     if (!root) return
-    const slots = [...root.querySelectorAll<HTMLElement>('[data-accueil-edit-slot]')]
-    for (const el of slots) {
-      const id = el.getAttribute('data-accueil-edit-slot')
-      if (!id || id === draggingId) continue
-      const prev = first.get(id)
-      if (!prev) continue
-      // Animate the layout slot (not the floating body) so text never ghosts
-      // under the dragged tile.
-      const last = el.getBoundingClientRect()
-      const dx = prev.left - last.left
-      const dy = prev.top - last.top
-      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue
-      el.style.transition = 'none'
-      el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`
-      el.style.zIndex = '2'
-      void el.offsetWidth
-      el.style.transition = `transform ${FLIP_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`
-      el.style.transform = ''
-      window.setTimeout(() => {
-        el.style.transition = ''
-        el.style.zIndex = ''
-        el.style.transform = ''
-      }, FLIP_MS + 40)
-    }
+    // Animate layout slots (not floating bodies) so text never ghosts under the drag.
+    // Clears in-flight transforms before measuring Last → interruptible, no jump.
+    runFlipFromFirst(root, first, {
+      skipId: draggingId,
+      ms: ACCUEIL_FLIP_MS,
+    })
   }, [visibleOrderKey, editMode, prefersReducedMotion, draggingId])
   const subtitle = getHomeGreetingSubtitle()
   const firstName = resolveDisplayFirstName({
@@ -357,16 +392,15 @@ export function HomeGalleryView({
   const captureFlipFirst = useCallback(() => {
     const root = widgetsRootRef.current
     if (!root || prefersReducedMotion) return
-    const map = new Map<string, DOMRect>()
-    for (const el of root.querySelectorAll('[data-accueil-edit-slot]')) {
-      const id = el.getAttribute('data-accueil-edit-slot')
-      if (id) map.set(id, el.getBoundingClientRect())
-    }
-    flipFirstRef.current = map
+    // Visual positions (includes mid-FLIP transforms) so the next Invert starts
+    // from where the tile currently appears — no jump on fast reorders.
+    flipFirstRef.current = captureSlotRects(root)
   }, [prefersReducedMotion])
 
   const handleDragStart = useCallback((id: AccueilWidgetId, point: DragPoint) => {
+    setDropGlide(null)
     setDraggingId(id)
+    draggingIdRef.current = id
     dragOriginRef.current = { x: point.clientX, y: point.clientY }
     setDragDelta({ x: 0, y: 0 })
   }, [])
@@ -421,8 +455,8 @@ export function HomeGalleryView({
   )
 
   const handleDragEnd = useCallback(() => {
-    clearDrag()
-  }, [clearDrag])
+    finishDrag()
+  }, [finishDrag])
 
   // Reorder remounts the slot under the finger — keep drag alive via window
   // pointermove, and always clear on pointerup/cancel (no stuck lift).
@@ -432,8 +466,10 @@ export function HomeGalleryView({
     const onMove = (e: PointerEvent) => {
       handleDragMove(e.clientX, e.clientY)
     }
-    const onUp = () => clearDrag()
-    const onForce = () => clearDrag()
+    const onUp = () => finishDrag()
+    // Force-clear still glides when a floating body is measurable (capture scripts
+    // fire this after pointerup); skip only if drag already ended.
+    const onForce = () => finishDrag()
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onUp)
@@ -444,7 +480,7 @@ export function HomeGalleryView({
       window.removeEventListener('pointercancel', onUp)
       window.removeEventListener('ranked-gym:accueil-force-drag-end', onForce)
     }
-  }, [draggingId, clearDrag, handleDragMove])
+  }, [draggingId, finishDrag, handleDragMove])
 
   const handleHide = useCallback(
     (id: AccueilWidgetId) => {
@@ -458,10 +494,14 @@ export function HomeGalleryView({
         captureFlipFirst()
         commitPrefs(hideAccueilWidget(prefsRef.current, id, Date.now()))
         setExitingId(null)
-      }, EDIT_REMOVE_MS)
+      }, ACCUEIL_EXIT_MS)
     },
     [captureFlipFirst, commitPrefs, prefersReducedMotion],
   )
+
+  const handleDropGlideDone = useCallback((id: AccueilWidgetId) => {
+    setDropGlide((current) => (current?.id === id ? null : current))
+  }, [])
 
   // proximity (not mandatory): diagonal vertical swipes must not yank the strip sideways.
   const snapStyle = {
@@ -481,12 +521,15 @@ export function HomeGalleryView({
       reducedMotion={prefersReducedMotion}
       dragging={draggingId === id}
       exiting={exitingId === id}
+      entering={enteringId === id}
+      dropGlide={dropGlide?.id === id ? dropGlide : null}
       dragDelta={draggingId === id ? dragDelta : null}
       onEnterEdit={enterEdit}
       onHide={handleHide}
       onDragStart={handleDragStart}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
+      onDropGlideDone={handleDropGlideDone}
     >
       {child}
     </EditableAccueilSlot>
@@ -875,6 +918,20 @@ export function HomeGalleryView({
         prefs={prefs}
         onClose={() => setAddOpen(false)}
         onSave={(next) => {
+          const before = resolveVisibleAccueilWidgets(prefsRef.current)
+          const after = resolveVisibleAccueilWidgets(next)
+          const added = after.filter((id) => !before.includes(id))
+          captureFlipFirst()
+          if (added.length === 1 && !prefersReducedMotion) {
+            if (enterTimerRef.current != null) {
+              window.clearTimeout(enterTimerRef.current)
+            }
+            setEnteringId(added[0])
+            enterTimerRef.current = window.setTimeout(() => {
+              setEnteringId(null)
+              enterTimerRef.current = null
+            }, ACCUEIL_ENTER_MS + 40)
+          }
           setPrefs(next)
           window.dispatchEvent(new Event('ranked-gym:accueil-widgets-changed'))
         }}
