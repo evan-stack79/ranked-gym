@@ -157,10 +157,14 @@ export function runFlipFromFirst(
     if (!shouldAnimateFlip(dx, dy)) continue
     el.style.zIndex = '2'
     el.dataset.accueilFlipping = '1'
+    el.dataset.accueilFlipDx = String(Math.round(dx))
+    el.dataset.accueilFlipDy = String(Math.round(dy))
     const anim = playFlipTranslate(el, dx, dy, { ms })
     const clearFlipMark = () => {
       el.style.zIndex = ''
       delete el.dataset.accueilFlipping
+      delete el.dataset.accueilFlipDx
+      delete el.dataset.accueilFlipDy
     }
     if (anim) {
       anim.finished.then(clearFlipMark).catch(clearFlipMark)

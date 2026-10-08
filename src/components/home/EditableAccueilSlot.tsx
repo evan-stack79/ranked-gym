@@ -29,6 +29,9 @@ export type DropGlideFrom = {
   height: number
 }
 
+/** Survives remount mid-drag so the layout hole keeps height (sibling FLIP). */
+const dragSlotSizeCache = new Map<string, { width: number; height: number }>()
+
 interface EditableAccueilSlotProps {
   id: AccueilWidgetId
   editMode: boolean
@@ -130,17 +133,31 @@ export function EditableAccueilSlot({
     if (!dragging) {
       pressRef.current.dragging = false
       setSlotBox(null)
+      dragSlotSizeCache.delete(id)
       return
     }
     const el = rootRef.current
     if (!el) return
-    // Prefer the pre-drag measure from pointerdown; only fill if missing.
+    // Prefer pointerdown measure / remount cache; never leave a 0-height hole
+    // (collapsed placeholder makes sibling FLIP dy≈0 — looks like a teleport).
     setSlotBox((prev) => {
       if (prev) return prev
+      const cached = dragSlotSizeCache.get(id)
+      if (cached) {
+        const r = el.getBoundingClientRect()
+        return {
+          left: r.left,
+          top: r.top,
+          width: cached.width,
+          height: cached.height,
+        }
+      }
       const r = el.getBoundingClientRect()
-      return { left: r.left, top: r.top, width: r.width, height: r.height }
+      const next = { left: r.left, top: r.top, width: r.width, height: r.height }
+      if (next.height > 0) dragSlotSizeCache.set(id, { width: next.width, height: next.height })
+      return next
     })
-  }, [dragging])
+  }, [dragging, id])
 
   // Drop glide: invert from the last floating rect → play into the layout slot.
   useLayoutEffect(() => {
@@ -196,12 +213,16 @@ export function EditableAccueilSlot({
     if (editMode) {
       const rect = rootRef.current?.getBoundingClientRect()
       if (rect) {
-        setSlotBox({
+        const box = {
           left: rect.left,
           top: rect.top,
           width: rect.width,
           height: rect.height,
-        })
+        }
+        setSlotBox(box)
+        if (box.height > 0) {
+          dragSlotSizeCache.set(id, { width: box.width, height: box.height })
+        }
       }
       pressRef.current.dragging = true
       onDragStart(id, {
@@ -295,9 +316,12 @@ export function EditableAccueilSlot({
           }
         : undefined
 
+  const cachedSize = dragSlotSizeCache.get(id)
+  const layoutH = slotBox?.height ?? cachedSize?.height
+  const layoutW = slotBox?.width ?? cachedSize?.width
   const rootStyle: CSSProperties | undefined =
-    dragging && slotBox
-      ? { minHeight: slotBox.height, height: slotBox.height }
+    dragging && layoutH
+      ? { minHeight: layoutH, height: layoutH }
       : undefined
 
   const wiggling =
@@ -342,8 +366,8 @@ export function EditableAccueilSlot({
           aria-hidden="true"
           data-accueil-drag-placeholder={id}
           style={
-            slotBox
-              ? { minHeight: slotBox.height, height: slotBox.height }
+            layoutH
+              ? { minHeight: layoutH, height: layoutH, width: layoutW }
               : undefined
           }
         />

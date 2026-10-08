@@ -216,139 +216,139 @@ async function touchLongPress(page, x, y, holdMs, recorder) {
 }
 
 /**
- * In-page pointer drag (reorder-proven) while CDP screencast records compositor
- * frames — Playwright page.screenshot cannot run during evaluate.
+ * In-page pointer drag until reorder, then Playwright screenshots during the
+ * FLIP window (animations:'allow') so WAAPI transforms are in the video.
  */
 async function touchDrag(page, fromX, fromY, toX, toY, steps, recorder, samples) {
-  const cdp = await page.context().newCDPSession(page)
-  await cdp.send('Page.enable').catch(() => {})
-  const castFrames = []
-  const onFrame = (frame) => {
-    castFrames.push(Buffer.from(frame.data, 'base64'))
-    cdp.send('Page.screencastFrameAck', { sessionId: frame.sessionId }).catch(() => {})
-  }
-  cdp.on('Page.screencastFrame', onFrame)
-  await cdp.send('Page.startScreencast', {
-    format: 'png',
-    quality: 70,
-    everyNthFrame: 1,
-  })
-
-  try {
-    const dragSamples = await page.evaluate(
-      async ({ x0, y0, x1, y1, steps: n }) => {
-        const samplesLocal = []
-        const sample = (label) => {
-          const week = document.querySelector('[data-accueil-edit-slot="seances_semaine"]')
-          const wr = week?.getBoundingClientRect()
-          samplesLocal.push({
-            label,
-            t: performance.now(),
-            weekTop: wr?.top ?? null,
-            weekLeft: wr?.left ?? null,
-            flipping: [...document.querySelectorAll('[data-accueil-flipping="1"]')].map((el) =>
-              el.getAttribute('data-accueil-edit-slot'),
-            ),
-            settling: !!document.querySelector('[data-accueil-settling="1"]'),
-            dragging: document
-              .querySelector('[data-accueil-dragging="1"]')
-              ?.getAttribute('data-accueil-edit-slot'),
-            order: [...document.querySelectorAll('[data-accueil-edit-slot]')].map((el) =>
-              el.getAttribute('data-accueil-edit-slot'),
-            ),
-          })
-        }
-        const el = document.elementFromPoint(x0, y0)
-        const target = el?.closest('[data-accueil-edit-slot]') ?? el
-        if (!(target instanceof HTMLElement)) throw new Error('drag: no slot')
-        const fire = (type, x, y, buttons = 1, node = target) => {
-          const live =
-            document.querySelector('[data-accueil-dragging="1"]') ??
-            document.elementFromPoint(x, y)?.closest('[data-accueil-edit-slot]') ??
-            node
-          if (!(live instanceof HTMLElement)) return
-          live.dispatchEvent(
-            new PointerEvent(type, {
-              bubbles: true,
-              cancelable: true,
-              clientX: x,
-              clientY: y,
-              pointerId: 7,
-              pointerType: 'touch',
-              isPrimary: true,
-              buttons,
-            }),
-          )
-        }
-        fire('pointerdown', x0, y0, 1)
-        sample('down')
-        let dropX = x1
-        let dropY = y1
-        for (let i = 1; i <= n; i++) {
-          const t = i / n
-          const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
-          const x = x0 + (x1 - x0) * e
-          const y = y0 + (y1 - y0) * e
-          fire('pointermove', x, y, 1)
-          if (i % 3 === 0 || i === n) sample(`move-${i}`)
-          await new Promise((r) => setTimeout(r, 40))
-          // Drop as soon as Eau has moved above Séances — further moves oscillate.
-          const orderNow = [
-            ...document.querySelectorAll('[data-accueil-edit-slot]'),
-          ].map((el) => el.getAttribute('data-accueil-edit-slot'))
-          const eauI = orderNow.indexOf('eau')
-          const weekI = orderNow.indexOf('seances_semaine')
-          if (eauI >= 0 && weekI >= 0 && eauI < weekI) {
-            dropX = x
-            dropY = y
-            sample(`moved-up-at-${i}`)
-            // Hold so sibling FLIP (~220ms) paints multiple screencast frames.
-            for (let h = 0; h < 8; h++) {
-              await new Promise((r) => setTimeout(r, 40))
-              sample(`flip-hold-${h}`)
-            }
-            break
-          }
-        }
-        const liveEnd =
+  const moved = await page.evaluate(
+    async ({ x0, y0, x1, y1, steps: n }) => {
+      const samplesLocal = []
+      const sample = (label) => {
+        const week = document.querySelector('[data-accueil-edit-slot="seances_semaine"]')
+        const wr = week?.getBoundingClientRect()
+        samplesLocal.push({
+          label,
+          t: performance.now(),
+          weekTop: wr?.top ?? null,
+          weekLeft: wr?.left ?? null,
+          flipping: [...document.querySelectorAll('[data-accueil-flipping="1"]')].map((el) =>
+            el.getAttribute('data-accueil-edit-slot'),
+          ),
+          settling: !!document.querySelector('[data-accueil-settling="1"]'),
+          dragging: document
+            .querySelector('[data-accueil-dragging="1"]')
+            ?.getAttribute('data-accueil-edit-slot'),
+          order: [...document.querySelectorAll('[data-accueil-edit-slot]')].map((el) =>
+            el.getAttribute('data-accueil-edit-slot'),
+          ),
+        })
+      }
+      const el = document.elementFromPoint(x0, y0)
+      const target = el?.closest('[data-accueil-edit-slot]') ?? el
+      if (!(target instanceof HTMLElement)) throw new Error('drag: no slot')
+      const fire = (type, x, y, buttons = 1, node = target) => {
+        const live =
           document.querySelector('[data-accueil-dragging="1"]') ??
-          document.elementFromPoint(dropX, dropY)?.closest('[data-accueil-edit-slot]') ??
-          target
-        fire('pointerup', dropX, dropY, 0, liveEnd)
-        window.dispatchEvent(
+          document.elementFromPoint(x, y)?.closest('[data-accueil-edit-slot]') ??
+          node
+        if (!(live instanceof HTMLElement)) return
+        live.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            clientX: x,
+            clientY: y,
+            pointerId: 7,
+            pointerType: 'touch',
+            isPrimary: true,
+            buttons,
+          }),
+        )
+      }
+      fire('pointerdown', x0, y0, 1)
+      sample('down')
+      let dropX = x1
+      let dropY = y1
+      let movedUp = false
+      for (let i = 1; i <= n; i++) {
+        const t = i / n
+        const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
+        const x = x0 + (x1 - x0) * e
+        const y = y0 + (y1 - y0) * e
+        fire('pointermove', x, y, 1)
+        if (i % 3 === 0 || i === n) sample(`move-${i}`)
+        await new Promise((r) => setTimeout(r, 40))
+        const orderNow = [...document.querySelectorAll('[data-accueil-edit-slot]')].map((node) =>
+          node.getAttribute('data-accueil-edit-slot'),
+        )
+        const eauI = orderNow.indexOf('eau')
+        const weekI = orderNow.indexOf('seances_semaine')
+        if (eauI >= 0 && weekI >= 0 && eauI < weekI) {
+          dropX = x
+          dropY = y
+          movedUp = true
+          sample(`moved-up-at-${i}`)
+          break
+        }
+      }
+      return { samplesLocal, dropX, dropY, movedUp }
+    },
+    { x0: fromX, y0: fromY, x1: toX, y1: toY, steps },
+  )
+
+  samples.push(...moved.samplesLocal)
+  if (!moved.movedUp) {
+    throw new Error('Drag finished without Eau moving above Séances')
+  }
+
+  // FLIP is running now — screenshot each frame (includes WAAPI transforms).
+  for (let h = 0; h < 10; h++) {
+    const snap = await sampleFlip(page)
+    samples.push({ label: `flip-hold-${h}`, ...snap })
+    await recorder.snap()
+    await page.waitForTimeout(FRAME_MS)
+  }
+
+  await page.evaluate(
+    ({ dropX, dropY }) => {
+      const live =
+        document.querySelector('[data-accueil-dragging="1"]') ??
+        document.elementFromPoint(dropX, dropY)?.closest('[data-accueil-edit-slot]')
+      if (live instanceof HTMLElement) {
+        live.dispatchEvent(
           new PointerEvent('pointerup', {
             bubbles: true,
+            cancelable: true,
             clientX: dropX,
             clientY: dropY,
             pointerId: 7,
+            pointerType: 'touch',
+            isPrimary: true,
+            buttons: 0,
           }),
         )
-        if (document.querySelector('[data-accueil-dragging="1"]')) {
-          window.dispatchEvent(new Event('ranked-gym:accueil-force-drag-end'))
-        }
-        sample('up')
-        for (let i = 0; i < 10; i++) {
-          await new Promise((r) => setTimeout(r, 30))
-          sample(`settle-${i}`)
-        }
-        return samplesLocal
-      },
-      { x0: fromX, y0: fromY, x1: toX, y1: toY, steps },
-    )
-    samples.push(...dragSamples)
-  } finally {
-    await cdp.send('Page.stopScreencast').catch(() => {})
-    cdp.off('Page.screencastFrame', onFrame)
-    await cdp.detach().catch(() => {})
-  }
+      }
+      window.dispatchEvent(
+        new PointerEvent('pointerup', {
+          bubbles: true,
+          clientX: dropX,
+          clientY: dropY,
+          pointerId: 7,
+        }),
+      )
+      if (document.querySelector('[data-accueil-dragging="1"]')) {
+        window.dispatchEvent(new Event('ranked-gym:accueil-force-drag-end'))
+      }
+    },
+    { dropX: moved.dropX, dropY: moved.dropY },
+  )
 
-  console.log(`screencast frames during drag: ${castFrames.length}`)
-  for (const buf of castFrames) {
-    await recorder.writePng(buf)
+  // Drop glide screenshots.
+  for (let i = 0; i < 10; i++) {
+    samples.push({ label: `settle-${i}`, ...(await sampleFlip(page)) })
+    await recorder.snap()
+    await page.waitForTimeout(FRAME_MS)
   }
-
-  // Post-drag Playwright screenshots (drop settle already sampled in-page).
-  await recorder.hold(400)
 }
 
 async function main() {
@@ -622,10 +622,8 @@ async function main() {
     const frameFiles = readdirSync(framesDir)
       .filter((f) => f.endsWith('.png'))
       .sort()
-    if (frameFiles.length < 50) {
-      throw new Error(
-        `Too few screenshot frames: ${frameFiles.length} (need screencast during drag)`,
-      )
+    if (frameFiles.length < 30) {
+      throw new Error(`Too few screenshot frames: ${frameFiles.length}`)
     }
 
     const dest = join(artifactsDir, 'accueil_flip_edit.mp4')
