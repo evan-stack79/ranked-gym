@@ -3,10 +3,10 @@
  * Capture HeightWeightPicker @ 402×874 (iPhone 17) + short drag video.
  * Usage: node scripts/capture-height-weight-picker.mjs
  */
-import { mkdir, copyFile } from 'node:fs/promises'
+import { mkdir, readdir, rename } from 'node:fs/promises'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { chromiumLaunchOptions, projectRoot } from './streak-celeb-browser-utils.mjs'
 
@@ -56,7 +56,14 @@ async function shot(page, name) {
   const path = join(artifactsDir, name)
   await page.screenshot({ path, type: 'png' })
   console.log('shot', name)
-  return path
+}
+
+async function openMode(page, mode) {
+  await page.goto(`http://127.0.0.1:${port}/height-weight-fixture?mode=${mode}`, {
+    waitUntil: 'networkidle',
+    timeout: 60_000,
+  })
+  await page.waitForSelector('[data-height-weight-fixture="1"]')
 }
 
 async function capture() {
@@ -71,125 +78,112 @@ async function capture() {
       deviceScaleFactor: 3,
       isMobile: true,
       hasTouch: true,
-      recordVideo: {
-        dir: artifactsDir,
-        size: { width, height },
-      },
     })
     const page = await context.newPage()
 
     // 1) Empty —
-    await page.goto(`http://127.0.0.1:${port}/height-weight-fixture?mode=empty`, {
-      waitUntil: 'networkidle',
-      timeout: 60_000,
-    })
+    await openMode(page, 'empty')
     await page.waitForSelector('[data-testid="number-wheel-empty"]')
     await shot(page, 'hw-empty-dash.png')
 
-    // 2) Weight spinning mid-drag feel (value set + neighbors)
-    await page.goto(`http://127.0.0.1:${port}/height-weight-fixture?mode=weight`, {
-      waitUntil: 'networkidle',
-    })
+    // 2) Weight spinning
+    await openMode(page, 'weight')
     await page.waitForSelector('[data-testid="number-wheel-center"]')
     const wheel = page.locator('[data-testid="number-wheel"]')
     const box = await wheel.boundingBox()
     if (box) {
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
       await page.mouse.down()
-      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 90, { steps: 12 })
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 110, { steps: 14 })
       await shot(page, 'hw-weight-spinning.png')
       await page.mouse.up()
-      await page.waitForTimeout(400)
+      await page.waitForTimeout(450)
     } else {
       await shot(page, 'hw-weight-spinning.png')
     }
 
-    // 3) Height wheel
-    await page.click('[data-testid="fixture-force-height-tab"]')
+    // 3) Height wheel — click visible tab
+    await page.locator('[data-testid="height-weight-tab-height"]').click({ force: true })
     await page.waitForTimeout(200)
-    await page.click('[data-testid="height-weight-tab-height"]')
-    await page.waitForTimeout(150)
+    await page.waitForSelector('[data-testid="number-wheel-center"]')
     await shot(page, 'hw-height-wheel.png')
 
     // 4) lb mode
-    await page.click('[data-testid="height-weight-tab-weight"]')
-    await page.waitForTimeout(100)
-    await page.click('[data-testid="weight-unit-lb"]')
+    await page.locator('[data-testid="height-weight-tab-weight"]').click({ force: true })
+    await page.waitForTimeout(120)
+    await page.locator('[data-testid="weight-unit-lb"]').click({ force: true })
     await page.waitForTimeout(150)
     await shot(page, 'hw-lb-mode.png')
 
     // 5) C’est noté.
-    await page.goto(`http://127.0.0.1:${port}/height-weight-fixture?mode=noted`, {
-      waitUntil: 'networkidle',
-    })
+    await openMode(page, 'noted')
     await page.waitForSelector('[data-testid="height-weight-noted"]')
     await shot(page, 'hw-cest-note.png')
 
     // 6) Profil Effacer
-    await page.goto(`http://127.0.0.1:${port}/height-weight-fixture?mode=erase`, {
-      waitUntil: 'networkidle',
-    })
+    await openMode(page, 'erase')
     await page.waitForSelector('[data-testid="height-weight-erase"]')
     await shot(page, 'hw-profil-effacer.png')
 
-    // Short video: flick weight → Continuer → C’est noté.
-    const videoPage = await context.newPage()
-    await videoPage.goto(`http://127.0.0.1:${port}/height-weight-fixture?mode=empty`, {
-      waitUntil: 'networkidle',
+    await context.close()
+
+    // Video context
+    const videoContext = await browser.newContext({
+      viewport: { width, height },
+      deviceScaleFactor: 2,
+      isMobile: true,
+      hasTouch: true,
+      recordVideo: { dir: artifactsDir, size: { width, height } },
     })
+    const videoPage = await videoContext.newPage()
+    await openMode(videoPage, 'empty')
     await videoPage.waitForSelector('[data-testid="number-wheel-empty"]')
-    const vWheel = videoPage.locator('[data-testid="number-wheel"]')
-    const vb = await vWheel.boundingBox()
+
+    const vb = await videoPage.locator('[data-testid="number-wheel"]').boundingBox()
     if (vb) {
-      // Finger-like flick
-      await videoPage.mouse.move(vb.x + vb.width / 2, vb.y + vb.height * 0.7)
+      await videoPage.mouse.move(vb.x + vb.width / 2, vb.y + vb.height * 0.72)
       await videoPage.mouse.down()
-      await videoPage.mouse.move(vb.x + vb.width / 2, vb.y + vb.height * 0.2, { steps: 8 })
+      await videoPage.mouse.move(vb.x + vb.width / 2, vb.y + vb.height * 0.18, { steps: 10 })
       await videoPage.mouse.up()
-      await videoPage.waitForTimeout(700)
-      // Switch to height and set
-      await videoPage.click('[data-testid="height-weight-tab-height"]')
-      await videoPage.waitForTimeout(200)
+      await videoPage.waitForTimeout(800)
+
+      await videoPage.locator('[data-testid="height-weight-tab-height"]').click({ force: true })
+      await videoPage.waitForTimeout(250)
       const hb = await videoPage.locator('[data-testid="number-wheel"]').boundingBox()
       if (hb) {
-        await videoPage.mouse.move(hb.x + hb.width / 2, hb.y + hb.height * 0.65)
+        await videoPage.mouse.move(hb.x + hb.width / 2, hb.y + hb.height * 0.68)
         await videoPage.mouse.down()
-        await videoPage.mouse.move(hb.x + hb.width / 2, hb.y + hb.height * 0.35, { steps: 6 })
+        await videoPage.mouse.move(hb.x + hb.width / 2, hb.y + hb.height * 0.32, { steps: 8 })
         await videoPage.mouse.up()
-        await videoPage.waitForTimeout(500)
+        await videoPage.waitForTimeout(600)
       }
-      await videoPage.click('[data-testid="height-weight-continue"]')
-      await videoPage.waitForSelector('[data-testid="height-weight-noted"]')
-      await videoPage.waitForTimeout(600)
+
+      await videoPage.locator('[data-testid="height-weight-continue"]').click({ force: true })
+      await videoPage.waitForSelector('[data-testid="height-weight-noted"]', { timeout: 5000 })
+      await videoPage.waitForTimeout(700)
     }
 
     await videoPage.close()
-    await context.close()
+    await videoContext.close()
     await browser.close()
 
-    // Rename recorded video
-    const { readdir, rename } = await import('node:fs/promises')
     const files = await readdir(artifactsDir)
-    const webm = files.find((f) => f.endsWith('.webm'))
+    const webm = files.find((f) => f.endsWith('.webm') && !f.startsWith('hw-'))
     if (webm) {
       const src = join(artifactsDir, webm)
-      const dest = join(artifactsDir, 'hw-wheel-flick-demo.webm')
-      await rename(src, dest)
-      console.log('video', dest)
-      // Also try ffmpeg to mp4 30fps if available
-      try {
-        const { spawnSync } = await import('node:child_process')
-        const mp4 = join(artifactsDir, 'hw-wheel-flick-demo.mp4')
-        const r = spawnSync(
-          'ffmpeg',
-          ['-y', '-i', dest, '-r', '30', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', mp4],
-          { encoding: 'utf8' },
-        )
-        if (r.status === 0 && existsSync(mp4)) console.log('video mp4', mp4)
-        else console.warn('ffmpeg skipped', r.stderr?.slice(0, 200))
-      } catch (e) {
-        console.warn('ffmpeg unavailable', e)
-      }
+      const destWebm = join(artifactsDir, 'hw-wheel-flick-demo.webm')
+      await rename(src, destWebm)
+      console.log('video', destWebm)
+      const mp4 = join(artifactsDir, 'hw-wheel-flick-demo.mp4')
+      const r = spawnSync(
+        'ffmpeg',
+        ['-y', '-i', destWebm, '-r', '30', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-an', mp4],
+        { encoding: 'utf8' },
+      )
+      if (r.status === 0 && existsSync(mp4)) console.log('video mp4', mp4)
+      else console.warn('ffmpeg failed', r.stderr?.slice(0, 300))
+    } else {
+      console.warn('no webm found', files)
     }
   } finally {
     server.kill('SIGTERM')
