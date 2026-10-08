@@ -2,9 +2,16 @@
 /**
  * Enregistre le Tilt Card Accueil à taille iPhone 17 (402×874, dsf 3) :
  * - press + move sur Séance du jour (tilt + glare)
- * - swipe horizontal du carrousel
+ * - swipe horizontal du carrousel (scrollTo + pointer touch; no CDP pinch)
  * - tap ouvre une carte
  * - Train → Accueil (cartes toujours visibles)
+ *
+ * Capture notes:
+ * - Do NOT element-screenshot a 3D-transformed node while recordVideo is on:
+ *   Playwright's screencast can briefly show the page shrunk top-left (~1/dpr)
+ *   with grey margins. That is a capture artifact (visualViewport.scale stays 1).
+ * - Harness viewport meta matches prod (maximum-scale=1, user-scalable=0).
+ *
  * Artifacts : /opt/cursor/artifacts/tilt_card.mp4 + tilt_card_pic.png
  */
 import { mkdir, copyFile } from 'node:fs/promises'
@@ -228,6 +235,35 @@ async function simulateTouchTilt(page, path, { holdMs = 80, release = true, hold
   }
 }
 
+async function readViewportScale(page) {
+  return page.evaluate(() => {
+    const vv = window.visualViewport
+    return {
+      scale: vv?.scale ?? 1,
+      vvW: vv?.width ?? window.innerWidth,
+      vvH: vv?.height ?? window.innerHeight,
+      innerW: window.innerWidth,
+      innerH: window.innerHeight,
+      dpr: window.devicePixelRatio,
+      meta: document.querySelector('meta[name="viewport"]')?.getAttribute('content') ?? '',
+    }
+  })
+}
+
+async function assertNoPageScale(page, label) {
+  const snap = await readViewportScale(page)
+  console.log(`viewport ${label}`, snap)
+  if (snap.scale !== 1) {
+    throw new Error(`${label}: visualViewport.scale=${snap.scale} (expected 1)`)
+  }
+  if (snap.innerW !== VIEWPORT.width || snap.innerH !== VIEWPORT.height) {
+    throw new Error(
+      `${label}: inner=${snap.innerW}x${snap.innerH} (expected ${VIEWPORT.width}x${VIEWPORT.height})`,
+    )
+  }
+  return snap
+}
+
 async function midTiltScreenshot(page, path) {
   const box = await page.locator('[data-accueil-hero="session"]').boundingBox()
   if (!box) throw new Error('hero box missing for mid-tilt shot')
@@ -249,17 +285,99 @@ async function midTiltScreenshot(page, path) {
   if (active !== '1') {
     throw new Error(`tilt not active for PNG (active=${active})`)
   }
-  // Full-page + card crop (crop bbox grows under perspective — proves tilt paint)
+  // Full-page only while video records. Element screenshots of a 3D-transformed
+  // node can glitch Playwright's screencast (page appears shrunk top-left).
   await page.screenshot({ path, fullPage: false })
   const planeBox = await page.locator('[data-rg-tilt-plane]').first().boundingBox()
   const heroBox = await page.locator('[data-accueil-hero="session"]').boundingBox()
   console.log('mid-tilt boxes', { planeBox, heroBox })
-  await page.locator('[data-rg-tilt-plane]').first().screenshot({
-    path: path.replace(/\.png$/, '_card.png'),
-  })
   await fireTouchPointer(page, 'pointerup', mid.x, mid.y, { buttons: 0 })
   await moveFinger(page, mid.x, mid.y, false)
   await page.waitForTimeout(400)
+}
+
+/**
+ * Horizontal carousel swipe without CDP pinch/scroll gestures.
+ * Uses scrollTo({behavior:'smooth'}) + touch pointer events on the scroller.
+ * Asserts visualViewport.scale stays 1 (rules out real page zoom).
+ */
+async function swipeCarousel(page) {
+  await assertNoPageScale(page, 'before-swipe')
+  const carousel = page.locator('[data-accueil-carousel]')
+  const beforeScroll = await carousel.evaluate((el) => el.scrollLeft)
+  const cbox = await carousel.boundingBox()
+  if (!cbox) throw new Error('carousel box missing')
+
+  const targetLeft = await carousel.evaluate((el) =>
+    Math.min(220, Math.max(160, Math.floor(el.scrollWidth / 3))),
+  )
+
+  // Optional finger cue on the scroller (not a multi-touch / pinch).
+  await ensureFingerOverlay(page)
+  const y = cbox.y + cbox.height * 0.55
+  const x0 = cbox.x + cbox.width * 0.82
+  const x1 = cbox.x + cbox.width * 0.28
+  await moveFinger(page, x0, y, true)
+
+  // Dispatch touch pointers on the carousel (bubbles; no preventDefault).
+  await page.evaluate(
+    async ({ x0, x1, y, targetLeft }) => {
+      const el = document.querySelector('[data-accueil-carousel]')
+      if (!(el instanceof HTMLElement)) throw new Error('carousel missing')
+      const fire = (type, x, extras = {}) => {
+        el.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            pointerId: 7,
+            pointerType: 'touch',
+            isPrimary: true,
+            clientX: x,
+            clientY: y,
+            ...extras,
+          }),
+        )
+      }
+      fire('pointerdown', x0, { buttons: 1 })
+      const steps = 12
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps
+        fire('pointermove', x0 + (x1 - x0) * t, { buttons: 1 })
+        // Drive scroll explicitly — mirrors iOS scroll-snap without CDP gestures.
+        el.scrollTo({ left: targetLeft * t, behavior: 'instant' })
+        await new Promise((r) => requestAnimationFrame(r))
+      }
+      fire('pointerup', x1, { buttons: 0 })
+      el.scrollTo({ left: targetLeft, behavior: 'smooth' })
+    },
+    { x0, x1, y, targetLeft },
+  )
+
+  // Sample scale while the smooth settle runs
+  const scaleSamples = []
+  for (let i = 0; i < 10; i++) {
+    await page.waitForTimeout(50)
+    scaleSamples.push(await readViewportScale(page))
+    await moveFinger(page, x0 + (x1 - x0) * Math.min(1, (i + 1) / 8), y, i < 7)
+  }
+  await moveFinger(page, x1, y, false)
+
+  for (const s of scaleSamples) {
+    if (s.scale !== 1) {
+      throw new Error(`swipe scaled the page: ${JSON.stringify(s)}`)
+    }
+    if (s.innerW !== VIEWPORT.width) {
+      throw new Error(`swipe changed innerWidth: ${JSON.stringify(s)}`)
+    }
+  }
+
+  const afterScroll = await carousel.evaluate((el) => el.scrollLeft)
+  console.log(`carousel scrollLeft ${beforeScroll} → ${afterScroll}`, { scaleSamples: scaleSamples.length })
+  if (afterScroll <= beforeScroll) {
+    throw new Error('carousel did not scroll horizontally')
+  }
+  await assertNoPageScale(page, 'after-swipe')
 }
 
 async function main() {
@@ -296,6 +414,13 @@ async function main() {
 
     await gotoHome(page)
     await assertNoErrorBanner(page)
+    await assertNoPageScale(page, 'home-ready')
+    const meta = await page.evaluate(
+      () => document.querySelector('meta[name="viewport"]')?.getAttribute('content') ?? '',
+    )
+    if (!/user-scalable=0/.test(meta) || !/maximum-scale=1/.test(meta)) {
+      throw new Error(`capture harness viewport meta must match prod zoom lock: ${meta}`)
+    }
 
     const galleryText = await page.locator('[data-accueil-gallery]').innerText()
     if (!/Séance du jour|Mon programme|Push/i.test(galleryText)) {
@@ -321,6 +446,7 @@ async function main() {
       })
     }
     await simulateTouchTilt(page, path, { holdMs: 120 })
+    await assertNoPageScale(page, 'after-tilt-1')
     await page.waitForTimeout(350)
 
     // Second tilt pass for clarity in the video
@@ -333,28 +459,20 @@ async function main() {
       })
     }
     await simulateTouchTilt(page, path2, { holdMs: 90 })
+    await assertNoPageScale(page, 'after-tilt-2')
     await page.waitForTimeout(300)
 
-    // Mid-tilt PNG while still on Accueil (separate synthetic hold)
+    // Mid-tilt PNG while still on Accueil (full-page only — no element screenshot)
     const pngLocal = join(outDir, 'tilt_card_pic.png')
     await midTiltScreenshot(page, pngLocal)
     await copyFile(pngLocal, join(artifactsDir, 'tilt_card_pic.png'))
+    await assertNoPageScale(page, 'after-mid-tilt-png')
 
-    // 3) Horizontal swipe through cards — native scroll must still work
-    const carousel = page.locator('[data-accueil-carousel]')
-    const beforeScroll = await carousel.evaluate((el) => el.scrollLeft)
-    await carousel.evaluate((el) => {
-      el.scrollBy({ left: Math.min(220, el.scrollWidth / 3), behavior: 'smooth' })
-    })
-    await page.waitForTimeout(600)
-    const afterScroll = await carousel.evaluate((el) => el.scrollLeft)
-    console.log(`carousel scrollLeft ${beforeScroll} → ${afterScroll}`)
-    if (afterScroll <= beforeScroll) {
-      throw new Error('carousel did not scroll horizontally')
-    }
+    // 3) Horizontal swipe — scrollTo + touch pointers (no CDP pinch / element shot)
+    await swipeCarousel(page)
 
     // Reset carousel
-    await carousel.evaluate((el) => {
+    await page.locator('[data-accueil-carousel]').evaluate((el) => {
       el.scrollTo({ left: 0, behavior: 'instant' })
     })
     await page.waitForTimeout(250)
