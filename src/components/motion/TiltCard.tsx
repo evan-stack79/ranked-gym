@@ -79,9 +79,11 @@ function clearTiltVars(plane: HTMLElement) {
 /**
  * Subtle 3D tilt + glare for Accueil hero cards.
  * Writes CSS vars via rAF (no React state per move). Native pointer listeners
- * (not React synthetic) so Playwright / touch sims work. Does not preventDefault
- * — horizontal carousel swipe still wins past a small threshold.
- * Transform lives on an inner plane so Reveal / clip-path stay untouched.
+ * (not React synthetic) so Playwright / touch sims work. Never preventDefault
+ * and never setPointerCapture — vertical page scroll and horizontal carousel
+ * swipe must stay with the browser. Past a small threshold, dominant vertical
+ * or horizontal motion drops the tilt (iOS may also fire pointercancel).
+ * Transform lives on an inner plane so Reveal / clip-path stay untouched (#95).
  */
 export function TiltCard({ children, className = '', disabled = false }: TiltCardProps) {
   const reduced = usePrefersReducedMotion()
@@ -139,8 +141,20 @@ export function TiltCard({ children, className = '', disabled = false }: TiltCar
       rafId = requestAnimationFrame(flushTilt)
     }
 
+    /** Drop tilt when the gesture is clearly a scroll/swipe, never block it. */
+    const shouldCancelForScroll = (dx: number, dy: number) => {
+      const absX = Math.abs(dx)
+      const absY = Math.abs(dy)
+      if (absX <= TILT_SWIPE_CANCEL_PX && absY <= TILT_SWIPE_CANCEL_PX) return false
+      // Vertical-dominant → let Accueil page scroll
+      if (absY >= absX) return true
+      // Horizontal-dominant → let carousel swipe
+      return absX > TILT_SWIPE_CANCEL_PX
+    }
+
     const onPointerDown = (event: PointerEvent) => {
       if (event.pointerType !== 'touch') return
+      // Do not setPointerCapture — that would eat vertical scroll on iOS.
       cancelled = false
       touchTracking = true
       start = { x: event.clientX, y: event.clientY }
@@ -150,10 +164,11 @@ export function TiltCard({ children, className = '', disabled = false }: TiltCar
     const onPointerMove = (event: PointerEvent) => {
       if (event.pointerType === 'touch') {
         if (!touchTracking || cancelled) return
+        // Never preventDefault — vertical pan must reach the scroll container.
         if (start) {
           const dx = event.clientX - start.x
           const dy = event.clientY - start.y
-          if (Math.abs(dx) > TILT_SWIPE_CANCEL_PX && Math.abs(dx) > Math.abs(dy)) {
+          if (shouldCancelForScroll(dx, dy)) {
             cancelled = true
             resetTilt()
             return
@@ -176,6 +191,7 @@ export function TiltCard({ children, className = '', disabled = false }: TiltCar
       }
     }
 
+    // iOS fires pointercancel when the scroll view takes over the gesture.
     const onPointerCancel = () => {
       cancelled = false
       resetTilt()
