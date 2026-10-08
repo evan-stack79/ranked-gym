@@ -18,6 +18,7 @@ const base: CalorieProfile = {
   declaredBreastfeeding: false,
   declaredEatingDisorder: false,
   preferNotAnswerHealth: false,
+  healthAnswer: 'none',
 }
 
 describe('QA BUG-05 — safetyNotices consommés via getNutritionTarget', () => {

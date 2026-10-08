@@ -14,6 +14,7 @@ const BASE_PROFILE: CalorieProfile = {
   goal: 'maintain',
   weeklyPaceKg: 0,
   onboardingComplete: true,
+  healthAnswer: 'none',
 }
 
 const BASE_TRAINING: TrainingState = {
@@ -102,6 +103,7 @@ describe('getNutritionTarget — cas écran 61,7 kg force + prise de masse', () 
     goal: 'bulk',
     weeklyPaceKg: 0.5,
     onboardingComplete: true,
+    healthAnswer: 'none',
   }
 
   beforeEach(async () => {

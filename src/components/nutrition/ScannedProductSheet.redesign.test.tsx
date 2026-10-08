@@ -32,6 +32,7 @@ const ADULT: CalorieProfile = {
   goal: 'maintain',
   weeklyPaceKg: 0,
   onboardingComplete: true,
+  healthAnswer: 'none',
 }
 
 async function flushPortal() {
@@ -235,8 +236,13 @@ describe('refonte ajout repas — AR-05…AR-13 + mineures ciblées', () => {
 
   it('AR-13 ON TCA/grossesse/mineur : pas de repère', async () => {
     const profiles: CalorieProfile[] = [
-      { ...ADULT, declaredEatingDisorder: true },
-      { ...ADULT, sex: 'female', declaredPregnancy: true },
+      { ...ADULT, healthAnswer: 'situations', declaredEatingDisorder: true },
+      {
+        ...ADULT,
+        sex: 'female',
+        healthAnswer: 'situations',
+        declaredPregnancy: true,
+      },
       { ...ADULT, age: 16 },
     ]
     for (const profile of profiles) {

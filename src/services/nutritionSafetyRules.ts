@@ -7,7 +7,7 @@
  * restrictif que 0,9 kg/sem ; c'est voulu (SEC-NUT-03 / SEC-NUT-05).
  */
 import { computeBmr } from '../utils/calories'
-import type { CalorieProfile, NutritionGoal, Sex } from '../types/nutrition'
+import type { CalorieProfile, HealthAnswerStatus, NutritionGoal, Sex } from '../types/nutrition'
 import { isCalorieGoalEnabled } from '../backend/calorieGoalFeatureFlag'
 import {
   M_CAL_3,
@@ -64,6 +64,7 @@ export type EstimationEligibilityReason =
   | 'minor'
   | 'pregnancy_or_breastfeeding'
   | 'eating_disorder'
+  | 'health_not_none'
   | 'calorie_goal_disabled'
 
 export interface HealthDeclarations {
@@ -82,10 +83,35 @@ export interface SafetyProfileInput {
   goal?: NutritionGoal | null | undefined
   weeklyPaceKg?: number | null | undefined
   declarations?: Partial<HealthDeclarations> | null
+  healthAnswer?: HealthAnswerStatus | null
+}
+
+/**
+ * Read the explicit 3-state Santé answer.
+ * Missing / unknown field → `null` (not answered) — never coerced to `'none'`.
+ */
+export function readHealthAnswer(
+  input:
+    | Pick<CalorieProfile, 'healthAnswer'>
+    | SafetyProfileInput
+    | null
+    | undefined,
+): HealthAnswerStatus | null {
+  if (!input) return null
+  const raw = 'healthAnswer' in input ? input.healthAnswer : null
+  if (raw === 'none' || raw === 'prefer_not' || raw === 'situations') return raw
+  return null
 }
 
 export function readHealthDeclarations(
-  input: Pick<CalorieProfile, 'declaredPregnancy' | 'declaredBreastfeeding' | 'declaredEatingDisorder' | 'preferNotAnswerHealth'> | SafetyProfileInput | null | undefined,
+  input: Pick<
+    CalorieProfile,
+    | 'declaredPregnancy'
+    | 'declaredBreastfeeding'
+    | 'declaredEatingDisorder'
+    | 'preferNotAnswerHealth'
+    | 'healthAnswer'
+  > | SafetyProfileInput | null | undefined,
 ): HealthDeclarations {
   if (!input) {
     return { pregnancy: false, breastfeeding: false, eatingDisorder: false, preferNotToAnswer: false }
@@ -100,11 +126,39 @@ export function readHealthDeclarations(
     }
   }
   const p = input as CalorieProfile
+  const answer = readHealthAnswer(p)
+  // Explicit none / prefer_not → no situations. Situations → flags.
+  // Legacy (no healthAnswer): keep declared* for safety gates, but prefer-not
+  // alone without healthAnswer is NOT treated as an answered prefer_not
+  // (missing ≠ « non » / ≠ prefer_not for the 3-state rule).
+  if (answer === 'none' || answer === 'prefer_not') {
+    return {
+      pregnancy: false,
+      breastfeeding: false,
+      eatingDisorder: false,
+      preferNotToAnswer: answer === 'prefer_not',
+    }
+  }
   return {
     pregnancy: Boolean(p.declaredPregnancy),
     breastfeeding: Boolean(p.declaredBreastfeeding),
     eatingDisorder: Boolean(p.declaredEatingDisorder),
-    preferNotToAnswer: Boolean(p.preferNotAnswerHealth),
+    preferNotToAnswer: false,
+  }
+}
+
+/** Active situations for weight-screen / estimate gates. */
+export function activeHealthSituations(
+  input: Pick<
+    CalorieProfile,
+    'declaredPregnancy' | 'declaredBreastfeeding' | 'declaredEatingDisorder' | 'healthAnswer'
+  > | SafetyProfileInput | null | undefined,
+): { pregnancy: boolean; breastfeeding: boolean; eatingDisorder: boolean } {
+  const d = readHealthDeclarations(input)
+  return {
+    pregnancy: d.pregnancy,
+    breastfeeding: d.breastfeeding,
+    eatingDisorder: d.eatingDisorder,
   }
 }
 
@@ -114,6 +168,14 @@ export function isValidAge(age: unknown): age is number {
 
 export function isPlausibleOnboardingAge(age: unknown): age is number {
   return typeof age === 'number' && Number.isFinite(age) && age >= PLAUSIBLE_AGE_MIN && age <= PLAUSIBLE_AGE_MAX
+}
+
+/** Lit un âge stocké : 0 / non-fini / hors plage → vide (null). Legacy 0 = empty. */
+export function sanitizeAge(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value === 0) return null
+  const rounded = Math.round(value)
+  if (!isPlausibleOnboardingAge(rounded)) return null
+  return rounded
 }
 
 export function isMinorAge(age: unknown): boolean {
@@ -179,8 +241,47 @@ export function lbToKgStorage(lb: number): number {
 export function shouldShowHeightWeightPicker(input: SafetyProfileInput): boolean {
   if (!isValidAge(input.age) || isMinorAge(input.age)) return false
   const d = readHealthDeclarations(input)
-  if (d.pregnancy || d.breastfeeding || d.eatingDisorder) return false
+  const pb = effectivePregnancyBreastfeeding(input)
+  if (pb.pregnancy || pb.breastfeeding || d.eatingDisorder) return false
   return true
+}
+
+/**
+ * Écran « Ton poids » pendant l'inscription : caché si <18 ou situation cochée.
+ * Montré pour Santé « Je préfère ne pas répondre » / Plus tard (pas d'estimation).
+ * Sex prefer_not_to_say / null : Grossesse flags can still hide weight if ticked.
+ * Sex male : stale Grossesse/Allaitement ignored; TCA still hides.
+ */
+export function shouldShowWeightScreen(input: SafetyProfileInput): boolean {
+  const age = sanitizeAge(input.age)
+  if (age == null || age < MINOR_AGE_THRESHOLD) return false
+  const d = readHealthDeclarations(input)
+  const pb = effectivePregnancyBreastfeeding(input)
+  if (pb.pregnancy || pb.breastfeeding || d.eatingDisorder) return false
+  return true
+}
+
+/**
+ * Grossesse / Allaitement UI : cachés seulement si sexe = Homme.
+ * Shown for Femme, prefer_not_to_say, and null (Plus tard / unanswered).
+ */
+export function shouldShowPregnancyBreastfeedingChoices(sex: Sex | null | undefined): boolean {
+  return sex !== 'male'
+}
+
+/**
+ * Whether pregnancy/breastfeeding flags actively block gates.
+ * When sex is Homme, stale Grossesse/Allaitement must not block
+ * (calculation, weight screen, picker). TCA is never cleared by sex.
+ */
+export function effectivePregnancyBreastfeeding(
+  input: SafetyProfileInput | Pick<CalorieProfile, 'sex' | 'declaredPregnancy' | 'declaredBreastfeeding' | 'healthAnswer'> | null | undefined,
+): { pregnancy: boolean; breastfeeding: boolean } {
+  if (!input) return { pregnancy: false, breastfeeding: false }
+  const sex = 'sex' in input ? input.sex : null
+  if (sex === 'male') return { pregnancy: false, breastfeeding: false }
+  const d = readHealthDeclarations(input)
+  return { pregnancy: d.pregnancy, breastfeeding: d.breastfeeding }
 }
 
 export function isProfileCompleteForNutrition(input: SafetyProfileInput): boolean {
@@ -204,7 +305,8 @@ export function decideLossEligibility(
   if (declarations.eatingDisorder) {
     return { eligible: false, reason: 'eating_disorder' }
   }
-  if (declarations.pregnancy || declarations.breastfeeding) {
+  const pb = effectivePregnancyBreastfeeding(input)
+  if (pb.pregnancy || pb.breastfeeding) {
     return { eligible: false, reason: 'pregnancy_or_breastfeeding' }
   }
 
@@ -250,18 +352,28 @@ export function decideEstimationEligibility(
   // d'entretien reste masquée côté UI (M-INFO-1 seul). Ici « allowed » = calcul
   // chiffré autorisé lorsque le drapeau est ON (assistant) ou pour tests injectés.
   const declarations = readHealthDeclarations(input)
+  const healthAnswer = readHealthAnswer(input)
+  const pb = effectivePregnancyBreastfeeding(input)
 
-  if (declarations.pregnancy || declarations.breastfeeding) {
+  if (pb.pregnancy || pb.breastfeeding) {
     return { allowed: false, reason: 'pregnancy_or_breastfeeding', disclaimer: Q6B_GROSSESSE_ALLAITEMENT }
   }
   if (declarations.eatingDisorder) {
     return { allowed: false, reason: 'eating_disorder', disclaimer: M_INFO_1 }
   }
+  // Mifflin only when Santé = « Aucune de ces situations » (explicit).
+  if (healthAnswer !== 'none') {
+    return { allowed: false, reason: 'health_not_none', disclaimer: M_INFO_1 }
+  }
+  // Sex must be Femme or Homme — prefer_not_to_say / null → no estimate.
+  if (input.sex !== 'male' && input.sex !== 'female') {
+    return { allowed: false, reason: 'incomplete_profile', disclaimer: null }
+  }
   if (!isProfileCompleteForNutrition(input)) {
     return { allowed: false, reason: 'incomplete_profile', disclaimer: null }
   }
-  const age = input.age as number
-  if (age < MINOR_AGE_THRESHOLD) {
+  const age = sanitizeAge(input.age)
+  if (age == null || age < MINOR_AGE_THRESHOLD) {
     return { allowed: false, reason: 'minor', disclaimer: null }
   }
   if (!enabled) {
@@ -437,8 +549,11 @@ export function applySafetyToProfile(
 ): CalorieProfile {
   const enabled = opts?.calorieGoalEnabled ?? isCalorieGoalEnabled()
   const declarations = readHealthDeclarations(profile)
+  // Preserve prefer_not_to_say; only strip unknown values to null.
   const sex: Sex | null =
-    profile.sex === 'female' || profile.sex === 'male' ? profile.sex : null
+    profile.sex === 'female' || profile.sex === 'male' || profile.sex === 'prefer_not_to_say'
+      ? profile.sex
+      : null
 
   let goal: NutritionGoal = profile.goal
   let weeklyPaceKg = profile.weeklyPaceKg
@@ -456,6 +571,7 @@ export function applySafetyToProfile(
         heightCm: profile.heightCm,
         sex,
         goalWeightKg: profile.goalWeightKg,
+        healthAnswer: profile.healthAnswer,
         declarations,
       },
       { calorieGoalEnabled: true },
@@ -475,6 +591,7 @@ export function applySafetyToProfile(
     sex,
     goal,
     weeklyPaceKg,
+    // Keep stored flags; gating uses effectivePregnancyBreastfeeding (sex=male ignores PB).
     declaredPregnancy: declarations.pregnancy,
     declaredBreastfeeding: declarations.breastfeeding,
     declaredEatingDisorder: declarations.eatingDisorder,

@@ -32,6 +32,7 @@ const ADULT: CalorieProfile = {
   goal: 'maintain',
   weeklyPaceKg: 0,
   onboardingComplete: true,
+  healthAnswer: 'none',
 }
 
 async function renderSheet(opts: {
@@ -156,7 +157,7 @@ describe('AR-01…AR-04 — pas de budget/zone/cible sans objectifs repas', () =
 
   it('ON TCA : aucun mot budget/zone/cible/restantes/bonne zone', async () => {
     const nutrition = getNutritionTarget(
-      { ...ADULT, declaredEatingDisorder: true },
+      { ...ADULT, healthAnswer: 'situations', declaredEatingDisorder: true },
       { calorieGoalEnabled: true },
     )
     const active = hasMealTargets(nutrition)
@@ -174,7 +175,12 @@ describe('AR-01…AR-04 — pas de budget/zone/cible sans objectifs repas', () =
 
   it('ON grossesse : aucun mot budget/zone/cible/restantes/bonne zone', async () => {
     const nutrition = getNutritionTarget(
-      { ...ADULT, sex: 'female', declaredPregnancy: true },
+      {
+        ...ADULT,
+        sex: 'female',
+        healthAnswer: 'situations',
+        declaredPregnancy: true,
+      },
       { calorieGoalEnabled: true },
     )
     const active = hasMealTargets(nutrition)

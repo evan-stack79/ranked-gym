@@ -104,6 +104,7 @@ export function isEngineReadyProfile(
       weightKg: profile.weightKg,
       heightCm: profile.heightCm,
       sex: profile.sex,
+      healthAnswer: profile.healthAnswer,
       declarations: readHealthDeclarations(profile),
     },
     { calorieGoalEnabled: enabled },

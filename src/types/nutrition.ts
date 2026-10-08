@@ -1,9 +1,23 @@
-export type Sex = 'male' | 'female'
+/**
+ * Profile sex — three answered values + null (Plus tard / never answered).
+ * `'prefer_not_to_say'` is stored as its own value (never coerced to male/female).
+ * Engine Mifflin still only accepts `'male' | 'female'`.
+ */
+export type Sex = 'male' | 'female' | 'prefer_not_to_say'
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'athlete'
 export type NutritionGoal = 'cut' | 'maintain' | 'bulk'
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
 /** Somatotype — used to adapt meal size & scan guidance (not a medical label). */
 export type BodyMorphology = 'ectomorph' | 'mesomorph' | 'endomorph'
+
+/**
+ * Explicit Santé answer (3 distinct states).
+ * - `null` / absent = not answered (Plus tard / legacy) — never coerced to « non »
+ * - `'none'` = « Aucune de ces situations »
+ * - `'prefer_not'` = « Je préfère ne pas répondre »
+ * - `'situations'` = one or more of Grossesse / Allaitement / TCA
+ */
+export type HealthAnswerStatus = 'none' | 'prefer_not' | 'situations'
 
 export interface CalorieProfile {
   /**
@@ -16,9 +30,18 @@ export interface CalorieProfile {
    * Taille en cm. `null` = vide (jamais 0). À la lecture, 0/hors-plage legacy → null.
    */
   heightCm: number | null
+  /**
+   * Âge en années. `0` legacy = vide (lire via sanitizeAge → null).
+   * Jamais utilisé comme un vrai âge dans les calculs.
+   */
   age: number
-  /** Null si non renseigné — plus de défaut « homme » (SEC-POP / profil incomplet). */
+  /**
+   * Null = Plus tard / never answered.
+   * `'prefer_not_to_say'` = « Je préfère ne pas répondre » (distinct, survives sync).
+   */
   sex: Sex | null
+  /** Newest sex answer wins on sync (same pattern as bodyMetricsClearedAt). */
+  sexUpdatedAt?: number | null
   activity: ActivityLevel
   morphology: BodyMorphology
   /** Explicit user choice: cut | maintain | bulk */
@@ -33,7 +56,17 @@ export interface CalorieProfile {
   declaredPregnancy?: boolean
   declaredBreastfeeding?: boolean
   declaredEatingDisorder?: boolean
+  /** @deprecated Prefer `healthAnswer === 'prefer_not'`. Kept for back-compat reads. */
   preferNotAnswerHealth?: boolean
+  /**
+   * Explicit 3-state Santé answer. Absent/null = not answered (legacy / Plus tard).
+   * Never infer « none » from missing flags alone.
+   */
+  healthAnswer?: HealthAnswerStatus | null
+  /**
+   * Tombstone / version Santé — newest wins on sync (same pattern as bodyMetricsClearedAt).
+   */
+  healthAnswerUpdatedAt?: number | null
   /**
    * Tombstone effacement taille/poids — empêche une copie cloud stale (0 ou
    * ancienne valeur) de ressusciter les mensurations après « Effacer ».

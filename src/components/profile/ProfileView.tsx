@@ -124,6 +124,7 @@ function ProfileViewContent() {
     saveCalorieProfile({
       ...current,
       ...next,
+      healthAnswerUpdatedAt: Date.now(),
     })
   }, [])
 
@@ -212,8 +213,9 @@ function ProfileViewContent() {
           value={healthValue}
           onChange={handleHealthChange}
           onOpenNeedToTalk={() => navigate('needToTalk')}
+          sex={getCalorieProfile().sex}
         />
-        {!healthValue.declaredEatingDisorder && healthValue.preferNotAnswerHealth ? (
+        {healthValue.healthAnswer === 'prefer_not' ? (
           <p className="text-[12px] text-[#8E8E93]">{M_INFO_1}</p>
         ) : null}
       </section>
