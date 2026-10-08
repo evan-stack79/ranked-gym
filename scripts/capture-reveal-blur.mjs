@@ -125,7 +125,11 @@ async function replayEntranceForStill(page) {
         'rg-reveal--instant',
       )
       if (el.hasAttribute('data-rg-blur')) el.setAttribute('data-rg-blur', 'pending')
-      if (el.hasAttribute('data-rg-reveal')) el.setAttribute('data-rg-reveal', 'pending')
+      if (el.hasAttribute('data-rg-reveal')) {
+        el.setAttribute('data-rg-reveal', 'pending')
+        const mask = el.querySelector('.rg-mask-reveal')
+        mask?.classList.remove('rg-mask-reveal--in', 'rg-mask-reveal--instant', 'rg-reveal--in')
+      }
     }
     requestAnimationFrame(() => {
       for (const el of document.querySelectorAll('[data-rg-blur], [data-rg-reveal]')) {
@@ -134,8 +138,10 @@ async function replayEntranceForStill(page) {
           el.setAttribute('data-rg-blur', 'in')
         }
         if (el.hasAttribute('data-rg-reveal')) {
-          el.classList.add('rg-reveal--in')
           el.setAttribute('data-rg-reveal', 'in')
+          const mask = el.querySelector('.rg-mask-reveal')
+          if (mask) mask.classList.add('rg-mask-reveal--in')
+          else el.classList.add('rg-reveal--in')
         }
       }
     })

@@ -21,6 +21,10 @@ export interface RevealProps {
  * Mask Reveal Up — cards: clip-path inset bottom→top + slight translateY.
  * Inspired by Animata / Magic UI (MIT), pure CSS. No opacity fade on brand logo.
  * Stagger via delayMs (≤80ms). Disabled under prefers-reduced-motion.
+ *
+ * Clip-path lives on an *inner* mask so IntersectionObserver watches an
+ * unclipped layout box. Observing a fully inset(100%) node reports ratio 0
+ * forever in Chromium/WebKit — heroes stayed invisible after Accueil remount.
  */
 export function Reveal({
   children,
@@ -38,11 +42,10 @@ export function Reveal({
       ? ({ '--rg-reveal-delay': `${delayMs}ms` } as CSSProperties)
       : undefined
 
-  const classes = [
+  const maskClasses = [
     'rg-mask-reveal',
     inView ? 'rg-mask-reveal--in' : '',
     skip ? 'rg-mask-reveal--instant' : '',
-    className,
   ]
     .filter(Boolean)
     .join(' ')
@@ -50,13 +53,14 @@ export function Reveal({
   return (
     <Tag
       ref={ref}
-      className={classes}
-      style={style}
+      className={className}
       data-rg-reveal={inView ? 'in' : 'pending'}
       data-rg-reveal-variant="mask-up"
       data-rg-motion={skip ? 'reduced' : 'on'}
     >
-      {children}
+      <div className={maskClasses} style={style}>
+        {children}
+      </div>
     </Tag>
   )
 }

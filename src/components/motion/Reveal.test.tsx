@@ -80,7 +80,8 @@ describe('Reveal (Mask Reveal Up) / BlurInUp / SoftBlurIn', () => {
     expect(el.getAttribute('data-rg-reveal')).toBe('in')
     expect(el.getAttribute('data-rg-reveal-variant')).toBe('mask-up')
     expect(el.getAttribute('data-rg-motion')).toBe('reduced')
-    expect(el.className).toContain('rg-mask-reveal--instant')
+    const mask = el.querySelector('.rg-mask-reveal') as HTMLElement
+    expect(mask?.className).toContain('rg-mask-reveal--instant')
     expect(observe).not.toHaveBeenCalled()
   })
 
@@ -187,7 +188,9 @@ describe('Reveal (Mask Reveal Up) / BlurInUp / SoftBlurIn', () => {
 
     const el = host.querySelector('[data-rg-reveal]') as HTMLElement
     expect(observe).toHaveBeenCalledTimes(1)
-    expect(el.className).toContain('rg-mask-reveal')
+    // Clip-path mask is on an inner node so IO observes an unclipped layout box.
+    expect(el.className).not.toContain('rg-mask-reveal')
+    expect(el.querySelector('.rg-mask-reveal')).not.toBeNull()
 
     act(() => {
       ioCallback?.(
@@ -207,6 +210,7 @@ describe('Reveal (Mask Reveal Up) / BlurInUp / SoftBlurIn', () => {
     })
 
     expect(el.getAttribute('data-rg-reveal')).toBe('in')
+    expect(el.querySelector('.rg-mask-reveal--in')).not.toBeNull()
     expect(disconnect).toHaveBeenCalled()
   })
 })
