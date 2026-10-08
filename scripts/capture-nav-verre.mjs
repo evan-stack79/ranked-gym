@@ -78,26 +78,10 @@ async function prepareAccueil(page) {
   await page.waitForSelector('[data-accueil-recent-tile]', { timeout: 15_000 })
   await page.waitForSelector('[data-nav-bubble][data-ready="true"]', { timeout: 15_000 })
 
-  // Demo-only: let tiles travel under the pill + make recent thumbs fill their tiles
-  // so exercise images (not near-black chrome) read through the glass blur.
+  // Demo-only: shrink main bottom pad so Accueil tiles can travel under the
+  // floating pill (shows glass blur). Do not override Accueil tile-fill styles.
   await page.addStyleTag({
-    content: `
-      [data-app-scroll-main] { padding-bottom: 28px !important; }
-      [data-accueil-recent-tile] > span:first-child {
-        background: linear-gradient(160deg, #3a3a42 0%, #1c1c22 100%) !important;
-      }
-      [data-accueil-recent-tile] .history-thumb {
-        width: 100% !important;
-        height: 100% !important;
-      }
-      [data-accueil-recent-tile] .history-thumb img {
-        object-fit: contain !important;
-        padding: 10%;
-      }
-      [data-accueil-program-tile] > span:first-child {
-        background: linear-gradient(145deg, #5a2a2a 0%, #1a1214 55%, #141416 100%) !important;
-      }
-    `,
+    content: `[data-app-scroll-main] { padding-bottom: 28px !important; }`,
   })
 
   await page.evaluate(() => {

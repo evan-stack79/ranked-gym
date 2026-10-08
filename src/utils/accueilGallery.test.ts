@@ -5,7 +5,9 @@ import {
   computeSessionProgressPercent,
   countTotalSets,
   deriveGalleryHeroCards,
+  deriveGalleryProgramTiles,
   formatGalleryRecentMeta,
+  resolveGalleryCoverSrc,
 } from './accueilGallery'
 import type { TrainingState, WorkoutRoutine } from '../types/training'
 
@@ -110,6 +112,99 @@ describe('accueilGallery progress', () => {
     expect(cards.every((c) => c.progressPercent >= 0 && c.progressPercent <= 100)).toBe(true)
     const blob = JSON.stringify(cards)
     expect(blob).not.toMatch(/kcal|calories|poids|body\s*fat|graisse/i)
+  })
+
+  it('hero session cover uses first illustratable exercise even with multi-exo routine', () => {
+    const cards = deriveGalleryHeroCards(
+      baseState({
+        routines: [
+          routine({
+            id: 'push',
+            label: 'Push',
+            exercises: [
+              {
+                id: 'a',
+                name: 'Développé couché',
+                canonicalExerciseId: 'bench_press',
+                sets: [{ reps: 8, weightKg: 60 }],
+              },
+              {
+                id: 'b',
+                name: 'Développé militaire',
+                sets: [{ reps: 10, weightKg: 30 }],
+              },
+            ],
+          }),
+        ],
+        schedule: [
+          {
+            id: 'sch-1',
+            templateId: 'tpl-push',
+            title: 'Push',
+            days: [new Date().getDay() as import('../types/training').Weekday],
+            time: '18:00',
+            enabled: true,
+            sportId: 'musculation',
+            sessionKind: 'strength',
+          },
+        ],
+      }),
+    )
+    const session = cards.find((c) => c.id === 'session')
+    expect(session?.imageSrc).toMatch(/developpe-couche/i)
+    expect(cards.find((c) => c.id === 'program')?.imageSrc).toBeNull()
+  })
+
+  it('resolveGalleryCoverSrc picks first bundled illustration', () => {
+    expect(
+      resolveGalleryCoverSrc([
+        {
+          id: 'a',
+          name: 'Développé couché',
+          canonicalExerciseId: 'bench_press',
+          sets: [{ reps: 8, weightKg: 60 }],
+        },
+      ]),
+    ).toMatch(/developpe-couche/i)
+    expect(
+      resolveGalleryCoverSrc([
+        { id: 'x', name: 'Custom', sets: [{ reps: 8, weightKg: 20 }] },
+      ]),
+    ).toBeNull()
+  })
+
+  it('program tiles expose cover from first illustratable exercise', () => {
+    const tiles = deriveGalleryProgramTiles(
+      baseState({
+        routines: [
+          routine({
+            id: 'push',
+            label: 'Push',
+            exercises: [
+              {
+                id: 'a',
+                name: 'Développé couché',
+                canonicalExerciseId: 'bench_press',
+                sets: [{ reps: 8, weightKg: 60 }],
+              },
+              {
+                id: 'b',
+                name: 'Autre',
+                sets: [{ reps: 10, weightKg: 20 }],
+              },
+            ],
+          }),
+          routine({
+            id: 'pull',
+            label: 'Pull',
+            exercises: [{ id: 'c', name: 'Tractions', sets: [{ reps: 6, weightKg: 0 }] }],
+          }),
+        ],
+      }),
+    )
+    const push = tiles.find((t) => t.id === 'push')
+    expect(push?.imageSrc).toMatch(/developpe-couche/i)
+    expect(tiles.find((t) => t.id === 'pull')?.imageSrc).toBeNull()
   })
 
   it('recent meta has no calorie or weight numbers', () => {
