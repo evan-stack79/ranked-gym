@@ -134,15 +134,15 @@ describe('TiltCard', () => {
       rootEl.dispatchEvent(
         new TestPointerEvent('pointerdown', {
           clientX: 100,
-          clientY: 80,
+          clientY: 150,
           pointerType: 'touch',
         }),
       )
-      // Stay under the horizontal swipe threshold so tilt stays active.
+      // Stay under scroll/swipe cancel thresholds so tilt stays active.
       rootEl.dispatchEvent(
         new TestPointerEvent('pointermove', {
           clientX: 108,
-          clientY: 220,
+          clientY: 156,
           pointerType: 'touch',
         }),
       )
@@ -165,7 +165,7 @@ describe('TiltCard', () => {
       rootEl.dispatchEvent(
         new TestPointerEvent('pointerup', {
           clientX: 108,
-          clientY: 220,
+          clientY: 156,
           pointerType: 'touch',
         }),
       )
@@ -237,6 +237,68 @@ describe('TiltCard', () => {
     expect(rootEl.getAttribute('data-rg-tilt-active')).toBe('0')
     expect(plane!.style.getPropertyValue('--rx')).toBe('0deg')
     expect(plane!.style.getPropertyValue('--ry')).toBe('0deg')
+  })
+
+  it('vertical-dominant move cancels tilt and never preventDefaults', () => {
+    const { rootEl, plane } = renderTilt()
+
+    act(() => {
+      rootEl.dispatchEvent(
+        new TestPointerEvent('pointerdown', {
+          clientX: 100,
+          clientY: 80,
+          pointerType: 'touch',
+        }),
+      )
+      flushRaf()
+    })
+    expect(rootEl.getAttribute('data-rg-tilt-active')).toBe('1')
+
+    const move = new TestPointerEvent('pointermove', {
+      clientX: 104,
+      clientY: 80 + TILT_SWIPE_CANCEL_PX + 20,
+      pointerType: 'touch',
+    })
+    const preventSpy = vi.spyOn(move, 'preventDefault')
+
+    act(() => {
+      rootEl.dispatchEvent(move)
+      flushRaf()
+    })
+
+    expect(preventSpy).not.toHaveBeenCalled()
+    expect(rootEl.getAttribute('data-rg-tilt-active')).toBe('0')
+    expect(plane!.style.getPropertyValue('--rx')).toBe('0deg')
+    expect(plane!.style.getPropertyValue('--ry')).toBe('0deg')
+  })
+
+  it('uses rg-tilt surface class (touch-action pan-x pan-y via CSS)', () => {
+    const { rootEl } = renderTilt()
+    expect(rootEl.classList.contains('rg-tilt')).toBe(true)
+    expect(rootEl.getAttribute('data-rg-tilt')).toBe('on')
+  })
+
+  it('does not call setPointerCapture on touch down', () => {
+    // jsdom may lack setPointerCapture — stub so we can assert TiltCard never calls it.
+    HTMLElement.prototype.setPointerCapture ??= function setPointerCapture() {}
+    HTMLElement.prototype.releasePointerCapture ??= function releasePointerCapture() {}
+    const captureSpy = vi.spyOn(HTMLElement.prototype, 'setPointerCapture')
+    const { rootEl } = renderTilt()
+
+    act(() => {
+      rootEl.dispatchEvent(
+        new TestPointerEvent('pointerdown', {
+          clientX: 100,
+          clientY: 100,
+          pointerType: 'touch',
+          pointerId: 7,
+        }),
+      )
+      flushRaf()
+    })
+
+    expect(captureSpy).not.toHaveBeenCalled()
+    captureSpy.mockRestore()
   })
 
   it('carousel scroll cancels an active tilt', () => {
