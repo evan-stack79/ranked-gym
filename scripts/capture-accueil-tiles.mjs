@@ -248,8 +248,8 @@ async function touchDrag(page, fromX, fromY, toX, toY, steps = 28, stepDelayMs =
       const el = document.elementFromPoint(x0, y0)
       const target = el?.closest('[data-accueil-edit-slot]') ?? el
       if (!(target instanceof HTMLElement)) throw new Error('drag: no slot')
-      const fire = (type, x, y, buttons = 1) =>
-        target.dispatchEvent(
+      const fire = (type, x, y, buttons = 1, node = target) =>
+        node.dispatchEvent(
           new PointerEvent(type, {
             bubbles: true,
             cancelable: true,
@@ -266,10 +266,24 @@ async function touchDrag(page, fromX, fromY, toX, toY, steps = 28, stepDelayMs =
         const t = i / n
         // Ease-in-out so the tile visibly accelerates then settles
         const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
-        fire('pointermove', x0 + (x1 - x0) * e, y0 + (y1 - y0) * e, 1)
+        const x = x0 + (x1 - x0) * e
+        const y = y0 + (y1 - y0) * e
+        // Prefer the live slot (reorder remounts detach the original target).
+        const live =
+          document.querySelector('[data-accueil-dragging="1"]') ??
+          document.elementFromPoint(x, y)?.closest('[data-accueil-edit-slot]') ??
+          target
+        fire('pointermove', x, y, 1, live)
         await new Promise((r) => setTimeout(r, delay))
       }
-      fire('pointerup', x1, y1, 0)
+      const liveEnd =
+        document.querySelector('[data-accueil-dragging="1"]') ??
+        document.elementFromPoint(x1, y1)?.closest('[data-accueil-edit-slot]') ??
+        target
+      fire('pointerup', x1, y1, 0, liveEnd)
+      // Detached-node pointerup never reaches window — force-clear drag state.
+      window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 7 }))
+      window.dispatchEvent(new Event('ranked-gym:accueil-force-drag-end'))
     },
     { fromX, fromY, toX, toY, steps, stepDelayMs },
   )
@@ -577,22 +591,22 @@ async function main() {
       36,
       48,
     )
-    // Drop settle — confirm not stuck in dragging state (force-clear if remount ate pointerup)
-    await vpage
-      .waitForFunction(
-        () => document.querySelectorAll('[data-accueil-dragging="1"]').length === 0,
-        { timeout: 2_500 },
-      )
-      .catch(async () => {
-        await vpage.evaluate(() => {
-          window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 7 }))
-          window.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerId: 7 }))
-        })
-        await vpage.waitForFunction(
-          () => document.querySelectorAll('[data-accueil-dragging="1"]').length === 0,
-          { timeout: 2_000 },
-        )
-      })
+    // Drop settle — require a stable clear (remount gaps can briefly show 0 drag nodes).
+    await vpage.evaluate(() => {
+      window.dispatchEvent(new Event('ranked-gym:accueil-force-drag-end'))
+    })
+    await vpage.waitForFunction(
+      () => {
+        const n = document.querySelectorAll('[data-accueil-dragging="1"]').length
+        if (n !== 0) {
+          window.__accueilDragZeroStreak = 0
+          return false
+        }
+        window.__accueilDragZeroStreak = (window.__accueilDragZeroStreak || 0) + 1
+        return window.__accueilDragZeroStreak >= 5
+      },
+      { timeout: 5_000, polling: 50 },
+    )
     await vpage.waitForTimeout(1100)
 
     // 3) Tap − on « Séries du jour » (must be visible on camera ~1s)
@@ -684,7 +698,14 @@ async function main() {
         `Missing on-camera steps: seriesGone=${sawSeriesGone} addOpen=${sawAddOpen} seriesBack=${sawSeriesBack}`,
       )
     }
-    // Drag must end: no sample in the last 2s still dragging
+    // Drag must be a short gesture — not stuck until trash/sheet.
+    const dragSamples = metricLog.filter((s) => (s.dragging || []).length > 0)
+    if (dragSamples.length > 0) {
+      const dragMs = dragSamples[dragSamples.length - 1].t - dragSamples[0].t
+      if (dragMs > 8_000) {
+        throw new Error(`Stuck drag lasted ${(dragMs / 1000).toFixed(1)}s (max 8s)`)
+      }
+    }
     const tMax = Math.max(...metricLog.map((s) => s.t))
     const lateDrag = metricLog.filter((s) => s.t > tMax - 2000 && (s.dragging || []).length > 0)
     if (lateDrag.length > 0) {

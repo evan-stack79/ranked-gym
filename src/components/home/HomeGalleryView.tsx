@@ -405,19 +405,23 @@ export function HomeGalleryView({
 
   // Reorder remounts the slot under the finger — keep drag alive via window
   // pointermove, and always clear on pointerup/cancel (no stuck lift).
+  // Custom event covers synthetic tests where pointerup hits a detached node.
   useEffect(() => {
     if (!draggingId) return
     const onMove = (e: PointerEvent) => {
       handleDragMove(e.clientX, e.clientY)
     }
     const onUp = () => clearDrag()
+    const onForce = () => clearDrag()
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onUp)
+    window.addEventListener('ranked-gym:accueil-force-drag-end', onForce)
     return () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onUp)
+      window.removeEventListener('ranked-gym:accueil-force-drag-end', onForce)
     }
   }, [draggingId, clearDrag, handleDragMove])
 
