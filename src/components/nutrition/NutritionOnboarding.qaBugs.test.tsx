@@ -39,11 +39,11 @@ function setNative(el: HTMLInputElement, value: string) {
   el.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
-function fillAgeSex(host: HTMLElement, ageYears: number) {
+function fillAgeSex(host: HTMLElement, ageYears: number, sexLabel: 'Homme' | 'Femme' = 'Homme') {
   const age = host.querySelector('input[aria-label="Âge"]') as HTMLInputElement
-  const male = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'Homme')
+  const sexBtn = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === sexLabel)
   setNative(age, String(ageYears))
-  male?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  sexBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
 }
 
 /** Drive NumberWheel via keyboard (Home → ArrowDown × N). */
@@ -234,9 +234,9 @@ describe('QA BUG-03 — grossesse / TCA : sortie vers l’app', () => {
     })
     expect(checkbox.checked).toBe(true)
 
-    // Grossesse → roue corps masquée ; âge + sexe suffisent
+    // Grossesse → roue corps masquée ; âge + Femme (Homme ignorerait Grossesse)
     await act(async () => {
-      fillAgeSex(host, 28)
+      fillAgeSex(host, 28, 'Femme')
     })
     expect(host.querySelector('[data-testid="height-weight-picker"]')).toBeNull()
 
@@ -391,12 +391,12 @@ describe('QA BUG-36 — adulte à risque OFF sans poids/taille peut terminer', (
   })
 
   it.each([
-    { label: 'Grossesse', field: 'declaredPregnancy' as const },
-    { label: 'Allaitement', field: 'declaredBreastfeeding' as const },
-    { label: 'Trouble du comportement', field: 'declaredEatingDisorder' as const },
+    { label: 'Grossesse', field: 'declaredPregnancy' as const, sex: 'Femme' as const },
+    { label: 'Allaitement', field: 'declaredBreastfeeding' as const, sex: 'Femme' as const },
+    { label: 'Trouble du comportement', field: 'declaredEatingDisorder' as const, sex: 'Homme' as const },
   ])(
     '$label : Continuer vers l’app sans poids ni taille',
-    async ({ label, field }) => {
+    async ({ label, field, sex }) => {
       const saved: { current: CalorieProfile | null } = { current: null }
       const { host, cleanup } = await renderOnboarding((p) => {
         saved.current = p
@@ -410,7 +410,7 @@ describe('QA BUG-36 — adulte à risque OFF sans poids/taille peut terminer', (
       })
 
       await act(async () => {
-        fillAgeSex(host, 30)
+        fillAgeSex(host, 30, sex)
       })
       // Situations à risque : roue taille/poids masquée (pas de saisie corps)
       expect(host.querySelector('[data-testid="height-weight-picker"]')).toBeNull()

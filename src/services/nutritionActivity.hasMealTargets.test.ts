@@ -13,6 +13,7 @@ const ADULT: CalorieProfile = {
   goal: 'maintain',
   weeklyPaceKg: 0,
   onboardingComplete: true,
+  healthAnswer: 'none',
 }
 
 describe('hasMealTargets — AR-01…AR-04 (cause racine)', () => {
@@ -35,7 +36,7 @@ describe('hasMealTargets — AR-01…AR-04 (cause racine)', () => {
 
   it('ON TCA → pas d’objectifs repas', () => {
     const nutrition = getNutritionTarget(
-      { ...ADULT, declaredEatingDisorder: true },
+      { ...ADULT, healthAnswer: 'situations', declaredEatingDisorder: true },
       { calorieGoalEnabled: true },
     )
     expect(hasMealTargets(nutrition)).toBe(false)
@@ -44,7 +45,12 @@ describe('hasMealTargets — AR-01…AR-04 (cause racine)', () => {
 
   it('ON grossesse → pas d’objectifs repas', () => {
     const nutrition = getNutritionTarget(
-      { ...ADULT, sex: 'female', declaredPregnancy: true },
+      {
+        ...ADULT,
+        sex: 'female',
+        healthAnswer: 'situations',
+        declaredPregnancy: true,
+      },
       { calorieGoalEnabled: true },
     )
     expect(hasMealTargets(nutrition)).toBe(false)

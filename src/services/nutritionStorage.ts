@@ -25,7 +25,7 @@ import {
   sanitizeHeightCm,
   sanitizeWeightKg,
 } from './nutritionSafetyRules'
-import type { Sex } from '../types/nutrition'
+import type { HealthAnswerStatus, Sex } from '../types/nutrition'
 import { clearQueuedConvexNutritionOpsForUser } from './convexNutritionQueue'
 
 const PROFILE_BASE = 'ranked-gym:nutrition-profile'
@@ -147,6 +147,7 @@ export const BLANK_PROFILE: CalorieProfile = {
   heightCm: null,
   age: 0,
   sex: null,
+  sexUpdatedAt: null,
   activity: 'moderate',
   morphology: 'mesomorph',
   goal: 'maintain',
@@ -156,6 +157,8 @@ export const BLANK_PROFILE: CalorieProfile = {
   declaredBreastfeeding: false,
   declaredEatingDisorder: false,
   preferNotAnswerHealth: false,
+  healthAnswer: null,
+  healthAnswerUpdatedAt: null,
   bodyMetricsClearedAt: null,
 }
 
@@ -205,7 +208,7 @@ function normalizeGoal(value: unknown, fallback: NutritionGoal): NutritionGoal {
 }
 
 function normalizeSex(value: unknown): Sex | null {
-  if (value === 'female' || value === 'male') return value
+  if (value === 'female' || value === 'male' || value === 'prefer_not_to_say') return value
   return null
 }
 
@@ -230,25 +233,61 @@ export function normalizeCalorieProfile(input: CalorieProfile): CalorieProfile {
       ? input.bodyMetricsClearedAt
       : null
 
+  const healthAnswer = normalizeHealthAnswer(input.healthAnswer)
+  const healthAnswerUpdatedAt =
+    typeof input.healthAnswerUpdatedAt === 'number' && Number.isFinite(input.healthAnswerUpdatedAt)
+      ? input.healthAnswerUpdatedAt
+      : null
+
+  // Sync preferNotAnswerHealth with explicit healthAnswer for back-compat readers.
+  const preferNotAnswerHealth =
+    healthAnswer === 'prefer_not' ? true : healthAnswer != null ? false : Boolean(input.preferNotAnswerHealth)
+
+  const sexUpdatedAt =
+    typeof input.sexUpdatedAt === 'number' && Number.isFinite(input.sexUpdatedAt)
+      ? input.sexUpdatedAt
+      : null
+
   const draft: CalorieProfile = {
     weightKg,
     goalWeightKg,
     heightCm,
     age,
     sex: normalizeSex(input.sex),
+    sexUpdatedAt,
     activity: input.activity || 'moderate',
     morphology: input.morphology || 'mesomorph',
     goal,
     weeklyPaceKg,
     onboardingComplete: Boolean(input.onboardingComplete),
-    declaredPregnancy: Boolean(input.declaredPregnancy),
-    declaredBreastfeeding: Boolean(input.declaredBreastfeeding),
-    declaredEatingDisorder: Boolean(input.declaredEatingDisorder),
-    preferNotAnswerHealth: Boolean(input.preferNotAnswerHealth),
+    declaredPregnancy: healthAnswer === 'situations' ? Boolean(input.declaredPregnancy) : Boolean(input.declaredPregnancy) && healthAnswer == null,
+    declaredBreastfeeding:
+      healthAnswer === 'situations'
+        ? Boolean(input.declaredBreastfeeding)
+        : Boolean(input.declaredBreastfeeding) && healthAnswer == null,
+    declaredEatingDisorder:
+      healthAnswer === 'situations'
+        ? Boolean(input.declaredEatingDisorder)
+        : Boolean(input.declaredEatingDisorder) && healthAnswer == null,
+    preferNotAnswerHealth,
+    healthAnswer,
+    healthAnswerUpdatedAt,
     bodyMetricsClearedAt: clearedAt,
   }
 
+  // When explicit none/prefer_not, clear situation flags.
+  if (healthAnswer === 'none' || healthAnswer === 'prefer_not') {
+    draft.declaredPregnancy = false
+    draft.declaredBreastfeeding = false
+    draft.declaredEatingDisorder = false
+  }
+
   return applySafetyToProfile(draft)
+}
+
+function normalizeHealthAnswer(value: unknown): HealthAnswerStatus | null {
+  if (value === 'none' || value === 'prefer_not' || value === 'situations') return value
+  return null
 }
 
 export function getCalorieProfile(): CalorieProfile {
@@ -275,6 +314,7 @@ export function getCalorieProfile(): CalorieProfile {
     heightCm: asOptionalBodyMetric(stored.heightCm),
     age: asFiniteNumber(stored.age, 0),
     sex: normalizeSex(stored.sex),
+    sexUpdatedAt: typeof stored.sexUpdatedAt === 'number' ? stored.sexUpdatedAt : null,
     activity: stored.activity || 'moderate',
     morphology: stored.morphology || 'mesomorph',
     goal: normalizeGoal(stored.goal, 'maintain'),
@@ -284,6 +324,9 @@ export function getCalorieProfile(): CalorieProfile {
     declaredBreastfeeding: Boolean(stored.declaredBreastfeeding),
     declaredEatingDisorder: Boolean(stored.declaredEatingDisorder),
     preferNotAnswerHealth: Boolean(stored.preferNotAnswerHealth),
+    healthAnswer: normalizeHealthAnswer(stored.healthAnswer),
+    healthAnswerUpdatedAt:
+      typeof stored.healthAnswerUpdatedAt === 'number' ? stored.healthAnswerUpdatedAt : null,
     bodyMetricsClearedAt:
       typeof stored.bodyMetricsClearedAt === 'number' ? stored.bodyMetricsClearedAt : null,
   })
@@ -318,26 +361,39 @@ export function mergeCalorieProfilesForSync(
   const remoteNorm = normalizeCalorieProfile(remote)
   const localCleared = localNorm.bodyMetricsClearedAt ?? 0
   const remoteCleared = remoteNorm.bodyMetricsClearedAt ?? 0
+  const localHealthAt = localNorm.healthAnswerUpdatedAt ?? 0
+  const remoteHealthAt = remoteNorm.healthAnswerUpdatedAt ?? 0
+  const localSexAt = localNorm.sexUpdatedAt ?? 0
+  const remoteSexAt = remoteNorm.sexUpdatedAt ?? 0
 
-  if (localCleared > remoteCleared) {
-    return normalizeCalorieProfile({
-      ...remoteNorm,
-      weightKg: null,
-      heightCm: null,
-      goalWeightKg: null,
-      bodyMetricsClearedAt: localCleared,
-      // Preserve other local onboarding flags when erase is local-authoritative.
-      onboardingComplete: localNorm.onboardingComplete || remoteNorm.onboardingComplete,
-      age: localNorm.age > 0 ? localNorm.age : remoteNorm.age,
-      sex: localNorm.sex ?? remoteNorm.sex,
-      declaredPregnancy: localNorm.declaredPregnancy,
-      declaredBreastfeeding: localNorm.declaredBreastfeeding,
-      declaredEatingDisorder: localNorm.declaredEatingDisorder,
-      preferNotAnswerHealth: localNorm.preferNotAnswerHealth,
-    })
-  }
+  // Newest Santé / sex answers win (same pattern as bodyMetricsClearedAt).
+  const healthWinner = localHealthAt >= remoteHealthAt ? localNorm : remoteNorm
+  const sexWinner = localSexAt >= remoteSexAt ? localNorm : remoteNorm
 
-  return remoteNorm
+  const base =
+    localCleared > remoteCleared
+      ? {
+          ...remoteNorm,
+          weightKg: null as null,
+          heightCm: null as null,
+          goalWeightKg: null as null,
+          bodyMetricsClearedAt: localCleared,
+          onboardingComplete: localNorm.onboardingComplete || remoteNorm.onboardingComplete,
+          age: localNorm.age > 0 ? localNorm.age : remoteNorm.age,
+        }
+      : { ...remoteNorm }
+
+  return normalizeCalorieProfile({
+    ...base,
+    sex: sexWinner.sex,
+    sexUpdatedAt: sexWinner.sexUpdatedAt ?? null,
+    declaredPregnancy: healthWinner.declaredPregnancy,
+    declaredBreastfeeding: healthWinner.declaredBreastfeeding,
+    declaredEatingDisorder: healthWinner.declaredEatingDisorder,
+    preferNotAnswerHealth: healthWinner.preferNotAnswerHealth,
+    healthAnswer: healthWinner.healthAnswer ?? null,
+    healthAnswerUpdatedAt: healthWinner.healthAnswerUpdatedAt ?? null,
+  })
 }
 
 export function saveCalorieProfile(

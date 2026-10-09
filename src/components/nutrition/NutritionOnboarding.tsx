@@ -551,6 +551,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               onChange={applyHealthChange}
               showTcaMessage
               onOpenNeedToTalk={() => setShowNeedToTalk(true)}
+              sex={sex}
             />
             <MeasurementsFields
               weightKg={weightKg}
@@ -589,6 +590,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               onChange={applyHealthChange}
               showTcaMessage
               onOpenNeedToTalk={() => setShowNeedToTalk(true)}
+              sex={sex}
             />
 
             {!isRestrictedHealth ? (

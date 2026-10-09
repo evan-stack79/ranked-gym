@@ -26,6 +26,7 @@ const adultBase = {
   weightKg: 70,
   heightCm: 175,
   sex: 'female' as const,
+  healthAnswer: 'none' as const,
 }
 
 describe('Âge — éligibilité', () => {

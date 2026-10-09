@@ -121,6 +121,7 @@ export function getNutritionTarget(
       weightKg: profile.weightKg,
       heightCm: profile.heightCm,
       sex: profile.sex,
+      healthAnswer: profile.healthAnswer,
       declarations,
     },
     { calorieGoalEnabled: true },

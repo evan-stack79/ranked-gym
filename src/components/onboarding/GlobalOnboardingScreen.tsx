@@ -1,18 +1,22 @@
 import { useCallback, useState } from 'react'
-import { Sparkles } from 'lucide-react'
 import { NutritionOnboarding } from '../nutrition/NutritionOnboarding'
+import { InscriptionFlow } from './InscriptionFlow'
 import {
   getCalorieProfile,
   saveCalorieProfile,
 } from '../../services/nutritionStorage'
 import type { CalorieProfile } from '../../types/nutrition'
 import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
-import { M_INFO_1 } from '../../content/safetyCopy'
 
 interface GlobalOnboardingScreenProps {
   onComplete: () => void
 }
 
+/**
+ * Shell d'inscription.
+ * Drapeau calorie OFF (défaut) → InscriptionFlow une question / écran.
+ * Drapeau ON → NutritionOnboarding assistant (inchangé).
+ */
 export function GlobalOnboardingScreen({ onComplete }: GlobalOnboardingScreenProps) {
   const [profile, setProfile] = useState<CalorieProfile>(() => getCalorieProfile())
   const calorieGoalEnabled = isCalorieGoalEnabled()
@@ -46,22 +50,12 @@ export function GlobalOnboardingScreen({ onComplete }: GlobalOnboardingScreenPro
         </div>
       </header>
 
-      <main
-        className="relative z-10 mx-auto w-full max-w-lg flex-1 overflow-y-auto px-5 pb-8 pt-6"
-      >
-        <header className="mb-8 ios-fade-up">
-          <h1 className="text-[28px] font-bold leading-tight tracking-tight text-white">
-            {calorieGoalEnabled ? 'Ton plan sur mesure' : 'Bienvenue'}
-          </h1>
-          <p className="mt-2 flex items-start gap-2 text-[15px] leading-snug text-[#8E8E93]">
-            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#FFD60A]" />
-            {calorieGoalEnabled
-              ? 'Objectif, morphologie et rythme — on calcule tes calories et macros.'
-              : M_INFO_1}
-          </p>
-        </header>
-
-        <NutritionOnboarding initial={profile} onComplete={handleComplete} />
+      <main className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col overflow-y-auto px-5 pb-8 pt-6">
+        {calorieGoalEnabled ? (
+          <NutritionOnboarding initial={profile} onComplete={handleComplete} />
+        ) : (
+          <InscriptionFlow initial={profile} onComplete={handleComplete} />
+        )}
       </main>
     </div>
   )

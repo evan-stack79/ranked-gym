@@ -1,11 +1,16 @@
-import { Q7_INTRO, M_INFO_1, M_TCA_1 } from '../../content/safetyCopy'
-import type { CalorieProfile } from '../../types/nutrition'
+import { Q7_INTRO, M_TCA_1 } from '../../content/safetyCopy'
+import type { CalorieProfile, HealthAnswerStatus } from '../../types/nutrition'
+import {
+  readHealthAnswer,
+  shouldShowPregnancyBreastfeedingChoices,
+} from '../../services/nutritionSafetyRules'
 
 export interface HealthSituationsValue {
   declaredPregnancy: boolean
   declaredBreastfeeding: boolean
   declaredEatingDisorder: boolean
   preferNotAnswerHealth: boolean
+  healthAnswer: HealthAnswerStatus | null
 }
 
 interface HealthSituationsFormProps {
@@ -13,14 +18,18 @@ interface HealthSituationsFormProps {
   onChange: (next: HealthSituationsValue) => void
   onOpenNeedToTalk?: () => void
   showTcaMessage?: boolean
+  /** Current sex — hides Grossesse/Allaitement only when Homme. */
+  sex?: CalorieProfile['sex']
 }
 
 export function healthSituationsFromProfile(profile: CalorieProfile): HealthSituationsValue {
+  const answer = readHealthAnswer(profile)
   return {
     declaredPregnancy: Boolean(profile.declaredPregnancy),
     declaredBreastfeeding: Boolean(profile.declaredBreastfeeding),
     declaredEatingDisorder: Boolean(profile.declaredEatingDisorder),
-    preferNotAnswerHealth: Boolean(profile.preferNotAnswerHealth),
+    preferNotAnswerHealth: answer === 'prefer_not',
+    healthAnswer: answer,
   }
 }
 
@@ -29,21 +38,43 @@ export function HealthSituationsForm({
   onChange,
   onOpenNeedToTalk,
   showTcaMessage = true,
+  sex = null,
 }: HealthSituationsFormProps) {
-  const setFlag = (key: keyof HealthSituationsValue, checked: boolean) => {
-    if (key === 'preferNotAnswerHealth' && checked) {
-      onChange({
-        declaredPregnancy: false,
-        declaredBreastfeeding: false,
-        declaredEatingDisorder: false,
-        preferNotAnswerHealth: true,
-      })
-      return
-    }
+  const showPregBreast = shouldShowPregnancyBreastfeedingChoices(sex)
+  const answer = value.healthAnswer
+
+  const emit = (partial: Partial<HealthSituationsValue>) => {
+    const next = { ...value, ...partial }
     onChange({
-      ...value,
-      [key]: checked,
-      preferNotAnswerHealth: key === 'preferNotAnswerHealth' ? checked : false,
+      ...next,
+      preferNotAnswerHealth: next.healthAnswer === 'prefer_not',
+      healthAnswer: next.healthAnswer,
+    })
+  }
+
+  const toggleSituation = (key: 'declaredPregnancy' | 'declaredBreastfeeding' | 'declaredEatingDisorder') => {
+    const flipped = !value[key]
+    const pregnancy = key === 'declaredPregnancy' ? flipped : value.declaredPregnancy
+    const breastfeeding = key === 'declaredBreastfeeding' ? flipped : value.declaredBreastfeeding
+    const eatingDisorder = key === 'declaredEatingDisorder' ? flipped : value.declaredEatingDisorder
+    const any = pregnancy || breastfeeding || eatingDisorder
+    emit({
+      declaredPregnancy: pregnancy,
+      declaredBreastfeeding: breastfeeding,
+      declaredEatingDisorder: eatingDisorder,
+      healthAnswer: any ? 'situations' : null,
+      preferNotAnswerHealth: false,
+    })
+  }
+
+  const pickExclusive = (next: 'none' | 'prefer_not') => {
+    const cleared = answer === next ? null : next
+    emit({
+      healthAnswer: cleared,
+      declaredPregnancy: false,
+      declaredBreastfeeding: false,
+      declaredEatingDisorder: false,
+      preferNotAnswerHealth: cleared === 'prefer_not',
     })
   }
 
@@ -51,37 +82,46 @@ export function HealthSituationsForm({
     <section className="space-y-3" data-testid="health-situations-form">
       <p className="text-[13px] leading-relaxed text-[#AEAEB2]">{Q7_INTRO}</p>
       <div className="space-y-2">
-        {(
-          [
-            { key: 'declaredPregnancy' as const, label: 'Grossesse' },
-            { key: 'declaredBreastfeeding' as const, label: 'Allaitement' },
-            {
-              key: 'declaredEatingDisorder' as const,
-              label: 'Trouble du comportement alimentaire (actuel ou passé)',
-            },
-            { key: 'preferNotAnswerHealth' as const, label: 'Je préfère ne pas répondre' },
-          ] as const
-        ).map((item) => (
-          <label
-            key={item.key}
-            className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 bg-black/25 px-3.5 py-3"
-          >
-            <input
-              type="checkbox"
-              className="mt-1"
-              checked={value[item.key]}
-              onChange={(e) => setFlag(item.key, e.target.checked)}
+        {showPregBreast ? (
+          <>
+            <HealthRow
+              label="Grossesse"
+              checked={answer === 'situations' && value.declaredPregnancy}
+              onToggle={() => toggleSituation('declaredPregnancy')}
+              testId="health-pregnancy"
             />
-            <span className="text-[14px] font-medium text-white">{item.label}</span>
-          </label>
-        ))}
+            <HealthRow
+              label="Allaitement"
+              checked={answer === 'situations' && value.declaredBreastfeeding}
+              onToggle={() => toggleSituation('declaredBreastfeeding')}
+              testId="health-breastfeeding"
+            />
+          </>
+        ) : null}
+        <HealthRow
+          label="Trouble du comportement alimentaire (actuel ou passé)"
+          checked={answer === 'situations' && value.declaredEatingDisorder}
+          onToggle={() => toggleSituation('declaredEatingDisorder')}
+          testId="health-tca"
+        />
+      </div>
+      <div className="h-2" aria-hidden />
+      <div className="space-y-2">
+        <HealthRow
+          label="Aucune de ces situations"
+          checked={answer === 'none'}
+          onToggle={() => pickExclusive('none')}
+          testId="health-none"
+        />
+        <HealthRow
+          label="Je préfère ne pas répondre"
+          checked={answer === 'prefer_not'}
+          onToggle={() => pickExclusive('prefer_not')}
+          testId="health-prefer-not"
+        />
       </div>
 
-      {value.preferNotAnswerHealth ? (
-        <p className="text-[12px] leading-relaxed text-[#8E8E93]">{M_INFO_1}</p>
-      ) : null}
-
-      {showTcaMessage && value.declaredEatingDisorder ? (
+      {showTcaMessage && answer === 'situations' && value.declaredEatingDisorder ? (
         <div className="space-y-2 rounded-2xl border border-white/10 bg-[#FF9F0A]/10 p-3.5">
           <p className="text-[13px] leading-relaxed text-[#EBEBF5]">{M_TCA_1}</p>
           {onOpenNeedToTalk ? (
@@ -96,5 +136,27 @@ export function HealthSituationsForm({
         </div>
       ) : null}
     </section>
+  )
+}
+
+function HealthRow({
+  label,
+  checked,
+  onToggle,
+  testId,
+}: {
+  label: string
+  checked: boolean
+  onToggle: () => void
+  testId: string
+}) {
+  return (
+    <label
+      className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 bg-black/25 px-3.5 py-3"
+      data-testid={testId}
+    >
+      <input type="checkbox" className="mt-1" checked={checked} onChange={onToggle} />
+      <span className="text-[14px] font-medium text-white">{label}</span>
+    </label>
   )
 }
