@@ -90,10 +90,7 @@ import { TrainGymLeaderboardCard } from './TrainGymLeaderboardCard'
 import { TrainBeginnerProgrammeCard } from './TrainBeginnerProgrammeCard'
 import { beginnerProgrammeEligibility } from '../../services/beginnerProgramme'
 import { BEGINNER_PROGRAMME_ID } from '../../data/beginnerProgramme'
-import {
-  countSessionsInParisWeek,
-  isTrainWeekEmpty,
-} from '../../services/trainWeekProgress'
+import { countSessionsInParisWeek } from '../../services/trainWeekProgress'
 import { resolveTrainStartSessionAction } from '../../services/trainStartSession'
 import {
   dismissRestReminderForCurrentWeek,
@@ -248,10 +245,6 @@ export function TrainingView({
   )
   const recentSessions = useMemo(
     () => deriveRecentSessions(state.workoutNotes, now, 1),
-    [state.workoutNotes, now],
-  )
-  const weekEmpty = useMemo(
-    () => isTrainWeekEmpty(state.workoutNotes, now),
     [state.workoutNotes, now],
   )
   const weekSessionCount = useMemo(
@@ -810,7 +803,10 @@ export function TrainingView({
         <div className="flex flex-col gap-4" data-training-hub>
           <TrainWeekStrip days={weekStrip} />
 
-          {weekEmpty ? <TrainStartSessionCard onStart={startLikePlayButton} /> : null}
+          <TrainStartSessionCard
+            onStart={startLikePlayButton}
+            resume={Boolean(state.activeWorkoutDraft)}
+          />
 
           <TrainWeeklyGoalCard
             doneCount={weekSessionCount}

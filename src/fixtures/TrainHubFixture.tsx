@@ -209,8 +209,6 @@ function TrainHubCardsFixture({ scene }: { scene: string }) {
     doneOverride != null ? doneOverride : countSessionsInParisWeek(state.workoutNotes, now)
   const weeklyGoal = parseWeeklySessionGoal(state.weeklySessionGoal)
   const showRest = shouldShowRestReminder(state.workoutNotes, state.restReminder, now)
-  const weekEmpty = weekCount === 0
-
   const startLikePlayButton = () => {
     const draft = getTrainingState().activeWorkoutDraft
     const action = resolveTrainStartSessionAction(Boolean(draft))
@@ -292,7 +290,10 @@ function TrainHubCardsFixture({ scene }: { scene: string }) {
         <h1 className="text-[34px] font-bold tracking-tight text-white">Train</h1>
         <TrainWeekStrip days={weekStrip} />
 
-        {weekEmpty ? <TrainStartSessionCard onStart={startLikePlayButton} /> : null}
+        <TrainStartSessionCard
+          onStart={startLikePlayButton}
+          resume={Boolean(state.activeWorkoutDraft)}
+        />
 
         <TrainWeeklyGoalCard
           doneCount={weekCount}

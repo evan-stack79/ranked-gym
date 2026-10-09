@@ -321,6 +321,65 @@ describe('accueil Train — maquette unique', () => {
     host.remove()
   })
 
+  it('start session card is always rendered (even when the week already has sessions)', async () => {
+    seedHub('bench')
+    const { host, cleanup } = await renderHub()
+    const card = host.querySelector('[data-testid="train-start-session-card"]')
+    expect(card).toBeTruthy()
+    expect(card?.textContent).toContain('Commencer ma séance')
+    expect(card?.getAttribute('data-resume')).toBeNull()
+    await cleanup()
+  })
+
+  it('start session card shows Reprendre when a draft is active', async () => {
+    seedHub('bench')
+    const raw = JSON.parse(localStorage.getItem('ranked-gym:training') ?? '{}') as Record<
+      string,
+      unknown
+    >
+    localStorage.setItem(
+      'ranked-gym:training',
+      JSON.stringify({
+        ...raw,
+        activeWorkoutDraft: {
+          routineId: 'upper',
+          sportId: 'musculation',
+          startedAt: NOW - 45_000,
+          updatedAt: NOW,
+          elapsedActiveMs: 40_000,
+          runningSince: NOW - 5_000,
+          paused: false,
+          activeExerciseIndex: 0,
+          restTimer: null,
+        },
+        routines: [
+          {
+            id: 'upper',
+            label: 'Upper',
+            subtitle: '',
+            accent: '#FF2B2B',
+            updatedAt: NOW,
+            exercises: [
+              {
+                id: 'ex-row',
+                name: 'Row barre',
+                canonicalExerciseId: 'barbell_row',
+                sets: [{ reps: 0, weightKg: 0 }],
+              },
+            ],
+          },
+        ],
+      }),
+    )
+    const { host, cleanup } = await renderHub()
+    const card = host.querySelector('[data-testid="train-start-session-card"]')
+    expect(card).toBeTruthy()
+    expect(card?.getAttribute('data-resume')).toBe('1')
+    expect(card?.textContent).toContain('Reprendre ma séance')
+    expect(card?.textContent).not.toContain('Commencer ma séance')
+    await cleanup()
+  })
+
   it('Commencer ma séance card uses the same ▶ start path (opens Nouvelle séance)', async () => {
     seedHub('empty')
     const host = document.createElement('div')

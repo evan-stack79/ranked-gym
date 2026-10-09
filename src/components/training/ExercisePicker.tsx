@@ -79,7 +79,6 @@ export function ExercisePicker({
       data-picker-mode={mode}
       style={{
         paddingTop: 'max(0.5rem, env(safe-area-inset-top))',
-        paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
       }}
     >
       {/* Top chrome — logo panthère seul, pas de wordmark / pas de bascule programme */}
@@ -149,74 +148,91 @@ export function ExercisePicker({
           ) : null}
         </label>
 
-        {/* Results — lignes sobres, scroll au-dessus du clavier */}
-        <ul
-          id={listId}
-          role="listbox"
-          aria-label="Résultats d’exercices"
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[env(keyboard-inset-height,0px)] [-webkit-overflow-scrolling:touch]"
-        >
-          {results.map((ex, index) => (
-            <ExerciseResultRow
-              key={ex.id}
-              exercise={ex}
-              active={index === 0}
-              onSelect={() => onSelect(ex)}
-            />
-          ))}
-          {results.length === 0 ? (
-            <li className="px-1 py-8 text-center text-[14px] text-[#8E8E93]">
-              Aucun exercice trouvé
-            </li>
-          ) : null}
-        </ul>
-
-        {/* Footer */}
-        <div className="shrink-0 pt-2">
-          {customOpen ? (
-            <div className="mb-3 space-y-2">
-              <label className="block">
-                <span className="sr-only">Nom de l’exercice personnalisé</span>
-                <input
-                  type="text"
-                  value={customName}
-                  onChange={(e) => setCustomName(e.target.value)}
-                  placeholder="Nom de ton exercice"
-                  autoFocus
-                  className="min-h-11 w-full rounded-xl border border-white/12 bg-[#1c1c1e] px-3.5 text-[15px] text-white placeholder:text-[#636366] outline-none focus-visible:border-[#FF2B2B]/55"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitCustom()
-                  }}
-                />
-              </label>
-              <button
-                type="button"
-                onClick={submitCustom}
-                disabled={!customName.trim()}
-                className="ios-press flex min-h-11 w-full items-center justify-center rounded-xl bg-[#FF2B2B] text-[14px] font-semibold text-white disabled:opacity-40"
-              >
-                Créer et ajouter
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                setCustomOpen(true)
-                setCustomName(query.trim())
-              }}
-              className="ios-press mb-1 flex min-h-11 w-full items-center justify-center text-[14px] font-semibold text-white"
-            >
-              + Créer un exercice personnalisé
-            </button>
-          )}
-          <p
-            className="pb-1 text-center text-[12px] tabular-nums text-[#636366]"
-            aria-live="polite"
-            data-result-count
+        {/* Results + sticky create CTA — list pads by button height + safe area */}
+        <div className="relative min-h-0 flex-1">
+          <ul
+            id={listId}
+            role="listbox"
+            aria-label="Résultats d’exercices"
+            data-testid="exercise-picker-list"
+            className="absolute inset-0 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+            data-list-pad-bottom="create-btn+safe"
+            style={{
+              // Sticky create button (min-h-11) + count row + gaps + safe area (+ keyboard)
+              paddingBottom:
+                'calc(4.75rem + max(0.75rem, env(safe-area-inset-bottom, 0px)) + env(keyboard-inset-height, 0px))',
+            }}
           >
-            {totalMatches} résultat{totalMatches === 1 ? '' : 's'}
-          </p>
+            {results.map((ex, index) => (
+              <ExerciseResultRow
+                key={ex.id}
+                exercise={ex}
+                active={index === 0}
+                onSelect={() => onSelect(ex)}
+              />
+            ))}
+            {results.length === 0 ? (
+              <li className="px-1 py-8 text-center text-[14px] text-[#8E8E93]">
+                Aucun exercice trouvé
+              </li>
+            ) : null}
+          </ul>
+
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black via-black/95 to-transparent pt-4"
+            data-testid="exercise-picker-footer"
+            style={{
+              paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))',
+            }}
+          >
+            <div className="pointer-events-auto px-0">
+              {customOpen ? (
+                <div className="mb-3 space-y-2">
+                  <label className="block">
+                    <span className="sr-only">Nom de l’exercice personnalisé</span>
+                    <input
+                      type="text"
+                      value={customName}
+                      onChange={(e) => setCustomName(e.target.value)}
+                      placeholder="Nom de ton exercice"
+                      autoFocus
+                      className="min-h-11 w-full rounded-xl border border-white/12 bg-[#1c1c1e] px-3.5 text-[15px] text-white placeholder:text-[#636366] outline-none focus-visible:border-[#FF2B2B]/55"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') submitCustom()
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={submitCustom}
+                    disabled={!customName.trim()}
+                    className="ios-press flex min-h-11 w-full items-center justify-center rounded-xl bg-[#FF2B2B] text-[14px] font-semibold text-white disabled:opacity-40"
+                  >
+                    Créer et ajouter
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomOpen(true)
+                    setCustomName(query.trim())
+                  }}
+                  className="ios-press mb-1 flex min-h-11 w-full items-center justify-center text-[14px] font-semibold text-white"
+                  data-testid="exercise-picker-create"
+                >
+                  + Créer un exercice personnalisé
+                </button>
+              )}
+              <p
+                className="pb-1 text-center text-[12px] tabular-nums text-[#636366]"
+                aria-live="polite"
+                data-result-count
+              >
+                {totalMatches} résultat{totalMatches === 1 ? '' : 's'}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </section>
