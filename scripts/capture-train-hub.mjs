@@ -217,10 +217,17 @@ async function capture() {
         return t === '2/2' && r === '1'
       })
       await page.waitForSelector('[data-testid="train-weekly-goal-spark"]', { timeout: 8000 })
-      await page.waitForTimeout(1100)
+      // Hold while the normal spark plays (~650ms) + a beat
+      await page.waitForTimeout(1400)
 
       // Explicit 4× slow-mo spark pass
       await openScene(page, 'spark-slow')
+      await page.waitForFunction(() => {
+        const t = document.querySelector('[data-testid="train-weekly-goal-progress"]')?.textContent
+        const r = document.querySelector('[data-testid="train-weekly-goal-fill"]')?.getAttribute('data-ratio')
+        return t === '1/2' && r === '0.5'
+      })
+      await page.waitForTimeout(300)
       await page.waitForFunction(() => {
         const t = document.querySelector('[data-testid="train-weekly-goal-progress"]')?.textContent
         const r = document.querySelector('[data-testid="train-weekly-goal-fill"]')?.getAttribute('data-ratio')
@@ -231,7 +238,8 @@ async function capture() {
         const el = document.querySelector('[data-testid="train-weekly-goal-spark"]')
         return el && Number(el.getAttribute('data-spark-ms')) >= 2000
       })
-      await page.waitForTimeout(3200)
+      // Hold full 4× spark (~2600ms) + buffer
+      await page.waitForTimeout(3400)
 
       // 4) Rest + dismiss
       await openScene(page, 'rest')

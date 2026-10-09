@@ -156,19 +156,21 @@ export function TrainWeeklyGoalCard({
         .train-weekly-goal-spark {
           pointer-events: none;
           position: absolute;
-          right: 2px;
+          right: 0;
           top: 50%;
-          width: 12px;
-          height: 12px;
-          margin-top: -6px;
+          width: 18px;
+          height: 18px;
+          margin-top: -9px;
           border-radius: 9999px;
           background: #ff2b2b;
           box-shadow:
-            14px -9px 0 -2px #ff2b2b,
-            -12px -11px 0 -2px #ff2b2b,
-            16px 6px 0 -2px #ff2b2b,
-            -14px 8px 0 -2px #ff2b2b,
-            0 -16px 0 -2px #ff2b2b;
+            0 0 0 3px rgba(255, 43, 43, 0.45),
+            0 0 18px 4px rgba(255, 43, 43, 0.85),
+            18px -12px 0 -3px #ff2b2b,
+            -16px -14px 0 -3px #ff2b2b,
+            20px 8px 0 -3px #ff2b2b,
+            -18px 10px 0 -3px #ff2b2b,
+            0 -20px 0 -3px #ff2b2b;
           animation-name: train-weekly-goal-spark-burst;
           animation-duration: ${sparkMs}ms;
           animation-timing-function: var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
@@ -177,9 +179,10 @@ export function TrainWeeklyGoalCard({
           animation-direction: normal;
         }
         @keyframes train-weekly-goal-spark-burst {
-          0% { opacity: 0; transform: scale(0.85); }
-          18% { opacity: 1; transform: scale(1.05); }
-          100% { opacity: 0; transform: scale(1.35); }
+          0% { opacity: 0; transform: scale(0.7); }
+          15% { opacity: 1; transform: scale(1.15); }
+          55% { opacity: 1; transform: scale(1.05); }
+          100% { opacity: 0; transform: scale(1.5); }
         }
         @media (prefers-reduced-motion: reduce) {
           .train-weekly-goal-spark { animation: none !important; opacity: 0; }

@@ -54,7 +54,12 @@ export function ExercisePicker({
   const totalMatches = useMemo(() => countExerciseMatches(query, sportIds), [query, sportIds])
 
   useEffect(() => {
-    // Focus search after paint — clavier web OK, résultats visibles au-dessus.
+    // Autofocus only on fine pointers — on touch, the keyboard would cover the list.
+    try {
+      if (window.matchMedia('(pointer: coarse)').matches) return
+    } catch {
+      /* ignore */
+    }
     const t = window.setTimeout(() => searchRef.current?.focus(), 60)
     return () => window.clearTimeout(t)
   }, [])
