@@ -13,6 +13,7 @@ import { TrainUxFixture } from './fixtures/TrainUxFixture.tsx'
 import { WaterGoalFixture } from './fixtures/WaterGoalFixture.tsx'
 import { HeightWeightFixture } from './fixtures/HeightWeightFixture.tsx'
 import { InscriptionFixture } from './fixtures/InscriptionFixture.tsx'
+import { AddFoodScreenFixture } from './fixtures/AddFoodScreenFixture.tsx'
 import { LegalDocumentScreen } from './components/legal/LegalDocumentScreen.tsx'
 import { legalKindFromPath } from './components/legal/legalRoutes.ts'
 import { ConvexClientProvider } from './lib/ConvexClientProvider.tsx'
@@ -44,6 +45,7 @@ function resolveBootTree() {
   if (legal) return <LegalDocumentScreen kind={legal} />
   if (QA_FIXTURES_ENABLED && path === '/accueil-fixture') return <ColdLaunchAccueilFixture />
   if (QA_FIXTURES_ENABLED && path === '/nutrition-fixture') return <NutritionUxFixture />
+  if (QA_FIXTURES_ENABLED && path === '/add-food-fixture') return <AddFoodScreenFixture />
   if (QA_FIXTURES_ENABLED && path === '/water-goal-fixture') return <WaterGoalFixture />
   if (QA_FIXTURES_ENABLED && path === '/height-weight-fixture') return <HeightWeightFixture />
   if (QA_FIXTURES_ENABLED && path === '/inscription-fixture') return <InscriptionFixture />
@@ -66,6 +68,7 @@ function isColdLaunchPath() {
   // Motion / UX fixtures skip cold-launch gate for clean capture demos
   if (QA_FIXTURES_ENABLED && path === '/accueil-fixture') return false
   if (QA_FIXTURES_ENABLED && path === '/nutrition-fixture') return false
+  if (QA_FIXTURES_ENABLED && path === '/add-food-fixture') return false
   if (QA_FIXTURES_ENABLED && path === '/water-goal-fixture') return false
   if (QA_FIXTURES_ENABLED && path === '/height-weight-fixture') return false
   if (QA_FIXTURES_ENABLED && path === '/inscription-fixture') return false

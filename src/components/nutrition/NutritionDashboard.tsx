@@ -27,7 +27,6 @@ import {
 } from '../../utils/userWaterGoal'
 import {
   listPersonalFoods,
-  setPersonalFoodFavorite,
   searchOpenFoodFacts,
   type OpenFoodFactsProduct,
   type OpenFoodFactsSearchHit,
@@ -64,6 +63,14 @@ import {
 } from '../../utils/nutritionDate'
 import { todayKey } from '../../utils/calories'
 import { persistScannedProductSelection } from './persistScannedProductSelection'
+import {
+  primaryOffTagForCategory,
+  type FoodCategoryId,
+} from '../../utils/foodCategories'
+import {
+  buildFoodNutritionSnapshot,
+  mealEntryFromSnapshot,
+} from '../../utils/foodJournalSnapshot'
 
 type DashboardToast = {
   message: string
@@ -117,6 +124,7 @@ export function NutritionDashboard({
   const [searchHits, setSearchHits] = useState<OpenFoodFactsSearchHit[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
+  const [foodCategory, setFoodCategory] = useState<FoodCategoryId>('all')
   const [toast, setToast] = useState<DashboardToast | null>(null)
   const photoRef = useRef<MealPhotoAnalyzerHandle>(null)
   const journalRef = useRef<HTMLDivElement>(null)
@@ -186,7 +194,10 @@ export function NutritionDashboard({
     }
 
     const term = searchQuery.trim()
-    if (term.length < 2) {
+    const categoryTag = primaryOffTagForCategory(foodCategory)
+    const needsRemote = term.length >= 2 || Boolean(categoryTag)
+
+    if (!needsRemote) {
       setSearchError(null)
       setSearchLoading(false)
       let cancelled = false
@@ -203,6 +214,8 @@ export function NutritionDashboard({
               glucides: item.glucides,
               lipides: item.lipides,
               imageUrl: item.imageUrl,
+              servingSize: null,
+              categoriesTags: [],
               provenance: item.provenance,
               fetchedAt: item.fetchedAt,
               foodKey: item.foodKey,
@@ -224,7 +237,7 @@ export function NutritionDashboard({
     setSearchError(null)
 
     const timer = window.setTimeout(() => {
-      void searchOpenFoodFacts(term, controller.signal)
+      void searchOpenFoodFacts(term, controller.signal, { categoryTag })
         .then((hits) => {
           if (controller.signal.aborted) return
           setSearchHits(hits)
@@ -238,13 +251,13 @@ export function NutritionDashboard({
         .finally(() => {
           if (!controller.signal.aborted) setSearchLoading(false)
         })
-    }, 500)
+    }, term.length >= 2 ? 500 : 120)
 
     return () => {
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [searchQuery, showForm])
+  }, [searchQuery, showForm, foodCategory])
 
   const nutrition = useMemo(() => {
     void tick
@@ -298,10 +311,12 @@ export function NutritionDashboard({
     setSearchHits([])
     setSearchError(null)
     setSearchLoading(false)
+    setFoodCategory('all')
     setShowForm(false)
   }
 
   const openAddFood = (type?: MealType) => {
+    if (readHealthDeclarations(profile).eatingDisorder) return
     if (type) {
       setMealType(type)
       setPendingMealType(type)
@@ -309,6 +324,29 @@ export function NutritionDashboard({
       setPendingMealType(null)
     }
     setShowForm(true)
+  }
+
+  const handleValidateFoodSelection = (hits: OpenFoodFactsSearchHit[]) => {
+    const type = pendingMealType ?? mealType
+    let journal = getJournalForDate(selectedDateKey)
+    for (const hit of hits) {
+      const snapshot = buildFoodNutritionSnapshot(hit)
+      const entry = mealEntryFromSnapshot(snapshot, type)
+      journal = addMealToDate(selectedDateKey, entry)
+      if (user) {
+        void persistScannedProductSelection(hit, user.id, (message) => {
+          showToast(message, 'error')
+        })
+      }
+    }
+    setMeals(journal.meals)
+    setTick((n) => n + 1)
+    setPendingMealType(null)
+    resetForm()
+    setJournalDetailOpen(true)
+    showToast(
+      hits.length === 1 ? 'Aliment ajouté.' : `${hits.length} aliments ajoutés.`,
+    )
   }
 
   const selectDate = (dateKey: string) => {
@@ -397,32 +435,6 @@ export function NutritionDashboard({
       showToast("L'ajout n'a pas fonctionné. Réessaie.", 'error')
     }
   }
-
-  const handleToggleFavorite = useCallback(
-    (hit: OpenFoodFactsSearchHit) => {
-      if (!hit.foodKey) return
-      requireAuth(() => {
-        const next = !hit.isFavorite
-        void setPersonalFoodFavorite(hit.foodKey!, next)
-          .then((applied) => {
-            if (!applied) {
-              showToast('Impossible de mettre à jour le favori.', 'error')
-              return
-            }
-            setSearchHits((prev) =>
-              prev.map((item) =>
-                item.foodKey === hit.foodKey ? { ...item, isFavorite: next } : item,
-              ),
-            )
-            showToast(next ? 'Ajouté aux favoris.' : 'Retiré des favoris.')
-          })
-          .catch(() => {
-            showToast('Impossible de mettre à jour le favori.', 'error')
-          })
-      })
-    },
-    [requireAuth, showToast],
-  )
 
   const handleAdd = (event: FormEvent) => {
     event.preventDefault()
@@ -633,12 +645,15 @@ export function NutritionDashboard({
           />
         </Reveal>
 
-        <NutritionQuickActions onAction={handleQuickAction} />
+        {!declarations.eatingDisorder ? (
+          <NutritionQuickActions onAction={handleQuickAction} />
+        ) : null}
 
         <NutritionDayMealsCard
           meals={meals}
-          onAddMeal={openAddFood}
+          onAddMeal={declarations.eatingDisorder ? () => undefined : openAddFood}
           onEditMeal={setEditingMeal}
+          hideAdd={declarations.eatingDisorder}
         />
 
         <div ref={journalRef} className="scroll-mt-4">
@@ -743,19 +758,16 @@ export function NutritionDashboard({
         onProduct={handleScannedProduct}
       />
 
-      {showForm ? (
+      {showForm && !declarations.eatingDisorder ? (
         <AddFoodScreen
           searchQuery={searchQuery}
           onSearchQueryChange={setSearchQuery}
           searchLoading={searchLoading}
           searchError={searchError}
           searchHits={searchHits}
-          onSelectHit={(hit) => {
-            handleScannedProduct(hit)
-            setSearchQuery('')
-            setSearchHits([])
-          }}
-          onToggleFavorite={handleToggleFavorite}
+          category={foodCategory}
+          onCategoryChange={setFoodCategory}
+          onValidateSelection={handleValidateFoodSelection}
           onOpenScanner={() => openScanner()}
           scannerSlot={
             scannerOpen ? (
