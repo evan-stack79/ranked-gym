@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Check, Play } from 'lucide-react'
 import { BrandMark } from '../components/brand/BrandMark'
 import { BottomNav } from '../components/layout/BottomNav'
@@ -32,7 +32,7 @@ export function AnimationsFixture() {
   const [xpCurrent, setXpCurrent] = useState(360)
   const [expandFrom, setExpandFrom] = useState<CardExpandRect | null>(null)
   const [waveKey, setWaveKey] = useState(0)
-  const [waveActive, setWaveActive] = useState(true)
+  const [waveActive, setWaveActive] = useState(false)
   const [streakOpen, setStreakOpen] = useState(false)
   const [playKey, setPlayKey] = useState(0)
   const [pressHeld, setPressHeld] = useState(false)
@@ -63,18 +63,25 @@ export function AnimationsFixture() {
   }, [])
 
   const fillProgress = useCallback(() => {
+    // Hold ~30% long enough to read on video, then fill to 100% + sparks.
     setProgress(0.3)
     setXpCurrent(360)
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        setProgress(1)
-        setXpCurrent(1200)
-      })
-    })
+    window.setTimeout(() => {
+      setProgress(1)
+      setXpCurrent(1200)
+    }, animMs(700))
   }, [])
 
   const restartPlayBreathe = useCallback(() => {
     setPlayKey((k) => k + 1)
+  }, [])
+
+  // First paint: cards mount hidden, then wave plays (visible on video / reload).
+  useEffect(() => {
+    const id = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setWaveActive(true))
+    })
+    return () => window.cancelAnimationFrame(id)
   }, [])
 
   const sessionDemos = (

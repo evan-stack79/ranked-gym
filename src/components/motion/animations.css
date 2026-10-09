@@ -46,7 +46,32 @@
   --rg-play-breathe-count: 2;
 }
 
-/* Slow-motion pass for QA capture (4×). Base tokens stay ≤600ms for WCAG contract. */
+/* Slow-motion passes for QA capture. Base tokens stay ≤600ms for WCAG contract. */
+html[data-rg-anim-slow='2'] {
+  --rg-anim-slow: 2;
+  --rg-session-total-ms: 1160;
+  --rg-session-circle-dur: 840ms;
+  --rg-session-fill-dur: 560ms;
+  --rg-session-fill-delay: 440ms;
+  --rg-session-check-dur: 520ms;
+  --rg-session-check-delay: 600ms;
+  --rg-session-scale-dur: 440ms;
+  --rg-session-scale-delay: 720ms;
+  --rg-session-spark-dur: 800ms;
+  --rg-session-spark-delay: 560ms;
+  --rg-session-label-dur: 440ms;
+  --rg-session-label-delay: 640ms;
+  --rg-set-pop-dur: 800ms;
+  --rg-tab-fade-dur: 360ms;
+  --rg-card-expand-dur: 560ms;
+  --rg-vt-dur: 560ms;
+  --rg-wave-card-dur: 840ms;
+  --rg-wave-stagger: 80ms;
+  --rg-progress-fill-dur: 840ms;
+  --rg-progress-spark-dur: 800ms;
+  --rg-play-breathe-dur: 1800ms;
+}
+
 html[data-rg-anim-slow='4'] {
   --rg-anim-slow: 4;
   --rg-session-total-ms: 2320;
@@ -71,6 +96,30 @@ html[data-rg-anim-slow='4'] {
   --rg-progress-spark-dur: 1600ms;
   --rg-play-breathe-dur: 3600ms;
 }
+
+
+/* Streak overlay — ×2 */
+html[data-rg-anim-slow='2'] .streak-celeb { animation-duration: 360ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__flash { animation-duration: 360ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__ring { animation-duration: 1040ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__star { animation-duration: 960ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__particle { animation-duration: 1240ms; }
+html[data-rg-anim-slow='2'] .streak-celeb--compress .streak-celeb__flame-wrap { animation-duration: 600ms; }
+html[data-rg-anim-slow='2'] .streak-celeb--launch .streak-celeb__flame-wrap { animation-duration: 600ms; }
+html[data-rg-anim-slow='2'] .streak-celeb--lit .streak-celeb__flame-wrap,
+html[data-rg-anim-slow='2'] .streak-celeb--reveal .streak-celeb__flame-wrap,
+html[data-rg-anim-slow='2'] .streak-celeb--week .streak-celeb__flame-wrap,
+html[data-rg-anim-slow='2'] .streak-celeb--settled .streak-celeb__flame-wrap { animation-duration: 840ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__count--old { animation-duration: 640ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__count--new { animation-duration: 840ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__label { animation-duration: 760ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__message { animation-duration: 840ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__week { animation-duration: 1040ms; }
+html[data-rg-anim-slow='2'] .streak-celeb--week .streak-celeb__week-fill,
+html[data-rg-anim-slow='2'] .streak-celeb--settled .streak-celeb__week-fill { animation-duration: 1400ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__panther { animation-duration: 1040ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__panther--badge { animation-duration: 760ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__day-flame { animation-duration: 720ms; }
 
 /* Streak overlay uses hardcoded ms in index.css — stretch the visible ones ×4. */
 html[data-rg-anim-slow='4'] .streak-celeb {
@@ -288,7 +337,8 @@ html[data-rg-anim-slow='4'] .streak-celeb__day-flame {
 }
 
 @keyframes rg-set-boing {
-  50% { transform: scale(0.9); }
+  0% { transform: scale(0.72); }
+  55% { transform: scale(1.12); }
   100% { transform: scale(1); }
 }
 
@@ -484,10 +534,13 @@ html[data-rg-anim-slow='4'] .streak-celeb__day-flame {
 
 @keyframes rg-play-glow-breathe {
   0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--rg-anim-accent) 55%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--rg-anim-accent) 70%, transparent);
+  }
+  45% {
+    box-shadow: 0 0 18px 16px color-mix(in srgb, var(--rg-anim-accent) 45%, transparent);
   }
   100% {
-    box-shadow: 0 0 0 28px color-mix(in srgb, var(--rg-anim-accent) 0%, transparent);
+    box-shadow: 0 0 0 32px color-mix(in srgb, var(--rg-anim-accent) 0%, transparent);
   }
 }
 
