@@ -94,6 +94,7 @@ import {
   countSessionsInParisWeek,
   isTrainWeekEmpty,
 } from '../../services/trainWeekProgress'
+import { resolveTrainStartSessionAction } from '../../services/trainStartSession'
 import {
   dismissRestReminderForCurrentWeek,
   shouldShowRestReminder,
@@ -348,7 +349,8 @@ export function TrainingView({
   const startLikePlayButton = useCallback(() => {
     requireAuth(() => {
       const draft = getTrainingState().activeWorkoutDraft
-      if (draft) {
+      const action = resolveTrainStartSessionAction(Boolean(draft))
+      if (action === 'resume-draft' && draft) {
         setState(ensureActiveWorkoutClock())
         openNotebook(draft.routineId, null, true)
         return
@@ -385,7 +387,8 @@ export function TrainingView({
   useEffect(() => {
     if (!openActivitySheet) return
     const draft = getTrainingState().activeWorkoutDraft
-    if (draft) {
+    const action = resolveTrainStartSessionAction(Boolean(draft))
+    if (action === 'resume-draft' && draft) {
       setState(ensureActiveWorkoutClock())
       openNotebook(draft.routineId, null, true)
     } else {

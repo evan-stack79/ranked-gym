@@ -320,4 +320,60 @@ describe('accueil Train — maquette unique', () => {
     await act(async () => root.unmount())
     host.remove()
   })
+
+  it('Commencer ma séance card uses the same ▶ start path (opens Nouvelle séance)', async () => {
+    seedHub('empty')
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const value = buildAuthContextValue({
+      isAuthenticated: true,
+      isLoading: false,
+      requireAuth: (onSuccess) => {
+        onSuccess()
+      },
+    })
+    await act(async () => {
+      root.render(
+        <AuthStateProvider value={value}>
+          <RestTimerProvider>
+            <TrainingView />
+          </RestTimerProvider>
+        </AuthStateProvider>,
+      )
+    })
+    const card = host.querySelector('[data-testid="train-start-session-card"]')
+    expect(card).toBeTruthy()
+    expect(host.textContent).not.toContain('Séance démarrée')
+    await act(async () => {
+      card?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    const sheetFromCard = document.querySelector('[data-new-session-sheet]')
+    expect(sheetFromCard).toBeTruthy()
+    expect(sheetFromCard?.textContent).toContain('Musculation')
+    await act(async () => root.unmount())
+    host.remove()
+
+    // ▶ path (openActivitySheet prop) opens the identical sheet
+    const host2 = document.createElement('div')
+    document.body.appendChild(host2)
+    const root2 = createRoot(host2)
+    await act(async () => {
+      root2.render(
+        <AuthStateProvider value={value}>
+          <RestTimerProvider>
+            <TrainingView openActivitySheet />
+          </RestTimerProvider>
+        </AuthStateProvider>,
+      )
+    })
+    const sheetFromPlay = document.querySelector('[data-new-session-sheet]')
+    expect(sheetFromPlay).toBeTruthy()
+    expect(sheetFromPlay?.textContent).toContain('Musculation')
+    expect(sheetFromPlay?.textContent).toContain('Course')
+    expect(sheetFromPlay?.textContent).toContain('Football')
+    expect(sheetFromPlay?.textContent).toContain('Autre activité')
+    await act(async () => root2.unmount())
+    host2.remove()
+  })
 })

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Capture Train hub improvements @ 390×844 + walkthrough video.
+ * Capture Train hub improvements @ 390×844 + walkthrough video @ 30fps.
  * Usage: node scripts/capture-train-hub.mjs
  */
 import { mkdir, readdir, rename } from 'node:fs/promises'
@@ -75,7 +75,7 @@ async function capture() {
   try {
     browser = await chromium.launch(chromiumLaunchOptions)
 
-    // Empty + start card
+    // Empty + start card → real Nouvelle séance → carnet (same as ▶)
     {
       const context = await browser.newContext({
         viewport: { width, height },
@@ -88,7 +88,10 @@ async function capture() {
       await page.waitForSelector('[data-testid="train-start-session-card"]')
       await shot(page, 'train-empty-start-card.png')
       await page.locator('[data-testid="train-start-session-card"]').click({ force: true })
-      await page.waitForSelector('[data-testid="train-hub-started"]')
+      await page.waitForSelector('[data-new-session-sheet]')
+      await page.getByRole('button', { name: 'Musculation' }).click({ force: true })
+      await page.waitForSelector('#workout-notebook')
+      await page.waitForTimeout(300)
       await shot(page, 'train-start-card-tapped.png')
       await context.close()
     }
@@ -129,7 +132,7 @@ async function capture() {
       await context.close()
     }
 
-    // Beginner programme opened (exercise list + Gainage + Machine prise)
+    // Beginner programme opened (list + Machine prise + Gainage in-card timer)
     {
       const context = await browser.newContext({
         viewport: { width, height },
@@ -141,16 +144,14 @@ async function capture() {
       await openScene(page, 'beginner-open')
       await page.waitForSelector('[data-testid="train-beginner-session"]')
       await page.waitForSelector('[data-testid="train-machine-busy-badge"]')
-      await page.waitForSelector('[data-testid="train-beginner-exercise-list"]')
       await shot(page, 'train-beginner-programme.png')
-      // Scroll to Gainage row / hold panel for secondary shot
       await page.locator('[data-testid="gainage-hold-panel"]').scrollIntoViewIfNeeded()
       await page.waitForTimeout(200)
       await shot(page, 'train-beginner-gainage.png')
       await context.close()
     }
 
-    // Video walkthrough
+    // Video walkthrough @ record then encode 30fps
     {
       const videoContext = await browser.newContext({
         viewport: { width, height },
@@ -161,19 +162,21 @@ async function capture() {
       })
       const page = await videoContext.newPage()
 
-      // Empty page + big card → tap starts session
+      // 1) Empty → Commencer → Nouvelle séance → Musculation → carnet
       await openScene(page, 'empty')
       await page.waitForSelector('[data-testid="train-start-session-card"]')
-      await page.waitForTimeout(900)
+      await page.waitForTimeout(800)
       await page.locator('[data-testid="train-start-session-card"]').click({ force: true })
-      await page.waitForSelector('[data-testid="train-hub-started"]')
-      await page.locator('[data-testid="train-hub-started"]').scrollIntoViewIfNeeded()
+      await page.waitForSelector('[data-new-session-sheet]')
+      await page.waitForTimeout(700)
+      await page.getByRole('button', { name: 'Musculation' }).click({ force: true })
+      await page.waitForSelector('#workout-notebook')
       await page.waitForTimeout(1200)
 
-      // Goal picker 1–5 (empty week — no spark mid-cycle; hold each value ~1s)
+      // 2) Goal picker 1–5
       await openScene(page, 'goal')
       await page.waitForSelector('[data-testid="train-weekly-goal-select"]')
-      await page.waitForTimeout(800)
+      await page.waitForTimeout(600)
       const goalSelect = page.locator('[data-testid="train-weekly-goal-select"]')
       for (const n of ['1', '2', '3', '4', '5']) {
         await goalSelect.selectOption(n)
@@ -181,46 +184,61 @@ async function capture() {
           (v) => document.querySelector('[data-testid="train-weekly-goal-select"]')?.value === v,
           n,
         )
-        // Flash select border so the change is obvious on compressed video
-        await goalSelect.evaluate((el) => {
-          el.style.outline = '2px solid #FF2B2B'
-        })
-        await page.waitForTimeout(900)
-        await goalSelect.evaluate((el) => {
-          el.style.outline = ''
-        })
-        await page.waitForTimeout(150)
+        await page.waitForTimeout(550)
       }
       await page.waitForTimeout(400)
 
-      // Bar filling + single spark at 100%
+      // 3) Bar 1/2 → 2/2 + spark, then 4× slow-mo spark pass
       await openScene(page, 'spark')
-      await page.waitForSelector('[data-testid="train-weekly-goal"]')
-      await page.waitForSelector('[data-testid="train-weekly-goal-fill"][data-ratio="1"]')
-      await page.waitForTimeout(1500)
+      await page.waitForSelector('[data-testid="train-weekly-goal-progress"]')
+      await page.waitForFunction(() => {
+        const t = document.querySelector('[data-testid="train-weekly-goal-progress"]')?.textContent
+        return t === '1/2'
+      })
+      await page.waitForTimeout(400)
+      await page.waitForFunction(() => {
+        const t = document.querySelector('[data-testid="train-weekly-goal-progress"]')?.textContent
+        return t === '2/2'
+      })
+      await page.waitForSelector('[data-testid="train-weekly-goal-spark"]', { timeout: 5000 })
+      await page.waitForTimeout(900)
+      // Slow-mo remount (4×) — wait for spark with data-spark-ms = 650*4
+      await page.waitForFunction(() => {
+        const el = document.querySelector('[data-testid="train-weekly-goal-spark"]')
+        return el && Number(el.getAttribute('data-spark-ms')) >= 2000
+      }, null, { timeout: 8000 }).catch(() => null)
+      await page.waitForTimeout(2800)
 
-      // Rest reminder + dismiss (hold after dismiss before next scene)
+      // Explicit second slow-mo scene for clarity
+      await openScene(page, 'spark-slow')
+      await page.waitForFunction(() => {
+        const t = document.querySelector('[data-testid="train-weekly-goal-progress"]')?.textContent
+        return t === '2/2'
+      })
+      await page.waitForSelector('[data-testid="train-weekly-goal-spark"]', { timeout: 5000 })
+      await page.waitForTimeout(3200)
+
+      // 4) Rest + dismiss
       await openScene(page, 'rest')
       await page.waitForSelector('[data-testid="train-rest-reminder"]')
-      await page.waitForTimeout(1100)
+      await page.waitForTimeout(1000)
       await page.locator('[data-testid="train-rest-reminder-dismiss"]').click({ force: true })
       await page.waitForFunction(() => !document.querySelector('[data-testid="train-rest-reminder"]'))
-      await page.waitForTimeout(1100)
+      await page.waitForTimeout(900)
 
-      // Programme opened — stay at top (Machine prise) then scroll to Gainage
+      // 5) Programme opened — Machine prise then Gainage (timer in-card, no duplicate title)
       await openScene(page, 'beginner')
-      await page.waitForTimeout(600)
+      await page.waitForTimeout(500)
       await page.locator('[data-testid="train-beginner-start"]').click({ force: true })
       await page.waitForSelector('[data-testid="train-beginner-session"]')
       await page.waitForSelector('[data-testid="train-machine-busy-badge"]')
-      await page.locator('[data-testid="train-machine-busy-swap"]').scrollIntoViewIfNeeded()
-      await page.waitForTimeout(1600)
+      await page.waitForTimeout(1400)
       await page.locator('[data-testid="gainage-hold-panel"]').scrollIntoViewIfNeeded()
-      await page.waitForTimeout(900)
+      await page.waitForTimeout(800)
       await page.locator('[data-testid="gainage-hold-toggle"]').click({ force: true })
       await page.waitForTimeout(1200)
       await page.locator('[data-testid="gainage-hold-done"]').click({ force: true })
-      await page.waitForTimeout(700)
+      await page.waitForTimeout(600)
 
       await page.close()
       await videoContext.close()
@@ -240,7 +258,19 @@ async function capture() {
       const mp4 = join(artifactsDir, 'train-hub-demo.mp4')
       const r = spawnSync(
         'ffmpeg',
-        ['-y', '-i', destWebm, '-r', '30', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-an', mp4],
+        [
+          '-y',
+          '-i',
+          destWebm,
+          '-r',
+          '30',
+          '-c:v',
+          'libx264',
+          '-pix_fmt',
+          'yuv420p',
+          '-an',
+          mp4,
+        ],
         { encoding: 'utf8' },
       )
       if (r.status === 0 && existsSync(mp4)) console.log('video mp4', mp4)

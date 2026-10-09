@@ -31,16 +31,23 @@ export function TrainWeeklyGoalCard({
   sparkShownWeekKey,
   onChangeTarget,
   onSparkShown,
+  /** Override spark duration (QA/demo slow-mo only). App default stays WEEKLY_GOAL_SPARK_MS. */
+  sparkDurationMs,
 }: {
   doneCount: number
   target: WeeklySessionGoalTarget
   sparkShownWeekKey?: string | null
   onChangeTarget: (next: WeeklySessionGoalTarget) => void
   onSparkShown: (weekKey: string) => void
+  sparkDurationMs?: number
 }) {
   const labelId = useId()
   const reduced = prefersReducedMotion()
   const weekKey = parisWeekKey()
+  const sparkMs =
+    typeof sparkDurationMs === 'number' && sparkDurationMs > 0
+      ? sparkDurationMs
+      : WEEKLY_GOAL_SPARK_MS
   const cappedRatio = Math.min(1, target > 0 ? doneCount / target : 0)
   const reached = doneCount >= target && target > 0
   const [spark, setSpark] = useState(false)
@@ -59,9 +66,9 @@ export function TrainWeeklyGoalCard({
     }
     setSpark(true)
     onSparkShown(weekKey)
-    const t = window.setTimeout(() => setSpark(false), WEEKLY_GOAL_SPARK_MS + 50)
+    const t = window.setTimeout(() => setSpark(false), sparkMs + 50)
     return () => window.clearTimeout(t)
-  }, [reached, sparkShownWeekKey, weekKey, reduced, onSparkShown])
+  }, [reached, sparkShownWeekKey, weekKey, reduced, onSparkShown, sparkMs])
 
   return (
     <section
@@ -122,7 +129,7 @@ export function TrainWeeklyGoalCard({
           <span
             className="train-weekly-goal-spark"
             data-testid="train-weekly-goal-spark"
-            data-spark-ms={String(WEEKLY_GOAL_SPARK_MS)}
+            data-spark-ms={String(sparkMs)}
             data-spark-flashes="1"
             aria-hidden
           />
@@ -130,26 +137,26 @@ export function TrainWeeklyGoalCard({
       </div>
 
       <style>{`
-        /* Single burst (iteration 1) — one luminance peak in ${WEEKLY_GOAL_SPARK_MS}ms
-           ⇒ < 3 flashes/s (WCAG 2.2 SC 2.3.1). Never infinite / never strobe. */
+        /* Single burst (iteration 1) — one luminance peak in ${sparkMs}ms
+           ⇒ < 3 flashes/s at default duration (WCAG 2.2 SC 2.3.1). Never infinite / never strobe. */
         .train-weekly-goal-spark {
           pointer-events: none;
           position: absolute;
           right: 2px;
           top: 50%;
-          width: 8px;
-          height: 8px;
-          margin-top: -4px;
+          width: 10px;
+          height: 10px;
+          margin-top: -5px;
           border-radius: 9999px;
           background: #ff2b2b;
           box-shadow:
-            10px -6px 0 -2px #ff2b2b,
-            -8px -8px 0 -2px #ff2b2b,
-            12px 4px 0 -2px #ff2b2b,
-            -10px 6px 0 -2px #ff2b2b,
-            0 -12px 0 -2px #ff2b2b;
+            12px -8px 0 -2px #ff2b2b,
+            -10px -10px 0 -2px #ff2b2b,
+            14px 5px 0 -2px #ff2b2b,
+            -12px 7px 0 -2px #ff2b2b,
+            0 -14px 0 -2px #ff2b2b;
           animation-name: train-weekly-goal-spark-burst;
-          animation-duration: ${WEEKLY_GOAL_SPARK_MS}ms;
+          animation-duration: ${sparkMs}ms;
           animation-timing-function: var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
           animation-fill-mode: both;
           animation-iteration-count: 1;

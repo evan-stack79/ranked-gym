@@ -1,5 +1,5 @@
 /**
- * Programme Débutant ouvert — liste d’exercices, gainage, remplacement « Machine prise ».
+ * Programme Débutant ouvert — liste d’exercices, gainage (timer in-card), « Machine prise ».
  */
 import {
   BEGINNER_EXERCISES,
@@ -81,7 +81,10 @@ export function TrainBeginnerSessionView({
                 </p>
               ) : null}
               {isGainage ? (
-                <p className="mt-2 text-[13px] leading-relaxed text-[#E5E5EA]">{GAINAGE_HOLD_TEXT}</p>
+                <>
+                  <p className="mt-2 text-[13px] leading-relaxed text-[#E5E5EA]">{GAINAGE_HOLD_TEXT}</p>
+                  <GainageHoldPanel embedded />
+                </>
               ) : (
                 <p className="mt-1 text-[12px] text-[#8E8E93]">
                   1 série · 8 à 12 répétitions · repos{' '}
@@ -92,8 +95,6 @@ export function TrainBeginnerSessionView({
           )
         })}
       </ol>
-
-      <GainageHoldPanel />
     </section>
   )
 }
