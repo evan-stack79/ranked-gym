@@ -170,21 +170,28 @@ async function capture() {
       await page.locator('[data-testid="train-hub-started"]').scrollIntoViewIfNeeded()
       await page.waitForTimeout(1200)
 
-      // Goal picker 1–5 (empty week — no spark mid-cycle; hold each value)
+      // Goal picker 1–5 (empty week — no spark mid-cycle; hold each value ~1s)
       await openScene(page, 'goal')
       await page.waitForSelector('[data-testid="train-weekly-goal-select"]')
-      await page.waitForTimeout(700)
+      await page.waitForTimeout(800)
+      const goalSelect = page.locator('[data-testid="train-weekly-goal-select"]')
       for (const n of ['1', '2', '3', '4', '5']) {
-        await page.locator('[data-testid="train-weekly-goal-select"]').focus()
-        await page.locator('[data-testid="train-weekly-goal-select"]').selectOption({ value: n })
+        await goalSelect.selectOption(n)
         await page.waitForFunction(
           (v) => document.querySelector('[data-testid="train-weekly-goal-select"]')?.value === v,
           n,
         )
-        // Pause long enough for several video frames at each value
-        await page.waitForTimeout(650)
+        // Flash select border so the change is obvious on compressed video
+        await goalSelect.evaluate((el) => {
+          el.style.outline = '2px solid #FF2B2B'
+        })
+        await page.waitForTimeout(900)
+        await goalSelect.evaluate((el) => {
+          el.style.outline = ''
+        })
+        await page.waitForTimeout(150)
       }
-      await page.waitForTimeout(500)
+      await page.waitForTimeout(400)
 
       // Bar filling + single spark at 100%
       await openScene(page, 'spark')
