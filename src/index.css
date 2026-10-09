@@ -1653,7 +1653,8 @@ select,
   pointer-events: none;
   background: var(--sc-bg);
   opacity: 0;
-  animation: streak-celeb-scrim-in 120ms ease-out forwards;
+  /* Fade over the live screen — keep in sync with slow-mo overrides in animations.css. */
+  animation: streak-celeb-scrim-in 200ms ease-out forwards;
 }
 
 @keyframes streak-celeb-scrim-in {
@@ -1661,7 +1662,7 @@ select,
     opacity: 0;
   }
   to {
-    opacity: 0.94;
+    opacity: 0.92;
   }
 }
 
@@ -2071,7 +2072,7 @@ select,
   letter-spacing: -0.01em;
   color: #fff;
   /* Reach full opacity quickly — no long dim frame. */
-  animation: streak-celeb-text-in 160ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: streak-celeb-text-in 90ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 .streak-celeb__message {
@@ -2081,13 +2082,13 @@ select,
   font-weight: 500;
   line-height: 1.35;
   color: #AEAEB2;
-  animation: streak-celeb-text-in 180ms 20ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: streak-celeb-text-in 110ms 16ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 @keyframes streak-celeb-text-in {
   from {
-    opacity: 0.55;
-    transform: translateY(6px);
+    opacity: 0.92;
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -2226,9 +2227,11 @@ select,
   height: auto;
   user-select: none;
   background: transparent;
-  /* Alpha PNG — no opaque square behind the mark. */
-  mix-blend-mode: normal;
-  -webkit-mask-image: none;
+  /* Drop pure-black plate pixels against the dark scrim; keep red/white mark. */
+  mix-blend-mode: lighten;
+  /* Soft falloff hides any residual bitmap fringe around the alpha mark. */
+  -webkit-mask-image: radial-gradient(ellipse 72% 68% at 50% 46%, #000 58%, transparent 78%);
+  mask-image: radial-gradient(ellipse 72% 68% at 50% 46%, #000 58%, transparent 78%);
 }
 
 .streak-celeb__crown {

@@ -8,7 +8,7 @@ import {
   useState,
 } from 'react'
 import { createPortal } from 'react-dom'
-import pantherRoaringUrl from '../../assets/brand/panther-launch-roaring.png'
+import pantherRoaringUrl from '../../assets/brand/panther-calm-crowned.png'
 import {
   formatStreakDaysLabel,
   getStreakStatusMessage,
@@ -127,8 +127,9 @@ export const StreakCelebrationOverlay = forwardRef<
     [forceReducedMotion],
   )
   const [phase, setPhase] = useState<StreakCelebrationPhase>(reduced ? 'settled' : 'idle')
-  const [displayCount, setDisplayCount] = useState(previousStreak)
-  const [showNewCount, setShowNewCount] = useState(reduced)
+  // Always show the new count — never a large translucent previous digit.
+  const [displayCount, setDisplayCount] = useState(currentStreak)
+  const [showNewCount, setShowNewCount] = useState(true)
   const [flash, setFlash] = useState(false)
   const [todayFlame, setTodayFlame] = useState(reduced)
   const completedRef = useRef(false)
@@ -193,11 +194,9 @@ export const StreakCelebrationOverlay = forwardRef<
       schedule(() => setFlash(false), 100)
     }, 120)
 
-    // Reveal the new count early — never linger on a large translucent previous digit.
-    schedule(() => {
-      setShowNewCount(true)
-      setDisplayCount(currentStreak)
-    }, 120)
+    // Count + flame stay lit from frame 0 (no ghost previous digit / dark flame "6").
+    setShowNewCount(true)
+    setDisplayCount(currentStreak)
 
     schedule(() => setTodayFlame(true), 300)
 
@@ -233,7 +232,12 @@ export const StreakCelebrationOverlay = forwardRef<
     phase === 'week' ||
     phase === 'settled'
   const showWeek = phase === 'week' || phase === 'settled'
-  const showReveal = phase === 'reveal' || phase === 'week' || phase === 'settled'
+  // Label as soon as the new count is up — no long dim frame waiting on `reveal`.
+  const showReveal =
+    showNewCount ||
+    phase === 'reveal' ||
+    phase === 'week' ||
+    phase === 'settled'
   const showBurst =
     phase === 'burst' || phase === 'count' || phase === 'reveal' || phase === 'week'
   const showPanther =
@@ -293,8 +297,8 @@ export const StreakCelebrationOverlay = forwardRef<
           }`}
           aria-hidden
         >
+          {/* Alpha PNG with built-in crown — no opaque black square, no CSS crown overlay. */}
           <img src={pantherRoaringUrl} alt="" draggable={false} />
-          <span className="streak-celeb__crown" />
         </div>
       ) : null}
 

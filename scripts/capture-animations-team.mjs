@@ -155,6 +155,8 @@ async function captureClip(browser, name, interact) {
   await page.addStyleTag({
     content: `*, *::before, *::after { cursor: none !important; } html { caret-color: transparent; }`,
   })
+  // Park the pointer off-screen — some Chromium builds still composite a hand glyph on click.
+  await page.mouse.move(-100, -100)
   await interact(page)
   await page.waitForTimeout(400)
   await page.screenshot({
@@ -287,31 +289,35 @@ async function main() {
           await expand.waitFor({ state: 'visible', timeout: 3_000 })
           await page.waitForTimeout(400)
           await expand.waitFor({ state: 'detached', timeout: 3_000 }).catch(() => undefined)
+          await page.waitForTimeout(200)
         }
         const nav = page.getByRole('navigation', { name: 'Navigation principale' })
         for (let i = 0; i < 2; i++) {
           await nav.getByLabel('Nutri').click()
           await page.locator('[data-fixture-panel="nutrition"]').waitFor({ timeout: 5_000 })
-          await page.waitForTimeout(350)
+          // Wait out the crossfade so outgoing is cleared before next tap.
+          await page.waitForTimeout(420)
           await nav.getByLabel('Train').click()
           await page.locator('[data-fixture-panel="training"]').waitFor({ timeout: 5_000 })
-          await page.waitForTimeout(350)
+          await page.waitForTimeout(420)
           await nav.getByLabel('Accueil').click()
           await page.locator('[data-fixture-panel="home"]').waitFor({ timeout: 5_000 })
-          await page.waitForTimeout(350)
+          await page.waitForTimeout(420)
         }
         await openHome(page)
+        await page.waitForTimeout(300)
         await setSlow(page, 4)
         await page.locator('[data-demo="card-expand"]').scrollIntoViewIfNeeded()
         await page.locator('[data-testid="demo-expand-card"]').click()
         await page.locator('[data-rg-anim="card-expand"]').waitFor({ state: 'visible', timeout: 5_000 })
         await page.waitForTimeout(1500)
+        await page.locator('[data-rg-anim="card-expand"]').waitFor({ state: 'detached', timeout: 5_000 }).catch(() => undefined)
         await nav.getByLabel('Nutri').click()
         await page.locator('[data-fixture-panel="nutrition"]').waitFor({ timeout: 5_000 })
-        await page.waitForTimeout(1100)
+        await page.waitForTimeout(1400)
         await nav.getByLabel('Accueil').click()
         await page.locator('[data-fixture-panel="home"]').waitFor({ timeout: 5_000 })
-        await page.waitForTimeout(1100)
+        await page.waitForTimeout(1400)
         await setSlow(page, 1)
       })
 
@@ -373,25 +379,32 @@ async function main() {
     if (want('anim-7-streak-fix'))
       await captureClip(browser, 'anim-7-streak-fix', async (page) => {
         await openHome(page)
-        await page.locator('[data-demo="streak-fix"]').scrollIntoViewIfNeeded()
+        await page.locator('[data-demo="streak-jours"]').scrollIntoViewIfNeeded()
+        // Keyboard-activate + pointer parked off-screen — no click/hand glyphs.
+        const trigger = page.locator('[data-testid="demo-streak"]')
+        await page.mouse.move(-100, -100)
         for (let i = 0; i < 2; i++) {
-          await page.locator('[data-testid="demo-streak"]').click()
+          await trigger.focus()
+          await page.mouse.move(-100, -100)
+          await page.keyboard.press('Enter')
           const streak = page.locator('.streak-celeb')
           await streak.waitFor({ state: 'visible', timeout: 5_000 })
-          await page.waitForTimeout(400)
+          await page.waitForTimeout(500)
           if (i === 1 && (await streak.count())) {
-            await streak.click({ timeout: 1_500 }).catch(() => undefined)
+            await page.keyboard.press('Escape')
           }
           await streak.waitFor({ state: 'detached', timeout: 5_000 }).catch(() => undefined)
-          await page.waitForTimeout(250)
+          await page.waitForTimeout(300)
         }
         await setSlow(page, 4)
-        await page.locator('[data-testid="demo-streak"]').click()
+        await trigger.focus()
+        await page.mouse.move(-100, -100)
+        await page.keyboard.press('Enter')
         const streak = page.locator('.streak-celeb')
         await streak.waitFor({ state: 'visible', timeout: 5_000 })
-        await page.waitForTimeout(2600)
+        await page.waitForTimeout(2800)
         if (await streak.count()) {
-          await streak.click({ timeout: 2_000 }).catch(() => undefined)
+          await page.keyboard.press('Escape')
         }
         await streak.waitFor({ state: 'detached', timeout: 5_000 }).catch(() => undefined)
         await setSlow(page, 1)

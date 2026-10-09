@@ -24,7 +24,7 @@ import {
 } from '../../utils/bodyScrollLock'
 import { __resetStreakCelebrationSessionForTests } from '../../utils/streakCelebrationSession'
 
-vi.mock('../../assets/brand/panther-launch-roaring.png', () => ({ default: 'panther.png' }))
+vi.mock('../../assets/brand/panther-calm-crowned.png', () => ({ default: 'panther.png' }))
 
 function mockReducedMotion() {
   Object.defineProperty(window, 'matchMedia', {

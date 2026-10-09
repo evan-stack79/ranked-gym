@@ -37,14 +37,15 @@ export function TabPageTransition({ tabId, children, className = '' }: TabPageTr
       setPhase('idle')
       return
     }
-    // Keep outgoing painted under the incoming fade-in.
+    // Keep outgoing painted under the incoming fade-in — never clear early.
     setOutgoing(previous)
     setIncoming(children)
     setPhase('in')
     const id = window.setTimeout(() => {
       setOutgoing(null)
       setPhase('idle')
-    }, animMs(TAB_FADE_MS))
+      // Small buffer past CSS duration so the last painted outgoing frame is never dropped.
+    }, animMs(TAB_FADE_MS) + 32)
     return () => window.clearTimeout(id)
   }, [tabId, children, reduced])
 

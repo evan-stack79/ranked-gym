@@ -99,6 +99,7 @@ html[data-rg-anim-slow='4'] {
 
 
 /* Streak overlay — ×2 */
+html[data-rg-anim-slow='2'] .streak-celeb::before { animation-duration: 400ms; }
 html[data-rg-anim-slow='2'] .streak-celeb { animation-duration: 360ms; }
 html[data-rg-anim-slow='2'] .streak-celeb__flash { animation-duration: 360ms; }
 html[data-rg-anim-slow='2'] .streak-celeb__ring { animation-duration: 1040ms; }
@@ -112,8 +113,9 @@ html[data-rg-anim-slow='2'] .streak-celeb--week .streak-celeb__flame-wrap,
 html[data-rg-anim-slow='2'] .streak-celeb--settled .streak-celeb__flame-wrap { animation-duration: 840ms; }
 html[data-rg-anim-slow='2'] .streak-celeb__count--old { animation-duration: 640ms; }
 html[data-rg-anim-slow='2'] .streak-celeb__count--new { animation-duration: 840ms; }
-html[data-rg-anim-slow='2'] .streak-celeb__label { animation-duration: 760ms; }
-html[data-rg-anim-slow='2'] .streak-celeb__message { animation-duration: 840ms; }
+/* Keep label/message near-full opacity — do not stretch into a long dim hold. */
+html[data-rg-anim-slow='2'] .streak-celeb__label { animation-duration: 160ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__message { animation-duration: 180ms; }
 html[data-rg-anim-slow='2'] .streak-celeb__week { animation-duration: 1040ms; }
 html[data-rg-anim-slow='2'] .streak-celeb--week .streak-celeb__week-fill,
 html[data-rg-anim-slow='2'] .streak-celeb--settled .streak-celeb__week-fill { animation-duration: 1400ms; }
@@ -122,6 +124,9 @@ html[data-rg-anim-slow='2'] .streak-celeb__panther--badge { animation-duration: 
 html[data-rg-anim-slow='2'] .streak-celeb__day-flame { animation-duration: 720ms; }
 
 /* Streak overlay uses hardcoded ms in index.css — stretch the visible ones ×4. */
+html[data-rg-anim-slow='4'] .streak-celeb::before {
+  animation-duration: 800ms;
+}
 html[data-rg-anim-slow='4'] .streak-celeb {
   animation-duration: 720ms;
 }
@@ -155,11 +160,12 @@ html[data-rg-anim-slow='4'] .streak-celeb__count--old {
 html[data-rg-anim-slow='4'] .streak-celeb__count--new {
   animation-duration: 1680ms;
 }
+/* Cap label fade — full opacity almost immediately even in the 4× pass. */
 html[data-rg-anim-slow='4'] .streak-celeb__label {
-  animation-duration: 1520ms;
+  animation-duration: 240ms;
 }
 html[data-rg-anim-slow='4'] .streak-celeb__message {
-  animation-duration: 1680ms;
+  animation-duration: 280ms;
 }
 html[data-rg-anim-slow='4'] .streak-celeb__week {
   animation-duration: 2080ms;
@@ -365,7 +371,7 @@ html[data-rg-anim-slow='4'] .streak-celeb__day-flame {
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-  /* Stay fully painted — never fade the outgoing to blank. */
+  /* Stay fully painted under the incoming cover — never an empty hole. */
   opacity: 1;
 }
 
@@ -375,13 +381,18 @@ html[data-rg-anim-slow='4'] .streak-celeb__day-flame {
   min-height: 0;
 }
 
-.rg-tab-fade--in {
+.rg-tab-fade__layer--in.rg-tab-fade--in {
+  /*
+   * Opaque app plate + fade-in: covers outgoing text (no double-print) while
+   * outgoing stays at opacity 1 underneath — never an empty hole over mesh-bg.
+   */
+  background: #0c0c0e;
   animation: rg-tab-fade-in var(--rg-tab-fade-dur) var(--ease-out) both;
 }
 
 @keyframes rg-tab-fade-in {
-  /* Start readable — never a fully blank frame over a dark mesh. */
-  from { opacity: 0.35; transform: translate3d(0, 6px, 0); }
+  /* Start just readable so the plate never reads as a fully blank cut. */
+  from { opacity: 0.2; transform: translate3d(0, 6px, 0); }
   to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
