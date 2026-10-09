@@ -116,6 +116,12 @@ async function goFixture(page) {
     timeout: 60_000,
   })
   await page.locator('[data-animations-fixture]').waitFor({ timeout: 15_000 })
+  // Skip / wait out cold-launch splash so clips never open on the boot panther plate.
+  await page.evaluate(() => {
+    document.documentElement.setAttribute('data-cold-launch-played', '1')
+    document.documentElement.setAttribute('data-cold-launch-handoff', 'done')
+    document.querySelectorAll('.app-cold-launch').forEach((el) => el.remove())
+  })
   await setSlow(page, 1)
   await page.waitForTimeout(400)
 }

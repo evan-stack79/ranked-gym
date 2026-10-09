@@ -16,6 +16,9 @@ export type CardExpandTransitionProps = {
   from: CardExpandRect | null
   onComplete: () => void
   forceReducedMotion?: boolean
+  /** Optional title painted on the expand surface — never a blank dark plate. */
+  title?: string
+  subtitle?: string
 }
 
 /**
@@ -28,6 +31,8 @@ export function CardExpandTransition({
   from,
   onComplete,
   forceReducedMotion,
+  title = 'Carte séance',
+  subtitle = 'Ouverture…',
 }: CardExpandTransitionProps) {
   const prefersReduced = usePrefersReducedMotion()
   const reduced = forceReducedMotion ?? prefersReduced
@@ -89,7 +94,12 @@ export function CardExpandTransition({
       data-rg-anim="card-expand"
       style={style}
       aria-hidden="true"
-    />,
+    >
+      <div className="rg-card-expand__body">
+        <p className="rg-card-expand__title">{title}</p>
+        <p className="rg-card-expand__subtitle">{subtitle}</p>
+      </div>
+    </div>,
     document.body,
   )
 }
