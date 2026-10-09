@@ -11,40 +11,63 @@ export type TabPageTransitionProps = {
 }
 
 /**
- * Short fade between bottom-bar tabs. Sticky header / nav stay put
- * (only the page panel animates). Reduced-motion → instant swap.
+ * Short tab transition. Keeps the outgoing page painted until the incoming
+ * panel has faded in — never an empty frame between tabs.
+ * Reduced-motion → instant swap.
  */
 export function TabPageTransition({ tabId, children, className = '' }: TabPageTransitionProps) {
   const reduced = usePrefersReducedMotion()
   const prevTab = useRef(tabId)
   const [phase, setPhase] = useState<'idle' | 'in'>('idle')
-  const [panel, setPanel] = useState(children)
+  const [incoming, setIncoming] = useState(children)
+  const [outgoing, setOutgoing] = useState<ReactNode | null>(null)
+  const incomingRef = useRef(children)
+  incomingRef.current = incoming
 
   useEffect(() => {
     if (tabId === prevTab.current) {
-      setPanel(children)
+      setIncoming(children)
       return
     }
+    const previous = incomingRef.current
     prevTab.current = tabId
     if (reduced) {
-      setPanel(children)
+      setOutgoing(null)
+      setIncoming(children)
       setPhase('idle')
       return
     }
-    setPanel(children)
+    // Keep outgoing painted under the incoming fade-in.
+    setOutgoing(previous)
+    setIncoming(children)
     setPhase('in')
-    const id = window.setTimeout(() => setPhase('idle'), animMs(TAB_FADE_MS))
+    const id = window.setTimeout(() => {
+      setOutgoing(null)
+      setPhase('idle')
+    }, animMs(TAB_FADE_MS))
     return () => window.clearTimeout(id)
   }, [tabId, children, reduced])
 
   return (
     <div
-      className={`rg-tab-fade ${phase === 'in' ? 'rg-tab-fade--in' : ''} ${className}`}
+      className={`rg-tab-fade ${phase === 'in' ? 'rg-tab-fade--crossing' : ''} ${className}`}
       data-rg-anim="tab-fade"
       data-rg-tab={tabId}
       data-rg-motion={reduced ? 'reduced' : 'ok'}
+      data-rg-tab-phase={phase}
     >
-      {panel}
+      {outgoing ? (
+        <div className="rg-tab-fade__layer rg-tab-fade__layer--out" aria-hidden="true">
+          {outgoing}
+        </div>
+      ) : null}
+      <div
+        className={`rg-tab-fade__layer rg-tab-fade__layer--in${
+          phase === 'in' ? ' rg-tab-fade--in' : ''
+        }`}
+      >
+        {incoming}
+      </div>
     </div>
   )
 }

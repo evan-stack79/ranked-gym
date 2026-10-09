@@ -1633,7 +1633,8 @@ select,
   justify-content: center;
   overflow: hidden;
   overscroll-behavior: none;
-  background: var(--sc-bg);
+  /* Transparent shell — scrim fades over the live screen (no hard black cut). */
+  background: transparent;
   padding:
     max(16px, var(--app-safe-area-top))
     max(16px, var(--app-safe-area-right))
@@ -1642,7 +1643,36 @@ select,
   color: #fff;
   outline: none;
   -webkit-tap-highlight-color: transparent;
-  animation: streak-celeb-fade-in 180ms ease-out both;
+}
+
+.streak-celeb::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--sc-bg);
+  opacity: 0;
+  animation: streak-celeb-scrim-in 120ms ease-out forwards;
+}
+
+@keyframes streak-celeb-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.94;
+  }
+}
+
+/* Keep celebration layers above the fading scrim (::before). */
+.streak-celeb__halo,
+.streak-celeb__flash,
+.streak-celeb__burst,
+.streak-celeb__panther,
+.streak-celeb__stage,
+.streak-celeb__week {
+  z-index: 1;
 }
 
 @keyframes streak-celeb-fade-in {
@@ -2040,7 +2070,8 @@ select,
   font-weight: 800;
   letter-spacing: -0.01em;
   color: #fff;
-  animation: streak-celeb-text-in 380ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  /* Reach full opacity quickly — no long dim frame. */
+  animation: streak-celeb-text-in 160ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 .streak-celeb__message {
@@ -2050,13 +2081,13 @@ select,
   font-weight: 500;
   line-height: 1.35;
   color: #AEAEB2;
-  animation: streak-celeb-text-in 420ms 60ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: streak-celeb-text-in 180ms 20ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 @keyframes streak-celeb-text-in {
   from {
-    opacity: 0;
-    transform: translateY(10px);
+    opacity: 0.55;
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -2194,6 +2225,10 @@ select,
   width: 100%;
   height: auto;
   user-select: none;
+  background: transparent;
+  /* Alpha PNG — no opaque square behind the mark. */
+  mix-blend-mode: normal;
+  -webkit-mask-image: none;
 }
 
 .streak-celeb__crown {
@@ -2249,7 +2284,12 @@ select,
 }
 
 .streak-celeb--reduced {
-  animation: streak-celeb-fade-in 300ms ease-out both;
+  background: var(--sc-bg);
+}
+
+.streak-celeb--reduced::before {
+  animation: none;
+  opacity: 1;
 }
 
 .streak-celeb--reduced .streak-celeb__flame-wrap,
@@ -2288,7 +2328,12 @@ select,
   }
 
   .streak-celeb {
-    animation: streak-celeb-fade-in 300ms ease-out both !important;
+    background: var(--sc-bg) !important;
+  }
+
+  .streak-celeb::before {
+    opacity: 1 !important;
+    animation: none !important;
   }
 
   .streak-celeb__week-fill {

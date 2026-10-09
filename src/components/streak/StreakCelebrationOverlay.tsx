@@ -8,7 +8,7 @@ import {
   useState,
 } from 'react'
 import { createPortal } from 'react-dom'
-import pantherRoaringUrl from '../../assets/brand/panther-roaring.png'
+import pantherRoaringUrl from '../../assets/brand/panther-launch-roaring.png'
 import {
   formatStreakDaysLabel,
   getStreakStatusMessage,
@@ -44,10 +44,10 @@ export const STREAK_CELEB_PHASE_STEPS: Array<{ at: number; phase: StreakCelebrat
   { at: 40, phase: 'compress' },
   { at: 80, phase: 'launch' },
   { at: 120, phase: 'burst' },
-  { at: 200, phase: 'count' },
-  { at: 280, phase: 'reveal' },
-  { at: 380, phase: 'week' },
-  { at: 480, phase: 'settled' },
+  { at: 160, phase: 'count' },
+  { at: 200, phase: 'reveal' },
+  { at: 320, phase: 'week' },
+  { at: 440, phase: 'settled' },
 ]
 
 export const STREAK_CELEB_TOTAL_MS = 560
@@ -193,12 +193,13 @@ export const StreakCelebrationOverlay = forwardRef<
       schedule(() => setFlash(false), 100)
     }, 120)
 
+    // Reveal the new count early — never linger on a large translucent previous digit.
     schedule(() => {
       setShowNewCount(true)
       setDisplayCount(currentStreak)
-    }, 200)
+    }, 120)
 
-    schedule(() => setTodayFlame(true), 380)
+    schedule(() => setTodayFlame(true), 300)
 
     schedule(finish, STREAK_CELEB_TOTAL_MS)
 
@@ -303,14 +304,11 @@ export const StreakCelebrationOverlay = forwardRef<
           <FlameGlyph lit={lit} className="streak-celeb__flame" />
         </div>
 
-        <div
-          className={`streak-celeb__count${
-            showNewCount ? ' streak-celeb__count--new' : ' streak-celeb__count--old'
-          }`}
-          aria-hidden
-        >
-          {displayCount}
-        </div>
+        {showNewCount ? (
+          <div className="streak-celeb__count streak-celeb__count--new" aria-hidden>
+            {displayCount}
+          </div>
+        ) : null}
 
         {showReveal ? <p className="streak-celeb__label">{daysLabel}</p> : null}
         {showReveal ? <p className="streak-celeb__message">{statusMessage}</p> : null}

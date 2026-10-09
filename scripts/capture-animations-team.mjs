@@ -144,12 +144,17 @@ async function captureClip(browser, name, interact) {
     isMobile: false,
     hasTouch: false,
     reducedMotion: 'no-preference',
+    // Hide OS/browser cursor so it never appears as a hand/pointer overlay.
     recordVideo: { dir: tmpDir, size: { width, height } },
   })
   const page = await context.newPage()
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await allowHttpLocalhost(page)
   await goFixture(page)
+  // After navigation — hide cursor so recordings never show a hand/pointer overlay.
+  await page.addStyleTag({
+    content: `*, *::before, *::after { cursor: none !important; } html { caret-color: transparent; }`,
+  })
   await interact(page)
   await page.waitForTimeout(400)
   await page.screenshot({

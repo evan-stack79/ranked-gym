@@ -350,6 +350,28 @@ html[data-rg-anim-slow='4'] .streak-celeb__day-flame {
 
 /* ── 3. Tab fade + View Transitions card→page ─────────────────── */
 .rg-tab-fade {
+  position: relative;
+  min-height: 0;
+}
+
+.rg-tab-fade--crossing {
+  /* Reserve space while outgoing is absolutely stacked. */
+  min-height: 12rem;
+}
+
+.rg-tab-fade__layer--out {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  /* Stay fully painted — never fade the outgoing to blank. */
+  opacity: 1;
+}
+
+.rg-tab-fade__layer--in {
+  position: relative;
+  z-index: 1;
   min-height: 0;
 }
 
@@ -358,7 +380,8 @@ html[data-rg-anim-slow='4'] .streak-celeb__day-flame {
 }
 
 @keyframes rg-tab-fade-in {
-  from { opacity: 0; transform: translate3d(0, 6px, 0); }
+  /* Start readable — never a fully blank frame over a dark mesh. */
+  from { opacity: 0.35; transform: translate3d(0, 6px, 0); }
   to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 

@@ -75,6 +75,10 @@ describe('TabPageTransition', () => {
       )
     })
     const el = host.querySelector('[data-rg-anim="tab-fade"]') as HTMLElement
-    expect(el.classList.contains('rg-tab-fade--in')).toBe(true)
+    expect(el.classList.contains('rg-tab-fade--crossing')).toBe(true)
+    expect(host.querySelector('.rg-tab-fade--in')).toBeTruthy()
+    // Outgoing stays painted under the incoming fade.
+    expect(host.querySelector('.rg-tab-fade__layer--out')?.textContent).toContain('A')
+    expect(host.querySelector('.rg-tab-fade__layer--in')?.textContent).toContain('B')
   })
 })
