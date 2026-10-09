@@ -1,5 +1,6 @@
 /**
  * Programme Débutant ouvert — liste d’exercices, gainage (timer in-card), « Machine prise ».
+ * Stable sticky programme header (Débutant + Fermer) — no BrandMark swap / layout jump.
  */
 import {
   BEGINNER_EXERCISES,
@@ -26,11 +27,14 @@ export function TrainBeginnerSessionView({
 
   return (
     <section
-      className="space-y-3"
+      className="flex min-h-0 flex-1 flex-col"
       data-testid="train-beginner-session"
       data-programme-open="1"
     >
-      <div className="flex items-center justify-between gap-2">
+      <header
+        className="sticky top-0 z-20 flex shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-[#0C0C0E]/95 px-5 py-3 backdrop-blur-md"
+        data-testid="train-beginner-session-header"
+      >
         <h2 className="text-[20px] font-bold text-white">{BEGINNER_PROGRAMME_TITLE}</h2>
         {onClose ? (
           <button
@@ -41,10 +45,17 @@ export function TrainBeginnerSessionView({
           >
             Fermer
           </button>
-        ) : null}
-      </div>
+        ) : (
+          <span className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#8E8E93]">
+            Programme
+          </span>
+        )}
+      </header>
 
-      <ol className="space-y-2" data-testid="train-beginner-exercise-list">
+      <ol
+        className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-5 py-4"
+        data-testid="train-beginner-exercise-list"
+      >
         {rows.map(({ slot, entry, busy: isBusy }, index) => {
           if (!entry) return null
           const isGainage = slot.kind === 'gainage'
@@ -61,7 +72,6 @@ export function TrainBeginnerSessionView({
                   <p className="text-[11px] font-semibold tabular-nums text-[#8E8E93]">
                     {index + 1}
                   </p>
-                  {/* Machine prise : keep planned machine name; swap is the replacement line. */}
                   <p className="text-[15px] font-semibold text-white">
                     {isBusy ? slot.name : entry.name}
                   </p>

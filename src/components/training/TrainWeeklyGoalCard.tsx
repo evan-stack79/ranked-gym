@@ -3,14 +3,21 @@
  * Remplissage fluide (scaleX ≤400 ms, off si reduced motion).
  * Étincelle rouge une fois à 100 % pour la semaine ; rien de plus si dépassé.
  * Self-contained — pas de vibration, pas de lib motion.
+ *
+ * Fill ratio and progress text always share weeklyGoalFillRatio (same source of truth).
+ * Transition is off on first paint so remount/reset never shows a mismatched bar.
  */
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useState } from 'react'
 import {
   clampWeeklySessionGoal,
   type WeeklySessionGoalTarget,
   WEEKLY_SESSION_GOAL_MAX,
   WEEKLY_SESSION_GOAL_MIN,
 } from '../../services/trainWeeklyGoal'
+import {
+  weeklyGoalFillRatio,
+  weeklyGoalReached,
+} from '../../services/trainWeeklyGoalFill'
 import { parisWeekKey } from '../../utils/parisDate'
 import {
   WEEKLY_GOAL_FILL_MS,
@@ -48,14 +55,16 @@ export function TrainWeeklyGoalCard({
     typeof sparkDurationMs === 'number' && sparkDurationMs > 0
       ? sparkDurationMs
       : WEEKLY_GOAL_SPARK_MS
-  const cappedRatio = Math.min(1, target > 0 ? doneCount / target : 0)
-  const reached = doneCount >= target && target > 0
+  const cappedRatio = weeklyGoalFillRatio(doneCount, target)
+  const reached = weeklyGoalReached(doneCount, target)
   const [spark, setSpark] = useState(false)
-  const prevRatio = useRef(cappedRatio)
+  /** Skip CSS transition on first paint / remount so bar matches text immediately. */
+  const [fillTransitionOn, setFillTransitionOn] = useState(false)
 
-  useEffect(() => {
-    prevRatio.current = cappedRatio
-  }, [cappedRatio])
+  useLayoutEffect(() => {
+    const id = requestAnimationFrame(() => setFillTransitionOn(true))
+    return () => cancelAnimationFrame(id)
+  }, [])
 
   useEffect(() => {
     if (!reached) return
@@ -118,11 +127,13 @@ export function TrainWeeklyGoalCard({
           className="train-weekly-goal-fill h-full origin-left rounded-full bg-brand"
           data-testid="train-weekly-goal-fill"
           data-ratio={String(cappedRatio)}
+          data-fill-sync={`${doneCount}/${target}`}
           style={{
             transform: `scaleX(${cappedRatio})`,
-            transition: reduced
-              ? undefined
-              : `transform ${WEEKLY_GOAL_FILL_MS}ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1))`,
+            transition:
+              fillTransitionOn && !reduced
+                ? `transform ${WEEKLY_GOAL_FILL_MS}ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1))`
+                : 'none',
           }}
         />
         {spark ? (

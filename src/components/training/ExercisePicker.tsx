@@ -114,7 +114,7 @@ export function ExercisePicker({
 
         {/* Search — graphite, coins modérés */}
         <label
-          className="mb-2 flex min-h-12 shrink-0 items-center gap-2.5 rounded-2xl bg-[#2c2c2e] px-3.5"
+          className="mb-3 flex min-h-12 shrink-0 items-center gap-2.5 rounded-2xl bg-[#2c2c2e] px-3.5"
           htmlFor={`${listId}-search`}
         >
           <Search className="h-5 w-5 shrink-0 text-[#8E8E93]" aria-hidden="true" />
@@ -157,8 +157,12 @@ export function ExercisePicker({
             data-testid="exercise-picker-list"
             className="absolute inset-0 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
             data-list-pad-bottom="create-btn+safe"
+            data-list-pad-top="search-clearance"
             style={{
-              // Sticky footer: gradient pad + min-h-11 CTA + count + safe area (+ keyboard)
+              // Top: keep the first result fully below the search field
+              // Bottom: sticky create CTA + count + safe area (+ keyboard)
+              paddingTop: '0.75rem',
+              scrollPaddingTop: '0.75rem',
               paddingBottom:
                 'calc(7.5rem + max(0.75rem, env(safe-area-inset-bottom, 0px)) + env(keyboard-inset-height, 0px))',
             }}

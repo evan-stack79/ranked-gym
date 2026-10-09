@@ -184,9 +184,11 @@ describe('ExercisePicker', () => {
     expect(footer).toBeTruthy()
     expect(host.querySelector('[data-testid="exercise-picker-create"]')).toBeTruthy()
     expect(list?.getAttribute('data-list-pad-bottom')).toBe('create-btn+safe')
+    expect(list?.getAttribute('data-list-pad-top')).toBe('search-clearance')
     const pb = list?.style.paddingBottom ?? ''
     expect(pb).toMatch(/7\.5rem/)
     expect(pb).toMatch(/safe-area-inset-bottom/)
+    expect(list?.style.paddingTop).toMatch(/0\.75rem/)
     await cleanup()
   })
 

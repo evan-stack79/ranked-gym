@@ -91,8 +91,12 @@ function seedScene(scene: string) {
   const today = parisDateKey()
   const yesterday = shiftDateKey(today, -1)
   let notes: WorkoutNote[] = []
-  if (scene === 'spark' || scene === 'spark-slow') {
+  if (scene === 'spark') {
     // Start at 1/2 — capture bumps to 2/2 so fill + spark are visible
+    notes = [noteOn(today, 'n-today')]
+  }
+  if (scene === 'spark-slow') {
+    // Start at 1/2 then bump; sparkDurationMs×4 makes the 100% burst obvious
     notes = [noteOn(today, 'n-today')]
   }
   if (scene === 'rest') {
@@ -167,27 +171,24 @@ function TrainHubCardsFixture({ scene }: { scene: string }) {
   const [activityOpen, setActivityOpen] = useState(false)
   const [sessionOpen, setSessionOpen] = useState(false)
   const [sparkSlow, setSparkSlow] = useState(scene === 'spark-slow')
-  const [doneOverride, setDoneOverride] = useState<number | null>(null)
 
   useEffect(() => {
     seedScene(scene)
     setTick((n) => n + 1)
   }, [scene])
 
-  // spark / spark-slow: hold 1/2, then reach 2/2 so bar fill + spark run
+  // spark: hold 1/2, then reach 2/2 from notes (single source of truth for text + bar)
+  // spark-slow: seed already at 2 notes after bump, or bump immediately for slow spark
   useEffect(() => {
     if (scene !== 'spark' && scene !== 'spark-slow') return
-    setDoneOverride(1)
+    const delay = scene === 'spark-slow' ? 400 : 1000
     const t = window.setTimeout(() => {
       const today = parisDateKey()
       const state = getTrainingState()
       saveTrainingState(
         {
           ...state,
-          workoutNotes: [
-            noteOn(today, 'n-today'),
-            noteOn(today, 'n-today-2'),
-          ],
+          workoutNotes: [noteOn(today, 'n-today'), noteOn(today, 'n-today-2')],
           weeklySessionGoal: {
             target: 2,
             updatedAt: Date.now(),
@@ -196,17 +197,15 @@ function TrainHubCardsFixture({ scene }: { scene: string }) {
         },
         { skipCloud: true },
       )
-      setDoneOverride(2)
       setTick((n) => n + 1)
-    }, 900)
+    }, delay)
     return () => window.clearTimeout(t)
   }, [scene])
 
   const state = useMemo(() => getTrainingState(), [tick])
   const now = useMemo(() => new Date(), [tick])
   const weekStrip = deriveWeekStrip(state.workoutNotes, now)
-  const weekCount =
-    doneOverride != null ? doneOverride : countSessionsInParisWeek(state.workoutNotes, now)
+  const weekCount = countSessionsInParisWeek(state.workoutNotes, now)
   const weeklyGoal = parseWeeklySessionGoal(state.weeklySessionGoal)
   const showRest = shouldShowRestReminder(state.workoutNotes, state.restReminder, now)
   const startLikePlayButton = () => {
@@ -232,23 +231,24 @@ function TrainHubCardsFixture({ scene }: { scene: string }) {
   }
 
   if (programmeOpen || scene === 'beginner-open') {
+    // Stable programme chrome only — no BrandMark swap that jumps the list under a header.
     return (
       <div
         className="relative flex h-[100dvh] min-h-0 flex-col mesh-bg font-sans"
         data-train-hub-fixture="1"
         data-scene={scene}
+        data-programme-shell="1"
       >
-        <header className="border-b border-white/5 bg-[#0C0C0E]">
-          <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-2">
-            <BrandMark variant="compact" />
-          </div>
-        </header>
-        <main className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col gap-4 overflow-y-auto px-5 py-6">
+        <div className="relative z-10 mx-auto flex h-full w-full max-w-lg min-h-0 flex-1 flex-col">
           <TrainBeginnerSessionView
             machineBusyIds={['leg_press']}
-            onClose={scene === 'beginner-open' ? undefined : () => setProgrammeOpen(false)}
+            onClose={
+              scene === 'beginner-open'
+                ? undefined
+                : () => setProgrammeOpen(false)
+            }
           />
-        </main>
+        </div>
       </div>
     )
   }

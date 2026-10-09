@@ -198,51 +198,61 @@ async function capture() {
       }
       await page.waitForTimeout(400)
 
-      // 3) Bar 1/2 → 2/2 + spark, then 4× slow-mo spark pass
+      // 3) Bar 1/2 → 2/2 + spark (assert fill sync), then 4× slow-mo spark
       await openScene(page, 'spark')
       await page.waitForSelector('[data-testid="train-weekly-goal-progress"]')
       await page.waitForFunction(() => {
         const t = document.querySelector('[data-testid="train-weekly-goal-progress"]')?.textContent
-        return t === '1/2'
+        const r = document.querySelector('[data-testid="train-weekly-goal-fill"]')?.getAttribute('data-ratio')
+        return t === '1/2' && r === '0.5'
       })
-      await page.waitForTimeout(400)
+      await page.waitForTimeout(600)
       await page.waitForFunction(() => {
         const t = document.querySelector('[data-testid="train-weekly-goal-progress"]')?.textContent
-        return t === '2/2'
+        const r = document.querySelector('[data-testid="train-weekly-goal-fill"]')?.getAttribute('data-ratio')
+        return t === '2/2' && r === '1'
       })
-      await page.waitForSelector('[data-testid="train-weekly-goal-spark"]', { timeout: 5000 })
-      await page.waitForTimeout(900)
-      // Slow-mo remount (4×) — wait for spark with data-spark-ms = 650*4
-      await page.waitForFunction(() => {
-        const el = document.querySelector('[data-testid="train-weekly-goal-spark"]')
-        return el && Number(el.getAttribute('data-spark-ms')) >= 2000
-      }, null, { timeout: 8000 }).catch(() => null)
-      await page.waitForTimeout(2800)
+      await page.waitForSelector('[data-testid="train-weekly-goal-spark"]', { timeout: 8000 })
+      await page.waitForTimeout(1100)
 
-      // Explicit second slow-mo scene for clarity
+      // Explicit 4× slow-mo spark pass
       await openScene(page, 'spark-slow')
       await page.waitForFunction(() => {
         const t = document.querySelector('[data-testid="train-weekly-goal-progress"]')?.textContent
-        return t === '2/2'
+        const r = document.querySelector('[data-testid="train-weekly-goal-fill"]')?.getAttribute('data-ratio')
+        return t === '2/2' && r === '1'
       })
-      await page.waitForSelector('[data-testid="train-weekly-goal-spark"]', { timeout: 5000 })
+      await page.waitForSelector('[data-testid="train-weekly-goal-spark"]', { timeout: 8000 })
+      await page.waitForFunction(() => {
+        const el = document.querySelector('[data-testid="train-weekly-goal-spark"]')
+        return el && Number(el.getAttribute('data-spark-ms')) >= 2000
+      })
       await page.waitForTimeout(3200)
 
       // 4) Rest + dismiss
       await openScene(page, 'rest')
       await page.waitForSelector('[data-testid="train-rest-reminder"]')
+      // Assert bar sync on remount
+      await page.waitForFunction(() => {
+        const t = document.querySelector('[data-testid="train-weekly-goal-progress"]')?.textContent
+        const r = document.querySelector('[data-testid="train-weekly-goal-fill"]')?.getAttribute('data-ratio')
+        return t != null && r != null && Number(r) === Math.min(1, Number(t.split('/')[0]) / Number(t.split('/')[1]))
+      })
       await page.waitForTimeout(1000)
       await page.locator('[data-testid="train-rest-reminder-dismiss"]').click({ force: true })
       await page.waitForFunction(() => !document.querySelector('[data-testid="train-rest-reminder"]'))
       await page.waitForTimeout(900)
 
-      // 5) Programme opened — Machine prise then Gainage (timer in-card, no duplicate title)
+      // 5) Programme opened — stable Débutant header, Machine prise, then Gainage
       await openScene(page, 'beginner')
       await page.waitForTimeout(500)
       await page.locator('[data-testid="train-beginner-start"]').click({ force: true })
       await page.waitForSelector('[data-testid="train-beginner-session"]')
+      await page.waitForSelector('[data-testid="train-beginner-session-header"]')
       await page.waitForSelector('[data-testid="train-machine-busy-badge"]')
-      await page.waitForTimeout(1400)
+      // First exercise must stay visible under the programme header
+      await page.waitForSelector('[data-testid="train-beginner-ex-goblet_squat"], [data-testid="train-beginner-ex-leg_press"]')
+      await page.waitForTimeout(1600)
       await page.locator('[data-testid="gainage-hold-panel"]').scrollIntoViewIfNeeded()
       await page.waitForTimeout(800)
       await page.locator('[data-testid="gainage-hold-toggle"]').click({ force: true })
