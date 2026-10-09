@@ -61,7 +61,10 @@ export function TrainBeginnerSessionView({
                   <p className="text-[11px] font-semibold tabular-nums text-[#8E8E93]">
                     {index + 1}
                   </p>
-                  <p className="text-[15px] font-semibold text-white">{entry.name}</p>
+                  {/* Machine prise : keep planned machine name; swap is the replacement line. */}
+                  <p className="text-[15px] font-semibold text-white">
+                    {isBusy ? slot.name : entry.name}
+                  </p>
                 </div>
                 {isBusy ? (
                   <span

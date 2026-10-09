@@ -163,42 +163,53 @@ async function capture() {
 
       // Empty page + big card → tap starts session
       await openScene(page, 'empty')
-      await page.waitForTimeout(600)
+      await page.waitForSelector('[data-testid="train-start-session-card"]')
+      await page.waitForTimeout(900)
       await page.locator('[data-testid="train-start-session-card"]').click({ force: true })
       await page.waitForSelector('[data-testid="train-hub-started"]')
-      await page.waitForTimeout(700)
+      await page.locator('[data-testid="train-hub-started"]').scrollIntoViewIfNeeded()
+      await page.waitForTimeout(1200)
 
-      // Goal picker 1–5
+      // Goal picker 1–5 (empty week — no spark mid-cycle; hold each value)
       await openScene(page, 'goal')
-      await page.waitForTimeout(400)
+      await page.waitForSelector('[data-testid="train-weekly-goal-select"]')
+      await page.waitForTimeout(700)
       for (const n of ['1', '2', '3', '4', '5']) {
-        await page.locator('[data-testid="train-weekly-goal-select"]').selectOption(n)
-        await page.waitForTimeout(280)
+        await page.locator('[data-testid="train-weekly-goal-select"]').focus()
+        await page.locator('[data-testid="train-weekly-goal-select"]').selectOption({ value: n })
+        await page.waitForFunction(
+          (v) => document.querySelector('[data-testid="train-weekly-goal-select"]')?.value === v,
+          n,
+        )
+        // Pause long enough for several video frames at each value
+        await page.waitForTimeout(650)
       }
-      await page.locator('[data-testid="train-weekly-goal-select"]').selectOption('2')
       await page.waitForTimeout(500)
 
       // Bar filling + single spark at 100%
       await openScene(page, 'spark')
       await page.waitForSelector('[data-testid="train-weekly-goal"]')
-      await page.waitForTimeout(1100)
+      await page.waitForSelector('[data-testid="train-weekly-goal-fill"][data-ratio="1"]')
+      await page.waitForTimeout(1500)
 
-      // Rest reminder + dismiss
+      // Rest reminder + dismiss (hold after dismiss before next scene)
       await openScene(page, 'rest')
       await page.waitForSelector('[data-testid="train-rest-reminder"]')
-      await page.waitForTimeout(900)
+      await page.waitForTimeout(1100)
       await page.locator('[data-testid="train-rest-reminder-dismiss"]').click({ force: true })
-      await page.waitForTimeout(600)
+      await page.waitForFunction(() => !document.querySelector('[data-testid="train-rest-reminder"]'))
+      await page.waitForTimeout(1100)
 
-      // Programme opened (list + Machine prise + Gainage)
+      // Programme opened — stay at top (Machine prise) then scroll to Gainage
       await openScene(page, 'beginner')
-      await page.waitForTimeout(500)
+      await page.waitForTimeout(600)
       await page.locator('[data-testid="train-beginner-start"]').click({ force: true })
       await page.waitForSelector('[data-testid="train-beginner-session"]')
       await page.waitForSelector('[data-testid="train-machine-busy-badge"]')
-      await page.waitForTimeout(800)
+      await page.locator('[data-testid="train-machine-busy-swap"]').scrollIntoViewIfNeeded()
+      await page.waitForTimeout(1600)
       await page.locator('[data-testid="gainage-hold-panel"]').scrollIntoViewIfNeeded()
-      await page.waitForTimeout(500)
+      await page.waitForTimeout(900)
       await page.locator('[data-testid="gainage-hold-toggle"]').click({ force: true })
       await page.waitForTimeout(1200)
       await page.locator('[data-testid="gainage-hold-done"]').click({ force: true })

@@ -81,13 +81,14 @@ function seedScene(scene: string) {
   const today = parisDateKey()
   const yesterday = shiftDateKey(today, -1)
   let notes: WorkoutNote[] = []
-  if (scene === 'goal' || scene === 'spark') {
+  // goal: week empty so picker 1–5 is clean (no mid-cycle spark)
+  if (scene === 'spark') {
     notes = [noteOn(today, 'n-today')]
   }
   if (scene === 'rest') {
     notes = [noteOn(yesterday, 'n-y'), noteOn(today, 'n-t')]
   }
-  if (scene === 'beginner' || scene === 'beginner-open' || scene === 'gainage') {
+  if (scene === 'beginner' || scene === 'beginner-open' || scene === 'gainage' || scene === 'goal') {
     notes = []
   }
   const state = getTrainingState()
@@ -111,7 +112,6 @@ function seedScene(scene: string) {
 export function TrainHubFixture() {
   const scene = useMemo(() => sceneFromQuery(), [])
   const [tick, setTick] = useState(0)
-  const [activityOpen, setActivityOpen] = useState(false)
   const [started, setStarted] = useState(false)
   const [showGainage, setShowGainage] = useState(scene === 'gainage')
   const [programmeOpen, setProgrammeOpen] = useState(scene === 'beginner-open')
@@ -166,16 +166,24 @@ export function TrainHubFixture() {
         <h1 className="text-[34px] font-bold tracking-tight text-white">Train</h1>
         <TrainWeekStrip days={weekStrip} />
 
-        {weekEmpty ? (
+        {weekEmpty && !started ? (
           <TrainStartSessionCard
             onStart={() => {
-              setActivityOpen(true)
               setStarted(true)
               ensureBeginnerProgrammeRoutine()
               startFreeWorkoutSession('musculation')
               setTick((n) => n + 1)
             }}
           />
+        ) : null}
+
+        {started && !programmeOpen ? (
+          <p
+            className="rounded-2xl border border-brand/30 bg-brand/15 px-4 py-3 text-[14px] font-semibold text-white"
+            data-testid="train-hub-started"
+          >
+            Séance démarrée — même chemin que le bouton en bas.
+          </p>
         ) : null}
 
         <TrainWeeklyGoalCard
@@ -214,12 +222,6 @@ export function TrainHubFixture() {
         />
 
         {showGainage ? <GainageHoldPanel onDone={() => setShowGainage(false)} /> : null}
-
-        {activityOpen || started ? (
-          <p className="text-[13px] text-[#8E8E93]" data-testid="train-hub-started">
-            Séance démarrée (même chemin que ▶)
-          </p>
-        ) : null}
       </main>
     </div>
   )
