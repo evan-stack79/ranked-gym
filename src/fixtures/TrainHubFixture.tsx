@@ -166,22 +166,22 @@ export function TrainHubFixture() {
 }
 
 function TrainHubCardsFixture({ scene }: { scene: string }) {
+  // Seed before first paint so remounts never flash a stale week count.
+  useMemo(() => {
+    seedScene(scene)
+    return true
+  }, [scene])
+
   const [tick, setTick] = useState(0)
   const [programmeOpen, setProgrammeOpen] = useState(scene === 'beginner-open')
   const [activityOpen, setActivityOpen] = useState(false)
   const [sessionOpen, setSessionOpen] = useState(false)
   const [sparkSlow, setSparkSlow] = useState(scene === 'spark-slow')
 
-  useEffect(() => {
-    seedScene(scene)
-    setTick((n) => n + 1)
-  }, [scene])
-
-  // spark: hold 1/2, then reach 2/2 from notes (single source of truth for text + bar)
-  // spark-slow: seed already at 2 notes after bump, or bump immediately for slow spark
+  // spark / spark-slow: hold 1/2, then reach 2/2 from notes (single source of truth)
   useEffect(() => {
     if (scene !== 'spark' && scene !== 'spark-slow') return
-    const delay = scene === 'spark-slow' ? 400 : 1000
+    const delay = scene === 'spark-slow' ? 900 : 1000
     const t = window.setTimeout(() => {
       const today = parisDateKey()
       const state = getTrainingState()
