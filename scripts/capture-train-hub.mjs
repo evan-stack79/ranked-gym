@@ -89,8 +89,9 @@ async function capture() {
       await shot(page, 'train-empty-start-card.png')
       await page.locator('[data-testid="train-start-session-card"]').click({ force: true })
       await page.waitForSelector('[data-new-session-sheet]')
-      await page.getByRole('button', { name: 'Musculation' }).click({ force: true })
-      await page.waitForSelector('#workout-notebook')
+      await page.locator('[data-new-session-sheet] button').filter({ hasText: 'Musculation' }).click({ force: true })
+      // Free session opens the real first-exercise picker (same path as ▶)
+      await page.getByText('Quel est ton premier exercice').waitFor({ timeout: 15_000 })
       await page.waitForTimeout(300)
       await shot(page, 'train-start-card-tapped.png')
       await context.close()
@@ -169,8 +170,11 @@ async function capture() {
       await page.locator('[data-testid="train-start-session-card"]').click({ force: true })
       await page.waitForSelector('[data-new-session-sheet]')
       await page.waitForTimeout(700)
-      await page.getByRole('button', { name: 'Musculation' }).click({ force: true })
-      await page.waitForSelector('#workout-notebook')
+      await page.locator('[data-new-session-sheet] button').filter({ hasText: 'Musculation' }).click({ force: true })
+      await page.getByText('Quel est ton premier exercice').waitFor({ timeout: 15_000 })
+      await page.waitForTimeout(1000)
+      // Pick first exercise so the immersive session screen is visible
+      await page.getByRole('button', { name: /Développé couché/i }).first().click({ force: true })
       await page.waitForTimeout(1200)
 
       // 2) Goal picker 1–5
