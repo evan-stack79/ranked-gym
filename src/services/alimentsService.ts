@@ -271,68 +271,60 @@ export async function searchOpenFoodFacts(
   const categoryTag = options?.categoryTag?.trim() || null
   const searchTerm = term.trim()
 
-  // Direct OFF : serving_size + categories_tags (absents du proxy Convex actuel, sans deploy).
-  const directPromise = searchOpenFoodFactsDirect(searchTerm, signal, { categoryTag }).catch(
-    (error) => {
-      safeWarn('[aliments] direct OFF search failed', error)
-      return [] as OpenFoodFactsSearchHit[]
-    },
-  )
+  // Catégorie : chemin direct OFF (tag filter + serving_size / categories_tags).
+  if (categoryTag) {
+    return searchOpenFoodFactsDirect(searchTerm, signal, { categoryTag })
+  }
 
-  if (isConvexDomainActive() && !categoryTag && searchTerm.length >= 2) {
+  if (isConvexDomainActive() && searchTerm.length >= 2) {
     try {
-      const [directHits, personal] = await Promise.all([
-        directPromise,
-        listConvexFoodCatalog({ limit: SEARCH_PAGE_SIZE * 2 }).catch(() => []),
+      const [hits, personal] = await Promise.all([
+        searchOpenFoodFactsViaConvex(searchTerm, SEARCH_PAGE_SIZE),
+        listConvexFoodCatalog({ limit: SEARCH_PAGE_SIZE * 2 }),
       ])
 
       const merged = new Map<string, OpenFoodFactsSearchHit>()
       for (const hit of personal.filter((row) => matchCatalogRow(row, searchTerm)).map(mapCatalogToHit)) {
         const key = `${hit.barcode}::${hit.nom}`.toLowerCase()
         if (!merged.has(key)) merged.set(key, hit)
+        if (merged.size >= SEARCH_PAGE_SIZE) return Array.from(merged.values())
       }
-      for (const hit of directHits) {
+      for (const hit of hits.map(mapCloudProduct)) {
         const key = `${hit.barcode}::${hit.nom}`.toLowerCase()
-        const existing = merged.get(key)
-        if (!existing) {
-          merged.set(key, hit)
-        } else {
-          // Préfère serving_size / image / tags du hit direct.
-          merged.set(key, {
-            ...existing,
-            servingSize: existing.servingSize || hit.servingSize,
-            categoriesTags:
-              existing.categoriesTags && existing.categoriesTags.length > 0
-                ? existing.categoriesTags
-                : hit.categoriesTags,
-            imageUrl: existing.imageUrl || hit.imageUrl,
-            calories: existing.calories ?? hit.calories,
-            proteines: existing.proteines ?? hit.proteines,
-            glucides: existing.glucides ?? hit.glucides,
-            lipides: existing.lipides ?? hit.lipides,
-          })
-        }
+        if (!merged.has(key)) merged.set(key, hit)
         if (merged.size >= SEARCH_PAGE_SIZE) break
       }
-      if (merged.size > 0) return Array.from(merged.values()).slice(0, SEARCH_PAGE_SIZE)
+      const result = Array.from(merged.values())
+      // Enrichit serving_size / tags via direct OFF (best-effort, non bloquant).
+      void enrichServingFromDirect(result, searchTerm, signal).catch((error) => {
+        safeWarn('[aliments] serving enrich failed', error)
+      })
+      return result
     } catch (error) {
-      safeWarn('[aliments] convex catalog merge failed, fallback direct', error)
+      safeWarn('[aliments] convex OFF search failed, fallback direct', error)
     }
   }
+  return searchOpenFoodFactsDirect(searchTerm, signal, { categoryTag })
+}
 
-  const direct = await directPromise
-  if (direct.length > 0) return direct
-
-  // Dernier recours : proxy Convex (sans serving_size).
-  if (isConvexDomainActive() && searchTerm.length >= 2 && !categoryTag) {
-    try {
-      const hits = await searchOpenFoodFactsViaConvex(searchTerm, SEARCH_PAGE_SIZE)
-      return hits.map(mapCloudProduct)
-    } catch (error) {
-      safeWarn('[aliments] convex OFF search failed', error)
+async function enrichServingFromDirect(
+  hits: OpenFoodFactsSearchHit[],
+  term: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (hits.length === 0 || term.trim().length < 2) return
+  const direct = await searchOpenFoodFactsDirect(term, signal)
+  if (direct.length === 0) return
+  const byBarcode = new Map(direct.map((h) => [h.barcode, h] as const))
+  for (const hit of hits) {
+    const extra = byBarcode.get(hit.barcode)
+    if (!extra) continue
+    if (!hit.servingSize && extra.servingSize) hit.servingSize = extra.servingSize
+    if ((!hit.categoriesTags || hit.categoriesTags.length === 0) && extra.categoriesTags?.length) {
+      hit.categoriesTags = extra.categoriesTags
     }
+    if (!hit.imageUrl && extra.imageUrl) hit.imageUrl = extra.imageUrl
   }
-  return []
 }
 
 function mapFoodCatalogRecord(row: CloudFoodRecord): PersonalFoodItem {

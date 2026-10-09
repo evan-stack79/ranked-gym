@@ -54,7 +54,7 @@ describe('AddFoodScreen content rules', () => {
     await act(async () => {
       root.render(
         <AddFoodScreen
-          searchQuery="banane"
+          searchQuery=""
           onSearchQueryChange={noop}
           searchLoading={false}
           searchError={null}
