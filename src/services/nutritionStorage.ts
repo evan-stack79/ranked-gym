@@ -86,7 +86,8 @@ function queueJournalDayDiff(dateKey: string, prev: DayJournal | undefined, next
       kind: 'meal-upsert',
       dateKey,
       meal,
-      updatedAt: now,
+      // Chaque aliment a son propre updatedAt (newest wins), comme les verres d’eau.
+      updatedAt: meal.updatedAt ?? meal.createdAt ?? now,
     })
   }
   for (const prevMealId of prevMeals.keys()) {
@@ -569,20 +570,24 @@ export function saveTodayJournal(journal: DayJournal, opts?: StorageSaveOptions)
 
 export function addMealToDate(
   dateKey: string,
-  meal: Omit<MealEntry, 'id' | 'createdAt'>,
+  meal: Omit<MealEntry, 'id' | 'createdAt'> & { createdAt?: number; updatedAt?: number },
 ): DayJournal {
   const journal = getJournalForDate(dateKey)
+  const now = Date.now()
   const entry: MealEntry = {
     ...meal,
-    id: `meal-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    createdAt: Date.now(),
+    id: `meal-${now}-${Math.random().toString(36).slice(2, 7)}`,
+    createdAt: meal.createdAt ?? now,
+    updatedAt: meal.updatedAt ?? meal.createdAt ?? now,
   }
   const next = { ...journal, meals: [entry, ...journal.meals] }
   saveJournalForDate(next)
   return next
 }
 
-export function addMealToToday(meal: Omit<MealEntry, 'id' | 'createdAt'>): DayJournal {
+export function addMealToToday(
+  meal: Omit<MealEntry, 'id' | 'createdAt'> & { createdAt?: number; updatedAt?: number },
+): DayJournal {
   return addMealToDate(todayKey(), meal)
 }
 
@@ -603,9 +608,14 @@ export function updateMealOnDate(
   patch: Partial<Omit<MealEntry, 'id' | 'createdAt'>>,
 ): DayJournal {
   const journal = getJournalForDate(dateKey)
+  const now = Date.now()
   const next = {
     ...journal,
-    meals: journal.meals.map((meal) => (meal.id === mealId ? { ...meal, ...patch } : meal)),
+    meals: journal.meals.map((meal) =>
+      meal.id === mealId
+        ? { ...meal, ...patch, updatedAt: patch.updatedAt ?? now }
+        : meal,
+    ),
   }
   saveJournalForDate(next)
   return next

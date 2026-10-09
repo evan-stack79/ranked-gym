@@ -101,7 +101,19 @@ export interface MealEntry {
   pieces?: number
   /** How the user intended this food in the meal */
   portionMode?: 'solo' | 'with_sides'
+  /**
+   * Libellé de portion figé à l’ajout (serving_size OFF ou « pour 100 g »).
+   * Snapshot — un repas passé ne se met pas à jour si OFF change.
+   */
+  portionLabel?: string
+  /** URL photo OFF figée pour miniatures ; absente / offline → icône neutre. */
+  imageUrl?: string
   createdAt: number
+  /**
+   * Horodatage propre à cette entrée (sync newest-wins, comme les verres d’eau).
+   * Absent sur les repas legacy → traité comme createdAt.
+   */
+  updatedAt?: number
 }
 
 /** Compteurs journaliers des raccourcis d’hydratation (verre, shaker…). */

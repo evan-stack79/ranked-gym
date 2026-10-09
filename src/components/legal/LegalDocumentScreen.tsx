@@ -11,6 +11,7 @@ const TERMS_PARAGRAPHS = [
 const PRIVACY_PARAGRAPHS = [
   'Nous collectons l’email, le profil sportif et les données que tu saisis (entraînement, nutrition, récupération) pour faire fonctionner Ranked Gym.',
   'La session est restaurée localement sur ton appareil. Les sauvegardes cloud, si activées, restent liées à ton compte.',
+  'Lorsque tu cherches un aliment, les photos produit sont chargées depuis Open Food Facts : ce service tiers peut voir l’adresse IP de ton appareil.',
   'Nous ne vendons pas tes données. Les sous-traitants techniques n’y accèdent que pour opérer l’infrastructure.',
   'Tu peux demander l’accès, la correction ou la suppression de tes données depuis le compte, une fois connecté.',
   'Cette politique s’applique à la bêta privée Ranked Gym. Elle pourra être précisée avant une ouverture plus large.',

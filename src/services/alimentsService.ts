@@ -21,6 +21,10 @@ export interface OpenFoodFactsProduct {
   lipides: number | null
   imageUrl?: string
   brands?: string
+  /** serving_size brut OFF — formater via formatOffServingSize pour l’UI. */
+  servingSize?: string | null
+  /** categories_tags OFF (filtre roue). */
+  categoriesTags?: string[]
   provenance: 'open_food_facts'
   fetchedAt: number
 }
@@ -48,41 +52,32 @@ export interface PersonalFoodItem {
   lastSelectedAt: number
 }
 
+interface OffProductFields {
+  code?: string
+  _id?: string
+  product_name?: string
+  product_name_fr?: string
+  brands?: string
+  serving_size?: string
+  categories_tags?: string[]
+  nutriments?: {
+    'energy-kcal_100g'?: number
+    energy_kcal_100g?: number
+    proteins_100g?: number
+    carbohydrates_100g?: number
+    fat_100g?: number
+  }
+  image_front_small_url?: string
+  image_front_url?: string
+}
+
 interface OffProductResponse {
   status: number
-  product?: {
-    code?: string
-    _id?: string
-    product_name?: string
-    product_name_fr?: string
-    brands?: string
-    nutriments?: {
-      'energy-kcal_100g'?: number
-      energy_kcal_100g?: number
-      proteins_100g?: number
-      carbohydrates_100g?: number
-      fat_100g?: number
-    }
-    image_front_small_url?: string
-  }
+  product?: OffProductFields
 }
 
 interface OffSearchResponse {
-  products?: Array<{
-    code?: string
-    _id?: string
-    product_name?: string
-    product_name_fr?: string
-    brands?: string
-    nutriments?: {
-      'energy-kcal_100g'?: number
-      energy_kcal_100g?: number
-      proteins_100g?: number
-      carbohydrates_100g?: number
-      fat_100g?: number
-    }
-    image_front_small_url?: string
-  }>
+  products?: OffProductFields[]
 }
 
 const SEARCH_PAGE_SIZE = 20
@@ -105,28 +100,19 @@ function mapCloudProduct(product: OpenFoodFactsProductCloud): OpenFoodFactsSearc
     lipides: product.lipides,
     imageUrl: product.imageUrl,
     brands: product.brands ?? '',
+    servingSize: null,
+    categoriesTags: [],
     provenance: product.provenance,
     fetchedAt: product.fetchedAt,
   }
 }
 
-function mapOffProduct(raw: {
-  code?: string
-  _id?: string
-  product_name?: string
-  product_name_fr?: string
-  brands?: string
-  nutriments?: {
-    'energy-kcal_100g'?: number
-    energy_kcal_100g?: number
-    proteins_100g?: number
-    carbohydrates_100g?: number
-    fat_100g?: number
-  }
-  image_front_small_url?: string
-}, fallbackBarcode: string): OpenFoodFactsSearchHit {
+function mapOffProduct(raw: OffProductFields, fallbackBarcode: string): OpenFoodFactsSearchHit {
   const nutriments = raw.nutriments ?? {}
   const barcode = String(raw.code || raw._id || fallbackBarcode).trim() || fallbackBarcode
+  const tags = Array.isArray(raw.categories_tags)
+    ? raw.categories_tags.filter((t): t is string => typeof t === 'string')
+    : []
   return {
     barcode,
     nom: raw.product_name_fr?.trim() || raw.product_name?.trim() || `Produit ${barcode}`,
@@ -135,7 +121,9 @@ function mapOffProduct(raw: {
     proteines: asNullableNumber(nutriments.proteins_100g),
     glucides: asNullableNumber(nutriments.carbohydrates_100g),
     lipides: asNullableNumber(nutriments.fat_100g),
-    imageUrl: raw.image_front_small_url,
+    imageUrl: raw.image_front_small_url || raw.image_front_url,
+    servingSize: raw.serving_size?.trim() || null,
+    categoriesTags: tags,
     provenance: 'open_food_facts',
     fetchedAt: Date.now(),
   }
@@ -165,14 +153,28 @@ async function fetchOpenFoodFactsDirect(barcode: string): Promise<OpenFoodFactsP
 async function searchOpenFoodFactsDirect(
   term: string,
   signal?: AbortSignal,
+  options?: { categoryTag?: string | null },
 ): Promise<OpenFoodFactsSearchHit[]> {
   const searchTerm = term.trim()
-  if (searchTerm.length < 2) return []
-  const url =
-    `https://world.openfoodfacts.org/cgi/search.pl` +
-    `?search_terms=${encodeURIComponent(searchTerm)}` +
-    `&search_simple=1&action=process&json=1` +
-    `&sort_by=unique_scans_n&page_size=${SEARCH_PAGE_SIZE}`
+  const categoryTag = options?.categoryTag?.trim() || ''
+  if (searchTerm.length < 2 && !categoryTag) return []
+
+  const params = new URLSearchParams()
+  params.set('action', 'process')
+  params.set('json', '1')
+  params.set('sort_by', 'unique_scans_n')
+  params.set('page_size', String(SEARCH_PAGE_SIZE))
+  if (searchTerm.length >= 2) {
+    params.set('search_terms', searchTerm)
+    params.set('search_simple', '1')
+  }
+  if (categoryTag) {
+    params.set('tagtype_0', 'categories')
+    params.set('tag_contains_0', 'contains')
+    params.set('tag_0', categoryTag)
+  }
+
+  const url = `https://world.openfoodfacts.org/cgi/search.pl?${params.toString()}`
   const response = await fetch(url, {
     signal,
     headers: {
@@ -264,31 +266,73 @@ export async function saveAliment(
 export async function searchOpenFoodFacts(
   term: string,
   signal?: AbortSignal,
+  options?: { categoryTag?: string | null },
 ): Promise<OpenFoodFactsSearchHit[]> {
-  if (isConvexDomainActive()) {
+  const categoryTag = options?.categoryTag?.trim() || null
+  const searchTerm = term.trim()
+
+  // Direct OFF : serving_size + categories_tags (absents du proxy Convex actuel, sans deploy).
+  const directPromise = searchOpenFoodFactsDirect(searchTerm, signal, { categoryTag }).catch(
+    (error) => {
+      safeWarn('[aliments] direct OFF search failed', error)
+      return [] as OpenFoodFactsSearchHit[]
+    },
+  )
+
+  if (isConvexDomainActive() && !categoryTag && searchTerm.length >= 2) {
     try {
-      const [hits, personal] = await Promise.all([
-        searchOpenFoodFactsViaConvex(term, SEARCH_PAGE_SIZE),
-        listConvexFoodCatalog({ limit: SEARCH_PAGE_SIZE * 2 }),
+      const [directHits, personal] = await Promise.all([
+        directPromise,
+        listConvexFoodCatalog({ limit: SEARCH_PAGE_SIZE * 2 }).catch(() => []),
       ])
 
       const merged = new Map<string, OpenFoodFactsSearchHit>()
-      for (const hit of personal.filter((row) => matchCatalogRow(row, term)).map(mapCatalogToHit)) {
+      for (const hit of personal.filter((row) => matchCatalogRow(row, searchTerm)).map(mapCatalogToHit)) {
         const key = `${hit.barcode}::${hit.nom}`.toLowerCase()
         if (!merged.has(key)) merged.set(key, hit)
-        if (merged.size >= SEARCH_PAGE_SIZE) return Array.from(merged.values())
       }
-      for (const hit of hits.map(mapCloudProduct)) {
+      for (const hit of directHits) {
         const key = `${hit.barcode}::${hit.nom}`.toLowerCase()
-        if (!merged.has(key)) merged.set(key, hit)
+        const existing = merged.get(key)
+        if (!existing) {
+          merged.set(key, hit)
+        } else {
+          // Préfère serving_size / image / tags du hit direct.
+          merged.set(key, {
+            ...existing,
+            servingSize: existing.servingSize || hit.servingSize,
+            categoriesTags:
+              existing.categoriesTags && existing.categoriesTags.length > 0
+                ? existing.categoriesTags
+                : hit.categoriesTags,
+            imageUrl: existing.imageUrl || hit.imageUrl,
+            calories: existing.calories ?? hit.calories,
+            proteines: existing.proteines ?? hit.proteines,
+            glucides: existing.glucides ?? hit.glucides,
+            lipides: existing.lipides ?? hit.lipides,
+          })
+        }
         if (merged.size >= SEARCH_PAGE_SIZE) break
       }
-      return Array.from(merged.values())
+      if (merged.size > 0) return Array.from(merged.values()).slice(0, SEARCH_PAGE_SIZE)
     } catch (error) {
-      safeWarn('[aliments] convex OFF search failed, fallback direct', error)
+      safeWarn('[aliments] convex catalog merge failed, fallback direct', error)
     }
   }
-  return searchOpenFoodFactsDirect(term, signal)
+
+  const direct = await directPromise
+  if (direct.length > 0) return direct
+
+  // Dernier recours : proxy Convex (sans serving_size).
+  if (isConvexDomainActive() && searchTerm.length >= 2 && !categoryTag) {
+    try {
+      const hits = await searchOpenFoodFactsViaConvex(searchTerm, SEARCH_PAGE_SIZE)
+      return hits.map(mapCloudProduct)
+    } catch (error) {
+      safeWarn('[aliments] convex OFF search failed', error)
+    }
+  }
+  return []
 }
 
 function mapFoodCatalogRecord(row: CloudFoodRecord): PersonalFoodItem {
@@ -320,6 +364,8 @@ function mapCatalogToHit(row: CloudFoodRecord): OpenFoodFactsSearchHit {
     glucides: row.carbsPer100g,
     lipides: row.fatPer100g,
     imageUrl: row.imageUrl,
+    servingSize: null,
+    categoriesTags: [],
     provenance: 'open_food_facts',
     fetchedAt: row.lastFetchedAt,
     foodKey: row.foodKey,
