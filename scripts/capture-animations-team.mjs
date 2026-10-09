@@ -133,10 +133,19 @@ async function main() {
     try {
       browser = await webkit.launch({ headless: true })
     } catch {
-      browser = await chromium.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-dev-shm-usage'],
-      })
+      try {
+        browser = await chromium.launch({
+          channel: 'chrome',
+          headless: true,
+          args: ['--no-sandbox', '--disable-dev-shm-usage'],
+        })
+      } catch {
+        browser = await chromium.launch({
+          executablePath: process.env.CHROME_PATH || '/usr/local/bin/google-chrome',
+          headless: true,
+          args: ['--no-sandbox', '--disable-dev-shm-usage'],
+        })
+      }
     }
 
     await captureClip(browser, 'anim-1-fin-seance', async (page) => {
