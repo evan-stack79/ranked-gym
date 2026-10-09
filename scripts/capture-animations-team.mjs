@@ -379,7 +379,7 @@ async function main() {
     if (want('anim-7-streak-fix'))
       await captureClip(browser, 'anim-7-streak-fix', async (page) => {
         await openHome(page)
-        await page.locator('[data-demo="streak-jours"]').scrollIntoViewIfNeeded()
+        await page.locator('[data-demo="streak-fix"]').scrollIntoViewIfNeeded()
         // Keyboard-activate + pointer parked off-screen — no click/hand glyphs.
         const trigger = page.locator('[data-testid="demo-streak"]')
         await page.mouse.move(-100, -100)
