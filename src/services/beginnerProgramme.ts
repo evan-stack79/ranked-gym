@@ -141,7 +141,11 @@ export function areLoadHistoriesIsolated(
 }
 
 export function beginnerRepRangeLabel(): string {
-  return `${BEGINNER_TARGET_REPS_MIN}–${BEGINNER_TARGET_REPS_MAX}`
+  return `${BEGINNER_TARGET_REPS_MIN} à ${BEGINNER_TARGET_REPS_MAX}`
+}
+
+export function beginnerProgrammeDetailCopy(): string {
+  return `1 série pour commencer · ${beginnerRepRangeLabel()} répétitions · machines, avec un remplacement si elles sont prises`
 }
 
 export function isGainageExercise(canonicalExerciseId: string | undefined | null): boolean {

@@ -1,6 +1,6 @@
 /**
  * QA fixture — hub Train amélioré @ 390×844.
- * Route: /train-hub-fixture?scene=empty|goal|rest|beginner
+ * Route: /train-hub-fixture?scene=empty|goal|spark|rest|beginner|beginner-open|gainage
  */
 import { useEffect, useMemo, useState } from 'react'
 import { BrandMark } from '../components/brand/BrandMark'
@@ -8,6 +8,7 @@ import { TrainStartSessionCard } from '../components/training/TrainStartSessionC
 import { TrainWeeklyGoalCard } from '../components/training/TrainWeeklyGoalCard'
 import { TrainRestReminderCard } from '../components/training/TrainRestReminderCard'
 import { TrainBeginnerProgrammeCard } from '../components/training/TrainBeginnerProgrammeCard'
+import { TrainBeginnerSessionView } from '../components/training/TrainBeginnerSessionView'
 import { TrainGymLeaderboardCard } from '../components/training/TrainGymLeaderboardCard'
 import { TrainWeekStrip } from '../components/training/TrainWeekStrip'
 import { GainageHoldPanel } from '../components/training/GainageHoldPanel'
@@ -86,7 +87,7 @@ function seedScene(scene: string) {
   if (scene === 'rest') {
     notes = [noteOn(yesterday, 'n-y'), noteOn(today, 'n-t')]
   }
-  if (scene === 'beginner') {
+  if (scene === 'beginner' || scene === 'beginner-open' || scene === 'gainage') {
     notes = []
   }
   const state = getTrainingState()
@@ -113,6 +114,7 @@ export function TrainHubFixture() {
   const [activityOpen, setActivityOpen] = useState(false)
   const [started, setStarted] = useState(false)
   const [showGainage, setShowGainage] = useState(scene === 'gainage')
+  const [programmeOpen, setProgrammeOpen] = useState(scene === 'beginner-open')
 
   useEffect(() => {
     seedScene(scene)
@@ -126,6 +128,28 @@ export function TrainHubFixture() {
   const weeklyGoal = parseWeeklySessionGoal(state.weeklySessionGoal)
   const showRest = shouldShowRestReminder(state.workoutNotes, state.restReminder, now)
   const weekEmpty = weekCount === 0
+
+  if (programmeOpen || scene === 'beginner-open') {
+    return (
+      <div
+        className="relative flex h-[100dvh] min-h-0 flex-col mesh-bg font-sans"
+        data-train-hub-fixture="1"
+        data-scene={scene}
+      >
+        <header className="border-b border-white/5 bg-[#0C0C0E]">
+          <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-2">
+            <BrandMark variant="compact" />
+          </div>
+        </header>
+        <main className="relative z-10 mx-auto flex w-full max-w-lg flex-1 flex-col gap-4 overflow-y-auto px-5 py-6">
+          <TrainBeginnerSessionView
+            machineBusyIds={['leg_press']}
+            onClose={scene === 'beginner-open' ? undefined : () => setProgrammeOpen(false)}
+          />
+        </main>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -184,7 +208,7 @@ export function TrainHubFixture() {
             ensureBeginnerProgrammeRoutine()
             startFreeWorkoutSession('musculation', BEGINNER_PROGRAMME_ID)
             setStarted(true)
-            setShowGainage(true)
+            setProgrammeOpen(true)
             setTick((n) => n + 1)
           }}
         />

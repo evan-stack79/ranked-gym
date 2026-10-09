@@ -1,11 +1,14 @@
 /**
  * Programme « Débutant » — validé §10 bis.
- * Full body, 2×/sem, 1 série au départ (jusqu’à 3), 8–12 reps.
+ * Tout le corps, 2×/sem, 1 série au départ (jusqu’à 3), 8 à 12 répétitions.
  */
 
 export const BEGINNER_PROGRAMME_ID = 'programme-debutant' as const
 export const BEGINNER_PROGRAMME_TITLE = 'Débutant' as const
-export const BEGINNER_PROGRAMME_SUBTITLE = 'Full body · 2 séances / semaine' as const
+export const BEGINNER_PROGRAMME_SUBTITLE = 'Tout le corps · 2 séances / semaine' as const
+export const BEGINNER_PROGRAMME_DETAIL =
+  '1 série pour commencer · 8 à 12 répétitions · machines, avec un remplacement si elles sont prises' as const
+export const MACHINE_BUSY_LABEL = 'Machine prise' as const
 
 export const BEGINNER_TARGET_REPS_MIN = 8
 export const BEGINNER_TARGET_REPS_MAX = 12

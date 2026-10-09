@@ -129,7 +129,7 @@ async function capture() {
       await context.close()
     }
 
-    // Beginner + gainage
+    // Beginner programme opened (exercise list + Gainage + Machine prise)
     {
       const context = await browser.newContext({
         viewport: { width, height },
@@ -138,11 +138,14 @@ async function capture() {
         hasTouch: true,
       })
       const page = await context.newPage()
-      await openScene(page, 'beginner')
-      await page.waitForSelector('[data-testid="train-beginner-programme"]')
+      await openScene(page, 'beginner-open')
+      await page.waitForSelector('[data-testid="train-beginner-session"]')
+      await page.waitForSelector('[data-testid="train-machine-busy-badge"]')
+      await page.waitForSelector('[data-testid="train-beginner-exercise-list"]')
       await shot(page, 'train-beginner-programme.png')
-      await page.locator('[data-testid="train-beginner-start"]').click({ force: true })
-      await page.waitForSelector('[data-testid="gainage-hold-panel"]')
+      // Scroll to Gainage row / hold panel for secondary shot
+      await page.locator('[data-testid="gainage-hold-panel"]').scrollIntoViewIfNeeded()
+      await page.waitForTimeout(200)
       await shot(page, 'train-beginner-gainage.png')
       await context.close()
     }
@@ -158,30 +161,44 @@ async function capture() {
       })
       const page = await videoContext.newPage()
 
+      // Empty page + big card → tap starts session
       await openScene(page, 'empty')
       await page.waitForTimeout(600)
       await page.locator('[data-testid="train-start-session-card"]').click({ force: true })
+      await page.waitForSelector('[data-testid="train-hub-started"]')
       await page.waitForTimeout(700)
 
+      // Goal picker 1–5
       await openScene(page, 'goal')
       await page.waitForTimeout(400)
-      await page.locator('[data-testid="train-weekly-goal-select"]').selectOption('1')
-      await page.waitForTimeout(350)
-      await page.locator('[data-testid="train-weekly-goal-select"]').selectOption('5')
-      await page.waitForTimeout(500)
+      for (const n of ['1', '2', '3', '4', '5']) {
+        await page.locator('[data-testid="train-weekly-goal-select"]').selectOption(n)
+        await page.waitForTimeout(280)
+      }
       await page.locator('[data-testid="train-weekly-goal-select"]').selectOption('2')
-      await page.waitForTimeout(600)
+      await page.waitForTimeout(500)
 
+      // Bar filling + single spark at 100%
+      await openScene(page, 'spark')
+      await page.waitForSelector('[data-testid="train-weekly-goal"]')
+      await page.waitForTimeout(1100)
+
+      // Rest reminder + dismiss
       await openScene(page, 'rest')
       await page.waitForSelector('[data-testid="train-rest-reminder"]')
       await page.waitForTimeout(900)
       await page.locator('[data-testid="train-rest-reminder-dismiss"]').click({ force: true })
       await page.waitForTimeout(600)
 
+      // Programme opened (list + Machine prise + Gainage)
       await openScene(page, 'beginner')
       await page.waitForTimeout(500)
       await page.locator('[data-testid="train-beginner-start"]').click({ force: true })
-      await page.waitForSelector('[data-testid="gainage-hold-panel"]')
+      await page.waitForSelector('[data-testid="train-beginner-session"]')
+      await page.waitForSelector('[data-testid="train-machine-busy-badge"]')
+      await page.waitForTimeout(800)
+      await page.locator('[data-testid="gainage-hold-panel"]').scrollIntoViewIfNeeded()
+      await page.waitForTimeout(500)
       await page.locator('[data-testid="gainage-hold-toggle"]').click({ force: true })
       await page.waitForTimeout(1200)
       await page.locator('[data-testid="gainage-hold-done"]').click({ force: true })

@@ -1,16 +1,35 @@
 import { describe, expect, it } from 'vitest'
 import {
   areLoadHistoriesIsolated,
+  beginnerProgrammeDetailCopy,
   beginnerProgrammeEligibility,
+  beginnerRepRangeLabel,
   buildBeginnerExerciseEntry,
   buildBeginnerRoutineExercises,
   GAINAGE_HOLD_TEXT,
 } from './beginnerProgramme'
-import { BEGINNER_EXERCISES } from '../data/beginnerProgramme'
+import {
+  BEGINNER_EXERCISES,
+  BEGINNER_PROGRAMME_DETAIL,
+  BEGINNER_PROGRAMME_SUBTITLE,
+  MACHINE_BUSY_LABEL,
+} from '../data/beginnerProgramme'
 import { suggestLoadIncrease } from './loadIncreaseSuggest'
 import type { WorkoutNote } from '../types/training'
 
 describe('Programme Débutant', () => {
+  it('shows plain French copy (no full body / reps / swap jargon)', () => {
+    expect(BEGINNER_PROGRAMME_SUBTITLE).toBe('Tout le corps · 2 séances / semaine')
+    expect(BEGINNER_PROGRAMME_DETAIL).toBe(
+      '1 série pour commencer · 8 à 12 répétitions · machines, avec un remplacement si elles sont prises',
+    )
+    expect(beginnerProgrammeDetailCopy()).toBe(BEGINNER_PROGRAMME_DETAIL)
+    expect(beginnerRepRangeLabel()).toBe('8 à 12')
+    expect(MACHINE_BUSY_LABEL).toBe('Machine prise')
+    expect(BEGINNER_PROGRAMME_SUBTITLE.toLowerCase()).not.toMatch(/full body|reps|swap/)
+    expect(BEGINNER_PROGRAMME_DETAIL.toLowerCase()).not.toMatch(/\breps\b|\bswap\b|full body/)
+  })
+
   it('is hidden for under-18, pregnancy, and breastfeeding', () => {
     expect(
       beginnerProgrammeEligibility({

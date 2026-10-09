@@ -1,8 +1,8 @@
 import {
+  BEGINNER_PROGRAMME_DETAIL,
   BEGINNER_PROGRAMME_SUBTITLE,
   BEGINNER_PROGRAMME_TITLE,
 } from '../../data/beginnerProgramme'
-import { beginnerRepRangeLabel } from '../../services/beginnerProgramme'
 
 export function TrainBeginnerProgrammeCard({ onStart }: { onStart: () => void }) {
   return (
@@ -15,9 +15,7 @@ export function TrainBeginnerProgrammeCard({ onStart }: { onStart: () => void })
       </p>
       <h2 className="mt-1 text-[18px] font-bold text-white">{BEGINNER_PROGRAMME_TITLE}</h2>
       <p className="mt-1 text-[13px] text-[#AEAEB2]">{BEGINNER_PROGRAMME_SUBTITLE}</p>
-      <p className="mt-2 text-[13px] text-[#8E8E93]">
-        1 série pour commencer · {beginnerRepRangeLabel()} reps · machines avec swap si prises
-      </p>
+      <p className="mt-2 text-[13px] text-[#8E8E93]">{BEGINNER_PROGRAMME_DETAIL}</p>
       <button
         type="button"
         onClick={onStart}
