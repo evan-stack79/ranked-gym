@@ -10,6 +10,21 @@ import type {
   SessionKind,
 } from '../types/training'
 import { todayKey } from '../utils/calories'
+import { parisDateKey } from '../utils/parisDate'
+import {
+  clampWeeklySessionGoal,
+  mergeWeeklySessionGoal,
+  parseWeeklySessionGoal,
+  type WeeklySessionGoalRecord,
+  type WeeklySessionGoalTarget,
+} from './trainWeeklyGoal'
+import {
+  mergeRestReminderPrefs,
+  parseRestReminderPrefs,
+  type RestReminderPrefs,
+} from './trainRestReminder'
+import { buildBeginnerRoutine } from './beginnerProgramme'
+import { BEGINNER_PROGRAMME_ID } from '../data/beginnerProgramme'
 import { getCalorieProfile } from './nutritionStorage'
 import {
   computeStrengthSessionStats,
@@ -150,6 +165,8 @@ const DEFAULT_STATE: TrainingState = {
   lastSelectedSportId: null,
   activeWorkoutDraft: null,
   lastVoluntaryRoute: null,
+  weeklySessionGoal: { target: 2, updatedAt: 0, sparkShownWeekKey: null },
+  restReminder: { enabled: true, updatedAt: 0, dismissedWeekKey: null },
 }
 
 function cloneExercises(exercises: ExerciseEntry[]): ExerciseEntry[] {
@@ -383,6 +400,8 @@ function read(): TrainingState {
             ? false
             : undefined,
       sportsUndecided: parsed.sportsUndecided === true ? true : undefined,
+      weeklySessionGoal: parseWeeklySessionGoal(parsed.weeklySessionGoal),
+      restReminder: parseRestReminderPrefs(parsed.restReminder),
     }
     if (merged.stepsDateKey !== todayKey()) {
       merged.stepsToday = 0
@@ -726,6 +745,7 @@ export function saveWorkoutNote(
       ? sanitizeStoredId(liveDraft.sessionId)
       : null)
 
+  const now = Date.now()
   const entry: WorkoutNote = {
     id: note.id ?? `note-${Date.now()}`,
     title: persistedTitle.title,
@@ -734,8 +754,10 @@ export function saveWorkoutNote(
     durationMin,
     totalVolumeKg,
     routineId: note.routineId ?? existing?.routineId,
-    dateKey: note.dateKey ?? existing?.dateKey ?? todayKey(),
-    createdAt: note.createdAt ?? existing?.createdAt ?? Date.now(),
+    // Date téléphone Europe/Paris — une séance offline compte le bon jour.
+    dateKey: note.dateKey ?? existing?.dateKey ?? parisDateKey(now),
+    createdAt: note.createdAt ?? existing?.createdAt ?? now,
+    updatedAt: now,
     // Métadonnées multisport additives — jamais inventées pour les notes legacy.
     sportId: note.sportId ?? existing?.sportId,
     sessionKind: note.sessionKind ?? existing?.sessionKind,
@@ -1108,6 +1130,61 @@ export function addCustomRoutine(label: string): TrainingState {
   write(next)
   return next
 }
+
+/** Assure la présence du programme Débutant dans les routines (idempotent). */
+export function ensureBeginnerProgrammeRoutine(): TrainingState {
+  const state = read()
+  if (state.routines.some((r) => r.id === BEGINNER_PROGRAMME_ID)) return state
+  const beginner = buildBeginnerRoutine()
+  const next = { ...state, routines: [...state.routines, beginner] }
+  write(next)
+  return next
+}
+
+export function setWeeklySessionGoal(target: WeeklySessionGoalTarget): TrainingState {
+  const state = read()
+  const current = parseWeeklySessionGoal(state.weeklySessionGoal)
+  const nextGoal: WeeklySessionGoalRecord = {
+    ...current,
+    target: clampWeeklySessionGoal(target),
+    updatedAt: Date.now(),
+  }
+  const next = { ...state, weeklySessionGoal: nextGoal }
+  write(next)
+  return next
+}
+
+export function markWeeklyGoalSparkShown(weekKey: string): TrainingState {
+  const state = read()
+  const current = parseWeeklySessionGoal(state.weeklySessionGoal)
+  if (current.sparkShownWeekKey === weekKey) return state
+  const next = {
+    ...state,
+    weeklySessionGoal: {
+      ...current,
+      sparkShownWeekKey: weekKey,
+      updatedAt: Date.now(),
+    },
+  }
+  write(next)
+  return next
+}
+
+export function setRestReminderPrefs(patch: Partial<RestReminderPrefs>): TrainingState {
+  const state = read()
+  const current = parseRestReminderPrefs(state.restReminder)
+  const nextPrefs: RestReminderPrefs = {
+    ...current,
+    ...patch,
+    updatedAt: Date.now(),
+  }
+  const next = { ...state, restReminder: nextPrefs }
+  write(next)
+  return next
+}
+
+/** Exposé pour tests / sync — réexporte les merges prefs. */
+export { mergeWeeklySessionGoal, mergeRestReminderPrefs }
 
 export function getRoutineExercises(routineId: string): ExerciseEntry[] {
   const state = read()

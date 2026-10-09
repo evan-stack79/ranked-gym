@@ -176,6 +176,22 @@ describe('ExercisePicker', () => {
     await cleanup()
   })
 
+  it('pads the list so the last result clears the sticky create button + safe area', async () => {
+    const { host, cleanup } = await renderPicker()
+    const list = host.querySelector('[data-testid="exercise-picker-list"]') as HTMLElement | null
+    const footer = host.querySelector('[data-testid="exercise-picker-footer"]')
+    expect(list).toBeTruthy()
+    expect(footer).toBeTruthy()
+    expect(host.querySelector('[data-testid="exercise-picker-create"]')).toBeTruthy()
+    expect(list?.getAttribute('data-list-pad-bottom')).toBe('create-btn+safe')
+    expect(list?.getAttribute('data-list-pad-top')).toBe('search-clearance')
+    const pb = list?.style.paddingBottom ?? ''
+    expect(pb).toMatch(/7\.5rem/)
+    expect(pb).toMatch(/safe-area-inset-bottom/)
+    expect(list?.style.paddingTop).toMatch(/0\.75rem/)
+    await cleanup()
+  })
+
   it('id sans illustration + exo custom : fallback neutre uniquement', async () => {
     const onCreateCustom = vi.fn()
     const { host, cleanup } = await renderPicker({ onCreateCustom })

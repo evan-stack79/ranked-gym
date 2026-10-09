@@ -54,7 +54,12 @@ export function ExercisePicker({
   const totalMatches = useMemo(() => countExerciseMatches(query, sportIds), [query, sportIds])
 
   useEffect(() => {
-    // Focus search after paint — clavier web OK, résultats visibles au-dessus.
+    // Autofocus only on fine pointers — on touch, the keyboard would cover the list.
+    try {
+      if (window.matchMedia('(pointer: coarse)').matches) return
+    } catch {
+      /* ignore */
+    }
     const t = window.setTimeout(() => searchRef.current?.focus(), 60)
     return () => window.clearTimeout(t)
   }, [])
@@ -79,7 +84,6 @@ export function ExercisePicker({
       data-picker-mode={mode}
       style={{
         paddingTop: 'max(0.5rem, env(safe-area-inset-top))',
-        paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
       }}
     >
       {/* Top chrome — logo panthère seul, pas de wordmark / pas de bascule programme */}
@@ -115,7 +119,7 @@ export function ExercisePicker({
 
         {/* Search — graphite, coins modérés */}
         <label
-          className="mb-2 flex min-h-12 shrink-0 items-center gap-2.5 rounded-2xl bg-[#2c2c2e] px-3.5"
+          className="mb-3 flex min-h-12 shrink-0 items-center gap-2.5 rounded-2xl bg-[#2c2c2e] px-3.5"
           htmlFor={`${listId}-search`}
         >
           <Search className="h-5 w-5 shrink-0 text-[#8E8E93]" aria-hidden="true" />
@@ -149,74 +153,96 @@ export function ExercisePicker({
           ) : null}
         </label>
 
-        {/* Results — lignes sobres, scroll au-dessus du clavier */}
-        <ul
-          id={listId}
-          role="listbox"
-          aria-label="Résultats d’exercices"
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[env(keyboard-inset-height,0px)] [-webkit-overflow-scrolling:touch]"
-        >
-          {results.map((ex, index) => (
-            <ExerciseResultRow
-              key={ex.id}
-              exercise={ex}
-              active={index === 0}
-              onSelect={() => onSelect(ex)}
-            />
-          ))}
-          {results.length === 0 ? (
-            <li className="px-1 py-8 text-center text-[14px] text-[#8E8E93]">
-              Aucun exercice trouvé
-            </li>
-          ) : null}
-        </ul>
-
-        {/* Footer */}
-        <div className="shrink-0 pt-2">
-          {customOpen ? (
-            <div className="mb-3 space-y-2">
-              <label className="block">
-                <span className="sr-only">Nom de l’exercice personnalisé</span>
-                <input
-                  type="text"
-                  value={customName}
-                  onChange={(e) => setCustomName(e.target.value)}
-                  placeholder="Nom de ton exercice"
-                  autoFocus
-                  className="min-h-11 w-full rounded-xl border border-white/12 bg-[#1c1c1e] px-3.5 text-[15px] text-white placeholder:text-[#636366] outline-none focus-visible:border-[#FF2B2B]/55"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitCustom()
-                  }}
-                />
-              </label>
-              <button
-                type="button"
-                onClick={submitCustom}
-                disabled={!customName.trim()}
-                className="ios-press flex min-h-11 w-full items-center justify-center rounded-xl bg-[#FF2B2B] text-[14px] font-semibold text-white disabled:opacity-40"
-              >
-                Créer et ajouter
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                setCustomOpen(true)
-                setCustomName(query.trim())
-              }}
-              className="ios-press mb-1 flex min-h-11 w-full items-center justify-center text-[14px] font-semibold text-white"
-            >
-              + Créer un exercice personnalisé
-            </button>
-          )}
-          <p
-            className="pb-1 text-center text-[12px] tabular-nums text-[#636366]"
-            aria-live="polite"
-            data-result-count
+        {/*
+          Flex column (not absolute inset): list stays below the search.
+          Sticky footer overlays the bottom; list pads so the last row clears it.
+        */}
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <ul
+            id={listId}
+            role="listbox"
+            aria-label="Résultats d’exercices"
+            data-testid="exercise-picker-list"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+            data-list-pad-bottom="create-btn+safe"
+            data-list-pad-top="search-clearance"
+            style={{
+              paddingTop: '0.75rem',
+              scrollPaddingTop: '0.75rem',
+              paddingBottom:
+                'calc(7.5rem + max(0.75rem, env(safe-area-inset-bottom, 0px)) + env(keyboard-inset-height, 0px))',
+            }}
           >
-            {totalMatches} résultat{totalMatches === 1 ? '' : 's'}
-          </p>
+            {results.map((ex, index) => (
+              <ExerciseResultRow
+                key={ex.id}
+                exercise={ex}
+                active={index === 0}
+                onSelect={() => onSelect(ex)}
+              />
+            ))}
+            {results.length === 0 ? (
+              <li className="px-1 py-8 text-center text-[14px] text-[#8E8E93]">
+                Aucun exercice trouvé
+              </li>
+            ) : null}
+          </ul>
+
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black via-black/95 to-transparent pt-4"
+            data-testid="exercise-picker-footer"
+            style={{
+              paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))',
+            }}
+          >
+            <div className="pointer-events-auto px-0">
+              {customOpen ? (
+                <div className="mb-3 space-y-2">
+                  <label className="block">
+                    <span className="sr-only">Nom de l’exercice personnalisé</span>
+                    <input
+                      type="text"
+                      value={customName}
+                      onChange={(e) => setCustomName(e.target.value)}
+                      placeholder="Nom de ton exercice"
+                      autoFocus
+                      className="min-h-11 w-full rounded-xl border border-white/12 bg-[#1c1c1e] px-3.5 text-[15px] text-white placeholder:text-[#636366] outline-none focus-visible:border-[#FF2B2B]/55"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') submitCustom()
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={submitCustom}
+                    disabled={!customName.trim()}
+                    className="ios-press flex min-h-11 w-full items-center justify-center rounded-xl bg-[#FF2B2B] text-[14px] font-semibold text-white disabled:opacity-40"
+                  >
+                    Créer et ajouter
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomOpen(true)
+                    setCustomName(query.trim())
+                  }}
+                  className="ios-press mb-1 flex min-h-11 w-full items-center justify-center text-[14px] font-semibold text-white"
+                  data-testid="exercise-picker-create"
+                >
+                  + Créer un exercice personnalisé
+                </button>
+              )}
+              <p
+                className="pb-1 text-center text-[12px] tabular-nums text-[#636366]"
+                aria-live="polite"
+                data-result-count
+              >
+                {totalMatches} résultat{totalMatches === 1 ? '' : 's'}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </section>

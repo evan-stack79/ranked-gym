@@ -1038,7 +1038,7 @@ export function WorkoutNotebook({
                           />
                         </label>
                         <label className="block">
-                          <span className="mb-0.5 block text-[10px] text-[#636366]">Reps</span>
+                          <span className="mb-0.5 block text-[10px] text-[#636366]">Rép.</span>
                           <ClearableNumberInput
                             value={showLastHint ? null : set.reps}
                             onChange={(v) =>
@@ -1057,7 +1057,7 @@ export function WorkoutNotebook({
                             aria-label={
                               showLastHint && lastPerf
                                 ? formatLastRepsAriaLabel(lastPerf.reps)
-                                : 'Reps'
+                                : 'Rép.'
                             }
                             className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
                           />

@@ -292,7 +292,7 @@ export function ImmersiveExerciseSession({
             kg
           </span>
           <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#636366]">
-            Reps
+            Rép.
           </span>
           <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#636366]">
             Effort

@@ -26,6 +26,10 @@ import {
   dismissRecommendedExercise,
   appendExerciseToActiveRoutine,
   persistActiveExerciseIndex,
+  ensureBeginnerProgrammeRoutine,
+  setWeeklySessionGoal,
+  markWeeklyGoalSparkShown,
+  setRestReminderPrefs,
 } from '../../services/trainingStorage'
 import { saveAndSyncWorkoutSession } from '../../services/trainingSyncService'
 import { safeError } from '../../utils/safeLog'
@@ -79,6 +83,23 @@ import { TrainRecentSessions } from './TrainRecentSessions'
 import { TrainActivitySheet, type QuickActivityId } from './TrainActivitySheet'
 import { TrainingRecommendationCard } from './TrainingRecommendationCard'
 import { isTrainingRecommendationsEnabled } from '../../backend/trainingFeatureFlags'
+import { TrainStartSessionCard } from './TrainStartSessionCard'
+import { TrainWeeklyGoalCard } from './TrainWeeklyGoalCard'
+import { TrainRestReminderCard } from './TrainRestReminderCard'
+import { TrainGymLeaderboardCard } from './TrainGymLeaderboardCard'
+import { TrainBeginnerProgrammeCard } from './TrainBeginnerProgrammeCard'
+import { beginnerProgrammeEligibility } from '../../services/beginnerProgramme'
+import { BEGINNER_PROGRAMME_ID } from '../../data/beginnerProgramme'
+import { countSessionsInParisWeek } from '../../services/trainWeekProgress'
+import { resolveTrainStartSessionAction } from '../../services/trainStartSession'
+import {
+  dismissRestReminderForCurrentWeek,
+  shouldShowRestReminder,
+} from '../../services/trainRestReminder'
+import {
+  parseWeeklySessionGoal,
+  resolveWeeklySessionGoal,
+} from '../../services/trainWeeklyGoal'
 import {
   recommendExercises,
   recommendationProfileFromState,
@@ -226,6 +247,23 @@ export function TrainingView({
     () => deriveRecentSessions(state.workoutNotes, now, 1),
     [state.workoutNotes, now],
   )
+  const weekSessionCount = useMemo(
+    () => countSessionsInParisWeek(state.workoutNotes, now),
+    [state.workoutNotes, now],
+  )
+  const weeklyGoal = useMemo(
+    () => parseWeeklySessionGoal(state.weeklySessionGoal),
+    [state.weeklySessionGoal],
+  )
+  const showRestReminder = useMemo(
+    () => shouldShowRestReminder(state.workoutNotes, state.restReminder, now),
+    [state.workoutNotes, state.restReminder, now],
+  )
+  const showBeginner = useMemo(
+    () => beginnerProgrammeEligibility(profile).eligible,
+    [profile],
+  )
+
   const recsEnabled = isTrainingRecommendationsEnabled()
   const recommendations = useMemo(() => {
     if (!recsEnabled) return []
@@ -300,6 +338,20 @@ export function TrainingView({
     setPanel('notebook')
   }, [])
 
+  /** Même chemin que le ▶ de la barre du bas (ouvre le sheet / reprend le brouillon). */
+  const startLikePlayButton = useCallback(() => {
+    requireAuth(() => {
+      const draft = getTrainingState().activeWorkoutDraft
+      const action = resolveTrainStartSessionAction(Boolean(draft))
+      if (action === 'resume-draft' && draft) {
+        setState(ensureActiveWorkoutClock())
+        openNotebook(draft.routineId, null, true)
+        return
+      }
+      setActivityOpen(true)
+    })
+  }, [requireAuth, openNotebook])
+
   /** Soft-leave : flush + flag volontaire + hub. Ne termine / reset rien. */
   const softLeaveToHub = useCallback((opts?: { viaHistory?: boolean }) => {
     draftFlushRef.current?.()
@@ -328,7 +380,8 @@ export function TrainingView({
   useEffect(() => {
     if (!openActivitySheet) return
     const draft = getTrainingState().activeWorkoutDraft
-    if (draft) {
+    const action = resolveTrainStartSessionAction(Boolean(draft))
+    if (action === 'resume-draft' && draft) {
       setState(ensureActiveWorkoutClock())
       openNotebook(draft.routineId, null, true)
     } else {
@@ -588,6 +641,15 @@ export function TrainingView({
     setDisciplineTick((t) => t + 1)
   }
 
+  const startBeginnerProgramme = () => {
+    requireAuth(() => {
+      ensureBeginnerProgrammeRoutine()
+      applyDiscipline('musculation')
+      setState(startFreeWorkoutSession('musculation', BEGINNER_PROGRAMME_ID))
+      openNotebook(BEGINNER_PROGRAMME_ID, null, false, false)
+    })
+  }
+
   const applySport = (sportId: string) => {
     const selectedSport = getSportById(sportId)
     const nextDiscipline = selectedSport
@@ -740,6 +802,35 @@ export function TrainingView({
       {panel === 'hub' ? (
         <div className="flex flex-col gap-4" data-training-hub>
           <TrainWeekStrip days={weekStrip} />
+
+          <TrainStartSessionCard
+            onStart={startLikePlayButton}
+            resume={Boolean(state.activeWorkoutDraft)}
+          />
+
+          <TrainWeeklyGoalCard
+            doneCount={weekSessionCount}
+            target={resolveWeeklySessionGoal(weeklyGoal)}
+            sparkShownWeekKey={weeklyGoal.sparkShownWeekKey}
+            onChangeTarget={(next) => setState(setWeeklySessionGoal(next))}
+            onSparkShown={(weekKey) => setState(markWeeklyGoalSparkShown(weekKey))}
+          />
+
+          {showRestReminder ? (
+            <TrainRestReminderCard
+              onDismiss={() =>
+                setState(
+                  setRestReminderPrefs(dismissRestReminderForCurrentWeek(state.restReminder)),
+                )
+              }
+            />
+          ) : null}
+
+          <TrainGymLeaderboardCard />
+
+          {showBeginner ? (
+            <TrainBeginnerProgrammeCard onStart={startBeginnerProgramme} />
+          ) : null}
 
           {heroRec ? (
             <TrainingRecommendationCard

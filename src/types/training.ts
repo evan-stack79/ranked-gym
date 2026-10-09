@@ -110,6 +110,12 @@ export interface WorkoutNote {
   dateKey: string
   exercises: ExerciseEntry[]
   createdAt: number
+  /**
+   * Horloge de sync par séance (comme un verre d’eau).
+   * Newest-wins à la fusion cloud — une séance offline n’est jamais écrasée.
+   * Absent sur notes legacy → on retombe sur `createdAt`.
+   */
+  updatedAt?: number
   estimatedKcal: number
   /** Session length used for kcal (Poids × Durée × Intensité) */
   durationMin?: number
@@ -284,4 +290,21 @@ export interface TrainingState {
   sportsOnboardingComplete?: boolean
   /** L’utilisateur a choisi « Je ne sais pas encore ». */
   sportsUndecided?: boolean
+  /**
+   * Objectif de séances / semaine (1–5, défaut 2). Newest-wins via updatedAt.
+   */
+  weeklySessionGoal?: {
+    target: 1 | 2 | 3 | 4 | 5
+    updatedAt: number
+    /** Semaine (lundi Paris) où l’étincelle 100 % a déjà été jouée. */
+    sparkShownWeekKey?: string | null
+  }
+  /**
+   * Rappel repos après 2 jours consécutifs. Newest-wins via updatedAt.
+   */
+  restReminder?: {
+    enabled: boolean
+    updatedAt: number
+    dismissedWeekKey?: string | null
+  }
 }
