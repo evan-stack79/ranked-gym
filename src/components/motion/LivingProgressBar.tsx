@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
+import { animMs } from './animTiming'
 import { PROGRESS_FILL_MS } from './sessionActionGuards'
 
 export type LivingProgressBarProps = {
@@ -8,7 +9,7 @@ export type LivingProgressBarProps = {
   className?: string
   trackClassName?: string
   fillClassName?: string
-  /** Sparks once when the bar first reaches 100%. Never again if exceeded. */
+  /** Sparks once when the bar first reaches 100%. Resets if value drops below 1. */
   sparksAtFull?: boolean
   /** Skip fill animation (tests / reduced path). */
   instant?: boolean
@@ -16,9 +17,9 @@ export type LivingProgressBarProps = {
 }
 
 /**
- * Reusable progress fill — transform scaleX, ≤400 ms.
+ * Reusable progress fill — transform scaleX, ≤420 ms (× slow factor in capture).
  * Never use for kcal / body-weight / load displays.
- * At 100%: optional sparks once, then quiet.
+ * At 100%: optional sparks once, then quiet (until value drops below 1 again).
  */
 export function LivingProgressBar({
   value,
@@ -47,14 +48,24 @@ export function LivingProgressBar({
   }, [clamped, skip])
 
   useEffect(() => {
+    if (clamped < 1) {
+      sparkedRef.current = false
+      setSparked(false)
+      setSparking(false)
+    }
+  }, [clamped])
+
+  useEffect(() => {
     if (!sparksAtFull || skip || sparkedRef.current) return
     if (clamped < 1) return
     sparkedRef.current = true
     setSparked(true)
     setSparking(true)
-    const id = window.setTimeout(() => setSparking(false), 420)
+    const id = window.setTimeout(() => setSparking(false), animMs(420))
     return () => window.clearTimeout(id)
   }, [clamped, sparksAtFull, skip])
+
+  const fillMs = animMs(PROGRESS_FILL_MS)
 
   return (
     <div
@@ -75,7 +86,7 @@ export function LivingProgressBar({
             transform: `scaleX(${shown})`,
             transition: skip
               ? undefined
-              : `transform ${PROGRESS_FILL_MS}ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1))`,
+              : `transform ${fillMs}ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1))`,
           }}
         />
         {sparking ? (

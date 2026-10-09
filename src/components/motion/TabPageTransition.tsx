@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
+import { animMs } from './animTiming'
 import { TAB_FADE_MS } from './sessionActionGuards'
 import type { TabId } from '../../types'
 
@@ -32,7 +33,7 @@ export function TabPageTransition({ tabId, children, className = '' }: TabPageTr
     }
     setPanel(children)
     setPhase('in')
-    const id = window.setTimeout(() => setPhase('idle'), TAB_FADE_MS)
+    const id = window.setTimeout(() => setPhase('idle'), animMs(TAB_FADE_MS))
     return () => window.clearTimeout(id)
   }, [tabId, children, reduced])
 

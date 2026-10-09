@@ -12,6 +12,8 @@
   --rg-anim-scrim: rgb(12 12 14 / 0.72);
   --rg-anim-curve: cubic-bezier(0.65, 0, 0.45, 1); /* haniotis */
   --rg-anim-spring: cubic-bezier(0.16, 1, 0.3, 1); /* codefronts */
+  /* Debug capture: set html[data-rg-anim-slow="4"] to stretch ×4 (see block below). */
+  --rg-anim-slow: 1;
 
   /* Cap every UI motion ≤ 600ms (play breathe excluded). */
   --rg-session-total-ms: 580;
@@ -42,6 +44,89 @@
   /* Exception: 2 slow cycles behind the play button — never blocks taps. */
   --rg-play-breathe-dur: 900ms;
   --rg-play-breathe-count: 2;
+}
+
+/* Slow-motion pass for QA capture (4×). Base tokens stay ≤600ms for WCAG contract. */
+html[data-rg-anim-slow='4'] {
+  --rg-anim-slow: 4;
+  --rg-session-total-ms: 2320;
+  --rg-session-circle-dur: 1680ms;
+  --rg-session-fill-dur: 1120ms;
+  --rg-session-fill-delay: 880ms;
+  --rg-session-check-dur: 1040ms;
+  --rg-session-check-delay: 1200ms;
+  --rg-session-scale-dur: 880ms;
+  --rg-session-scale-delay: 1440ms;
+  --rg-session-spark-dur: 1600ms;
+  --rg-session-spark-delay: 1120ms;
+  --rg-session-label-dur: 880ms;
+  --rg-session-label-delay: 1280ms;
+  --rg-set-pop-dur: 1600ms;
+  --rg-tab-fade-dur: 720ms;
+  --rg-card-expand-dur: 1120ms;
+  --rg-vt-dur: 1120ms;
+  --rg-wave-card-dur: 1680ms;
+  --rg-wave-stagger: 160ms;
+  --rg-progress-fill-dur: 1680ms;
+  --rg-progress-spark-dur: 1600ms;
+  --rg-play-breathe-dur: 3600ms;
+}
+
+/* Streak overlay uses hardcoded ms in index.css — stretch the visible ones ×4. */
+html[data-rg-anim-slow='4'] .streak-celeb {
+  animation-duration: 720ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__flash {
+  animation-duration: 720ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__ring {
+  animation-duration: 2080ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__star {
+  animation-duration: 1920ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__particle {
+  animation-duration: 2480ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb--compress .streak-celeb__flame-wrap {
+  animation-duration: 1200ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb--launch .streak-celeb__flame-wrap {
+  animation-duration: 1200ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb--lit .streak-celeb__flame-wrap,
+html[data-rg-anim-slow='4'] .streak-celeb--reveal .streak-celeb__flame-wrap,
+html[data-rg-anim-slow='4'] .streak-celeb--week .streak-celeb__flame-wrap,
+html[data-rg-anim-slow='4'] .streak-celeb--settled .streak-celeb__flame-wrap {
+  animation-duration: 1680ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__count--old {
+  animation-duration: 1280ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__count--new {
+  animation-duration: 1680ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__label {
+  animation-duration: 1520ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__message {
+  animation-duration: 1680ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__week {
+  animation-duration: 2080ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb--week .streak-celeb__week-fill,
+html[data-rg-anim-slow='4'] .streak-celeb--settled .streak-celeb__week-fill {
+  animation-duration: 2800ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__panther {
+  animation-duration: 2080ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__panther--badge {
+  animation-duration: 1520ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__day-flame {
+  animation-duration: 1440ms;
 }
 
 /* ── 1. Fin de séance (haniotis KwvYLO + 12 sparks) ───────────── */

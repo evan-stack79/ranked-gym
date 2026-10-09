@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
+import { animMs } from './animTiming'
 import { CARD_EXPAND_MS } from './sessionActionGuards'
 
 export type CardExpandRect = {
@@ -17,13 +18,10 @@ export type CardExpandTransitionProps = {
   forceReducedMotion?: boolean
 }
 
-function supportsViewTransitions(): boolean {
-  return typeof document !== 'undefined' && 'startViewTransition' in document
-}
-
 /**
- * App Store–style card → page.
- * Prefers Chrome same-document View Transitions; falls back to FLIP expand.
+ * App Store–style card → page (FLIP expand overlay).
+ * Always paints the visual fallback so the expand is visible on video / WebKit.
+ * View Transitions are used only by `navigateWithViewTransition` for real navigation.
  * Reduced-motion / missing rect → onComplete immediately.
  */
 export function CardExpandTransition({
@@ -37,7 +35,6 @@ export function CardExpandTransition({
   const onCompleteRef = useRef(onComplete)
   onCompleteRef.current = onComplete
   const [expanded, setExpanded] = useState(false)
-  const [useFallback, setUseFallback] = useState(true)
 
   const finish = useCallback(() => {
     if (doneRef.current) return
@@ -49,7 +46,6 @@ export function CardExpandTransition({
     if (!from) {
       doneRef.current = false
       setExpanded(false)
-      setUseFallback(true)
       return
     }
     doneRef.current = false
@@ -58,33 +54,18 @@ export function CardExpandTransition({
       return
     }
 
-    if (supportsViewTransitions()) {
-      setUseFallback(false)
-      try {
-        const doc = document as Document & {
-          startViewTransition: (cb: () => void) => { finished: Promise<void> }
-        }
-        const vt = doc.startViewTransition(() => {
-          /* DOM swap is handled by the caller after onComplete. */
-        })
-        void vt.finished.then(finish).catch(finish)
-        const id = window.setTimeout(finish, CARD_EXPAND_MS)
-        return () => window.clearTimeout(id)
-      } catch {
-        setUseFallback(true)
-      }
-    }
-
-    setUseFallback(true)
-    const raf = window.requestAnimationFrame(() => setExpanded(true))
-    const id = window.setTimeout(finish, CARD_EXPAND_MS)
+    setExpanded(false)
+    const raf = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setExpanded(true))
+    })
+    const id = window.setTimeout(finish, animMs(CARD_EXPAND_MS))
     return () => {
       window.cancelAnimationFrame(raf)
       window.clearTimeout(id)
     }
   }, [from, reduced, finish])
 
-  if (!from || reduced || !useFallback) return null
+  if (!from || reduced) return null
 
   const style = expanded
     ? {

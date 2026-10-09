@@ -416,11 +416,11 @@ export function ImmersiveExerciseSession({
                 <div className="flex items-center justify-center">
                   {done ? (
                     <span
-                      className="flex h-7 w-7 items-center justify-center rounded-full bg-white"
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FF2B2B] text-white"
                       aria-label={`Série ${idx + 1} validée`}
                       data-rg-set-check
                     >
-                      <Check className="h-3.5 w-3.5 text-black" strokeWidth={3} />
+                      <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
                     </span>
                   ) : (
                     <span

@@ -15,6 +15,7 @@ import {
   getWeekStripDays,
   isStreakMilestone,
 } from '../../services/streakService'
+import { animMs } from '../motion/animTiming'
 
 export type StreakCelebrationOverlayProps = {
   previousStreak: number
@@ -162,7 +163,7 @@ export const StreakCelebrationOverlay = forwardRef<
   }, [])
 
   const schedule = useCallback((fn: () => void, ms: number) => {
-    const id = window.setTimeout(fn, ms)
+    const id = window.setTimeout(fn, animMs(ms))
     timersRef.current.push(id)
   }, [])
 

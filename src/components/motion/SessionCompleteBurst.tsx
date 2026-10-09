@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
+import { animMs } from './animTiming'
 import {
   SESSION_COMPLETE_BURST_MS,
   SESSION_COMPLETE_REDUCED_MS,
@@ -42,7 +43,7 @@ export function SessionCompleteBurst({
       if (completedRef.current) return
       completedRef.current = true
       onCompleteRef.current()
-    }, SESSION_COMPLETE_BURST_MS)
+    }, animMs(SESSION_COMPLETE_BURST_MS))
     return () => window.clearTimeout(id)
   }, [open, reduced])
 

@@ -51,6 +51,7 @@ import {
   shouldCommitAutoValidate,
 } from '../../utils/autoValidateSet'
 import { CANONICAL_REST_SEC, resolveRestDuration } from '../../utils/restDuration'
+import { animMs } from '../motion/animTiming'
 import {
   canFinishSession,
   canValidateSet,
@@ -569,7 +570,7 @@ export function WorkoutNotebook({
       setValidatedPop((cur) =>
         cur && cur.exerciseId === ex.id && cur.setIndex === setIndex ? null : cur,
       )
-    }, SET_VALIDATED_POP_MS)
+    }, animMs(SET_VALIDATED_POP_MS))
     setUndoSnapshot({
       exerciseId: ex.id,
       setIndex,

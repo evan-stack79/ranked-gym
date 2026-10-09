@@ -65,3 +65,4 @@ export {
   PROGRESS_FILL_MS,
   type SetLike,
 } from './sessionActionGuards'
+export { getAnimSlowFactor, animMs } from './animTiming'

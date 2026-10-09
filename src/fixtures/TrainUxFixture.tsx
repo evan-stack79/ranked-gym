@@ -3,7 +3,7 @@ import { BrandMark } from '../components/brand/BrandMark'
 
 /**
  * Route `/train-fixture` — hub Train figé pour démo animations (sans auth).
- * UI word: Effort (never RPE).
+ * UI word: Effort only.
  */
 export function TrainUxFixture() {
   return (
@@ -89,7 +89,7 @@ export function TrainUxFixture() {
           <section className="glass-card rounded-2xl p-4">
             <p className="text-[11px] font-medium text-[#8E8E93]">Conseil</p>
             <p className="mt-1 text-[14px] text-[#AEAEB2]">
-              Note ton Effort de 1 à 10 après chaque série — jamais d&apos;échelle RPE dans l&apos;UI.
+              Note ton Effort de 1 à 10 après chaque série.
             </p>
           </section>
         </div>
