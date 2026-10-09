@@ -37,22 +37,23 @@ export type StreakCelebrationPhase =
   | 'week'
   | 'settled'
 
-/** Timings exacts de la chorégraphie (~5,7 s). */
+/** Timings exacts de la chorégraphie (~1 s). Skippable immediately. */
 export const STREAK_CELEB_PHASE_STEPS: Array<{ at: number; phase: StreakCelebrationPhase }> = [
   { at: 0, phase: 'idle' },
-  { at: 550, phase: 'compress' },
-  { at: 850, phase: 'launch' },
-  { at: 1000, phase: 'burst' },
-  { at: 1350, phase: 'count' },
-  { at: 1700, phase: 'reveal' },
-  { at: 2300, phase: 'week' },
-  { at: 3800, phase: 'settled' },
+  { at: 80, phase: 'compress' },
+  { at: 160, phase: 'launch' },
+  { at: 240, phase: 'burst' },
+  { at: 360, phase: 'count' },
+  { at: 480, phase: 'reveal' },
+  { at: 640, phase: 'week' },
+  { at: 820, phase: 'settled' },
 ]
 
-export const STREAK_CELEB_TOTAL_MS = 5700
-/** Skip vers l’état final autorisé après le début de la révélation. */
-export const STREAK_CELEB_SKIP_AFTER_MS = 1700
-export const STREAK_CELEB_REDUCED_MS = 900
+export const STREAK_CELEB_TOTAL_MS = 1000
+/** Skip allowed from the first frame (tap anywhere). */
+export const STREAK_CELEB_SKIP_AFTER_MS = 0
+/** Reduced-motion: settle instantly (0 ms wait). */
+export const STREAK_CELEB_REDUCED_MS = 0
 
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -102,7 +103,8 @@ function FlameGlyph({ lit, className = '' }: { lit: boolean; className?: string 
 }
 
 /**
- * Célébration Daily Streak — chorégraphie ~5,7 s (CSS/SVG, pas de vidéo).
+ * Célébration Daily Streak — chorégraphie ~1 s (CSS/SVG, pas de vidéo).
+ * Skippable immédiatement (tap anywhere). Reduced-motion → instant.
  * À monter uniquement après une vraie incrémentation N → N+1.
  */
 export const StreakCelebrationOverlay = forwardRef<
@@ -129,7 +131,6 @@ export const StreakCelebrationOverlay = forwardRef<
   const [flash, setFlash] = useState(false)
   const [todayFlame, setTodayFlame] = useState(reduced)
   const completedRef = useRef(false)
-  const startedAtRef = useRef(0)
   const timersRef = useRef<number[]>([])
   const overlayRef = useRef<HTMLDivElement>(null)
   useImperativeHandle(forwardedRef, () => overlayRef.current as HTMLDivElement)
@@ -172,14 +173,12 @@ export const StreakCelebrationOverlay = forwardRef<
   }, [clearTimers])
 
   useEffect(() => {
-    startedAtRef.current =
-      typeof performance !== 'undefined' ? performance.now() : Date.now()
-
     if (reduced) {
       setDisplayCount(currentStreak)
       setShowNewCount(true)
       setTodayFlame(true)
       setPhase('settled')
+      // Instant — no flash choreography under prefers-reduced-motion.
       schedule(finish, STREAK_CELEB_REDUCED_MS)
       return () => clearTimers()
     }
@@ -190,17 +189,15 @@ export const StreakCelebrationOverlay = forwardRef<
 
     schedule(() => {
       setFlash(true)
-      schedule(() => setFlash(false), 180)
-    }, 1000)
+      schedule(() => setFlash(false), 120)
+    }, 240)
 
-    // Ancien nombre encore visible, puis roulement → nouveau.
     schedule(() => {
       setShowNewCount(true)
       setDisplayCount(currentStreak)
-    }, 1500)
+    }, 360)
 
-    // Marqueur gris → petite flamme (3 400–3 800 ms).
-    schedule(() => setTodayFlame(true), 3400)
+    schedule(() => setTodayFlame(true), 640)
 
     schedule(finish, STREAK_CELEB_TOTAL_MS)
 
@@ -214,7 +211,7 @@ export const StreakCelebrationOverlay = forwardRef<
     setDisplayCount(currentStreak)
     setTodayFlame(true)
     setPhase('settled')
-    schedule(finish, 700)
+    schedule(finish, 120)
   }, [clearTimers, currentStreak, finish, schedule])
 
   const onSkip = () => {
@@ -223,8 +220,6 @@ export const StreakCelebrationOverlay = forwardRef<
       finish()
       return
     }
-    const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
-    if (now - startedAtRef.current < STREAK_CELEB_SKIP_AFTER_MS) return
     jumpToSettledThenClose()
   }
 

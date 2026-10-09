@@ -38,3 +38,29 @@ export {
   type StaticKcalNumberProps,
   type StaticBodyWeightNumberProps,
 } from './StaticMetricNumber'
+export {
+  SessionCompleteBurst,
+  SESSION_COMPLETE_BURST_MS,
+  SESSION_COMPLETE_REDUCED_MS,
+  type SessionCompleteBurstProps,
+} from './SessionCompleteBurst'
+export {
+  LivingProgressBar,
+  type LivingProgressBarProps,
+} from './LivingProgressBar'
+export { TabPageTransition, type TabPageTransitionProps } from './TabPageTransition'
+export {
+  CardExpandTransition,
+  readCardExpandRect,
+  type CardExpandRect,
+  type CardExpandTransitionProps,
+} from './CardExpandTransition'
+export {
+  canValidateSet,
+  canFinishSession,
+  SET_VALIDATED_POP_MS,
+  TAB_FADE_MS,
+  CARD_EXPAND_MS,
+  PROGRESS_FILL_MS,
+  type SetLike,
+} from './sessionActionGuards'

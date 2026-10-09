@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import './components/motion/animations.css'
 import App from './App.tsx'
 import { RootErrorBoundary } from './components/ui/RootErrorBoundary.tsx'
 import { AppColdLaunch } from './components/brand/AppColdLaunch.tsx'
@@ -10,6 +11,7 @@ import { AuthWelcomeLoggedInFixture } from './fixtures/AuthWelcomeLoggedInFixtur
 import { AuthWelcomeSheetFixture } from './fixtures/AuthWelcomeSheetFixture.tsx'
 import { NutritionAiErrorFixture } from './fixtures/NutritionAiErrorFixture.tsx'
 import { TrainUxFixture } from './fixtures/TrainUxFixture.tsx'
+import { AnimationsFixture } from './fixtures/AnimationsFixture.tsx'
 import { WaterGoalFixture } from './fixtures/WaterGoalFixture.tsx'
 import { HeightWeightFixture } from './fixtures/HeightWeightFixture.tsx'
 import { InscriptionFixture } from './fixtures/InscriptionFixture.tsx'
@@ -48,6 +50,7 @@ function resolveBootTree() {
   if (QA_FIXTURES_ENABLED && path === '/height-weight-fixture') return <HeightWeightFixture />
   if (QA_FIXTURES_ENABLED && path === '/inscription-fixture') return <InscriptionFixture />
   if (QA_FIXTURES_ENABLED && path === '/train-fixture') return <TrainUxFixture />
+  if (QA_FIXTURES_ENABLED && path === '/animations-fixture') return <AnimationsFixture />
   if (QA_FIXTURES_ENABLED && path === '/nutrition-ai-error-fixture') return <NutritionAiErrorFixture />
   if (QA_FIXTURES_ENABLED && path === '/auth-welcome-logged-in-fixture')
     return <AuthWelcomeLoggedInFixture />
@@ -70,6 +73,7 @@ function isColdLaunchPath() {
   if (QA_FIXTURES_ENABLED && path === '/height-weight-fixture') return false
   if (QA_FIXTURES_ENABLED && path === '/inscription-fixture') return false
   if (QA_FIXTURES_ENABLED && path === '/train-fixture') return false
+  if (QA_FIXTURES_ENABLED && path === '/animations-fixture') return false
   return true
 }
 

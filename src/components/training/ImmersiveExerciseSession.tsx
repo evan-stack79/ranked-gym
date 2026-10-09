@@ -46,6 +46,8 @@ export interface ImmersiveExerciseSessionProps {
   history?: WorkoutNote[]
   /** Exclure une note (édition d’historique). */
   excludeHistoryNoteId?: string
+  /** After persist: identical check-hop + red flash on this set row. */
+  validatedPop?: { exerciseId: string; setIndex: number } | null
 }
 
 function formatClock(totalSec: number): string {
@@ -93,6 +95,7 @@ export function ImmersiveExerciseSession({
   onUndoValidation,
   history = EMPTY_HISTORY,
   excludeHistoryNoteId,
+  validatedPop = null,
 }: ImmersiveExerciseSessionProps) {
   const rest = useRestTimerContext()
   const safeIndex = Math.min(Math.max(0, activeIndex), Math.max(0, exercises.length - 1))
@@ -313,15 +316,21 @@ export function ImmersiveExerciseSession({
               patchSet(idx, lastPerformanceToSetPatch(last))
             }
 
+            const popping =
+              done &&
+              validatedPop?.exerciseId === exercise.id &&
+              validatedPop.setIndex === idx
+
             return (
               <div
                 key={idx}
                 role="listitem"
                 data-set-row={done ? 'done' : active ? 'active' : 'upcoming'}
                 data-last-hint={showLastHint ? '1' : undefined}
+                data-rg-set-pop={popping ? '1' : undefined}
                 className={`relative grid grid-cols-[2.25rem_1fr_1fr_1fr_2.5rem] items-center gap-x-2 ${
                   upcoming ? 'opacity-45' : ''
-                }`}
+                }${popping ? ' rg-set-row--pop' : ''}`}
               >
                 {active ? (
                   <span
@@ -409,6 +418,7 @@ export function ImmersiveExerciseSession({
                     <span
                       className="flex h-7 w-7 items-center justify-center rounded-full bg-white"
                       aria-label={`Série ${idx + 1} validée`}
+                      data-rg-set-check
                     >
                       <Check className="h-3.5 w-3.5 text-black" strokeWidth={3} />
                     </span>
@@ -518,6 +528,11 @@ export function ImmersiveExerciseSession({
                     strokeLinecap="round"
                     strokeDasharray={circumference}
                     strokeDashoffset={dashOffset}
+                    style={{
+                      transition:
+                        'stroke-dashoffset 360ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1))',
+                    }}
+                    data-rg-anim="living-progress-ring"
                   />
                 </svg>
                 <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tabular-nums text-white">
