@@ -61,6 +61,7 @@ describe('TrainWeeklyGoalCard — fill sync', () => {
   })
 
   it('fires spark once when reaching 100%', async () => {
+    vi.useFakeTimers()
     const onSparkShown = vi.fn()
     await act(async () => {
       root.render(
@@ -87,6 +88,10 @@ describe('TrainWeeklyGoalCard — fill sync', () => {
       )
     })
     expect(host.querySelector('[data-testid="train-weekly-goal-spark"]')).toBeTruthy()
+    await act(async () => {
+      vi.advanceTimersByTime(50)
+    })
     expect(onSparkShown).toHaveBeenCalled()
+    vi.useRealTimers()
   })
 })

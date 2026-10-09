@@ -92,11 +92,15 @@ async function capture() {
       await page.locator('[data-new-session-sheet] button').filter({ hasText: 'Musculation' }).click({ force: true })
       // Free session opens the real first-exercise picker (same path as ▶)
       await page.getByText('Quel est ton premier exercice').waitFor({ timeout: 15_000 })
-      // Prove last result clears the sticky create CTA
+      // First result fully below search
+      await page.locator('[data-exercise-id="bench_press"]').waitFor()
+      await page.waitForTimeout(200)
+      await shot(page, 'train-start-card-tapped.png')
+      // Then prove last result clears the sticky create CTA
       const lastRow = page.locator('[data-testid="exercise-picker-list"] [data-exercise-id]').last()
       await lastRow.scrollIntoViewIfNeeded()
-      await page.waitForTimeout(250)
-      await shot(page, 'train-start-card-tapped.png')
+      await page.waitForTimeout(200)
+      await shot(page, 'train-picker-scroll-bottom.png')
       await context.close()
     }
 

@@ -148,19 +148,20 @@ export function ExercisePicker({
           ) : null}
         </label>
 
-        {/* Results + sticky create CTA — list pads by button height + safe area */}
-        <div className="relative min-h-0 flex-1">
+        {/*
+          Flex column (not absolute inset): list stays below the search.
+          Sticky footer overlays the bottom; list pads so the last row clears it.
+        */}
+        <div className="relative flex min-h-0 flex-1 flex-col">
           <ul
             id={listId}
             role="listbox"
             aria-label="Résultats d’exercices"
             data-testid="exercise-picker-list"
-            className="absolute inset-0 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
             data-list-pad-bottom="create-btn+safe"
             data-list-pad-top="search-clearance"
             style={{
-              // Top: keep the first result fully below the search field
-              // Bottom: sticky create CTA + count + safe area (+ keyboard)
               paddingTop: '0.75rem',
               scrollPaddingTop: '0.75rem',
               paddingBottom:

@@ -1,13 +1,10 @@
 /**
  * « Mon objectif de la semaine » — barre + compteur.
- * Remplissage fluide (scaleX ≤400 ms, off si reduced motion).
- * Étincelle rouge une fois à 100 % pour la semaine ; rien de plus si dépassé.
- * Self-contained — pas de vibration, pas de lib motion.
- *
  * Fill ratio and progress text always share weeklyGoalFillRatio (same source of truth).
- * Transition is off on first paint so remount/reset never shows a mismatched bar.
+ * Bar snaps with the text (no laggy CSS fill) so remount/reset never desync.
+ * Spark on crossing 100 %; onSparkShown deferred for React StrictMode.
  */
-import { useEffect, useId, useLayoutEffect, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import {
   clampWeeklySessionGoal,
   type WeeklySessionGoalTarget,
@@ -19,10 +16,7 @@ import {
   weeklyGoalReached,
 } from '../../services/trainWeeklyGoalFill'
 import { parisWeekKey } from '../../utils/parisDate'
-import {
-  WEEKLY_GOAL_FILL_MS,
-  WEEKLY_GOAL_SPARK_MS,
-} from './trainWeeklyGoalMotion'
+import { WEEKLY_GOAL_SPARK_MS } from './trainWeeklyGoalMotion'
 
 function prefersReducedMotion(): boolean {
   try {
@@ -38,7 +32,6 @@ export function TrainWeeklyGoalCard({
   sparkShownWeekKey,
   onChangeTarget,
   onSparkShown,
-  /** Override spark duration (QA/demo slow-mo only). App default stays WEEKLY_GOAL_SPARK_MS. */
   sparkDurationMs,
 }: {
   doneCount: number
@@ -58,26 +51,40 @@ export function TrainWeeklyGoalCard({
   const cappedRatio = weeklyGoalFillRatio(doneCount, target)
   const reached = weeklyGoalReached(doneCount, target)
   const [spark, setSpark] = useState(false)
-  /** Skip CSS transition on first paint / remount so bar matches text immediately. */
-  const [fillTransitionOn, setFillTransitionOn] = useState(false)
-
-  useLayoutEffect(() => {
-    const id = requestAnimationFrame(() => setFillTransitionOn(true))
-    return () => cancelAnimationFrame(id)
-  }, [])
+  const prevRatioRef = useRef(cappedRatio)
+  const markedRef = useRef(sparkShownWeekKey === weekKey)
 
   useEffect(() => {
-    if (!reached) return
-    if (sparkShownWeekKey === weekKey) return
+    markedRef.current = sparkShownWeekKey === weekKey
+  }, [sparkShownWeekKey, weekKey])
+
+  useEffect(() => {
+    const prev = prevRatioRef.current
+    prevRatioRef.current = cappedRatio
+    const crossedToFull = prev < 1 && cappedRatio >= 1
+    if (!crossedToFull || !reached) return
     if (reduced) {
-      onSparkShown(weekKey)
+      if (!markedRef.current) {
+        markedRef.current = true
+        onSparkShown(weekKey)
+      }
       return
     }
+
     setSpark(true)
-    onSparkShown(weekKey)
-    const t = window.setTimeout(() => setSpark(false), sparkMs + 50)
-    return () => window.clearTimeout(t)
-  }, [reached, sparkShownWeekKey, weekKey, reduced, onSparkShown, sparkMs])
+    // Defer persistence so StrictMode cleanup+re-run still paints the spark.
+    const markTimer = window.setTimeout(() => {
+      if (!markedRef.current) {
+        markedRef.current = true
+        onSparkShown(weekKey)
+      }
+    }, 40)
+    const hideTimer = window.setTimeout(() => setSpark(false), sparkMs + 50)
+    return () => {
+      window.clearTimeout(markTimer)
+      window.clearTimeout(hideTimer)
+    }
+  }, [cappedRatio, reached, reduced, onSparkShown, weekKey, sparkMs])
 
   return (
     <section
@@ -130,10 +137,8 @@ export function TrainWeeklyGoalCard({
           data-fill-sync={`${doneCount}/${target}`}
           style={{
             transform: `scaleX(${cappedRatio})`,
-            transition:
-              fillTransitionOn && !reduced
-                ? `transform ${WEEKLY_GOAL_FILL_MS}ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1))`
-                : 'none',
+            // No CSS transition — fill always equals done/target (including remount/reset).
+            transition: 'none',
           }}
         />
         {spark ? (
@@ -148,24 +153,22 @@ export function TrainWeeklyGoalCard({
       </div>
 
       <style>{`
-        /* Single burst (iteration 1) — one luminance peak in ${sparkMs}ms
-           ⇒ < 3 flashes/s at default duration (WCAG 2.2 SC 2.3.1). Never infinite / never strobe. */
         .train-weekly-goal-spark {
           pointer-events: none;
           position: absolute;
           right: 2px;
           top: 50%;
-          width: 10px;
-          height: 10px;
-          margin-top: -5px;
+          width: 12px;
+          height: 12px;
+          margin-top: -6px;
           border-radius: 9999px;
           background: #ff2b2b;
           box-shadow:
-            12px -8px 0 -2px #ff2b2b,
-            -10px -10px 0 -2px #ff2b2b,
-            14px 5px 0 -2px #ff2b2b,
-            -12px 7px 0 -2px #ff2b2b,
-            0 -14px 0 -2px #ff2b2b;
+            14px -9px 0 -2px #ff2b2b,
+            -12px -11px 0 -2px #ff2b2b,
+            16px 6px 0 -2px #ff2b2b,
+            -14px 8px 0 -2px #ff2b2b,
+            0 -16px 0 -2px #ff2b2b;
           animation-name: train-weekly-goal-spark-burst;
           animation-duration: ${sparkMs}ms;
           animation-timing-function: var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
@@ -174,9 +177,9 @@ export function TrainWeeklyGoalCard({
           animation-direction: normal;
         }
         @keyframes train-weekly-goal-spark-burst {
-          0% { opacity: 0; transform: scale(0.92); }
-          22% { opacity: 1; transform: scale(1); }
-          100% { opacity: 0; transform: scale(1.28); }
+          0% { opacity: 0; transform: scale(0.85); }
+          18% { opacity: 1; transform: scale(1.05); }
+          100% { opacity: 0; transform: scale(1.35); }
         }
         @media (prefers-reduced-motion: reduce) {
           .train-weekly-goal-spark { animation: none !important; opacity: 0; }
