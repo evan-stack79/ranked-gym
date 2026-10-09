@@ -8,6 +8,7 @@ import {
   SessionCompleteBurst,
   readCardExpandRect,
 } from '../components/motion'
+import { StreakCelebrationOverlay } from '../components/streak/StreakCelebrationOverlay'
 import { HomeBootSkeleton } from '../components/ui/AppBootScreen'
 import type { TabId } from '../types'
 import type { CardExpandRect } from '../components/motion/CardExpandTransition'
@@ -23,6 +24,7 @@ export function AnimationsFixture() {
   const [progress, setProgress] = useState(0.35)
   const [expandFrom, setExpandFrom] = useState<CardExpandRect | null>(null)
   const [wave, setWave] = useState(true)
+  const [streakOpen, setStreakOpen] = useState(false)
 
   return (
     <div
@@ -186,6 +188,18 @@ export function AnimationsFixture() {
               </span>
             </div>
           </section>
+
+          <section className="space-y-2" data-demo="streak-fix">
+            <h2 className="text-[13px] font-semibold text-[#8E8E93]">7 · Streak (~1s, skippable)</h2>
+            <button
+              type="button"
+              className="ios-press btn-brand min-h-11 w-full rounded-2xl px-4 text-[14px] font-semibold text-white"
+              data-testid="demo-streak"
+              onClick={() => setStreakOpen(true)}
+            >
+              Lancer la série
+            </button>
+          </section>
         </div>
       </main>
 
@@ -200,6 +214,14 @@ export function AnimationsFixture() {
 
       <SessionCompleteBurst open={burstOpen} onComplete={() => setBurstOpen(false)} />
       <CardExpandTransition from={expandFrom} onComplete={() => setExpandFrom(null)} />
+      {streakOpen ? (
+        <StreakCelebrationOverlay
+          previousStreak={6}
+          currentStreak={7}
+          dateKey="2026-10-09"
+          onComplete={() => setStreakOpen(false)}
+        />
+      ) : null}
     </div>
   )
 }
