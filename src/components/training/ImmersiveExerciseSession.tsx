@@ -384,7 +384,7 @@ export function ImmersiveExerciseSession({
                   aria-label={
                     showLastHint && last
                       ? formatLastRepsAriaLabel(last.reps)
-                      : `Série ${idx + 1} reps`
+                      : `Série ${idx + 1} répétitions`
                   }
                   className={FIELD}
                 />

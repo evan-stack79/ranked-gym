@@ -140,8 +140,9 @@ async function captureClip(browser, name, interact) {
   const context = await browser.newContext({
     viewport: { width, height },
     deviceScaleFactor: 2,
-    isMobile: true,
-    hasTouch: true,
+    // Desktop-like input — no mobile touch markers / assistive-touch overlay on video.
+    isMobile: false,
+    hasTouch: false,
     reducedMotion: 'no-preference',
     recordVideo: { dir: tmpDir, size: { width, height } },
   })
@@ -198,6 +199,14 @@ async function dismissBurst(page) {
 
 async function main() {
   await mkdir(artifactsDir, { recursive: true })
+  const only = new Set(
+    (process.env.CAPTURE_ONLY || process.argv.slice(2).join(','))
+      .split(/[\s,]+/)
+      .map((s) => s.trim())
+      .filter(Boolean),
+  )
+  const want = (name) => only.size === 0 || only.has(name)
+
   const server = await startAppServer(port)
   let browser
   try {
@@ -220,7 +229,7 @@ async function main() {
     }
 
     // 1 · Fin de séance
-    await captureClip(browser, 'anim-1-fin-seance', async (page) => {
+    if (want('anim-1-fin-seance')) await captureClip(browser, 'anim-1-fin-seance', async (page) => {
       await openTrain(page)
       await page.locator('[data-demo="session-complete"]').scrollIntoViewIfNeeded()
       for (let i = 0; i < 3; i++) {
@@ -240,145 +249,148 @@ async function main() {
     })
 
     // 2 · Série validée — show empty check, tap, watch red bounce (×2 then 4×)
-    await captureClip(browser, 'anim-2-serie-validee', async (page) => {
-      await openTrain(page)
-      await page.locator('[data-demo="set-validated"]').scrollIntoViewIfNeeded()
-      await setSlow(page, 2)
-      for (let i = 0; i < 3; i++) {
-        // Hold the empty outline on screen, then tap checkbox / validate.
-        await page.waitForTimeout(600)
-        const empty = page.locator('[data-testid="demo-set-check"]:not([data-rg-set-check])')
-        if (await empty.count()) {
-          await empty.click()
-        } else {
-          // Already done → validate button resets then re-pops
-          await page.locator('[data-testid="demo-set-validate"]').click()
+    if (want('anim-2-serie-validee'))
+      await captureClip(browser, 'anim-2-serie-validee', async (page) => {
+        await openTrain(page)
+        await page.locator('[data-demo="set-validated"]').scrollIntoViewIfNeeded()
+        await setSlow(page, 2)
+        for (let i = 0; i < 3; i++) {
+          await page.waitForTimeout(600)
+          const empty = page.locator('[data-testid="demo-set-check"]:not([data-rg-set-check])')
+          if (await empty.count()) {
+            await empty.click()
+          } else {
+            await page.locator('[data-testid="demo-set-validate"]').click()
+          }
+          await page.locator('[data-rg-set-check]').waitFor({ state: 'visible', timeout: 3_000 })
+          await page.waitForTimeout(1100)
         }
-        await page.locator('[data-rg-set-check]').waitFor({ state: 'visible', timeout: 3_000 })
-        await page.waitForTimeout(1100)
-      }
-      await setSlow(page, 4)
-      await page.locator('[data-testid="demo-set-validate"]').click()
-      await page.waitForTimeout(2400)
-      await setSlow(page, 1)
-    })
+        await setSlow(page, 4)
+        await page.locator('[data-testid="demo-set-validate"]').click()
+        await page.waitForTimeout(2400)
+        await setSlow(page, 1)
+      })
 
-    // 3 · Passage pages
-    await captureClip(browser, 'anim-3-passage-pages', async (page) => {
-      await openHome(page)
-      await page.locator('[data-demo="card-expand"]').scrollIntoViewIfNeeded()
-      for (let i = 0; i < 3; i++) {
+    // 3 · Passage pages — card expand + tabs (Nutri shows real card)
+    if (want('anim-3-passage-pages'))
+      await captureClip(browser, 'anim-3-passage-pages', async (page) => {
+        await openHome(page)
+        await page.locator('[data-demo="card-expand"]').scrollIntoViewIfNeeded()
+        for (let i = 0; i < 3; i++) {
+          await page.locator('[data-testid="demo-expand-card"]').click()
+          const expand = page.locator('[data-rg-anim="card-expand"]')
+          await expand.waitFor({ state: 'visible', timeout: 3_000 })
+          await page.waitForTimeout(400)
+          await expand.waitFor({ state: 'detached', timeout: 3_000 }).catch(() => undefined)
+        }
+        const nav = page.getByRole('navigation', { name: 'Navigation principale' })
+        for (let i = 0; i < 2; i++) {
+          await nav.getByLabel('Nutri').click()
+          await page.locator('[data-fixture-panel="nutrition"]').waitFor({ timeout: 5_000 })
+          await page.waitForTimeout(350)
+          await nav.getByLabel('Train').click()
+          await page.locator('[data-fixture-panel="training"]').waitFor({ timeout: 5_000 })
+          await page.waitForTimeout(350)
+          await nav.getByLabel('Accueil').click()
+          await page.locator('[data-fixture-panel="home"]').waitFor({ timeout: 5_000 })
+          await page.waitForTimeout(350)
+        }
+        await openHome(page)
+        await setSlow(page, 4)
+        await page.locator('[data-demo="card-expand"]').scrollIntoViewIfNeeded()
         await page.locator('[data-testid="demo-expand-card"]').click()
-        const expand = page.locator('[data-rg-anim="card-expand"]')
-        await expand.waitFor({ state: 'visible', timeout: 3_000 })
-        await page.waitForTimeout(400)
-        await expand.waitFor({ state: 'detached', timeout: 3_000 }).catch(() => undefined)
-      }
-      const nav = page.getByRole('navigation', { name: 'Navigation principale' })
-      for (let i = 0; i < 2; i++) {
+        await page.locator('[data-rg-anim="card-expand"]').waitFor({ state: 'visible', timeout: 5_000 })
+        await page.waitForTimeout(1500)
         await nav.getByLabel('Nutri').click()
-        await page.waitForTimeout(320)
-        await nav.getByLabel('Train').click()
-        await page.waitForTimeout(320)
+        await page.locator('[data-fixture-panel="nutrition"]').waitFor({ timeout: 5_000 })
+        await page.waitForTimeout(1100)
         await nav.getByLabel('Accueil').click()
-        await page.waitForTimeout(320)
-      }
-      await openHome(page)
-      await setSlow(page, 4)
-      await page.locator('[data-demo="card-expand"]').scrollIntoViewIfNeeded()
-      await page.locator('[data-testid="demo-expand-card"]').click()
-      await page.locator('[data-rg-anim="card-expand"]').waitFor({ state: 'visible', timeout: 5_000 })
-      await page.waitForTimeout(1500)
-      await nav.getByLabel('Nutri').click()
-      await page.waitForTimeout(1000)
-      await nav.getByLabel('Accueil').click()
-      await page.waitForTimeout(1000)
-      await setSlow(page, 1)
-    })
+        await page.locator('[data-fixture-panel="home"]').waitFor({ timeout: 5_000 })
+        await page.waitForTimeout(1100)
+        await setSlow(page, 1)
+      })
 
     // 4 · Wave — remount, watch stagger (×2 then 4×)
-    await captureClip(browser, 'anim-4-chargement-vague', async (page) => {
-      await openHome(page)
-      await page.locator('[data-demo="wave-enter"]').scrollIntoViewIfNeeded()
-      await setSlow(page, 2)
-      // Wait for initial wave if still running
-      await page.waitForTimeout(900)
-      for (let i = 0; i < 3; i++) {
+    if (want('anim-4-chargement-vague'))
+      await captureClip(browser, 'anim-4-chargement-vague', async (page) => {
+        await openHome(page)
+        await page.locator('[data-demo="wave-enter"]').scrollIntoViewIfNeeded()
+        await setSlow(page, 2)
+        await page.waitForTimeout(900)
+        for (let i = 0; i < 3; i++) {
+          await page.locator('[data-testid="demo-wave-replay"]').click()
+          await page.waitForTimeout(1200)
+        }
+        await setSlow(page, 4)
         await page.locator('[data-testid="demo-wave-replay"]').click()
-        await page.waitForTimeout(1200)
-      }
-      await setSlow(page, 4)
-      await page.locator('[data-testid="demo-wave-replay"]').click()
-      await page.waitForTimeout(2800)
-      await setSlow(page, 1)
-    })
+        await page.waitForTimeout(2800)
+        await setSlow(page, 1)
+      })
 
     // 5 · Living progress — hold ~30%, fill to 100% + sparks
-    await captureClip(browser, 'anim-5-barres-vivantes', async (page) => {
-      await openHome(page)
-      await page.locator('[data-demo="living-progress"]').scrollIntoViewIfNeeded()
-      await setSlow(page, 2)
-      for (let i = 0; i < 3; i++) {
-        // Reset to ~30% visibly, then click fill (fixture holds 700ms×slow before 100%)
-        await page.evaluate(() => {
-          // force labels readable at partial fill via button cycle
-        })
+    if (want('anim-5-barres-vivantes'))
+      await captureClip(browser, 'anim-5-barres-vivantes', async (page) => {
+        await openHome(page)
+        await page.locator('[data-demo="living-progress"]').scrollIntoViewIfNeeded()
+        await setSlow(page, 2)
+        for (let i = 0; i < 3; i++) {
+          await page.locator('[data-testid="demo-progress-fill"]').click()
+          await page.waitForTimeout(2400)
+        }
+        await setSlow(page, 4)
         await page.locator('[data-testid="demo-progress-fill"]').click()
-        // 700ms hold at 30% + 420ms fill, ×2 slow ≈ 2.2s
-        await page.waitForTimeout(2400)
-      }
-      await setSlow(page, 4)
-      await page.locator('[data-testid="demo-progress-fill"]').click()
-      await page.waitForTimeout(4500)
-      await setSlow(page, 1)
-    })
+        await page.waitForTimeout(4500)
+        await setSlow(page, 1)
+      })
 
     // 6 · Buttons — long press + play glow (demo + bottom nav)
-    await captureClip(browser, 'anim-6-boutons', async (page) => {
-      await openHome(page)
-      await page.locator('[data-demo="buttons"]').scrollIntoViewIfNeeded()
-      await setSlow(page, 2)
-      const btn = page.locator('[data-testid="demo-press-btn"]')
-      for (let i = 0; i < 3; i++) {
-        await pressHold(page, btn, 700)
+    if (want('anim-6-boutons'))
+      await captureClip(browser, 'anim-6-boutons', async (page) => {
+        await openHome(page)
+        await page.locator('[data-demo="buttons"]').scrollIntoViewIfNeeded()
+        await setSlow(page, 2)
+        const btn = page.locator('[data-testid="demo-press-btn"]')
+        for (let i = 0; i < 3; i++) {
+          await pressHold(page, btn, 700)
+          await page.locator('[data-testid="demo-play-breathe"]').click()
+          await restartNavPlayBreathe(page)
+          await page.waitForTimeout(2200)
+        }
+        await setSlow(page, 4)
+        await pressHold(page, btn, 900)
         await page.locator('[data-testid="demo-play-breathe"]').click()
         await restartNavPlayBreathe(page)
-        await page.waitForTimeout(2200)
-      }
-      await setSlow(page, 4)
-      await pressHold(page, btn, 900)
-      await page.locator('[data-testid="demo-play-breathe"]').click()
-      await restartNavPlayBreathe(page)
-      await page.waitForTimeout(8000)
-      await setSlow(page, 1)
-    })
+        await page.waitForTimeout(8000)
+        await setSlow(page, 1)
+      })
 
-    // 7 · Streak overlay
-    await captureClip(browser, 'anim-7-streak-fix', async (page) => {
-      await openHome(page)
-      await page.locator('[data-demo="streak-fix"]').scrollIntoViewIfNeeded()
-      for (let i = 0; i < 2; i++) {
+    // 7 · Streak overlay (red/white palette)
+    if (want('anim-7-streak-fix'))
+      await captureClip(browser, 'anim-7-streak-fix', async (page) => {
+        await openHome(page)
+        await page.locator('[data-demo="streak-fix"]').scrollIntoViewIfNeeded()
+        for (let i = 0; i < 2; i++) {
+          await page.locator('[data-testid="demo-streak"]').click()
+          const streak = page.locator('.streak-celeb')
+          await streak.waitFor({ state: 'visible', timeout: 5_000 })
+          await page.waitForTimeout(400)
+          if (i === 1 && (await streak.count())) {
+            await streak.click({ timeout: 1_500 }).catch(() => undefined)
+          }
+          await streak.waitFor({ state: 'detached', timeout: 5_000 }).catch(() => undefined)
+          await page.waitForTimeout(250)
+        }
+        await setSlow(page, 4)
         await page.locator('[data-testid="demo-streak"]').click()
         const streak = page.locator('.streak-celeb')
         await streak.waitFor({ state: 'visible', timeout: 5_000 })
-        await page.waitForTimeout(400)
-        if (i === 1 && (await streak.count())) {
-          await streak.click({ timeout: 1_500 }).catch(() => undefined)
+        await page.waitForTimeout(2600)
+        if (await streak.count()) {
+          await streak.click({ timeout: 2_000 }).catch(() => undefined)
         }
         await streak.waitFor({ state: 'detached', timeout: 5_000 }).catch(() => undefined)
-        await page.waitForTimeout(250)
-      }
-      await setSlow(page, 4)
-      await page.locator('[data-testid="demo-streak"]').click()
-      const streak = page.locator('.streak-celeb')
-      await streak.waitFor({ state: 'visible', timeout: 5_000 })
-      await page.waitForTimeout(2600)
-      if (await streak.count()) {
-        await streak.click({ timeout: 2_000 }).catch(() => undefined)
-      }
-      await streak.waitFor({ state: 'detached', timeout: 5_000 }).catch(() => undefined)
-      await setSlow(page, 1)
-    })
+        await setSlow(page, 1)
+      })
   } finally {
     if (browser) await browser.close()
     await stopHarnessServer(server)

@@ -141,9 +141,9 @@ export function AnimationsFixture() {
             )}
           </div>
         </div>
-        <p className="text-[12px] text-[#636366]">Bench · Effort 7</p>
+        <p className="text-[12px] text-[#636366]">Développé couché · Effort 7</p>
         <p className="text-[12px] tabular-nums text-[#636366]" data-rg-metric="load-static">
-          80 kg · 8 reps
+          80 kg · 8 répétitions
         </p>
         <button
           type="button"
@@ -243,7 +243,7 @@ export function AnimationsFixture() {
           onPointerLeave={() => setPressHeld(false)}
           onPointerCancel={() => setPressHeld(false)}
         >
-          Press feedback
+          Retour de pression
         </button>
         <div className="flex justify-center py-2">
           <button
@@ -259,20 +259,36 @@ export function AnimationsFixture() {
           </button>
         </div>
         <p className="text-center text-[12px] text-[#636366]">
-          Glow aussi sur le bouton play de la barre du bas
+          Halo aussi sur le bouton lecture de la barre du bas
         </p>
       </section>
 
       <section className="space-y-2" data-demo="streak-fix">
-        <h2 className="text-[13px] font-semibold text-[#8E8E93]">7 · Streak (≤560ms, skippable)</h2>
+        <h2 className="text-[13px] font-semibold text-[#8E8E93]">
+          7 · Série de jours (≤560&nbsp;ms, ignorable)
+        </h2>
         <button
           type="button"
           className="ios-press btn-brand min-h-11 w-full rounded-2xl px-4 text-[14px] font-semibold text-white"
           data-testid="demo-streak"
           onClick={() => setStreakOpen(true)}
         >
-          Lancer la série
+          Lancer la série de jours
         </button>
+      </section>
+    </div>
+  )
+
+  const nutritionPanel = (
+    <div className="mx-auto flex w-full max-w-lg flex-col gap-5" data-fixture-panel="nutrition">
+      <h1 className="text-[28px] font-bold tracking-tight text-white">Nutri</h1>
+      <p className="text-[14px] text-[#AEAEB2]">Transition d&apos;onglet</p>
+      <section className="glass-card rounded-2xl p-4" aria-label="Aperçu nutrition">
+        <p className="text-[11px] font-medium text-[#8E8E93]">Aujourd&apos;hui</p>
+        <p className="mt-2 text-[18px] font-semibold text-white">Repas et hydratation</p>
+        <p className="mt-1 text-[13px] text-[#AEAEB2]">
+          Suivi du jour — aperçu neutre pour la démo de passage.
+        </p>
       </section>
     </div>
   )
@@ -282,7 +298,7 @@ export function AnimationsFixture() {
     panel = (
       <div className="mx-auto flex w-full max-w-lg flex-col gap-5" data-fixture-panel="training">
         <h1 className="text-[28px] font-bold tracking-tight text-white">Séance</h1>
-        <p className="text-[14px] text-[#AEAEB2]">Push · Effort suivi</p>
+        <p className="text-[14px] text-[#AEAEB2]">Poussée · Effort suivi</p>
         {sessionDemos}
         <section className="glass-card rounded-2xl p-4">
           <p className="text-[11px] font-medium text-[#8E8E93]">Train</p>
@@ -293,10 +309,12 @@ export function AnimationsFixture() {
     )
   } else if (tab === 'home') {
     panel = homePanel
+  } else if (tab === 'nutrition') {
+    panel = nutritionPanel
   } else {
     panel = (
       <div className="mx-auto flex w-full max-w-lg flex-col gap-5" data-fixture-panel={tab}>
-        <h1 className="text-[28px] font-bold tracking-tight text-white">{tab}</h1>
+        <h1 className="text-[28px] font-bold tracking-tight text-white">Profil</h1>
         <p className="text-[14px] text-[#AEAEB2]">Transition d&apos;onglet</p>
       </div>
     )
