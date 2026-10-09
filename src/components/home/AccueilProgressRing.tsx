@@ -76,7 +76,9 @@ export function AccueilProgressRing({
         strokeDashoffset={offset}
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
         style={{
-          transition: skip ? undefined : 'stroke-dashoffset 700ms cubic-bezier(0.22, 1, 0.36, 1)',
+          transition: skip
+            ? undefined
+            : 'stroke-dashoffset 360ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1))',
           filter: `drop-shadow(0 0 6px ${accent}88)`,
         }}
       />

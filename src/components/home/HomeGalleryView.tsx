@@ -52,6 +52,7 @@ import {
 import { getHomeGreetingSubtitle, resolveDisplayFirstName } from '../../utils/homeGreeting'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { findActiveStrengthSession } from '../../utils/trainHub'
+import { markWaveEnterSeen, shouldPlayWaveEnter } from '../../utils/waveEnterOnce'
 import { BlurInText, CountUpNumber, Reveal, SoftBlurIn, TiltCard } from '../motion'
 import { HistorySessionThumb } from '../training/HistorySessionThumb'
 import { AccueilAddSheet } from './AccueilAddSheet'
@@ -155,7 +156,10 @@ export function HomeGalleryView({
   } | null>(null)
   const [coldEntering, setColdEntering] = useState(() => {
     if (typeof document === 'undefined') return false
-    return document.documentElement.dataset.coldLaunchLanding === '1'
+    // Wave enter only the first time this browser session (not every Accueil revisit).
+    return (
+      document.documentElement.dataset.coldLaunchLanding === '1' && shouldPlayWaveEnter()
+    )
   })
   const prefersReducedMotion = usePrefersReducedMotion()
   const tiltDisabled = editMode || prefersReducedMotion
@@ -214,7 +218,10 @@ export function HomeGalleryView({
   }, [])
 
   useEffect(() => {
-    const onColdLanding = () => setColdEntering(true)
+    const onColdLanding = () => {
+      if (!shouldPlayWaveEnter()) return
+      setColdEntering(true)
+    }
     window.addEventListener('ranked-gym:cold-launch-landing', onColdLanding)
     return () => window.removeEventListener('ranked-gym:cold-launch-landing', onColdLanding)
   }, [])
@@ -222,6 +229,7 @@ export function HomeGalleryView({
   useEffect(() => {
     if (!coldEntering) return
     delete document.documentElement.dataset.coldLaunchLanding
+    markWaveEnterSeen()
     const t = window.setTimeout(() => setColdEntering(false), 320)
     return () => window.clearTimeout(t)
   }, [coldEntering])
@@ -877,7 +885,7 @@ export function HomeGalleryView({
 
   return (
     <div
-      className={`accueil-gallery flex flex-col gap-7 ${coldEntering ? 'home-cold-enter home-cold-enter--active' : ''} ${
+      className={`accueil-gallery flex flex-col gap-7 ${coldEntering ? 'home-cold-enter home-cold-enter--active rg-wave-enter rg-wave-enter--active' : ''} ${
         editMode ? 'accueil-gallery--editing' : ''
       }`}
       data-accueil-gallery="1"

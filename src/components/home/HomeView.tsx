@@ -13,6 +13,7 @@ import { HomeGalleryView } from './HomeGalleryView'
 import { TodayWorkoutCard } from './TodayWorkoutCard'
 import { NutritionSnapshot } from './NutritionSnapshot'
 import { SleepSnapshot } from './SleepSnapshot'
+import { markWaveEnterSeen, shouldPlayWaveEnter } from '../../utils/waveEnterOnce'
 
 interface HomeViewProps {
   onStartTraining: (routineId: string) => void
@@ -68,8 +69,11 @@ function HomeDashboardView({
   const [trainingTick, setTrainingTick] = useState(0)
   const [coldEntering, setColdEntering] = useState(() => {
     if (typeof document === 'undefined') return false
-    return document.documentElement.dataset.coldLaunchLanding === '1'
+    return (
+      document.documentElement.dataset.coldLaunchLanding === '1' && shouldPlayWaveEnter()
+    )
   })
+  const [waveEnter, setWaveEnter] = useState(() => shouldPlayWaveEnter())
 
   useEffect(() => {
     const syncTraining = () => setTrainingTick((n) => n + 1)
@@ -89,20 +93,24 @@ function HomeDashboardView({
 
   useEffect(() => {
     const onColdLanding = () => {
+      if (!shouldPlayWaveEnter()) return
       setColdEntering(true)
+      setWaveEnter(true)
     }
     window.addEventListener('ranked-gym:cold-launch-landing', onColdLanding)
     return () => window.removeEventListener('ranked-gym:cold-launch-landing', onColdLanding)
   }, [])
 
   useEffect(() => {
-    if (!coldEntering) return
+    if (!coldEntering && !waveEnter) return
     delete document.documentElement.dataset.coldLaunchLanding
+    markWaveEnterSeen()
     const t = window.setTimeout(() => {
       setColdEntering(false)
+      setWaveEnter(false)
     }, 320)
     return () => window.clearTimeout(t)
-  }, [coldEntering])
+  }, [coldEntering, waveEnter])
 
   const firstName = resolveDisplayFirstName({
     firstName: user?.firstName,
@@ -117,8 +125,15 @@ function HomeDashboardView({
   )
 
   return (
-    <div className={`flex flex-col gap-8 ${coldEntering ? 'home-cold-enter home-cold-enter--active' : ''}`}>
-      <header className="home-cold-enter__group home-cold-enter__group--0">
+    <div
+      className={`flex flex-col gap-8 ${
+        coldEntering || waveEnter
+          ? 'home-cold-enter home-cold-enter--active rg-wave-enter rg-wave-enter--active'
+          : ''
+      }`}
+      data-rg-anim={coldEntering || waveEnter ? 'wave-enter' : undefined}
+    >
+      <header className="home-cold-enter__group home-cold-enter__group--0 rg-wave-enter__card rg-wave-enter__card--0">
         <h1 className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white">
           <TextFlip /><BlurInText as="span" instant={coldEntering} label={`, ${firstName} ?`}>{`, ${firstName} ?`}</BlurInText>
         </h1>
@@ -127,13 +142,13 @@ function HomeDashboardView({
         </p>
       </header>
 
-      <div className="home-cold-enter__group home-cold-enter__group--1">
+      <div className="home-cold-enter__group home-cold-enter__group--1 rg-wave-enter__card rg-wave-enter__card--1">
         <Reveal instant={coldEntering}>
           <NutritionSnapshot onOpenNutrition={onOpenNutrition} />
         </Reveal>
       </div>
 
-      <div className="home-cold-enter__group home-cold-enter__group--2">
+      <div className="home-cold-enter__group home-cold-enter__group--2 rg-wave-enter__card rg-wave-enter__card--2">
         <Reveal delayMs={60} instant={coldEntering}>
           <TodayWorkoutCard
             workout={todayWorkout}
@@ -145,11 +160,11 @@ function HomeDashboardView({
         </Reveal>
       </div>
 
-      <div className="home-cold-enter__group home-cold-enter__group--3">
+      <div className="home-cold-enter__group home-cold-enter__group--3 rg-wave-enter__card rg-wave-enter__card--3">
         <SleepSnapshot />
       </div>
 
-      <div className="home-cold-enter__group home-cold-enter__group--4">
+      <div className="home-cold-enter__group home-cold-enter__group--4 rg-wave-enter__card rg-wave-enter__card--4">
         <DailyStreak />
       </div>
 

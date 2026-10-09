@@ -8,13 +8,14 @@ import {
   useState,
 } from 'react'
 import { createPortal } from 'react-dom'
-import pantherRoaringUrl from '../../assets/brand/panther-roaring.png'
+import pantherRoaringUrl from '../../assets/brand/panther-calm-crowned.png'
 import {
   formatStreakDaysLabel,
   getStreakStatusMessage,
   getWeekStripDays,
   isStreakMilestone,
 } from '../../services/streakService'
+import { animMs } from '../motion/animTiming'
 
 export type StreakCelebrationOverlayProps = {
   previousStreak: number
@@ -37,22 +38,23 @@ export type StreakCelebrationPhase =
   | 'week'
   | 'settled'
 
-/** Timings exacts de la chorégraphie (~5,7 s). */
+/** Timings exacts — ≤600ms (team duration cap). Skippable immediately. */
 export const STREAK_CELEB_PHASE_STEPS: Array<{ at: number; phase: StreakCelebrationPhase }> = [
   { at: 0, phase: 'idle' },
-  { at: 550, phase: 'compress' },
-  { at: 850, phase: 'launch' },
-  { at: 1000, phase: 'burst' },
-  { at: 1350, phase: 'count' },
-  { at: 1700, phase: 'reveal' },
-  { at: 2300, phase: 'week' },
-  { at: 3800, phase: 'settled' },
+  { at: 40, phase: 'compress' },
+  { at: 80, phase: 'launch' },
+  { at: 120, phase: 'burst' },
+  { at: 160, phase: 'count' },
+  { at: 200, phase: 'reveal' },
+  { at: 320, phase: 'week' },
+  { at: 440, phase: 'settled' },
 ]
 
-export const STREAK_CELEB_TOTAL_MS = 5700
-/** Skip vers l’état final autorisé après le début de la révélation. */
-export const STREAK_CELEB_SKIP_AFTER_MS = 1700
-export const STREAK_CELEB_REDUCED_MS = 900
+export const STREAK_CELEB_TOTAL_MS = 560
+/** Skip allowed from the first frame (tap anywhere). */
+export const STREAK_CELEB_SKIP_AFTER_MS = 0
+/** Reduced-motion: settle instantly (0 ms wait). */
+export const STREAK_CELEB_REDUCED_MS = 0
 
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -77,15 +79,15 @@ function FlameGlyph({ lit, className = '' }: { lit: boolean; className?: string 
     <svg className={className} viewBox="0 0 64 80" aria-hidden>
       <defs>
         <linearGradient id="rgStreakFlameOuter" x1="0.5" y1="1" x2="0.5" y2="0">
-          <stop offset="0%" stopColor="#B91C1C" />
-          <stop offset="45%" stopColor="#FF2B2B" />
-          <stop offset="75%" stopColor="#FF7A1A" />
-          <stop offset="100%" stopColor="#FFC928" />
+          <stop offset="0%" stopColor="#7F1D1D" />
+          <stop offset="40%" stopColor="#B91C1C" />
+          <stop offset="75%" stopColor="#FF2B2B" />
+          <stop offset="100%" stopColor="#FF8A8A" />
         </linearGradient>
         <linearGradient id="rgStreakFlameInner" x1="0.5" y1="1" x2="0.5" y2="0">
-          <stop offset="0%" stopColor="#FF7A1A" />
-          <stop offset="60%" stopColor="#FFC928" />
-          <stop offset="100%" stopColor="#FFF4C2" />
+          <stop offset="0%" stopColor="#FF2B2B" />
+          <stop offset="55%" stopColor="#FF6B6B" />
+          <stop offset="100%" stopColor="#FFFFFF" />
         </linearGradient>
       </defs>
       <path
@@ -102,7 +104,8 @@ function FlameGlyph({ lit, className = '' }: { lit: boolean; className?: string 
 }
 
 /**
- * Célébration Daily Streak — chorégraphie ~5,7 s (CSS/SVG, pas de vidéo).
+ * Célébration Daily Streak — chorégraphie ≤560 ms (CSS/SVG, pas de vidéo).
+ * Skippable immédiatement (tap anywhere). Reduced-motion → instant.
  * À monter uniquement après une vraie incrémentation N → N+1.
  */
 export const StreakCelebrationOverlay = forwardRef<
@@ -124,12 +127,12 @@ export const StreakCelebrationOverlay = forwardRef<
     [forceReducedMotion],
   )
   const [phase, setPhase] = useState<StreakCelebrationPhase>(reduced ? 'settled' : 'idle')
-  const [displayCount, setDisplayCount] = useState(previousStreak)
-  const [showNewCount, setShowNewCount] = useState(reduced)
+  // Always show the new count — never a large translucent previous digit.
+  const [displayCount, setDisplayCount] = useState(currentStreak)
+  const [showNewCount, setShowNewCount] = useState(true)
   const [flash, setFlash] = useState(false)
   const [todayFlame, setTodayFlame] = useState(reduced)
   const completedRef = useRef(false)
-  const startedAtRef = useRef(0)
   const timersRef = useRef<number[]>([])
   const overlayRef = useRef<HTMLDivElement>(null)
   useImperativeHandle(forwardedRef, () => overlayRef.current as HTMLDivElement)
@@ -161,7 +164,7 @@ export const StreakCelebrationOverlay = forwardRef<
   }, [])
 
   const schedule = useCallback((fn: () => void, ms: number) => {
-    const id = window.setTimeout(fn, ms)
+    const id = window.setTimeout(fn, animMs(ms))
     timersRef.current.push(id)
   }, [])
 
@@ -172,14 +175,12 @@ export const StreakCelebrationOverlay = forwardRef<
   }, [clearTimers])
 
   useEffect(() => {
-    startedAtRef.current =
-      typeof performance !== 'undefined' ? performance.now() : Date.now()
-
     if (reduced) {
       setDisplayCount(currentStreak)
       setShowNewCount(true)
       setTodayFlame(true)
       setPhase('settled')
+      // Instant — no flash choreography under prefers-reduced-motion.
       schedule(finish, STREAK_CELEB_REDUCED_MS)
       return () => clearTimers()
     }
@@ -190,17 +191,14 @@ export const StreakCelebrationOverlay = forwardRef<
 
     schedule(() => {
       setFlash(true)
-      schedule(() => setFlash(false), 180)
-    }, 1000)
+      schedule(() => setFlash(false), 100)
+    }, 120)
 
-    // Ancien nombre encore visible, puis roulement → nouveau.
-    schedule(() => {
-      setShowNewCount(true)
-      setDisplayCount(currentStreak)
-    }, 1500)
+    // Count + flame stay lit from frame 0 (no ghost previous digit / dark flame "6").
+    setShowNewCount(true)
+    setDisplayCount(currentStreak)
 
-    // Marqueur gris → petite flamme (3 400–3 800 ms).
-    schedule(() => setTodayFlame(true), 3400)
+    schedule(() => setTodayFlame(true), 300)
 
     schedule(finish, STREAK_CELEB_TOTAL_MS)
 
@@ -214,7 +212,7 @@ export const StreakCelebrationOverlay = forwardRef<
     setDisplayCount(currentStreak)
     setTodayFlame(true)
     setPhase('settled')
-    schedule(finish, 700)
+    schedule(finish, 120)
   }, [clearTimers, currentStreak, finish, schedule])
 
   const onSkip = () => {
@@ -223,8 +221,6 @@ export const StreakCelebrationOverlay = forwardRef<
       finish()
       return
     }
-    const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
-    if (now - startedAtRef.current < STREAK_CELEB_SKIP_AFTER_MS) return
     jumpToSettledThenClose()
   }
 
@@ -236,7 +232,12 @@ export const StreakCelebrationOverlay = forwardRef<
     phase === 'week' ||
     phase === 'settled'
   const showWeek = phase === 'week' || phase === 'settled'
-  const showReveal = phase === 'reveal' || phase === 'week' || phase === 'settled'
+  // Label as soon as the new count is up — no long dim frame waiting on `reveal`.
+  const showReveal =
+    showNewCount ||
+    phase === 'reveal' ||
+    phase === 'week' ||
+    phase === 'settled'
   const showBurst =
     phase === 'burst' || phase === 'count' || phase === 'reveal' || phase === 'week'
   const showPanther =
@@ -296,8 +297,8 @@ export const StreakCelebrationOverlay = forwardRef<
           }`}
           aria-hidden
         >
+          {/* Alpha PNG with built-in crown — no opaque black square, no CSS crown overlay. */}
           <img src={pantherRoaringUrl} alt="" draggable={false} />
-          <span className="streak-celeb__crown" />
         </div>
       ) : null}
 
@@ -307,14 +308,11 @@ export const StreakCelebrationOverlay = forwardRef<
           <FlameGlyph lit={lit} className="streak-celeb__flame" />
         </div>
 
-        <div
-          className={`streak-celeb__count${
-            showNewCount ? ' streak-celeb__count--new' : ' streak-celeb__count--old'
-          }`}
-          aria-hidden
-        >
-          {displayCount}
-        </div>
+        {showNewCount ? (
+          <div className="streak-celeb__count streak-celeb__count--new" aria-hidden>
+            {displayCount}
+          </div>
+        ) : null}
 
         {showReveal ? <p className="streak-celeb__label">{daysLabel}</p> : null}
         {showReveal ? <p className="streak-celeb__message">{statusMessage}</p> : null}

@@ -6,6 +6,8 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import '../../index.css'
 import {
   STREAK_CELEB_REDUCED_MS,
+  STREAK_CELEB_SKIP_AFTER_MS,
+  STREAK_CELEB_TOTAL_MS,
   StreakCelebrationOverlay,
 } from './StreakCelebrationOverlay'
 import { StreakCelebrationHost } from './StreakCelebrationHost'
@@ -22,7 +24,7 @@ import {
 } from '../../utils/bodyScrollLock'
 import { __resetStreakCelebrationSessionForTests } from '../../utils/streakCelebrationSession'
 
-vi.mock('../../assets/brand/panther-roaring.png', () => ({ default: 'panther.png' }))
+vi.mock('../../assets/brand/panther-calm-crowned.png', () => ({ default: 'panther.png' }))
 
 function mockReducedMotion() {
   Object.defineProperty(window, 'matchMedia', {
@@ -490,5 +492,59 @@ describe('DailyStreak — pas de montage local overlay', () => {
     const root = join(dirname(fileURLToPath(import.meta.url)), '..')
     const daily = readFileSync(join(root, 'home/DailyStreak.tsx'), 'utf8')
     expect(daily).not.toMatch(/StreakCelebrationOverlay/)
+  })
+})
+
+describe('StreakCelebrationOverlay — shortened + skippable immediately', () => {
+  beforeEach(() => {
+    document.body.innerHTML = ''
+    vi.useFakeTimers()
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      configurable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('total choreography is ≤600ms and skip is allowed from frame 0', () => {
+    expect(STREAK_CELEB_TOTAL_MS).toBeLessThanOrEqual(600)
+    expect(STREAK_CELEB_SKIP_AFTER_MS).toBe(0)
+  })
+
+  it('tap anywhere skips immediately (no 1.7s lockout)', () => {
+    const onComplete = vi.fn()
+    const { root, container } = render(
+      <StreakCelebrationOverlay
+        previousStreak={3}
+        currentStreak={4}
+        dateKey="2026-10-09"
+        onComplete={onComplete}
+      />,
+    )
+
+    const dialog = document.body.querySelector('[role="dialog"].streak-celeb') as HTMLElement
+    expect(dialog).toBeTruthy()
+
+    act(() => {
+      dialog.click()
+    })
+    act(() => {
+      vi.advanceTimersByTime(200)
+    })
+    expect(onComplete).toHaveBeenCalledTimes(1)
+
+    unmount(root, container)
   })
 })
