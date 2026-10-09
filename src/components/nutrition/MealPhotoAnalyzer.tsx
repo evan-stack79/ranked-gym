@@ -5,6 +5,7 @@ import {
   useImperativeHandle,
   useRef,
   useState,
+  type ReactNode,
 } from 'react'
 import { AlertCircle, Camera, Loader2, Sparkles } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
@@ -25,6 +26,10 @@ interface MealPhotoAnalyzerProps {
   variant?: 'card' | 'button' | 'headless'
   /** Fixture/debug only: force a visible error message. */
   forcedErrorMessage?: string | null
+  /** Remplace le style du bouton (variant=button). */
+  buttonClassName?: string
+  /** Icône custom à gauche du libellé (variant=button). */
+  iconSlot?: ReactNode
 }
 
 export type MealPhotoAnalyzerHandle = {
@@ -42,7 +47,17 @@ function defaultMealType(): MealType {
 }
 
 export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAnalyzerProps>(
-  function MealPhotoAnalyzer({ onAnalyzed, onToast, variant = 'card', forcedErrorMessage = null }, ref) {
+  function MealPhotoAnalyzer(
+    {
+      onAnalyzed,
+      onToast,
+      variant = 'card',
+      forcedErrorMessage = null,
+      buttonClassName,
+      iconSlot,
+    },
+    ref,
+  ) {
   const { user, isAuthenticated, requireAuth } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
@@ -170,12 +185,15 @@ export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAn
             type="button"
             onClick={openPicker}
             disabled={busy || remaining === 0}
-            className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-[#BF5AF2]/40 bg-[#BF5AF2]/15 px-3 py-3.5 text-[13px] font-semibold text-[#E9D5FF] disabled:opacity-50"
+            className={
+              buttonClassName ??
+              'ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-[#BF5AF2]/40 bg-[#BF5AF2]/15 px-3 py-3.5 text-[13px] font-semibold text-[#E9D5FF] disabled:opacity-50'
+            }
           >
             {busy ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
             ) : (
-              <Camera className="h-4 w-4" aria-hidden />
+              (iconSlot ?? <Camera className="h-4 w-4" aria-hidden />)
             )}
             {busy ? 'Analyse…' : 'Photo IA'}
           </button>

@@ -26,7 +26,6 @@ import { HydrationProgressBar } from './HydrationProgressBar'
 import { WaterGoalChooser } from './WaterGoalChooser'
 import {
   listPersonalFoods,
-  setPersonalFoodFavorite,
   searchOpenFoodFacts,
   type OpenFoodFactsProduct,
   type OpenFoodFactsSearchHit,
@@ -42,6 +41,14 @@ import { MealPhotoAnalyzer } from './MealPhotoAnalyzer'
 import { AddFoodScreen } from './AddFoodScreen'
 import { SectionSkeleton } from '../ui/AppBootScreen'
 import { persistScannedProductSelection } from './persistScannedProductSelection'
+import {
+  primaryOffTagForCategory,
+  type FoodCategoryId,
+} from '../../utils/foodCategories'
+import {
+  buildFoodNutritionSnapshot,
+  mealEntryFromSnapshot,
+} from '../../utils/foodJournalSnapshot'
 
 interface MealJournalProps {
   targetCalories: number
@@ -78,6 +85,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   const [searchHits, setSearchHits] = useState<OpenFoodFactsSearchHit[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
+  const [foodCategory, setFoodCategory] = useState<FoodCategoryId>('all')
   const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' } | null>(
     null,
   )
@@ -121,7 +129,10 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     }
 
     const term = searchQuery.trim()
-    if (term.length < 2) {
+    const categoryTag = primaryOffTagForCategory(foodCategory)
+    const needsRemote = term.length >= 2 || Boolean(categoryTag)
+
+    if (!needsRemote) {
       setSearchError(null)
       setSearchLoading(false)
       let cancelled = false
@@ -138,6 +149,8 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
               glucides: item.glucides,
               lipides: item.lipides,
               imageUrl: item.imageUrl,
+              servingSize: null,
+              categoriesTags: [],
               provenance: item.provenance,
               fetchedAt: item.fetchedAt,
               foodKey: item.foodKey,
@@ -159,7 +172,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     setSearchError(null)
 
     const timer = window.setTimeout(() => {
-      void searchOpenFoodFacts(term, controller.signal)
+      void searchOpenFoodFacts(term, controller.signal, { categoryTag })
         .then((hits) => {
           if (controller.signal.aborted) return
           setSearchHits(hits)
@@ -173,13 +186,13 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
         .finally(() => {
           if (!controller.signal.aborted) setSearchLoading(false)
         })
-    }, 500)
+    }, term.length >= 2 ? 500 : 120)
 
     return () => {
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [searchQuery, showForm])
+  }, [searchQuery, showForm, foodCategory])
 
   const pendingRemaining = useMemo(() => {
     if (!pendingMealType) return 0
@@ -209,7 +222,27 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     setSearchHits([])
     setSearchError(null)
     setSearchLoading(false)
+    setFoodCategory('all')
     setShowForm(false)
+  }
+
+  const handleValidateFoodSelection = (hits: OpenFoodFactsSearchHit[]) => {
+    const type = pendingMealType ?? mealType
+    let journal = getTodayJournal()
+    for (const hit of hits) {
+      const snapshot = buildFoodNutritionSnapshot(hit)
+      const entry = mealEntryFromSnapshot(snapshot, type)
+      journal = addMealToToday(entry)
+      if (user) {
+        void persistScannedProductSelection(hit, user.id, (message) => {
+          showToast(message, 'error')
+        })
+      }
+    }
+    setMeals(journal.meals)
+    setPendingMealType(null)
+    resetForm()
+    showToast(hits.length === 1 ? 'Aliment ajouté.' : `${hits.length} aliments ajoutés.`)
   }
 
   const handleScanSave = (entry: {
@@ -237,32 +270,6 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     setPendingMealType(null)
     resetForm()
   }
-
-  const handleToggleFavorite = useCallback(
-    (hit: OpenFoodFactsSearchHit) => {
-      if (!hit.foodKey) return
-      requireAuth(() => {
-        const next = !hit.isFavorite
-        void setPersonalFoodFavorite(hit.foodKey!, next)
-          .then((applied) => {
-            if (!applied) {
-              showToast('Impossible de mettre à jour le favori.', 'error')
-              return
-            }
-            setSearchHits((prev) =>
-              prev.map((item) =>
-                item.foodKey === hit.foodKey ? { ...item, isFavorite: next } : item,
-              ),
-            )
-            showToast(next ? 'Ajouté aux favoris.' : 'Retiré des favoris.')
-          })
-          .catch(() => {
-            showToast('Impossible de mettre à jour le favori.', 'error')
-          })
-      })
-    },
-    [requireAuth, showToast],
-  )
 
   const openScanner = (forMeal?: MealType) => {
     if (forMeal) setPendingMealType(forMeal)
@@ -517,12 +524,9 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
           searchLoading={searchLoading}
           searchError={searchError}
           searchHits={searchHits}
-          onSelectHit={(hit) => {
-            handleScannedProduct(hit)
-            setSearchQuery('')
-            setSearchHits([])
-          }}
-          onToggleFavorite={handleToggleFavorite}
+          category={foodCategory}
+          onCategoryChange={setFoodCategory}
+          onValidateSelection={handleValidateFoodSelection}
           onOpenScanner={() => openScanner()}
           scannerSlot={
             scannerOpen ? (
