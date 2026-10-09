@@ -27,6 +27,8 @@ import {
 } from '../../data/disciplines'
 import { BETA_FEEDBACK_SETTINGS_LABEL } from '../../content/betaFeedbackCopy'
 import { canOpenBetaFeedback } from '../../services/betaFeedbackAccess'
+import { getTrainingState, setRestReminderPrefs } from '../../services/trainingStorage'
+import { parseRestReminderPrefs } from '../../services/trainRestReminder'
 
 const PRO_PASS_DISMISSED_KEY = 'ranked-gym:pro-pass-dismissed'
 
@@ -112,6 +114,9 @@ export function SettingsScreen({
   const [avatarError, setAvatarError] = useState<string | null>(null)
   const [disciplineId, setDisciplineId] = useState<AppDisciplineId>(() =>
     disciplineFromLabel(profileDiscipline) || 'musculation',
+  )
+  const [restReminderOn, setRestReminderOn] = useState(
+    () => parseRestReminderPrefs(getTrainingState().restReminder).enabled,
   )
 
   const displayAvatarUrl = avatarPreview || avatarUrl || null
@@ -386,6 +391,36 @@ export function SettingsScreen({
             <p className="mt-1 text-[13px] text-[#8E8E93]">
               Gère les rappels de séance dans l&apos;onglet Train → Agenda.
             </p>
+          </div>
+          <div className="glass-card rounded-2xl p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[15px] font-semibold text-white">Rappel repos</p>
+                <p className="mt-1 text-[13px] text-[#8E8E93]">
+                  Après 2 jours d&apos;affilée avec séance — au plus une fois par semaine.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={restReminderOn}
+                data-testid="settings-rest-reminder-toggle"
+                className={`ios-press relative h-8 w-14 shrink-0 rounded-full transition-colors ${
+                  restReminderOn ? 'bg-brand' : 'bg-white/20'
+                }`}
+                onClick={() => {
+                  const next = !restReminderOn
+                  setRestReminderOn(next)
+                  setRestReminderPrefs({ enabled: next })
+                }}
+              >
+                <span
+                  className={`absolute top-1 h-6 w-6 rounded-full bg-white transition-transform ${
+                    restReminderOn ? 'translate-x-7' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
           </div>
           <div className="glass-card rounded-2xl p-4">
             <p className="text-[15px] font-semibold text-white">Unités</p>

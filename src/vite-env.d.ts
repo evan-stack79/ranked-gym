@@ -29,6 +29,11 @@ interface ImportMetaEnv {
    * Unset/empty = ON. Explicit false restores legacy dashboard + dock nav.
    */
   readonly VITE_ENABLE_ACCUEIL_GALLERY?: string
+  /**
+   * « Classement de ma salle » sur Train.
+   * Unset/empty = OFF. Explicit true to enable (PR #101 code optional).
+   */
+  readonly VITE_ENABLE_GYM_LEADERBOARD?: string
 }
 
 interface ImportMeta {
