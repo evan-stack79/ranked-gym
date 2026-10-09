@@ -1,8 +1,8 @@
 /*
- * Ranked Gym — team animations (RECHERCHE).
- * Restyle via --rg-anim-* tokens below (license-OK references can retarget these).
- * Accent is brand red only — never yellow.
- * WCAG 2.2 SC 2.3.1: no flash > 3×/s (spark/glow durations ≥ 334ms, play-once).
+ * Ranked Gym — team animations adapted from ANIMATIONS_GRATUITES sources.
+ * Restyle via --rg-anim-* tokens. Accent = brand red only.
+ * Durations: all motion ≤ 600ms except play-button breathe (2 slow cycles).
+ * WCAG 2.2 SC 2.3.1: spark/glow flash ≤ 3×/s (play-once sparks ≥ 334ms).
  */
 
 :root {
@@ -10,33 +10,41 @@
   --rg-anim-accent-soft: rgb(255 43 43 / 0.14);
   --rg-anim-surface: #141416;
   --rg-anim-scrim: rgb(12 12 14 / 0.72);
+  --rg-anim-curve: cubic-bezier(0.65, 0, 0.45, 1); /* haniotis */
+  --rg-anim-spring: cubic-bezier(0.16, 1, 0.3, 1); /* codefronts */
 
+  /* Cap every UI motion ≤ 600ms (play breathe excluded). */
+  --rg-session-total-ms: 580;
   --rg-session-circle-dur: 420ms;
-  --rg-session-check-dur: 380ms;
-  --rg-session-check-delay: 220ms;
-  --rg-session-spark-dur: 480ms;
-  --rg-session-spark-delay: 340ms;
-  --rg-session-label-dur: 280ms;
-  --rg-session-label-delay: 400ms;
-  --rg-session-total-ms: 1000;
+  --rg-session-fill-dur: 280ms;
+  --rg-session-fill-delay: 220ms;
+  --rg-session-check-dur: 260ms;
+  --rg-session-check-delay: 300ms;
+  --rg-session-scale-dur: 220ms;
+  --rg-session-scale-delay: 360ms;
+  --rg-session-spark-dur: 400ms;
+  --rg-session-spark-delay: 280ms;
+  --rg-session-label-dur: 220ms;
+  --rg-session-label-delay: 320ms;
 
-  --rg-set-pop-dur: 340ms;
+  --rg-set-pop-dur: 400ms; /* wicked-catfish wave-46 */
 
   --rg-tab-fade-dur: 180ms;
   --rg-card-expand-dur: 280ms;
+  --rg-vt-dur: 280ms;
 
-  --rg-wave-card-dur: 200ms;
+  --rg-wave-card-dur: 420ms; /* codefronts fi-04, capped <600 */
   --rg-wave-stagger: 40ms;
 
-  --rg-progress-fill-dur: 360ms;
+  --rg-progress-fill-dur: 420ms;
   --rg-progress-spark-dur: 400ms;
 
-  /* Slow glow — 2 breaths then stop (not a seizure-risk flash). */
-  --rg-play-breathe-dur: 700ms;
+  /* Exception: 2 slow cycles behind the play button — never blocks taps. */
+  --rg-play-breathe-dur: 900ms;
   --rg-play-breathe-count: 2;
 }
 
-/* ── 1. Fin de séance ─────────────────────────────────────────── */
+/* ── 1. Fin de séance (haniotis KwvYLO + 12 sparks) ───────────── */
 .rg-session-burst {
   position: fixed;
   inset: 0;
@@ -58,59 +66,73 @@
 
 .rg-session-burst__stage {
   position: relative;
-  width: 7.5rem;
-  height: 7.5rem;
+  width: 5.5rem;
+  height: 5.5rem;
   display: grid;
   place-items: center;
 }
 
+/* Adapted from CodePen haniotis/KwvYLO — green → Ranked Gym red */
+.rg-session-burst__mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: block;
+  stroke-width: 2;
+  stroke: #fff;
+  stroke-miterlimit: 10;
+  box-shadow: inset 0 0 0 var(--rg-anim-accent);
+  animation:
+    rg-session-fill var(--rg-session-fill-dur) ease-in-out var(--rg-session-fill-delay) forwards,
+    rg-session-scale var(--rg-session-scale-dur) ease-in-out var(--rg-session-scale-delay) both;
+}
+
 .rg-session-burst__circle {
-  position: absolute;
-  inset: 0;
-  border-radius: 9999px;
-  background: var(--rg-anim-accent);
-  transform: scale(0.92);
-  opacity: 0;
-  animation: rg-session-circle var(--rg-session-circle-dur) var(--ease-out) both;
+  stroke-dasharray: 166;
+  stroke-dashoffset: 166;
+  stroke-width: 2;
+  stroke-miterlimit: 10;
+  stroke: var(--rg-anim-accent);
+  fill: none;
+  animation: rg-session-stroke var(--rg-session-circle-dur) var(--rg-anim-curve) forwards;
 }
 
-.rg-session-burst__check-svg {
-  position: relative;
-  z-index: 1;
-  width: 3rem;
-  height: 3rem;
-  color: #fff;
-}
-
-.rg-session-burst__check-path {
+.rg-session-burst__check {
+  transform-origin: 50% 50%;
   stroke-dasharray: 48;
   stroke-dashoffset: 48;
-  animation: rg-session-check-draw var(--rg-session-check-dur) var(--ease-out)
-    var(--rg-session-check-delay) both;
+  animation: rg-session-stroke var(--rg-session-check-dur) var(--rg-anim-curve)
+    var(--rg-session-check-delay) forwards;
 }
 
 .rg-session-burst__spark {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 6px;
-  height: 6px;
-  margin: -3px;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px;
   border-radius: 9999px;
   background: var(--rg-anim-accent);
   opacity: 0;
-  /* Play-once spark: single luminance peak, duration ≥ 334ms (WCAG 2.3.1). */
   animation: rg-session-spark var(--rg-session-spark-dur) var(--ease-out)
     var(--rg-session-spark-delay) both;
   animation-iteration-count: 1;
 }
 
-.rg-session-burst__spark--0 { --sx: 42px; --sy: -48px; }
-.rg-session-burst__spark--1 { --sx: -40px; --sy: -36px; }
-.rg-session-burst__spark--2 { --sx: 48px; --sy: 12px; }
-.rg-session-burst__spark--3 { --sx: -46px; --sy: 18px; }
-.rg-session-burst__spark--4 { --sx: 10px; --sy: 50px; }
-.rg-session-burst__spark--5 { --sx: -8px; --sy: -54px; }
+/* 12 sparks — identical every session */
+.rg-session-burst__spark--0 { --sx: 44px; --sy: -40px; }
+.rg-session-burst__spark--1 { --sx: -42px; --sy: -36px; }
+.rg-session-burst__spark--2 { --sx: 48px; --sy: 8px; }
+.rg-session-burst__spark--3 { --sx: -46px; --sy: 14px; }
+.rg-session-burst__spark--4 { --sx: 12px; --sy: 48px; }
+.rg-session-burst__spark--5 { --sx: -10px; --sy: -52px; }
+.rg-session-burst__spark--6 { --sx: 36px; --sy: 36px; }
+.rg-session-burst__spark--7 { --sx: -38px; --sy: 34px; }
+.rg-session-burst__spark--8 { --sx: 52px; --sy: -12px; }
+.rg-session-burst__spark--9 { --sx: -50px; --sy: -8px; }
+.rg-session-burst__spark--10 { --sx: 22px; --sy: -48px; }
+.rg-session-burst__spark--11 { --sx: -24px; --sy: 46px; }
 
 .rg-session-burst__label {
   margin: 0;
@@ -136,16 +158,20 @@
   pointer-events: auto;
 }
 
-@keyframes rg-session-circle {
-  from { transform: scale(0.92); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+@keyframes rg-session-stroke {
+  100% { stroke-dashoffset: 0; }
 }
 
-@keyframes rg-session-check-draw {
-  to { stroke-dashoffset: 0; }
+@keyframes rg-session-scale {
+  0%,
+  100% { transform: none; }
+  50% { transform: scale3d(1.1, 1.1, 1); }
 }
 
-/* One soft peak — not a strobe. */
+@keyframes rg-session-fill {
+  100% { box-shadow: inset 0 0 0 30px var(--rg-anim-accent); }
+}
+
 @keyframes rg-session-spark {
   0% { opacity: 0; transform: translate3d(0, 0, 0) scale(0.6); }
   40% { opacity: 1; }
@@ -157,15 +183,28 @@
   to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
-/* ── 2. Série validée ─────────────────────────────────────────── */
+/* ── 2. Série validée (wicked-catfish-29 boing → red) ─────────── */
 .rg-set-row--pop {
-  animation: rg-set-row-flash var(--rg-set-pop-dur) var(--ease-out) both;
+  animation: rg-set-row-flash var(--rg-set-pop-dur) ease both;
   animation-iteration-count: 1;
 }
 
 .rg-set-row--pop [data-rg-set-check] {
-  animation: rg-set-check-hop var(--rg-set-pop-dur) var(--ease-out) both;
+  background: var(--rg-anim-accent) !important;
+  border-color: var(--rg-anim-accent);
+  color: #fff;
+  animation: rg-set-boing var(--rg-set-pop-dur) ease both;
   animation-iteration-count: 1;
+}
+
+.rg-set-row--pop [data-rg-set-check] svg {
+  color: #fff;
+  stroke: #fff;
+}
+
+@keyframes rg-set-boing {
+  50% { transform: scale(0.9); }
+  100% { transform: scale(1); }
 }
 
 @keyframes rg-set-row-flash {
@@ -174,13 +213,7 @@
   100% { background-color: transparent; }
 }
 
-@keyframes rg-set-check-hop {
-  0% { transform: scale(1) translateY(0); }
-  40% { transform: scale(1.12) translateY(-3px); }
-  100% { transform: scale(1) translateY(0); }
-}
-
-/* ── 3. Tab fade / card expand ────────────────────────────────── */
+/* ── 3. Tab fade + View Transitions card→page ─────────────────── */
 .rg-tab-fade {
   min-height: 0;
 }
@@ -194,6 +227,7 @@
   to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
+/* Fallback expand (no View Transitions support) */
 .rg-card-expand {
   position: fixed;
   z-index: 8500;
@@ -215,11 +249,32 @@
   border-color: transparent;
 }
 
-/* ── 4. Wave enter (first time) ───────────────────────────────── */
+/* Chrome same-document View Transitions */
+::view-transition-old(rg-card-expand),
+::view-transition-new(rg-card-expand) {
+  animation-duration: var(--rg-vt-dur);
+  animation-timing-function: var(--rg-anim-spring);
+}
+
+::view-transition-old(rg-page),
+::view-transition-new(rg-page) {
+  animation-duration: var(--rg-tab-fade-dur);
+  animation-timing-function: var(--ease-out);
+}
+
+[data-rg-vt-card] {
+  view-transition-name: rg-card-expand;
+}
+
+[data-rg-vt-page] {
+  view-transition-name: rg-page;
+}
+
+/* ── 4. Wave enter (codefronts fi-04 stagger fade-up) ─────────── */
 .rg-wave-enter--active .rg-wave-enter__card {
   opacity: 0;
-  transform: translate3d(0, 10px, 0);
-  animation: rg-wave-card-in var(--rg-wave-card-dur) var(--ease-out) both;
+  transform: translateY(16px);
+  animation: rg-wave-card-in var(--rg-wave-card-dur) var(--rg-anim-spring) both;
 }
 
 .rg-wave-enter--active .rg-wave-enter__card--0 { animation-delay: calc(var(--rg-wave-stagger) * 0); }
@@ -229,10 +284,9 @@
 .rg-wave-enter--active .rg-wave-enter__card--4 { animation-delay: calc(var(--rg-wave-stagger) * 4); }
 
 @keyframes rg-wave-card-in {
-  to { opacity: 1; transform: translate3d(0, 0, 0); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* Skeleton wave shimmer — soft sweep, not a hard flash */
 .skeleton-shimmer {
   background: linear-gradient(
     100deg,
@@ -246,14 +300,25 @@
   animation: skeleton-shimmer 1.2s var(--ease-in-out) infinite;
 }
 
-/* ── 5. Living progress sparks ────────────────────────────────── */
+/* ── 5. Living progress (codefronts color-mix + sparks @100%) ─── */
 .rg-living-progress__track {
   position: relative;
   height: 0.625rem;
   overflow: hidden;
   border-radius: 9999px;
   border: 1px solid rgb(255 255 255 / 0.1);
-  background: rgb(0 0 0 / 0.4);
+  /* Fallback then color-mix (demo 08) */
+  background: rgb(255 255 255 / 0.08);
+}
+
+@supports (color: color-mix(in oklab, white 10%, transparent)) {
+  .rg-living-progress__track {
+    background: color-mix(in oklab, currentColor 15%, transparent);
+  }
+
+  .rg-living-progress__fill {
+    background: color-mix(in oklab, var(--rg-anim-accent) 90%, white 10%);
+  }
 }
 
 .rg-living-progress__fill {
@@ -280,7 +345,6 @@
   margin: -2.5px;
   border-radius: 9999px;
   background: var(--rg-anim-accent);
-  /* Play-once; duration token ≥ 334ms. */
   animation: rg-progress-spark var(--rg-progress-spark-dur) var(--ease-out) both;
   animation-iteration-count: 1;
 }
@@ -297,23 +361,48 @@
   100% { opacity: 0; transform: translate3d(var(--px), var(--py), 0) scale(0.15); }
 }
 
-/* ── 6. Play button breathe (2× then stop) ─────────────────────── */
+/* ── 6a. Press-in (evil-monkey-41) via ios-press ──────────────── */
+.ios-press {
+  transition:
+    transform 120ms cubic-bezier(0.3, 0.7, 0.4, 1),
+    opacity 120ms var(--ease-out),
+    background-color 120ms var(--ease-out),
+    color 120ms var(--ease-out),
+    filter 120ms var(--ease-out);
+}
+
+.ios-press:active,
+.ios-press[data-pressed='true'] {
+  transform: scale(0.96) translateY(1px);
+  opacity: 0.92;
+  filter: brightness(0.96);
+}
+
+/* ── 6b. Play glow breathe ×2 (pink-ladybug-22 pulse, capped) ─── */
 .rg-play-breathe {
-  animation: rg-play-glow-breathe var(--rg-play-breathe-dur) var(--ease-in-out)
+  position: relative;
+  /* Glow lives behind the control — never blocks taps */
+  isolation: isolate;
+}
+
+.rg-play-breathe::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  z-index: -1;
+  pointer-events: none;
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--rg-anim-accent) 55%, transparent);
+  animation: rg-play-glow-breathe var(--rg-play-breathe-dur) cubic-bezier(0.8, 0, 0, 1)
     var(--rg-play-breathe-count) both;
 }
 
 @keyframes rg-play-glow-breathe {
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 0 color-mix(in srgb, var(--rg-anim-accent) 0%, transparent),
-      inset 0 1px 0 rgb(255 255 255 / 0.14);
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--rg-anim-accent) 55%, transparent);
   }
-  50% {
-    box-shadow:
-      0 0 18px 4px color-mix(in srgb, var(--rg-anim-accent) 55%, transparent),
-      inset 0 1px 0 rgb(255 255 255 / 0.14);
+  100% {
+    box-shadow: 0 0 0 28px color-mix(in srgb, var(--rg-anim-accent) 0%, transparent);
   }
 }
 
@@ -328,12 +417,21 @@
   .rg-wave-enter--active .rg-wave-enter__card,
   .rg-living-progress__spark,
   .rg-play-breathe,
+  .rg-play-breathe::before,
   .skeleton-shimmer {
     animation: none !important;
     transition: none !important;
   }
 
+  .rg-session-burst__mark {
+    box-shadow: inset 0 0 0 30px var(--rg-anim-accent) !important;
+  }
+
   .rg-session-burst__circle,
+  .rg-session-burst__check {
+    stroke-dashoffset: 0 !important;
+  }
+
   .rg-session-burst__label,
   .rg-wave-enter--active .rg-wave-enter__card,
   .rg-tab-fade--in {
@@ -341,11 +439,13 @@
     transform: none !important;
   }
 
-  .rg-session-burst__check-path {
-    stroke-dashoffset: 0 !important;
-  }
-
   .rg-card-expand {
     display: none !important;
+  }
+
+  .ios-press:active,
+  .ios-press[data-pressed='true'] {
+    transform: none;
+    filter: none;
   }
 }

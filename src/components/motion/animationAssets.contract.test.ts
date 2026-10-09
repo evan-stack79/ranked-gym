@@ -47,12 +47,20 @@ function isAnimationAssetUrl(url: string): boolean {
 }
 
 describe('animation assets — offline / bundled only', () => {
-  it('public/animations/LICENSES.md documents licenses (or none)', () => {
+  it('public/animations/LICENSES.md and root LICENCES_TIERS.md document sources', () => {
     const licensePath = join(root, 'public/animations/LICENSES.md')
+    const tiersPath = join(root, 'LICENCES_TIERS.md')
     expect(existsSync(licensePath)).toBe(true)
+    expect(existsSync(tiersPath)).toBe(true)
     const body = readFileSync(licensePath, 'utf8')
     expect(body).toMatch(/license/i)
     expect(body).toMatch(/No CDN|bundled|offline/i)
+    const tiers = readFileSync(tiersPath, 'utf8')
+    expect(tiers).toMatch(/codepen\.io\/haniotis\/pen\/KwvYLO/)
+    expect(tiers).toMatch(/wicked-catfish-29/)
+    expect(tiers).toMatch(/evil-monkey-41/)
+    expect(tiers).toMatch(/pink-ladybug-22/)
+    expect(tiers).toMatch(/codefronts\.com/)
   })
 
   it('no external animation asset URLs in motion-related sources', () => {

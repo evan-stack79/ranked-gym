@@ -27,10 +27,11 @@ export function canFinishSession(options: {
 }
 
 /** Fixed celebration timings — identical for every session (no scaling by sets/load/goals). */
-export const SESSION_COMPLETE_BURST_MS = 1000
+/** All UI motion ≤ 600ms (play-button breathe excluded). */
+export const SESSION_COMPLETE_BURST_MS = 580
 export const SESSION_COMPLETE_REDUCED_MS = 0
-export const SET_VALIDATED_POP_MS = 340
+export const SET_VALIDATED_POP_MS = 400
 export const TAB_FADE_MS = 180
 export const CARD_EXPAND_MS = 280
 export const WAVE_ENTER_STAGGER_MS = 40
-export const PROGRESS_FILL_MS = 360
+export const PROGRESS_FILL_MS = 420

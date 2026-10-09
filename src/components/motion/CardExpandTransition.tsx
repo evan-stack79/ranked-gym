@@ -17,8 +17,13 @@ export type CardExpandTransitionProps = {
   forceReducedMotion?: boolean
 }
 
+function supportsViewTransitions(): boolean {
+  return typeof document !== 'undefined' && 'startViewTransition' in document
+}
+
 /**
- * App Store–style: tapped card grows into the full page, then hands off.
+ * App Store–style card → page.
+ * Prefers Chrome same-document View Transitions; falls back to FLIP expand.
  * Reduced-motion / missing rect → onComplete immediately.
  */
 export function CardExpandTransition({
@@ -32,6 +37,7 @@ export function CardExpandTransition({
   const onCompleteRef = useRef(onComplete)
   onCompleteRef.current = onComplete
   const [expanded, setExpanded] = useState(false)
+  const [useFallback, setUseFallback] = useState(true)
 
   const finish = useCallback(() => {
     if (doneRef.current) return
@@ -43,6 +49,7 @@ export function CardExpandTransition({
     if (!from) {
       doneRef.current = false
       setExpanded(false)
+      setUseFallback(true)
       return
     }
     doneRef.current = false
@@ -50,6 +57,25 @@ export function CardExpandTransition({
       finish()
       return
     }
+
+    if (supportsViewTransitions()) {
+      setUseFallback(false)
+      try {
+        const doc = document as Document & {
+          startViewTransition: (cb: () => void) => { finished: Promise<void> }
+        }
+        const vt = doc.startViewTransition(() => {
+          /* DOM swap is handled by the caller after onComplete. */
+        })
+        void vt.finished.then(finish).catch(finish)
+        const id = window.setTimeout(finish, CARD_EXPAND_MS)
+        return () => window.clearTimeout(id)
+      } catch {
+        setUseFallback(true)
+      }
+    }
+
+    setUseFallback(true)
     const raf = window.requestAnimationFrame(() => setExpanded(true))
     const id = window.setTimeout(finish, CARD_EXPAND_MS)
     return () => {
@@ -58,7 +84,7 @@ export function CardExpandTransition({
     }
   }, [from, reduced, finish])
 
-  if (!from || reduced) return null
+  if (!from || reduced || !useFallback) return null
 
   const style = expanded
     ? {
@@ -93,4 +119,24 @@ export function readCardExpandRect(el: Element | null): CardExpandRect | null {
   const r = el.getBoundingClientRect()
   if (r.width < 8 || r.height < 8) return null
   return { top: r.top, left: r.left, width: r.width, height: r.height }
+}
+
+/** Navigate with View Transitions when available; otherwise call navigate directly. */
+export function navigateWithViewTransition(navigate: () => void): void {
+  if (typeof document === 'undefined') {
+    navigate()
+    return
+  }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    navigate()
+    return
+  }
+  const doc = document as Document & {
+    startViewTransition?: (cb: () => void) => unknown
+  }
+  if (typeof doc.startViewTransition === 'function') {
+    doc.startViewTransition(navigate)
+    return
+  }
+  navigate()
 }

@@ -102,7 +102,7 @@ export function AnimationsFixture() {
               data-testid="demo-set-validate"
               onClick={() => {
                 setSetPop(true)
-                window.setTimeout(() => setSetPop(false), 340)
+                window.setTimeout(() => setSetPop(false), 400)
               }}
             >
               Valider la série
@@ -115,6 +115,7 @@ export function AnimationsFixture() {
               type="button"
               className="ios-press glass-card w-full rounded-2xl p-4 text-left"
               data-testid="demo-expand-card"
+              data-rg-vt-card
               onClick={(e) => {
                 setExpandFrom(readCardExpandRect(e.currentTarget))
               }}
@@ -190,7 +191,7 @@ export function AnimationsFixture() {
           </section>
 
           <section className="space-y-2" data-demo="streak-fix">
-            <h2 className="text-[13px] font-semibold text-[#8E8E93]">7 · Streak (~1s, skippable)</h2>
+            <h2 className="text-[13px] font-semibold text-[#8E8E93]">7 · Streak (≤560ms, skippable)</h2>
             <button
               type="button"
               className="ios-press btn-brand min-h-11 w-full rounded-2xl px-4 text-[14px] font-semibold text-white"

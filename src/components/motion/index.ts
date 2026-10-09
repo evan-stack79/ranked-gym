@@ -52,6 +52,7 @@ export { TabPageTransition, type TabPageTransitionProps } from './TabPageTransit
 export {
   CardExpandTransition,
   readCardExpandRect,
+  navigateWithViewTransition,
   type CardExpandRect,
   type CardExpandTransitionProps,
 } from './CardExpandTransition'

@@ -45,10 +45,23 @@ function opacityPeakCount(block: string): number {
 }
 
 describe('WCAG 2.2 SC 2.3.1 — spark / glow flash budget', () => {
-  it('spark duration tokens are ≥ 334ms (≤ 3 flashes/sec)', () => {
+  it('spark duration tokens are ≥ 334ms (≤ 3 flashes/sec) and UI motion ≤ 600ms', () => {
     expect(parseMsToken(animCss, '--rg-session-spark-dur')).toBeGreaterThanOrEqual(MIN_FLASH_PERIOD_MS)
     expect(parseMsToken(animCss, '--rg-progress-spark-dur')).toBeGreaterThanOrEqual(MIN_FLASH_PERIOD_MS)
     expect(parseMsToken(animCss, '--rg-set-pop-dur')).toBeGreaterThanOrEqual(MIN_FLASH_PERIOD_MS)
+    for (const token of [
+      '--rg-session-circle-dur',
+      '--rg-session-check-dur',
+      '--rg-set-pop-dur',
+      '--rg-tab-fade-dur',
+      '--rg-card-expand-dur',
+      '--rg-wave-card-dur',
+      '--rg-progress-fill-dur',
+    ] as const) {
+      expect(parseMsToken(animCss, token), token).toBeLessThanOrEqual(600)
+    }
+    // Play breathe is the allowed exception (slow, 2 cycles).
+    expect(parseMsToken(animCss, '--rg-play-breathe-dur')).toBeGreaterThanOrEqual(500)
   })
 
   it('session + progress spark keyframes are single-peak play-once (not a strobe)', () => {

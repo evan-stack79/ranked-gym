@@ -146,7 +146,9 @@ export function AppLayout({
                 }
           }
         >
-          <TabPageTransition tabId={activeTab}>{children}</TabPageTransition>
+          <TabPageTransition tabId={activeTab}>
+            <div data-rg-vt-page>{children}</div>
+          </TabPageTransition>
         </div>
       </main>
 

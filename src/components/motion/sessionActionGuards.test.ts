@@ -20,8 +20,10 @@ describe('sessionActionGuards — persist-first / idempotent', () => {
     expect(canFinishSession({ saving: false, finishCommitted: false })).toBe(true)
   })
 
-  it('celebration timings are fixed (identical every session)', () => {
-    expect(SESSION_COMPLETE_BURST_MS).toBe(1000)
-    expect(SET_VALIDATED_POP_MS).toBe(340)
+  it('celebration timings are fixed and ≤600ms (identical every session)', () => {
+    expect(SESSION_COMPLETE_BURST_MS).toBe(580)
+    expect(SESSION_COMPLETE_BURST_MS).toBeLessThanOrEqual(600)
+    expect(SET_VALIDATED_POP_MS).toBe(400)
+    expect(SET_VALIDATED_POP_MS).toBeLessThanOrEqual(600)
   })
 })

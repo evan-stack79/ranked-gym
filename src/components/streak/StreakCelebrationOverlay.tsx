@@ -37,19 +37,19 @@ export type StreakCelebrationPhase =
   | 'week'
   | 'settled'
 
-/** Timings exacts de la chorégraphie (~1 s). Skippable immediately. */
+/** Timings exacts — ≤600ms (team duration cap). Skippable immediately. */
 export const STREAK_CELEB_PHASE_STEPS: Array<{ at: number; phase: StreakCelebrationPhase }> = [
   { at: 0, phase: 'idle' },
-  { at: 80, phase: 'compress' },
-  { at: 160, phase: 'launch' },
-  { at: 240, phase: 'burst' },
-  { at: 360, phase: 'count' },
-  { at: 480, phase: 'reveal' },
-  { at: 640, phase: 'week' },
-  { at: 820, phase: 'settled' },
+  { at: 40, phase: 'compress' },
+  { at: 80, phase: 'launch' },
+  { at: 120, phase: 'burst' },
+  { at: 200, phase: 'count' },
+  { at: 280, phase: 'reveal' },
+  { at: 380, phase: 'week' },
+  { at: 480, phase: 'settled' },
 ]
 
-export const STREAK_CELEB_TOTAL_MS = 1000
+export const STREAK_CELEB_TOTAL_MS = 560
 /** Skip allowed from the first frame (tap anywhere). */
 export const STREAK_CELEB_SKIP_AFTER_MS = 0
 /** Reduced-motion: settle instantly (0 ms wait). */
@@ -103,7 +103,7 @@ function FlameGlyph({ lit, className = '' }: { lit: boolean; className?: string 
 }
 
 /**
- * Célébration Daily Streak — chorégraphie ~1 s (CSS/SVG, pas de vidéo).
+ * Célébration Daily Streak — chorégraphie ≤560 ms (CSS/SVG, pas de vidéo).
  * Skippable immédiatement (tap anywhere). Reduced-motion → instant.
  * À monter uniquement après une vraie incrémentation N → N+1.
  */
@@ -189,15 +189,15 @@ export const StreakCelebrationOverlay = forwardRef<
 
     schedule(() => {
       setFlash(true)
-      schedule(() => setFlash(false), 120)
-    }, 240)
+      schedule(() => setFlash(false), 100)
+    }, 120)
 
     schedule(() => {
       setShowNewCount(true)
       setDisplayCount(currentStreak)
-    }, 360)
+    }, 200)
 
-    schedule(() => setTodayFlame(true), 640)
+    schedule(() => setTodayFlame(true), 380)
 
     schedule(finish, STREAK_CELEB_TOTAL_MS)
 

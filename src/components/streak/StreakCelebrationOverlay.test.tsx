@@ -518,8 +518,8 @@ describe('StreakCelebrationOverlay — shortened + skippable immediately', () =>
     vi.useRealTimers()
   })
 
-  it('total choreography is ~1s and skip is allowed from frame 0', () => {
-    expect(STREAK_CELEB_TOTAL_MS).toBeLessThanOrEqual(1000)
+  it('total choreography is ≤600ms and skip is allowed from frame 0', () => {
+    expect(STREAK_CELEB_TOTAL_MS).toBeLessThanOrEqual(600)
     expect(STREAK_CELEB_SKIP_AFTER_MS).toBe(0)
   })
 
