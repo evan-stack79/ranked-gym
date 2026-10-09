@@ -92,7 +92,10 @@ async function capture() {
       await page.locator('[data-new-session-sheet] button').filter({ hasText: 'Musculation' }).click({ force: true })
       // Free session opens the real first-exercise picker (same path as ▶)
       await page.getByText('Quel est ton premier exercice').waitFor({ timeout: 15_000 })
-      await page.waitForTimeout(300)
+      // Prove last result clears the sticky create CTA
+      const lastRow = page.locator('[data-testid="exercise-picker-list"] [data-exercise-id]').last()
+      await lastRow.scrollIntoViewIfNeeded()
+      await page.waitForTimeout(250)
       await shot(page, 'train-start-card-tapped.png')
       await context.close()
     }
@@ -172,9 +175,12 @@ async function capture() {
       await page.waitForTimeout(700)
       await page.locator('[data-new-session-sheet] button').filter({ hasText: 'Musculation' }).click({ force: true })
       await page.getByText('Quel est ton premier exercice').waitFor({ timeout: 15_000 })
-      await page.waitForTimeout(1000)
-      // Pick first exercise so the immersive session screen is visible
-      await page.getByRole('button', { name: /Développé couché/i }).first().click({ force: true })
+      await page.waitForTimeout(700)
+      // Scroll last result fully above the sticky create button
+      const lastEx = page.locator('[data-testid="exercise-picker-list"] [data-exercise-id]').last()
+      await lastEx.scrollIntoViewIfNeeded()
+      await page.waitForTimeout(900)
+      await page.locator('[data-exercise-id="bench_press"]').click({ force: true })
       await page.waitForTimeout(1200)
 
       // 2) Goal picker 1–5

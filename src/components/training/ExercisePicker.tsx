@@ -158,9 +158,9 @@ export function ExercisePicker({
             className="absolute inset-0 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
             data-list-pad-bottom="create-btn+safe"
             style={{
-              // Sticky create button (min-h-11) + count row + gaps + safe area (+ keyboard)
+              // Sticky footer: gradient pad + min-h-11 CTA + count + safe area (+ keyboard)
               paddingBottom:
-                'calc(4.75rem + max(0.75rem, env(safe-area-inset-bottom, 0px)) + env(keyboard-inset-height, 0px))',
+                'calc(7.5rem + max(0.75rem, env(safe-area-inset-bottom, 0px)) + env(keyboard-inset-height, 0px))',
             }}
           >
             {results.map((ex, index) => (

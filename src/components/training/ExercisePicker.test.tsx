@@ -185,7 +185,7 @@ describe('ExercisePicker', () => {
     expect(host.querySelector('[data-testid="exercise-picker-create"]')).toBeTruthy()
     expect(list?.getAttribute('data-list-pad-bottom')).toBe('create-btn+safe')
     const pb = list?.style.paddingBottom ?? ''
-    expect(pb).toMatch(/4\.75rem/)
+    expect(pb).toMatch(/7\.5rem/)
     expect(pb).toMatch(/safe-area-inset-bottom/)
     await cleanup()
   })
