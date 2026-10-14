@@ -347,7 +347,7 @@ export async function upsertImportedUserWithoutPassword(
       emailNorm,
       displayName: toDisplayName(emailNorm, rawUser.displayName),
       mustResetPassword: true,
-      emailConfirmedAt: now,
+      // B9-01 : import sans confirmation — l’utilisateur passera par le code e-mail.
       createdAt: now,
       updatedAt: now,
     })
@@ -395,7 +395,7 @@ export async function registerUserWithEmail(
     emailNorm,
     displayName,
     mustResetPassword: false,
-    emailConfirmedAt: now,
+    // B9-01 : jamais auto-confirmé à l’inscription — seulement code e-mail ou Google.
     createdAt: now,
     updatedAt: now,
   })

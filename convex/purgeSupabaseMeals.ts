@@ -1,14 +1,18 @@
 /**
  * Purge Supabase nutrition.journal + user_backups.payload côté serveur.
- * Identité Supabase = lien stocké (auth_account_links.supabaseUserId),
- * jamais l’id Convex ni un id envoyé par le téléphone.
- * Service-role côté serveur — pas de session Supabase téléphone requise.
+ * Identité Supabase =
+ *   - lien auth_account_links (compte Convex lié), ou
+ *   - access token Supabase vérifié (compte Supabase-only, pas de lien).
+ * Jamais un userId envoyé par le téléphone.
+ * Service-role côté serveur — jamais VITE_*.
  */
 import { v } from 'convex/values'
 import { api, internal } from './_generated/api'
 import { action } from './_generated/server'
+import { resolveSupabaseAuthUserFromAccessToken } from './accountLinks'
 import {
   StripJournalParseError,
+  collectMealIdsFromJournal,
   parseJournalObject,
   stripMealsFromBackupPayload,
   stripMealsFromJournalJson,
@@ -42,7 +46,9 @@ export function toClientSafePurgeError(error: unknown, secrets: string[] = []): 
   if (
     raw === 'ERASE_MEALS_PURGE_FAILED' ||
     raw === 'ACCOUNT_LINK_MISSING' ||
-    raw === 'ACCOUNT_LINK_UNAUTHORIZED'
+    raw === 'ACCOUNT_LINK_UNAUTHORIZED' ||
+    raw === 'ACCOUNT_LINK_MISMATCH' ||
+    raw === 'SUPABASE_TOKEN_UNRESOLVED'
   ) {
     return new Error(raw)
   }
@@ -186,9 +192,152 @@ async function restUpdate(
   return { ok: true, count }
 }
 
+async function countMealIdsForSupabaseUser(
+  config: { url: string; serviceKey: string },
+  supabaseUserId: string,
+): Promise<{ count: number; mealIds: string[] }> {
+  const nutritionSelect = await restSelectSingle(
+    config,
+    'nutrition',
+    supabaseUserId,
+    'journal,user_id',
+  )
+  if (nutritionSelect.error || typeof nutritionSelect.count !== 'number') {
+    throw new Error('ERASE_MEALS_PURGE_FAILED')
+  }
+  if (nutritionSelect.count === 0) {
+    return { count: 0, mealIds: [] }
+  }
+  const row = nutritionSelect.data as Record<string, unknown>
+  if (row.user_id != null && row.user_id !== supabaseUserId) {
+    throw new Error('ERASE_MEALS_PURGE_FAILED')
+  }
+  try {
+    const mealIds = collectMealIdsFromJournal(row.journal)
+    const count = countMealsInJournal(row.journal)
+    if (typeof count !== 'number' || !Number.isFinite(count) || count < 0) {
+      throw new Error('ERASE_MEALS_PURGE_FAILED')
+    }
+    return { count, mealIds }
+  } catch {
+    throw new Error('ERASE_MEALS_PURGE_FAILED')
+  }
+}
+
+async function purgeMealsForSupabaseUser(
+  config: { url: string; serviceKey: string },
+  supabaseUserId: string,
+): Promise<{
+  deletedCount: number
+  nutritionStatus: 'purged' | 'absent'
+  userBackupsStatus: 'purged' | 'absent'
+  resolvedUserId: string
+}> {
+  const now = new Date().toISOString()
+  let deletedCount = 0
+
+  const nutritionSelect = await restSelectSingle(
+    config,
+    'nutrition',
+    supabaseUserId,
+    'journal,profile,updated_at,user_id',
+  )
+  if (nutritionSelect.error || typeof nutritionSelect.count !== 'number') {
+    throw new Error('ERASE_MEALS_PURGE_FAILED')
+  }
+
+  let nutritionStatus: 'purged' | 'absent'
+  if (nutritionSelect.count === 0) {
+    if (nutritionSelect.data != null) throw new Error('ERASE_MEALS_PURGE_FAILED')
+    nutritionStatus = 'absent'
+  } else {
+    const row = nutritionSelect.data as Record<string, unknown>
+    if (row.user_id != null && row.user_id !== supabaseUserId) {
+      throw new Error('ERASE_MEALS_PURGE_FAILED')
+    }
+    try {
+      deletedCount += countMealsInJournal(row.journal)
+      const nextJournal = stripMealsFromJournalJson(row.journal)
+      const updated = await restUpdate(config, 'nutrition', supabaseUserId, {
+        journal: nextJournal,
+        updated_at: now,
+      })
+      if (!updated.ok) throw new Error('ERASE_MEALS_PURGE_FAILED')
+    } catch {
+      throw new Error('ERASE_MEALS_PURGE_FAILED')
+    }
+    nutritionStatus = 'purged'
+  }
+
+  const backupSelect = await restSelectSingle(
+    config,
+    'user_backups',
+    supabaseUserId,
+    'payload,updated_at,user_id',
+  )
+  if (backupSelect.error || typeof backupSelect.count !== 'number') {
+    throw new Error('ERASE_MEALS_PURGE_FAILED')
+  }
+
+  let userBackupsStatus: 'purged' | 'absent'
+  if (backupSelect.count === 0) {
+    if (backupSelect.data != null) throw new Error('ERASE_MEALS_PURGE_FAILED')
+    userBackupsStatus = 'absent'
+  } else {
+    const row = backupSelect.data as Record<string, unknown>
+    if (row.user_id != null && row.user_id !== supabaseUserId) {
+      throw new Error('ERASE_MEALS_PURGE_FAILED')
+    }
+    try {
+      deletedCount += countMealsInBackupPayload(row.payload)
+      const nextPayload = stripMealsFromBackupPayload(row.payload)
+      const updated = await restUpdate(config, 'user_backups', supabaseUserId, {
+        payload: nextPayload,
+        updated_at: now,
+      })
+      if (!updated.ok) throw new Error('ERASE_MEALS_PURGE_FAILED')
+    } catch {
+      throw new Error('ERASE_MEALS_PURGE_FAILED')
+    }
+    userBackupsStatus = 'purged'
+  }
+
+  if (typeof deletedCount !== 'number' || !Number.isFinite(deletedCount)) {
+    throw new Error('ERASE_MEALS_PURGE_FAILED')
+  }
+
+  return {
+    deletedCount,
+    nutritionStatus,
+    userBackupsStatus,
+    resolvedUserId: supabaseUserId,
+  }
+}
+
+async function resolveLinkedSupabaseUserId(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ctx: { runQuery: (...args: any[]) => Promise<any> },
+  sessionToken: string,
+): Promise<string> {
+  const session: { userId: string } | null = await ctx.runQuery(api.auth.getSession, {
+    sessionToken,
+  })
+  if (!session?.userId) throw new Error('ERASE_MEALS_PURGE_FAILED')
+
+  const link: {
+    ownerUserId: string
+    supabaseUserId: string
+    linkedAt: number
+  } | null = await ctx.runQuery(internal.accountLinks.getLinkByOwner, {
+    ownerUserId: session.userId,
+  })
+  if (!link?.supabaseUserId) throw new Error('ACCOUNT_LINK_MISSING')
+  return link.supabaseUserId
+}
+
 /**
  * Compte les repas restants dans Supabase (journal) via le lien + service-role.
- * Toujours interrogé même si Convex a 0 repas (B8-03).
+ * Retourne aussi les mealIds pour dédup avec Convex (B9-03).
  */
 export const countSupabaseMealCopies = action({
   args: {
@@ -196,53 +345,51 @@ export const countSupabaseMealCopies = action({
   },
   returns: v.object({
     count: v.number(),
+    mealIds: v.array(v.string()),
     resolvedUserId: v.string(),
   }),
   handler: async (
     ctx,
     args,
-  ): Promise<{ count: number; resolvedUserId: string }> => {
-    const session: { userId: string } | null = await ctx.runQuery(api.auth.getSession, {
-      sessionToken: args.sessionToken,
-    })
-    if (!session?.userId) throw new Error('ERASE_MEALS_PURGE_FAILED')
-
-    const link: {
-      ownerUserId: string
-      supabaseUserId: string
-      linkedAt: number
-    } | null = await ctx.runQuery(internal.accountLinks.getLinkByOwner, {
-      ownerUserId: session.userId,
-    })
-    if (!link?.supabaseUserId) throw new Error('ACCOUNT_LINK_MISSING')
-
+  ): Promise<{ count: number; mealIds: string[]; resolvedUserId: string }> => {
+    const supabaseUserId = await resolveLinkedSupabaseUserId(ctx, args.sessionToken)
     const config = readSupabaseAdminConfig()
     if (!config) throw new Error('ERASE_MEALS_PURGE_FAILED')
+    const result = await countMealIdsForSupabaseUser(config, supabaseUserId)
+    return {
+      count: result.count,
+      mealIds: result.mealIds,
+      resolvedUserId: supabaseUserId,
+    }
+  },
+})
 
-    const nutritionSelect = await restSelectSingle(
-      config,
-      'nutrition',
-      link.supabaseUserId,
-      'journal,user_id',
-    )
-    if (nutritionSelect.error || typeof nutritionSelect.count !== 'number') {
-      throw new Error('ERASE_MEALS_PURGE_FAILED')
-    }
-    if (nutritionSelect.count === 0) {
-      return { count: 0, resolvedUserId: link.supabaseUserId }
-    }
-    const row = nutritionSelect.data as Record<string, unknown>
-    if (row.user_id != null && row.user_id !== link.supabaseUserId) {
-      throw new Error('ERASE_MEALS_PURGE_FAILED')
-    }
-    try {
-      const count = countMealsInJournal(row.journal)
-      if (typeof count !== 'number' || !Number.isFinite(count) || count < 0) {
-        throw new Error('ERASE_MEALS_PURGE_FAILED')
-      }
-      return { count, resolvedUserId: link.supabaseUserId }
-    } catch {
-      throw new Error('ERASE_MEALS_PURGE_FAILED')
+/**
+ * Compte via access token Supabase (compte Supabase-only, pas de lien).
+ * Identité = Auth getUser(token) — jamais un userId client.
+ */
+export const countSupabaseMealCopiesByAccessToken = action({
+  args: {
+    supabaseAccessToken: v.string(),
+  },
+  returns: v.object({
+    count: v.number(),
+    mealIds: v.array(v.string()),
+    resolvedUserId: v.string(),
+  }),
+  handler: async (
+    _ctx,
+    args,
+  ): Promise<{ count: number; mealIds: string[]; resolvedUserId: string }> => {
+    const supabaseUser = await resolveSupabaseAuthUserFromAccessToken(args.supabaseAccessToken)
+    if (!supabaseUser?.id) throw new Error('SUPABASE_TOKEN_UNRESOLVED')
+    const config = readSupabaseAdminConfig()
+    if (!config) throw new Error('ERASE_MEALS_PURGE_FAILED')
+    const result = await countMealIdsForSupabaseUser(config, supabaseUser.id)
+    return {
+      count: result.count,
+      mealIds: result.mealIds,
+      resolvedUserId: supabaseUser.id,
     }
   },
 })
@@ -264,109 +411,39 @@ export const purgeSupabaseMealCopies = action({
     userBackupsStatus: 'purged' | 'absent'
     resolvedUserId: string
   }> => {
-    const session: { userId: string } | null = await ctx.runQuery(api.auth.getSession, {
-      sessionToken: args.sessionToken,
-    })
-    if (!session?.userId) {
-      throw new Error('ERASE_MEALS_PURGE_FAILED')
-    }
-
-    const link: {
-      ownerUserId: string
-      supabaseUserId: string
-      linkedAt: number
-    } | null = await ctx.runQuery(internal.accountLinks.getLinkByOwner, {
-      ownerUserId: session.userId,
-    })
-    if (!link?.supabaseUserId) {
-      throw new Error('ACCOUNT_LINK_MISSING')
-    }
     // B7-03 : toujours l’id Supabase du lien, jamais l’id Convex de session.
-    const supabaseUserId: string = link.supabaseUserId
-
+    const supabaseUserId = await resolveLinkedSupabaseUserId(ctx, args.sessionToken)
     const config = readSupabaseAdminConfig()
-    if (!config) {
-      throw new Error('ERASE_MEALS_PURGE_FAILED')
-    }
+    if (!config) throw new Error('ERASE_MEALS_PURGE_FAILED')
+    return purgeMealsForSupabaseUser(config, supabaseUserId)
+  },
+})
 
-    const now = new Date().toISOString()
-    let deletedCount = 0
-
-    const nutritionSelect = await restSelectSingle(
-      config,
-      'nutrition',
-      supabaseUserId,
-      'journal,profile,updated_at,user_id',
-    )
-    if (nutritionSelect.error || typeof nutritionSelect.count !== 'number') {
-      throw new Error('ERASE_MEALS_PURGE_FAILED')
-    }
-
-    let nutritionStatus: 'purged' | 'absent'
-    if (nutritionSelect.count === 0) {
-      if (nutritionSelect.data != null) throw new Error('ERASE_MEALS_PURGE_FAILED')
-      nutritionStatus = 'absent'
-    } else {
-      const row = nutritionSelect.data as Record<string, unknown>
-      if (row.user_id != null && row.user_id !== supabaseUserId) {
-        throw new Error('ERASE_MEALS_PURGE_FAILED')
-      }
-      try {
-        deletedCount += countMealsInJournal(row.journal)
-        const nextJournal = stripMealsFromJournalJson(row.journal)
-        const updated = await restUpdate(config, 'nutrition', supabaseUserId, {
-          journal: nextJournal,
-          updated_at: now,
-        })
-        if (!updated.ok) throw new Error('ERASE_MEALS_PURGE_FAILED')
-      } catch {
-        throw new Error('ERASE_MEALS_PURGE_FAILED')
-      }
-      nutritionStatus = 'purged'
-    }
-
-    const backupSelect = await restSelectSingle(
-      config,
-      'user_backups',
-      supabaseUserId,
-      'payload,updated_at,user_id',
-    )
-    if (backupSelect.error || typeof backupSelect.count !== 'number') {
-      throw new Error('ERASE_MEALS_PURGE_FAILED')
-    }
-
-    let userBackupsStatus: 'purged' | 'absent'
-    if (backupSelect.count === 0) {
-      if (backupSelect.data != null) throw new Error('ERASE_MEALS_PURGE_FAILED')
-      userBackupsStatus = 'absent'
-    } else {
-      const row = backupSelect.data as Record<string, unknown>
-      if (row.user_id != null && row.user_id !== supabaseUserId) {
-        throw new Error('ERASE_MEALS_PURGE_FAILED')
-      }
-      try {
-        deletedCount += countMealsInBackupPayload(row.payload)
-        const nextPayload = stripMealsFromBackupPayload(row.payload)
-        const updated = await restUpdate(config, 'user_backups', supabaseUserId, {
-          payload: nextPayload,
-          updated_at: now,
-        })
-        if (!updated.ok) throw new Error('ERASE_MEALS_PURGE_FAILED')
-      } catch {
-        throw new Error('ERASE_MEALS_PURGE_FAILED')
-      }
-      userBackupsStatus = 'purged'
-    }
-
-    if (typeof deletedCount !== 'number' || !Number.isFinite(deletedCount)) {
-      throw new Error('ERASE_MEALS_PURGE_FAILED')
-    }
-
-    return {
-      deletedCount,
-      nutritionStatus,
-      userBackupsStatus,
-      resolvedUserId: supabaseUserId,
-    }
+/**
+ * Supabase-only : purge après vérification du access token.
+ * Efface UNIQUEMENT le compte du token — jamais un autre.
+ */
+export const purgeSupabaseMealCopiesByAccessToken = action({
+  args: {
+    supabaseAccessToken: v.string(),
+  },
+  returns: v.object({
+    deletedCount: v.number(),
+    nutritionStatus: v.union(v.literal('purged'), v.literal('absent')),
+    userBackupsStatus: v.union(v.literal('purged'), v.literal('absent')),
+    resolvedUserId: v.string(),
+  }),
+  handler: async (_ctx, args): Promise<{
+    deletedCount: number
+    nutritionStatus: 'purged' | 'absent'
+    userBackupsStatus: 'purged' | 'absent'
+    resolvedUserId: string
+  }> => {
+    const supabaseUser = await resolveSupabaseAuthUserFromAccessToken(args.supabaseAccessToken)
+    if (!supabaseUser?.id) throw new Error('SUPABASE_TOKEN_UNRESOLVED')
+    const config = readSupabaseAdminConfig()
+    if (!config) throw new Error('ERASE_MEALS_PURGE_FAILED')
+    // Identity bound to verified token only — never accept a userId argument.
+    return purgeMealsForSupabaseUser(config, supabaseUser.id)
   },
 })

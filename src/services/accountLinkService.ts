@@ -18,6 +18,9 @@ export const ERASE_MEALS_RECONNECT_LEGACY_MESSAGE =
 export const ERASE_MEALS_LINK_REFUSED_MESSAGE =
   'Impossible de relier ton ancien compte. Contacte-nous.'
 
+export const ERASE_MEALS_EMAIL_CODE_REQUIRED_MESSAGE =
+  'Confirme ton e-mail avec le code reçu, puis relie ton compte.'
+
 export class EraseMealsNeedsLegacyReconnectError extends Error {
   constructor() {
     super(ERASE_MEALS_RECONNECT_LEGACY_MESSAGE)
@@ -29,6 +32,13 @@ export class EraseMealsLinkRefusedError extends Error {
   constructor() {
     super(ERASE_MEALS_LINK_REFUSED_MESSAGE)
     this.name = 'EraseMealsLinkRefusedError'
+  }
+}
+
+export class EraseMealsEmailCodeRequiredError extends Error {
+  constructor() {
+    super(ERASE_MEALS_EMAIL_CODE_REQUIRED_MESSAGE)
+    this.name = 'EraseMealsEmailCodeRequiredError'
   }
 }
 
@@ -75,6 +85,7 @@ export async function fetchMyAccountLink(): Promise<AccountLinkInfo | null> {
 /**
  * Crée le lien en envoyant seulement l’access token Supabase.
  * Le serveur résout id + emails et refuse mismatch / non confirmé.
+ * Convex emailConfirmedAt doit déjà être posé (code e-mail ou Google) — B9-01/B9-02.
  */
 export async function linkLegacySupabaseAccountWithAccessToken(
   supabaseAccessToken: string,
@@ -105,12 +116,19 @@ export async function linkLegacySupabaseAccountWithAccessToken(
   } catch (error) {
     if (error instanceof EraseMealsPurgeError) throw error
     if (error instanceof EraseMealsLinkRefusedError) throw error
+    if (error instanceof EraseMealsEmailCodeRequiredError) throw error
     const message = error instanceof Error ? error.message : ''
-    if (
-      message.includes('ACCOUNT_LINK_EMAIL_MISMATCH') ||
-      message.includes('ACCOUNT_LINK_EMAIL_UNCONFIRMED')
-    ) {
-      safeWarn('[account-link] link refused (email)', message)
+    if (message.includes('ACCOUNT_LINK_EMAIL_UNCONFIRMED')) {
+      // B9-02 : legacy / signup sans code → demander le code une fois.
+      safeWarn('[account-link] email unconfirmed — code required', message)
+      throw new EraseMealsEmailCodeRequiredError()
+    }
+    if (message.includes('ACCOUNT_LINK_EMAIL_MISMATCH')) {
+      safeWarn('[account-link] link refused (email mismatch)', message)
+      throw new EraseMealsLinkRefusedError()
+    }
+    if (message.includes('EMAIL_PROVIDER_NOT_CONFIGURED')) {
+      safeWarn('[account-link] mailer not configured', message)
       throw new EraseMealsLinkRefusedError()
     }
     if (

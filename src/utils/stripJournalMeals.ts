@@ -61,6 +61,29 @@ export function countMealsInJournalJson(journalJson: unknown): number {
   return count
 }
 
+/** Ids repas (`id` ou `mealId`) pour dédup Convex ↔ Supabase (B9-03). */
+export function collectMealIdsFromJournalJson(journalJson: unknown): string[] {
+  const journal = parseJournalObject(journalJson)
+  const ids: string[] = []
+  for (const day of Object.values(journal)) {
+    if (!day || typeof day !== 'object' || Array.isArray(day)) continue
+    const meals = (day as { meals?: unknown }).meals
+    if (!Array.isArray(meals)) continue
+    for (const meal of meals) {
+      if (!meal || typeof meal !== 'object' || Array.isArray(meal)) continue
+      const row = meal as { id?: unknown; mealId?: unknown }
+      const id =
+        typeof row.id === 'string' && row.id.trim()
+          ? row.id.trim()
+          : typeof row.mealId === 'string' && row.mealId.trim()
+            ? row.mealId.trim()
+            : null
+      if (id) ids.push(id)
+    }
+  }
+  return ids
+}
+
 /** Payload type user_backups / legacy_supabase_backups / CloudBackupPayload. */
 export function stripMealsFromBackupPayload(payload: unknown): {
   payload: unknown

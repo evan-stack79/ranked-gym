@@ -124,6 +124,15 @@ export async function countActiveMealsViaConvex(): Promise<number> {
   return result.count
 }
 
+/** Ids repas actifs Convex — pour dédup avec Supabase (B9-03). */
+export async function listActiveMealIdsViaConvex(): Promise<string[]> {
+  const sessionToken = await requireToken()
+  const result = (await getConvex().query(api.nutrition.listActiveMealIds, {
+    sessionToken,
+  })) as { mealIds: string[] }
+  return Array.isArray(result?.mealIds) ? result.mealIds : []
+}
+
 export async function deleteAllMyMealsViaConvex(deletedAt = Date.now()): Promise<{
   deletedCount: number
   updatedAt: number
@@ -144,6 +153,15 @@ export async function countSupabaseMealsViaConvex(): Promise<number> {
   return result.count
 }
 
+/** Meal ids Supabase (lien) — pour dédup B9-03. */
+export async function listSupabaseMealIdsViaConvex(): Promise<string[]> {
+  const sessionToken = await requireToken()
+  const result = (await getConvex().action(api.purgeSupabaseMeals.countSupabaseMealCopies, {
+    sessionToken,
+  })) as { mealIds?: string[] }
+  return Array.isArray(result?.mealIds) ? result.mealIds : []
+}
+
 /** Purge Supabase via Convex — session only, userId résolu serveur. */
 export async function purgeSupabaseMealCopiesViaConvex(): Promise<{
   deletedCount: number
@@ -154,6 +172,34 @@ export async function purgeSupabaseMealCopiesViaConvex(): Promise<{
   const sessionToken = await requireToken()
   return getConvex().action(api.purgeSupabaseMeals.purgeSupabaseMealCopies, {
     sessionToken,
+  }) as Promise<{
+    deletedCount: number
+    nutritionStatus: 'purged' | 'absent'
+    userBackupsStatus: 'purged' | 'absent'
+    resolvedUserId: string
+  }>
+}
+
+/** Compte Supabase-only via access token (pas de lien). */
+export async function countSupabaseMealsByAccessTokenViaConvex(
+  supabaseAccessToken: string,
+): Promise<{ count: number; mealIds: string[]; resolvedUserId: string }> {
+  return getConvex().action(api.purgeSupabaseMeals.countSupabaseMealCopiesByAccessToken, {
+    supabaseAccessToken,
+  }) as Promise<{ count: number; mealIds: string[]; resolvedUserId: string }>
+}
+
+/** Purge Supabase-only via access token vérifié serveur — jamais un autre compte. */
+export async function purgeSupabaseMealCopiesByAccessTokenViaConvex(
+  supabaseAccessToken: string,
+): Promise<{
+  deletedCount: number
+  nutritionStatus: 'purged' | 'absent'
+  userBackupsStatus: 'purged' | 'absent'
+  resolvedUserId: string
+}> {
+  return getConvex().action(api.purgeSupabaseMeals.purgeSupabaseMealCopiesByAccessToken, {
+    supabaseAccessToken,
   }) as Promise<{
     deletedCount: number
     nutritionStatus: 'purged' | 'absent'

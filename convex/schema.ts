@@ -54,6 +54,19 @@ export const convexTables = {
     .index('by_ownerUserId', ['ownerUserId'])
     .index('by_supabaseUserId', ['supabaseUserId']),
 
+  /**
+   * Codes e-mail 6 chiffres pour confirmer l’e-mail Convex (liaison compte).
+   * Confirmé uniquement après code correct (ou Google) — jamais à l’inscription/import.
+   */
+  auth_email_verification_codes: defineTable({
+    userId: v.string(),
+    codeHash: v.string(),
+    expiresAt: v.number(),
+    attempts: v.number(),
+    createdAt: v.number(),
+    consumedAt: v.optional(v.number()),
+  }).index('by_userId', ['userId']),
+
   auth_password_credentials: defineTable({
     userId: v.string(),
     passwordHash: v.string(),

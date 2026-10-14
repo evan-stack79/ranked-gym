@@ -15,7 +15,20 @@ import {
   eraseAllUserMeals,
   fetchMealsEraseCardState,
 } from '../../services/eraseUserMeals'
-import { signInLegacySupabaseAndLink } from '../../services/accountLinkService'
+import {
+  EraseMealsEmailCodeRequiredError,
+  ERASE_MEALS_EMAIL_CODE_REQUIRED_MESSAGE,
+  signInLegacySupabaseAndLink,
+} from '../../services/accountLinkService'
+import {
+  EMAIL_PROVIDER_NOT_CONFIGURED_MESSAGE,
+  EmailCodeBlockedError,
+  EmailCodeInvalidError,
+  EmailProviderNotConfiguredError,
+  fetchEmailConfirmationState,
+  requestEmailVerificationCode,
+  verifyEmailVerificationCode,
+} from '../../services/emailVerificationService'
 import { useAuth } from '../../context/AuthContext'
 
 export type EraseCardCountMode =
@@ -47,6 +60,13 @@ interface YourDataMealsErasePanelProps {
   onReconnectPasswordChange?: (value: string) => void
   onReconnectSubmit?: () => void | Promise<void>
   reconnectBusy?: boolean
+  /** B9-01/B9-02 : étape code e-mail avant liaison. */
+  emailCodeStep?: boolean
+  emailCode?: string
+  onEmailCodeChange?: (value: string) => void
+  onRequestEmailCode?: () => void | Promise<void>
+  onVerifyEmailCode?: () => void | Promise<void>
+  emailCodeBusy?: boolean
 }
 
 function countLabel(mode: EraseCardCountMode, serverCount: number): string {
@@ -78,6 +98,12 @@ export function YourDataMealsErasePanel({
   onReconnectPasswordChange,
   onReconnectSubmit,
   reconnectBusy = false,
+  emailCodeStep = false,
+  emailCode = '',
+  onEmailCodeChange,
+  onRequestEmailCode,
+  onVerifyEmailCode,
+  emailCodeBusy = false,
 }: YourDataMealsErasePanelProps) {
   const signedOut = countMode === 'signed_out'
   const needsReconnect = countMode === 'needs_legacy_reconnect'
@@ -158,61 +184,117 @@ export function YourDataMealsErasePanel({
       <IosSheet
         open={reconnectOpen && needsReconnect}
         onClose={() => {
-          if (!reconnectBusy) onReconnectOpenChange?.(false)
+          if (!reconnectBusy && !emailCodeBusy) onReconnectOpenChange?.(false)
         }}
-        dismissible={!reconnectBusy}
-        title="Ancien compte"
-        subtitle="Lier pour effacer"
+        dismissible={!reconnectBusy && !emailCodeBusy}
+        title={emailCodeStep ? 'Confirmer l’e-mail' : 'Ancien compte'}
+        subtitle={emailCodeStep ? 'Code à 6 chiffres' : 'Lier pour effacer'}
         leading={<Trash2 className="mt-0.5 h-5 w-5 text-[#FF453A]" />}
       >
         <div className="space-y-3 pb-2">
-          <p className="text-[13px] leading-relaxed text-[#AEAEB2]">
-            {ERASE_MEALS_RECONNECT_LEGACY_MESSAGE}. Entre l’e-mail et le mot de passe de ton
-            ancien compte.
-          </p>
-          <label className="block space-y-1">
-            <span className="text-[12px] text-[#8E8E93]">E-mail</span>
-            <input
-              data-testid="erase-legacy-reconnect-email"
-              type="email"
-              autoComplete="username"
-              value={reconnectEmail}
-              onChange={(e) => onReconnectEmailChange?.(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-[15px] text-white outline-none"
-            />
-          </label>
-          <label className="block space-y-1">
-            <span className="text-[12px] text-[#8E8E93]">Mot de passe</span>
-            <input
-              data-testid="erase-legacy-reconnect-password"
-              type="password"
-              autoComplete="current-password"
-              value={reconnectPassword}
-              onChange={(e) => onReconnectPasswordChange?.(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-[15px] text-white outline-none"
-            />
-          </label>
-          {error ? (
-            <p className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]">
-              {error}
-            </p>
-          ) : null}
-          <button
-            type="button"
-            data-testid="erase-legacy-reconnect-submit"
-            disabled={reconnectBusy || !reconnectEmail.trim() || !reconnectPassword}
-            onClick={() => void onReconnectSubmit?.()}
-            className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 py-3.5 text-[15px] font-semibold text-white disabled:opacity-50"
-          >
-            {reconnectBusy ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-                Liaison…
-              </>
-            ) : (
-              'Lier mon ancien compte'
-            )}
-          </button>
+          {emailCodeStep ? (
+            <>
+              <p className="text-[13px] leading-relaxed text-[#AEAEB2]">
+                {ERASE_MEALS_EMAIL_CODE_REQUIRED_MESSAGE}
+              </p>
+              <label className="block space-y-1">
+                <span className="text-[12px] text-[#8E8E93]">Code reçu par e-mail</span>
+                <input
+                  data-testid="erase-email-verify-code"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={emailCode}
+                  onChange={(e) => onEmailCodeChange?.(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-[15px] tracking-[0.3em] text-white outline-none"
+                />
+              </label>
+              {error ? (
+                <p
+                  className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]"
+                  data-testid="erase-email-verify-error"
+                >
+                  {error}
+                </p>
+              ) : null}
+              <button
+                type="button"
+                data-testid="erase-email-verify-submit"
+                disabled={emailCodeBusy || emailCode.trim().length !== 6}
+                onClick={() => void onVerifyEmailCode?.()}
+                className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 py-3.5 text-[15px] font-semibold text-white disabled:opacity-50"
+              >
+                {emailCodeBusy ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+                    Vérification…
+                  </>
+                ) : (
+                  'Valider le code'
+                )}
+              </button>
+              <button
+                type="button"
+                data-testid="erase-email-verify-resend"
+                disabled={emailCodeBusy}
+                onClick={() => void onRequestEmailCode?.()}
+                className="ios-press w-full rounded-2xl border border-white/10 bg-black/30 py-3 text-[14px] font-medium text-[#AEAEB2] disabled:opacity-50"
+              >
+                Renvoyer un code
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-[13px] leading-relaxed text-[#AEAEB2]">
+                {ERASE_MEALS_RECONNECT_LEGACY_MESSAGE}. Entre l’e-mail et le mot de passe de ton
+                ancien compte.
+              </p>
+              <label className="block space-y-1">
+                <span className="text-[12px] text-[#8E8E93]">E-mail</span>
+                <input
+                  data-testid="erase-legacy-reconnect-email"
+                  type="email"
+                  autoComplete="username"
+                  value={reconnectEmail}
+                  onChange={(e) => onReconnectEmailChange?.(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-[15px] text-white outline-none"
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-[12px] text-[#8E8E93]">Mot de passe</span>
+                <input
+                  data-testid="erase-legacy-reconnect-password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={reconnectPassword}
+                  onChange={(e) => onReconnectPasswordChange?.(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-[15px] text-white outline-none"
+                />
+              </label>
+              {error ? (
+                <p className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]">
+                  {error}
+                </p>
+              ) : null}
+              <button
+                type="button"
+                data-testid="erase-legacy-reconnect-submit"
+                disabled={reconnectBusy || !reconnectEmail.trim() || !reconnectPassword}
+                onClick={() => void onReconnectSubmit?.()}
+                className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 py-3.5 text-[15px] font-semibold text-white disabled:opacity-50"
+              >
+                {reconnectBusy ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+                    Liaison…
+                  </>
+                ) : (
+                  'Lier mon ancien compte'
+                )}
+              </button>
+            </>
+          )}
         </div>
       </IosSheet>
 
@@ -282,6 +364,13 @@ export function YourDataMealsEraseCard() {
   const [reconnectEmail, setReconnectEmail] = useState('')
   const [reconnectPassword, setReconnectPassword] = useState('')
   const [reconnectBusy, setReconnectBusy] = useState(false)
+  const [emailCodeStep, setEmailCodeStep] = useState(false)
+  const [emailCode, setEmailCode] = useState('')
+  const [emailCodeBusy, setEmailCodeBusy] = useState(false)
+  const [pendingLegacyLink, setPendingLegacyLink] = useState<{
+    email: string
+    password: string
+  } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -362,27 +451,123 @@ export function YourDataMealsEraseCard() {
       onReconnectOpenChange={(open) => {
         setError(null)
         setReconnectOpen(open)
+        if (!open) {
+          setEmailCodeStep(false)
+          setEmailCode('')
+          setPendingLegacyLink(null)
+        }
       }}
       reconnectEmail={reconnectEmail}
       reconnectPassword={reconnectPassword}
       onReconnectEmailChange={setReconnectEmail}
       onReconnectPasswordChange={setReconnectPassword}
       reconnectBusy={reconnectBusy}
+      emailCodeStep={emailCodeStep}
+      emailCode={emailCode}
+      onEmailCodeChange={setEmailCode}
+      emailCodeBusy={emailCodeBusy}
       onNeedsLegacyReconnectTap={() => {
         setConfirmOpen(false)
         setError(null)
+        setEmailCodeStep(false)
         setReconnectOpen(true)
+      }}
+      onRequestEmailCode={async () => {
+        setEmailCodeBusy(true)
+        setError(null)
+        try {
+          const state = await fetchEmailConfirmationState()
+          if (state && !state.mailerConfigured) {
+            setError(EMAIL_PROVIDER_NOT_CONFIGURED_MESSAGE)
+            return
+          }
+          await requestEmailVerificationCode()
+        } catch (err) {
+          if (err instanceof EmailProviderNotConfiguredError) {
+            setError(EMAIL_PROVIDER_NOT_CONFIGURED_MESSAGE)
+          } else if (err instanceof EmailCodeInvalidError) {
+            setError(err.message)
+          } else {
+            setError(EMAIL_PROVIDER_NOT_CONFIGURED_MESSAGE)
+          }
+        } finally {
+          setEmailCodeBusy(false)
+        }
+      }}
+      onVerifyEmailCode={async () => {
+        setEmailCodeBusy(true)
+        setError(null)
+        try {
+          await verifyEmailVerificationCode(emailCode)
+          setEmailCodeStep(false)
+          setEmailCode('')
+          if (pendingLegacyLink) {
+            setReconnectBusy(true)
+            try {
+              await signInLegacySupabaseAndLink(
+                pendingLegacyLink.email,
+                pendingLegacyLink.password,
+              )
+              setPendingLegacyLink(null)
+              setReconnectOpen(false)
+              setReconnectPassword('')
+              await refresh()
+            } finally {
+              setReconnectBusy(false)
+            }
+          }
+        } catch (err) {
+          if (err instanceof EmailCodeBlockedError) {
+            setError(err.message)
+          } else if (err instanceof EmailCodeInvalidError) {
+            setError(err.message)
+          } else if (err instanceof EmailProviderNotConfiguredError) {
+            setError(EMAIL_PROVIDER_NOT_CONFIGURED_MESSAGE)
+          } else if (err instanceof EraseMealsLinkRefusedError) {
+            setError(ERASE_MEALS_LINK_REFUSED_MESSAGE)
+          } else {
+            setError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
+          }
+        } finally {
+          setEmailCodeBusy(false)
+        }
       }}
       onReconnectSubmit={async () => {
         setReconnectBusy(true)
         setError(null)
         try {
+          const state = await fetchEmailConfirmationState()
+          if (state && !state.emailConfirmed) {
+            if (!state.mailerConfigured) {
+              setError(EMAIL_PROVIDER_NOT_CONFIGURED_MESSAGE)
+              return
+            }
+            await requestEmailVerificationCode()
+            setPendingLegacyLink({ email: reconnectEmail, password: reconnectPassword })
+            setEmailCodeStep(true)
+            return
+          }
           await signInLegacySupabaseAndLink(reconnectEmail, reconnectPassword)
           setReconnectOpen(false)
           setReconnectPassword('')
           await refresh()
         } catch (err) {
-          if (err instanceof EraseMealsNeedsLegacyReconnectError) {
+          if (err instanceof EraseMealsEmailCodeRequiredError) {
+            try {
+              await requestEmailVerificationCode()
+              setPendingLegacyLink({ email: reconnectEmail, password: reconnectPassword })
+              setEmailCodeStep(true)
+              setError(null)
+            } catch (mailErr) {
+              if (mailErr instanceof EmailProviderNotConfiguredError) {
+                setError(EMAIL_PROVIDER_NOT_CONFIGURED_MESSAGE)
+              } else {
+                setError(ERASE_MEALS_EMAIL_CODE_REQUIRED_MESSAGE)
+              }
+            }
+          } else if (err instanceof EmailProviderNotConfiguredError) {
+            setError(EMAIL_PROVIDER_NOT_CONFIGURED_MESSAGE)
+          } else if (err instanceof EraseMealsNeedsLegacyReconnectError) {
             setError(ERASE_MEALS_RECONNECT_LEGACY_MESSAGE)
           } else if (err instanceof EraseMealsLinkRefusedError) {
             setError(ERASE_MEALS_LINK_REFUSED_MESSAGE)

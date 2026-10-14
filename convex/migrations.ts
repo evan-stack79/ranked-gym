@@ -167,7 +167,8 @@ function mergeSummaryJson(existing: unknown, incoming: unknown): unknown {
   }
 }
 
-async function upsertAuthUser(
+/** Exported for FakeDb migration tests (B9 — must run against DB, not grep). */
+export async function upsertAuthUser(
   ctx: MutationCtx,
   payload: Record<string, unknown>,
 ): Promise<{ convexId: string; operation: Exclude<ImportOperation, 'skipped'> }> {
@@ -190,21 +191,29 @@ async function upsertAuthUser(
     emailNorm: String(payload.emailNorm ?? String(payload.email ?? '').trim().toLowerCase()),
     displayName: String(payload.displayName ?? 'Athlete'),
     mustResetPassword,
-    // Compte migré depuis Supabase : email déjà confirmé côté source.
-    emailConfirmedAt:
-      typeof existing?.emailConfirmedAt === 'number' && existing.emailConfirmedAt > 0
-        ? existing.emailConfirmedAt
-        : now,
+    // B9-01 : reset / never set confirmed without code verification.
+    emailConfirmedAt: undefined,
     updatedAt: Number(payload.updatedAt ?? now),
   }
   if (existing) {
-    await ctx.db.patch(existing._id, patch)
+    await ctx.db.patch(existing._id, {
+      ...patch,
+      emailConfirmedAt: undefined,
+    })
+    // Efface explicitement un flag posé sans vérification (B9 migration reset).
+    if (existing.emailConfirmedAt != null) {
+      await ctx.db.patch(existing._id, { emailConfirmedAt: undefined })
+    }
     return { convexId: String(existing._id), operation: 'updated' }
   }
   const inserted = await ctx.db.insert('auth_users', {
     userId,
     createdAt: Number(payload.createdAt ?? now),
-    ...patch,
+    email: patch.email,
+    emailNorm: patch.emailNorm,
+    displayName: patch.displayName,
+    mustResetPassword: patch.mustResetPassword,
+    updatedAt: patch.updatedAt,
   })
   return { convexId: String(inserted), operation: 'inserted' }
 }

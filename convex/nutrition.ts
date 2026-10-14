@@ -377,6 +377,24 @@ export const countActiveMeals = query({
   },
 })
 
+/** Ids des repas actifs — pour dédup Convex↔Supabase (B9-03). */
+export const listActiveMealIds = query({
+  args: { sessionToken: v.string() },
+  returns: v.object({ mealIds: v.array(v.string()) }),
+  handler: async (ctx, args) => {
+    const userId = await sessionUserId(ctx, args.sessionToken)
+    const rows = await ctx.db
+      .query('nutrition_meals')
+      .withIndex('by_userId_updatedAt', (q) => q.eq('userId', userId))
+      .collect()
+    const mealIds = rows
+      .filter((row) => row.deletedAt == null)
+      .map((row) => row.mealId)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0)
+    return { mealIds }
+  },
+})
+
 /**
  * Hard-delete tous les repas : remplace chaque ligne par un tombstone
  * (mealId + deletedAt) et vide nutrition_state.journalJson.
