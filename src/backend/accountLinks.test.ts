@@ -228,6 +228,28 @@ describe('runLinkSupabaseAccount — B8-02 emails', () => {
     expect(result.supabaseUserId).toBe('supabase-A')
     expect(ctx.runMutation).toHaveBeenCalled()
   })
+
+  it('B8-02 : comparaison email case-insensitive + trim (Evan@x.fr ==  evan@x.fr )', async () => {
+    const ctx = mockCtx({
+      ownerEmail: 'Evan@x.fr',
+      ownerConfirmed: true,
+      supabaseBody: {
+        id: 'supabase-evan',
+        email: ' evan@x.fr ',
+        email_confirmed_at: '2026-01-01T00:00:00Z',
+      },
+    })
+    const result = await runLinkSupabaseAccount(ctx, {
+      sessionToken: 'sess',
+      supabaseAccessToken: 'good',
+    })
+    expect(result.ok).toBe(true)
+    expect(result.supabaseUserId).toBe('supabase-evan')
+    expect(ctx.runMutation).toHaveBeenCalledWith(
+      expect.anything(),
+      { ownerUserId: 'user-A', supabaseUserId: 'supabase-evan' },
+    )
+  })
 })
 
 describe('runAssertLinkForErase — B8-01', () => {
