@@ -26,7 +26,10 @@ import {
   sanitizeWeightKg,
 } from './nutritionSafetyRules'
 import type { HealthAnswerStatus, Sex } from '../types/nutrition'
-import { clearQueuedConvexNutritionOpsForUser } from './convexNutritionQueue'
+import {
+  clearQueuedConvexNutritionOpsForUser,
+  clearQueuedMealOpsForUser,
+} from './convexNutritionQueue'
 
 const PROFILE_BASE = 'ranked-gym:nutrition-profile'
 const JOURNAL_BASE = 'ranked-gym:nutrition-journal'
@@ -604,6 +607,53 @@ export function removeMealFromDate(dateKey: string, mealId: string): DayJournal 
 
 export function removeMealFromToday(mealId: string): DayJournal {
   return removeMealFromDate(todayKey(), mealId)
+}
+
+/** Nombre de repas locaux (tous les jours) — pas de détails. */
+export function countLocalMeals(): number {
+  const all = getAllJournals()
+  let count = 0
+  for (const day of Object.values(all)) {
+    count += Array.isArray(day.meals) ? day.meals.length : 0
+  }
+  return count
+}
+
+/**
+ * Vide les repas du journal local (garde eau / day-state).
+ * skipCloud évite de refiler des meal-delete dans la queue.
+ */
+export function clearLocalMealsOnly(opts?: StorageSaveOptions): void {
+  const all = getAllJournals()
+  const next: Record<string, DayJournal> = {}
+  for (const [dateKey, day] of Object.entries(all)) {
+    next[dateKey] = {
+      ...day,
+      meals: [],
+    }
+  }
+  writeJson(scopedKey(JOURNAL_BASE), next)
+  if (!opts?.skipCloud && !isConvexDomainActive()) {
+    triggerCloudBackup('journal')
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('ranked-gym:profile-changed'))
+  }
+}
+
+/**
+ * Efface repas locaux + ops repas en file d’attente (rien ne revient au sync).
+ * Appelé après / avec deleteAllMyMeals côté serveur.
+ */
+export function clearLocalMealsAndPendingMealWrites(opts?: { userId?: string | null }): void {
+  const uid = opts?.userId ?? getActiveCloudUserId()
+  clearLocalMealsOnly({ skipCloud: true })
+  if (uid) {
+    clearQueuedMealOpsForUser(uid)
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('ranked-gym:profile-changed'))
+  }
 }
 
 export function updateMealOnDate(

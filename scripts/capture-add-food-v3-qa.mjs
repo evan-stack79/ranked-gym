@@ -76,6 +76,22 @@ async function main() {
     })
     const page = await context.newPage()
 
+    // Capture bouton « Tes données »
+    await page.goto(`http://127.0.0.1:${port}/your-data-meals-fixture`, {
+      waitUntil: 'networkidle',
+      timeout: 60_000,
+    })
+    await page.waitForSelector('[data-testid="erase-old-meals-button"]', { timeout: 10_000 })
+    await page.waitForTimeout(400)
+    await page.screenshot({
+      path: join(outDir, 'tes_donnees_effacer.png'),
+      fullPage: false,
+    })
+    await copyFile(
+      join(outDir, 'tes_donnees_effacer.png'),
+      join(artifactsDir, 'ajouter-aliment-v3-qa-tes-donnees.png'),
+    )
+
     await page.goto(`http://127.0.0.1:${port}/add-food-fixture`, {
       waitUntil: 'networkidle',
       timeout: 60_000,

@@ -361,6 +361,53 @@ export const deleteMeal = mutation({
   },
 })
 
+/** Nombre de repas actifs (non soft-deleted) — autorisé pour comptes bloqués. */
+export const countActiveMeals = query({
+  args: { sessionToken: v.string() },
+  returns: v.object({ count: v.number() }),
+  handler: async (ctx, args) => {
+    const userId = await sessionUserId(ctx, args.sessionToken)
+    const rows = await ctx.db
+      .query('nutrition_meals')
+      .withIndex('by_userId_updatedAt', (q) => q.eq('userId', userId))
+      .collect()
+    const count = rows.filter((row) => row.deletedAt == null).length
+    return { count }
+  },
+})
+
+/**
+ * Efface tous les repas de l’utilisateur (soft-delete).
+ * Autorisé pour mineur / TCA / âge inconnu (droit sur ses données).
+ * Ownership-scoped uniquement — pas de garde food-add.
+ */
+export const deleteAllMyMeals = mutation({
+  args: {
+    sessionToken: v.string(),
+    deletedAt: v.optional(v.number()),
+  },
+  returns: v.object({
+    deletedCount: v.number(),
+    updatedAt: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const userId = await sessionUserId(ctx, args.sessionToken)
+    const deletedAt = args.deletedAt ?? Date.now()
+    const rows = await ctx.db
+      .query('nutrition_meals')
+      .withIndex('by_userId_updatedAt', (q) => q.eq('userId', userId))
+      .collect()
+    let deletedCount = 0
+    for (const row of rows) {
+      assertUserOwnership(row.userId, userId)
+      if (row.deletedAt != null) continue
+      await ctx.db.patch(row._id, { deletedAt, updatedAt: deletedAt })
+      deletedCount += 1
+    }
+    return { deletedCount, updatedAt: deletedAt }
+  },
+})
+
 export const upsertWaterEntry = mutation({
   args: {
     sessionToken: v.string(),

@@ -115,6 +115,25 @@ export async function deleteConvexMeal(mealId: string, dateKey: string, deletedA
   }) as Promise<{ applied: boolean; stale: boolean; updatedAt: number }>
 }
 
+export async function countActiveMealsViaConvex(): Promise<number> {
+  const sessionToken = await requireToken()
+  const result = (await getConvex().query(api.nutrition.countActiveMeals, {
+    sessionToken,
+  })) as { count: number }
+  return result.count
+}
+
+export async function deleteAllMyMealsViaConvex(deletedAt = Date.now()): Promise<{
+  deletedCount: number
+  updatedAt: number
+}> {
+  const sessionToken = await requireToken()
+  return getConvex().mutation(api.nutrition.deleteAllMyMeals, {
+    sessionToken,
+    deletedAt,
+  }) as Promise<{ deletedCount: number; updatedAt: number }>
+}
+
 export async function pushConvexWaterEntry(
   entry: WaterEntry,
   dateKey: string,

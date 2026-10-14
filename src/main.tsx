@@ -14,6 +14,7 @@ import { WaterGoalFixture } from './fixtures/WaterGoalFixture.tsx'
 import { HeightWeightFixture } from './fixtures/HeightWeightFixture.tsx'
 import { InscriptionFixture } from './fixtures/InscriptionFixture.tsx'
 import { AddFoodScreenFixture } from './fixtures/AddFoodScreenFixture.tsx'
+import { YourDataMealsEraseFixture } from './fixtures/YourDataMealsEraseFixture.tsx'
 import { LegalDocumentScreen } from './components/legal/LegalDocumentScreen.tsx'
 import { legalKindFromPath } from './components/legal/legalRoutes.ts'
 import { ConvexClientProvider } from './lib/ConvexClientProvider.tsx'
@@ -46,6 +47,7 @@ function resolveBootTree() {
   if (QA_FIXTURES_ENABLED && path === '/accueil-fixture') return <ColdLaunchAccueilFixture />
   if (QA_FIXTURES_ENABLED && path === '/nutrition-fixture') return <NutritionUxFixture />
   if (QA_FIXTURES_ENABLED && path === '/add-food-fixture') return <AddFoodScreenFixture />
+  if (QA_FIXTURES_ENABLED && path === '/your-data-meals-fixture') return <YourDataMealsEraseFixture />
   if (QA_FIXTURES_ENABLED && path === '/water-goal-fixture') return <WaterGoalFixture />
   if (QA_FIXTURES_ENABLED && path === '/height-weight-fixture') return <HeightWeightFixture />
   if (QA_FIXTURES_ENABLED && path === '/inscription-fixture') return <InscriptionFixture />

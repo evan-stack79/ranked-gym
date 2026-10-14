@@ -189,3 +189,28 @@ export function clearQueuedConvexNutritionOpsForUser(userId: string): void {
     // ignore
   }
 }
+
+/** Retire uniquement les ops repas (upsert/delete) — garde eau / day-state. */
+export function clearQueuedMealOpsForUser(userId: string): void {
+  if (typeof localStorage === 'undefined') return
+  try {
+    const kept = readQueue(userId).filter(
+      (op) => op.kind !== 'meal-upsert' && op.kind !== 'meal-delete',
+    )
+    writeQueue(userId, kept)
+  } catch {
+    // ignore
+  }
+}
+
+/** Compte les ops repas en attente (tests / UI). */
+export function countQueuedMealOpsForUser(userId: string): number {
+  return readQueue(userId).filter(
+    (op) => op.kind === 'meal-upsert' || op.kind === 'meal-delete',
+  ).length
+}
+
+/** Exposé tests : lire la file. */
+export function __testReadNutritionQueue(userId: string): StoredQueueOp[] {
+  return readQueue(userId)
+}

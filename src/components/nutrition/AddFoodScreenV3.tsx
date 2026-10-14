@@ -296,7 +296,15 @@ export function AddFoodScreenV3({
           ) : null}
 
           {!searchLoading && !searchError && searchActive && filteredHits.length === 0 ? (
-            <p className="py-8 text-center text-[13px] text-[#8E8E93]">Aucun produit trouvé.</p>
+            <p
+              className="py-8 text-center text-[13px] text-[#8E8E93]"
+              data-food-empty-state
+              role="status"
+            >
+              {!online || forceOfflineImages
+                ? 'Pas de connexion. Réessaie quand tu as du réseau.'
+                : 'Aucun produit trouvé.'}
+            </p>
           ) : null}
 
           {idleBrowse ? (
