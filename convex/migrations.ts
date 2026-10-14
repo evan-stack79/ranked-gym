@@ -1,5 +1,6 @@
 import { v } from 'convex/values'
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from './_generated/server'
+import { createImmutableAccountLink } from './accountLinks'
 import {
   assertRunSecretStrength,
   hashMigrationSecret,
@@ -840,6 +841,15 @@ export async function importEntityForRun(
     mapConvexId: existingMap?.convexId ?? null,
     prune: args.prune === true,
   })
+
+  // B7-01 : lien Convex ↔ Supabase créé à la migration auth_users (serveur only).
+  if (args.entityType === 'auth_users') {
+    const ownerUserId = String(args.payload.userId ?? '').trim()
+    const supabaseUserId = String(args.supabaseId ?? '').trim()
+    if (ownerUserId && supabaseUserId) {
+      await createImmutableAccountLink(ctx, ownerUserId, supabaseUserId, now)
+    }
+  }
 
   if (existingMap) {
     await ctx.db.patch(existingMap._id, {

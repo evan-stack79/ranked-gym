@@ -6,17 +6,25 @@ import {
   ERASE_MEALS_COUNT_UNKNOWN_MESSAGE,
   ERASE_MEALS_NONE_MESSAGE,
   ERASE_MEALS_PURGE_FAILED_MESSAGE,
+  ERASE_MEALS_RECONNECT_LEGACY_MESSAGE,
   EraseMealsNeedsConnectionError,
+  EraseMealsNeedsLegacyReconnectError,
   EraseMealsPurgeError,
   eraseAllUserMeals,
   fetchMealsEraseCardState,
 } from '../../services/eraseUserMeals'
+import { signInLegacySupabaseAndLink } from '../../services/accountLinkService'
 import { useAuth } from '../../context/AuthContext'
 
-export type EraseCardCountMode = 'ready' | 'none' | 'unknown' | 'signed_out'
+export type EraseCardCountMode =
+  | 'ready'
+  | 'none'
+  | 'unknown'
+  | 'signed_out'
+  | 'needs_legacy_reconnect'
 
 interface YourDataMealsErasePanelProps {
-  /** Count serveur (ignoré si mode signed_out / unknown / none). */
+  /** Count serveur (ignoré si mode signed_out / unknown / none / reconnect). */
   serverCount: number
   pendingCount?: number
   countMode: EraseCardCountMode
@@ -26,12 +34,22 @@ interface YourDataMealsErasePanelProps {
   confirmOpen: boolean
   onConfirmOpenChange: (open: boolean) => void
   onSignedOutTap?: () => void
-  /** true quand erase est bloqué (unknown / none / signed_out). */
+  onNeedsLegacyReconnectTap?: () => void
+  /** true quand erase est bloqué (unknown / none / signed_out / reconnect). */
   eraseDisabled?: boolean
+  reconnectOpen?: boolean
+  onReconnectOpenChange?: (open: boolean) => void
+  reconnectEmail?: string
+  reconnectPassword?: string
+  onReconnectEmailChange?: (value: string) => void
+  onReconnectPasswordChange?: (value: string) => void
+  onReconnectSubmit?: () => void | Promise<void>
+  reconnectBusy?: boolean
 }
 
 function countLabel(mode: EraseCardCountMode, serverCount: number): string {
   if (mode === 'signed_out') return 'Connexion requise'
+  if (mode === 'needs_legacy_reconnect') return ERASE_MEALS_RECONNECT_LEGACY_MESSAGE
   if (mode === 'unknown') return ERASE_MEALS_COUNT_UNKNOWN_MESSAGE
   if (mode === 'none') return ERASE_MEALS_NONE_MESSAGE
   return `${serverCount} repas gardé${serverCount > 1 ? 's' : ''}`
@@ -48,10 +66,25 @@ export function YourDataMealsErasePanel({
   confirmOpen,
   onConfirmOpenChange,
   onSignedOutTap,
+  onNeedsLegacyReconnectTap,
   eraseDisabled = false,
+  reconnectOpen = false,
+  onReconnectOpenChange,
+  reconnectEmail = '',
+  reconnectPassword = '',
+  onReconnectEmailChange,
+  onReconnectPasswordChange,
+  onReconnectSubmit,
+  reconnectBusy = false,
 }: YourDataMealsErasePanelProps) {
   const signedOut = countMode === 'signed_out'
-  const disabled = eraseDisabled || signedOut || countMode === 'unknown' || countMode === 'none'
+  const needsReconnect = countMode === 'needs_legacy_reconnect'
+  const disabled =
+    eraseDisabled ||
+    signedOut ||
+    needsReconnect ||
+    countMode === 'unknown' ||
+    countMode === 'none'
 
   return (
     <div className="space-y-2" data-testid="your-data-meals-section">
@@ -62,10 +95,14 @@ export function YourDataMealsErasePanel({
         <button
           type="button"
           data-testid="erase-old-meals-button"
-          disabled={disabled && !signedOut}
+          disabled={disabled && !signedOut && !needsReconnect}
           onClick={() => {
             if (signedOut) {
               onSignedOutTap?.()
+              return
+            }
+            if (needsReconnect) {
+              onNeedsLegacyReconnectTap?.()
               return
             }
             if (disabled) return
@@ -107,17 +144,78 @@ export function YourDataMealsErasePanel({
         </p>
       ) : null}
 
-      {!signedOut && countMode === 'unknown' ? (
+      {needsReconnect && error ? (
         <p
-          className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-[13px] text-[#AEAEB2]"
-          data-testid="erase-old-meals-unknown"
+          className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]"
+          data-testid="erase-old-meals-reconnect-error"
         >
-          {ERASE_MEALS_COUNT_UNKNOWN_MESSAGE}
+          {error}
         </p>
       ) : null}
 
       <IosSheet
-        open={confirmOpen && !signedOut && !disabled}
+        open={reconnectOpen && needsReconnect}
+        onClose={() => {
+          if (!reconnectBusy) onReconnectOpenChange?.(false)
+        }}
+        dismissible={!reconnectBusy}
+        title="Ancien compte"
+        subtitle="Lier pour effacer"
+        leading={<Trash2 className="mt-0.5 h-5 w-5 text-[#FF453A]" />}
+      >
+        <div className="space-y-3 pb-2">
+          <p className="text-[13px] leading-relaxed text-[#AEAEB2]">
+            {ERASE_MEALS_RECONNECT_LEGACY_MESSAGE}. Entre l’e-mail et le mot de passe de ton
+            ancien compte.
+          </p>
+          <label className="block space-y-1">
+            <span className="text-[12px] text-[#8E8E93]">E-mail</span>
+            <input
+              data-testid="erase-legacy-reconnect-email"
+              type="email"
+              autoComplete="username"
+              value={reconnectEmail}
+              onChange={(e) => onReconnectEmailChange?.(e.target.value)}
+              className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-[15px] text-white outline-none"
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-[12px] text-[#8E8E93]">Mot de passe</span>
+            <input
+              data-testid="erase-legacy-reconnect-password"
+              type="password"
+              autoComplete="current-password"
+              value={reconnectPassword}
+              onChange={(e) => onReconnectPasswordChange?.(e.target.value)}
+              className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-[15px] text-white outline-none"
+            />
+          </label>
+          {error ? (
+            <p className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]">
+              {error}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            data-testid="erase-legacy-reconnect-submit"
+            disabled={reconnectBusy || !reconnectEmail.trim() || !reconnectPassword}
+            onClick={() => void onReconnectSubmit?.()}
+            className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 py-3.5 text-[15px] font-semibold text-white disabled:opacity-50"
+          >
+            {reconnectBusy ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+                Liaison…
+              </>
+            ) : (
+              'Lier mon ancien compte'
+            )}
+          </button>
+        </div>
+      </IosSheet>
+
+      <IosSheet
+        open={confirmOpen && !signedOut && !needsReconnect && !disabled}
         onClose={() => {
           if (!busy) onConfirmOpenChange(false)
         }}
@@ -178,6 +276,10 @@ export function YourDataMealsEraseCard() {
   const [countMode, setCountMode] = useState<EraseCardCountMode>('signed_out')
   const [loading, setLoading] = useState(true)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [reconnectOpen, setReconnectOpen] = useState(false)
+  const [reconnectEmail, setReconnectEmail] = useState('')
+  const [reconnectPassword, setReconnectPassword] = useState('')
+  const [reconnectBusy, setReconnectBusy] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -202,6 +304,9 @@ export function YourDataMealsEraseCard() {
       } else if (state.serverCount === 0 && state.pendingCount === 0) {
         setCountMode('none')
         setServerCount(0)
+      } else if (state.needsLegacyReconnect) {
+        setCountMode('needs_legacy_reconnect')
+        setServerCount(state.serverCount)
       } else {
         setCountMode('ready')
         setServerCount(state.serverCount)
@@ -235,7 +340,10 @@ export function YourDataMealsEraseCard() {
   }
 
   const eraseDisabled =
-    countMode === 'unknown' || countMode === 'none' || countMode === 'signed_out'
+    countMode === 'unknown' ||
+    countMode === 'none' ||
+    countMode === 'signed_out' ||
+    countMode === 'needs_legacy_reconnect'
 
   return (
     <YourDataMealsErasePanel
@@ -247,6 +355,41 @@ export function YourDataMealsEraseCard() {
       onConfirmOpenChange={(open) => {
         setError(null)
         setConfirmOpen(open)
+      }}
+      reconnectOpen={reconnectOpen}
+      onReconnectOpenChange={(open) => {
+        setError(null)
+        setReconnectOpen(open)
+      }}
+      reconnectEmail={reconnectEmail}
+      reconnectPassword={reconnectPassword}
+      onReconnectEmailChange={setReconnectEmail}
+      onReconnectPasswordChange={setReconnectPassword}
+      reconnectBusy={reconnectBusy}
+      onNeedsLegacyReconnectTap={() => {
+        setConfirmOpen(false)
+        setError(null)
+        setReconnectOpen(true)
+      }}
+      onReconnectSubmit={async () => {
+        setReconnectBusy(true)
+        setError(null)
+        try {
+          await signInLegacySupabaseAndLink(reconnectEmail, reconnectPassword)
+          setReconnectOpen(false)
+          setReconnectPassword('')
+          await refresh()
+        } catch (err) {
+          if (err instanceof EraseMealsNeedsLegacyReconnectError) {
+            setError(ERASE_MEALS_RECONNECT_LEGACY_MESSAGE)
+          } else if (err instanceof EraseMealsPurgeError) {
+            setError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
+          } else {
+            setError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
+          }
+        } finally {
+          setReconnectBusy(false)
+        }
       }}
       onSignedOutTap={() => {
         setConfirmOpen(false)
@@ -267,6 +410,10 @@ export function YourDataMealsEraseCard() {
         } catch (err) {
           if (err instanceof EraseMealsNeedsConnectionError) {
             setError(ERASE_MEALS_CONNECT_MESSAGE)
+          } else if (err instanceof EraseMealsNeedsLegacyReconnectError) {
+            setError(ERASE_MEALS_RECONNECT_LEGACY_MESSAGE)
+            setCountMode('needs_legacy_reconnect')
+            setConfirmOpen(false)
           } else if (err instanceof EraseMealsPurgeError) {
             setError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
           } else {

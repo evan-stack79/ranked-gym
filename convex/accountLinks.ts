@@ -1,10 +1,19 @@
 /**
- * Lien ownerUserId (Convex / cloud app) ↔ supabaseUserId.
- * Vérifie l’identité Supabase via access token (Auth API).
+ * Lien ownerUserId (Convex) ↔ supabaseUserId.
+ * Création serveur uniquement : le téléphone n’envoie jamais un user id Supabase,
+ * seulement un access token vérifié via Auth getUser.
+ * Lien immuable une fois créé.
  */
 import { v } from 'convex/values'
-import { api } from './_generated/api'
-import { action, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
+import { api, internal } from './_generated/api'
+import {
+  action,
+  internalMutation,
+  internalQuery,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from './_generated/server'
 import { requireSessionUser } from './lib/auth'
 
 function readEnv(name: string): string | undefined {
@@ -34,26 +43,53 @@ export async function findLinkByOwner(
     .first()
 }
 
-export async function upsertAccountLink(
+export async function findLinkBySupabaseUserId(
+  ctx: QueryCtx | MutationCtx,
+  supabaseUserId: string,
+) {
+  return ctx.db
+    .query('auth_account_links')
+    .withIndex('by_supabaseUserId', (q) => q.eq('supabaseUserId', supabaseUserId))
+    .first()
+}
+
+/**
+ * Crée un lien immuable. Idempotent si même couple.
+ * Refuse si owner déjà lié à un autre Supabase, ou si ce Supabase est déjà lié ailleurs.
+ */
+export async function createImmutableAccountLink(
   ctx: MutationCtx,
   ownerUserId: string,
   supabaseUserId: string,
   now = Date.now(),
-): Promise<void> {
-  const existing = await findLinkByOwner(ctx, ownerUserId)
-  if (existing) {
-    await ctx.db.patch(existing._id, {
-      supabaseUserId,
-      updatedAt: now,
-    })
-    return
+): Promise<{ created: boolean; ownerUserId: string; supabaseUserId: string }> {
+  const owner = ownerUserId.trim()
+  const supabaseId = supabaseUserId.trim()
+  if (!owner || !supabaseId) throw new Error('ACCOUNT_LINK_INVALID')
+
+  const byOwner = await findLinkByOwner(ctx, owner)
+  if (byOwner) {
+    if (byOwner.supabaseUserId === supabaseId) {
+      return { created: false, ownerUserId: owner, supabaseUserId: supabaseId }
+    }
+    throw new Error('ACCOUNT_LINK_IMMUTABLE')
   }
+
+  const bySupabase = await findLinkBySupabaseUserId(ctx, supabaseId)
+  if (bySupabase) {
+    if (bySupabase.ownerUserId === owner) {
+      return { created: false, ownerUserId: owner, supabaseUserId: supabaseId }
+    }
+    throw new Error('ACCOUNT_LINK_ALREADY_TAKEN')
+  }
+
   await ctx.db.insert('auth_account_links', {
-    ownerUserId,
-    supabaseUserId,
+    ownerUserId: owner,
+    supabaseUserId: supabaseId,
     linkedAt: now,
     updatedAt: now,
   })
+  return { created: true, ownerUserId: owner, supabaseUserId: supabaseId }
 }
 
 export async function isAccountLinkValid(
@@ -71,12 +107,14 @@ async function resolveSupabaseUserIdFromAccessToken(
 ): Promise<string | null> {
   const config = readSupabaseConfig()
   if (!config) return null
+  const token = accessToken.trim()
+  if (!token) return null
   let response: Response
   try {
     response = await fetch(`${config.url}/auth/v1/user`, {
       method: 'GET',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${token}`,
         apikey: config.key,
         Accept: 'application/json',
       },
@@ -96,7 +134,8 @@ async function resolveSupabaseUserIdFromAccessToken(
   return typeof id === 'string' && id.length > 0 ? id : null
 }
 
-export const getLinkForOwner = query({
+/** Lecture interne — jamais exposée au téléphone avec un ownerUserId arbitraire. */
+export const getLinkByOwner = internalQuery({
   args: { ownerUserId: v.string() },
   returns: v.union(
     v.object({
@@ -117,77 +156,91 @@ export const getLinkForOwner = query({
   },
 })
 
-export const storeLink = mutation({
+/** Stockage après vérification serveur du token (action) ou migration. */
+export const storeVerifiedLink = internalMutation({
   args: {
-    sessionToken: v.string(),
+    ownerUserId: v.string(),
     supabaseUserId: v.string(),
   },
-  returns: v.object({ ok: v.literal(true) }),
+  returns: v.object({
+    created: v.boolean(),
+    ownerUserId: v.string(),
+    supabaseUserId: v.string(),
+  }),
   handler: async (ctx, args) => {
-    const user = await requireSessionUser(ctx, args.sessionToken)
-    const supabaseUserId = args.supabaseUserId.trim()
-    if (!supabaseUserId) throw new Error('ACCOUNT_LINK_INVALID')
-    await upsertAccountLink(ctx, user.userId, supabaseUserId)
-    return { ok: true as const }
+    return createImmutableAccountLink(ctx, args.ownerUserId, args.supabaseUserId)
   },
 })
 
-/** Lie le compte Convex de session au Supabase du access token. */
+/** L’utilisateur ne lit que son propre lien (session). */
+export const getMyLink = query({
+  args: { sessionToken: v.string() },
+  returns: v.union(
+    v.object({
+      ownerUserId: v.string(),
+      supabaseUserId: v.string(),
+      linkedAt: v.number(),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx, args.sessionToken)
+    const link = await findLinkByOwner(ctx, user.userId)
+    if (!link) return null
+    return {
+      ownerUserId: link.ownerUserId,
+      supabaseUserId: link.supabaseUserId,
+      linkedAt: link.linkedAt,
+    }
+  },
+})
+
+/** Logique action — testable sans wrapper Convex. */
+export async function runLinkSupabaseAccount(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ctx: { runQuery: (...args: any[]) => Promise<any>; runMutation: (...args: any[]) => Promise<any> },
+  args: { sessionToken: string; supabaseAccessToken: string },
+): Promise<{
+  ok: true
+  created: boolean
+  ownerUserId: string
+  supabaseUserId: string
+}> {
+  const session: { userId: string } | null = await ctx.runQuery(api.auth.getSession, {
+    sessionToken: args.sessionToken,
+  })
+  if (!session?.userId) throw new Error('ACCOUNT_LINK_UNAUTHORIZED')
+
+  const supabaseUserId = await resolveSupabaseUserIdFromAccessToken(args.supabaseAccessToken)
+  if (!supabaseUserId) throw new Error('ACCOUNT_LINK_SUPABASE_UNRESOLVED')
+
+  const stored: { created: boolean; ownerUserId: string; supabaseUserId: string } =
+    await ctx.runMutation(internal.accountLinks.storeVerifiedLink, {
+      ownerUserId: session.userId,
+      supabaseUserId,
+    })
+  return {
+    ok: true as const,
+    created: stored.created,
+    ownerUserId: stored.ownerUserId,
+    supabaseUserId: stored.supabaseUserId,
+  }
+}
+
+/**
+ * Lie le compte Convex de session au Supabase du access token.
+ * Le téléphone n’envoie pas de supabaseUserId — le serveur le lit via Auth getUser.
+ */
 export const linkSupabaseAccount = action({
   args: {
     sessionToken: v.string(),
     supabaseAccessToken: v.string(),
   },
   returns: v.object({
-    ok: v.boolean(),
-    ownerUserId: v.string(),
-    supabaseUserId: v.string(),
-  }),
-  handler: async (
-    ctx,
-    args,
-  ): Promise<{ ok: boolean; ownerUserId: string; supabaseUserId: string }> => {
-    const session: { userId: string } | null = await ctx.runQuery(api.auth.getSession, {
-      sessionToken: args.sessionToken,
-    })
-    if (!session?.userId) throw new Error('ACCOUNT_LINK_UNAUTHORIZED')
-    const supabaseUserId = await resolveSupabaseUserIdFromAccessToken(args.supabaseAccessToken)
-    if (!supabaseUserId) throw new Error('ACCOUNT_LINK_SUPABASE_UNRESOLVED')
-    await ctx.runMutation(api.accountLinks.storeLink, {
-      sessionToken: args.sessionToken,
-      supabaseUserId,
-    })
-    return { ok: true, ownerUserId: session.userId, supabaseUserId }
-  },
-})
-
-/**
- * Vérifie le lien avant purge.
- * ownerUserId = identité app ; supabaseAccessToken résolu serveur doit matcher.
- */
-export const assertLinkForErase = action({
-  args: {
-    ownerUserId: v.string(),
-    supabaseAccessToken: v.string(),
-  },
-  returns: v.object({
     ok: v.literal(true),
+    created: v.boolean(),
     ownerUserId: v.string(),
     supabaseUserId: v.string(),
   }),
-  handler: async (
-    ctx,
-    args,
-  ): Promise<{ ok: true; ownerUserId: string; supabaseUserId: string }> => {
-    const ownerUserId = args.ownerUserId.trim()
-    if (!ownerUserId) throw new Error('ACCOUNT_LINK_MISMATCH')
-    const supabaseUserId = await resolveSupabaseUserIdFromAccessToken(args.supabaseAccessToken)
-    if (!supabaseUserId) throw new Error('ACCOUNT_LINK_MISMATCH')
-
-    const link = await ctx.runQuery(api.accountLinks.getLinkForOwner, { ownerUserId })
-    if (!link || link.supabaseUserId !== supabaseUserId) {
-      throw new Error('ACCOUNT_LINK_MISMATCH')
-    }
-    return { ok: true as const, ownerUserId, supabaseUserId }
-  },
+  handler: async (ctx, args) => runLinkSupabaseAccount(ctx, args),
 })

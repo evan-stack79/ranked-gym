@@ -7,9 +7,10 @@ import {
   ERASE_MEALS_CONNECT_MESSAGE,
   ERASE_MEALS_COUNT_UNKNOWN_MESSAGE,
   ERASE_MEALS_NONE_MESSAGE,
+  ERASE_MEALS_RECONNECT_LEGACY_MESSAGE,
 } from '../../services/eraseUserMeals'
 
-describe('YourDataMealsErasePanel — B6', () => {
+describe('YourDataMealsErasePanel — B6/B7', () => {
   it('toujours visible ; serveur 0 + pending 0 → Aucun ancien repas, bouton disabled', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -81,7 +82,7 @@ describe('YourDataMealsErasePanel — B6', () => {
     host.remove()
   })
 
-  it('serveur muet → Nombre inconnu, erase bloqué', async () => {
+  it('B7-04 : serveur muet → Nombre inconnu une seule fois, erase bloqué', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const root = createRoot(host)
@@ -100,6 +101,9 @@ describe('YourDataMealsErasePanel — B6', () => {
       )
     })
 
+    const matches = host.textContent?.split(ERASE_MEALS_COUNT_UNKNOWN_MESSAGE) ?? []
+    expect(matches.length - 1).toBe(1)
+    expect(host.querySelector('[data-testid="erase-old-meals-unknown"]')).toBeNull()
     expect(host.querySelector('[data-testid="erase-old-meals-count"]')?.textContent).toBe(
       ERASE_MEALS_COUNT_UNKNOWN_MESSAGE,
     )
@@ -107,6 +111,45 @@ describe('YourDataMealsErasePanel — B6', () => {
       '[data-testid="erase-old-meals-button"]',
     ) as HTMLButtonElement
     expect(button.disabled).toBe(true)
+
+    await act(async () => {
+      root.unmount()
+    })
+    host.remove()
+  })
+
+  it('B7 : sans lien → Connecte-toi à ton ancien compte ; tap ouvre reconnect', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const onReconnect = vi.fn()
+    const onConfirm = vi.fn()
+
+    await act(async () => {
+      root.render(
+        <YourDataMealsErasePanel
+          serverCount={4}
+          countMode="needs_legacy_reconnect"
+          eraseDisabled
+          confirmOpen={false}
+          onConfirmOpenChange={onConfirm}
+          onNeedsLegacyReconnectTap={onReconnect}
+          onRequestErase={vi.fn()}
+        />,
+      )
+    })
+
+    expect(host.querySelector('[data-testid="erase-old-meals-count"]')?.textContent).toBe(
+      ERASE_MEALS_RECONNECT_LEGACY_MESSAGE,
+    )
+    const button = host.querySelector(
+      '[data-testid="erase-old-meals-button"]',
+    ) as HTMLButtonElement
+    await act(async () => {
+      button.click()
+    })
+    expect(onReconnect).toHaveBeenCalled()
+    expect(onConfirm).not.toHaveBeenCalled()
 
     await act(async () => {
       root.unmount()

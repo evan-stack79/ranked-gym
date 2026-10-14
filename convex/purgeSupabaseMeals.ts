@@ -1,9 +1,11 @@
 /**
  * Purge Supabase nutrition.journal + user_backups.payload côté serveur.
- * Identité = session Convex — jamais un userId envoyé par le téléphone.
+ * Identité Supabase = lien stocké (auth_account_links.supabaseUserId),
+ * jamais l’id Convex ni un id envoyé par le téléphone.
+ * Service-role côté serveur — pas de session Supabase téléphone requise.
  */
 import { v } from 'convex/values'
-import { api } from './_generated/api'
+import { api, internal } from './_generated/api'
 import { action } from './_generated/server'
 import {
   StripJournalParseError,
@@ -188,7 +190,19 @@ export const purgeSupabaseMealCopies = action({
     if (!session?.userId) {
       throw new Error('ERASE_MEALS_PURGE_FAILED')
     }
-    const userId: string = session.userId
+
+    const link: {
+      ownerUserId: string
+      supabaseUserId: string
+      linkedAt: number
+    } | null = await ctx.runQuery(internal.accountLinks.getLinkByOwner, {
+      ownerUserId: session.userId,
+    })
+    if (!link?.supabaseUserId) {
+      throw new Error('ACCOUNT_LINK_MISSING')
+    }
+    // B7-03 : toujours l’id Supabase du lien, jamais l’id Convex de session.
+    const supabaseUserId: string = link.supabaseUserId
 
     const config = readSupabaseAdminConfig()
     if (!config) {
@@ -201,7 +215,7 @@ export const purgeSupabaseMealCopies = action({
     const nutritionSelect = await restSelectSingle(
       config,
       'nutrition',
-      userId,
+      supabaseUserId,
       'journal,profile,updated_at,user_id',
     )
     if (nutritionSelect.error || typeof nutritionSelect.count !== 'number') {
@@ -214,13 +228,13 @@ export const purgeSupabaseMealCopies = action({
       nutritionStatus = 'absent'
     } else {
       const row = nutritionSelect.data as Record<string, unknown>
-      if (row.user_id != null && row.user_id !== userId) {
+      if (row.user_id != null && row.user_id !== supabaseUserId) {
         throw new Error('ERASE_MEALS_PURGE_FAILED')
       }
       try {
         deletedCount += countMealsInJournal(row.journal)
         const nextJournal = stripMealsFromJournalJson(row.journal)
-        const updated = await restUpdate(config, 'nutrition', userId, {
+        const updated = await restUpdate(config, 'nutrition', supabaseUserId, {
           journal: nextJournal,
           updated_at: now,
         })
@@ -234,7 +248,7 @@ export const purgeSupabaseMealCopies = action({
     const backupSelect = await restSelectSingle(
       config,
       'user_backups',
-      userId,
+      supabaseUserId,
       'payload,updated_at,user_id',
     )
     if (backupSelect.error || typeof backupSelect.count !== 'number') {
@@ -247,13 +261,13 @@ export const purgeSupabaseMealCopies = action({
       userBackupsStatus = 'absent'
     } else {
       const row = backupSelect.data as Record<string, unknown>
-      if (row.user_id != null && row.user_id !== userId) {
+      if (row.user_id != null && row.user_id !== supabaseUserId) {
         throw new Error('ERASE_MEALS_PURGE_FAILED')
       }
       try {
         deletedCount += countMealsInBackupPayload(row.payload)
         const nextPayload = stripMealsFromBackupPayload(row.payload)
-        const updated = await restUpdate(config, 'user_backups', userId, {
+        const updated = await restUpdate(config, 'user_backups', supabaseUserId, {
           payload: nextPayload,
           updated_at: now,
         })
@@ -272,7 +286,7 @@ export const purgeSupabaseMealCopies = action({
       deletedCount,
       nutritionStatus,
       userBackupsStatus,
-      resolvedUserId: userId,
+      resolvedUserId: supabaseUserId,
     }
   },
 })
