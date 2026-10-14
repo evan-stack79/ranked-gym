@@ -167,6 +167,11 @@ export const convexTables = {
     grams: v.optional(v.number()),
     pieces: v.optional(v.number()),
     portionMode: v.optional(v.union(v.literal('solo'), v.literal('with_sides'))),
+    /** Snapshot v3 — portion / OFF / image Ranked Gym. */
+    portionLabel: v.optional(v.string()),
+    offCode: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    imageStorageId: v.optional(v.id('_storage')),
     createdAt: v.number(),
     updatedAt: v.number(),
     deletedAt: v.optional(v.number()),
@@ -213,7 +218,12 @@ export const convexTables = {
     proteinPer100g: v.union(v.number(), v.null()),
     carbsPer100g: v.union(v.number(), v.null()),
     fatPer100g: v.union(v.number(), v.null()),
+    /** URL de NOTRE stockage (Convex) — jamais un hotlink OFF. */
     imageUrl: v.optional(v.string()),
+    imageStorageId: v.optional(v.id('_storage')),
+    servingSize: v.optional(v.union(v.string(), v.null())),
+    portionLabel: v.optional(v.string()),
+    categoriesTags: v.optional(v.array(v.string())),
     source: v.union(
       v.literal('open_food_facts'),
       v.literal('manual'),
@@ -233,6 +243,26 @@ export const convexTables = {
     .index('by_userId_lastSelectedAt', ['userId', 'lastSelectedAt'])
     .index('by_userId_favorite', ['userId', 'isFavorite'])
     .index('by_userId_barcode', ['userId', 'barcode']),
+
+  /** Quota recherche aliments OFF — limite journalière par utilisateur. */
+  food_search_usage: defineTable({
+    userId: v.string(),
+    dateKey: v.string(),
+    searchCount: v.number(),
+    updatedAt: v.number(),
+  }).index('by_userId_dateKey', ['userId', 'dateKey']),
+
+  /**
+   * Cache global des images OFF copiées dans Convex storage.
+   * Le client ne hotlink jamais images.openfoodfacts.org.
+   */
+  off_product_images: defineTable({
+    offCode: v.string(),
+    storageId: v.id('_storage'),
+    contentType: v.string(),
+    sourceUrl: v.optional(v.string()),
+    updatedAt: v.number(),
+  }).index('by_offCode', ['offCode']),
 
   sleep_nights: defineTable({
     userId: v.string(),

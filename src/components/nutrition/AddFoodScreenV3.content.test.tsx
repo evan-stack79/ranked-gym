@@ -2,7 +2,7 @@
 import { createRoot } from 'react-dom/client'
 import { act } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { AddFoodScreen } from './AddFoodScreen'
+import { AddFoodScreenV3 as AddFoodScreen } from './AddFoodScreenV3'
 import type { OpenFoodFactsSearchHit } from '../../services/alimentsService'
 
 vi.mock('../../context/AuthContext', () => ({

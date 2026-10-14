@@ -14,7 +14,11 @@ import {
 } from '../../services/nutritionStorage'
 import { getNutritionTarget, hasMealTargets } from '../../services/nutritionActivity'
 import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
+import { isFoodAddV3Enabled } from '../../backend/foodAddV3FeatureFlag'
+import { canAccessFoodAdd } from '../../services/foodAddAccess'
 import { readHealthDeclarations } from '../../services/nutritionSafetyRules'
+import { isConvexDomainActive } from '../../backend/adapter'
+import { addFoodSnapshotViaConvex } from '../../services/convexNutritionService'
 import { M_CAL_2, M_INFO_1 } from '../../content/safetyCopy'
 import { NeedToTalkScreen } from '../settings/NeedToTalkScreen'
 import { SafetyNote } from './SafetyNote'
@@ -28,6 +32,7 @@ import {
 import {
   listPersonalFoods,
   searchOpenFoodFacts,
+  setPersonalFoodFavorite,
   type OpenFoodFactsProduct,
   type OpenFoodFactsSearchHit,
 } from '../../services/alimentsService'
@@ -52,7 +57,8 @@ import {
   MealPhotoAnalyzer,
   type MealPhotoAnalyzerHandle,
 } from './MealPhotoAnalyzer'
-import { AddFoodScreen } from './AddFoodScreen'
+import { AddFoodScreenV3 } from './AddFoodScreenV3'
+import { AddFoodScreenLegacy } from './AddFoodScreenLegacy'
 import { IosSheet } from '../ui/IosSheet'
 import { SectionSkeleton } from '../ui/AppBootScreen'
 import { BlurInText, Reveal } from '../motion'
@@ -269,6 +275,7 @@ export function NutritionDashboard({
   const allowGoalSetup =
     calorieGoalEnabled &&
     !declarations.eatingDisorder &&
+    !declarations.diabetes &&
     !declarations.pregnancy &&
     !declarations.breastfeeding &&
     !nutrition.showCalorieGoal
@@ -315,8 +322,10 @@ export function NutritionDashboard({
     setShowForm(false)
   }
 
+  const foodAddV3 = isFoodAddV3Enabled()
+
   const openAddFood = (type?: MealType) => {
-    if (readHealthDeclarations(profile).eatingDisorder) return
+    if (foodAddV3 && !canAccessFoodAdd(profile)) return
     if (type) {
       setMealType(type)
       setPendingMealType(type)
@@ -327,6 +336,10 @@ export function NutritionDashboard({
   }
 
   const handleValidateFoodSelection = (hits: OpenFoodFactsSearchHit[]) => {
+    if (foodAddV3 && !canAccessFoodAdd(profile)) {
+      showToast('Ajout d’aliment indisponible pour ce compte.', 'error')
+      return
+    }
     const type = pendingMealType ?? mealType
     let journal = getJournalForDate(selectedDateKey)
     for (const hit of hits) {
@@ -337,6 +350,29 @@ export function NutritionDashboard({
         void persistScannedProductSelection(hit, user.id, (message) => {
           showToast(message, 'error')
         })
+        if (foodAddV3 && isConvexDomainActive()) {
+          void addFoodSnapshotViaConvex({
+            mealId: crypto.randomUUID(),
+            dateKey: selectedDateKey,
+            mealType: type,
+            name: snapshot.name,
+            portionLabel: snapshot.portionLabel,
+            offCode: snapshot.offCode,
+            imageUrl: snapshot.imageUrl,
+            imageStorageId: snapshot.imageStorageId as never,
+            calories: snapshot.calories,
+            proteinG: snapshot.proteinG ?? null,
+            carbsG: snapshot.carbsG ?? null,
+            fatG: snapshot.fatG ?? null,
+            grams: snapshot.grams,
+            updatedAt: snapshot.updatedAt,
+          }).catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : String(error)
+            if (message.includes('FOOD_ADD_ACCESS_DENIED')) {
+              showToast('Ajout d’aliment refusé par le serveur.', 'error')
+            }
+          })
+        }
       }
     }
     setMeals(journal.meals)
@@ -758,8 +794,8 @@ export function NutritionDashboard({
         onProduct={handleScannedProduct}
       />
 
-      {showForm && !declarations.eatingDisorder ? (
-        <AddFoodScreen
+      {showForm && foodAddV3 && canAccessFoodAdd(profile) ? (
+        <AddFoodScreenV3
           searchQuery={searchQuery}
           onSearchQueryChange={setSearchQuery}
           searchLoading={searchLoading}
@@ -768,6 +804,82 @@ export function NutritionDashboard({
           category={foodCategory}
           onCategoryChange={setFoodCategory}
           onValidateSelection={handleValidateFoodSelection}
+          onOpenScanner={() => openScanner()}
+          scannerSlot={
+            scannerOpen ? (
+              <BarcodeScanner
+                open={scannerOpen}
+                onClose={() => setScannerOpen(false)}
+                onProduct={handleScannedProduct}
+              />
+            ) : null
+          }
+          onToast={showToast}
+          onPhotoAnalyzed={(result) => {
+            const journal = addMealToDate(selectedDateKey, {
+              name: result.name,
+              mealType: result.mealType,
+              calories: result.calories,
+              proteinG: result.proteinG,
+              carbsG: result.carbsG,
+              fatG: result.fatG,
+            })
+            setMeals(journal.meals)
+            setTick((n) => n + 1)
+            resetForm()
+            setJournalDetailOpen(true)
+          }}
+          name={name}
+          onNameChange={setName}
+          calories={calories}
+          onCaloriesChange={setCalories}
+          proteinG={proteinG}
+          onProteinChange={setProteinG}
+          carbsG={carbsG}
+          onCarbsChange={setCarbsG}
+          fatG={fatG}
+          onFatChange={setFatG}
+          mealType={mealType}
+          onMealTypeChange={setMealType}
+          onSubmitManual={handleAdd}
+          onClose={resetForm}
+        />
+      ) : null}
+
+      {showForm && !foodAddV3 ? (
+        <AddFoodScreenLegacy
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          searchLoading={searchLoading}
+          searchError={searchError}
+          searchHits={searchHits}
+          onSelectHit={(hit) => {
+            handleScannedProduct(hit)
+            setSearchQuery('')
+            setSearchHits([])
+          }}
+          onToggleFavorite={(hit) => {
+            if (!hit.foodKey) return
+            requireAuth(() => {
+              const next = !hit.isFavorite
+              void setPersonalFoodFavorite(hit.foodKey!, next)
+                .then((applied) => {
+                  if (!applied) {
+                    showToast('Impossible de mettre à jour le favori.', 'error')
+                    return
+                  }
+                  setSearchHits((prev) =>
+                    prev.map((item) =>
+                      item.foodKey === hit.foodKey ? { ...item, isFavorite: next } : item,
+                    ),
+                  )
+                  showToast(next ? 'Ajouté aux favoris.' : 'Retiré des favoris.')
+                })
+                .catch(() => {
+                  showToast('Impossible de mettre à jour le favori.', 'error')
+                })
+            })
+          }}
           onOpenScanner={() => openScanner()}
           scannerSlot={
             scannerOpen ? (

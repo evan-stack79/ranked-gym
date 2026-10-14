@@ -22,6 +22,9 @@ describe('foodJournalSnapshot (architect)', () => {
     expect(snapshot.calories).toBe(200)
     expect(snapshot.proteinG).toBe(30)
     expect(snapshot.barcode).toBe('3017620422003')
+    expect(snapshot.offCode).toBe('3017620422003')
+    expect(snapshot.imageUrl).toBe('https://images.openfoodfacts.org/x.jpg')
+    expect(typeof snapshot.updatedAt).toBe('number')
 
     // Même si OFF changeait demain, le snapshot local reste figé.
     const frozen = { ...snapshot }

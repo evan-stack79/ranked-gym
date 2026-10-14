@@ -33,6 +33,9 @@ export type OpenFoodFactsProductCloud = {
   glucides: number | null
   lipides: number | null
   imageUrl?: string
+  imageStorageId?: string
+  servingSize?: string | null
+  categoriesTags?: string[]
   provenance: 'open_food_facts'
   fetchedAt: number
 }
@@ -197,6 +200,53 @@ export async function searchOpenFoodFactsViaConvex(
     term,
     limit,
   }) as Promise<OpenFoodFactsProductCloud[]>
+}
+
+/** Recherche v3 — action Convex dédiée (quota journalier + images hébergées). */
+export async function searchFoodsV3ViaConvex(input: {
+  term: string
+  categoryTag?: string | null
+  limit?: number
+}): Promise<{
+  hits: OpenFoodFactsProductCloud[]
+  searchCount: number
+  dailyLimit: number
+}> {
+  const sessionToken = await requireToken()
+  return getConvex().action(api.foodAdd.searchFoods, {
+    sessionToken,
+    term: input.term,
+    categoryTag: input.categoryTag ?? null,
+    limit: input.limit,
+  }) as Promise<{
+    hits: OpenFoodFactsProductCloud[]
+    searchCount: number
+    dailyLimit: number
+  }>
+}
+
+export async function addFoodSnapshotViaConvex(input: {
+  mealId: string
+  dateKey: string
+  mealType: string
+  name: string
+  portionLabel: string
+  offCode?: string
+  imageUrl?: string
+  imageStorageId?: string
+  calories: number | null
+  proteinG?: number | null
+  carbsG?: number | null
+  fatG?: number | null
+  grams?: number
+  createdAt?: number
+  updatedAt?: number
+}): Promise<{ applied: boolean; stale: boolean; updatedAt: number }> {
+  const sessionToken = await requireToken()
+  return getConvex().mutation(api.foodAdd.addFoodSnapshot, {
+    sessionToken,
+    ...input,
+  }) as Promise<{ applied: boolean; stale: boolean; updatedAt: number }>
 }
 
 export async function upsertConvexFoodSelection(input: {

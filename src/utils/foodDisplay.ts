@@ -28,6 +28,9 @@ export function cleanupFoodName(raw: string): string {
 
   if (isAllCapsWordy(name)) {
     name = softTitleCaseFr(name)
+  } else {
+    // Majuscule initiale seulement (ex. « bananes Cavendish » → « Bananes Cavendish »).
+    name = name.replace(/^\p{Ll}/u, (ch) => ch.toLocaleUpperCase('fr-FR'))
   }
   return name
 }
@@ -58,6 +61,13 @@ export function formatOffServingSize(servingSize: string | null | undefined): st
   let formatted = raw
     .replace(/\bservings\b/gi, 'portions')
     .replace(/\bserving\b/gi, 'portion')
+    .replace(/\bwedges\b/gi, 'pointes')
+    .replace(/\bwedge\b/gi, 'pointe')
+  // Point décimal → virgule (FR) pour les nombres : 0.5 → 0,5
+  formatted = formatted.replace(
+    /(\d+)\.(\d+)/g,
+    (_, a: string, b: string) => `${a},${b}`,
+  )
   // Espace avant unités collées : 30g → 30 g, 250ml → 250 ml
   formatted = formatted.replace(
     /(\d+(?:[.,]\d+)?)\s*(kg|g|mg|l|cl|ml)\b/gi,

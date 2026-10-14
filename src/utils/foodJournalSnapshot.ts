@@ -15,9 +15,14 @@ export interface FoodNutritionSnapshot {
   carbsG?: number
   fatG?: number
   grams?: number
+  /** URL de notre stockage / cache — jamais un hotlink OFF vivant. */
   imageUrl?: string
+  imageStorageId?: string
+  /** Code OFF / code-barres figé. */
+  offCode?: string
   /** Conservé pour historique / debug — le journal n’en dépend pas pour recalculer. */
   barcode?: string
+  updatedAt: number
 }
 
 export interface OffHitLike {
@@ -28,6 +33,7 @@ export interface OffHitLike {
   glucides: number | null
   lipides: number | null
   imageUrl?: string
+  imageStorageId?: string
   servingSize?: string | null
 }
 
@@ -35,10 +41,14 @@ export interface OffHitLike {
  * Construit un snapshot journal à partir d’un hit OFF du jour.
  * Name cleanup n’altère pas la portion. Nutrients figés (scalés si grammes connus).
  */
-export function buildFoodNutritionSnapshot(hit: OffHitLike): FoodNutritionSnapshot {
+export function buildFoodNutritionSnapshot(
+  hit: OffHitLike,
+  now = Date.now(),
+): FoodNutritionSnapshot {
   const portionLabel = formatOffServingSize(hit.servingSize)
   const grams = parseGramsFromServingSize(hit.servingSize)
   const name = cleanupFoodName(hit.nom)
+  const offCode = hit.barcode?.trim() || undefined
 
   if (grams != null) {
     const calories = scaleNutrientPer100g(hit.calories, grams, 0)
@@ -54,7 +64,10 @@ export function buildFoodNutritionSnapshot(hit: OffHitLike): FoodNutritionSnapsh
       fatG: fatG ?? undefined,
       grams,
       imageUrl: hit.imageUrl,
+      imageStorageId: hit.imageStorageId,
+      offCode,
       barcode: hit.barcode,
+      updatedAt: now,
     }
   }
 
@@ -66,7 +79,10 @@ export function buildFoodNutritionSnapshot(hit: OffHitLike): FoodNutritionSnapsh
     carbsG: hit.glucides ?? undefined,
     fatG: hit.lipides ?? undefined,
     imageUrl: hit.imageUrl,
+    imageStorageId: hit.imageStorageId,
+    offCode,
     barcode: hit.barcode,
+    updatedAt: now,
   }
 }
 
@@ -86,6 +102,8 @@ export function mealEntryFromSnapshot(
     grams: snapshot.grams,
     portionLabel: snapshot.portionLabel,
     imageUrl: snapshot.imageUrl,
+    imageStorageId: snapshot.imageStorageId,
+    offCode: snapshot.offCode,
     createdAt: now,
     updatedAt: now,
   }

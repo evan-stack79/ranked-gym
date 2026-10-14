@@ -12,6 +12,8 @@ describe('foodDisplay (scientific checker)', () => {
     expect(formatOffServingSize('30g')).toBe('30 g')
     expect(formatOffServingSize('1 serving (45g)')).toBe('1 portion (45 g)')
     expect(formatOffServingSize('2 servings')).toBe('2 portions')
+    expect(formatOffServingSize('0.5 wedge (100 g)')).toBe('0,5 pointe (100 g)')
+    expect(formatOffServingSize('1 serving (100 g)')).toBe('1 portion (100 g)')
     expect(formatOffServingSize(null)).toBe(DEFAULT_PORTION_LABEL)
     expect(formatOffServingSize('')).toBe(DEFAULT_PORTION_LABEL)
     expect(formatOffServingSize(undefined)).toBe(DEFAULT_PORTION_LABEL)

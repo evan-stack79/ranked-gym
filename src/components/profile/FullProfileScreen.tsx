@@ -120,6 +120,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
     calorieGoalEnabled &&
     showBodyMetrics &&
     !healthFlags.eatingDisorder &&
+    !healthFlags.diabetes &&
     !healthFlags.pregnancy &&
     !healthFlags.breastfeeding
 

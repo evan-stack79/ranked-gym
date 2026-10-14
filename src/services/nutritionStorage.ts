@@ -157,6 +157,7 @@ export const BLANK_PROFILE: CalorieProfile = {
   declaredPregnancy: false,
   declaredBreastfeeding: false,
   declaredEatingDisorder: false,
+  declaredDiabetes: false,
   preferNotAnswerHealth: false,
   healthAnswer: null,
   healthAnswerUpdatedAt: null,
@@ -270,13 +271,14 @@ export function normalizeCalorieProfile(input: CalorieProfile): CalorieProfile {
       healthAnswer === 'situations'
         ? Boolean(input.declaredEatingDisorder)
         : Boolean(input.declaredEatingDisorder) && healthAnswer == null,
+    declaredDiabetes: Boolean(input.declaredDiabetes),
     preferNotAnswerHealth,
     healthAnswer,
     healthAnswerUpdatedAt,
     bodyMetricsClearedAt: clearedAt,
   }
 
-  // When explicit none/prefer_not, clear situation flags.
+  // When explicit none/prefer_not, clear situation flags (diabète conservé).
   if (healthAnswer === 'none' || healthAnswer === 'prefer_not') {
     draft.declaredPregnancy = false
     draft.declaredBreastfeeding = false
@@ -324,6 +326,7 @@ export function getCalorieProfile(): CalorieProfile {
     declaredPregnancy: Boolean(stored.declaredPregnancy),
     declaredBreastfeeding: Boolean(stored.declaredBreastfeeding),
     declaredEatingDisorder: Boolean(stored.declaredEatingDisorder),
+    declaredDiabetes: Boolean(stored.declaredDiabetes),
     preferNotAnswerHealth: Boolean(stored.preferNotAnswerHealth),
     healthAnswer: normalizeHealthAnswer(stored.healthAnswer),
     healthAnswerUpdatedAt:
@@ -391,6 +394,7 @@ export function mergeCalorieProfilesForSync(
     declaredPregnancy: healthWinner.declaredPregnancy,
     declaredBreastfeeding: healthWinner.declaredBreastfeeding,
     declaredEatingDisorder: healthWinner.declaredEatingDisorder,
+    declaredDiabetes: Boolean(localNorm.declaredDiabetes || remoteNorm.declaredDiabetes),
     preferNotAnswerHealth: healthWinner.preferNotAnswerHealth,
     healthAnswer: healthWinner.healthAnswer ?? null,
     healthAnswerUpdatedAt: healthWinner.healthAnswerUpdatedAt ?? null,

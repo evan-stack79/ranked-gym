@@ -9,6 +9,7 @@ export interface HealthSituationsValue {
   declaredPregnancy: boolean
   declaredBreastfeeding: boolean
   declaredEatingDisorder: boolean
+  declaredDiabetes: boolean
   preferNotAnswerHealth: boolean
   healthAnswer: HealthAnswerStatus | null
 }
@@ -28,6 +29,7 @@ export function healthSituationsFromProfile(profile: CalorieProfile): HealthSitu
     declaredPregnancy: Boolean(profile.declaredPregnancy),
     declaredBreastfeeding: Boolean(profile.declaredBreastfeeding),
     declaredEatingDisorder: Boolean(profile.declaredEatingDisorder),
+    declaredDiabetes: Boolean(profile.declaredDiabetes),
     preferNotAnswerHealth: answer === 'prefer_not',
     healthAnswer: answer,
   }
@@ -52,7 +54,9 @@ export function HealthSituationsForm({
     })
   }
 
-  const toggleSituation = (key: 'declaredPregnancy' | 'declaredBreastfeeding' | 'declaredEatingDisorder') => {
+  const toggleSituation = (
+    key: 'declaredPregnancy' | 'declaredBreastfeeding' | 'declaredEatingDisorder',
+  ) => {
     const flipped = !value[key]
     const pregnancy = key === 'declaredPregnancy' ? flipped : value.declaredPregnancy
     const breastfeeding = key === 'declaredBreastfeeding' ? flipped : value.declaredBreastfeeding
@@ -62,9 +66,14 @@ export function HealthSituationsForm({
       declaredPregnancy: pregnancy,
       declaredBreastfeeding: breastfeeding,
       declaredEatingDisorder: eatingDisorder,
-      healthAnswer: any ? 'situations' : null,
+      // Diabète n’entre pas dans le triad Santé — flag indépendant.
+      healthAnswer: any ? 'situations' : value.declaredDiabetes ? value.healthAnswer : null,
       preferNotAnswerHealth: false,
     })
+  }
+
+  const toggleDiabetes = () => {
+    emit({ declaredDiabetes: !value.declaredDiabetes })
   }
 
   const pickExclusive = (next: 'none' | 'prefer_not') => {
@@ -74,6 +83,7 @@ export function HealthSituationsForm({
       declaredPregnancy: false,
       declaredBreastfeeding: false,
       declaredEatingDisorder: false,
+      // Diabète : non effacé par « Aucune de ces situations » (flag médical distinct).
       preferNotAnswerHealth: cleared === 'prefer_not',
     })
   }
@@ -103,6 +113,12 @@ export function HealthSituationsForm({
           checked={answer === 'situations' && value.declaredEatingDisorder}
           onToggle={() => toggleSituation('declaredEatingDisorder')}
           testId="health-tca"
+        />
+        <HealthRow
+          label="Diabète"
+          checked={value.declaredDiabetes}
+          onToggle={toggleDiabetes}
+          testId="health-diabetes"
         />
       </div>
       <div className="h-2" aria-hidden />

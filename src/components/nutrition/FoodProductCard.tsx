@@ -58,11 +58,7 @@ export function FoodProductCard({
           onClick={onToggle}
           aria-label={selected ? `Retirer ${name}` : `Choisir ${name}`}
           aria-pressed={selected}
-          className={`ios-press flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-            selected
-              ? 'bg-white text-[#FF2B2B]'
-              : 'bg-[#FF2B2B] text-white'
-          }`}
+          className="ios-press flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white"
         >
           {selected ? (
             <Check className="h-4 w-4" strokeWidth={2.75} aria-hidden />

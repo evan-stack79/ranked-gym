@@ -1,16 +1,19 @@
 import { isConvexDomainActive } from '../backend/adapter'
+import { isFoodAddV3Enabled } from '../backend/foodAddV3FeatureFlag'
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 import type { AlimentRow } from '../types/database'
 import { safeWarn } from '../utils/safeLog'
 import {
   fetchOpenFoodFactsViaConvex,
   listConvexFoodCatalog,
+  searchFoodsV3ViaConvex,
   searchOpenFoodFactsViaConvex,
   setConvexFoodFavorite,
   upsertConvexFoodSelection,
   type CloudFoodRecord,
   type OpenFoodFactsProductCloud,
 } from './convexNutritionService'
+import { listCachedFoods, rememberFoodHits } from './foodOfflineCache'
 
 export interface OpenFoodFactsProduct {
   barcode: string
@@ -19,7 +22,9 @@ export interface OpenFoodFactsProduct {
   proteines: number | null
   glucides: number | null
   lipides: number | null
+  /** URL de NOTRE cache / stockage — jamais un hotlink OFF en v3. */
   imageUrl?: string
+  imageStorageId?: string
   brands?: string
   /** serving_size brut OFF — formater via formatOffServingSize pour l’UI. */
   servingSize?: string | null
@@ -99,9 +104,10 @@ function mapCloudProduct(product: OpenFoodFactsProductCloud): OpenFoodFactsSearc
     glucides: product.glucides,
     lipides: product.lipides,
     imageUrl: product.imageUrl,
+    imageStorageId: product.imageStorageId,
     brands: product.brands ?? '',
-    servingSize: null,
-    categoriesTags: [],
+    servingSize: product.servingSize ?? null,
+    categoriesTags: product.categoriesTags ?? [],
     provenance: product.provenance,
     fetchedAt: product.fetchedAt,
   }
@@ -271,7 +277,40 @@ export async function searchOpenFoodFacts(
   const categoryTag = options?.categoryTag?.trim() || null
   const searchTerm = term.trim()
 
-  // Catégorie : chemin direct OFF (tag filter + serving_size / categories_tags).
+  // v3 : le téléphone ne contacte JAMAIS Open Food Facts — Convex uniquement + cache offline.
+  if (isFoodAddV3Enabled()) {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      return listCachedFoods({ term: searchTerm, categoryTag, limit: SEARCH_PAGE_SIZE })
+    }
+    try {
+      const { hits } = await searchFoodsV3ViaConvex({
+        term: searchTerm,
+        categoryTag,
+        limit: SEARCH_PAGE_SIZE,
+      })
+      if (signal?.aborted) return []
+      const mapped = hits.map(mapCloudProduct)
+      rememberFoodHits(mapped)
+      return mapped
+    } catch (error) {
+      if (signal?.aborted) return []
+      const message = error instanceof Error ? error.message : String(error)
+      if (message.includes('FOOD_SEARCH_DAILY_LIMIT')) {
+        throw new Error('Limite quotidienne de recherches atteinte. Réessaie demain.')
+      }
+      if (
+        message.includes('FOOD_ADD_ACCESS_DENIED') ||
+        message.includes('FOOD_ADD_ACCESS_DENIED_MINOR') ||
+        message.includes('FOOD_ADD_ACCESS_DENIED_TCA')
+      ) {
+        throw new Error('Ajout d’aliment indisponible pour ce compte.')
+      }
+      safeWarn('[aliments] v3 Convex search failed, fallback offline cache', error)
+      return listCachedFoods({ term: searchTerm, categoryTag, limit: SEARCH_PAGE_SIZE })
+    }
+  }
+
+  // Legacy (flag OFF) : comportement historique.
   if (categoryTag) {
     return searchOpenFoodFactsDirect(searchTerm, signal, { categoryTag })
   }
@@ -295,7 +334,6 @@ export async function searchOpenFoodFacts(
         if (merged.size >= SEARCH_PAGE_SIZE) break
       }
       const result = Array.from(merged.values())
-      // Enrichit serving_size / tags via direct OFF (best-effort, non bloquant).
       void enrichServingFromDirect(result, searchTerm, signal).catch((error) => {
         safeWarn('[aliments] serving enrich failed', error)
       })

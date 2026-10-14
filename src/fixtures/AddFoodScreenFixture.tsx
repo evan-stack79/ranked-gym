@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { AuthProvider } from '../context/AuthContext'
-import { AddFoodScreen } from '../components/nutrition/AddFoodScreen'
+import { AddFoodScreenV3 as AddFoodScreen } from '../components/nutrition/AddFoodScreenV3'
 import type { OpenFoodFactsSearchHit } from '../services/alimentsService'
 import type { FoodCategoryId } from '../utils/foodCategories'
 import { hitMatchesFoodCategory } from '../utils/foodCategories'

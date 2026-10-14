@@ -27,6 +27,7 @@ import { WaterGoalChooser } from './WaterGoalChooser'
 import {
   listPersonalFoods,
   searchOpenFoodFacts,
+  setPersonalFoodFavorite,
   type OpenFoodFactsProduct,
   type OpenFoodFactsSearchHit,
 } from '../../services/alimentsService'
@@ -38,7 +39,8 @@ import { ScannedProductSheet } from './ScannedProductSheet'
 import { MealBudgetsCard } from './MealBudgetsCard'
 import { EditMealSheet } from './EditMealSheet'
 import { MealPhotoAnalyzer } from './MealPhotoAnalyzer'
-import { AddFoodScreen } from './AddFoodScreen'
+import { AddFoodScreenV3 } from './AddFoodScreenV3'
+import { AddFoodScreenLegacy } from './AddFoodScreenLegacy'
 import { SectionSkeleton } from '../ui/AppBootScreen'
 import { persistScannedProductSelection } from './persistScannedProductSelection'
 import {
@@ -49,6 +51,9 @@ import {
   buildFoodNutritionSnapshot,
   mealEntryFromSnapshot,
 } from '../../utils/foodJournalSnapshot'
+import { isFoodAddV3Enabled } from '../../backend/foodAddV3FeatureFlag'
+import { canAccessFoodAdd } from '../../services/foodAddAccess'
+import { getCalorieProfile } from '../../services/nutritionStorage'
 
 interface MealJournalProps {
   targetCalories: number
@@ -226,7 +231,14 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     setShowForm(false)
   }
 
+  const foodAddV3 = isFoodAddV3Enabled()
+  const calorieProfile = getCalorieProfile()
+
   const handleValidateFoodSelection = (hits: OpenFoodFactsSearchHit[]) => {
+    if (foodAddV3 && !canAccessFoodAdd(calorieProfile)) {
+      showToast('Ajout d’aliment indisponible pour ce compte.', 'error')
+      return
+    }
     const type = pendingMealType ?? mealType
     let journal = getTodayJournal()
     for (const hit of hits) {
@@ -517,8 +529,8 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
         </div>
       )}
 
-      {showForm ? (
-        <AddFoodScreen
+      {showForm && foodAddV3 && canAccessFoodAdd(calorieProfile) ? (
+        <AddFoodScreenV3
           searchQuery={searchQuery}
           onSearchQueryChange={setSearchQuery}
           searchLoading={searchLoading}
@@ -527,6 +539,80 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
           category={foodCategory}
           onCategoryChange={setFoodCategory}
           onValidateSelection={handleValidateFoodSelection}
+          onOpenScanner={() => openScanner()}
+          scannerSlot={
+            scannerOpen ? (
+              <BarcodeScanner
+                open={scannerOpen}
+                onClose={() => setScannerOpen(false)}
+                onProduct={handleScannedProduct}
+              />
+            ) : null
+          }
+          onToast={showToast}
+          onPhotoAnalyzed={(result) => {
+            const journal = addMealToToday({
+              name: result.name,
+              mealType: result.mealType,
+              calories: result.calories,
+              proteinG: result.proteinG,
+              carbsG: result.carbsG,
+              fatG: result.fatG,
+            })
+            setMeals(journal.meals)
+            resetForm()
+          }}
+          name={name}
+          onNameChange={setName}
+          calories={calories}
+          onCaloriesChange={setCalories}
+          proteinG={proteinG}
+          onProteinChange={setProteinG}
+          carbsG={carbsG}
+          onCarbsChange={setCarbsG}
+          fatG={fatG}
+          onFatChange={setFatG}
+          mealType={mealType}
+          onMealTypeChange={setMealType}
+          onSubmitManual={handleAdd}
+          onClose={resetForm}
+        />
+      ) : null}
+
+      {showForm && !foodAddV3 ? (
+        <AddFoodScreenLegacy
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          searchLoading={searchLoading}
+          searchError={searchError}
+          searchHits={searchHits}
+          onSelectHit={(hit) => {
+            handleScannedProduct(hit)
+            setSearchQuery('')
+            setSearchHits([])
+          }}
+          onToggleFavorite={(hit) => {
+            if (!hit.foodKey) return
+            requireAuth(() => {
+              const next = !hit.isFavorite
+              void setPersonalFoodFavorite(hit.foodKey!, next)
+                .then((applied) => {
+                  if (!applied) {
+                    showToast('Impossible de mettre à jour le favori.', 'error')
+                    return
+                  }
+                  setSearchHits((prev) =>
+                    prev.map((item) =>
+                      item.foodKey === hit.foodKey ? { ...item, isFavorite: next } : item,
+                    ),
+                  )
+                  showToast(next ? 'Ajouté aux favoris.' : 'Retiré des favoris.')
+                })
+                .catch(() => {
+                  showToast('Impossible de mettre à jour le favori.', 'error')
+                })
+            })
+          }}
           onOpenScanner={() => openScanner()}
           scannerSlot={
             scannerOpen ? (
