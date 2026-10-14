@@ -2,6 +2,7 @@ import { v } from 'convex/values'
 import { makeFunctionReference } from 'convex/server'
 import type { Id } from './_generated/dataModel'
 import {
+  action,
   mutation,
   query,
   internalMutation,
@@ -10,6 +11,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from './_generated/server'
+import { internal } from './_generated/api'
 import {
   assertPasswordPolicy,
   createOpaqueToken,
@@ -36,6 +38,13 @@ import {
   sendPasswordResetEmail,
 } from './lib/passwordResetMailer'
 import { markEmailConfirmedViaGoogleForUser } from './emailVerification'
+import {
+  AUTH_GOOGLE_DISABLED,
+  AUTH_GOOGLE_TOKEN_INVALID,
+  getGoogleClientId,
+  isGoogleSignInConfigured,
+  verifyGoogleIdToken,
+} from './lib/googleIdToken'
 
 const RESET_ROUTE_PATH = '/auth/reset-password'
 const RESET_LINK_PURGE_GRACE_MS = 5 * 60 * 1000
@@ -723,15 +732,16 @@ export const signInWithPassword = mutation({
 })
 
 /**
- * B10-04 : Google sign-in — email Google-verified ⇒ markEmailConfirmedViaGoogle.
- * `googleSub` + email already verified by Google token exchange (caller / action).
+ * B11-01 : session creation ONLY from claims already verified via Google JWKS.
+ * Never accepts client-supplied email/sub — those come from verifyGoogleIdToken.
  */
-export async function completeGoogleSignIn(
+export async function completeGoogleSignInFromVerifiedClaims(
   ctx: MutationCtx,
   args: {
     email: string
     googleSub: string
     displayName?: string
+    emailVerified: true
     now?: number
   },
 ): Promise<{
@@ -741,9 +751,10 @@ export async function completeGoogleSignIn(
   emailConfirmed: true
   user: { userId: string; email: string; displayName: string }
 }> {
+  if (args.emailVerified !== true) throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
   const emailNorm = normalizeEmail(args.email)
   const googleSub = args.googleSub.trim()
-  if (!emailNorm || !googleSub) throw new Error('AUTH_GOOGLE_INVALID')
+  if (!emailNorm || !googleSub) throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
   const now = args.now ?? Date.now()
   await consumeRateLimit(ctx, 'signInEmail', { kind: 'email', value: emailNorm })
 
@@ -761,9 +772,8 @@ export async function completeGoogleSignIn(
     })
     user = await findUserByEmailNorm(ctx, emailNorm)
   }
-  if (!user || user.deletedAt) throw new Error('AUTH_GOOGLE_INVALID')
+  if (!user || user.deletedAt) throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
 
-  // Google-verified email exception — always call confirmation marker.
   await markEmailConfirmedViaGoogleForUser(ctx, { userId: user.userId, now })
 
   const session = await createSession(ctx, user.userId)
@@ -780,11 +790,13 @@ export async function completeGoogleSignIn(
   }
 }
 
-export const signInWithGoogle = mutation({
+export const completeGoogleSignInFromVerifiedClaimsMutation = internalMutation({
   args: {
     email: v.string(),
     googleSub: v.string(),
     displayName: v.optional(v.string()),
+    emailVerified: v.literal(true),
+    now: v.optional(v.number()),
   },
   returns: v.object({
     sessionToken: v.string(),
@@ -797,7 +809,60 @@ export const signInWithGoogle = mutation({
       displayName: v.string(),
     }),
   }),
-  handler: (ctx, args) => completeGoogleSignIn(ctx, args),
+  handler: (ctx, args) => completeGoogleSignInFromVerifiedClaims(ctx, args),
+})
+
+/**
+ * B11-01 : phone sends ONLY the Google ID token.
+ * Server verifies JWKS signature + iss/aud/exp/email_verified; fail-closed if unset client id.
+ */
+type GoogleSignInResult = {
+  sessionToken: string
+  expiresAt: number
+  mustResetPassword: boolean
+  emailConfirmed: true
+  user: { userId: string; email: string; displayName: string }
+}
+
+export const signInWithGoogle = action({
+  args: {
+    idToken: v.string(),
+  },
+  returns: v.object({
+    sessionToken: v.string(),
+    expiresAt: v.number(),
+    mustResetPassword: v.boolean(),
+    emailConfirmed: v.literal(true),
+    user: v.object({
+      userId: v.string(),
+      email: v.string(),
+      displayName: v.string(),
+    }),
+  }),
+  handler: async (ctx, args): Promise<GoogleSignInResult> => {
+    if (!isGoogleSignInConfigured()) {
+      throw new Error(AUTH_GOOGLE_DISABLED)
+    }
+    const clientId = getGoogleClientId()
+    let verified
+    try {
+      verified = await verifyGoogleIdToken(args.idToken, { clientId })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ''
+      if (message === AUTH_GOOGLE_DISABLED) throw new Error(AUTH_GOOGLE_DISABLED)
+      throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
+    }
+    const result: GoogleSignInResult = await ctx.runMutation(
+      internal.auth.completeGoogleSignInFromVerifiedClaimsMutation,
+      {
+        email: verified.email,
+        googleSub: verified.sub,
+        displayName: verified.name,
+        emailVerified: true as const,
+      },
+    )
+    return result
+  },
 })
 
 export const signOut = mutation({

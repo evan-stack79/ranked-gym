@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   EMAIL_CODE_HOUR_BLOCKED,
@@ -18,7 +17,7 @@ import {
   storeEmailCodeForUser,
 } from '../../convex/emailVerification'
 import {
-  completeGoogleSignIn,
+  completeGoogleSignInFromVerifiedClaims,
   registerUserWithEmail,
   upsertImportedUserWithoutPassword,
 } from '../../convex/auth'
@@ -346,18 +345,7 @@ describe('email verification codes — B9-01', () => {
     ).rejects.toThrow(EMAIL_CODE_HOUR_BLOCKED)
   })
 
-  it('signup/import ne posent pas emailConfirmedAt (source)', () => {
-    const authSource = readFileSync(
-      new URL('../../convex/auth.ts', import.meta.url),
-      'utf8',
-    )
-    expect(authSource).toMatch(/B9-01 : jamais auto-confirmé à l’inscription/)
-    expect(authSource).toMatch(/B9-01 : import sans confirmation/)
-    const registerIdx = authSource.indexOf('export async function registerUserWithEmail')
-    const registerBlock = authSource.slice(registerIdx, registerIdx + 900)
-    expect(registerBlock).not.toMatch(/emailConfirmedAt:\s*now/)
-  })
-
+  // B11-02 : replaced source-reading test with real FakeDb signup/import execution.
   it('signup/import ne posent pas emailConfirmedAt (exécution réelle)', async () => {
     vi.stubGlobal('process', { env: { CONVEX_ALLOW_PUBLIC_SIGNUP: 'true' } })
     const db = new FakeDb()
@@ -440,21 +428,21 @@ describe('email verification codes — B9-01', () => {
   })
 
   it('B10-04 : Google sign-in calls markEmailConfirmedViaGoogle', async () => {
-    vi.stubGlobal('process', { env: { CONVEX_ALLOW_PUBLIC_SIGNUP: 'true' } })
     const db = new FakeDb()
-    const result = await completeGoogleSignIn(
+    // Claims must already be JWKS-verified (action path); mutation never trusts phone email/sub.
+    const result = await completeGoogleSignInFromVerifiedClaims(
       { db } as never,
       {
         email: 'google.user@example.com',
         googleSub: 'google-sub-123',
         displayName: 'G',
+        emailVerified: true,
         now: 5_000,
       },
     )
     expect(result.emailConfirmed).toBe(true)
     const user = db.table('auth_users').find((u) => u.emailNorm === 'google.user@example.com')!
     expect(user.emailConfirmedAt).toBe(5_000)
-    // Direct marker also works (same path used by completeGoogleSignIn).
     await markEmailConfirmedViaGoogleForUser(
       { db } as never,
       { userId: user.userId as string, now: 6_000 },

@@ -96,23 +96,15 @@ export async function signInWithPassword(
   }
 }
 
-/** B10-04 : Google sign-in — server marks email confirmed via Google. */
-export async function signInWithGoogle(args: {
-  email: string
-  googleSub: string
-  displayName?: string
-}): Promise<{
+/** B11-01 : phone sends ONLY the Google ID token — never email/sub. */
+export async function signInWithGoogle(idToken: string): Promise<{
   user: AuthUser
   sessionToken: string
   mustResetPassword: boolean
   emailConfirmed: true
 }> {
   const client = requireConvexClient()
-  const result = await client.mutation(api.auth.signInWithGoogle, {
-    email: args.email,
-    googleSub: args.googleSub,
-    displayName: args.displayName,
-  })
+  const result = await client.action(api.auth.signInWithGoogle, { idToken })
   await setStoredSessionToken(result.sessionToken)
   return {
     user: mapAuthUser(result.user),
