@@ -3,14 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const deleteAllMyMealsViaConvex = vi.fn()
 const countActiveMealsViaConvex = vi.fn()
+const countSupabaseMealsViaConvex = vi.fn()
 const purgeSupabaseMealCopiesViaConvex = vi.fn()
-const countActiveMealsViaSupabase = vi.fn()
 const requireAccountLinkForErase = vi.fn()
 const fetchMyAccountLink = vi.fn()
 const isConvexDomainActive = vi.fn(() => true)
 const isConvexConfigured = vi.fn(() => true)
-const isSupabaseConfigured = vi.fn(() => false)
-const purgeSupabaseMealCopies = vi.fn()
 const getActiveCloudUserId = vi.fn(() => 'user-A' as string | null)
 
 vi.mock('../backend/adapter', () => ({
@@ -20,7 +18,7 @@ vi.mock('../backend/adapter', () => ({
 }))
 
 vi.mock('../lib/supabase', () => ({
-  isSupabaseConfigured: () => isSupabaseConfigured(),
+  isSupabaseConfigured: () => true,
 }))
 
 vi.mock('../lib/convex', () => ({
@@ -43,13 +41,10 @@ vi.mock('./accountLinkService', async () => {
   }
 })
 
-vi.mock('./countSupabaseMeals', () => ({
-  countActiveMealsViaSupabase: (...args: unknown[]) => countActiveMealsViaSupabase(...args),
-}))
-
 vi.mock('./convexNutritionService', () => ({
   deleteAllMyMealsViaConvex: (...args: unknown[]) => deleteAllMyMealsViaConvex(...args),
   countActiveMealsViaConvex: (...args: unknown[]) => countActiveMealsViaConvex(...args),
+  countSupabaseMealsViaConvex: (...args: unknown[]) => countSupabaseMealsViaConvex(...args),
   purgeSupabaseMealCopiesViaConvex: (...args: unknown[]) =>
     purgeSupabaseMealCopiesViaConvex(...args),
   pushConvexMeal: vi.fn().mockResolvedValue({ applied: true, stale: false, updatedAt: 1 }),
@@ -59,33 +54,22 @@ vi.mock('./convexNutritionService', () => ({
   pushConvexDayState: vi.fn(),
 }))
 
-vi.mock('./purgeSupabaseMealCopies', async () => {
-  const actual = await vi.importActual<typeof import('./purgeSupabaseMealCopies')>(
-    './purgeSupabaseMealCopies',
-  )
-  return {
-    ...actual,
-    purgeSupabaseMealCopies: (...args: unknown[]) => purgeSupabaseMealCopies(...args),
-  }
-})
-
 vi.mock('./cloudBackup', () => ({
   notifyLocalDataChanged: vi.fn(),
   pushCloudBackup: vi.fn(),
 }))
 
-describe('eraseAllUserMeals — B6/B7', () => {
+describe('eraseAllUserMeals — B8', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
     localStorage.clear()
     isConvexDomainActive.mockReturnValue(true)
     isConvexConfigured.mockReturnValue(true)
-    isSupabaseConfigured.mockReturnValue(false)
     getActiveCloudUserId.mockReturnValue('user-A')
     deleteAllMyMealsViaConvex.mockResolvedValue({ deletedCount: 3, updatedAt: 1 })
     countActiveMealsViaConvex.mockResolvedValue(3)
-    countActiveMealsViaSupabase.mockResolvedValue(0)
+    countSupabaseMealsViaConvex.mockResolvedValue(0)
     fetchMyAccountLink.mockResolvedValue({
       ownerUserId: 'user-A',
       supabaseUserId: 'supabase-A',
@@ -102,17 +86,10 @@ describe('eraseAllUserMeals — B6/B7', () => {
       userBackupsStatus: 'absent',
       resolvedUserId: 'supabase-A',
     })
-    purgeSupabaseMealCopies.mockResolvedValue({
-      deletedCount: 2,
-      nutritionStatus: 'purged',
-      userBackupsStatus: 'purged',
-      resolvedUserId: 'supabase-A',
-    })
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
   })
 
-  it('efface Convex + local ; deletedCount serveur ; purge Supabase sans session téléphone', async () => {
-    isSupabaseConfigured.mockReturnValue(false)
+  it('efface Convex + local ; chemin serveur Supabase', async () => {
     const { addMealToToday, countLocalMeals } = await import('./nutritionStorage')
     const { eraseAllUserMeals } = await import('./eraseUserMeals')
     addMealToToday({ name: 'Skyr', mealType: 'breakfast', calories: 120 })
@@ -121,7 +98,31 @@ describe('eraseAllUserMeals — B6/B7', () => {
     expect(countLocalMeals()).toBe(0)
     expect(requireAccountLinkForErase).toHaveBeenCalled()
     expect(purgeSupabaseMealCopiesViaConvex).toHaveBeenCalled()
-    expect(purgeSupabaseMealCopies).not.toHaveBeenCalled()
+  })
+
+  it('B8-01 permanent : Supabase B, app A → erreur, rien effacé', async () => {
+    // Legacy domain off, but same server path — phone session B mismatches link A
+    isConvexDomainActive.mockReturnValue(false)
+    const { EraseMealsPurgeError, ERASE_MEALS_PURGE_FAILED_MESSAGE } = await import(
+      './purgeSupabaseMealCopies'
+    )
+    requireAccountLinkForErase.mockRejectedValue(
+      new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE),
+    )
+
+    const { addMealToToday, countLocalMeals, getTodayJournal } = await import('./nutritionStorage')
+    const { eraseAllUserMeals } = await import('./eraseUserMeals')
+
+    addMealToToday({ name: 'Meal of A', mealType: 'lunch', calories: 300 })
+    const before = countLocalMeals()
+    const nameBefore = getTodayJournal().meals[0]?.name
+
+    await expect(eraseAllUserMeals()).rejects.toThrow(ERASE_MEALS_PURGE_FAILED_MESSAGE)
+    expect(countLocalMeals()).toBe(before)
+    expect(getTodayJournal().meals[0]?.name).toBe(nameBefore)
+    expect(purgeSupabaseMealCopiesViaConvex).not.toHaveBeenCalled()
+    expect(deleteAllMyMealsViaConvex).not.toHaveBeenCalled()
+    expect(requireAccountLinkForErase).toHaveBeenCalled()
   })
 
   it('B7 : sans lien → reconnect, rien effacé', async () => {
@@ -140,7 +141,7 @@ describe('eraseAllUserMeals — B6/B7', () => {
     expect(purgeSupabaseMealCopiesViaConvex).not.toHaveBeenCalled()
   })
 
-  it('Supabase pausé / injoignable → message purge, téléphone intact, Convex non effacé', async () => {
+  it('Supabase pausé → message purge, téléphone intact, Convex non effacé', async () => {
     purgeSupabaseMealCopiesViaConvex.mockRejectedValue(new Error('ERASE_MEALS_PURGE_FAILED'))
 
     const { addMealToToday, countLocalMeals, getTodayJournal } = await import('./nutritionStorage')
@@ -157,29 +158,34 @@ describe('eraseAllUserMeals — B6/B7', () => {
     expect(deleteAllMyMealsViaConvex).not.toHaveBeenCalled()
   })
 
-  it('clé service-role absente côté serveur → même fail-closed local', async () => {
-    purgeSupabaseMealCopiesViaConvex.mockRejectedValue(new Error('ERASE_MEALS_PURGE_FAILED'))
+  it('B8-03 : 0 Convex + 3 Supabase → count 3, erase', async () => {
+    countActiveMealsViaConvex.mockResolvedValue(0)
+    countSupabaseMealsViaConvex.mockResolvedValue(3)
+    purgeSupabaseMealCopiesViaConvex.mockResolvedValue({
+      deletedCount: 3,
+      nutritionStatus: 'purged',
+      userBackupsStatus: 'absent',
+      resolvedUserId: 'supabase-A',
+    })
 
     const { addMealToToday, countLocalMeals } = await import('./nutritionStorage')
-    const { EraseMealsPurgeError } = await import('./purgeSupabaseMealCopies')
-    const { eraseAllUserMeals, ERASE_MEALS_PURGE_FAILED_MESSAGE } = await import('./eraseUserMeals')
-    addMealToToday({ name: 'Still here', mealType: 'dinner', calories: 400 })
-    const before = countLocalMeals()
+    const { eraseAllUserMeals, fetchMealsEraseCardState } = await import('./eraseUserMeals')
 
-    let caught: unknown
-    try {
-      await eraseAllUserMeals()
-    } catch (error) {
-      caught = error
-    }
-    expect(caught).toBeInstanceOf(EraseMealsPurgeError)
-    expect((caught as Error).message).toBe(ERASE_MEALS_PURGE_FAILED_MESSAGE)
-    expect(countLocalMeals()).toBe(before)
+    const state = await fetchMealsEraseCardState()
+    expect(state.serverCount).toBe(3)
+    expect(state.needsLegacyReconnect).toBe(false)
+
+    addMealToToday({ name: 'Local cache', mealType: 'snack', calories: 10 })
+    const result = await eraseAllUserMeals()
+    expect(result.serverDeleted).toBe(3)
+    expect(countLocalMeals()).toBe(0)
+    expect(purgeSupabaseMealCopiesViaConvex).toHaveBeenCalled()
     expect(deleteAllMyMealsViaConvex).not.toHaveBeenCalled()
   })
 
   it('B6-02 : serveur 0 + 5 synced locaux → erreur, rien effacé', async () => {
     countActiveMealsViaConvex.mockResolvedValue(0)
+    countSupabaseMealsViaConvex.mockResolvedValue(0)
     isConvexDomainActive.mockReturnValue(false)
     const { addMealToToday, countLocalMeals } = await import('./nutritionStorage')
     const { clearQueuedMealOpsForUser } = await import('./convexNutritionQueue')
@@ -202,6 +208,7 @@ describe('eraseAllUserMeals — B6/B7', () => {
 
   it('B6-02 : serveur 0 + pending-only → efface local sans purge online', async () => {
     countActiveMealsViaConvex.mockResolvedValue(0)
+    countSupabaseMealsViaConvex.mockResolvedValue(0)
     const { countLocalMeals } = await import('./nutritionStorage')
     const { enqueueConvexNutritionOp, countQueuedMealOpsForUser } =
       await import('./convexNutritionQueue')
@@ -224,17 +231,17 @@ describe('eraseAllUserMeals — B6/B7', () => {
     const result = await eraseAllUserMeals()
     expect(result.serverDeleted).toBe(0)
     expect(deleteAllMyMealsViaConvex).not.toHaveBeenCalled()
+    expect(purgeSupabaseMealCopiesViaConvex).not.toHaveBeenCalled()
     expect(countLocalMeals()).toBe(0)
     expect(countQueuedMealOpsForUser('user-A')).toBe(0)
   })
 
-  it('B6-03 : fetchMealsEraseCardState — count serveur only + pending séparé', async () => {
+  it('B6-03 : fetchMealsEraseCardState — count Convex+Supabase + pending', async () => {
     countActiveMealsViaConvex.mockResolvedValue(4)
-    const { addMealToToday } = await import('./nutritionStorage')
+    countSupabaseMealsViaConvex.mockResolvedValue(2)
     const { enqueueConvexNutritionOp } = await import('./convexNutritionQueue')
     const { fetchMealsEraseCardState } = await import('./eraseUserMeals')
 
-    addMealToToday({ name: 'Local extra', mealType: 'lunch', calories: 1 })
     enqueueConvexNutritionOp({
       kind: 'meal-upsert',
       dateKey: '2026-10-14',
@@ -249,37 +256,14 @@ describe('eraseAllUserMeals — B6/B7', () => {
     })
 
     const state = await fetchMealsEraseCardState()
-    expect(state.serverCount).toBe(4)
+    expect(state.serverCount).toBe(6)
     expect(state.pendingCount).toBeGreaterThanOrEqual(1)
-    expect(state.serverCount).not.toBe(5)
-    expect(state.needsLegacyReconnect).toBe(false)
   })
 
-  it('B7 : sans lien → needsLegacyReconnect sur la carte', async () => {
-    fetchMyAccountLink.mockResolvedValue(null)
-    countActiveMealsViaConvex.mockResolvedValue(5)
-    const { fetchMealsEraseCardState, ERASE_MEALS_RECONNECT_LEGACY_MESSAGE } =
-      await import('./eraseUserMeals')
-    const state = await fetchMealsEraseCardState()
-    expect(state.needsLegacyReconnect).toBe(true)
-    expect(state.serverCount).toBe(5)
-    expect(ERASE_MEALS_RECONNECT_LEGACY_MESSAGE).toMatch(/ancien compte/)
-  })
-
-  it('B6-03 : serveur muet → serverCount null', async () => {
-    countActiveMealsViaConvex.mockRejectedValue(new Error('down'))
+  it('serveur muet → serverCount null', async () => {
+    countSupabaseMealsViaConvex.mockRejectedValue(new Error('down'))
     const { fetchMealsEraseCardState } = await import('./eraseUserMeals')
     const state = await fetchMealsEraseCardState()
     expect(state.serverCount).toBeNull()
-  })
-
-  it('legacy serveur count via Supabase', async () => {
-    isConvexDomainActive.mockReturnValue(false)
-    isSupabaseConfigured.mockReturnValue(true)
-    countActiveMealsViaSupabase.mockResolvedValue(9)
-    const { fetchMealsEraseCardState } = await import('./eraseUserMeals')
-    const state = await fetchMealsEraseCardState()
-    expect(state.serverCount).toBe(9)
-    expect(countActiveMealsViaSupabase).toHaveBeenCalled()
   })
 })

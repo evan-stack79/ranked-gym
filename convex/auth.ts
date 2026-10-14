@@ -347,6 +347,7 @@ export async function upsertImportedUserWithoutPassword(
       emailNorm,
       displayName: toDisplayName(emailNorm, rawUser.displayName),
       mustResetPassword: true,
+      emailConfirmedAt: now,
       createdAt: now,
       updatedAt: now,
     })
@@ -394,6 +395,7 @@ export async function registerUserWithEmail(
     emailNorm,
     displayName,
     mustResetPassword: false,
+    emailConfirmedAt: now,
     createdAt: now,
     updatedAt: now,
   })

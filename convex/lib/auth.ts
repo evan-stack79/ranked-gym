@@ -25,6 +25,7 @@ export type SessionUser = {
   email: string
   displayName: string
   mustResetPassword: boolean
+  emailConfirmed: boolean
   role: 'admin' | 'user'
   deletedAt?: number
 }
@@ -58,6 +59,7 @@ export async function requireSessionUser(ctx: SessionCtx, sessionToken: string):
     email: user.email,
     displayName: user.displayName,
     mustResetPassword: user.mustResetPassword,
+    emailConfirmed: typeof user.emailConfirmedAt === 'number' && user.emailConfirmedAt > 0,
     role: user.role === 'admin' ? 'admin' : 'user',
     deletedAt: user.deletedAt,
   }

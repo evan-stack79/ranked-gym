@@ -29,6 +29,8 @@ export const convexTables = {
     emailNorm: v.string(),
     displayName: v.string(),
     mustResetPassword: v.boolean(),
+    /** Present when the Convex account email is confirmed (server-side only). */
+    emailConfirmedAt: v.optional(v.number()),
     role: v.optional(v.union(v.literal('admin'), v.literal('user'))),
     pendingDeletionAt: v.optional(v.number()),
     deletedAt: v.optional(v.number()),

@@ -190,6 +190,11 @@ async function upsertAuthUser(
     emailNorm: String(payload.emailNorm ?? String(payload.email ?? '').trim().toLowerCase()),
     displayName: String(payload.displayName ?? 'Athlete'),
     mustResetPassword,
+    // Compte migré depuis Supabase : email déjà confirmé côté source.
+    emailConfirmedAt:
+      typeof existing?.emailConfirmedAt === 'number' && existing.emailConfirmedAt > 0
+        ? existing.emailConfirmedAt
+        : now,
     updatedAt: Number(payload.updatedAt ?? now),
   }
   if (existing) {

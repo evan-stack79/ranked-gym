@@ -135,6 +135,15 @@ export async function deleteAllMyMealsViaConvex(deletedAt = Date.now()): Promise
   }) as Promise<{ deletedCount: number; updatedAt: number }>
 }
 
+/** Compte repas Supabase via Convex (lien + service-role), même si Convex a 0. */
+export async function countSupabaseMealsViaConvex(): Promise<number> {
+  const sessionToken = await requireToken()
+  const result = (await getConvex().action(api.purgeSupabaseMeals.countSupabaseMealCopies, {
+    sessionToken,
+  })) as { count: number }
+  return result.count
+}
+
 /** Purge Supabase via Convex — session only, userId résolu serveur. */
 export async function purgeSupabaseMealCopiesViaConvex(): Promise<{
   deletedCount: number

@@ -186,6 +186,67 @@ async function restUpdate(
   return { ok: true, count }
 }
 
+/**
+ * Compte les repas restants dans Supabase (journal) via le lien + service-role.
+ * Toujours interrogé même si Convex a 0 repas (B8-03).
+ */
+export const countSupabaseMealCopies = action({
+  args: {
+    sessionToken: v.string(),
+  },
+  returns: v.object({
+    count: v.number(),
+    resolvedUserId: v.string(),
+  }),
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ count: number; resolvedUserId: string }> => {
+    const session: { userId: string } | null = await ctx.runQuery(api.auth.getSession, {
+      sessionToken: args.sessionToken,
+    })
+    if (!session?.userId) throw new Error('ERASE_MEALS_PURGE_FAILED')
+
+    const link: {
+      ownerUserId: string
+      supabaseUserId: string
+      linkedAt: number
+    } | null = await ctx.runQuery(internal.accountLinks.getLinkByOwner, {
+      ownerUserId: session.userId,
+    })
+    if (!link?.supabaseUserId) throw new Error('ACCOUNT_LINK_MISSING')
+
+    const config = readSupabaseAdminConfig()
+    if (!config) throw new Error('ERASE_MEALS_PURGE_FAILED')
+
+    const nutritionSelect = await restSelectSingle(
+      config,
+      'nutrition',
+      link.supabaseUserId,
+      'journal,user_id',
+    )
+    if (nutritionSelect.error || typeof nutritionSelect.count !== 'number') {
+      throw new Error('ERASE_MEALS_PURGE_FAILED')
+    }
+    if (nutritionSelect.count === 0) {
+      return { count: 0, resolvedUserId: link.supabaseUserId }
+    }
+    const row = nutritionSelect.data as Record<string, unknown>
+    if (row.user_id != null && row.user_id !== link.supabaseUserId) {
+      throw new Error('ERASE_MEALS_PURGE_FAILED')
+    }
+    try {
+      const count = countMealsInJournal(row.journal)
+      if (typeof count !== 'number' || !Number.isFinite(count) || count < 0) {
+        throw new Error('ERASE_MEALS_PURGE_FAILED')
+      }
+      return { count, resolvedUserId: link.supabaseUserId }
+    } catch {
+      throw new Error('ERASE_MEALS_PURGE_FAILED')
+    }
+  },
+})
+
 /** SessionToken only — userId never accepted from the phone. */
 export const purgeSupabaseMealCopies = action({
   args: {

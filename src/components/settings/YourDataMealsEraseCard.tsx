@@ -4,9 +4,11 @@ import { IosSheet } from '../ui/IosSheet'
 import {
   ERASE_MEALS_CONNECT_MESSAGE,
   ERASE_MEALS_COUNT_UNKNOWN_MESSAGE,
+  ERASE_MEALS_LINK_REFUSED_MESSAGE,
   ERASE_MEALS_NONE_MESSAGE,
   ERASE_MEALS_PURGE_FAILED_MESSAGE,
   ERASE_MEALS_RECONNECT_LEGACY_MESSAGE,
+  EraseMealsLinkRefusedError,
   EraseMealsNeedsConnectionError,
   EraseMealsNeedsLegacyReconnectError,
   EraseMealsPurgeError,
@@ -382,6 +384,8 @@ export function YourDataMealsEraseCard() {
         } catch (err) {
           if (err instanceof EraseMealsNeedsLegacyReconnectError) {
             setError(ERASE_MEALS_RECONNECT_LEGACY_MESSAGE)
+          } else if (err instanceof EraseMealsLinkRefusedError) {
+            setError(ERASE_MEALS_LINK_REFUSED_MESSAGE)
           } else if (err instanceof EraseMealsPurgeError) {
             setError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
           } else {

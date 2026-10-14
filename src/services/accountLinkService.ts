@@ -1,6 +1,6 @@
 /**
  * Client : lien Convex ↔ Supabase.
- * Le téléphone n’envoie jamais un supabaseUserId — seulement l’access token de session.
+ * Le téléphone n’envoie jamais un supabaseUserId / email — seulement l’access token.
  */
 import { api } from '../../convex/_generated/api'
 import { isConvexConfigured, getConvex } from '../lib/convex'
@@ -15,10 +15,20 @@ import { safeWarn } from '../utils/safeLog'
 export const ERASE_MEALS_RECONNECT_LEGACY_MESSAGE =
   'Connecte-toi à ton ancien compte pour effacer'
 
+export const ERASE_MEALS_LINK_REFUSED_MESSAGE =
+  'Impossible de relier ton ancien compte. Contacte-nous.'
+
 export class EraseMealsNeedsLegacyReconnectError extends Error {
   constructor() {
     super(ERASE_MEALS_RECONNECT_LEGACY_MESSAGE)
     this.name = 'EraseMealsNeedsLegacyReconnectError'
+  }
+}
+
+export class EraseMealsLinkRefusedError extends Error {
+  constructor() {
+    super(ERASE_MEALS_LINK_REFUSED_MESSAGE)
+    this.name = 'EraseMealsLinkRefusedError'
   }
 }
 
@@ -32,6 +42,18 @@ async function requireConvexSessionToken(): Promise<string> {
   const token = await getConvexSessionToken()
   if (!token) throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
   return token
+}
+
+async function readOptionalPhoneSupabaseAccessToken(): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null
+  try {
+    const { data, error } = await getSupabase().auth.getSession()
+    const token = data?.session?.access_token
+    if (error || !token) return null
+    return token
+  } catch {
+    return null
+  }
 }
 
 /** Lit uniquement le lien du compte de session (serveur refuse les autres). */
@@ -52,7 +74,7 @@ export async function fetchMyAccountLink(): Promise<AccountLinkInfo | null> {
 
 /**
  * Crée le lien en envoyant seulement l’access token Supabase.
- * Le serveur résout l’id via Auth getUser.
+ * Le serveur résout id + emails et refuse mismatch / non confirmé.
  */
 export async function linkLegacySupabaseAccountWithAccessToken(
   supabaseAccessToken: string,
@@ -82,7 +104,15 @@ export async function linkLegacySupabaseAccountWithAccessToken(
     }
   } catch (error) {
     if (error instanceof EraseMealsPurgeError) throw error
+    if (error instanceof EraseMealsLinkRefusedError) throw error
     const message = error instanceof Error ? error.message : ''
+    if (
+      message.includes('ACCOUNT_LINK_EMAIL_MISMATCH') ||
+      message.includes('ACCOUNT_LINK_EMAIL_UNCONFIRMED')
+    ) {
+      safeWarn('[account-link] link refused (email)', message)
+      throw new EraseMealsLinkRefusedError()
+    }
     if (
       message.includes('ACCOUNT_LINK_SUPABASE_UNRESOLVED') ||
       message.includes('ACCOUNT_LINK_ALREADY_TAKEN') ||
@@ -121,7 +151,6 @@ export async function signInLegacySupabaseAndLink(
   try {
     return await linkLegacySupabaseAccountWithAccessToken(accessToken)
   } finally {
-    // Session Supabase téléphone non requise après le lien.
     try {
       await supabase.auth.signOut()
     } catch {
@@ -131,10 +160,39 @@ export async function signInLegacySupabaseAndLink(
 }
 
 /**
- * Avant erase Convex : le lien doit exister. Pas de token Supabase téléphone.
+ * Avant erase : lien requis. Si une session Supabase téléphone est présente,
+ * le serveur vérifie qu’elle correspond au lien (B8-01 legacy).
  */
 export async function requireAccountLinkForErase(): Promise<AccountLinkInfo> {
-  const link = await fetchMyAccountLink()
-  if (!link) throw new EraseMealsNeedsLegacyReconnectError()
-  return link
+  if (!isConvexConfigured()) {
+    throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
+  }
+  const sessionToken = await requireConvexSessionToken()
+  const phoneToken = await readOptionalPhoneSupabaseAccessToken()
+  try {
+    const result = (await getConvex().action(api.accountLinks.assertLinkForErase, {
+      sessionToken,
+      ...(phoneToken ? { supabaseAccessToken: phoneToken } : {}),
+    })) as { ok: true; ownerUserId: string; supabaseUserId: string }
+    if (!result?.ok || !result.supabaseUserId) {
+      throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
+    }
+    return {
+      ownerUserId: result.ownerUserId,
+      supabaseUserId: result.supabaseUserId,
+      linkedAt: Date.now(),
+    }
+  } catch (error) {
+    if (error instanceof EraseMealsPurgeError) throw error
+    if (error instanceof EraseMealsNeedsLegacyReconnectError) throw error
+    const message = error instanceof Error ? error.message : ''
+    if (message.includes('ACCOUNT_LINK_MISSING')) {
+      throw new EraseMealsNeedsLegacyReconnectError()
+    }
+    if (message.includes('ACCOUNT_LINK_MISMATCH')) {
+      throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
+    }
+    safeWarn('[erase-meals] account link assert failed', error)
+    throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
+  }
 }

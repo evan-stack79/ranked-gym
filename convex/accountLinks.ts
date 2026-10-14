@@ -1,8 +1,8 @@
 /**
  * Lien ownerUserId (Convex) ↔ supabaseUserId.
- * Création serveur uniquement : le téléphone n’envoie jamais un user id Supabase,
+ * Création serveur uniquement : le téléphone n’envoie jamais un user id / email Supabase,
  * seulement un access token vérifié via Auth getUser.
- * Lien immuable une fois créé.
+ * Lien immuable ; emails doivent matcher et être confirmés des deux côtés.
  */
 import { v } from 'convex/values'
 import { api, internal } from './_generated/api'
@@ -15,6 +15,7 @@ import {
   type QueryCtx,
 } from './_generated/server'
 import { requireSessionUser } from './lib/auth'
+import { normalizeEmail } from './lib/authCrypto'
 
 function readEnv(name: string): string | undefined {
   const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
@@ -103,9 +104,15 @@ export async function isAccountLinkValid(
   return link.supabaseUserId === supabaseUserId
 }
 
-async function resolveSupabaseUserIdFromAccessToken(
+export type ResolvedSupabaseAuthUser = {
+  id: string
+  email: string
+  emailConfirmed: boolean
+}
+
+export async function resolveSupabaseAuthUserFromAccessToken(
   accessToken: string,
-): Promise<string | null> {
+): Promise<ResolvedSupabaseAuthUser | null> {
   const config = readSupabaseConfig()
   if (!config) return null
   const token = accessToken.trim()
@@ -131,8 +138,20 @@ async function resolveSupabaseUserIdFromAccessToken(
     return null
   }
   if (!body || typeof body !== 'object') return null
-  const id = (body as { id?: unknown }).id
-  return typeof id === 'string' && id.length > 0 ? id : null
+  const row = body as {
+    id?: unknown
+    email?: unknown
+    email_confirmed_at?: unknown
+    confirmed_at?: unknown
+  }
+  const id = typeof row.id === 'string' && row.id.length > 0 ? row.id : null
+  if (!id) return null
+  const email = typeof row.email === 'string' ? row.email.trim() : ''
+  const confirmedRaw = row.email_confirmed_at ?? row.confirmed_at
+  const emailConfirmed =
+    (typeof confirmedRaw === 'string' && confirmedRaw.length > 0) ||
+    (typeof confirmedRaw === 'number' && confirmedRaw > 0)
+  return { id, email, emailConfirmed }
 }
 
 /** Lecture interne — jamais exposée au téléphone avec un ownerUserId arbitraire. */
@@ -153,6 +172,31 @@ export const getLinkByOwner = internalQuery({
       ownerUserId: link.ownerUserId,
       supabaseUserId: link.supabaseUserId,
       linkedAt: link.linkedAt,
+    }
+  },
+})
+
+/** Profil email Convex pour la création de lien (serveur only). */
+export const getOwnerEmailProfile = internalQuery({
+  args: { ownerUserId: v.string() },
+  returns: v.union(
+    v.object({
+      ownerUserId: v.string(),
+      email: v.string(),
+      emailConfirmed: v.boolean(),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query('auth_users')
+      .withIndex('by_userId', (q) => q.eq('userId', args.ownerUserId.trim()))
+      .first()
+    if (!user || user.deletedAt) return null
+    return {
+      ownerUserId: user.userId,
+      email: user.email,
+      emailConfirmed: typeof user.emailConfirmedAt === 'number' && user.emailConfirmedAt > 0,
     }
   },
 })
@@ -207,18 +251,38 @@ export async function runLinkSupabaseAccount(
   ownerUserId: string
   supabaseUserId: string
 }> {
-  const session: { userId: string } | null = await ctx.runQuery(api.auth.getSession, {
-    sessionToken: args.sessionToken,
-  })
+  const session: { userId: string; email?: string } | null = await ctx.runQuery(
+    api.auth.getSession,
+    { sessionToken: args.sessionToken },
+  )
   if (!session?.userId) throw new Error('ACCOUNT_LINK_UNAUTHORIZED')
 
-  const supabaseUserId = await resolveSupabaseUserIdFromAccessToken(args.supabaseAccessToken)
-  if (!supabaseUserId) throw new Error('ACCOUNT_LINK_SUPABASE_UNRESOLVED')
+  const ownerProfile: {
+    ownerUserId: string
+    email: string
+    emailConfirmed: boolean
+  } | null = await ctx.runQuery(internal.accountLinks.getOwnerEmailProfile, {
+    ownerUserId: session.userId,
+  })
+  if (!ownerProfile) throw new Error('ACCOUNT_LINK_UNAUTHORIZED')
+
+  const supabaseUser = await resolveSupabaseAuthUserFromAccessToken(args.supabaseAccessToken)
+  if (!supabaseUser) throw new Error('ACCOUNT_LINK_SUPABASE_UNRESOLVED')
+
+  if (!ownerProfile.emailConfirmed || !supabaseUser.emailConfirmed) {
+    throw new Error('ACCOUNT_LINK_EMAIL_UNCONFIRMED')
+  }
+
+  const convexEmail = normalizeEmail(ownerProfile.email)
+  const supabaseEmail = normalizeEmail(supabaseUser.email)
+  if (!convexEmail || !supabaseEmail || convexEmail !== supabaseEmail) {
+    throw new Error('ACCOUNT_LINK_EMAIL_MISMATCH')
+  }
 
   const stored: { created: boolean; ownerUserId: string; supabaseUserId: string } =
     await ctx.runMutation(internal.accountLinks.storeVerifiedLink, {
       ownerUserId: session.userId,
-      supabaseUserId,
+      supabaseUserId: supabaseUser.id,
     })
   return {
     ok: true as const,
@@ -230,7 +294,7 @@ export async function runLinkSupabaseAccount(
 
 /**
  * Lie le compte Convex de session au Supabase du access token.
- * Le téléphone n’envoie pas de supabaseUserId — le serveur le lit via Auth getUser.
+ * Emails lus serveur ; doivent matcher et être confirmés.
  */
 export const linkSupabaseAccount = action({
   args: {
@@ -244,4 +308,55 @@ export const linkSupabaseAccount = action({
     supabaseUserId: v.string(),
   }),
   handler: async (ctx, args) => runLinkSupabaseAccount(ctx, args),
+})
+
+/**
+ * Avant erase : lien requis. Si un access token Supabase téléphone est fourni,
+ * il doit correspondre exactement au supabaseUserId du lien (legacy / reconnect).
+ */
+export async function runAssertLinkForErase(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ctx: { runQuery: (...args: any[]) => Promise<any> },
+  args: { sessionToken: string; supabaseAccessToken?: string },
+): Promise<{ ok: true; ownerUserId: string; supabaseUserId: string }> {
+  const session: { userId: string } | null = await ctx.runQuery(api.auth.getSession, {
+    sessionToken: args.sessionToken,
+  })
+  if (!session?.userId) throw new Error('ACCOUNT_LINK_MISMATCH')
+
+  const link: {
+    ownerUserId: string
+    supabaseUserId: string
+    linkedAt: number
+  } | null = await ctx.runQuery(internal.accountLinks.getLinkByOwner, {
+    ownerUserId: session.userId,
+  })
+  if (!link?.supabaseUserId) throw new Error('ACCOUNT_LINK_MISSING')
+
+  const phoneToken = args.supabaseAccessToken?.trim()
+  if (phoneToken) {
+    const supabaseUser = await resolveSupabaseAuthUserFromAccessToken(phoneToken)
+    if (!supabaseUser || supabaseUser.id !== link.supabaseUserId) {
+      throw new Error('ACCOUNT_LINK_MISMATCH')
+    }
+  }
+
+  return {
+    ok: true as const,
+    ownerUserId: link.ownerUserId,
+    supabaseUserId: link.supabaseUserId,
+  }
+}
+
+export const assertLinkForErase = action({
+  args: {
+    sessionToken: v.string(),
+    supabaseAccessToken: v.optional(v.string()),
+  },
+  returns: v.object({
+    ok: v.literal(true),
+    ownerUserId: v.string(),
+    supabaseUserId: v.string(),
+  }),
+  handler: async (ctx, args) => runAssertLinkForErase(ctx, args),
 })

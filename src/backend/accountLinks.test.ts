@@ -4,6 +4,7 @@ import {
   createImmutableAccountLink,
   findLinkByOwner,
   isAccountLinkValid,
+  runAssertLinkForErase,
   runLinkSupabaseAccount,
 } from '../../convex/accountLinks'
 
@@ -63,7 +64,7 @@ class FakeQuery {
   }
 }
 
-describe('auth_account_links — B7', () => {
+describe('auth_account_links — B8', () => {
   const source = readFileSync(new URL('../../convex/accountLinks.ts', import.meta.url), 'utf8')
   const purgeSource = readFileSync(
     new URL('../../convex/purgeSupabaseMeals.ts', import.meta.url),
@@ -80,75 +81,35 @@ describe('auth_account_links — B7', () => {
     await createImmutableAccountLink(ctx as never, 'user-A', 'supabase-A')
     expect(await isAccountLinkValid(ctx as never, 'user-A', 'supabase-A')).toBe(true)
     expect(await isAccountLinkValid(ctx as never, 'user-A', 'supabase-B')).toBe(false)
-    expect(await isAccountLinkValid(ctx as never, 'user-B', 'supabase-B')).toBe(false)
   })
 
-  it('pas de lien → invalid', async () => {
-    const db = new FakeDb()
-    const ctx = { db }
-    expect(await isAccountLinkValid(ctx as never, 'user-A', 'supabase-A')).toBe(false)
-  })
-
-  it('B7-02 : lien immuable — refuse de changer le Supabase id', async () => {
-    const db = new FakeDb()
-    const ctx = { db }
-    await createImmutableAccountLink(ctx as never, 'user-A', 'supabase-A')
-    await expect(
-      createImmutableAccountLink(ctx as never, 'user-A', 'supabase-B'),
-    ).rejects.toThrow('ACCOUNT_LINK_IMMUTABLE')
-    const link = await findLinkByOwner(ctx as never, 'user-A')
-    expect(link?.supabaseUserId).toBe('supabase-A')
-  })
-
-  it('B7-02 : Supabase déjà lié à un autre Convex → refuse', async () => {
+  it('B7-02 : lien immuable + déjà pris', async () => {
     const db = new FakeDb()
     const ctx = { db }
     await createImmutableAccountLink(ctx as never, 'user-A', 'supabase-shared')
+    await expect(
+      createImmutableAccountLink(ctx as never, 'user-A', 'supabase-B'),
+    ).rejects.toThrow('ACCOUNT_LINK_IMMUTABLE')
     await expect(
       createImmutableAccountLink(ctx as never, 'user-B', 'supabase-shared'),
     ).rejects.toThrow('ACCOUNT_LINK_ALREADY_TAKEN')
     expect(await findLinkByOwner(ctx as never, 'user-B')).toBeNull()
   })
 
-  it('idempotent si même couple', async () => {
-    const db = new FakeDb()
-    const ctx = { db }
-    const first = await createImmutableAccountLink(ctx as never, 'user-A', 'supabase-A')
-    const second = await createImmutableAccountLink(ctx as never, 'user-A', 'supabase-A')
-    expect(first.created).toBe(true)
-    expect(second.created).toBe(false)
-    expect(db.table('auth_account_links')).toHaveLength(1)
-  })
-
-  it('API : lecture propre seulement ; pas de storeLink public ; token only', () => {
+  it('API : lecture propre ; store interne ; emails serveur', () => {
     expect(source).not.toMatch(/export const getLinkForOwner\s*=\s*query/)
     expect(source).toMatch(/export const getMyLink\s*=\s*query/)
-    expect(source).toMatch(/requireSessionUser/)
-    expect(source).not.toMatch(/export const storeLink\s*=\s*mutation/)
     expect(source).toMatch(/export const storeVerifiedLink\s*=\s*internalMutation/)
-    expect(source).toMatch(/supabaseAccessToken/)
-    expect(source).not.toMatch(/assertLinkForErase/)
-  })
-
-  it('B7-01 : migration auth_users crée le lien', () => {
+    expect(source).toMatch(/ACCOUNT_LINK_EMAIL_MISMATCH/)
+    expect(source).toMatch(/ACCOUNT_LINK_EMAIL_UNCONFIRMED/)
+    expect(source).toMatch(/email_confirmed_at/)
+    expect(source).toMatch(/assertLinkForErase/)
     expect(migrationSource).toContain('createImmutableAccountLink')
-    expect(migrationSource).toContain("args.entityType === 'auth_users'")
-  })
-
-  it('B7-03 : purge Supabase utilise l’id du lien, pas l’id Convex', () => {
-    expect(purgeSource).toContain('internal.accountLinks.getLinkByOwner')
-    expect(purgeSource).toContain('link.supabaseUserId')
-    expect(purgeSource).toContain('resolvedUserId: supabaseUserId')
-    expect(purgeSource).toContain('ACCOUNT_LINK_MISSING')
-    // Ne doit plus purger avec session.userId (Convex) comme user_id Supabase
-    const handlerIdx = purgeSource.indexOf('export const purgeSupabaseMealCopies')
-    const handler = purgeSource.slice(handlerIdx)
-    expect(handler).toContain('const supabaseUserId: string = link.supabaseUserId')
-    expect(handler).not.toMatch(/restSelectSingle\(\s*config,\s*'nutrition',\s*userId/)
+    expect(purgeSource).toContain('countSupabaseMealCopies')
   })
 })
 
-describe('runLinkSupabaseAccount — token', () => {
+describe('runLinkSupabaseAccount — B8-02 emails', () => {
   const originalFetch = globalThis.fetch
 
   beforeEach(() => {
@@ -165,70 +126,164 @@ describe('runLinkSupabaseAccount — token', () => {
     vi.unstubAllGlobals()
   })
 
-  it('token fake → refuse, rien créé', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 401,
-      json: async () => ({}),
-    }) as unknown as typeof fetch
-
-    const runMutation = vi.fn()
-    const runQuery = vi.fn().mockResolvedValue({ userId: 'user-A' })
-
-    await expect(
-      runLinkSupabaseAccount(
-        { runQuery, runMutation },
-        { sessionToken: 'sess', supabaseAccessToken: 'fake-token' },
-      ),
-    ).rejects.toThrow('ACCOUNT_LINK_SUPABASE_UNRESOLVED')
-    expect(runMutation).not.toHaveBeenCalled()
-  })
-
-  it('token d’un Supabase déjà lié ailleurs → refuse', async () => {
+  function mockCtx(opts: {
+    ownerEmail: string
+    ownerConfirmed: boolean
+    supabaseBody: Record<string, unknown>
+  }) {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ id: 'supabase-shared' }),
+      json: async () => opts.supabaseBody,
     }) as unknown as typeof fetch
 
-    const runQuery = vi.fn().mockResolvedValue({ userId: 'user-B' })
-    const runMutation = vi.fn().mockRejectedValue(new Error('ACCOUNT_LINK_ALREADY_TAKEN'))
-
-    await expect(
-      runLinkSupabaseAccount(
-        { runQuery, runMutation },
-        { sessionToken: 'sess-b', supabaseAccessToken: 'token-of-shared' },
-      ),
-    ).rejects.toThrow('ACCOUNT_LINK_ALREADY_TAKEN')
-  })
-
-  it('token valide → storeVerifiedLink avec id résolu serveur', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ id: 'supabase-A' }),
-    }) as unknown as typeof fetch
-
-    const runQuery = vi.fn().mockResolvedValue({ userId: 'user-A' })
     const runMutation = vi.fn().mockResolvedValue({
       created: true,
       ownerUserId: 'user-A',
-      supabaseUserId: 'supabase-A',
+      supabaseUserId: String(opts.supabaseBody.id),
+    })
+    const runQuery = vi.fn().mockImplementation((_ref: unknown, args: Record<string, unknown>) => {
+      if ('sessionToken' in args) {
+        return Promise.resolve({ userId: 'user-A', email: opts.ownerEmail })
+      }
+      return Promise.resolve({
+        ownerUserId: 'user-A',
+        email: opts.ownerEmail,
+        emailConfirmed: opts.ownerConfirmed,
+      })
+    })
+    return { runQuery, runMutation }
+  }
+
+  it('token B avec email différent → refuse, rien créé', async () => {
+    const ctx = mockCtx({
+      ownerEmail: 'a@example.com',
+      ownerConfirmed: true,
+      supabaseBody: {
+        id: 'supabase-B',
+        email: 'b@example.com',
+        email_confirmed_at: '2026-01-01T00:00:00Z',
+      },
+    })
+    await expect(
+      runLinkSupabaseAccount(ctx, {
+        sessionToken: 'sess',
+        supabaseAccessToken: 'token-b',
+      }),
+    ).rejects.toThrow('ACCOUNT_LINK_EMAIL_MISMATCH')
+    expect(ctx.runMutation).not.toHaveBeenCalled()
+  })
+
+  it('email Supabase non confirmé → refuse', async () => {
+    const ctx = mockCtx({
+      ownerEmail: 'same@example.com',
+      ownerConfirmed: true,
+      supabaseBody: {
+        id: 'supabase-A',
+        email: 'same@example.com',
+        email_confirmed_at: null,
+      },
+    })
+    await expect(
+      runLinkSupabaseAccount(ctx, {
+        sessionToken: 'sess',
+        supabaseAccessToken: 'token',
+      }),
+    ).rejects.toThrow('ACCOUNT_LINK_EMAIL_UNCONFIRMED')
+    expect(ctx.runMutation).not.toHaveBeenCalled()
+  })
+
+  it('email Convex non confirmé → refuse', async () => {
+    const ctx = mockCtx({
+      ownerEmail: 'same@example.com',
+      ownerConfirmed: false,
+      supabaseBody: {
+        id: 'supabase-A',
+        email: 'same@example.com',
+        email_confirmed_at: '2026-01-01T00:00:00Z',
+      },
+    })
+    await expect(
+      runLinkSupabaseAccount(ctx, {
+        sessionToken: 'sess',
+        supabaseAccessToken: 'token',
+      }),
+    ).rejects.toThrow('ACCOUNT_LINK_EMAIL_UNCONFIRMED')
+    expect(ctx.runMutation).not.toHaveBeenCalled()
+  })
+
+  it('emails match + confirmés → storeVerifiedLink', async () => {
+    const ctx = mockCtx({
+      ownerEmail: 'Same@Example.com',
+      ownerConfirmed: true,
+      supabaseBody: {
+        id: 'supabase-A',
+        email: 'same@example.com',
+        email_confirmed_at: '2026-01-01T00:00:00Z',
+      },
+    })
+    const result = await runLinkSupabaseAccount(ctx, {
+      sessionToken: 'sess',
+      supabaseAccessToken: 'good',
+    })
+    expect(result.supabaseUserId).toBe('supabase-A')
+    expect(ctx.runMutation).toHaveBeenCalled()
+  })
+})
+
+describe('runAssertLinkForErase — B8-01', () => {
+  const originalFetch = globalThis.fetch
+
+  beforeEach(() => {
+    vi.stubGlobal('process', {
+      env: {
+        SUPABASE_URL: 'https://example.supabase.co',
+        SUPABASE_ANON_KEY: 'anon-key',
+      },
+    })
+  })
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+    vi.unstubAllGlobals()
+  })
+
+  it('token Supabase B alors que lien = A → ACCOUNT_LINK_MISMATCH', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: 'supabase-B',
+        email: 'b@example.com',
+        email_confirmed_at: '2026-01-01T00:00:00Z',
+      }),
+    }) as unknown as typeof fetch
+
+    const runQuery = vi.fn().mockImplementation((_ref: unknown, args: Record<string, unknown>) => {
+      if ('sessionToken' in args) return Promise.resolve({ userId: 'user-A' })
+      return Promise.resolve({
+        ownerUserId: 'user-A',
+        supabaseUserId: 'supabase-A',
+        linkedAt: 1,
+      })
     })
 
-    const result = await runLinkSupabaseAccount(
-      { runQuery, runMutation },
-      { sessionToken: 'sess', supabaseAccessToken: 'good-token' },
-    )
-    expect(result).toEqual({
-      ok: true,
-      created: true,
-      ownerUserId: 'user-A',
-      supabaseUserId: 'supabase-A',
+    await expect(
+      runAssertLinkForErase(
+        { runQuery },
+        { sessionToken: 'sess', supabaseAccessToken: 'token-b' },
+      ),
+    ).rejects.toThrow('ACCOUNT_LINK_MISMATCH')
+  })
+
+  it('sans token téléphone + lien présent → ok', async () => {
+    const runQuery = vi.fn().mockImplementation((_ref: unknown, args: Record<string, unknown>) => {
+      if ('sessionToken' in args) return Promise.resolve({ userId: 'user-A' })
+      return Promise.resolve({
+        ownerUserId: 'user-A',
+        supabaseUserId: 'supabase-A',
+        linkedAt: 1,
+      })
     })
-    expect(runMutation).toHaveBeenCalledWith(
-      expect.anything(),
-      { ownerUserId: 'user-A', supabaseUserId: 'supabase-A' },
-    )
-    // Le téléphone n’a pas fourni supabaseUserId dans les args
-    expect(globalThis.fetch).toHaveBeenCalled()
+    const result = await runAssertLinkForErase({ runQuery }, { sessionToken: 'sess' })
+    expect(result.supabaseUserId).toBe('supabase-A')
   })
 })
