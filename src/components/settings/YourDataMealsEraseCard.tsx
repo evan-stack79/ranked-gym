@@ -5,7 +5,9 @@ import { canAccessFoodAdd } from '../../services/foodAddAccess'
 import { getCalorieProfile } from '../../services/nutritionStorage'
 import {
   ERASE_MEALS_CONNECT_MESSAGE,
+  ERASE_MEALS_PURGE_FAILED_MESSAGE,
   EraseMealsNeedsConnectionError,
+  EraseMealsPurgeError,
   eraseAllUserMeals,
   fetchStoredMealsCount,
 } from '../../services/eraseUserMeals'
@@ -182,10 +184,13 @@ export function YourDataMealsEraseCard() {
           setCount(0)
           setConfirmOpen(false)
         } catch (err) {
+          // Ne pas fermer le sheet ni remettre count à 0 → retryable.
           if (err instanceof EraseMealsNeedsConnectionError) {
             setError(ERASE_MEALS_CONNECT_MESSAGE)
+          } else if (err instanceof EraseMealsPurgeError) {
+            setError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
           } else {
-            setError('Impossible d’effacer les repas pour le moment. Réessaie.')
+            setError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
           }
         } finally {
           setBusy(false)

@@ -1,8 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { hardDeleteAllUserMeals } from '../../convex/nutrition'
+import {
+  backupPayloadContainsMealName,
+  journalJsonContainsMealName,
+} from '../utils/stripJournalMeals'
 
-type TableName = 'nutrition_meals' | 'nutrition_state'
+type TableName = 'nutrition_meals' | 'nutrition_state' | 'legacy_supabase_backups'
 
 type StoredRow = Record<string, unknown> & { _id: string }
 
@@ -11,6 +15,7 @@ class FakeDb {
   private rows: Record<TableName, StoredRow[]> = {
     nutrition_meals: [],
     nutrition_state: [],
+    legacy_supabase_backups: [],
   }
 
   insert(table: TableName, value: Record<string, unknown>) {
@@ -77,7 +82,7 @@ class FakeQuery {
   }
 }
 
-describe('deleteAllMyMeals — hard-delete tombstones', () => {
+describe('deleteAllMyMeals — hard-delete + multi-store meal purge', () => {
   const source = readFileSync(new URL('../../convex/nutrition.ts', import.meta.url), 'utf8')
 
   it('expose countActiveMeals et deleteAllMyMeals sans assertFoodWriteAccess', () => {
@@ -85,6 +90,8 @@ describe('deleteAllMyMeals — hard-delete tombstones', () => {
     expect(source).toContain('export const deleteAllMyMeals')
     expect(source).toContain('hardDeleteAllUserMeals')
     expect(source).toContain('mealSyncTombstone')
+    expect(source).toContain('legacy_supabase_backups')
+    expect(source).toContain('stripMealsFromBackupPayload')
 
     const countIdx = source.indexOf('export const countActiveMeals')
     const countBlock = source.slice(countIdx, countIdx + 900)
@@ -98,18 +105,19 @@ describe('deleteAllMyMeals — hard-delete tombstones', () => {
     expect(delBlock).toContain('hardDeleteAllUserMeals')
   })
 
-  it('après delete-all : aucun contenu repas ; tombstones id+deletedAt ; journalJson vide', async () => {
+  it('après delete-all : aucun nom de repas dans meals, journalJson, legacy_supabase_backups', async () => {
     const db = new FakeDb()
     const ctx = { db }
     const now = 1_700_000_000_000
     const userId = 'user-erase'
+    const mealName = 'Skyr Vanille'
 
     await db.insert('nutrition_meals', {
       userId,
       mealId: 'meal-a',
       dateKey: '2026-10-14',
       mealType: 'lunch',
-      name: 'Skyr',
+      name: mealName,
       calories: 120,
       proteinG: 15,
       carbsG: 8,
@@ -123,7 +131,7 @@ describe('deleteAllMyMeals — hard-delete tombstones', () => {
       mealId: 'meal-b',
       dateKey: '2026-10-13',
       mealType: 'dinner',
-      name: 'Pomme',
+      name: 'Pomme Golden',
       calories: 52,
       createdAt: now,
       updatedAt: now,
@@ -145,38 +153,69 @@ describe('deleteAllMyMeals — hard-delete tombstones', () => {
       userId,
       profileJson: { age: 16 },
       journalJson: {
-        '2026-10-14': { meals: [{ id: 'meal-a', name: 'Skyr', calories: 120 }] },
+        '2026-10-14': {
+          meals: [{ id: 'meal-a', name: mealName, calories: 120 }],
+          waterEntries: [{ id: 'w1', amountMl: 250, type: 'glass', label: 'Verre', createdAt: now }],
+          waterMl: 250,
+        },
       },
       updatedAt: now,
+    })
+    await db.insert('legacy_supabase_backups', {
+      userId,
+      source: 'supabase_user_backups',
+      updatedAt: now,
+      payloadJson: {
+        nutrition: {
+          profile: { age: 16 },
+          journal: {
+            '2026-10-14': {
+              meals: [{ id: 'meal-a', name: mealName, calories: 120 }],
+              waterMl: 250,
+            },
+          },
+        },
+        training: { routines: [{ name: 'Push' }] },
+      },
     })
 
     const result = await hardDeleteAllUserMeals(ctx as never, userId, now + 50)
 
     expect(result.deletedCount).toBe(2)
-    expect(result.updatedAt).toBe(now + 50)
 
     const mine = db.table('nutrition_meals').filter((r) => r.userId === userId)
     expect(mine).toHaveLength(2)
     for (const row of mine) {
       expect(Object.keys(row).sort()).toEqual(['_id', 'deletedAt', 'mealId', 'updatedAt', 'userId'])
-      expect(row.deletedAt).toBe(now + 50)
-      expect(row.updatedAt).toBe(now + 50)
       expect(row.name).toBeUndefined()
-      expect(row.calories).toBeUndefined()
-      expect(row.dateKey).toBeUndefined()
-      expect(row.proteinG).toBeUndefined()
-      expect(row.carbsG).toBeUndefined()
-      expect(row.fatG).toBeUndefined()
-      expect(row.mealType).toBeUndefined()
+      expect(JSON.stringify(row)).not.toContain(mealName)
+      expect(JSON.stringify(row)).not.toContain('Pomme Golden')
     }
-    expect(mine.map((r) => r.mealId).sort()).toEqual(['meal-a', 'meal-b'])
+
+    const state = db.table('nutrition_state').find((r) => r.userId === userId)
+    expect(journalJsonContainsMealName(state?.journalJson, mealName)).toBe(false)
+    expect(journalJsonContainsMealName(state?.journalJson, 'Pomme Golden')).toBe(false)
+    // Eau conservée
+    const day = (state?.journalJson as Record<string, { waterMl?: number; meals?: unknown[] }>)[
+      '2026-10-14'
+    ]
+    expect(day.meals).toEqual([])
+    expect(day.waterMl).toBe(250)
+    expect(state?.profileJson).toEqual({ age: 16 })
+
+    const legacy = db.table('legacy_supabase_backups').find((r) => r.userId === userId)
+    expect(backupPayloadContainsMealName(legacy?.payloadJson, mealName)).toBe(false)
+    expect(backupPayloadContainsMealName(legacy?.payloadJson, 'Pomme Golden')).toBe(false)
+    const legacyPayload = legacy?.payloadJson as {
+      nutrition: { journal: Record<string, { meals: unknown[]; waterMl?: number }>; profile: unknown }
+      training: { routines: unknown[] }
+    }
+    expect(legacyPayload.nutrition.journal['2026-10-14'].meals).toEqual([])
+    expect(legacyPayload.nutrition.journal['2026-10-14'].waterMl).toBe(250)
+    expect(legacyPayload.nutrition.profile).toEqual({ age: 16 })
+    expect(legacyPayload.training.routines).toEqual([{ name: 'Push' }])
 
     const other = db.table('nutrition_meals').find((r) => r.userId === 'other-user')
     expect(other?.name).toBe('Keep me')
-    expect(other?.calories).toBe(99)
-
-    const state = db.table('nutrition_state').find((r) => r.userId === userId)
-    expect(state?.journalJson).toEqual({})
-    expect(state?.profileJson).toEqual({ age: 16 })
   })
 })

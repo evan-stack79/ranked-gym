@@ -10,6 +10,10 @@ import {
 } from './_generated/server'
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
 import { assertFoodAddAccessFromStoredProfile } from './lib/foodAddAccess'
+import {
+  stripMealsFromBackupPayload,
+  stripMealsFromJournalJson,
+} from './lib/stripJournalMeals'
 
 const NUTRITION_SCHEMA_VERSION = 1
 const DEFAULT_OFF_TIMEOUT_MS = 8_000
@@ -416,7 +420,20 @@ export async function hardDeleteAllUserMeals(
   for (const state of states) {
     assertUserOwnership(state.userId, userId)
     await ctx.db.patch(state._id, {
-      journalJson: {},
+      journalJson: stripMealsFromJournalJson(state.journalJson),
+      updatedAt: deletedAt,
+    })
+  }
+
+  // Migration blob : retirer seulement les repas, garder le reste du payload.
+  const legacyBackups = await ctx.db
+    .query('legacy_supabase_backups')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .collect()
+  for (const backup of legacyBackups) {
+    assertUserOwnership(backup.userId, userId)
+    await ctx.db.patch(backup._id, {
+      payloadJson: stripMealsFromBackupPayload(backup.payloadJson),
       updatedAt: deletedAt,
     })
   }
