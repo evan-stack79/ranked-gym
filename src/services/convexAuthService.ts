@@ -96,22 +96,16 @@ export async function signInWithPassword(
   }
 }
 
-/** B11-01 : phone sends ONLY the Google ID token — never email/sub. */
-export async function signInWithGoogle(idToken: string): Promise<{
+/** B11-01 / emergency: Google sign-in fail-closed on prod-linked deployments. */
+export async function signInWithGoogle(_idToken: string): Promise<{
   user: AuthUser
   sessionToken: string
   mustResetPassword: boolean
   emailConfirmed: true
 }> {
-  const client = requireConvexClient()
-  const result = await client.action(api.auth.signInWithGoogle, { idToken })
-  await setStoredSessionToken(result.sessionToken)
-  return {
-    user: mapAuthUser(result.user),
-    sessionToken: result.sessionToken,
-    mustResetPassword: result.mustResetPassword,
-    emailConfirmed: true as const,
-  }
+  void _idToken
+  // Do not call Convex — production Worker shares real Convex/Supabase.
+  throw new Error('AUTH_GOOGLE_DISABLED')
 }
 
 export async function signOut(): Promise<void> {

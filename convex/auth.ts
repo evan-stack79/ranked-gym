@@ -11,7 +11,6 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from './_generated/server'
-import { internal } from './_generated/api'
 import {
   assertPasswordPolicy,
   createOpaqueToken,
@@ -41,9 +40,6 @@ import { markEmailConfirmedViaGoogleForUser } from './emailVerification'
 import {
   AUTH_GOOGLE_DISABLED,
   AUTH_GOOGLE_TOKEN_INVALID,
-  getGoogleClientId,
-  isGoogleSignInConfigured,
-  verifyGoogleIdToken,
 } from './lib/googleIdToken'
 
 const RESET_ROUTE_PATH = '/auth/reset-password'
@@ -839,29 +835,15 @@ export const signInWithGoogle = action({
       displayName: v.string(),
     }),
   }),
-  handler: async (ctx, args): Promise<GoogleSignInResult> => {
-    if (!isGoogleSignInConfigured()) {
-      throw new Error(AUTH_GOOGLE_DISABLED)
-    }
-    const clientId = getGoogleClientId()
-    let verified
-    try {
-      verified = await verifyGoogleIdToken(args.idToken, { clientId })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : ''
-      if (message === AUTH_GOOGLE_DISABLED) throw new Error(AUTH_GOOGLE_DISABLED)
-      throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
-    }
-    const result: GoogleSignInResult = await ctx.runMutation(
-      internal.auth.completeGoogleSignInFromVerifiedClaimsMutation,
-      {
-        email: verified.email,
-        googleSub: verified.sub,
-        displayName: verified.name,
-        emailVerified: true as const,
-      },
-    )
-    return result
+  handler: async (_ctx, _args): Promise<GoogleSignInResult> => {
+    // EMERGENCY FAIL-CLOSED (B11): Cloudflare Workers production
+    // (ranked-gym.lembrezevan.workers.dev) deploys this PR branch against real
+    // Convex `fortunate-bloodhound-90` + Supabase `jivqfrkwvnzzefnerpii`.
+    // Throw before any token parse / session creation until Google sign-in is
+    // re-enabled behind an isolated non-prod Convex deployment.
+    void _ctx
+    void _args
+    throw new Error(AUTH_GOOGLE_DISABLED)
   },
 })
 

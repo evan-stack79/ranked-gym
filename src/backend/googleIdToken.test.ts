@@ -133,6 +133,20 @@ describe('Google ID token sign-in — B11-01', () => {
     expect(isGoogleSignInConfigured()).toBe(false)
   })
 
+  it('fail-closed unless CONVEX_GOOGLE_SIGNIN_ENABLED=true even with client id', () => {
+    vi.stubGlobal('process', {
+      env: { GOOGLE_CLIENT_ID: OUR_CLIENT_ID },
+    })
+    expect(isGoogleSignInConfigured()).toBe(false)
+    vi.stubGlobal('process', {
+      env: {
+        GOOGLE_CLIENT_ID: OUR_CLIENT_ID,
+        CONVEX_GOOGLE_SIGNIN_ENABLED: 'true',
+      },
+    })
+    expect(isGoogleSignInConfigured()).toBe(true)
+  })
+
   it('fake token => refused, no session', async () => {
     const db = new FakeDb()
     const { publicJwk } = await generateTestGoogleKeyPair()

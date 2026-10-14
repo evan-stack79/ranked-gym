@@ -24,8 +24,17 @@ export function getGoogleClientId(): string {
   )
 }
 
+/**
+ * Google sign-in stays fail-closed by default.
+ * Requires client id AND explicit CONVEX_GOOGLE_SIGNIN_ENABLED=true.
+ * (Public action currently hard-throws regardless — emergency kill-switch.)
+ */
 export function isGoogleSignInConfigured(): boolean {
-  return getGoogleClientId().length > 0
+  const enabled = (() => {
+    const raw = readEnv('CONVEX_GOOGLE_SIGNIN_ENABLED')?.trim().toLowerCase()
+    return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on'
+  })()
+  return enabled && getGoogleClientId().length > 0
 }
 
 export type GoogleJwks = {
