@@ -42,4 +42,10 @@ describe('foodOfflineCache', () => {
     expect(listCachedFoods({ categoryTag: 'en:fruits' })).toHaveLength(1)
     expect(listCachedFoods({ categoryTag: 'en:beverages' })).toHaveLength(0)
   })
+
+  it('conserve imageStorageId pour résolution hors ligne', () => {
+    rememberFoodHits([HIT])
+    const cached = listCachedFoods({ term: 'banane' })
+    expect(cached[0]?.imageStorageId).toBe('storage:abc')
+  })
 })

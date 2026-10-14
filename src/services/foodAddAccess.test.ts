@@ -48,4 +48,12 @@ describe('foodAddAccess — mineur / TCA / diabète', () => {
   it('autorise un adulte sans restriction', () => {
     expect(canAccessFoodAdd(ADULT)).toBe(true)
   })
+
+  it('refuse un âge inconnu (null / undefined) — aligné serveur', () => {
+    expect(decideFoodAddAccess({ ...ADULT, age: null as unknown as number })).toEqual({
+      allowed: false,
+      reason: 'minor',
+    })
+    expect(canAccessFoodAdd({ ...ADULT, age: undefined as unknown as number })).toBe(false)
+  })
 })

@@ -1,24 +1,29 @@
 import { useEffect, useState, type ImgHTMLAttributes } from 'react'
 import { Apple } from 'lucide-react'
+import { resolveCachedImageUrl } from '../../services/foodOfflineCache'
 
 interface OffProductImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'src' | 'alt'> {
   src?: string | null
   alt: string
   /** Taille visuelle (px) pour le fallback. */
   size?: number
-  /** Force l’icône neutre (tests offline). */
+  /** Force l’icône neutre (tests). */
   forceFallback?: boolean
+  barcode?: string
+  productName?: string
 }
 
 /**
- * Photo OFF chargée à la demande — jamais bloquante.
- * Offline / erreur → icône neutre ; l’ajout au journal reste possible.
+ * Photo produit — URL de notre stockage, ou data URL du cache offline.
+ * Offline : affiche les octets locaux s’ils existent ; sinon icône neutre.
  */
 export function OffProductImage({
   src,
   alt,
   size = 72,
   forceFallback = false,
+  barcode,
+  productName,
   className = '',
   ...rest
 }: OffProductImageProps) {
@@ -26,10 +31,31 @@ export function OffProductImage({
   const [online, setOnline] = useState(
     typeof navigator === 'undefined' ? true : navigator.onLine !== false,
   )
+  const [resolvedSrc, setResolvedSrc] = useState<string | undefined>(() => {
+    if (src?.startsWith('data:image/')) return src
+    if (barcode && productName) {
+      return resolveCachedImageUrl({ barcode, nom: productName, imageUrl: src ?? undefined })
+    }
+    return src ?? undefined
+  })
 
   useEffect(() => {
     setFailed(false)
-  }, [src])
+    if (src?.startsWith('data:image/')) {
+      setResolvedSrc(src)
+      return
+    }
+    if (barcode && productName) {
+      const cached = resolveCachedImageUrl({
+        barcode,
+        nom: productName,
+        imageUrl: src ?? undefined,
+      })
+      setResolvedSrc(cached ?? src ?? undefined)
+      return
+    }
+    setResolvedSrc(src ?? undefined)
+  }, [src, barcode, productName])
 
   useEffect(() => {
     const on = () => setOnline(true)
@@ -42,23 +68,25 @@ export function OffProductImage({
     }
   }, [])
 
-  const showImage = Boolean(src) && !failed && online && !forceFallback
+  const hasLocalBytes = Boolean(resolvedSrc?.startsWith('data:image/'))
+  const showImage =
+    Boolean(resolvedSrc) && !failed && !forceFallback && (online || hasLocalBytes)
 
   return (
     <div
-      className={`relative flex items-center justify-center overflow-visible ${className}`}
+      className={`relative flex items-center justify-center overflow-hidden rounded-2xl ${className}`}
       style={{ width: size, height: size }}
       data-off-image={showImage ? 'ready' : 'fallback'}
     >
       {showImage ? (
         <img
           {...rest}
-          src={src!}
+          src={resolvedSrc}
           alt={alt}
           loading="lazy"
           decoding="async"
           referrerPolicy="no-referrer"
-          className="pointer-events-none h-full w-full object-contain drop-shadow-[0_6px_12px_rgba(0,0,0,0.45)]"
+          className="pointer-events-none h-full w-full object-contain"
           onError={() => setFailed(true)}
         />
       ) : (

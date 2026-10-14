@@ -92,6 +92,7 @@ describe('AddFoodScreen content rules', () => {
     expect(screen?.textContent).toContain('1 portion (120 g)')
     expect(screen?.textContent).toContain('pour 100 g')
     expect(screen?.textContent).toContain('Données Open Food Facts')
+    expect(screen?.textContent).toContain('ODbL')
     expect(screen?.textContent).toContain('CC BY-SA 3.0')
     expect(screen?.textContent).toContain('Ou saisie manuelle')
 

@@ -65,9 +65,21 @@ describe('Convex foodAddAccess (serveur)', () => {
     expect(result).toEqual({ ok: true, diabetes: true })
   })
 
+  it('refuse un âge inconnu (profil sans age)', async () => {
+    const ctx = fakeCtx({
+      userId: 'u1',
+      profileJson: { declaredEatingDisorder: false },
+    })
+    const result = await assertFoodAddAccessFromStoredProfile(ctx as never, 'u1')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toBe(FOOD_ADD_ACCESS_DENIED_MINOR)
+  })
+
   it('helpers lecture profil', () => {
     expect(isAdultStoredAge(18)).toBe(true)
     expect(isAdultStoredAge(17)).toBe(false)
+    expect(isAdultStoredAge(null)).toBe(false)
+    expect(isAdultStoredAge(undefined)).toBe(false)
     expect(
       extractEatingDisorderFromProfileJson({
         healthAnswer: 'situations',

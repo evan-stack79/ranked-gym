@@ -5,6 +5,7 @@ import {
   formatOffServingSize,
   parseGramsFromServingSize,
   scaleNutrientPer100g,
+  stripJudgingWordsFromFoodName,
 } from './foodDisplay'
 
 describe('foodDisplay (scientific checker)', () => {
@@ -33,5 +34,12 @@ describe('foodDisplay (scientific checker)', () => {
     expect(parseGramsFromServingSize('250 ml')).toBeNull()
     expect(scaleNutrientPer100g(200, 50, 0)).toBe(100)
     expect(scaleNutrientPer100g(null, 50, 0)).toBeNull()
+  })
+
+  it('filtre les mots de jugement (light, sans sucres, allégé…)', () => {
+    expect(stripJudgingWordsFromFoodName('Coca light')).toBe('Coca')
+    expect(cleanupFoodName('Yaourt allégé sans sucres')).toMatch(/Yaourt/i)
+    expect(cleanupFoodName('Yaourt allégé sans sucres')).not.toMatch(/allégé|sans sucres|light/i)
+    expect(cleanupFoodName('Boisson LIGHT 33cl')).not.toMatch(/light/i)
   })
 })

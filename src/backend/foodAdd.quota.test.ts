@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { __test } from './foodAdd'
+import { __test } from '../../convex/foodAdd'
 
 describe('foodAdd — mapping OFF + quota', () => {
   it('mappe serving_size et categories_tags (sans hotlink image)', () => {

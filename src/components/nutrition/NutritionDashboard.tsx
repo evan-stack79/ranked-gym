@@ -358,7 +358,7 @@ export function NutritionDashboard({
             name: snapshot.name,
             portionLabel: snapshot.portionLabel,
             offCode: snapshot.offCode,
-            imageUrl: snapshot.imageUrl,
+            imageUrl: snapshot.imageStorageId ? snapshot.imageUrl : undefined,
             imageStorageId: snapshot.imageStorageId as never,
             calories: snapshot.calories,
             proteinG: snapshot.proteinG ?? null,
@@ -408,6 +408,7 @@ export function NutritionDashboard({
   }
 
   const openScanner = (forMeal?: MealType) => {
+    if (foodAddV3 && !canAccessFoodAdd(profile)) return
     if (forMeal) {
       setPendingMealType(forMeal)
       setMealType(forMeal)
@@ -681,15 +682,17 @@ export function NutritionDashboard({
           />
         </Reveal>
 
-        {!declarations.eatingDisorder ? (
+        {(foodAddV3 ? canAccessFoodAdd(profile) : !declarations.eatingDisorder) ? (
           <NutritionQuickActions onAction={handleQuickAction} />
         ) : null}
 
         <NutritionDayMealsCard
           meals={meals}
-          onAddMeal={declarations.eatingDisorder ? () => undefined : openAddFood}
+          onAddMeal={
+            foodAddV3 && !canAccessFoodAdd(profile) ? () => undefined : openAddFood
+          }
           onEditMeal={setEditingMeal}
-          hideAdd={declarations.eatingDisorder}
+          hideAdd={foodAddV3 ? !canAccessFoodAdd(profile) : declarations.eatingDisorder}
         />
 
         <div ref={journalRef} className="scroll-mt-4">
@@ -788,11 +791,13 @@ export function NutritionDashboard({
         }}
       />
 
-      <BarcodeScanner
-        open={scannerOpen && !showForm}
-        onClose={() => setScannerOpen(false)}
-        onProduct={handleScannedProduct}
-      />
+      {(!foodAddV3 || canAccessFoodAdd(profile)) ? (
+        <BarcodeScanner
+          open={scannerOpen && !showForm}
+          onClose={() => setScannerOpen(false)}
+          onProduct={handleScannedProduct}
+        />
+      ) : null}
 
       {showForm && foodAddV3 && canAccessFoodAdd(profile) ? (
         <AddFoodScreenV3

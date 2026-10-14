@@ -7,7 +7,7 @@
  */
 import type { CalorieProfile } from '../types/nutrition'
 import {
-  isMinorAge,
+  isMinorOrUnknownAge,
   readHealthDeclarations,
   type SafetyProfileInput,
 } from './nutritionSafetyRules'
@@ -22,7 +22,8 @@ export function decideFoodAddAccess(
   if (!profile) {
     return { allowed: false, reason: 'minor' }
   }
-  if (isMinorAge(profile.age)) {
+  // Âge inconnu = protégé (aligné serveur fail-closed).
+  if (isMinorOrUnknownAge(profile.age)) {
     return { allowed: false, reason: 'minor' }
   }
   const declarations = readHealthDeclarations(profile)

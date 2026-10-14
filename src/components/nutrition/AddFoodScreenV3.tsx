@@ -103,8 +103,8 @@ export function AddFoodScreenV3({
   onPhotoAnalyzed,
   name,
   onNameChange,
-  calories,
-  onCaloriesChange,
+  calories: _calories,
+  onCaloriesChange: _onCaloriesChange,
   proteinG,
   onProteinChange,
   carbsG,
@@ -117,6 +117,8 @@ export function AddFoodScreenV3({
   onClose,
   forceOfflineImages = false,
 }: AddFoodScreenProps) {
+  void _calories
+  void _onCaloriesChange
   const [manualOpen, setManualOpen] = useState(false)
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
   const online = useOnlineStatus()
@@ -307,7 +309,7 @@ export function AddFoodScreenV3({
 
           {filteredHits.length > 0 ? (
             <ul
-              className="grid grid-cols-2 gap-x-3 gap-y-8 pt-8"
+              className="grid grid-cols-2 gap-x-3 gap-y-3 pt-2"
               role="listbox"
               aria-label="Résultats Open Food Facts"
               aria-multiselectable="true"
@@ -328,9 +330,15 @@ export function AddFoodScreenV3({
             </ul>
           ) : null}
 
-          <footer className="mt-8 space-y-1 pb-4 text-center">
-            <p className="text-[11px] text-[#636366]">Données Open Food Facts</p>
-            <p className="text-[10px] leading-snug text-[#48484A]">
+          <footer
+            className="mt-8 space-y-1.5 pb-4 text-center"
+            data-off-licence
+            aria-label="Licence Open Food Facts"
+          >
+            <p className="text-[12px] leading-snug text-[#AEAEB2]">
+              Données Open Food Facts · licence ODbL
+            </p>
+            <p className="text-[12px] leading-snug text-[#8E8E93]">
               Photos : contributeurs Open Food Facts · CC BY-SA 3.0
             </p>
           </footer>
@@ -339,6 +347,7 @@ export function AddFoodScreenV3({
             <div className="border-t border-white/8 pb-4 pt-2">
               <button
                 type="button"
+                data-manual-toggle
                 onClick={() => setManualOpen((v) => !v)}
                 className="ios-press w-full py-2 text-left text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]"
                 aria-expanded={manualOpen}
@@ -375,21 +384,6 @@ export function AddFoodScreenV3({
                   </label>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <label className="block">
-                      <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
-                        Calories
-                      </span>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min={1}
-                        max={5000}
-                        value={calories}
-                        onChange={(e) => onCaloriesChange(Number(e.target.value))}
-                        className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#FF2B2B]/40"
-                        required
-                      />
-                    </label>
                     <label className="block">
                       <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
                         Protéines (g)

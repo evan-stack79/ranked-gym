@@ -22,7 +22,7 @@ export interface OpenFoodFactsProduct {
   proteines: number | null
   glucides: number | null
   lipides: number | null
-  /** URL de NOTRE cache / stockage — jamais un hotlink OFF en v3. */
+  /** URL de NOTRE cache / stockage — jamais un hotlink OFF. */
   imageUrl?: string
   imageStorageId?: string
   brands?: string
@@ -57,43 +57,7 @@ export interface PersonalFoodItem {
   lastSelectedAt: number
 }
 
-interface OffProductFields {
-  code?: string
-  _id?: string
-  product_name?: string
-  product_name_fr?: string
-  brands?: string
-  serving_size?: string
-  categories_tags?: string[]
-  nutriments?: {
-    'energy-kcal_100g'?: number
-    energy_kcal_100g?: number
-    proteins_100g?: number
-    carbohydrates_100g?: number
-    fat_100g?: number
-  }
-  image_front_small_url?: string
-  image_front_url?: string
-}
-
-interface OffProductResponse {
-  status: number
-  product?: OffProductFields
-}
-
-interface OffSearchResponse {
-  products?: OffProductFields[]
-}
-
 const SEARCH_PAGE_SIZE = 20
-
-function asNullableNumber(value: unknown, precision = 1): number | null {
-  const n = typeof value === 'number' ? value : Number(value)
-  if (!Number.isFinite(n)) return null
-  if (precision === 0) return Math.round(n)
-  const factor = precision === 1 ? 10 : 100
-  return Math.round(n * factor) / factor
-}
 
 function mapCloudProduct(product: OpenFoodFactsProductCloud): OpenFoodFactsSearchHit {
   return {
@@ -113,106 +77,38 @@ function mapCloudProduct(product: OpenFoodFactsProductCloud): OpenFoodFactsSearc
   }
 }
 
-function mapOffProduct(raw: OffProductFields, fallbackBarcode: string): OpenFoodFactsSearchHit {
-  const nutriments = raw.nutriments ?? {}
-  const barcode = String(raw.code || raw._id || fallbackBarcode).trim() || fallbackBarcode
-  const tags = Array.isArray(raw.categories_tags)
-    ? raw.categories_tags.filter((t): t is string => typeof t === 'string')
-    : []
-  return {
-    barcode,
-    nom: raw.product_name_fr?.trim() || raw.product_name?.trim() || `Produit ${barcode}`,
-    brands: raw.brands?.trim() || '',
-    calories: asNullableNumber(nutriments['energy-kcal_100g'] ?? nutriments.energy_kcal_100g, 0),
-    proteines: asNullableNumber(nutriments.proteins_100g),
-    glucides: asNullableNumber(nutriments.carbohydrates_100g),
-    lipides: asNullableNumber(nutriments.fat_100g),
-    imageUrl: raw.image_front_small_url || raw.image_front_url,
-    servingSize: raw.serving_size?.trim() || null,
-    categoriesTags: tags,
-    provenance: 'open_food_facts',
-    fetchedAt: Date.now(),
+function mapAccessError(error: unknown): Error | null {
+  const message = error instanceof Error ? error.message : String(error)
+  if (message.includes('FOOD_SEARCH_DAILY_LIMIT')) {
+    return new Error('Limite quotidienne de recherches atteinte. Réessaie demain.')
   }
+  if (
+    message.includes('FOOD_ADD_ACCESS_DENIED') ||
+    message.includes('FOOD_ADD_ACCESS_DENIED_MINOR') ||
+    message.includes('FOOD_ADD_ACCESS_DENIED_TCA')
+  ) {
+    return new Error('Ajout d’aliment indisponible pour ce compte.')
+  }
+  return null
 }
 
-async function fetchOpenFoodFactsDirect(barcode: string): Promise<OpenFoodFactsProduct> {
-  const code = barcode.trim()
-  const response = await fetch(
-    `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json`,
-    {
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': 'RankedGym/1.0 (support@rankedgym.app)',
-      },
-    },
-  )
-  if (!response.ok) {
-    throw new Error('Open Food Facts indisponible. Réessaie.')
-  }
-  const data = (await response.json()) as OffProductResponse
-  if (data.status !== 1 || !data.product) {
-    throw new Error('Produit introuvable dans Open Food Facts.')
-  }
-  return mapOffProduct(data.product, code)
-}
-
-async function searchOpenFoodFactsDirect(
-  term: string,
-  signal?: AbortSignal,
-  options?: { categoryTag?: string | null },
-): Promise<OpenFoodFactsSearchHit[]> {
-  const searchTerm = term.trim()
-  const categoryTag = options?.categoryTag?.trim() || ''
-  if (searchTerm.length < 2 && !categoryTag) return []
-
-  const params = new URLSearchParams()
-  params.set('action', 'process')
-  params.set('json', '1')
-  params.set('sort_by', 'unique_scans_n')
-  params.set('page_size', String(SEARCH_PAGE_SIZE))
-  if (searchTerm.length >= 2) {
-    params.set('search_terms', searchTerm)
-    params.set('search_simple', '1')
-  }
-  if (categoryTag) {
-    params.set('tagtype_0', 'categories')
-    params.set('tag_contains_0', 'contains')
-    params.set('tag_0', categoryTag)
-  }
-
-  const url = `https://world.openfoodfacts.org/cgi/search.pl?${params.toString()}`
-  const response = await fetch(url, {
-    signal,
-    headers: {
-      Accept: 'application/json',
-      'User-Agent': 'RankedGym/1.0 (support@rankedgym.app)',
-    },
-  })
-  if (!response.ok) {
-    throw new Error('Recherche Open Food Facts indisponible. Réessaie.')
-  }
-  const data = (await response.json()) as OffSearchResponse
-  const products = Array.isArray(data.products) ? data.products : []
-  const hits: OpenFoodFactsSearchHit[] = []
-  for (const raw of products) {
-    const name = raw.product_name_fr?.trim() || raw.product_name?.trim() || ''
-    if (!name) continue
-    hits.push(mapOffProduct(raw, String(raw.code || raw._id || `search-${hits.length}`)))
-    if (hits.length >= SEARCH_PAGE_SIZE) break
-  }
-  return hits
-}
-
+/**
+ * Le téléphone ne contacte JAMAIS Open Food Facts (flag ON ou OFF).
+ * Barcode → Convex uniquement ; échec → erreur (pas de repli world.openfoodfacts.org).
+ */
 export async function fetchOpenFoodFacts(barcode: string): Promise<OpenFoodFactsProduct> {
-  if (isConvexDomainActive()) {
-    try {
-      const product = await fetchOpenFoodFactsViaConvex(barcode)
-      return mapCloudProduct(product)
-    } catch (error) {
-      safeWarn('[aliments] convex OFF barcode lookup failed, fallback direct', error)
-    }
+  if (!isConvexDomainActive()) {
+    throw new Error('Recherche produit indisponible hors ligne serveur.')
   }
-  return fetchOpenFoodFactsDirect(barcode)
+  try {
+    const product = await fetchOpenFoodFactsViaConvex(barcode)
+    return mapCloudProduct(product)
+  } catch (error) {
+    const access = mapAccessError(error)
+    if (access) throw access
+    safeWarn('[aliments] convex OFF barcode lookup failed (no direct OFF fallback)', error)
+    throw new Error('Produit introuvable. Réessaie.')
+  }
 }
 
 export async function saveAliment(
@@ -269,6 +165,10 @@ export async function saveAliment(
   return data
 }
 
+/**
+ * Recherche OFF — toujours via notre serveur (Convex) + cache offline.
+ * Aucun fetch vers world.openfoodfacts.org depuis le téléphone.
+ */
 export async function searchOpenFoodFacts(
   term: string,
   signal?: AbortSignal,
@@ -277,11 +177,16 @@ export async function searchOpenFoodFacts(
   const categoryTag = options?.categoryTag?.trim() || null
   const searchTerm = term.trim()
 
-  // v3 : le téléphone ne contacte JAMAIS Open Food Facts — Convex uniquement + cache offline.
-  if (isFoodAddV3Enabled()) {
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      return listCachedFoods({ term: searchTerm, categoryTag, limit: SEARCH_PAGE_SIZE })
-    }
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return listCachedFoods({ term: searchTerm, categoryTag, limit: SEARCH_PAGE_SIZE })
+  }
+
+  if (!isConvexDomainActive()) {
+    return listCachedFoods({ term: searchTerm, categoryTag, limit: SEARCH_PAGE_SIZE })
+  }
+
+  // Catégorie ou v3 : action searchFoods (serveur mirror + quota).
+  if (isFoodAddV3Enabled() || categoryTag) {
     try {
       const { hits } = await searchFoodsV3ViaConvex({
         term: searchTerm,
@@ -290,78 +195,50 @@ export async function searchOpenFoodFacts(
       })
       if (signal?.aborted) return []
       const mapped = hits.map(mapCloudProduct)
-      rememberFoodHits(mapped)
+      void rememberFoodHits(mapped)
       return mapped
     } catch (error) {
       if (signal?.aborted) return []
-      const message = error instanceof Error ? error.message : String(error)
-      if (message.includes('FOOD_SEARCH_DAILY_LIMIT')) {
-        throw new Error('Limite quotidienne de recherches atteinte. Réessaie demain.')
-      }
-      if (
-        message.includes('FOOD_ADD_ACCESS_DENIED') ||
-        message.includes('FOOD_ADD_ACCESS_DENIED_MINOR') ||
-        message.includes('FOOD_ADD_ACCESS_DENIED_TCA')
-      ) {
-        throw new Error('Ajout d’aliment indisponible pour ce compte.')
-      }
-      safeWarn('[aliments] v3 Convex search failed, fallback offline cache', error)
+      const access = mapAccessError(error)
+      if (access) throw access
+      safeWarn('[aliments] Convex search failed, fallback offline cache', error)
       return listCachedFoods({ term: searchTerm, categoryTag, limit: SEARCH_PAGE_SIZE })
     }
   }
 
-  // Legacy (flag OFF) : comportement historique.
-  if (categoryTag) {
-    return searchOpenFoodFactsDirect(searchTerm, signal, { categoryTag })
-  }
+  // Legacy texte (flag OFF, sans catégorie) : Convex searchOpenFoodFacts + catalogue.
+  if (searchTerm.length < 2) return []
 
-  if (isConvexDomainActive() && searchTerm.length >= 2) {
-    try {
-      const [hits, personal] = await Promise.all([
-        searchOpenFoodFactsViaConvex(searchTerm, SEARCH_PAGE_SIZE),
-        listConvexFoodCatalog({ limit: SEARCH_PAGE_SIZE * 2 }),
-      ])
+  try {
+    const [hits, personal] = await Promise.all([
+      searchOpenFoodFactsViaConvex(searchTerm, SEARCH_PAGE_SIZE),
+      listConvexFoodCatalog({ limit: SEARCH_PAGE_SIZE * 2 }),
+    ])
 
-      const merged = new Map<string, OpenFoodFactsSearchHit>()
-      for (const hit of personal.filter((row) => matchCatalogRow(row, searchTerm)).map(mapCatalogToHit)) {
-        const key = `${hit.barcode}::${hit.nom}`.toLowerCase()
-        if (!merged.has(key)) merged.set(key, hit)
-        if (merged.size >= SEARCH_PAGE_SIZE) return Array.from(merged.values())
+    const merged = new Map<string, OpenFoodFactsSearchHit>()
+    for (const hit of personal.filter((row) => matchCatalogRow(row, searchTerm)).map(mapCatalogToHit)) {
+      const key = `${hit.barcode}::${hit.nom}`.toLowerCase()
+      if (!merged.has(key)) merged.set(key, hit)
+      if (merged.size >= SEARCH_PAGE_SIZE) {
+        const result = Array.from(merged.values())
+        void rememberFoodHits(result)
+        return result
       }
-      for (const hit of hits.map(mapCloudProduct)) {
-        const key = `${hit.barcode}::${hit.nom}`.toLowerCase()
-        if (!merged.has(key)) merged.set(key, hit)
-        if (merged.size >= SEARCH_PAGE_SIZE) break
-      }
-      const result = Array.from(merged.values())
-      void enrichServingFromDirect(result, searchTerm, signal).catch((error) => {
-        safeWarn('[aliments] serving enrich failed', error)
-      })
-      return result
-    } catch (error) {
-      safeWarn('[aliments] convex OFF search failed, fallback direct', error)
     }
-  }
-  return searchOpenFoodFactsDirect(searchTerm, signal, { categoryTag })
-}
-
-async function enrichServingFromDirect(
-  hits: OpenFoodFactsSearchHit[],
-  term: string,
-  signal?: AbortSignal,
-): Promise<void> {
-  if (hits.length === 0 || term.trim().length < 2) return
-  const direct = await searchOpenFoodFactsDirect(term, signal)
-  if (direct.length === 0) return
-  const byBarcode = new Map(direct.map((h) => [h.barcode, h] as const))
-  for (const hit of hits) {
-    const extra = byBarcode.get(hit.barcode)
-    if (!extra) continue
-    if (!hit.servingSize && extra.servingSize) hit.servingSize = extra.servingSize
-    if ((!hit.categoriesTags || hit.categoriesTags.length === 0) && extra.categoriesTags?.length) {
-      hit.categoriesTags = extra.categoriesTags
+    for (const hit of hits.map(mapCloudProduct)) {
+      const key = `${hit.barcode}::${hit.nom}`.toLowerCase()
+      if (!merged.has(key)) merged.set(key, hit)
+      if (merged.size >= SEARCH_PAGE_SIZE) break
     }
-    if (!hit.imageUrl && extra.imageUrl) hit.imageUrl = extra.imageUrl
+    const result = Array.from(merged.values())
+    void rememberFoodHits(result)
+    return result
+  } catch (error) {
+    if (signal?.aborted) return []
+    const access = mapAccessError(error)
+    if (access) throw access
+    safeWarn('[aliments] convex OFF search failed, fallback offline cache', error)
+    return listCachedFoods({ term: searchTerm, categoryTag, limit: SEARCH_PAGE_SIZE })
   }
 }
 

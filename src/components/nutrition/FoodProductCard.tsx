@@ -11,7 +11,8 @@ interface FoodProductCardProps {
 }
 
 /**
- * Carte produit 2-colonnes : photo flottante, nom, pill portion, + / check.
+ * Carte produit 2-colonnes : photo au-dessus du nom (pas de chevauchement),
+ * portion lisible (pas de truncate agressif), + / check.
  * Contenu : photo + name + portion UNIQUEMENT (pas de kcal, Nutri-Score, prix…).
  */
 export function FoodProductCard({
@@ -27,29 +28,31 @@ export function FoodProductCard({
     <article
       data-food-card
       data-selected={selected ? 'true' : 'false'}
-      className={`relative flex flex-col rounded-[22px] border bg-[#1A1A1C] pt-10 pb-3.5 px-3 transition-[border-color,box-shadow] ${
+      className={`flex flex-col rounded-[22px] border bg-[#1A1A1C] px-2.5 pb-3 pt-3 transition-[border-color,box-shadow] ${
         selected
           ? 'border-[#FF2B2B] shadow-[0_0_0_1px_rgb(255_43_43_/_0.35)]'
           : 'border-white/[0.08]'
       }`}
     >
-      <div className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-[42%]">
+      <div className="mx-auto flex h-[72px] w-[72px] shrink-0 items-center justify-center">
         <OffProductImage
           src={hit.imageUrl}
           alt=""
-          size={88}
+          size={72}
           forceFallback={forceOfflineImages}
+          barcode={hit.barcode}
+          productName={hit.nom}
         />
       </div>
 
-      <h3 className="mt-1 line-clamp-2 min-h-[2.5rem] text-center text-[13px] font-semibold leading-snug tracking-tight text-white">
+      <h3 className="mt-2 line-clamp-2 min-h-[2.5rem] break-words text-center text-[13px] font-semibold leading-snug tracking-tight text-white">
         {name}
       </h3>
 
-      <div className="mt-2.5 flex items-center justify-between gap-2">
+      <div className="mt-2 flex min-w-0 items-end justify-between gap-1.5">
         <span
           data-portion-pill
-          className="max-w-[70%] truncate rounded-full bg-white/[0.08] px-2.5 py-1 text-[11px] font-medium text-[#AEAEB2]"
+          className="min-w-0 flex-1 whitespace-normal break-words rounded-full bg-white/[0.08] px-2 py-1 text-left text-[10px] font-medium leading-snug text-[#AEAEB2] sm:text-[11px]"
         >
           {portion}
         </span>

@@ -8,9 +8,44 @@
 export const DEFAULT_PORTION_LABEL = 'pour 100 g'
 
 /**
+ * Mots / formules de jugement marketing retirés du nom affiché
+ * (light, sans sucres, allégé, etc.). Ne touche pas à la portion.
+ * Pas de \b (ASCII) — les accents FR cassent les word boundaries JS.
+ */
+const JUDGING_NAME_PATTERNS: RegExp[] = [
+  /(?<![\p{L}])sans\s+sucres?(?![\p{L}])/giu,
+  /(?<![\p{L}])sans\s+sucre\s+ajoutés?(?![\p{L}])/giu,
+  /(?<![\p{L}])all[eé]g[eé]e?s?(?![\p{L}])/giu,
+  /(?<![\p{L}])light(?![\p{L}])/giu,
+  /(?<![\p{L}])lite(?![\p{L}])/giu,
+  /(?<![\p{L}])diet(?![\p{L}])/giu,
+  /(?<![\p{L}])0\s*%\s*(mg|matière\s+grasse)(?![\p{L}])/giu,
+  /(?<![\p{L}])faible\s+en\s+calories?(?![\p{L}])/giu,
+  /(?<![\p{L}])r[eé]duit\s+en\s+sucres?(?![\p{L}])/giu,
+  /(?<![\p{L}])low\s*fat(?![\p{L}])/giu,
+  /(?<![\p{L}])sugar\s*free(?![\p{L}])/giu,
+  /(?<![\p{L}])0%(?![\p{L}])/giu,
+]
+
+/** Retire les termes de jugement du nom produit. */
+export function stripJudgingWordsFromFoodName(raw: string): string {
+  let name = raw
+  for (const pattern of JUDGING_NAME_PATTERNS) {
+    name = name.replace(pattern, ' ')
+  }
+  return name
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.;:!?)])/g, '$1')
+    .replace(/([(])\s+/g, '$1')
+    .replace(/\(\s*\)/g, '')
+    .trim()
+}
+
+/**
  * Nettoie le nom produit pour l’UI :
  * - trim
  * - retire un poids/volume collé en fin (« 250g », « 33 cl », « 1,5L »)
+ * - filtre les mots de jugement (light, sans sucres, allégé…)
  * - corrige le TOUT EN MAJUSCULES (title case fr léger)
  * Ne touche jamais à la portion / serving_size.
  */
@@ -25,6 +60,9 @@ export function cleanupFoodName(raw: string): string {
       '',
     )
     .trim()
+
+  name = stripJudgingWordsFromFoodName(name)
+  if (!name) name = raw.trim().replace(/\s+/g, ' ')
 
   if (isAllCapsWordy(name)) {
     name = softTitleCaseFr(name)

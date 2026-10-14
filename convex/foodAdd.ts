@@ -51,6 +51,39 @@ type OffApiProduct = {
   }
 }
 
+type OwnedImageRef = {
+  storageId: Id<'_storage'>
+  url: string | null
+}
+
+type FoodHit = {
+  barcode: string
+  nom: string
+  brands: string
+  calories: number | null
+  proteines: number | null
+  glucides: number | null
+  lipides: number | null
+  servingSize: string | null
+  categoriesTags: string[]
+  imageUrl?: string
+  imageStorageId?: string
+  provenance: 'open_food_facts'
+  fetchedAt: number
+}
+
+type FoodSearchQuota = {
+  allowed: boolean
+  searchCount: number
+  dailyLimit: number
+}
+
+type SearchFoodsResult = {
+  hits: FoodHit[]
+  searchCount: number
+  dailyLimit: number
+}
+
 function toDateKey(d = new Date()): string {
   const y = d.getUTCFullYear()
   const m = String(d.getUTCMonth() + 1).padStart(2, '0')
@@ -84,6 +117,22 @@ function normalizeDateKey(value: string): string {
     throw new Error('NUTRITION_DATEKEY_INVALID')
   }
   return normalized
+}
+
+/** Accepte uniquement une image hébergée chez nous (storageId Convex). */
+export function assertOwnedImageArgs(input: {
+  imageUrl?: string
+  imageStorageId?: Id<'_storage'>
+}): void {
+  const url = input.imageUrl?.trim()
+  const storageId = input.imageStorageId
+  if (!url && !storageId) return
+  if (url && /openfoodfacts\.org/i.test(url)) {
+    throw new Error('FOOD_ADD_IMAGE_NOT_OWNED')
+  }
+  if (!storageId) {
+    throw new Error('FOOD_ADD_IMAGE_NOT_OWNED')
+  }
 }
 
 async function fetchOffJson(url: string): Promise<unknown> {
@@ -141,7 +190,6 @@ const foodHitValidator = v.object({
   lipides: v.union(v.number(), v.null()),
   servingSize: v.union(v.string(), v.null()),
   categoriesTags: v.array(v.string()),
-  /** URL Convex storage (ou absente). Jamais un hotlink OFF. */
   imageUrl: v.optional(v.string()),
   imageStorageId: v.optional(v.string()),
   provenance: v.literal('open_food_facts'),
@@ -151,7 +199,7 @@ const foodHitValidator = v.object({
 export async function reserveFoodSearchForUserId(
   ctx: MutationCtx,
   userId: string,
-): Promise<{ allowed: boolean; searchCount: number; dailyLimit: number }> {
+): Promise<FoodSearchQuota> {
   const now = Date.now()
   const dateKey = toDateKey(new Date(now))
   const row = await ctx.db
@@ -189,7 +237,7 @@ export const reserveFoodSearch = mutation({
     searchCount: v.number(),
     dailyLimit: v.number(),
   }),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<FoodSearchQuota> => {
     const user = await requireSessionUser(ctx, args.sessionToken)
     const access = await assertFoodAddAccessFromStoredProfile(ctx, user.userId)
     if (!access.ok) {
@@ -264,7 +312,7 @@ export const getOffImageCache = internalQuery({
     }),
     v.null(),
   ),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<OwnedImageRef | null> => {
     const code = args.offCode.trim()
     if (!code) return null
     const row = await ctx.db
@@ -290,7 +338,7 @@ export const mirrorOffImage = internalAction({
     }),
     v.null(),
   ),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<OwnedImageRef | null> => {
     const code = args.offCode.trim()
     const sourceUrl = args.sourceUrl.trim()
     if (!code || !sourceUrl) return null
@@ -298,7 +346,9 @@ export const mirrorOffImage = internalAction({
       return null
     }
 
-    const cached = await ctx.runQuery(internal.foodAdd.getOffImageCache, { offCode: code })
+    const cached: OwnedImageRef | null = await ctx.runQuery(internal.foodAdd.getOffImageCache, {
+      offCode: code,
+    })
     if (cached?.url) return cached
 
     try {
@@ -322,7 +372,7 @@ export const mirrorOffImage = internalAction({
       const buffer = await response.arrayBuffer()
       if (buffer.byteLength === 0 || buffer.byteLength > IMAGE_MAX_BYTES) return null
       const blob = new Blob([buffer], { type: contentType })
-      const storageId = await ctx.storage.store(blob)
+      const storageId: Id<'_storage'> = await ctx.storage.store(blob)
       await ctx.runMutation(internal.foodAdd.upsertOffImageCache, {
         offCode: code,
         storageId,
@@ -343,7 +393,7 @@ async function resolveOwnedImage(
   offImageUrl: string | undefined,
 ): Promise<{ imageUrl?: string; imageStorageId?: string }> {
   if (!offCode) return {}
-  const mirrored = offImageUrl
+  const mirrored: OwnedImageRef | null = offImageUrl
     ? await ctx.runAction(internal.foodAdd.mirrorOffImage, {
         offCode,
         sourceUrl: offImageUrl,
@@ -352,7 +402,7 @@ async function resolveOwnedImage(
   if (!mirrored) return {}
   return {
     imageUrl: mirrored.url ?? undefined,
-    imageStorageId: mirrored.storageId as string,
+    imageStorageId: mirrored.storageId,
   }
 }
 
@@ -368,18 +418,19 @@ export const searchFoods = action({
     searchCount: v.number(),
     dailyLimit: v.number(),
   }),
-  handler: async (ctx, args) => {
-    const quota = await ctx.runMutation(api.foodAdd.reserveFoodSearch, {
+  handler: async (ctx, args): Promise<SearchFoodsResult> => {
+    const term = args.term.trim()
+    const categoryTag = args.categoryTag?.trim() || ''
+    // Ne consomme pas le quota pour une requête vide.
+    if (term.length < 2 && !categoryTag) {
+      return { hits: [], searchCount: 0, dailyLimit: FOOD_SEARCH_DAILY_LIMIT }
+    }
+
+    const quota: FoodSearchQuota = await ctx.runMutation(api.foodAdd.reserveFoodSearch, {
       sessionToken: args.sessionToken,
     })
     if (!quota.allowed) {
       throw new Error('FOOD_SEARCH_DAILY_LIMIT')
-    }
-
-    const term = args.term.trim()
-    const categoryTag = args.categoryTag?.trim() || ''
-    if (term.length < 2 && !categoryTag) {
-      return { hits: [], searchCount: quota.searchCount, dailyLimit: quota.dailyLimit }
     }
 
     const limit = Math.max(1, Math.min(OFF_MAX_RESULTS, Math.floor(args.limit ?? OFF_MAX_RESULTS)))
@@ -402,26 +453,11 @@ export const searchFoods = action({
       `https://world.openfoodfacts.org/cgi/search.pl?${params.toString()}`,
     )) as { products?: OffApiProduct[] }
     const products = Array.isArray(data.products) ? data.products : []
-    const hits: Array<{
-      barcode: string
-      nom: string
-      brands: string
-      calories: number | null
-      proteines: number | null
-      glucides: number | null
-      lipides: number | null
-      servingSize: string | null
-      categoriesTags: string[]
-      imageUrl?: string
-      imageStorageId?: string
-      provenance: 'open_food_facts'
-      fetchedAt: number
-    }> = []
+    const hits: FoodHit[] = []
 
     for (const product of products) {
       const mapped = mapOffProduct(product, String(product.code || product._id || ''))
       if (!mapped.nom.trim()) continue
-      // Images : on copie chez nous (best-effort, séquentiel limité).
       let imageUrl: string | undefined
       let imageStorageId: string | undefined
       if (hits.length < 8) {
@@ -429,12 +465,12 @@ export const searchFoods = action({
         imageUrl = owned.imageUrl
         imageStorageId = owned.imageStorageId
       } else if (mapped.barcode) {
-        const cached = await ctx.runQuery(internal.foodAdd.getOffImageCache, {
+        const cached: OwnedImageRef | null = await ctx.runQuery(internal.foodAdd.getOffImageCache, {
           offCode: mapped.barcode,
         })
         if (cached?.url) {
           imageUrl = cached.url
-          imageStorageId = cached.storageId as string
+          imageStorageId = cached.storageId
         }
       }
       hits.push({
@@ -462,6 +498,7 @@ export const searchFoods = action({
 /**
  * Ajoute un snapshot aliment au journal — refuse mineur / TCA côté serveur.
  * Stocke name, portion, offCode, image ref, updatedAt (jamais juste un lien).
+ * imageUrl / imageStorageId : uniquement nos refs Convex.
  */
 export const addFoodSnapshot = mutation({
   args: {
@@ -479,6 +516,7 @@ export const addFoodSnapshot = mutation({
     carbsG: v.optional(v.union(v.number(), v.null())),
     fatG: v.optional(v.union(v.number(), v.null())),
     grams: v.optional(v.number()),
+    servingSize: v.optional(v.union(v.string(), v.null())),
     createdAt: v.optional(v.number()),
     updatedAt: v.optional(v.number()),
   },
@@ -492,6 +530,19 @@ export const addFoodSnapshot = mutation({
     const access = await assertFoodAddAccessFromStoredProfile(ctx, user.userId)
     if (!access.ok) {
       throw new Error(access.error)
+    }
+
+    assertOwnedImageArgs({
+      imageUrl: args.imageUrl,
+      imageStorageId: args.imageStorageId,
+    })
+
+    let ownedImageUrl = args.imageUrl
+    let ownedStorageId = args.imageStorageId
+    if (ownedStorageId) {
+      const url = await ctx.storage.getUrl(ownedStorageId)
+      if (!url) throw new Error('FOOD_ADD_IMAGE_NOT_OWNED')
+      ownedImageUrl = url
     }
 
     const userId = user.userId
@@ -512,8 +563,8 @@ export const addFoodSnapshot = mutation({
       grams: args.grams,
       portionLabel: args.portionLabel.trim().slice(0, 80) || 'pour 100 g',
       offCode: args.offCode?.trim() || undefined,
-      imageUrl: args.imageUrl,
-      imageStorageId: args.imageStorageId,
+      imageUrl: ownedImageUrl,
+      imageStorageId: ownedStorageId,
       updatedAt: nextUpdatedAt,
       deletedAt: undefined as number | undefined,
     }
@@ -535,7 +586,6 @@ export const addFoodSnapshot = mutation({
       schemaVersion: NUTRITION_SCHEMA_VERSION,
     })
 
-    // Catalog snapshot (recent / offline sync).
     if (args.offCode?.trim() || args.name.trim()) {
       const foodKey = normalizeFoodKey({
         barcode: args.offCode,
@@ -545,6 +595,8 @@ export const addFoodSnapshot = mutation({
         .query('nutrition_food_catalog')
         .withIndex('by_userId_foodKey', (q) => q.eq('userId', userId).eq('foodKey', foodKey))
         .first()
+      const servingSize =
+        typeof args.servingSize === 'string' ? args.servingSize.trim() || null : null
       const catalogPatch = {
         barcode: args.offCode?.trim() || undefined,
         name: mealName(args.name),
@@ -552,9 +604,9 @@ export const addFoodSnapshot = mutation({
         proteinPer100g: args.proteinG ?? null,
         carbsPer100g: args.carbsG ?? null,
         fatPer100g: args.fatG ?? null,
-        imageUrl: args.imageUrl,
-        imageStorageId: args.imageStorageId,
-        servingSize: null as string | null,
+        imageUrl: ownedImageUrl,
+        imageStorageId: ownedStorageId,
+        servingSize,
         portionLabel: patch.portionLabel,
         lastFetchedAt: nextUpdatedAt,
         lastSelectedAt: nextUpdatedAt,
@@ -586,6 +638,7 @@ export const addFoodSnapshot = mutation({
 /** Exposé pour tests unitaires (sans Convex runtime). */
 export const __test = {
   mapOffProduct,
+  assertOwnedImageArgs,
   FOOD_SEARCH_DAILY_LIMIT,
   FOOD_ADD_ACCESS_DENIED_MINOR,
   FOOD_ADD_ACCESS_DENIED_TCA,

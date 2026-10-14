@@ -95,12 +95,43 @@ describe('AddFoodScreenV3 — règles produit', () => {
     expect(text).toContain('Le Brie président')
     expect(text).toContain('0,5 pointe (100 g)')
     expect(text).toContain('Données Open Food Facts')
+    expect(text).toContain('ODbL')
     expect(text).toContain('CC BY-SA 3.0')
     expect(text).toContain('Tout')
     expect(text).toContain('Fruits')
     expect(text).toMatch(/Hors ligne/)
     expect(text).not.toMatch(FORBIDDEN)
     expect(document.querySelector('[data-food-offline-banner]')).toBeTruthy()
+
+    const licence = document.querySelector('[data-off-licence]') as HTMLElement | null
+    expect(licence).toBeTruthy()
+    const licenceStyle = window.getComputedStyle(licence!.querySelector('p')!)
+    const fontSize = Number.parseFloat(licenceStyle.fontSize || '0')
+    // Tailwind text-[12px] → au moins 12px (jsdom peut renvoyer '' ; on vérifie la classe).
+    expect(licence!.innerHTML).toMatch(/text-\[12px\]/)
+    void fontSize
+
+    // Pas de champ Calories dans le formulaire manuel (portal → document.body).
+    const manualBtn = document.querySelector('[data-manual-toggle]') as HTMLButtonElement | null
+    expect(manualBtn).toBeTruthy()
+    await act(async () => {
+      manualBtn!.click()
+    })
+    const calorieLabels = Array.from(document.querySelectorAll('label span')).filter(
+      (el) => el.textContent?.trim() === 'Calories',
+    )
+    expect(calorieLabels).toHaveLength(0)
+    expect(document.querySelector('[data-add-food-screen] form')?.textContent ?? '').toContain(
+      'Protéines',
+    )
+
+    // Cartes : image dans le flux (pas absolute overlapping), portion non truncatée.
+    const card = document.querySelector('[data-food-card]') as HTMLElement
+    expect(card).toBeTruthy()
+    expect(card.className).not.toMatch(/\brelative\b/)
+    const portion = card.querySelector('[data-portion-pill]') as HTMLElement
+    expect(portion.className).toMatch(/whitespace-normal/)
+    expect(portion.className).not.toMatch(/\btruncate\b/)
 
     await act(async () => {
       root.unmount()

@@ -1,5 +1,5 @@
 import { v } from 'convex/values'
-import { api } from './_generated/api'
+import { api, internal } from './_generated/api'
 import {
   action,
   mutation,
@@ -9,6 +9,7 @@ import {
   type QueryCtx,
 } from './_generated/server'
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
+import { assertFoodAddAccessFromStoredProfile } from './lib/foodAddAccess'
 
 const NUTRITION_SCHEMA_VERSION = 1
 const DEFAULT_OFF_TIMEOUT_MS = 8_000
@@ -23,7 +24,10 @@ type OffApiProduct = {
   product_name?: string
   product_name_fr?: string
   brands?: string
+  serving_size?: string
+  categories_tags?: string[]
   image_front_small_url?: string
+  image_front_url?: string
   nutriments?: {
     'energy-kcal_100g'?: number
     energy_kcal_100g?: number
@@ -72,9 +76,19 @@ async function sessionUserId(ctx: SessionCtx, sessionToken: string): Promise<str
   return user.userId
 }
 
-async function assertActionSession(ctx: ActionCtx, sessionToken: string): Promise<void> {
+async function assertFoodWriteAccess(ctx: SessionCtx, sessionToken: string): Promise<string> {
+  const user = await requireSessionUser(ctx, sessionToken)
+  const access = await assertFoodAddAccessFromStoredProfile(ctx, user.userId)
+  if (!access.ok) throw new Error(access.error)
+  return user.userId
+}
+
+async function assertActionSession(ctx: ActionCtx, sessionToken: string): Promise<string> {
   const session = await ctx.runQuery(api.auth.getSession, { sessionToken })
   if (!session) throw new Error('Not authenticated')
+  const access = await ctx.runQuery(api.nutrition.checkFoodAddAccess, { sessionToken })
+  if (!access.ok) throw new Error(access.error)
+  return session.userId
 }
 
 async function findMealRow(ctx: SessionCtx, userId: string, mealId: string) {
@@ -137,6 +151,9 @@ function mapOffProduct(raw: OffApiProduct, fallbackBarcode: string) {
     raw.product_name_fr?.trim() ||
     raw.product_name?.trim() ||
     (barcode ? `Produit ${barcode}` : 'Produit')
+  const tags = Array.isArray(raw.categories_tags)
+    ? raw.categories_tags.filter((t): t is string => typeof t === 'string').slice(0, 40)
+    : []
   return {
     barcode,
     nom,
@@ -145,11 +162,32 @@ function mapOffProduct(raw: OffApiProduct, fallbackBarcode: string) {
     proteines,
     glucides,
     lipides,
-    imageUrl: raw.image_front_small_url,
+    // Jamais de hotlink OFF — imageUrl rempli après mirroring Convex.
+    imageUrl: undefined as string | undefined,
+    imageStorageId: undefined as string | undefined,
+    offImageUrl: raw.image_front_small_url || raw.image_front_url || undefined,
+    servingSize: raw.serving_size?.trim() || null,
+    categoriesTags: tags,
     provenance: 'open_food_facts' as const,
     fetchedAt: Date.now(),
   }
 }
+
+/** Query publique pour les actions (garde mineur / TCA). */
+export const checkFoodAddAccess = query({
+  args: { sessionToken: v.string() },
+  returns: v.object({
+    ok: v.boolean(),
+    error: v.optional(v.string()),
+    diabetes: v.optional(v.boolean()),
+  }),
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx, args.sessionToken)
+    const access = await assertFoodAddAccessFromStoredProfile(ctx, user.userId)
+    if (!access.ok) return { ok: false, error: access.error }
+    return { ok: true, diabetes: access.diabetes }
+  },
+})
 
 const mealValidator = v.object({
   mealId: v.string(),
@@ -233,7 +271,7 @@ export const upsertMeal = mutation({
     updatedAt: v.number(),
   }),
   handler: async (ctx, args) => {
-    const userId = await sessionUserId(ctx, args.sessionToken)
+    const userId = await assertFoodWriteAccess(ctx, args.sessionToken)
     const existing = await findMealRow(ctx, userId, args.mealId)
     const nextUpdatedAt = args.updatedAt ?? Date.now()
     if (existing) {
@@ -292,7 +330,7 @@ export const deleteMeal = mutation({
     updatedAt: v.number(),
   }),
   handler: async (ctx, args) => {
-    const userId = await sessionUserId(ctx, args.sessionToken)
+    const userId = await assertFoodWriteAccess(ctx, args.sessionToken)
     const deletedAt = args.deletedAt ?? Date.now()
     const existing = await findMealRow(ctx, userId, args.mealId)
     if (existing) {
@@ -577,7 +615,7 @@ export const upsertFoodSelection = mutation({
     selectedCount: v.number(),
   }),
   handler: async (ctx, args) => {
-    const userId = await sessionUserId(ctx, args.sessionToken)
+    const userId = await assertFoodWriteAccess(ctx, args.sessionToken)
     const now = Date.now()
     const foodKey = normalizeFoodKey({
       barcode: args.barcode,
@@ -648,7 +686,7 @@ export const setFoodFavorite = mutation({
   },
   returns: v.object({ applied: v.boolean() }),
   handler: async (ctx, args) => {
-    const userId = await sessionUserId(ctx, args.sessionToken)
+    const userId = await assertFoodWriteAccess(ctx, args.sessionToken)
     const existing = await findFoodRow(ctx, userId, args.foodKey)
     if (!existing) return { applied: false }
     assertUserOwnership(existing.userId, userId)
@@ -706,24 +744,92 @@ export const listFoodCatalog = query({
   },
 })
 
+const offHitReturnValidator = v.object({
+  barcode: v.string(),
+  nom: v.string(),
+  brands: v.string(),
+  calories: v.union(v.number(), v.null()),
+  proteines: v.union(v.number(), v.null()),
+  glucides: v.union(v.number(), v.null()),
+  lipides: v.union(v.number(), v.null()),
+  imageUrl: v.optional(v.string()),
+  imageStorageId: v.optional(v.string()),
+  servingSize: v.union(v.string(), v.null()),
+  categoriesTags: v.array(v.string()),
+  provenance: v.literal('open_food_facts'),
+  fetchedAt: v.number(),
+})
+
+type ClientOffHit = {
+  barcode: string
+  nom: string
+  brands: string
+  calories: number | null
+  proteines: number | null
+  glucides: number | null
+  lipides: number | null
+  imageUrl?: string
+  imageStorageId?: string
+  servingSize: string | null
+  categoriesTags: string[]
+  provenance: 'open_food_facts'
+  fetchedAt: number
+}
+
+type OwnedImageRef = {
+  storageId: string
+  url: string | null
+}
+
+async function toClientOffHit(
+  ctx: ActionCtx,
+  mapped: ReturnType<typeof mapOffProduct>,
+  mirror: boolean,
+): Promise<ClientOffHit> {
+  let imageUrl: string | undefined
+  let imageStorageId: string | undefined
+  if (mirror && mapped.offImageUrl) {
+    const owned: OwnedImageRef | null = await ctx.runAction(internal.foodAdd.mirrorOffImage, {
+      offCode: mapped.barcode,
+      sourceUrl: mapped.offImageUrl,
+    })
+    if (owned?.url) {
+      imageUrl = owned.url
+      imageStorageId = owned.storageId
+    }
+  } else if (mapped.barcode) {
+    const cached: OwnedImageRef | null = await ctx.runQuery(internal.foodAdd.getOffImageCache, {
+      offCode: mapped.barcode,
+    })
+    if (cached?.url) {
+      imageUrl = cached.url
+      imageStorageId = cached.storageId
+    }
+  }
+  return {
+    barcode: mapped.barcode,
+    nom: mapped.nom,
+    brands: mapped.brands,
+    calories: mapped.calories,
+    proteines: mapped.proteines,
+    glucides: mapped.glucides,
+    lipides: mapped.lipides,
+    imageUrl,
+    imageStorageId,
+    servingSize: mapped.servingSize,
+    categoriesTags: mapped.categoriesTags,
+    provenance: mapped.provenance,
+    fetchedAt: mapped.fetchedAt,
+  }
+}
+
 export const fetchOpenFoodFactsByBarcode = action({
   args: {
     sessionToken: v.string(),
     barcode: v.string(),
   },
-  returns: v.object({
-    barcode: v.string(),
-    nom: v.string(),
-    brands: v.string(),
-    calories: v.union(v.number(), v.null()),
-    proteines: v.union(v.number(), v.null()),
-    glucides: v.union(v.number(), v.null()),
-    lipides: v.union(v.number(), v.null()),
-    imageUrl: v.optional(v.string()),
-    provenance: v.literal('open_food_facts'),
-    fetchedAt: v.number(),
-  }),
-  handler: async (ctx, args) => {
+  returns: offHitReturnValidator,
+  handler: async (ctx, args): Promise<ClientOffHit> => {
     await assertActionSession(ctx, args.sessionToken)
     const code = args.barcode.trim()
     if (!code) throw new Error('OFF_BARCODE_REQUIRED')
@@ -733,7 +839,7 @@ export const fetchOpenFoodFactsByBarcode = action({
     if (data.status !== 1 || !data.product) {
       throw new Error('OFF_PRODUCT_NOT_FOUND')
     }
-    return mapOffProduct(data.product, code)
+    return toClientOffHit(ctx, mapOffProduct(data.product, code), true)
   },
 })
 
@@ -743,20 +849,7 @@ export const searchOpenFoodFacts = action({
     term: v.string(),
     limit: v.optional(v.number()),
   },
-  returns: v.array(
-    v.object({
-      barcode: v.string(),
-      nom: v.string(),
-      brands: v.string(),
-      calories: v.union(v.number(), v.null()),
-      proteines: v.union(v.number(), v.null()),
-      glucides: v.union(v.number(), v.null()),
-      lipides: v.union(v.number(), v.null()),
-      imageUrl: v.optional(v.string()),
-      provenance: v.literal('open_food_facts'),
-      fetchedAt: v.number(),
-    }),
-  ),
+  returns: v.array(offHitReturnValidator),
   handler: async (ctx, args) => {
     await assertActionSession(ctx, args.sessionToken)
     const term = args.term.trim()
@@ -766,11 +859,11 @@ export const searchOpenFoodFacts = action({
       `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(term)}&search_simple=1&action=process&json=1&sort_by=unique_scans_n&page_size=${limit}`,
     )) as { products?: OffApiProduct[] }
     const products = Array.isArray(data.products) ? data.products : []
-    const hits: Array<ReturnType<typeof mapOffProduct>> = []
+    const hits: Array<Awaited<ReturnType<typeof toClientOffHit>>> = []
     for (const product of products) {
       const mapped = mapOffProduct(product, String(product.code || product._id || ''))
       if (!mapped.nom.trim()) continue
-      hits.push(mapped)
+      hits.push(await toClientOffHit(ctx, mapped, hits.length < 6))
       if (hits.length >= limit) break
     }
     return hits

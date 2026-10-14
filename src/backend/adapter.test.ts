@@ -28,6 +28,8 @@ const PHASE_E_TABLES = [
   'nutrition_water_entries',
   'nutrition_day_state',
   'nutrition_food_catalog',
+  'food_search_usage',
+  'off_product_images',
   'sleep_nights',
   'checkins',
   'custom_spots',

@@ -51,9 +51,12 @@ import {
   buildFoodNutritionSnapshot,
   mealEntryFromSnapshot,
 } from '../../utils/foodJournalSnapshot'
+import { isConvexDomainActive } from '../../backend/adapter'
 import { isFoodAddV3Enabled } from '../../backend/foodAddV3FeatureFlag'
 import { canAccessFoodAdd } from '../../services/foodAddAccess'
+import { addFoodSnapshotViaConvex } from '../../services/convexNutritionService'
 import { getCalorieProfile } from '../../services/nutritionStorage'
+import { todayKey } from '../../utils/calories'
 
 interface MealJournalProps {
   targetCalories: number
@@ -233,13 +236,15 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
 
   const foodAddV3 = isFoodAddV3Enabled()
   const calorieProfile = getCalorieProfile()
+  const foodAddAllowed = !foodAddV3 || canAccessFoodAdd(calorieProfile)
 
   const handleValidateFoodSelection = (hits: OpenFoodFactsSearchHit[]) => {
-    if (foodAddV3 && !canAccessFoodAdd(calorieProfile)) {
+    if (!foodAddAllowed) {
       showToast('Ajout d’aliment indisponible pour ce compte.', 'error')
       return
     }
     const type = pendingMealType ?? mealType
+    const dateKey = todayKey()
     let journal = getTodayJournal()
     for (const hit of hits) {
       const snapshot = buildFoodNutritionSnapshot(hit)
@@ -249,6 +254,29 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
         void persistScannedProductSelection(hit, user.id, (message) => {
           showToast(message, 'error')
         })
+        if (foodAddV3 && isConvexDomainActive()) {
+          void addFoodSnapshotViaConvex({
+            mealId: crypto.randomUUID(),
+            dateKey,
+            mealType: type,
+            name: snapshot.name,
+            portionLabel: snapshot.portionLabel,
+            offCode: snapshot.offCode,
+            imageUrl: snapshot.imageStorageId ? snapshot.imageUrl : undefined,
+            imageStorageId: snapshot.imageStorageId as never,
+            calories: snapshot.calories,
+            proteinG: snapshot.proteinG ?? null,
+            carbsG: snapshot.carbsG ?? null,
+            fatG: snapshot.fatG ?? null,
+            grams: snapshot.grams,
+            updatedAt: snapshot.updatedAt,
+          }).catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : String(error)
+            if (message.includes('FOOD_ADD_ACCESS_DENIED')) {
+              showToast('Ajout d’aliment refusé par le serveur.', 'error')
+            }
+          })
+        }
       }
     }
     setMeals(journal.meals)
@@ -284,6 +312,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   }
 
   const openScanner = (forMeal?: MealType) => {
+    if (!foodAddAllowed) return
     if (forMeal) setPendingMealType(forMeal)
     requireAuth(() => {
       setScannerOpen(true)
@@ -375,24 +404,26 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
               </h2>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => openScanner()}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[#30D158]/35 bg-[#30D158]/15 px-3.5 py-2 text-[13px] font-semibold text-[#30D158]"
-            >
-              <ScanBarcode className="h-4 w-4" />
-              Scanner
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowForm((v) => !v)}
-              className="btn-brand inline-flex items-center gap-1.5 rounded-full border border-white/15 px-3.5 py-2 text-[13px] font-semibold text-white"
-            >
-              <Plus className="h-4 w-4" />
-              Ajouter
-            </button>
-          </div>
+          {foodAddAllowed ? (
+            <div className="flex shrink-0 items-center gap-2 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => openScanner()}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[#30D158]/35 bg-[#30D158]/15 px-3.5 py-2 text-[13px] font-semibold text-[#30D158]"
+              >
+                <ScanBarcode className="h-4 w-4" />
+                Scanner
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowForm((v) => !v)}
+                className="btn-brand inline-flex items-center gap-1.5 rounded-full border border-white/15 px-3.5 py-2 text-[13px] font-semibold text-white"
+              >
+                <Plus className="h-4 w-4" />
+                Ajouter
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-5">
@@ -468,7 +499,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
         className="scroll-mt-24 space-y-3"
         id="nutrition-scan-zone"
       >
-        {!showForm ? (
+        {!showForm && foodAddAllowed ? (
           <>
             <MealPhotoAnalyzer
               onToast={showToast}
