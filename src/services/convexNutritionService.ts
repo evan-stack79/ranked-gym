@@ -135,6 +135,24 @@ export async function deleteAllMyMealsViaConvex(deletedAt = Date.now()): Promise
   }) as Promise<{ deletedCount: number; updatedAt: number }>
 }
 
+/** Purge Supabase via Convex — session only, userId résolu serveur. */
+export async function purgeSupabaseMealCopiesViaConvex(): Promise<{
+  deletedCount: number
+  nutritionStatus: 'purged' | 'absent'
+  userBackupsStatus: 'purged' | 'absent'
+  resolvedUserId: string
+}> {
+  const sessionToken = await requireToken()
+  return getConvex().action(api.purgeSupabaseMeals.purgeSupabaseMealCopies, {
+    sessionToken,
+  }) as Promise<{
+    deletedCount: number
+    nutritionStatus: 'purged' | 'absent'
+    userBackupsStatus: 'purged' | 'absent'
+    resolvedUserId: string
+  }>
+}
+
 export async function pushConvexWaterEntry(
   entry: WaterEntry,
   dateKey: string,

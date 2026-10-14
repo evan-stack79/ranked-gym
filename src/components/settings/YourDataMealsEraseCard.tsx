@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Loader2, Trash2 } from 'lucide-react'
 import { IosSheet } from '../ui/IosSheet'
-import { canAccessFoodAdd } from '../../services/foodAddAccess'
-import { getCalorieProfile } from '../../services/nutritionStorage'
 import {
   ERASE_MEALS_CONNECT_MESSAGE,
   ERASE_MEALS_PURGE_FAILED_MESSAGE,
@@ -20,6 +18,9 @@ interface YourDataMealsErasePanelProps {
   error?: string | null
   confirmOpen: boolean
   onConfirmOpenChange: (open: boolean) => void
+  /** Signé out : le tap affiche Connecte-toi immédiatement, sans sheet. */
+  signedOut?: boolean
+  onSignedOutTap?: () => void
 }
 
 /** Présentation — utilisée par la carte live et la fixture démo. */
@@ -30,9 +31,9 @@ export function YourDataMealsErasePanel({
   error = null,
   confirmOpen,
   onConfirmOpenChange,
+  signedOut = false,
+  onSignedOutTap,
 }: YourDataMealsErasePanelProps) {
-  if (count < 1) return null
-
   return (
     <div className="space-y-2" data-testid="your-data-meals-section">
       <p className="px-1 text-[13px] font-semibold uppercase tracking-wide text-[#8E8E93]">
@@ -42,7 +43,13 @@ export function YourDataMealsErasePanel({
         <button
           type="button"
           data-testid="erase-old-meals-button"
-          onClick={() => onConfirmOpenChange(true)}
+          onClick={() => {
+            if (signedOut) {
+              onSignedOutTap?.()
+              return
+            }
+            onConfirmOpenChange(true)
+          }}
           className="ios-press flex w-full items-center gap-3 px-4 py-3.5 text-left"
         >
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FF453A]/15 text-[#FF6961]">
@@ -56,14 +63,25 @@ export function YourDataMealsErasePanel({
               className="mt-0.5 block text-[13px] text-[#8E8E93]"
               data-testid="erase-old-meals-count"
             >
-              {count} repas gardé{count > 1 ? 's' : ''}
+              {signedOut
+                ? 'Connexion requise'
+                : `${count} repas gardé${count > 1 ? 's' : ''}`}
             </span>
           </span>
         </button>
       </div>
 
+      {signedOut && error ? (
+        <p
+          className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]"
+          data-testid="erase-old-meals-signed-out-error"
+        >
+          {error}
+        </p>
+      ) : null}
+
       <IosSheet
-        open={confirmOpen}
+        open={confirmOpen && !signedOut}
         onClose={() => {
           if (!busy) onConfirmOpenChange(false)
         }}
@@ -114,7 +132,7 @@ export function YourDataMealsErasePanel({
 
 /**
  * Profil > Tes données — bouton « Effacer mes anciens repas ».
- * Visible seulement pour comptes bloqués (mineur / TCA / âge inconnu) et count ≥ 1.
+ * Toujours visible (y compris déconnecté).
  */
 export function YourDataMealsEraseCard() {
   const { isAuthenticated } = useAuth()
@@ -124,11 +142,8 @@ export function YourDataMealsEraseCard() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const profile = getCalorieProfile()
-  const blocked = !canAccessFoodAdd(profile)
-
   const refresh = useCallback(async () => {
-    if (!isAuthenticated || !blocked) {
+    if (!isAuthenticated) {
       setCount(0)
       setLoading(false)
       return
@@ -140,7 +155,7 @@ export function YourDataMealsEraseCard() {
     } finally {
       setLoading(false)
     }
-  }, [blocked, isAuthenticated])
+  }, [isAuthenticated])
 
   useEffect(() => {
     void refresh()
@@ -151,8 +166,7 @@ export function YourDataMealsEraseCard() {
     return () => window.removeEventListener('ranked-gym:profile-changed', onChange)
   }, [refresh])
 
-  if (!isAuthenticated || !blocked) return null
-  if (loading) {
+  if (loading && isAuthenticated) {
     return (
       <div className="space-y-2" data-testid="your-data-meals-loading">
         <p className="px-1 text-[13px] font-semibold uppercase tracking-wide text-[#8E8E93]">
@@ -169,10 +183,15 @@ export function YourDataMealsEraseCard() {
   return (
     <YourDataMealsErasePanel
       count={count}
+      signedOut={!isAuthenticated}
       confirmOpen={confirmOpen}
       onConfirmOpenChange={(open) => {
         setError(null)
         setConfirmOpen(open)
+      }}
+      onSignedOutTap={() => {
+        setConfirmOpen(false)
+        setError(ERASE_MEALS_CONNECT_MESSAGE)
       }}
       busy={busy}
       error={error}
@@ -184,7 +203,6 @@ export function YourDataMealsEraseCard() {
           setCount(0)
           setConfirmOpen(false)
         } catch (err) {
-          // Ne pas fermer le sheet ni remettre count à 0 → retryable.
           if (err instanceof EraseMealsNeedsConnectionError) {
             setError(ERASE_MEALS_CONNECT_MESSAGE)
           } else if (err instanceof EraseMealsPurgeError) {

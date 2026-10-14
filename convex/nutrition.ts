@@ -419,8 +419,14 @@ export async function hardDeleteAllUserMeals(
     .collect()
   for (const state of states) {
     assertUserOwnership(state.userId, userId)
+    let nextJournal: Record<string, unknown>
+    try {
+      nextJournal = stripMealsFromJournalJson(state.journalJson)
+    } catch {
+      throw new Error('ERASE_MEALS_PURGE_FAILED')
+    }
     await ctx.db.patch(state._id, {
-      journalJson: stripMealsFromJournalJson(state.journalJson),
+      journalJson: nextJournal,
       updatedAt: deletedAt,
     })
   }
@@ -432,8 +438,14 @@ export async function hardDeleteAllUserMeals(
     .collect()
   for (const backup of legacyBackups) {
     assertUserOwnership(backup.userId, userId)
+    let nextPayload: unknown
+    try {
+      nextPayload = stripMealsFromBackupPayload(backup.payloadJson)
+    } catch {
+      throw new Error('ERASE_MEALS_PURGE_FAILED')
+    }
     await ctx.db.patch(backup._id, {
-      payloadJson: stripMealsFromBackupPayload(backup.payloadJson),
+      payloadJson: nextPayload,
       updatedAt: deletedAt,
     })
   }

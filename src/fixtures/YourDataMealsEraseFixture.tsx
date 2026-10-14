@@ -22,6 +22,7 @@ export function YourDataMealsEraseFixture() {
             setCount(0)
             setConfirmOpen(false)
           }}
+          signedOut={false}
         />
       </div>
     </div>
