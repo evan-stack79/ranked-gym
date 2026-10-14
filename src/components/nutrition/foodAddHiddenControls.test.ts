@@ -8,10 +8,11 @@ import { describe, expect, it } from 'vitest'
 describe('UI — masquage + / Ajouter / scanner pour comptes cachés', () => {
   it('NutritionDashboard conditionne QuickActions, hideAdd et BarcodeScanner', () => {
     const source = readFileSync(new URL('./NutritionDashboard.tsx', import.meta.url), 'utf8')
-    expect(source).toContain('canAccessFoodAdd(profile)')
-    expect(source).toContain('hideAdd={foodAddV3 ? !canAccessFoodAdd(profile)')
-    expect(source).toMatch(/foodAddV3 && !canAccessFoodAdd\(profile\)\) return/)
-    expect(source).toContain('(!foodAddV3 || canAccessFoodAdd(profile))')
+    expect(source).toContain('foodAddAllowed')
+    expect(source).toContain('canShowMealJournal')
+    expect(source).toContain('hideAdd={!foodAddAllowed}')
+    expect(source).toContain('if (!foodAddAllowed) return')
+    expect(source).toContain('{foodAddAllowed ? (')
   })
 
   it('MealJournal masque Scanner / Ajouter et le BarcodeScanner si accès refusé', () => {

@@ -6,7 +6,7 @@
  * - Convex (HTTPS + WSS + *.convex.site file URLs) when VITE_CONVEX_URL is set
  * - Google Maps JS Places loader
  * - Photon / Nominatim geocoding
- * - Open Food Facts product search
+ * - Open Food Facts is server-only (Convex) — never in connect-src
  *
  * Keep in sync with `public/_headers`, `index.html` meta CSP, and
  * `functions/_middleware.ts` — enforced by `cspPolicy.test.ts`.
@@ -35,7 +35,6 @@ export const CSP_META_DIRECTIVES = [
     'https://maps.gstatic.com',
     'https://photon.komoot.io',
     'https://nominatim.openstreetmap.org',
-    'https://world.openfoodfacts.org',
   ].join(' '),
   "media-src 'self' blob: mediastream:",
   "worker-src 'self' blob:",
@@ -63,7 +62,6 @@ export const CSP_CONNECT_ALLOWLIST = [
   'https://maps.gstatic.com',
   'https://photon.komoot.io',
   'https://nominatim.openstreetmap.org',
-  'https://world.openfoodfacts.org',
 ] as const
 
 /** Hosts / markers that must never appear anywhere in the CSP. */
@@ -74,6 +72,7 @@ export const CSP_FORBIDDEN_HOST_MARKERS = [
   'google-analytics.com',
   'facebook.net',
   'doubleclick.net',
+  'openfoodfacts.org',
 ] as const
 
 /** Markers forbidden specifically inside script-src (style-src may use unsafe-inline). */

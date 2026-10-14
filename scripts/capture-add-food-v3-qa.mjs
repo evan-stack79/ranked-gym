@@ -141,22 +141,35 @@ async function main() {
       join(artifactsDir, 'ajouter-aliment-v3-qa-offline.png'),
     )
 
-    // Retour online + sélection d’une carte
+    // Retour online + sélection Pomme Golden + validation visible
     await page.goto(`http://127.0.0.1:${port}/add-food-fixture`, {
       waitUntil: 'networkidle',
       timeout: 60_000,
     })
     await page.waitForSelector('[data-food-card]', { timeout: 10_000 })
-    const plus = page.locator('[data-food-card] button').first()
-    await plus.click()
+    const pommeCard = page.locator('[data-food-card]').filter({ hasText: /Pomme Golden/i }).first()
+    await pommeCard.locator('button').click()
     await page.waitForTimeout(400)
     const validate = page.getByRole('button', { name: /Ajouter|Valider|Confirmer/i }).first()
     if (await validate.count()) {
       await validate.click()
-      await page.waitForTimeout(500)
     }
+    await page.waitForSelector('[data-fixture-validated]', { timeout: 10_000 })
+    await page.waitForTimeout(800)
+    const validatedText = await page.locator('[data-fixture-validated]').innerText()
+    if (!/Validé\s*:\s*Pomme Golden/i.test(validatedText)) {
+      throw new Error(`Expected Validé : Pomme Golden, got: ${validatedText}`)
+    }
+    await page.screenshot({
+      path: join(outDir, 'ajout_390_valide.png'),
+      fullPage: false,
+    })
+    await copyFile(
+      join(outDir, 'ajout_390_valide.png'),
+      join(artifactsDir, 'ajouter-aliment-v3-qa-valide.png'),
+    )
 
-    await page.waitForTimeout(400)
+    await page.waitForTimeout(600)
     const videoPath = await page.video()?.path()
     await context.close()
     await browser.close()

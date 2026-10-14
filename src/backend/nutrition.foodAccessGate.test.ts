@@ -15,7 +15,7 @@ describe('nutrition.ts — garde accès sur les anciennes fonctions food', () =>
     expect(source).toContain('checkFoodAddAccess')
   })
 
-  it('protège upsertMeal / deleteMeal / upsertFoodSelection / setFoodFavorite', () => {
+  it('protège upsertMeal / upsertFoodSelection / setFoodFavorite (pas deleteMeal)', () => {
     for (const name of [
       'export const upsertMeal',
       'export const deleteMeal',
@@ -24,14 +24,17 @@ describe('nutrition.ts — garde accès sur les anciennes fonctions food', () =>
     ]) {
       expect(source).toContain(name)
     }
-    // Chaque handler food write appelle assertFoodWriteAccess
-    const foodWriteHandlers = source.match(
-      /export const (upsertMeal|deleteMeal|upsertFoodSelection|setFoodFavorite) = mutation\([\s\S]*?handler: async \(ctx, args\) => \{[\s\S]*?\n  \},\n\}\)/g,
-    )
-    expect(foodWriteHandlers?.length).toBe(4)
-    for (const block of foodWriteHandlers ?? []) {
-      expect(block).toContain('assertFoodWriteAccess')
+    for (const name of ['upsertMeal', 'upsertFoodSelection', 'setFoodFavorite']) {
+      const idx = source.indexOf(`export const ${name}`)
+      expect(idx).toBeGreaterThan(-1)
+      expect(source.slice(idx, idx + 1800)).toContain('assertFoodWriteAccess')
     }
+    // deleteMeal : ownership seulement (droit de supprimer ses données).
+    const delIdx = source.indexOf('export const deleteMeal')
+    const delBlock = source.slice(delIdx, delIdx + 1800)
+    expect(delBlock).toContain('sessionUserId')
+    expect(delBlock).toContain('assertUserOwnership')
+    expect(delBlock).not.toContain('assertFoodWriteAccess')
   })
 
   it('protège fetchOpenFoodFactsByBarcode et searchOpenFoodFacts via assertActionSession', () => {

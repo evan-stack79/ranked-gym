@@ -330,7 +330,8 @@ export const deleteMeal = mutation({
     updatedAt: v.number(),
   }),
   handler: async (ctx, args) => {
-    const userId = await assertFoodWriteAccess(ctx, args.sessionToken)
+    // Suppression toujours autorisée (droit sur ses données) — pas de garde mineur/TCA/âge.
+    const userId = await sessionUserId(ctx, args.sessionToken)
     const deletedAt = args.deletedAt ?? Date.now()
     const existing = await findMealRow(ctx, userId, args.mealId)
     if (existing) {
@@ -847,19 +848,36 @@ export const searchOpenFoodFacts = action({
   args: {
     sessionToken: v.string(),
     term: v.string(),
+    categoryTag: v.optional(v.union(v.string(), v.null())),
     limit: v.optional(v.number()),
   },
   returns: v.array(offHitReturnValidator),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<ClientOffHit[]> => {
     await assertActionSession(ctx, args.sessionToken)
     const term = args.term.trim()
-    if (term.length < 2) return []
+    const categoryTag = args.categoryTag?.trim() || ''
+    // Legacy : pas de quota 40/jour (contrairement à foodAdd.searchFoods).
+    if (term.length < 2 && !categoryTag) return []
     const limit = Math.max(1, Math.min(OFF_MAX_RESULTS, Math.floor(args.limit ?? OFF_MAX_RESULTS)))
+    const params = new URLSearchParams()
+    params.set('action', 'process')
+    params.set('json', '1')
+    params.set('sort_by', 'unique_scans_n')
+    params.set('page_size', String(limit))
+    if (term.length >= 2) {
+      params.set('search_terms', term)
+      params.set('search_simple', '1')
+    }
+    if (categoryTag) {
+      params.set('tagtype_0', 'categories')
+      params.set('tag_contains_0', 'contains')
+      params.set('tag_0', categoryTag)
+    }
     const data = (await fetchOffJson(
-      `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(term)}&search_simple=1&action=process&json=1&sort_by=unique_scans_n&page_size=${limit}`,
+      `https://world.openfoodfacts.org/cgi/search.pl?${params.toString()}`,
     )) as { products?: OffApiProduct[] }
     const products = Array.isArray(data.products) ? data.products : []
-    const hits: Array<Awaited<ReturnType<typeof toClientOffHit>>> = []
+    const hits: ClientOffHit[] = []
     for (const product of products) {
       const mapped = mapOffProduct(product, String(product.code || product._id || ''))
       if (!mapped.nom.trim()) continue

@@ -15,7 +15,7 @@ import {
 import { getNutritionTarget, hasMealTargets } from '../../services/nutritionActivity'
 import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
 import { isFoodAddV3Enabled } from '../../backend/foodAddV3FeatureFlag'
-import { canAccessFoodAdd } from '../../services/foodAddAccess'
+import { canAccessFoodAdd, canShowMealJournal } from '../../services/foodAddAccess'
 import { readHealthDeclarations } from '../../services/nutritionSafetyRules'
 import { isConvexDomainActive } from '../../backend/adapter'
 import { addFoodSnapshotViaConvex } from '../../services/convexNutritionService'
@@ -323,9 +323,11 @@ export function NutritionDashboard({
   }
 
   const foodAddV3 = isFoodAddV3Enabled()
+  const foodAddAllowed = canAccessFoodAdd(profile)
+  const showMealJournal = canShowMealJournal(profile)
 
   const openAddFood = (type?: MealType) => {
-    if (foodAddV3 && !canAccessFoodAdd(profile)) return
+    if (!foodAddAllowed) return
     if (type) {
       setMealType(type)
       setPendingMealType(type)
@@ -336,7 +338,7 @@ export function NutritionDashboard({
   }
 
   const handleValidateFoodSelection = (hits: OpenFoodFactsSearchHit[]) => {
-    if (foodAddV3 && !canAccessFoodAdd(profile)) {
+    if (!foodAddAllowed) {
       showToast('Ajout d’aliment indisponible pour ce compte.', 'error')
       return
     }
@@ -408,7 +410,7 @@ export function NutritionDashboard({
   }
 
   const openScanner = (forMeal?: MealType) => {
-    if (foodAddV3 && !canAccessFoodAdd(profile)) return
+    if (!foodAddAllowed) return
     if (forMeal) {
       setPendingMealType(forMeal)
       setMealType(forMeal)
@@ -443,6 +445,10 @@ export function NutritionDashboard({
     grams: number
     pieces?: number
   }) => {
+    if (!foodAddAllowed) {
+      showToast('Ajout d’aliment indisponible pour ce compte.', 'error')
+      return
+    }
     try {
       const journal = addMealToDate(selectedDateKey, {
         name: entry.name,
@@ -475,6 +481,10 @@ export function NutritionDashboard({
 
   const handleAdd = (event: FormEvent) => {
     event.preventDefault()
+    if (!foodAddAllowed) {
+      showToast('Ajout d’aliment indisponible pour ce compte.', 'error')
+      return
+    }
     const trimmed = name.trim()
     if (!trimmed || calories <= 0) return
 
@@ -505,6 +515,10 @@ export function NutritionDashboard({
   }
 
   const handleEditSave = (mealId: string, patch: Partial<MealEntry>) => {
+    if (!foodAddAllowed) {
+      showToast('Modification indisponible pour ce compte.', 'error')
+      return
+    }
     const journal = updateMealOnDate(selectedDateKey, mealId, patch)
     setMeals(journal.meals)
     setTick((n) => n + 1)
@@ -682,21 +696,21 @@ export function NutritionDashboard({
           />
         </Reveal>
 
-        {(foodAddV3 ? canAccessFoodAdd(profile) : !declarations.eatingDisorder) ? (
+        {foodAddAllowed ? (
           <NutritionQuickActions onAction={handleQuickAction} />
         ) : null}
 
+        {showMealJournal ? (
         <NutritionDayMealsCard
           meals={meals}
-          onAddMeal={
-            foodAddV3 && !canAccessFoodAdd(profile) ? () => undefined : openAddFood
-          }
-          onEditMeal={setEditingMeal}
-          hideAdd={foodAddV3 ? !canAccessFoodAdd(profile) : declarations.eatingDisorder}
+          onAddMeal={foodAddAllowed ? openAddFood : () => undefined}
+          onEditMeal={foodAddAllowed ? setEditingMeal : () => undefined}
+          hideAdd={!foodAddAllowed}
         />
+        ) : null}
 
         <div ref={journalRef} className="scroll-mt-4">
-          {journalDetailOpen ? (
+          {showMealJournal && journalDetailOpen ? (
             <section className="space-y-3" aria-label="Détail du journal">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-[17px] font-semibold text-white">
@@ -791,7 +805,7 @@ export function NutritionDashboard({
         }}
       />
 
-      {(!foodAddV3 || canAccessFoodAdd(profile)) ? (
+      {foodAddAllowed ? (
         <BarcodeScanner
           open={scannerOpen && !showForm}
           onClose={() => setScannerOpen(false)}
@@ -799,7 +813,7 @@ export function NutritionDashboard({
         />
       ) : null}
 
-      {showForm && foodAddV3 && canAccessFoodAdd(profile) ? (
+      {showForm && foodAddV3 && foodAddAllowed ? (
         <AddFoodScreenV3
           searchQuery={searchQuery}
           onSearchQueryChange={setSearchQuery}
@@ -851,7 +865,7 @@ export function NutritionDashboard({
         />
       ) : null}
 
-      {showForm && !foodAddV3 ? (
+      {showForm && !foodAddV3 && foodAddAllowed ? (
         <AddFoodScreenLegacy
           searchQuery={searchQuery}
           onSearchQueryChange={setSearchQuery}

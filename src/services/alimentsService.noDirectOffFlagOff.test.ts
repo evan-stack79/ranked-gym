@@ -57,35 +57,33 @@ describe('alimentsService — flag OFF : jamais de contact OFF direct', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('recherche catégorie via Convex (searchFoods) — pas world.openfoodfacts.org', async () => {
+  it('recherche catégorie legacy via searchOpenFoodFacts (pas de quota v3)', async () => {
     const fetchSpy = vi.fn()
     vi.stubGlobal('fetch', fetchSpy)
-    searchFoodsV3ViaConvex.mockResolvedValue({
-      hits: [
-        {
-          barcode: '2',
-          nom: 'Pomme',
-          brands: '',
-          calories: 52,
-          proteines: 0,
-          glucides: 14,
-          lipides: 0,
-          servingSize: '150 g',
-          categoriesTags: ['en:fruits'],
-          imageUrl: 'https://x.convex.cloud/pomme',
-          provenance: 'open_food_facts',
-          fetchedAt: 1,
-        },
-      ],
-      searchCount: 1,
-      dailyLimit: 40,
-    })
+    searchOpenFoodFactsViaConvex.mockResolvedValue([
+      {
+        barcode: '2',
+        nom: 'Pomme',
+        brands: '',
+        calories: 52,
+        proteines: 0,
+        glucides: 14,
+        lipides: 0,
+        servingSize: '150 g',
+        categoriesTags: ['en:fruits'],
+        imageUrl: 'https://x.convex.cloud/pomme',
+        provenance: 'open_food_facts',
+        fetchedAt: 1,
+      },
+    ])
+    listConvexFoodCatalog.mockResolvedValue([])
 
     const { searchOpenFoodFacts } = await import('./alimentsService')
     const hits = await searchOpenFoodFacts('', undefined, { categoryTag: 'en:fruits' })
 
     expect(hits).toHaveLength(1)
-    expect(searchFoodsV3ViaConvex).toHaveBeenCalled()
+    expect(searchOpenFoodFactsViaConvex).toHaveBeenCalledWith('', 20, { categoryTag: 'en:fruits' })
+    expect(searchFoodsV3ViaConvex).not.toHaveBeenCalled()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 

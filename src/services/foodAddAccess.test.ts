@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { canAccessFoodAdd, decideFoodAddAccess } from './foodAddAccess'
+import {
+  canAccessFoodAdd,
+  canShowMealJournal,
+  decideFoodAddAccess,
+  needsAgePrompt,
+} from './foodAddAccess'
 import type { CalorieProfile } from '../types/nutrition'
 
 const ADULT: CalorieProfile = {
@@ -16,7 +21,7 @@ const ADULT: CalorieProfile = {
   healthAnswer: 'none',
 }
 
-describe('foodAddAccess — mineur / TCA / diabète', () => {
+describe('foodAddAccess — mineur / TCA / diabète / âge', () => {
   it('refuse les mineurs (<18)', () => {
     expect(decideFoodAddAccess({ ...ADULT, age: 17 })).toEqual({
       allowed: false,
@@ -33,6 +38,7 @@ describe('foodAddAccess — mineur / TCA / diabète', () => {
     }
     expect(decideFoodAddAccess(tca).reason).toBe('eating_disorder')
     expect(canAccessFoodAdd(tca)).toBe(false)
+    expect(canShowMealJournal(tca)).toBe(false)
   })
 
   it('autorise un compte diabétique (voit l’écran)', () => {
@@ -47,13 +53,15 @@ describe('foodAddAccess — mineur / TCA / diabète', () => {
 
   it('autorise un adulte sans restriction', () => {
     expect(canAccessFoodAdd(ADULT)).toBe(true)
+    expect(canShowMealJournal(ADULT)).toBe(true)
   })
 
-  it('refuse un âge inconnu (null / undefined) — aligné serveur', () => {
+  it('âge inconnu → age_required (pas un refus silencieux / mineur)', () => {
     expect(decideFoodAddAccess({ ...ADULT, age: null as unknown as number })).toEqual({
       allowed: false,
-      reason: 'minor',
+      reason: 'age_required',
     })
-    expect(canAccessFoodAdd({ ...ADULT, age: undefined as unknown as number })).toBe(false)
+    expect(needsAgePrompt({ ...ADULT, age: undefined as unknown as number })).toBe(true)
+    expect(canShowMealJournal({ ...ADULT, age: null as unknown as number })).toBe(false)
   })
 })

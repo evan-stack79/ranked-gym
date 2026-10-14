@@ -82,6 +82,9 @@ function mapAccessError(error: unknown): Error | null {
   if (message.includes('FOOD_SEARCH_DAILY_LIMIT')) {
     return new Error('Limite quotidienne de recherches atteinte. Réessaie demain.')
   }
+  if (message.includes('age_required') || message.includes('FOOD_ADD_ACCESS_AGE_REQUIRED')) {
+    return new Error('Indique ton âge pour ajouter un aliment.')
+  }
   if (
     message.includes('FOOD_ADD_ACCESS_DENIED') ||
     message.includes('FOOD_ADD_ACCESS_DENIED_MINOR') ||
@@ -185,8 +188,8 @@ export async function searchOpenFoodFacts(
     return listCachedFoods({ term: searchTerm, categoryTag, limit: SEARCH_PAGE_SIZE })
   }
 
-  // Catégorie ou v3 : action searchFoods (serveur mirror + quota).
-  if (isFoodAddV3Enabled() || categoryTag) {
+  // v3 : action searchFoods (mirror + quota 40/jour).
+  if (isFoodAddV3Enabled()) {
     try {
       const { hits } = await searchFoodsV3ViaConvex({
         term: searchTerm,
@@ -206,12 +209,12 @@ export async function searchOpenFoodFacts(
     }
   }
 
-  // Legacy texte (flag OFF, sans catégorie) : Convex searchOpenFoodFacts + catalogue.
-  if (searchTerm.length < 2) return []
+  // Legacy (flag OFF) : searchOpenFoodFacts — pas de quota 40/jour, même avec catégorie.
+  if (searchTerm.length < 2 && !categoryTag) return []
 
   try {
     const [hits, personal] = await Promise.all([
-      searchOpenFoodFactsViaConvex(searchTerm, SEARCH_PAGE_SIZE),
+      searchOpenFoodFactsViaConvex(searchTerm, SEARCH_PAGE_SIZE, { categoryTag }),
       listConvexFoodCatalog({ limit: SEARCH_PAGE_SIZE * 2 }),
     ])
 

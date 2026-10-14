@@ -143,41 +143,57 @@ export function AddFoodScreenFixture() {
     <AuthProvider>
       <div className="min-h-[100dvh] bg-[#0C0C0E] text-white">
         {validated ? (
-          <p className="p-4 text-[13px] text-[#30D158]" data-fixture-validated>
-            Validé : {validated}
-          </p>
-        ) : null}
-        <AddFoodScreen
-          searchQuery={query}
-          onSearchQueryChange={setQuery}
-          searchLoading={false}
-          searchError={null}
-          searchHits={hits}
-          category={category}
-          onCategoryChange={setCategory}
-          onValidateSelection={(selected) => {
-            setValidated(selected.map((h) => h.nom).join(' · '))
-          }}
-          onOpenScanner={() => setValidated('scanner')}
-          onToast={() => undefined}
-          onPhotoAnalyzed={() => setValidated('photo-ia')}
-          name={name}
-          onNameChange={setName}
-          calories={calories}
-          onCaloriesChange={setCalories}
-          proteinG={proteinG}
-          onProteinChange={setProteinG}
-          carbsG={carbsG}
-          onCarbsChange={setCarbsG}
-          fatG={fatG}
-          onFatChange={setFatG}
-          mealType={mealType}
-          onMealTypeChange={setMealType}
-          onSubmitManual={onSubmitManual}
-          onClose={() => setValidated('closed')}
-          forceOfflineImages={forceOffline}
-        />
+          <div
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-[#0C0C0E] px-6"
+            data-fixture-validated
+            role="status"
+          >
+            <p className="text-center text-[20px] font-semibold text-[#30D158]">
+              Validé : {validated}
+            </p>
+            <p className="text-center text-[13px] text-[#8E8E93]">Ajout enregistré dans le journal.</p>
+          </div>
+        ) : (
+          <AddFoodScreen
+            searchQuery={query}
+            onSearchQueryChange={setQuery}
+            searchLoading={false}
+            searchError={null}
+            searchHits={hits}
+            category={category}
+            onCategoryChange={setCategory}
+            onValidateSelection={(selected) => {
+              setValidated(selected.map((h) => cleanupDisplayName(h.nom)).join(' · '))
+            }}
+            onOpenScanner={() => setValidated('scanner')}
+            onToast={() => undefined}
+            onPhotoAnalyzed={() => setValidated('photo-ia')}
+            name={name}
+            onNameChange={setName}
+            calories={calories}
+            onCaloriesChange={setCalories}
+            proteinG={proteinG}
+            onProteinChange={setProteinG}
+            carbsG={carbsG}
+            onCarbsChange={setCarbsG}
+            fatG={fatG}
+            onFatChange={setFatG}
+            mealType={mealType}
+            onMealTypeChange={setMealType}
+            onSubmitManual={onSubmitManual}
+            onClose={() => setValidated('closed')}
+            forceOfflineImages={forceOffline}
+          />
+        )}
       </div>
     </AuthProvider>
   )
+}
+
+function cleanupDisplayName(raw: string): string {
+  // Aligné UI cartes — « Pomme Golden » etc.
+  return raw
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/^\p{Ll}/u, (ch) => ch.toLocaleUpperCase('fr-FR'))
 }

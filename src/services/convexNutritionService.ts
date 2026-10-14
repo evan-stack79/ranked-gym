@@ -193,11 +193,13 @@ export async function fetchOpenFoodFactsViaConvex(
 export async function searchOpenFoodFactsViaConvex(
   term: string,
   limit?: number,
+  options?: { categoryTag?: string | null },
 ): Promise<OpenFoodFactsProductCloud[]> {
   const sessionToken = await requireToken()
   return getConvex().action(api.nutrition.searchOpenFoodFacts, {
     sessionToken,
     term,
+    categoryTag: options?.categoryTag ?? null,
     limit,
   }) as Promise<OpenFoodFactsProductCloud[]>
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { NutritionOnboarding } from './NutritionOnboarding'
 import { NutritionDashboard } from './NutritionDashboard'
+import { AgeRequiredPrompt } from './AgeRequiredPrompt'
 import {
   getCalorieProfile,
   saveCalorieProfile,
@@ -9,7 +10,8 @@ import { useAuth } from '../../context/AuthContext'
 import type { CalorieProfile } from '../../types/nutrition'
 import { HomeBootSkeleton } from '../ui/AppBootScreen'
 import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
-import { isMinorAge, readHealthDeclarations } from '../../services/nutritionSafetyRules'
+import { isMinorAge, isValidAge, readHealthDeclarations } from '../../services/nutritionSafetyRules'
+import { needsAgePrompt } from '../../services/foodAddAccess'
 import {
   HealthSituationsForm,
   healthSituationsFromProfile,
@@ -79,6 +81,17 @@ export function NutritionView() {
 
   if (showNeedToTalk) {
     return <NeedToTalkScreen onBack={() => setShowNeedToTalk(false)} />
+  }
+
+  // Âge manquant : prompt bloquant. Les repas locaux ne sont pas effacés.
+  if (needsAgePrompt(profile) || !isValidAge(profile.age)) {
+    return (
+      <AgeRequiredPrompt
+        onAgeSubmit={(age) => {
+          handleProfileChange({ ...profile, age })
+        }}
+      />
+    )
   }
 
   if (isMinorAge(profile.age)) {

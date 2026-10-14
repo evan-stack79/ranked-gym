@@ -236,7 +236,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
 
   const foodAddV3 = isFoodAddV3Enabled()
   const calorieProfile = getCalorieProfile()
-  const foodAddAllowed = !foodAddV3 || canAccessFoodAdd(calorieProfile)
+  const foodAddAllowed = canAccessFoodAdd(calorieProfile)
 
   const handleValidateFoodSelection = (hits: OpenFoodFactsSearchHit[]) => {
     if (!foodAddAllowed) {
