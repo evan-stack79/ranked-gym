@@ -96,6 +96,32 @@ export async function signInWithPassword(
   }
 }
 
+/** B10-04 : Google sign-in — server marks email confirmed via Google. */
+export async function signInWithGoogle(args: {
+  email: string
+  googleSub: string
+  displayName?: string
+}): Promise<{
+  user: AuthUser
+  sessionToken: string
+  mustResetPassword: boolean
+  emailConfirmed: true
+}> {
+  const client = requireConvexClient()
+  const result = await client.mutation(api.auth.signInWithGoogle, {
+    email: args.email,
+    googleSub: args.googleSub,
+    displayName: args.displayName,
+  })
+  await setStoredSessionToken(result.sessionToken)
+  return {
+    user: mapAuthUser(result.user),
+    sessionToken: result.sessionToken,
+    mustResetPassword: result.mustResetPassword,
+    emailConfirmed: true as const,
+  }
+}
+
 export async function signOut(): Promise<void> {
   const token = await getStoredSessionToken()
   const client = requireConvexClient()

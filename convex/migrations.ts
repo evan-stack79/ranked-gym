@@ -1,6 +1,7 @@
 import { v } from 'convex/values'
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from './_generated/server'
 import { createImmutableAccountLink } from './accountLinks'
+import { runUnconfirmResetMigrationOnce } from './emailVerification'
 import {
   assertRunSecretStrength,
   hashMigrationSecret,
@@ -191,21 +192,14 @@ export async function upsertAuthUser(
     emailNorm: String(payload.emailNorm ?? String(payload.email ?? '').trim().toLowerCase()),
     displayName: String(payload.displayName ?? 'Athlete'),
     mustResetPassword,
-    // B9-01 : reset / never set confirmed without code verification.
-    emailConfirmedAt: undefined,
     updatedAt: Number(payload.updatedAt ?? now),
   }
   if (existing) {
-    await ctx.db.patch(existing._id, {
-      ...patch,
-      emailConfirmedAt: undefined,
-    })
-    // Efface explicitement un flag posé sans vérification (B9 migration reset).
-    if (existing.emailConfirmedAt != null) {
-      await ctx.db.patch(existing._id, { emailConfirmedAt: undefined })
-    }
+    // B10-05 : re-import ne retire jamais une confirmation obtenue via code ou Google.
+    await ctx.db.patch(existing._id, patch)
     return { convexId: String(existing._id), operation: 'updated' }
   }
+  // Insert : jamais auto-confirmé (B9-01).
   const inserted = await ctx.db.insert('auth_users', {
     userId,
     createdAt: Number(payload.createdAt ?? now),
@@ -797,20 +791,29 @@ export async function startRunForAdmin(
       runId: args.runId,
       runSecret: args.runSecret,
     })
+    const unconfirm = await runUnconfirmResetMigrationOnce(ctx, now)
     await ctx.db.patch(existing._id, {
       status: 'running',
       sourceSha: args.sourceSha || existing.sourceSha,
-      summaryJson: { ...(existing.summaryJson ?? {}), resumedAt: now },
+      summaryJson: {
+        ...(existing.summaryJson ?? {}),
+        resumedAt: now,
+        emailConfirmUnverifiedReset: unconfirm,
+      },
     })
     return { created: false }
   }
+  // B10-03 : one-shot unconfirm reset — runs once when a migration run starts.
+  const unconfirm = await runUnconfirmResetMigrationOnce(ctx, now)
   await ctx.db.insert('migration_runs', {
     runId: args.runId,
     startedAt: now,
     status: 'running',
     sourceSha: args.sourceSha,
     adminSecretHash,
-    summaryJson: {},
+    summaryJson: {
+      emailConfirmUnverifiedReset: unconfirm,
+    },
   })
   return { created: true }
 }

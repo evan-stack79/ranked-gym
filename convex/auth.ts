@@ -35,6 +35,7 @@ import {
   isPasswordResetEmailConfigured,
   sendPasswordResetEmail,
 } from './lib/passwordResetMailer'
+import { markEmailConfirmedViaGoogleForUser } from './emailVerification'
 
 const RESET_ROUTE_PATH = '/auth/reset-password'
 const RESET_LINK_PURGE_GRACE_MS = 5 * 60 * 1000
@@ -719,6 +720,84 @@ export const signInWithPassword = mutation({
     }),
   }),
   handler: (ctx, args) => signInWithPasswordForEmail(ctx, args),
+})
+
+/**
+ * B10-04 : Google sign-in — email Google-verified ⇒ markEmailConfirmedViaGoogle.
+ * `googleSub` + email already verified by Google token exchange (caller / action).
+ */
+export async function completeGoogleSignIn(
+  ctx: MutationCtx,
+  args: {
+    email: string
+    googleSub: string
+    displayName?: string
+    now?: number
+  },
+): Promise<{
+  sessionToken: string
+  expiresAt: number
+  mustResetPassword: boolean
+  emailConfirmed: true
+  user: { userId: string; email: string; displayName: string }
+}> {
+  const emailNorm = normalizeEmail(args.email)
+  const googleSub = args.googleSub.trim()
+  if (!emailNorm || !googleSub) throw new Error('AUTH_GOOGLE_INVALID')
+  const now = args.now ?? Date.now()
+  await consumeRateLimit(ctx, 'signInEmail', { kind: 'email', value: emailNorm })
+
+  let user = await findUserByEmailNorm(ctx, emailNorm)
+  if (!user || user.deletedAt) {
+    const userId = crypto.randomUUID()
+    await ctx.db.insert('auth_users', {
+      userId,
+      email: emailNorm,
+      emailNorm,
+      displayName: toDisplayName(emailNorm, args.displayName),
+      mustResetPassword: false,
+      createdAt: now,
+      updatedAt: now,
+    })
+    user = await findUserByEmailNorm(ctx, emailNorm)
+  }
+  if (!user || user.deletedAt) throw new Error('AUTH_GOOGLE_INVALID')
+
+  // Google-verified email exception — always call confirmation marker.
+  await markEmailConfirmedViaGoogleForUser(ctx, { userId: user.userId, now })
+
+  const session = await createSession(ctx, user.userId)
+  return {
+    sessionToken: session.sessionToken,
+    expiresAt: session.expiresAt,
+    mustResetPassword: false,
+    emailConfirmed: true as const,
+    user: {
+      userId: user.userId,
+      email: user.email,
+      displayName: user.displayName,
+    },
+  }
+}
+
+export const signInWithGoogle = mutation({
+  args: {
+    email: v.string(),
+    googleSub: v.string(),
+    displayName: v.optional(v.string()),
+  },
+  returns: v.object({
+    sessionToken: v.string(),
+    expiresAt: v.number(),
+    mustResetPassword: v.boolean(),
+    emailConfirmed: v.literal(true),
+    user: v.object({
+      userId: v.string(),
+      email: v.string(),
+      displayName: v.string(),
+    }),
+  }),
+  handler: (ctx, args) => completeGoogleSignIn(ctx, args),
 })
 
 export const signOut = mutation({

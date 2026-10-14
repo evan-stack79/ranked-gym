@@ -1,8 +1,7 @@
 /**
- * Confirmation e-mail Convex par code à 6 chiffres (B9-01).
- * - Validité 10 min, 5 tentatives max puis nouveau code requis
- * - Flag emailConfirmedAt posé UNIQUEMENT ici (ou via Google)
- * - Envoi via transactionalMailer (env abstrait — pas de provider hardcodé)
+ * Confirmation e-mail Convex par code à 6 chiffres.
+ * B9-01 : flag emailConfirmedAt uniquement après code correct (ou Google).
+ * B10-02 : 5 tentatives / h et 3 codes / h (serveur) ; resend ne reset pas les tentatives.
  */
 import { v } from 'convex/values'
 import { api, internal } from './_generated/api'
@@ -10,9 +9,9 @@ import {
   action,
   internalMutation,
   internalQuery,
-  mutation,
   query,
   type MutationCtx,
+  type QueryCtx,
 } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import { requireSessionUser } from './lib/auth'
@@ -23,7 +22,13 @@ import {
 } from './lib/transactionalMailer'
 
 export const EMAIL_CODE_TTL_MS = 10 * 60 * 1000
+/** @deprecated alias — 5 tentatives totales / heure (B10-02). */
 export const EMAIL_CODE_MAX_ATTEMPTS = 5
+export const EMAIL_CODE_MAX_ATTEMPTS_PER_HOUR = 5
+export const EMAIL_CODE_MAX_ISSUES_PER_HOUR = 3
+export const EMAIL_CODE_HOUR_MS = 60 * 60 * 1000
+export const EMAIL_CODE_HOUR_BLOCKED = 'EMAIL_CODE_HOUR_BLOCKED'
+export const EMAIL_CODE_HOUR_BLOCKED_MESSAGE = 'Trop d’essais, réessaie dans 1 h'
 
 /** Exported for B9-01 format tests (always 6 digits, zero-padded). */
 export function generateSixDigitCode(): string {
@@ -33,6 +38,39 @@ export function generateSixDigitCode(): string {
 
 export async function hashEmailCode(userId: string, code: string): Promise<string> {
   return hashToken(`${userId}:${code.trim()}`)
+}
+
+export type EmailHourStats = {
+  codesIssued: number
+  attemptsUsed: number
+  windowStartedAt: number | null
+  blockedUntil: number | null
+  blocked: boolean
+}
+
+/** Stats fenêtre glissante 1 h — codes + tentatives (resend ne reset pas). */
+export async function getEmailCodeHourStats(
+  ctx: { db: QueryCtx['db'] | MutationCtx['db'] },
+  userId: string,
+  now: number,
+): Promise<EmailHourStats> {
+  const rows = await ctx.db
+    .query('auth_email_verification_codes')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .collect()
+  const windowStart = now - EMAIL_CODE_HOUR_MS
+  const inWindow = rows.filter((row) => row.createdAt > windowStart)
+  const codesIssued = inWindow.length
+  const attemptsUsed = inWindow.reduce((sum, row) => sum + (row.attempts ?? 0), 0)
+  const windowStartedAt =
+    inWindow.length > 0 ? Math.min(...inWindow.map((row) => row.createdAt)) : null
+  const hitLimit =
+    codesIssued >= EMAIL_CODE_MAX_ISSUES_PER_HOUR ||
+    attemptsUsed >= EMAIL_CODE_MAX_ATTEMPTS_PER_HOUR
+  const blockedUntil =
+    hitLimit && windowStartedAt != null ? windowStartedAt + EMAIL_CODE_HOUR_MS : null
+  const blocked = blockedUntil != null && now < blockedUntil
+  return { codesIssued, attemptsUsed, windowStartedAt, blockedUntil, blocked }
 }
 
 export const getEmailConfirmationState = query({
@@ -81,17 +119,41 @@ export const getActiveCodeMeta = internalQuery({
   },
 })
 
-/** Testable store — wraps the DB writes used by the internal mutation. */
+export const getHourStatsInternal = internalQuery({
+  args: { userId: v.string(), now: v.number() },
+  returns: v.object({
+    codesIssued: v.number(),
+    attemptsUsed: v.number(),
+    windowStartedAt: v.union(v.number(), v.null()),
+    blockedUntil: v.union(v.number(), v.null()),
+    blocked: v.boolean(),
+  }),
+  handler: async (ctx, args) => getEmailCodeHourStats(ctx, args.userId, args.now),
+})
+
+/**
+ * Testable store — resend marque l’ancien code consommé mais ne reset PAS
+ * les tentatives de la fenêtre horaire (B10-02).
+ */
 export async function storeEmailCodeForUser(
   ctx: { db: MutationCtx['db'] },
   args: { userId: string; codeHash: string; expiresAt: number; now: number },
 ): Promise<null> {
+  const stats = await getEmailCodeHourStats(ctx, args.userId, args.now)
+  if (stats.blocked || stats.codesIssued >= EMAIL_CODE_MAX_ISSUES_PER_HOUR) {
+    throw new Error(EMAIL_CODE_HOUR_BLOCKED)
+  }
+  if (stats.attemptsUsed >= EMAIL_CODE_MAX_ATTEMPTS_PER_HOUR) {
+    throw new Error(EMAIL_CODE_HOUR_BLOCKED)
+  }
+
   const existing = await ctx.db
     .query('auth_email_verification_codes')
     .withIndex('by_userId', (q) => q.eq('userId', args.userId))
     .collect()
   for (const row of existing) {
     if (row.consumedAt == null) {
+      // Invalidate for verify — keep attempts for hour accounting.
       await ctx.db.patch(row._id, { consumedAt: args.now })
     }
   }
@@ -116,7 +178,7 @@ export const storeEmailCode = internalMutation({
   handler: async (ctx, args) => storeEmailCodeForUser(ctx, args),
 })
 
-/** Testable attempt recorder — sets emailConfirmedAt only on success. */
+/** Testable attempt recorder — 5 tentatives / h cumulées ; confirmed seulement si succès. */
 export async function recordEmailCodeAttempt(
   ctx: { db: MutationCtx['db'] },
   args: {
@@ -124,22 +186,32 @@ export async function recordEmailCodeAttempt(
     success: boolean
     now: number
   },
-): Promise<{ attempts: number; blocked: boolean; confirmed: boolean }> {
+): Promise<{ attempts: number; blocked: boolean; confirmed: boolean; hourBlocked: boolean }> {
   const row = await ctx.db.get(args.codeId)
   if (!row) throw new Error('EMAIL_CODE_INVALID')
   if (row.consumedAt != null) throw new Error('EMAIL_CODE_INVALID')
   if (row.expiresAt <= args.now) throw new Error('EMAIL_CODE_EXPIRED')
-  if (row.attempts >= EMAIL_CODE_MAX_ATTEMPTS) {
-    return { attempts: row.attempts, blocked: true, confirmed: false }
+
+  const stats = await getEmailCodeHourStats(ctx, row.userId, args.now)
+  if (stats.blocked || stats.attemptsUsed >= EMAIL_CODE_MAX_ATTEMPTS_PER_HOUR) {
+    return {
+      attempts: stats.attemptsUsed,
+      blocked: true,
+      confirmed: false,
+      hourBlocked: true,
+    }
   }
 
   if (!args.success) {
     const attempts = row.attempts + 1
     await ctx.db.patch(row._id, { attempts })
+    const after = stats.attemptsUsed + 1
+    const hourBlocked = after >= EMAIL_CODE_MAX_ATTEMPTS_PER_HOUR
     return {
-      attempts,
-      blocked: attempts >= EMAIL_CODE_MAX_ATTEMPTS,
+      attempts: after,
+      blocked: hourBlocked,
       confirmed: false,
+      hourBlocked,
     }
   }
 
@@ -156,7 +228,12 @@ export async function recordEmailCodeAttempt(
     emailConfirmedAt: args.now,
     updatedAt: args.now,
   })
-  return { attempts: row.attempts + 1, blocked: false, confirmed: true }
+  return {
+    attempts: stats.attemptsUsed + 1,
+    blocked: false,
+    confirmed: true,
+    hourBlocked: false,
+  }
 }
 
 export const recordCodeAttempt = internalMutation({
@@ -169,27 +246,33 @@ export const recordCodeAttempt = internalMutation({
     attempts: v.number(),
     blocked: v.boolean(),
     confirmed: v.boolean(),
+    hourBlocked: v.boolean(),
   }),
   handler: async (ctx, args) => recordEmailCodeAttempt(ctx, args),
 })
 
-/** Google-verified email only (exception B9-01). */
+/** Google-verified email only (exception B9-01 / B10-04). */
+export async function markEmailConfirmedViaGoogleForUser(
+  ctx: { db: MutationCtx['db'] },
+  args: { userId: string; now?: number },
+): Promise<{ ok: true }> {
+  const now = args.now ?? Date.now()
+  const user = await ctx.db
+    .query('auth_users')
+    .withIndex('by_userId', (q) => q.eq('userId', args.userId.trim()))
+    .first()
+  if (!user || user.deletedAt) throw new Error('AUTH_USER_MISSING')
+  await ctx.db.patch(user._id, { emailConfirmedAt: now, updatedAt: now })
+  return { ok: true as const }
+}
+
 export const markEmailConfirmedViaGoogle = internalMutation({
   args: { userId: v.string(), now: v.optional(v.number()) },
   returns: v.object({ ok: v.literal(true) }),
-  handler: async (ctx, args) => {
-    const now = args.now ?? Date.now()
-    const user = await ctx.db
-      .query('auth_users')
-      .withIndex('by_userId', (q) => q.eq('userId', args.userId.trim()))
-      .first()
-    if (!user || user.deletedAt) throw new Error('AUTH_USER_MISSING')
-    await ctx.db.patch(user._id, { emailConfirmedAt: now, updatedAt: now })
-    return { ok: true as const }
-  },
+  handler: async (ctx, args) => markEmailConfirmedViaGoogleForUser(ctx, args),
 })
 
-/** B9 migration : retire les flags confirmed posés sans vérification. */
+/** B9/B10 migration : retire les flags confirmed posés sans vérification. */
 export async function clearAllEmailConfirmedFlags(
   ctx: { db: MutationCtx['db'] },
 ): Promise<{ cleared: number }> {
@@ -204,10 +287,39 @@ export async function clearAllEmailConfirmedFlags(
   return { cleared }
 }
 
+export const EMAIL_CONFIRM_UNVERIFIED_RESET_KEY = 'email_confirm_unverified_reset_v1'
+
+/**
+ * B10-03 : one-shot — clear unverified confirmed flags once, then never again.
+ */
+export async function runUnconfirmResetMigrationOnce(
+  ctx: { db: MutationCtx['db'] },
+  now = Date.now(),
+): Promise<{ ran: boolean; cleared: number; alreadyRan: boolean }> {
+  const existing = await ctx.db
+    .query('app_one_shot_migrations')
+    .withIndex('by_key', (q) => q.eq('key', EMAIL_CONFIRM_UNVERIFIED_RESET_KEY))
+    .first()
+  if (existing) {
+    return { ran: false, cleared: existing.resultCount ?? 0, alreadyRan: true }
+  }
+  const { cleared } = await clearAllEmailConfirmedFlags(ctx)
+  await ctx.db.insert('app_one_shot_migrations', {
+    key: EMAIL_CONFIRM_UNVERIFIED_RESET_KEY,
+    ranAt: now,
+    resultCount: cleared,
+  })
+  return { ran: true, cleared, alreadyRan: false }
+}
+
 export const resetAllEmailConfirmedFlags = internalMutation({
   args: {},
-  returns: v.object({ cleared: v.number() }),
-  handler: async (ctx) => clearAllEmailConfirmedFlags(ctx),
+  returns: v.object({
+    ran: v.boolean(),
+    cleared: v.number(),
+    alreadyRan: v.boolean(),
+  }),
+  handler: async (ctx) => runUnconfirmResetMigrationOnce(ctx),
 })
 
 export const requestEmailVerificationCode = action({
@@ -227,15 +339,27 @@ export const requestEmailVerificationCode = action({
     if (!session?.userId || !session.email) throw new Error('ACCOUNT_LINK_UNAUTHORIZED')
 
     const now = Date.now()
+    const stats = await ctx.runQuery(internal.emailVerification.getHourStatsInternal, {
+      userId: session.userId,
+      now,
+    })
+    if (stats.blocked) throw new Error(EMAIL_CODE_HOUR_BLOCKED)
+
     const code = generateSixDigitCode()
     const codeHash = await hashEmailCode(session.userId, code)
     const expiresAt = now + EMAIL_CODE_TTL_MS
-    await ctx.runMutation(internal.emailVerification.storeEmailCode, {
-      userId: session.userId,
-      codeHash,
-      expiresAt,
-      now,
-    })
+    try {
+      await ctx.runMutation(internal.emailVerification.storeEmailCode, {
+        userId: session.userId,
+        codeHash,
+        expiresAt,
+        now,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ''
+      if (message.includes(EMAIL_CODE_HOUR_BLOCKED)) throw new Error(EMAIL_CODE_HOUR_BLOCKED)
+      throw error
+    }
 
     const sent = await sendTransactionalEmail({
       toEmail: session.email,
@@ -271,13 +395,18 @@ export const verifyEmailVerificationCode = action({
     })
     if (!session?.userId) throw new Error('ACCOUNT_LINK_UNAUTHORIZED')
 
+    const now = Date.now()
+    const stats = await ctx.runQuery(internal.emailVerification.getHourStatsInternal, {
+      userId: session.userId,
+      now,
+    })
+    if (stats.blocked) throw new Error(EMAIL_CODE_HOUR_BLOCKED)
+
     const meta = await ctx.runQuery(internal.emailVerification.getActiveCodeMeta, {
       userId: session.userId,
     })
     if (!meta) throw new Error('EMAIL_CODE_INVALID')
-    const now = Date.now()
     if (meta.expiresAt <= now) throw new Error('EMAIL_CODE_EXPIRED')
-    if (meta.attempts >= EMAIL_CODE_MAX_ATTEMPTS) throw new Error('EMAIL_CODE_BLOCKED')
 
     const expected = await hashEmailCode(session.userId, args.code)
     const success = expected === meta.codeHash
@@ -286,31 +415,27 @@ export const verifyEmailVerificationCode = action({
       success,
       now,
     })
-    if (outcome.blocked && !outcome.confirmed) throw new Error('EMAIL_CODE_BLOCKED')
+    if (outcome.hourBlocked && !outcome.confirmed) throw new Error(EMAIL_CODE_HOUR_BLOCKED)
+    if (outcome.blocked && !outcome.confirmed) throw new Error(EMAIL_CODE_HOUR_BLOCKED)
     if (!outcome.confirmed) throw new Error('EMAIL_CODE_INVALID')
     return { ok: true as const, emailConfirmed: true as const }
   },
 })
 
-/** Test helper — vérifie les règles sans I/O mail. */
+/** Test helper — règles code sans I/O mail. */
 export async function evaluateCodeAttempt(args: {
   storedHash: string
   candidateHash: string
   expiresAt: number
   attempts: number
   now: number
+  hourAttemptsUsed?: number
 }): Promise<'ok' | 'expired' | 'blocked' | 'invalid'> {
   if (args.expiresAt <= args.now) return 'expired'
-  if (args.attempts >= EMAIL_CODE_MAX_ATTEMPTS) return 'blocked'
+  const hourUsed = args.hourAttemptsUsed ?? args.attempts
+  if (hourUsed >= EMAIL_CODE_MAX_ATTEMPTS_PER_HOUR) return 'blocked'
   if (args.storedHash !== args.candidateHash) {
-    return args.attempts + 1 >= EMAIL_CODE_MAX_ATTEMPTS ? 'blocked' : 'invalid'
+    return hourUsed + 1 >= EMAIL_CODE_MAX_ATTEMPTS_PER_HOUR ? 'blocked' : 'invalid'
   }
   return 'ok'
 }
-
-// Keep mutation export for schema discoverability of public surface used by clients that prefer mutations.
-export const _noopEmailVerificationProbe = mutation({
-  args: {},
-  returns: v.null(),
-  handler: async () => null,
-})

@@ -10,8 +10,7 @@ import { safeWarn } from '../utils/safeLog'
 export const EMAIL_PROVIDER_NOT_CONFIGURED_MESSAGE =
   'Confirmation e-mail indisponible. Contacte-nous.'
 
-export const EMAIL_CODE_BLOCKED_MESSAGE =
-  'Trop d’essais. Demande un nouveau code.'
+export const EMAIL_CODE_BLOCKED_MESSAGE = 'Trop d’essais, réessaie dans 1 h'
 
 export const EMAIL_CODE_INVALID_MESSAGE = 'Code incorrect. Réessaie.'
 
@@ -25,8 +24,8 @@ export class EmailProviderNotConfiguredError extends Error {
 }
 
 export class EmailCodeBlockedError extends Error {
-  constructor() {
-    super(EMAIL_CODE_BLOCKED_MESSAGE)
+  constructor(message = EMAIL_CODE_BLOCKED_MESSAGE) {
+    super(message)
     this.name = 'EmailCodeBlockedError'
   }
 }
@@ -78,6 +77,12 @@ export async function requestEmailVerificationCode(): Promise<{ expiresAt: numbe
     if (message.includes('EMAIL_PROVIDER_NOT_CONFIGURED')) {
       throw new EmailProviderNotConfiguredError()
     }
+    if (
+      message.includes('EMAIL_CODE_HOUR_BLOCKED') ||
+      message.includes('EMAIL_CODE_BLOCKED')
+    ) {
+      throw new EmailCodeBlockedError()
+    }
     safeWarn('[email-verify] request code failed', error)
     throw new EmailCodeInvalidError('Envoi du code impossible. Réessaie.')
   }
@@ -97,7 +102,12 @@ export async function verifyEmailVerificationCode(code: string): Promise<void> {
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : ''
-    if (message.includes('EMAIL_CODE_BLOCKED')) throw new EmailCodeBlockedError()
+    if (
+      message.includes('EMAIL_CODE_HOUR_BLOCKED') ||
+      message.includes('EMAIL_CODE_BLOCKED')
+    ) {
+      throw new EmailCodeBlockedError()
+    }
     if (message.includes('EMAIL_CODE_EXPIRED')) {
       throw new EmailCodeInvalidError(EMAIL_CODE_EXPIRED_MESSAGE)
     }

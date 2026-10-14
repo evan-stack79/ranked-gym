@@ -165,7 +165,6 @@ describe('auth_account_links — B7/B8/B9', () => {
   it('B7-01 : migration auth_users crée le lien + reset confirmed (FakeDb)', async () => {
     const db = new FakeDb()
     const ctx = { db }
-    // Compte déjà « confirmed » sans vérification → doit être reset.
     await db.insert('auth_users', {
       userId: 'user-mig',
       email: 'mig@example.com',
@@ -176,6 +175,7 @@ describe('auth_account_links — B7/B8/B9', () => {
       createdAt: 1,
       updatedAt: 1,
     })
+    // B10-05 : re-import préserve confirmation (code/Google) — one-shot reset est séparé.
     const outcome = await upsertAuthUser(ctx as never, {
       userId: 'user-mig',
       email: 'mig@example.com',
@@ -184,14 +184,13 @@ describe('auth_account_links — B7/B8/B9', () => {
       mustResetPassword: true,
     })
     expect(outcome.operation).toBe('updated')
-    const user = db.table('auth_users')[0]
-    expect(user.emailConfirmedAt).toBeUndefined()
+    expect(db.table('auth_users')[0].emailConfirmedAt).toBe(1_700_000_000_000)
 
-    // Même chemin migration : création du lien.
     await createImmutableAccountLink(ctx as never, 'user-mig', 'supabase-mig')
     const link = await findLinkByOwner(ctx as never, 'user-mig')
     expect(link?.supabaseUserId).toBe('supabase-mig')
     expect(migrationSource).toContain("args.entityType === 'auth_users'")
+    expect(migrationSource).toContain('runUnconfirmResetMigrationOnce')
   })
 
   it('B7-03 : purge Supabase utilise l’id du lien, pas l’id Convex', () => {

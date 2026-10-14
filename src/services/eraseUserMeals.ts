@@ -1,10 +1,9 @@
 /**
  * « Effacer mes anciens repas » — multi-store, fail-closed.
- * - Compte lié : lien + purge Supabase via Convex ; dédup meal id (B9-03)
- * - Supabase-only : access token vérifié serveur, pas de lien (B9-02)
+ * - Compte Convex lié : lien + purge Supabase via Convex ; dédup meal id (B9-03)
+ * - Supabase-only : UNIQUEMENT s’il n’y a PAS de session Convex (B10-01)
+ * - Convex signé-in sans lien → reconnect, jamais le JWT Supabase résiduel téléphone
  * - Backups Convex toujours nettoyés même si 0 repas Convex (B9-04)
- * - 0 online + repas locaux déjà sync → erreur
- * - pending-only → effacement local autorisé
  */
 import { isConvexDomainActive } from '../backend/adapter'
 import { isConvexConfigured } from '../lib/convex'
@@ -18,6 +17,7 @@ import {
   requireAccountLinkForErase,
 } from './accountLinkService'
 import { getActiveCloudUserId } from './cloudSession'
+import { getConvexSessionToken } from './convexAuthService'
 import {
   countActiveMealsViaConvex,
   countSupabaseMealsByAccessTokenViaConvex,
@@ -92,7 +92,7 @@ export type MealsEraseCardState = {
   signedOut: boolean
   /** Convex signé-in sans lien → reconnect ancien compte Supabase */
   needsLegacyReconnect: boolean
-  /** Compte Supabase-only (token) — erase sans lien */
+  /** Compte Supabase-only (token) — erase sans lien ; jamais si session Convex */
   supabaseOnly?: boolean
 }
 
@@ -108,6 +108,13 @@ async function readOptionalPhoneSupabaseAccessToken(): Promise<string | null> {
   }
 }
 
+/** B10-01 : session Convex active (compte Ranked Gym), indépendamment du JWT Supabase téléphone. */
+async function hasConvexAccountSession(): Promise<boolean> {
+  if (!isConvexConfigured()) return false
+  const token = await getConvexSessionToken()
+  return Boolean(token && token.trim())
+}
+
 async function fetchDedupedLinkedServerMealCount(): Promise<{
   convexCount: number
   supabaseCount: number
@@ -121,7 +128,6 @@ async function fetchDedupedLinkedServerMealCount(): Promise<{
   }
   const supabaseIds = await listSupabaseMealIdsViaConvex()
   const supabaseCount = supabaseIds.length
-  // B9-03 : même meal id des deux côtés compté une seule fois.
   const total = dedupeMealCountByIds(convexIds, supabaseIds)
   return {
     convexCount: requireServerCount(convexCount),
@@ -133,24 +139,66 @@ async function fetchDedupedLinkedServerMealCount(): Promise<{
 /** État carte : count dédupliqué ; pending local séparé. */
 export async function fetchMealsEraseCardState(): Promise<MealsEraseCardState> {
   const userId = getActiveCloudUserId()
-  if (!userId) {
-    // Supabase-only : session téléphone sans userId Convex local.
+  const convexSignedIn = await hasConvexAccountSession()
+
+  // B10-01 : sans session Convex → Supabase-only possible via token téléphone.
+  if (!convexSignedIn) {
+    if (!userId) {
+      const phoneToken = await readOptionalPhoneSupabaseAccessToken()
+      if (phoneToken && isConvexConfigured()) {
+        try {
+          const result = await countSupabaseMealsByAccessTokenViaConvex(phoneToken)
+          return {
+            serverCount: requireServerCount(result.count),
+            pendingCount: 0,
+            signedOut: false,
+            needsLegacyReconnect: false,
+            supabaseOnly: true,
+          }
+        } catch (error) {
+          safeWarn('[erase-meals] supabase-only count failed', error)
+          return {
+            serverCount: null,
+            pendingCount: 0,
+            signedOut: false,
+            needsLegacyReconnect: false,
+            supabaseOnly: true,
+          }
+        }
+      }
+      return {
+        serverCount: null,
+        pendingCount: 0,
+        signedOut: true,
+        needsLegacyReconnect: false,
+      }
+    }
+    // Legacy cloud user id without Convex session — count via Supabase token only.
+    const pendingCount = countPendingUnsyncedMeals(userId)
+    if (!isConvexConfigured()) {
+      return {
+        serverCount: null,
+        pendingCount,
+        signedOut: false,
+        needsLegacyReconnect: false,
+      }
+    }
     const phoneToken = await readOptionalPhoneSupabaseAccessToken()
-    if (phoneToken && isConvexConfigured()) {
+    if (phoneToken) {
       try {
         const result = await countSupabaseMealsByAccessTokenViaConvex(phoneToken)
         return {
           serverCount: requireServerCount(result.count),
-          pendingCount: 0,
+          pendingCount,
           signedOut: false,
           needsLegacyReconnect: false,
           supabaseOnly: true,
         }
       } catch (error) {
-        safeWarn('[erase-meals] supabase-only count failed', error)
+        safeWarn('[erase-meals] supabase-only count (no convex session) failed', error)
         return {
           serverCount: null,
-          pendingCount: 0,
+          pendingCount,
           signedOut: false,
           needsLegacyReconnect: false,
           supabaseOnly: true,
@@ -159,12 +207,14 @@ export async function fetchMealsEraseCardState(): Promise<MealsEraseCardState> {
     }
     return {
       serverCount: null,
-      pendingCount: 0,
-      signedOut: true,
+      pendingCount,
+      signedOut: false,
       needsLegacyReconnect: false,
     }
   }
-  const pendingCount = countPendingUnsyncedMeals(userId)
+
+  // --- Convex account signed in ---
+  const pendingCount = userId ? countPendingUnsyncedMeals(userId) : 0
 
   if (!isConvexConfigured()) {
     return {
@@ -176,32 +226,8 @@ export async function fetchMealsEraseCardState(): Promise<MealsEraseCardState> {
   }
 
   const link = await fetchMyAccountLink()
-  const needsLegacyReconnect = link == null && isConvexDomainActive()
-
-  if (needsLegacyReconnect) {
-    const phoneToken = await readOptionalPhoneSupabaseAccessToken()
-    if (phoneToken) {
-      try {
-        const supabase = await countSupabaseMealsByAccessTokenViaConvex(phoneToken)
-        let convexCount = 0
-        if (isConvexDomainActive()) {
-          try {
-            convexCount = requireServerCount(await countActiveMealsViaConvex())
-          } catch {
-            convexCount = 0
-          }
-        }
-        return {
-          serverCount: requireServerCount(convexCount + supabase.count),
-          pendingCount,
-          signedOut: false,
-          needsLegacyReconnect: false,
-          supabaseOnly: true,
-        }
-      } catch (error) {
-        safeWarn('[erase-meals] supabase-only count (no link) failed', error)
-      }
-    }
+  if (link == null) {
+    // B10-01 : jamais utiliser le JWT Supabase résiduel ; reconnect seulement.
     try {
       const convexCount = isConvexDomainActive()
         ? requireServerCount(await countActiveMealsViaConvex())
@@ -224,29 +250,9 @@ export async function fetchMealsEraseCardState(): Promise<MealsEraseCardState> {
   }
 
   try {
-    if (link) {
-      const { total } = await fetchDedupedLinkedServerMealCount()
-      return {
-        serverCount: total,
-        pendingCount,
-        signedOut: false,
-        needsLegacyReconnect: false,
-      }
-    }
-    // Legacy domain + Supabase session without Convex link.
-    const phoneToken = await readOptionalPhoneSupabaseAccessToken()
-    if (phoneToken) {
-      const result = await countSupabaseMealsByAccessTokenViaConvex(phoneToken)
-      return {
-        serverCount: requireServerCount(result.count),
-        pendingCount,
-        signedOut: false,
-        needsLegacyReconnect: false,
-        supabaseOnly: true,
-      }
-    }
+    const { total } = await fetchDedupedLinkedServerMealCount()
     return {
-      serverCount: null,
+      serverCount: total,
       pendingCount,
       signedOut: false,
       needsLegacyReconnect: false,
@@ -269,8 +275,7 @@ export async function fetchStoredMealsCount(): Promise<number> {
 }
 
 /**
- * Purge repas — lien Convex ou Supabase-only (token).
- * Jamais de purge Supabase directe téléphone (B8-01).
+ * Purge repas — lien Convex (si session Convex) ou Supabase-only (sans session Convex).
  */
 export async function eraseAllUserMeals(): Promise<{
   localCleared: number
@@ -289,26 +294,45 @@ export async function eraseAllUserMeals(): Promise<{
     throw new EraseMealsNeedsConnectionError()
   }
 
-  const link = userId ? await fetchMyAccountLink() : null
+  const convexSignedIn = await hasConvexAccountSession()
   const phoneToken = await readOptionalPhoneSupabaseAccessToken()
 
-  // --- Supabase-only path (no Convex link) ---
-  if (!link) {
-    if (phoneToken) {
-      return eraseSupabaseOnlyMeals({
-        userId,
-        phoneToken,
-        localBefore,
-        pendingBefore,
-      })
-    }
-    if (userId && isConvexDomainActive()) {
+  // B10-01 : session Convex ⇒ chemin lien uniquement (jamais JWT Supabase téléphone).
+  if (convexSignedIn) {
+    const link = await fetchMyAccountLink()
+    if (!link) {
       throw new EraseMealsNeedsLegacyReconnectError()
     }
-    throw new EraseMealsNeedsConnectionError()
+    return eraseLinkedConvexMeals({
+      userId,
+      localBefore,
+      pendingBefore,
+    })
   }
 
-  // --- Linked path ---
+  // Supabase-only : pas de compte Convex signé-in.
+  if (phoneToken) {
+    return eraseSupabaseOnlyMeals({
+      userId,
+      phoneToken,
+      localBefore,
+      pendingBefore,
+    })
+  }
+
+  throw new EraseMealsNeedsConnectionError()
+}
+
+async function eraseLinkedConvexMeals(args: {
+  userId: string | null
+  localBefore: number
+  pendingBefore: number
+}): Promise<{
+  localCleared: number
+  serverDeleted: number
+  pendingMealOpsCleared: number
+}> {
+  const { userId, localBefore, pendingBefore } = args
   await requireAccountLinkForErase()
 
   const { convexCount, total: serverCount } = await fetchDedupedLinkedServerMealCount()
@@ -323,7 +347,6 @@ export async function eraseAllUserMeals(): Promise<{
     if (pendingLocal > 0 || localBefore > 0) {
       clearLocalMealsAndPendingMealWrites({ userId: userId ?? undefined })
     }
-    // B9-04 : toujours nettoyer backups Convex même à 0 repas.
     if (isConvexDomainActive()) {
       try {
         await deleteAllMyMealsViaConvex()
@@ -357,7 +380,6 @@ export async function eraseAllUserMeals(): Promise<{
     throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
   }
 
-  // B9-04 : toujours appeler deleteAllMyMeals (backups) même si convexCount = 0.
   if (isConvexDomainActive()) {
     try {
       await deleteAllMyMealsViaConvex()
@@ -368,7 +390,6 @@ export async function eraseAllUserMeals(): Promise<{
     }
   }
 
-  // B9-03 : serverDeleted = count dédupliqué pré-purge (pas somme Convex+Supabase).
   void supabaseDeleted
   void convexCount
   const serverDeleted = requireServerCount(serverCount)
@@ -394,9 +415,11 @@ async function eraseSupabaseOnlyMeals(args: {
 }> {
   const { userId, phoneToken, localBefore, pendingBefore } = args
   let supabaseCount = 0
+  let resolvedUserId = ''
   try {
     const counted = await countSupabaseMealsByAccessTokenViaConvex(phoneToken)
     supabaseCount = requireServerCount(counted.count)
+    resolvedUserId = counted.resolvedUserId
   } catch (error) {
     const message = error instanceof Error ? error.message : ''
     if (message.includes('SUPABASE_TOKEN_UNRESOLVED')) {
@@ -406,28 +429,27 @@ async function eraseSupabaseOnlyMeals(args: {
     throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
   }
 
-  const syncedLocal = userId ? countSyncedLocalMeals(userId) : 0
-  const pendingLocal = userId ? countPendingUnsyncedMeals(userId) : 0
+  // B10-01 : n’efface le cache téléphone que s’il appartient au même compte que le token.
+  const phoneDataBelongsToTokenAccount =
+    userId == null || userId === resolvedUserId
+
+  const syncedLocal =
+    phoneDataBelongsToTokenAccount && userId ? countSyncedLocalMeals(userId) : 0
+  const pendingLocal =
+    phoneDataBelongsToTokenAccount && userId ? countPendingUnsyncedMeals(userId) : 0
 
   if (supabaseCount === 0 && syncedLocal > 0) {
     throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
   }
 
   if (supabaseCount === 0 && syncedLocal === 0) {
-    if (pendingLocal > 0 || localBefore > 0) {
+    if (phoneDataBelongsToTokenAccount && (pendingLocal > 0 || localBefore > 0)) {
       clearLocalMealsAndPendingMealWrites({ userId: userId ?? undefined })
     }
-    if (userId && isConvexDomainActive()) {
-      try {
-        await deleteAllMyMealsViaConvex()
-      } catch (error) {
-        safeWarn('[erase-meals] Convex backup cleanup (supabase-only 0) failed', error)
-      }
-    }
     return {
-      localCleared: localBefore,
+      localCleared: phoneDataBelongsToTokenAccount ? localBefore : 0,
       serverDeleted: 0,
-      pendingMealOpsCleared: pendingBefore,
+      pendingMealOpsCleared: phoneDataBelongsToTokenAccount ? pendingBefore : 0,
     }
   }
 
@@ -435,27 +457,22 @@ async function eraseSupabaseOnlyMeals(args: {
   try {
     const purge = await purgeSupabaseMealCopiesByAccessTokenViaConvex(phoneToken)
     supabaseDeleted = requireServerCount(purge?.deletedCount)
-    // Never erase another's account — resolved id must match token identity (server-enforced).
+    if (purge.resolvedUserId !== resolvedUserId) {
+      throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
+    }
   } catch (error) {
     if (error instanceof EraseMealsPurgeError) throw error
     safeWarn('[erase-meals] supabase-only purge failed', error)
     throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
   }
 
-  // B9-04 : si session Convex active, nettoyer backups même sans repas Convex.
-  if (userId && isConvexDomainActive()) {
-    try {
-      await deleteAllMyMealsViaConvex()
-    } catch (error) {
-      safeWarn('[erase-meals] Convex backup cleanup after supabase-only failed', error)
-      throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
-    }
+  if (phoneDataBelongsToTokenAccount) {
+    clearLocalMealsAndPendingMealWrites({ userId: userId ?? undefined })
   }
 
-  clearLocalMealsAndPendingMealWrites({ userId: userId ?? undefined })
   return {
-    localCleared: localBefore,
+    localCleared: phoneDataBelongsToTokenAccount ? localBefore : 0,
     serverDeleted: supabaseDeleted,
-    pendingMealOpsCleared: pendingBefore,
+    pendingMealOpsCleared: phoneDataBelongsToTokenAccount ? pendingBefore : 0,
   }
 }

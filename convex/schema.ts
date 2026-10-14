@@ -67,6 +67,13 @@ export const convexTables = {
     consumedAt: v.optional(v.number()),
   }).index('by_userId', ['userId']),
 
+  /** One-shot server migrations (e.g. B10-03 unconfirm reset). */
+  app_one_shot_migrations: defineTable({
+    key: v.string(),
+    ranAt: v.number(),
+    resultCount: v.optional(v.number()),
+  }).index('by_key', ['key']),
+
   auth_password_credentials: defineTable({
     userId: v.string(),
     passwordHash: v.string(),

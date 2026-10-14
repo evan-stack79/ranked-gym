@@ -17,6 +17,7 @@ const PHASE_E_TABLES = [
   'auth_users',
   'auth_account_links',
   'auth_email_verification_codes',
+  'app_one_shot_migrations',
   'auth_password_credentials',
   'auth_sessions',
   'auth_password_reset_tokens',

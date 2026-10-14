@@ -55,6 +55,7 @@ type TableName =
   | 'migration_runs'
   | 'migration_entity_map'
   | 'rate_limit_buckets'
+  | 'app_one_shot_migrations'
 
 type StoredRow = Record<string, unknown> & { _id: string }
 
@@ -86,6 +87,7 @@ class FakeDb {
     migration_runs: [],
     migration_entity_map: [],
     rate_limit_buckets: [],
+    app_one_shot_migrations: [],
   }
 
   insert(table: TableName, value: Record<string, unknown>) {
