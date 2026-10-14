@@ -3,37 +3,56 @@ import { Loader2, Trash2 } from 'lucide-react'
 import { IosSheet } from '../ui/IosSheet'
 import {
   ERASE_MEALS_CONNECT_MESSAGE,
+  ERASE_MEALS_COUNT_UNKNOWN_MESSAGE,
+  ERASE_MEALS_NONE_MESSAGE,
   ERASE_MEALS_PURGE_FAILED_MESSAGE,
   EraseMealsNeedsConnectionError,
   EraseMealsPurgeError,
   eraseAllUserMeals,
-  fetchStoredMealsCount,
+  fetchMealsEraseCardState,
 } from '../../services/eraseUserMeals'
 import { useAuth } from '../../context/AuthContext'
 
+export type EraseCardCountMode = 'ready' | 'none' | 'unknown' | 'signed_out'
+
 interface YourDataMealsErasePanelProps {
-  count: number
+  /** Count serveur (ignoré si mode signed_out / unknown / none). */
+  serverCount: number
+  pendingCount?: number
+  countMode: EraseCardCountMode
   onRequestErase: () => void | Promise<void>
   busy?: boolean
   error?: string | null
   confirmOpen: boolean
   onConfirmOpenChange: (open: boolean) => void
-  /** Signé out : le tap affiche Connecte-toi immédiatement, sans sheet. */
-  signedOut?: boolean
   onSignedOutTap?: () => void
+  /** true quand erase est bloqué (unknown / none / signed_out). */
+  eraseDisabled?: boolean
 }
 
-/** Présentation — utilisée par la carte live et la fixture démo. */
+function countLabel(mode: EraseCardCountMode, serverCount: number): string {
+  if (mode === 'signed_out') return 'Connexion requise'
+  if (mode === 'unknown') return ERASE_MEALS_COUNT_UNKNOWN_MESSAGE
+  if (mode === 'none') return ERASE_MEALS_NONE_MESSAGE
+  return `${serverCount} repas gardé${serverCount > 1 ? 's' : ''}`
+}
+
+/** Présentation — carte live + fixture. */
 export function YourDataMealsErasePanel({
-  count,
+  serverCount,
+  pendingCount = 0,
+  countMode,
   onRequestErase,
   busy = false,
   error = null,
   confirmOpen,
   onConfirmOpenChange,
-  signedOut = false,
   onSignedOutTap,
+  eraseDisabled = false,
 }: YourDataMealsErasePanelProps) {
+  const signedOut = countMode === 'signed_out'
+  const disabled = eraseDisabled || signedOut || countMode === 'unknown' || countMode === 'none'
+
   return (
     <div className="space-y-2" data-testid="your-data-meals-section">
       <p className="px-1 text-[13px] font-semibold uppercase tracking-wide text-[#8E8E93]">
@@ -43,14 +62,16 @@ export function YourDataMealsErasePanel({
         <button
           type="button"
           data-testid="erase-old-meals-button"
+          disabled={disabled && !signedOut}
           onClick={() => {
             if (signedOut) {
               onSignedOutTap?.()
               return
             }
+            if (disabled) return
             onConfirmOpenChange(true)
           }}
-          className="ios-press flex w-full items-center gap-3 px-4 py-3.5 text-left"
+          className="ios-press flex w-full items-center gap-3 px-4 py-3.5 text-left disabled:cursor-not-allowed disabled:opacity-45"
         >
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FF453A]/15 text-[#FF6961]">
             <Trash2 className="h-4 w-4" aria-hidden />
@@ -63,10 +84,16 @@ export function YourDataMealsErasePanel({
               className="mt-0.5 block text-[13px] text-[#8E8E93]"
               data-testid="erase-old-meals-count"
             >
-              {signedOut
-                ? 'Connexion requise'
-                : `${count} repas gardé${count > 1 ? 's' : ''}`}
+              {countLabel(countMode, serverCount)}
             </span>
+            {countMode === 'ready' && pendingCount > 0 ? (
+              <span
+                className="mt-0.5 block text-[12px] text-[#8E8E93]"
+                data-testid="erase-old-meals-pending"
+              >
+                + {pendingCount} repas pas encore envoyés
+              </span>
+            ) : null}
           </span>
         </button>
       </div>
@@ -80,8 +107,17 @@ export function YourDataMealsErasePanel({
         </p>
       ) : null}
 
+      {!signedOut && countMode === 'unknown' ? (
+        <p
+          className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-[13px] text-[#AEAEB2]"
+          data-testid="erase-old-meals-unknown"
+        >
+          {ERASE_MEALS_COUNT_UNKNOWN_MESSAGE}
+        </p>
+      ) : null}
+
       <IosSheet
-        open={confirmOpen && !signedOut}
+        open={confirmOpen && !signedOut && !disabled}
         onClose={() => {
           if (!busy) onConfirmOpenChange(false)
         }}
@@ -92,8 +128,10 @@ export function YourDataMealsErasePanel({
       >
         <div className="space-y-3 pb-2">
           <p className="text-[13px] leading-relaxed text-[#AEAEB2]">
-            Tu vas supprimer définitivement {count} repas enregistré{count > 1 ? 's' : ''}. Aucun
-            détail n’est affiché ici. Cette action vide aussi le cache de ton téléphone.
+            Tu vas supprimer définitivement {serverCount} repas enregistré
+            {serverCount > 1 ? 's' : ''}
+            {pendingCount > 0 ? ` (+ ${pendingCount} pas encore envoyés)` : ''}. Aucun détail n’est
+            affiché ici. Cette action vide aussi le cache de ton téléphone.
           </p>
           {error ? (
             <p className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]">
@@ -131,12 +169,13 @@ export function YourDataMealsErasePanel({
 }
 
 /**
- * Profil > Tes données — bouton « Effacer mes anciens repas ».
- * Toujours visible (y compris déconnecté).
+ * Profil > Tes données — toujours visible.
  */
 export function YourDataMealsEraseCard() {
   const { isAuthenticated } = useAuth()
-  const [count, setCount] = useState(0)
+  const [serverCount, setServerCount] = useState(0)
+  const [pendingCount, setPendingCount] = useState(0)
+  const [countMode, setCountMode] = useState<EraseCardCountMode>('signed_out')
   const [loading, setLoading] = useState(true)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -144,14 +183,29 @@ export function YourDataMealsEraseCard() {
 
   const refresh = useCallback(async () => {
     if (!isAuthenticated) {
-      setCount(0)
+      setCountMode('signed_out')
+      setServerCount(0)
+      setPendingCount(0)
       setLoading(false)
       return
     }
     setLoading(true)
     try {
-      const next = await fetchStoredMealsCount()
-      setCount(next)
+      const state = await fetchMealsEraseCardState()
+      setPendingCount(state.pendingCount)
+      if (state.signedOut) {
+        setCountMode('signed_out')
+        setServerCount(0)
+      } else if (state.serverCount == null) {
+        setCountMode('unknown')
+        setServerCount(0)
+      } else if (state.serverCount === 0 && state.pendingCount === 0) {
+        setCountMode('none')
+        setServerCount(0)
+      } else {
+        setCountMode('ready')
+        setServerCount(state.serverCount)
+      }
     } finally {
       setLoading(false)
     }
@@ -180,10 +234,15 @@ export function YourDataMealsEraseCard() {
     )
   }
 
+  const eraseDisabled =
+    countMode === 'unknown' || countMode === 'none' || countMode === 'signed_out'
+
   return (
     <YourDataMealsErasePanel
-      count={count}
-      signedOut={!isAuthenticated}
+      serverCount={serverCount}
+      pendingCount={pendingCount}
+      countMode={countMode}
+      eraseDisabled={eraseDisabled}
       confirmOpen={confirmOpen}
       onConfirmOpenChange={(open) => {
         setError(null)
@@ -196,11 +255,14 @@ export function YourDataMealsEraseCard() {
       busy={busy}
       error={error}
       onRequestErase={async () => {
+        if (eraseDisabled) return
         setBusy(true)
         setError(null)
         try {
           await eraseAllUserMeals()
-          setCount(0)
+          setServerCount(0)
+          setPendingCount(0)
+          setCountMode('none')
           setConfirmOpen(false)
         } catch (err) {
           if (err instanceof EraseMealsNeedsConnectionError) {

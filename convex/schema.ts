@@ -39,6 +39,19 @@ export const convexTables = {
     .index('by_emailNorm', ['emailNorm'])
     .index('by_mustResetPassword', ['mustResetPassword']),
 
+  /**
+   * Lien compte Ranked Gym (ownerUserId / Convex) ↔ compte Supabase Auth.
+   * Obligatoire avant purge repas multi-store.
+   */
+  auth_account_links: defineTable({
+    ownerUserId: v.string(),
+    supabaseUserId: v.string(),
+    linkedAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_ownerUserId', ['ownerUserId'])
+    .index('by_supabaseUserId', ['supabaseUserId']),
+
   auth_password_credentials: defineTable({
     userId: v.string(),
     passwordHash: v.string(),

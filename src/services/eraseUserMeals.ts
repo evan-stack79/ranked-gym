@@ -1,21 +1,30 @@
 /**
- * « Effacer mes anciens repas » — toutes les copies (Convex + Supabase) + local.
- * Fail-closed : si une copie en ligne n’est pas purgée → pas de succès.
- * deletedCount : uniquement valeurs serveur (jamais le count téléphone).
+ * « Effacer mes anciens repas » — multi-store, fail-closed.
+ * - Lien compte app ↔ Supabase vérifié serveur avant toute purge
+ * - deletedCount / card count : serveur uniquement
+ * - 0 online + repas locaux déjà sync → erreur
+ * - pending-only → effacement local autorisé
  */
 import { isConvexDomainActive } from '../backend/adapter'
+import { isConvexConfigured } from '../lib/convex'
 import { isSupabaseConfigured } from '../lib/supabase'
+import { assertAccountLinkForErase } from './accountLinkService'
 import { getActiveCloudUserId } from './cloudSession'
+import { countActiveMealsViaSupabase } from './countSupabaseMeals'
 import {
   countActiveMealsViaConvex,
   deleteAllMyMealsViaConvex,
   purgeSupabaseMealCopiesViaConvex,
 } from './convexNutritionService'
+import { countQueuedMealOpsForUser } from './convexNutritionQueue'
+import {
+  countPendingUnsyncedMeals,
+  countSyncedLocalMeals,
+} from './localMealSyncState'
 import {
   clearLocalMealsAndPendingMealWrites,
   countLocalMeals,
 } from './nutritionStorage'
-import { countQueuedMealOpsForUser } from './convexNutritionQueue'
 import {
   ERASE_MEALS_PURGE_FAILED_MESSAGE,
   EraseMealsPurgeError,
@@ -23,8 +32,9 @@ import {
 } from './purgeSupabaseMealCopies'
 import { safeWarn } from '../utils/safeLog'
 
-/** Message exact quand hors ligne / non connecté. */
 export const ERASE_MEALS_CONNECT_MESSAGE = 'Connecte-toi pour effacer'
+export const ERASE_MEALS_COUNT_UNKNOWN_MESSAGE = 'Nombre inconnu, réessaie'
+export const ERASE_MEALS_NONE_MESSAGE = 'Aucun ancien repas'
 
 export { ERASE_MEALS_PURGE_FAILED_MESSAGE, EraseMealsPurgeError }
 
@@ -40,28 +50,64 @@ function isBrowserOnline(): boolean {
   return navigator.onLine !== false
 }
 
-function requireServerDeletedCount(value: unknown): number {
+function requireServerCount(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
     throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
   }
   return value
 }
 
-export async function fetchStoredMealsCount(): Promise<number> {
-  const local = countLocalMeals()
-  if (!isConvexDomainActive()) return local
+export type MealsEraseCardState = {
+  /** null = serveur muet → UI « Nombre inconnu » + erase bloqué */
+  serverCount: number | null
+  pendingCount: number
+  signedOut: boolean
+}
+
+/** État carte : count serveur only + pending local séparé. */
+export async function fetchMealsEraseCardState(): Promise<MealsEraseCardState> {
+  const userId = getActiveCloudUserId()
+  if (!userId) {
+    return { serverCount: null, pendingCount: 0, signedOut: true }
+  }
+  const pendingCount = countPendingUnsyncedMeals(userId)
   try {
-    const remote = await countActiveMealsViaConvex()
-    return Math.max(local, remote)
+    let serverCount: number
+    if (isConvexDomainActive()) {
+      serverCount = await countActiveMealsViaConvex()
+    } else if (isSupabaseConfigured()) {
+      serverCount = await countActiveMealsViaSupabase()
+    } else {
+      return { serverCount: null, pendingCount, signedOut: false }
+    }
+    if (typeof serverCount !== 'number' || !Number.isFinite(serverCount)) {
+      return { serverCount: null, pendingCount, signedOut: false }
+    }
+    return { serverCount, pendingCount, signedOut: false }
   } catch (error) {
-    safeWarn('[erase-meals] count remote failed', error)
-    return local
+    safeWarn('[erase-meals] server count failed', error)
+    return { serverCount: null, pendingCount, signedOut: false }
   }
 }
 
+/** @deprecated prefer fetchMealsEraseCardState — ne plus fusionner local+serveur. */
+export async function fetchStoredMealsCount(): Promise<number> {
+  const state = await fetchMealsEraseCardState()
+  return state.serverCount ?? 0
+}
+
+async function fetchServerMealCount(): Promise<number> {
+  if (isConvexDomainActive()) {
+    return requireServerCount(await countActiveMealsViaConvex())
+  }
+  if (isSupabaseConfigured()) {
+    return requireServerCount(await countActiveMealsViaSupabase())
+  }
+  throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
+}
+
 /**
- * Purge repas sur Convex + Supabase, puis local.
- * Ne vide le local qu’après succès de toutes les copies applicables.
+ * Purge repas. Ne touche ni online ni local si lien / sync incohérents.
  */
 export async function eraseAllUserMeals(): Promise<{
   localCleared: number
@@ -83,24 +129,51 @@ export async function eraseAllUserMeals(): Promise<{
     throw new EraseMealsNeedsConnectionError()
   }
 
+  // B6-01 : lien app ↔ Supabase avant toute purge Supabase / legacy
+  if (supabaseConfigured) {
+    if (!isConvexConfigured()) {
+      throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
+    }
+    await assertAccountLinkForErase(userId)
+  }
+
+  const serverCount = await fetchServerMealCount()
+  const syncedLocal = countSyncedLocalMeals(userId)
+  const pendingLocal = countPendingUnsyncedMeals(userId)
+
+  // B6-02 : 0 online mais repas déjà sync sur le téléphone → incohérence, rien n’est effacé
+  if (serverCount === 0 && syncedLocal > 0) {
+    throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
+  }
+
+  // Pending-only + serveur 0 : effacement local sans purge online destructive
+  if (serverCount === 0 && syncedLocal === 0) {
+    if (pendingLocal > 0 || localBefore > 0) {
+      clearLocalMealsAndPendingMealWrites({ userId })
+    }
+    return {
+      localCleared: localBefore,
+      serverDeleted: 0,
+      pendingMealOpsCleared: pendingBefore,
+    }
+  }
+
   let serverDeleted: number | undefined
 
   if (convexActive) {
     try {
       const result = await deleteAllMyMealsViaConvex()
-      serverDeleted = requireServerDeletedCount(result?.deletedCount)
+      serverDeleted = requireServerCount(result?.deletedCount)
     } catch (error) {
       if (error instanceof EraseMealsPurgeError) throw error
       safeWarn('[erase-meals] Convex deleteAll failed', error)
       throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
     }
 
-    // Si Supabase est dans l’env client, le serveur doit purger via session Convex
-    // (identité résolue serveur — jamais un userId téléphone).
     if (supabaseConfigured) {
       try {
         const supabasePurge = await purgeSupabaseMealCopiesViaConvex()
-        requireServerDeletedCount(supabasePurge?.deletedCount)
+        requireServerCount(supabasePurge?.deletedCount)
       } catch (error) {
         if (error instanceof EraseMealsPurgeError) throw error
         safeWarn('[erase-meals] Convex→Supabase purge failed', error)
@@ -108,10 +181,9 @@ export async function eraseAllUserMeals(): Promise<{
       }
     }
   } else {
-    // Legacy Supabase : auth.getUser() côté purge — jamais userId argument.
     try {
       const purge = await purgeSupabaseMealCopies()
-      serverDeleted = requireServerDeletedCount(purge?.deletedCount)
+      serverDeleted = requireServerCount(purge?.deletedCount)
     } catch (error) {
       if (error instanceof EraseMealsPurgeError) throw error
       safeWarn('[erase-meals] Supabase meal purge failed', error)
@@ -119,8 +191,7 @@ export async function eraseAllUserMeals(): Promise<{
     }
   }
 
-  const confirmedServerDeleted = requireServerDeletedCount(serverDeleted)
-
+  const confirmedServerDeleted = requireServerCount(serverDeleted)
   clearLocalMealsAndPendingMealWrites({ userId })
 
   return {

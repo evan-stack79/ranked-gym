@@ -210,6 +210,15 @@ export function countQueuedMealOpsForUser(userId: string): number {
   ).length
 }
 
+/** Ids des repas avec upsert encore en file (pas encore envoyés). */
+export function pendingMealUpsertIdsForUser(userId: string): Set<string> {
+  const ids = new Set<string>()
+  for (const op of readQueue(userId)) {
+    if (op.kind === 'meal-upsert' && op.meal?.id) ids.add(op.meal.id)
+  }
+  return ids
+}
+
 /** Exposé tests : lire la file. */
 export function __testReadNutritionQueue(userId: string): StoredQueueOp[] {
   return readQueue(userId)
