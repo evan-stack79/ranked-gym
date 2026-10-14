@@ -140,6 +140,44 @@ describe('eraseAllUserMeals — B6/B7', () => {
     expect(purgeSupabaseMealCopiesViaConvex).not.toHaveBeenCalled()
   })
 
+  it('Supabase pausé / injoignable → message purge, téléphone intact, Convex non effacé', async () => {
+    purgeSupabaseMealCopiesViaConvex.mockRejectedValue(new Error('ERASE_MEALS_PURGE_FAILED'))
+
+    const { addMealToToday, countLocalMeals, getTodayJournal } = await import('./nutritionStorage')
+    const { eraseAllUserMeals, ERASE_MEALS_PURGE_FAILED_MESSAGE } = await import('./eraseUserMeals')
+
+    addMealToToday({ name: 'Kept locally', mealType: 'lunch', calories: 250 })
+    const before = countLocalMeals()
+    const nameBefore = getTodayJournal().meals[0]?.name
+
+    await expect(eraseAllUserMeals()).rejects.toThrow(ERASE_MEALS_PURGE_FAILED_MESSAGE)
+    expect(countLocalMeals()).toBe(before)
+    expect(getTodayJournal().meals[0]?.name).toBe(nameBefore)
+    expect(purgeSupabaseMealCopiesViaConvex).toHaveBeenCalled()
+    expect(deleteAllMyMealsViaConvex).not.toHaveBeenCalled()
+  })
+
+  it('clé service-role absente côté serveur → même fail-closed local', async () => {
+    purgeSupabaseMealCopiesViaConvex.mockRejectedValue(new Error('ERASE_MEALS_PURGE_FAILED'))
+
+    const { addMealToToday, countLocalMeals } = await import('./nutritionStorage')
+    const { EraseMealsPurgeError } = await import('./purgeSupabaseMealCopies')
+    const { eraseAllUserMeals, ERASE_MEALS_PURGE_FAILED_MESSAGE } = await import('./eraseUserMeals')
+    addMealToToday({ name: 'Still here', mealType: 'dinner', calories: 400 })
+    const before = countLocalMeals()
+
+    let caught: unknown
+    try {
+      await eraseAllUserMeals()
+    } catch (error) {
+      caught = error
+    }
+    expect(caught).toBeInstanceOf(EraseMealsPurgeError)
+    expect((caught as Error).message).toBe(ERASE_MEALS_PURGE_FAILED_MESSAGE)
+    expect(countLocalMeals()).toBe(before)
+    expect(deleteAllMyMealsViaConvex).not.toHaveBeenCalled()
+  })
+
   it('B6-02 : serveur 0 + 5 synced locaux → erreur, rien effacé', async () => {
     countActiveMealsViaConvex.mockResolvedValue(0)
     isConvexDomainActive.mockReturnValue(false)

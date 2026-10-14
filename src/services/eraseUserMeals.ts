@@ -197,16 +197,8 @@ export async function eraseAllUserMeals(): Promise<{
   let serverDeleted: number | undefined
 
   if (convexActive) {
-    try {
-      const result = await deleteAllMyMealsViaConvex()
-      serverDeleted = requireServerCount(result?.deletedCount)
-    } catch (error) {
-      if (error instanceof EraseMealsPurgeError) throw error
-      safeWarn('[erase-meals] Convex deleteAll failed', error)
-      throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
-    }
-
-    // Lien présent → serveur purge les copies Supabase, sans JWT téléphone.
+    // Supabase d’abord : projet pausé / injoignable / clé absente → fail-closed,
+    // rien n’est touché (ni Convex online, ni téléphone).
     try {
       const supabasePurge = await purgeSupabaseMealCopiesViaConvex()
       requireServerCount(supabasePurge?.deletedCount)
@@ -218,6 +210,15 @@ export async function eraseAllUserMeals(): Promise<{
         throw new EraseMealsNeedsLegacyReconnectError()
       }
       safeWarn('[erase-meals] Convex→Supabase purge failed', error)
+      throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
+    }
+
+    try {
+      const result = await deleteAllMyMealsViaConvex()
+      serverDeleted = requireServerCount(result?.deletedCount)
+    } catch (error) {
+      if (error instanceof EraseMealsPurgeError) throw error
+      safeWarn('[erase-meals] Convex deleteAll failed', error)
       throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
     }
   } else {
