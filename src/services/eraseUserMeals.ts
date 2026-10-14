@@ -15,6 +15,21 @@ import {
 import { countQueuedMealOpsForUser } from './convexNutritionQueue'
 import { safeWarn } from '../utils/safeLog'
 
+/** Message exact quand le mode legacy ne peut pas effacer la copie en ligne. */
+export const ERASE_MEALS_CONNECT_MESSAGE = 'Connecte-toi pour effacer'
+
+export class EraseMealsNeedsConnectionError extends Error {
+  constructor() {
+    super(ERASE_MEALS_CONNECT_MESSAGE)
+    this.name = 'EraseMealsNeedsConnectionError'
+  }
+}
+
+function isBrowserOnline(): boolean {
+  if (typeof navigator === 'undefined') return true
+  return navigator.onLine !== false
+}
+
 export async function fetchStoredMealsCount(): Promise<number> {
   const local = countLocalMeals()
   if (!isConvexDomainActive()) return local
@@ -28,8 +43,8 @@ export async function fetchStoredMealsCount(): Promise<number> {
 }
 
 /**
- * Supprime tous les repas côté serveur (si Convex), vide le journal local
- * et retire les meal-upsert / meal-delete en attente — rien ne revient au sync.
+ * Supprime tous les repas côté serveur (Convex hard-delete ou push cloud legacy),
+ * vide le journal local et retire les meal-upsert / meal-delete en attente.
  */
 export async function eraseAllUserMeals(): Promise<{
   localCleared: number
@@ -41,6 +56,7 @@ export async function eraseAllUserMeals(): Promise<{
   const pendingBefore = userId ? countQueuedMealOpsForUser(userId) : 0
 
   let serverDeleted = 0
+
   if (isConvexDomainActive()) {
     try {
       const result = await deleteAllMyMealsViaConvex()
@@ -49,9 +65,22 @@ export async function eraseAllUserMeals(): Promise<{
       safeWarn('[erase-meals] server deleteAll failed', error)
       throw error
     }
+    clearLocalMealsAndPendingMealWrites({ userId })
+  } else {
+    // Mode legacy (Supabase) : doit aussi vider la copie en ligne.
+    // Hors ligne / non connecté → refus, pas d’effacement local partiel.
+    if (!userId || !isBrowserOnline()) {
+      throw new EraseMealsNeedsConnectionError()
+    }
+    clearLocalMealsAndPendingMealWrites({ userId })
+    const { pushCloudBackup } = await import('./cloudBackup')
+    const push = await pushCloudBackup(userId)
+    if (!push.ok) {
+      safeWarn('[erase-meals] legacy cloud clear failed', push.error)
+      throw new EraseMealsNeedsConnectionError()
+    }
+    serverDeleted = localBefore
   }
-
-  clearLocalMealsAndPendingMealWrites({ userId })
 
   return {
     localCleared: localBefore,

@@ -43,17 +43,18 @@ export type OpenFoodFactsProductCloud = {
 type JournalSnapshot = {
   meals: Array<{
     mealId: string
-    dateKey: string
-    mealType: string
-    name: string
-    calories: number | null
+    /** Absent sur tombstone hard-delete (id + deletedAt seulement). */
+    dateKey?: string
+    mealType?: string
+    name?: string
+    calories?: number | null
     proteinG?: number | null
     carbsG?: number | null
     fatG?: number | null
     grams?: number
     pieces?: number
     portionMode?: 'solo' | 'with_sides'
-    createdAt: number
+    createdAt?: number
     updatedAt: number
     deletedAt?: number
   }>

@@ -4,13 +4,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const deleteAllMyMealsViaConvex = vi.fn()
 const countActiveMealsViaConvex = vi.fn()
 const isConvexDomainActive = vi.fn(() => true)
+const pushCloudBackup = vi.fn()
+const getActiveCloudUserId = vi.fn(() => 'user-tca' as string | null)
 
 vi.mock('../backend/adapter', () => ({
   isConvexDomainActive: () => isConvexDomainActive(),
 }))
 
 vi.mock('./cloudSession', () => ({
-  getActiveCloudUserId: () => 'user-tca',
+  getActiveCloudUserId: () => getActiveCloudUserId(),
 }))
 
 vi.mock('./convexNutritionService', () => ({
@@ -23,14 +25,22 @@ vi.mock('./convexNutritionService', () => ({
   pushConvexDayState: vi.fn(),
 }))
 
+vi.mock('./cloudBackup', () => ({
+  pushCloudBackup: (...args: unknown[]) => pushCloudBackup(...args),
+  notifyLocalDataChanged: vi.fn(),
+}))
+
 describe('eraseAllUserMeals — serveur + local + queue', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
     localStorage.clear()
     isConvexDomainActive.mockReturnValue(true)
+    getActiveCloudUserId.mockReturnValue('user-tca')
     deleteAllMyMealsViaConvex.mockResolvedValue({ deletedCount: 3, updatedAt: 1 })
     countActiveMealsViaConvex.mockResolvedValue(3)
+    pushCloudBackup.mockResolvedValue({ ok: true })
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
   })
 
   it('compte TCA : voit le count, efface tout, serveur + local + pending = 0', async () => {
@@ -108,5 +118,49 @@ describe('eraseAllUserMeals — serveur + local + queue', () => {
     expect(countQueuedMealOpsForUser('user-tca')).toBe(0)
     // deleteAll déjà appelé ; aucun meal-upsert restant ne peut recréer le repas.
     expect(deleteAllMyMealsViaConvex).toHaveBeenCalledTimes(1)
+  })
+
+  it('legacy (no Convex) : push cloud vide la copie en ligne', async () => {
+    isConvexDomainActive.mockReturnValue(false)
+    const { addMealToToday, countLocalMeals } = await import('./nutritionStorage')
+    const { eraseAllUserMeals } = await import('./eraseUserMeals')
+
+    addMealToToday({ name: 'Legacy meal', mealType: 'lunch', calories: 300 })
+    expect(countLocalMeals()).toBeGreaterThanOrEqual(1)
+
+    const result = await eraseAllUserMeals()
+
+    expect(deleteAllMyMealsViaConvex).not.toHaveBeenCalled()
+    expect(pushCloudBackup).toHaveBeenCalledWith('user-tca')
+    expect(countLocalMeals()).toBe(0)
+    expect(result.serverDeleted).toBeGreaterThanOrEqual(1)
+  })
+
+  it('legacy offline → refuse avec Connecte-toi pour effacer (pas d’effacement local)', async () => {
+    isConvexDomainActive.mockReturnValue(false)
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    const { addMealToToday, countLocalMeals } = await import('./nutritionStorage')
+    const { eraseAllUserMeals, ERASE_MEALS_CONNECT_MESSAGE } = await import('./eraseUserMeals')
+
+    addMealToToday({ name: 'Keep offline', mealType: 'snack', calories: 80 })
+    const before = countLocalMeals()
+
+    await expect(eraseAllUserMeals()).rejects.toThrow(ERASE_MEALS_CONNECT_MESSAGE)
+    expect(countLocalMeals()).toBe(before)
+    expect(pushCloudBackup).not.toHaveBeenCalled()
+  })
+
+  it('legacy non connecté → refuse avec Connecte-toi pour effacer', async () => {
+    isConvexDomainActive.mockReturnValue(false)
+    getActiveCloudUserId.mockReturnValue(null)
+    const { addMealToToday, countLocalMeals } = await import('./nutritionStorage')
+    const { eraseAllUserMeals, ERASE_MEALS_CONNECT_MESSAGE } = await import('./eraseUserMeals')
+
+    addMealToToday({ name: 'Unsigned', mealType: 'breakfast', calories: 100 })
+    const before = countLocalMeals()
+
+    await expect(eraseAllUserMeals()).rejects.toThrow(ERASE_MEALS_CONNECT_MESSAGE)
+    expect(countLocalMeals()).toBe(before)
+    expect(pushCloudBackup).not.toHaveBeenCalled()
   })
 })

@@ -154,13 +154,18 @@ export const convexTables = {
     .index('by_userId', ['userId'])
     .index('by_updatedAt', ['updatedAt']),
 
+  /**
+   * Repas actifs : champs complets.
+   * Tombstone sync (après delete / delete-all) : uniquement userId + mealId +
+   * deletedAt + updatedAt — aucun nom / calorie / macro / dateKey résiduel.
+   */
   nutrition_meals: defineTable({
     userId: v.string(),
     mealId: v.string(),
-    dateKey: v.string(),
-    mealType: v.string(),
-    name: v.string(),
-    calories: v.union(v.number(), v.null()),
+    dateKey: v.optional(v.string()),
+    mealType: v.optional(v.string()),
+    name: v.optional(v.string()),
+    calories: v.optional(v.union(v.number(), v.null())),
     proteinG: v.optional(v.union(v.number(), v.null())),
     carbsG: v.optional(v.union(v.number(), v.null())),
     fatG: v.optional(v.union(v.number(), v.null())),
@@ -172,10 +177,10 @@ export const convexTables = {
     offCode: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
     imageStorageId: v.optional(v.id('_storage')),
-    createdAt: v.number(),
+    createdAt: v.optional(v.number()),
     updatedAt: v.number(),
     deletedAt: v.optional(v.number()),
-    schemaVersion: v.number(),
+    schemaVersion: v.optional(v.number()),
   })
     .index('by_userId_mealId', ['userId', 'mealId'])
     .index('by_userId_dateKey', ['userId', 'dateKey'])

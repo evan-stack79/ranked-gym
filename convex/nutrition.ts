@@ -191,20 +191,31 @@ export const checkFoodAddAccess = query({
 
 const mealValidator = v.object({
   mealId: v.string(),
-  dateKey: v.string(),
-  mealType: v.string(),
-  name: v.string(),
-  calories: v.union(v.number(), v.null()),
+  /** Absent sur tombstone hard-delete (id + deletedAt uniquement). */
+  dateKey: v.optional(v.string()),
+  mealType: v.optional(v.string()),
+  name: v.optional(v.string()),
+  calories: v.optional(v.union(v.number(), v.null())),
   proteinG: v.optional(v.union(v.number(), v.null())),
   carbsG: v.optional(v.union(v.number(), v.null())),
   fatG: v.optional(v.union(v.number(), v.null())),
   grams: v.optional(v.number()),
   pieces: v.optional(v.number()),
   portionMode: v.optional(v.union(v.literal('solo'), v.literal('with_sides'))),
-  createdAt: v.number(),
+  createdAt: v.optional(v.number()),
   updatedAt: v.number(),
   deletedAt: v.optional(v.number()),
 })
+
+/** Tombstone sync : meal id + horodatage de suppression — aucun contenu repas. */
+function mealSyncTombstone(userId: string, mealId: string, deletedAt: number) {
+  return {
+    userId,
+    mealId,
+    deletedAt,
+    updatedAt: deletedAt,
+  }
+}
 
 const waterValidator = v.object({
   entryId: v.string(),
@@ -339,24 +350,10 @@ export const deleteMeal = mutation({
       if (existing.updatedAt > deletedAt) {
         return { applied: false, stale: true, updatedAt: existing.updatedAt }
       }
-      await ctx.db.patch(existing._id, {
-        deletedAt,
-        updatedAt: deletedAt,
-      })
+      await ctx.db.replace(existing._id, mealSyncTombstone(userId, args.mealId, deletedAt))
       return { applied: true, stale: false, updatedAt: deletedAt }
     }
-    await ctx.db.insert('nutrition_meals', {
-      userId,
-      mealId: args.mealId,
-      dateKey: normalizeDateKey(args.dateKey),
-      mealType: 'deleted',
-      name: 'deleted',
-      calories: null,
-      createdAt: deletedAt,
-      updatedAt: deletedAt,
-      deletedAt,
-      schemaVersion: NUTRITION_SCHEMA_VERSION,
-    })
+    await ctx.db.insert('nutrition_meals', mealSyncTombstone(userId, args.mealId, deletedAt))
     return { applied: true, stale: false, updatedAt: deletedAt }
   },
 })
@@ -377,10 +374,56 @@ export const countActiveMeals = query({
 })
 
 /**
- * Efface tous les repas de l’utilisateur (soft-delete).
+ * Hard-delete tous les repas : remplace chaque ligne par un tombstone
+ * (mealId + deletedAt) et vide nutrition_state.journalJson.
  * Autorisé pour mineur / TCA / âge inconnu (droit sur ses données).
  * Ownership-scoped uniquement — pas de garde food-add.
  */
+export async function hardDeleteAllUserMeals(
+  ctx: MutationCtx,
+  userId: string,
+  deletedAt: number,
+): Promise<{ deletedCount: number; updatedAt: number }> {
+  const rows = await ctx.db
+    .query('nutrition_meals')
+    .withIndex('by_userId_updatedAt', (q) => q.eq('userId', userId))
+    .collect()
+  let deletedCount = 0
+  for (const row of rows) {
+    assertUserOwnership(row.userId, userId)
+    const wasActive = row.deletedAt == null
+    const hasContent =
+      row.name != null ||
+      row.calories != null ||
+      row.dateKey != null ||
+      row.mealType != null ||
+      row.proteinG != null ||
+      row.carbsG != null ||
+      row.fatG != null ||
+      row.grams != null ||
+      row.portionLabel != null ||
+      row.offCode != null ||
+      row.imageUrl != null ||
+      row.imageStorageId != null
+    await ctx.db.replace(row._id, mealSyncTombstone(userId, row.mealId, deletedAt))
+    if (wasActive || hasContent) deletedCount += 1
+  }
+
+  const states = await ctx.db
+    .query('nutrition_state')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .collect()
+  for (const state of states) {
+    assertUserOwnership(state.userId, userId)
+    await ctx.db.patch(state._id, {
+      journalJson: {},
+      updatedAt: deletedAt,
+    })
+  }
+
+  return { deletedCount, updatedAt: deletedAt }
+}
+
 export const deleteAllMyMeals = mutation({
   args: {
     sessionToken: v.string(),
@@ -393,18 +436,7 @@ export const deleteAllMyMeals = mutation({
   handler: async (ctx, args) => {
     const userId = await sessionUserId(ctx, args.sessionToken)
     const deletedAt = args.deletedAt ?? Date.now()
-    const rows = await ctx.db
-      .query('nutrition_meals')
-      .withIndex('by_userId_updatedAt', (q) => q.eq('userId', userId))
-      .collect()
-    let deletedCount = 0
-    for (const row of rows) {
-      assertUserOwnership(row.userId, userId)
-      if (row.deletedAt != null) continue
-      await ctx.db.patch(row._id, { deletedAt, updatedAt: deletedAt })
-      deletedCount += 1
-    }
-    return { deletedCount, updatedAt: deletedAt }
+    return hardDeleteAllUserMeals(ctx, userId, deletedAt)
   },
 })
 
@@ -578,10 +610,23 @@ export const listJournalEntries = query({
     ])
 
     const meals = mealRows
-      .filter((row) => withinDateRange(row.dateKey, startDateKey, endDateKey))
-      .filter((row) => includeDeleted || !row.deletedAt)
+      .filter((row) => {
+        if (!includeDeleted && row.deletedAt) return false
+        // Tombstones hard-delete n’ont plus de dateKey — hors filtre date.
+        if (row.dateKey == null) {
+          return includeDeleted && !startDateKey && !endDateKey
+        }
+        return withinDateRange(row.dateKey, startDateKey, endDateKey)
+      })
       .map((row) => {
         assertUserOwnership(row.userId, userId)
+        if (row.deletedAt != null && row.name == null && row.dateKey == null) {
+          return {
+            mealId: row.mealId,
+            updatedAt: row.updatedAt,
+            deletedAt: row.deletedAt,
+          }
+        }
         return {
           mealId: row.mealId,
           dateKey: row.dateKey,

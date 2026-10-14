@@ -3,7 +3,12 @@ import { Loader2, Trash2 } from 'lucide-react'
 import { IosSheet } from '../ui/IosSheet'
 import { canAccessFoodAdd } from '../../services/foodAddAccess'
 import { getCalorieProfile } from '../../services/nutritionStorage'
-import { eraseAllUserMeals, fetchStoredMealsCount } from '../../services/eraseUserMeals'
+import {
+  ERASE_MEALS_CONNECT_MESSAGE,
+  EraseMealsNeedsConnectionError,
+  eraseAllUserMeals,
+  fetchStoredMealsCount,
+} from '../../services/eraseUserMeals'
 import { useAuth } from '../../context/AuthContext'
 
 interface YourDataMealsErasePanelProps {
@@ -176,8 +181,12 @@ export function YourDataMealsEraseCard() {
           await eraseAllUserMeals()
           setCount(0)
           setConfirmOpen(false)
-        } catch {
-          setError('Impossible d’effacer les repas pour le moment. Réessaie.')
+        } catch (err) {
+          if (err instanceof EraseMealsNeedsConnectionError) {
+            setError(ERASE_MEALS_CONNECT_MESSAGE)
+          } else {
+            setError('Impossible d’effacer les repas pour le moment. Réessaie.')
+          }
         } finally {
           setBusy(false)
         }
