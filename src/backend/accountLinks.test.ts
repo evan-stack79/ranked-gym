@@ -155,7 +155,7 @@ describe('runLinkSupabaseAccount — token', () => {
     vi.stubGlobal('process', {
       env: {
         SUPABASE_URL: 'https://example.supabase.co',
-        SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+        SUPABASE_ANON_KEY: 'anon-key-for-auth-getuser',
       },
     })
   })

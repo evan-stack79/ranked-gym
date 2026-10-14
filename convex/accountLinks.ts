@@ -23,10 +23,11 @@ function readEnv(name: string): string | undefined {
 
 function readSupabaseConfig(): { url: string; key: string } | null {
   const url = (readEnv('MIGRATION_SUPABASE_URL') || readEnv('SUPABASE_URL') || '').trim()
+  // Prefer anon for Auth getUser. Service-role is a server-only fallback (never VITE_*).
   const key = (
+    readEnv('SUPABASE_ANON_KEY') ||
     readEnv('MIGRATION_SUPABASE_SERVICE_ROLE_KEY') ||
     readEnv('SUPABASE_SERVICE_ROLE_KEY') ||
-    readEnv('SUPABASE_ANON_KEY') ||
     ''
   ).trim()
   if (!url || !key) return null

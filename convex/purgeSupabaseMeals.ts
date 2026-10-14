@@ -21,6 +21,7 @@ function readEnv(name: string): string | undefined {
 
 function readSupabaseAdminConfig(): { url: string; serviceKey: string } | null {
   const url = (readEnv('MIGRATION_SUPABASE_URL') || readEnv('SUPABASE_URL') || '').trim()
+  // Server-only secrets — never VITE_*, never returned to the client.
   const serviceKey = (
     readEnv('MIGRATION_SUPABASE_SERVICE_ROLE_KEY') ||
     readEnv('SUPABASE_SERVICE_ROLE_KEY') ||
@@ -28,6 +29,24 @@ function readSupabaseAdminConfig(): { url: string; serviceKey: string } | null {
   ).trim()
   if (!url || !serviceKey) return null
   return { url: url.replace(/\/$/, ''), serviceKey }
+}
+
+/** Errors exposed to the client must stay opaque — never echo the admin key. */
+export function toClientSafePurgeError(error: unknown, secrets: string[] = []): Error {
+  const raw = error instanceof Error ? error.message : String(error ?? '')
+  for (const secret of secrets) {
+    if (secret && raw.includes(secret)) {
+      return new Error('ERASE_MEALS_PURGE_FAILED')
+    }
+  }
+  if (
+    raw === 'ERASE_MEALS_PURGE_FAILED' ||
+    raw === 'ACCOUNT_LINK_MISSING' ||
+    raw === 'ACCOUNT_LINK_UNAUTHORIZED'
+  ) {
+    return new Error(raw)
+  }
+  return new Error('ERASE_MEALS_PURGE_FAILED')
 }
 
 type RestSelectResult = {

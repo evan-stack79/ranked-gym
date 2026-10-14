@@ -1,7 +1,7 @@
 /**
  * « Effacer mes anciens repas » — multi-store, fail-closed.
  * - Lien compte app ↔ Supabase : créé serveur (migration / reconnect) ; erase Convex
- *   utilise le service-role + id du lien, sans session Supabase téléphone.
+ *   purge les copies legacy côté serveur via le lien, sans session Supabase téléphone.
  * - deletedCount / card count : serveur uniquement
  * - 0 online + repas locaux déjà sync → erreur
  * - pending-only → effacement local autorisé
@@ -165,7 +165,7 @@ export async function eraseAllUserMeals(): Promise<{
     throw new EraseMealsNeedsConnectionError()
   }
 
-  // Convex : lien requis ; purge Supabase via service-role serveur (pas de session téléphone).
+  // Convex : lien requis ; purge Supabase côté serveur (pas de session téléphone).
   if (convexActive) {
     if (!isConvexConfigured()) {
       throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
@@ -206,7 +206,7 @@ export async function eraseAllUserMeals(): Promise<{
       throw new EraseMealsPurgeError(ERASE_MEALS_PURGE_FAILED_MESSAGE)
     }
 
-    // Lien présent → serveur purge les copies Supabase (service-role), sans JWT téléphone.
+    // Lien présent → serveur purge les copies Supabase, sans JWT téléphone.
     try {
       const supabasePurge = await purgeSupabaseMealCopiesViaConvex()
       requireServerCount(supabasePurge?.deletedCount)
