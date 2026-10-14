@@ -5,6 +5,7 @@ import {
   EMAIL_CODE_TTL_MS,
   clearAllEmailConfirmedFlags,
   evaluateCodeAttempt,
+  generateSixDigitCode,
   hashEmailCode,
   recordEmailCodeAttempt,
   storeEmailCodeForUser,
@@ -138,6 +139,16 @@ describe('transactionalMailer — abstract env', () => {
 })
 
 describe('email verification codes — B9-01', () => {
+  it('B9-01 : code e-mail 6 chiffres, validité 10 min, 5 tentatives', () => {
+    expect(EMAIL_CODE_TTL_MS).toBe(10 * 60 * 1000)
+    expect(EMAIL_CODE_MAX_ATTEMPTS).toBe(5)
+    for (let i = 0; i < 20; i += 1) {
+      const code = generateSixDigitCode()
+      expect(code).toMatch(/^\d{6}$/)
+      expect(code.length).toBe(6)
+    }
+  })
+
   it('TTL 10 min, max 5 attempts', () => {
     expect(EMAIL_CODE_TTL_MS).toBe(10 * 60 * 1000)
     expect(EMAIL_CODE_MAX_ATTEMPTS).toBe(5)

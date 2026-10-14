@@ -82,6 +82,17 @@ describe('accountLinkService — B8', () => {
     )
   })
 
+  it('B8-02 : email non confirmé → Impossible de relier…', async () => {
+    // Pre-B9 title kept: unconfirmed email still blocks link (message is now code-required).
+    const action = vi.fn().mockRejectedValue(new Error('ACCOUNT_LINK_EMAIL_UNCONFIRMED'))
+    getConvex.mockReturnValue({ action })
+    const { linkLegacySupabaseAccountWithAccessToken, EraseMealsEmailCodeRequiredError } =
+      await import('./accountLinkService')
+    await expect(linkLegacySupabaseAccountWithAccessToken('token')).rejects.toBeInstanceOf(
+      EraseMealsEmailCodeRequiredError,
+    )
+  })
+
   it('B8-02 / B9-02 : email non confirmé → code e-mail requis', async () => {
     const action = vi.fn().mockRejectedValue(new Error('ACCOUNT_LINK_EMAIL_UNCONFIRMED'))
     getConvex.mockReturnValue({ action })

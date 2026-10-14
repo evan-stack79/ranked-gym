@@ -25,7 +25,8 @@ import {
 export const EMAIL_CODE_TTL_MS = 10 * 60 * 1000
 export const EMAIL_CODE_MAX_ATTEMPTS = 5
 
-function generateSixDigitCode(): string {
+/** Exported for B9-01 format tests (always 6 digits, zero-padded). */
+export function generateSixDigitCode(): string {
   const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000
   return String(n).padStart(6, '0')
 }

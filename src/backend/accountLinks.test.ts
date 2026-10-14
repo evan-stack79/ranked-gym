@@ -105,6 +105,19 @@ describe('auth_account_links — B7/B8/B9', () => {
     expect(await isAccountLinkValid(ctx as never, 'user-A', 'supabase-A')).toBe(false)
   })
 
+  it('B7-02 : lien immuable + déjà pris', async () => {
+    const db = new FakeDb()
+    const ctx = { db }
+    await createImmutableAccountLink(ctx as never, 'user-A', 'supabase-shared')
+    await expect(
+      createImmutableAccountLink(ctx as never, 'user-A', 'supabase-B'),
+    ).rejects.toThrow('ACCOUNT_LINK_IMMUTABLE')
+    await expect(
+      createImmutableAccountLink(ctx as never, 'user-B', 'supabase-shared'),
+    ).rejects.toThrow('ACCOUNT_LINK_ALREADY_TAKEN')
+    expect(await findLinkByOwner(ctx as never, 'user-B')).toBeNull()
+  })
+
   it('B7-02 : lien immuable — refuse de changer le Supabase id', async () => {
     const db = new FakeDb()
     const ctx = { db }
