@@ -68,7 +68,6 @@ import {
 } from '../../services/foodAddAccess'
 import {
   addFoodSnapshotViaConvex,
-  pushConvexMeal,
 } from '../../services/convexNutritionService'
 import { getCalorieProfile, saveCalorieProfile } from '../../services/nutritionStorage'
 import { todayKey } from '../../utils/calories'
@@ -296,13 +295,16 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
           snapshot.portionLabel =
             sel.portionLabel?.trim() || formatGramsCountLabel(sel.grams)
         }
-        const mealId = crypto.randomUUID()
+        const mealId = sel.mealId || crypto.randomUUID()
+        const selectionEventId = sel.selectionEventId || crypto.randomUUID()
         const entry = {
           ...mealEntryFromSnapshot(snapshot, type),
           id: mealId,
           grams: sel.grams,
           pieces: sel.pieces,
           portionLabel: snapshot.portionLabel,
+          entrySource: foodAddV3 ? ('v3' as const) : undefined,
+          selectionEventId: foodAddV3 ? selectionEventId : undefined,
           calories: foodAddV3
             ? hit.calories == null
               ? null
@@ -338,6 +340,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
               imageStorageId: snapshot.imageStorageId as never,
               grams: sel.unit === 'pieces' ? undefined : (sel.grams ?? snapshot.grams),
               pieces: sel.pieces,
+              selectionEventId,
               updatedAt: snapshot.updatedAt,
             })
           } catch (error: unknown) {
@@ -475,7 +478,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   }
 
   const handleEditSave = (mealId: string, patch: Partial<MealEntry>) => {
-    if (patch.grams != null) {
+    if (foodAddV3 && patch.grams != null) {
       const checked = validateFoodQuantity({ unit: 'g', value: patch.grams })
       if (!checked.ok) {
         showToast(foodAddQuantityUserMessage(checked.reason, checked.unit), 'error')
@@ -487,39 +490,16 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
         grams: checked.grams,
         portionLabel: formatGramsCountLabel(checked.grams),
         pieces: undefined,
+        entrySource: patch.entrySource ?? 'v3',
       }
+    } else if (foodAddV3) {
+      patch = { ...patch, entrySource: patch.entrySource ?? 'v3' }
     }
 
-    const applyLocal = (nextPatch: Partial<MealEntry>) => {
-      const journal = updateMealInToday(mealId, nextPatch)
-      setMeals(journal.meals)
-      setEditingMeal(null)
-    }
-
-    if (foodAddV3 && isConvexDomainActive() && user) {
-      const current = getTodayJournal().meals.find((m) => m.id === mealId)
-      if (!current) return
-      const merged: MealEntry = { ...current, ...patch }
-      void pushConvexMeal(merged, todayKey(), Date.now())
-        .then((result) => {
-          applyLocal({
-            ...patch,
-            portionLabel: result.portionLabel ?? patch.portionLabel,
-          })
-        })
-        .catch((error: unknown) => {
-          const qtyMsg = mapFoodAddQuantityError(error)
-          if (qtyMsg) showToast(qtyMsg, 'error')
-          else {
-            const access = mapAccessError(error)
-            if (access) showToast(access.message, 'error')
-            else showToast('Modification refusée par le serveur.', 'error')
-          }
-        })
-      return
-    }
-
-    applyLocal(patch)
+    // Local d’abord ; file sync. PC-08 : pas de toast « refusée » hors ligne ici.
+    const journal = updateMealInToday(mealId, patch)
+    setMeals(journal.meals)
+    setEditingMeal(null)
   }
 
   if (!hydrated) {

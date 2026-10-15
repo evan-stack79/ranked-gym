@@ -59,7 +59,6 @@ async function openQuantityStep(root: ReturnType<typeof createRoot>, host: HTMLE
         onMealTypeChange={noop}
         onSubmitManual={(e) => e.preventDefault()}
         onClose={noop}
-        forceOfflineImages
       />,
     )
   })
@@ -210,7 +209,6 @@ describe('AddFoodScreenV3 — limites quantité (B111-04/05/06)', () => {
           onMealTypeChange={noop}
           onSubmitManual={(e) => e.preventDefault()}
           onClose={noop}
-          forceOfflineImages
         />,
       )
     })
@@ -250,6 +248,11 @@ describe('AddFoodScreenV3 — limites quantité (B111-04/05/06)', () => {
     const items = onValidate.mock.calls[0]![0] as FoodAddV3Selection[]
     expect(items[0]!.grams).toBe(2000)
     expect(items[0]!.unit).toBe('g')
+    // PC-07 / PC-09 : ids figés à l’ouverture de l’étape quantité.
+    expect(typeof items[0]!.mealId).toBe('string')
+    expect(items[0]!.mealId.length).toBeGreaterThan(8)
+    expect(typeof items[0]!.selectionEventId).toBe('string')
+    expect(items[0]!.selectionEventId.length).toBeGreaterThan(8)
 
     await act(async () => {
       root.unmount()
@@ -322,7 +325,6 @@ describe('AddFoodScreenV3 — limites quantité (B111-04/05/06)', () => {
           onMealTypeChange={noop}
           onSubmitManual={(e) => e.preventDefault()}
           onClose={noop}
-          forceOfflineImages
         />,
       )
     })
@@ -428,7 +430,6 @@ describe('AddFoodScreenV3 — limites quantité (B111-04/05/06)', () => {
           onClose={noop}
           manualGrams=""
           onManualGramsChange={noop}
-          forceOfflineImages
         />,
       )
     })
@@ -477,7 +478,6 @@ describe('AddFoodScreenV3 — limites quantité (B111-04/05/06)', () => {
             onClose={noop}
             manualGrams={grams}
             onManualGramsChange={onGrams}
-            forceOfflineImages
           />,
         )
       })
@@ -523,7 +523,6 @@ describe('AddFoodScreenV3 — limites quantité (B111-04/05/06)', () => {
           onMealTypeChange={noop}
           onSubmitManual={(e) => e.preventDefault()}
           onClose={noop}
-          forceOfflineImages
         />,
       )
     })

@@ -124,6 +124,14 @@ export interface MealEntry {
    * Absent sur les repas legacy → traité comme createdAt.
    */
   updatedAt?: number
+  /** Ligne créée par addFoodSnapshot V3 — upsertMeal ignore kcal/macros client. */
+  entrySource?: 'v3'
+  /** Id stable d’un ajout V3 (retries). */
+  selectionEventId?: string
+  /** File : refus définitif serveur — marque « Pas enregistré » dans le journal. */
+  syncRejected?: boolean
+  syncRejectCode?: string
+  syncRejectedAt?: number
 }
 
 /** Compteurs journaliers des raccourcis d’hydratation (verre, shaker…). */

@@ -100,8 +100,16 @@ async function requireToken(): Promise<string> {
   return token
 }
 
-export async function pushConvexMeal(meal: MealEntry, dateKey: string, updatedAt = Date.now()) {
+export async function pushConvexMeal(
+  meal: MealEntry,
+  dateKey: string,
+  updatedAt = Date.now(),
+  opts?: { quantityRules?: 'v3' },
+) {
   const sessionToken = await requireToken()
+  const quantityRules =
+    opts?.quantityRules ??
+    (meal.entrySource === 'v3' ? ('v3' as const) : undefined)
   return getConvex().mutation(api.nutrition.upsertMeal, {
     sessionToken,
     mealId: meal.id,
@@ -116,6 +124,7 @@ export async function pushConvexMeal(meal: MealEntry, dateKey: string, updatedAt
     pieces: meal.pieces,
     portionLabel: meal.portionLabel,
     portionMode: meal.portionMode,
+    ...(quantityRules ? { quantityRules } : {}),
     createdAt: meal.createdAt,
     updatedAt,
   }) as Promise<{
@@ -415,6 +424,7 @@ export async function addFoodSnapshotViaConvex(input: {
   fatG?: number | null
   grams?: number
   pieces?: number
+  selectionEventId?: string
   createdAt?: number
   updatedAt?: number
 }): Promise<{ applied: boolean; stale: boolean; updatedAt: number }> {

@@ -11,12 +11,14 @@ import {
 } from './_generated/server'
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
 import { assertFoodAddAccessFromStoredProfile } from './lib/foodAddAccess'
+import { FOOD_ADD_QUANTITY_INVALID } from './lib/foodAddQuantity'
 import {
-  formatGramsCountLabel,
-  formatPiecesCountLabel,
-  FOOD_ADD_QUANTITY_INVALID,
-  validateFoodQuantity,
-} from './lib/foodAddQuantity'
+  isV3MealContext,
+  resolveUpsertMealQuantity,
+  sanitizeLegacyMealNutrient,
+  sanitizePer100gNutrients,
+  scaleNutritionOnGramsChange,
+} from './lib/foodAddUpsertSanitize'
 import {
   adminCorrectNutritionSafetyField,
   clearNutritionSafetyBoolField,
@@ -342,6 +344,8 @@ export const upsertMeal = mutation({
     pieces: v.optional(v.number()),
     portionLabel: v.optional(v.string()),
     portionMode: v.optional(v.union(v.literal('solo'), v.literal('with_sides'))),
+    /** Appel V3 seulement — legacy d33b724 n’envoie jamais cet argument. */
+    quantityRules: v.optional(v.literal('v3')),
     createdAt: v.optional(v.number()),
     updatedAt: v.optional(v.number()),
   },
@@ -356,34 +360,87 @@ export const upsertMeal = mutation({
     const existing = await findMealRow(ctx, userId, args.mealId)
     const nextUpdatedAt = args.updatedAt ?? Date.now()
 
-    // B111-11 : valider grams/pieces si présents ; portionLabel réécrit serveur.
-    let storeGrams = args.grams
-    let storePieces = args.pieces
-    let portionLabel: string | undefined = args.portionLabel
-    const piecesPresent = args.pieces !== undefined
-    const gramsPresent = args.grams !== undefined
-    if (piecesPresent || gramsPresent) {
-      const qty = validateFoodQuantity({
-        unit: piecesPresent ? 'pieces' : 'g',
-        value: piecesPresent ? args.pieces : args.grams,
+    // Marqueur ligne gagne toujours : entrySource:'v3' OU quantityRules:'v3'.
+    const isV3 = isV3MealContext({
+      existingEntrySource: existing?.entrySource,
+      quantityRules: args.quantityRules,
+    })
+
+    const qty = resolveUpsertMealQuantity({
+      isV3,
+      grams: args.grams,
+      pieces: args.pieces,
+      portionLabel: args.portionLabel,
+    })
+    if (!qty.ok) {
+      throw new ConvexError({
+        code: FOOD_ADD_QUANTITY_INVALID,
+        reason: qty.reason,
+        unit: qty.unit,
       })
-      if (!qty.ok) {
-        throw new ConvexError({
-          code: FOOD_ADD_QUANTITY_INVALID,
-          reason: qty.reason,
-          unit: qty.unit,
-        })
-      }
-      if (qty.unit === 'pieces') {
-        storePieces = qty.pieces
-        storeGrams = undefined
-        portionLabel = formatPiecesCountLabel(qty.pieces)
-      } else {
-        storeGrams = qty.grams
-        storePieces = undefined
-        portionLabel = formatGramsCountLabel(qty.grams)
-      }
     }
+
+    let storeGrams = qty.storeGrams
+    let storePieces = qty.storePieces
+    let portionLabel = qty.portionLabel
+
+    // Legacy : si l’appel ommet grams/pieces (undefined), conserver l’existant.
+    if (!isV3 && existing) {
+      if (args.grams === undefined) storeGrams = existing.grams
+      if (args.pieces === undefined) storePieces = existing.pieces
+      if (args.portionLabel === undefined) portionLabel = existing.portionLabel
+    }
+
+    let calories: number | null
+    let proteinG: number | null | undefined
+    let carbsG: number | null | undefined
+    let fatG: number | null | undefined
+
+    if (isV3) {
+      // PC-02 : ignorer kcal/macros client ; proportion si grams changent.
+      void args.calories
+      void args.proteinG
+      void args.carbsG
+      void args.fatG
+      const prevCal = existing?.calories ?? null
+      const prevP = existing?.proteinG ?? null
+      const prevC = existing?.carbsG ?? null
+      const prevF = existing?.fatG ?? null
+      const oldGrams = existing?.grams
+      const gramsChanged =
+        typeof oldGrams === 'number' &&
+        oldGrams > 0 &&
+        typeof storeGrams === 'number' &&
+        storeGrams > 0 &&
+        storeGrams !== oldGrams
+      if (gramsChanged) {
+        const scaled = scaleNutritionOnGramsChange({
+          oldGrams: oldGrams!,
+          newGrams: storeGrams!,
+          calories: prevCal,
+          proteinG: prevP,
+          carbsG: prevC,
+          fatG: prevF,
+        })
+        calories = scaled.calories
+        proteinG = scaled.proteinG
+        carbsG = scaled.carbsG
+        fatG = scaled.fatG
+      } else {
+        calories = prevCal
+        proteinG = prevP
+        carbsG = prevC
+        fatG = prevF
+      }
+    } else {
+      // Legacy d33b724 : chiffres app ; NaN/inf/négatif → null (jamais de throw).
+      calories = sanitizeLegacyMealNutrient(args.calories)
+      proteinG = sanitizeLegacyMealNutrient(args.proteinG ?? null)
+      carbsG = sanitizeLegacyMealNutrient(args.carbsG ?? null)
+      fatG = sanitizeLegacyMealNutrient(args.fatG ?? null)
+    }
+
+    const entrySource = isV3 ? ('v3' as const) : existing?.entrySource
 
     if (existing) {
       assertUserOwnership(existing.userId, userId)
@@ -399,14 +456,15 @@ export const upsertMeal = mutation({
         dateKey: normalizeDateKey(args.dateKey),
         mealType: args.mealType.trim().slice(0, 24),
         name: mealName(args.name),
-        calories: args.calories,
-        proteinG: args.proteinG,
-        carbsG: args.carbsG,
-        fatG: args.fatG,
+        calories,
+        proteinG,
+        carbsG,
+        fatG,
         grams: storeGrams,
         pieces: storePieces,
         portionLabel,
         portionMode: args.portionMode,
+        entrySource,
         updatedAt: nextUpdatedAt,
         deletedAt: undefined,
       })
@@ -419,14 +477,15 @@ export const upsertMeal = mutation({
       dateKey: normalizeDateKey(args.dateKey),
       mealType: args.mealType.trim().slice(0, 24),
       name: mealName(args.name),
-      calories: args.calories,
-      proteinG: args.proteinG,
-      carbsG: args.carbsG,
-      fatG: args.fatG,
+      calories,
+      proteinG,
+      carbsG,
+      fatG,
       grams: storeGrams,
       pieces: storePieces,
       portionLabel,
       portionMode: args.portionMode,
+      entrySource,
       createdAt: args.createdAt ?? nextUpdatedAt,
       updatedAt: nextUpdatedAt,
       schemaVersion: NUTRITION_SCHEMA_VERSION,
@@ -865,6 +924,41 @@ export const upsertFoodSelection = mutation({
       name: args.name,
       brand: args.brand,
     })
+
+    // PC-04 : si barcode en off_product_nutrients → valeurs serveur ; sinon client + garde-fous.
+    const code = args.barcode?.trim()
+    const offRow = code
+      ? await ctx.db
+          .query('off_product_nutrients')
+          .withIndex('by_offCode', (q) => q.eq('offCode', code))
+          .first()
+      : null
+
+    let nutrientsSource: 'server' | 'client' = 'client'
+    let caloriesPer100g: number | null
+    let proteinPer100g: number | null
+    let carbsPer100g: number | null
+    let fatPer100g: number | null
+
+    if (offRow) {
+      nutrientsSource = 'server'
+      caloriesPer100g = offRow.caloriesPer100g ?? null
+      proteinPer100g = offRow.proteinPer100g ?? null
+      carbsPer100g = offRow.carbsPer100g ?? null
+      fatPer100g = offRow.fatPer100g ?? null
+    } else {
+      const sanitized = sanitizePer100gNutrients({
+        caloriesPer100g: args.caloriesPer100g,
+        proteinPer100g: args.proteinPer100g,
+        carbsPer100g: args.carbsPer100g,
+        fatPer100g: args.fatPer100g,
+      })
+      caloriesPer100g = sanitized.caloriesPer100g
+      proteinPer100g = sanitized.proteinPer100g
+      carbsPer100g = sanitized.carbsPer100g
+      fatPer100g = sanitized.fatPer100g
+    }
+
     const existing = await findFoodRow(ctx, userId, foodKey)
     if (existing) {
       assertUserOwnership(existing.userId, userId)
@@ -880,10 +974,11 @@ export const upsertFoodSelection = mutation({
         barcode: args.barcode?.trim() || undefined,
         name: mealName(args.name),
         brand: args.brand?.trim() || undefined,
-        caloriesPer100g: args.caloriesPer100g,
-        proteinPer100g: args.proteinPer100g,
-        carbsPer100g: args.carbsPer100g,
-        fatPer100g: args.fatPer100g,
+        caloriesPer100g,
+        proteinPer100g,
+        carbsPer100g,
+        fatPer100g,
+        nutrientsSource,
         imageUrl: args.imageUrl,
         source: args.source,
         lastFetchedAt: args.fetchedAt ?? now,
@@ -902,10 +997,11 @@ export const upsertFoodSelection = mutation({
       barcode: args.barcode?.trim() || undefined,
       name: mealName(args.name),
       brand: args.brand?.trim() || undefined,
-      caloriesPer100g: args.caloriesPer100g,
-      proteinPer100g: args.proteinPer100g,
-      carbsPer100g: args.carbsPer100g,
-      fatPer100g: args.fatPer100g,
+      caloriesPer100g,
+      proteinPer100g,
+      carbsPer100g,
+      fatPer100g,
+      nutrientsSource,
       imageUrl: args.imageUrl,
       source: args.source,
       lastFetchedAt: args.fetchedAt ?? now,

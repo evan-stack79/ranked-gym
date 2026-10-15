@@ -51,8 +51,11 @@ async function setGramsInput(value: string) {
 describe('EditMealSheet — B111-11', () => {
   let host: HTMLDivElement
   let root: Root
+  const prevFlag = import.meta.env.VITE_ENABLE_FOOD_ADD_V3
 
   beforeEach(() => {
+    // B111-11 : messages quantité + portionLabel serveur = chemin V3 ON.
+    vi.stubEnv('VITE_ENABLE_FOOD_ADD_V3', 'true')
     host = document.createElement('div')
     document.body.appendChild(host)
     root = createRoot(host)
@@ -64,6 +67,8 @@ describe('EditMealSheet — B111-11', () => {
     })
     host.remove()
     document.body.innerHTML = ''
+    if (prevFlag == null) vi.stubEnv('VITE_ENABLE_FOOD_ADD_V3', '')
+    else vi.stubEnv('VITE_ENABLE_FOOD_ADD_V3', prevFlag)
   })
 
   it('edit 120 → 200 : onSave + journal affiche « 200 g » (getByText)', async () => {

@@ -42,6 +42,10 @@ import {
   parsePortionGrams,
   validateFoodQuantity,
 } from './lib/foodAddQuantity'
+import {
+  catalogNutrientForV3Meal,
+  pickCatalogNutrient,
+} from './lib/foodAddUpsertSanitize'
 
 /** Toutes les erreurs FOOD_ADD_* passent par ConvexError (data.code visible en prod). */
 function throwFoodAddError(data: {
@@ -664,6 +668,8 @@ export const addFoodSnapshot = mutation({
     grams: v.optional(v.number()),
     pieces: v.optional(v.number()),
     servingSize: v.optional(v.union(v.string(), v.null())),
+    /** Id stable par ajout (retries) — selectedCount +1 seulement à la création. */
+    selectionEventId: v.optional(v.string()),
     createdAt: v.optional(v.number()),
     updatedAt: v.optional(v.number()),
   },
@@ -709,7 +715,6 @@ export const addFoodSnapshot = mutation({
 
     const nutrientCache = await loadOffProductNutrients(ctx, args.offCode)
 
-    // Catalog existant — fallback nutriments si off_product_nutrients absent (B111-12).
     const foodKey =
       args.offCode?.trim() || args.name.trim()
         ? normalizeFoodKey({ barcode: args.offCode, name: args.name })
@@ -721,35 +726,43 @@ export const addFoodSnapshot = mutation({
           .first()
       : null
 
-    // B111-12 : off_product_nutrients d’abord, puis catalog, sinon null (par champ).
+    // PC-04 : catalogue seulement si nutrientsSource === 'server' (jamais client 9999).
+    const catalogSrc = catalog?.nutrientsSource
     const nutrientForMeal: OffProductNutrientCache | null =
-      nutrientCache || catalog
+      nutrientCache || (catalog && catalogSrc === 'server')
         ? {
-            caloriesPer100g: pickCatalogNutrient(
+            caloriesPer100g: catalogNutrientForV3Meal(
               nutrientCache?.caloriesPer100g,
               catalog?.caloriesPer100g,
+              catalogSrc,
             ),
-            proteinPer100g: pickCatalogNutrient(
+            proteinPer100g: catalogNutrientForV3Meal(
               nutrientCache?.proteinPer100g,
               catalog?.proteinPer100g,
+              catalogSrc,
             ),
-            carbsPer100g: pickCatalogNutrient(
+            carbsPer100g: catalogNutrientForV3Meal(
               nutrientCache?.carbsPer100g,
               catalog?.carbsPer100g,
+              catalogSrc,
             ),
-            fatPer100g: pickCatalogNutrient(
+            fatPer100g: catalogNutrientForV3Meal(
               nutrientCache?.fatPer100g,
               catalog?.fatPer100g,
+              catalogSrc,
             ),
             servingSize:
-              nutrientCache?.servingSize ?? catalog?.servingSize ?? null,
+              nutrientCache?.servingSize ??
+              (catalogSrc === 'server' ? catalog?.servingSize ?? null : null),
             servingGrams:
               nutrientCache?.servingGrams ??
-              parseServingGrams(
-                nutrientCache?.servingSize ?? catalog?.servingSize ?? null,
-              ),
+              (catalogSrc === 'server'
+                ? parseServingGrams(catalog?.servingSize ?? null)
+                : null),
           }
-        : null
+        : nutrientCache
+          ? nutrientCache
+          : null
 
     const { storeGrams, storePieces, portionLabel } = resolveAddFoodSnapshotQuantity({
       grams: args.grams,
@@ -761,6 +774,8 @@ export const addFoodSnapshot = mutation({
       grams: storeGrams,
       pieces: storePieces != null && storeGrams == null ? storePieces : undefined,
     })
+
+    const selectionEventId = args.selectionEventId?.trim() || undefined
 
     const patch = {
       dateKey: normalizeDateKey(args.dateKey),
@@ -776,17 +791,19 @@ export const addFoodSnapshot = mutation({
       offCode: args.offCode?.trim() || undefined,
       imageUrl: ownedImageUrl,
       imageStorageId: ownedStorageId,
+      entrySource: 'v3' as const,
+      selectionEventId: selectionEventId ?? existing?.selectionEventId,
       updatedAt: nextUpdatedAt,
       deletedAt: undefined as number | undefined,
     }
 
+    const isNewMeal = !existing
     if (existing) {
       assertUserOwnership(existing.userId, userId)
       if (existing.updatedAt > nextUpdatedAt) {
         return { applied: false, stale: true, updatedAt: existing.updatedAt }
       }
       await ctx.db.patch(existing._id, patch)
-      // Fall through to catalog update when applicable.
     } else {
       await ctx.db.insert('nutrition_meals', {
         userId,
@@ -798,28 +815,36 @@ export const addFoodSnapshot = mutation({
     }
 
     if (foodKey) {
-      // Architect B111-12 : off_product_nutrients → catalog existant → null.
-      // Jamais écraser une valeur existante avec null/0 ; jamais kcal client.
+      // Catalogue : off d’abord, sinon conserver catalog server (y compris 0).
       const servingSize =
         typeof args.servingSize === 'string'
           ? args.servingSize.trim() || null
           : (nutrientCache?.servingSize ?? catalog?.servingSize ?? null)
+      const hasOff = Boolean(nutrientCache)
       const catalogPatch = {
         barcode: args.offCode?.trim() || undefined,
         name: mealName(args.name),
         caloriesPer100g: pickCatalogNutrient(
           nutrientCache?.caloriesPer100g,
-          catalog?.caloriesPer100g,
+          catalog?.nutrientsSource === 'server' ? catalog?.caloriesPer100g : null,
         ),
         proteinPer100g: pickCatalogNutrient(
           nutrientCache?.proteinPer100g,
-          catalog?.proteinPer100g,
+          catalog?.nutrientsSource === 'server' ? catalog?.proteinPer100g : null,
         ),
         carbsPer100g: pickCatalogNutrient(
           nutrientCache?.carbsPer100g,
-          catalog?.carbsPer100g,
+          catalog?.nutrientsSource === 'server' ? catalog?.carbsPer100g : null,
         ),
-        fatPer100g: pickCatalogNutrient(nutrientCache?.fatPer100g, catalog?.fatPer100g),
+        fatPer100g: pickCatalogNutrient(
+          nutrientCache?.fatPer100g,
+          catalog?.nutrientsSource === 'server' ? catalog?.fatPer100g : null,
+        ),
+        nutrientsSource: hasOff
+          ? ('server' as const)
+          : catalog?.nutrientsSource === 'server'
+            ? ('server' as const)
+            : catalog?.nutrientsSource,
         imageUrl: ownedImageUrl,
         imageStorageId: ownedStorageId,
         servingSize,
@@ -830,15 +855,19 @@ export const addFoodSnapshot = mutation({
       }
       if (catalog) {
         assertUserOwnership(catalog.userId, userId)
+        // PC-09 : selectedCount +1 seulement à la création du repas.
         await ctx.db.patch(catalog._id, {
           ...catalogPatch,
-          selectedCount: (catalog.selectedCount ?? 0) + 1,
+          selectedCount: isNewMeal
+            ? (catalog.selectedCount ?? 0) + 1
+            : catalog.selectedCount,
         })
-      } else {
+      } else if (isNewMeal) {
         await ctx.db.insert('nutrition_food_catalog', {
           userId,
           foodKey,
           ...catalogPatch,
+          nutrientsSource: hasOff ? 'server' : undefined,
           source: args.offCode?.trim() ? 'open_food_facts' : 'manual',
           selectedCount: 1,
           isFavorite: false,
@@ -851,17 +880,8 @@ export const addFoodSnapshot = mutation({
   },
 })
 
-/** B111-12 — off_product_nutrients d’abord, sinon catalog, sinon null (jamais 0 inventé). */
-export function pickCatalogNutrient(
-  fromOff: number | null | undefined,
-  fromCatalog: number | null | undefined,
-): number | null {
-  if (typeof fromOff === 'number' && Number.isFinite(fromOff)) return fromOff
-  if (typeof fromCatalog === 'number' && Number.isFinite(fromCatalog) && fromCatalog !== 0) {
-    return fromCatalog
-  }
-  return null
-}
+/** Réexport — off d’abord, catalog (y compris 0), sinon null. */
+export { pickCatalogNutrient }
 
 /**
  * Journal V3 app-facing — name / quantité / unité (+ ids, timestamps).

@@ -27,7 +27,6 @@ import { isConvexDomainActive } from '../../backend/adapter'
 import {
   addFoodSnapshotViaConvex,
   checkFoodAddAccessViaConvex,
-  pushConvexMeal,
 } from '../../services/convexNutritionService'
 import type { FoodAddV3Selection } from './AddFoodScreenV3'
 import { M_CAL_2, M_INFO_1 } from '../../content/safetyCopy'
@@ -397,11 +396,19 @@ export function NutritionDashboard({
       return
     }
     const type = pendingMealType ?? mealType
-    const selections: FoodAddV3Selection[] = Array.isArray(items)
-      && items.length > 0
-      && 'hit' in items[0]!
+    // Legacy path (hits bruts) : mealId créé plus bas. V3 Selection apporte déjà les ids.
+    const selections: Array<
+      Omit<FoodAddV3Selection, 'mealId' | 'selectionEventId'> & {
+        mealId?: string
+        selectionEventId?: string
+      }
+    > = Array.isArray(items) && items.length > 0 && 'hit' in items[0]!
       ? (items as FoodAddV3Selection[])
-      : (items as OpenFoodFactsSearchHit[]).map((hit) => ({ hit, unit: 'g' as const, grams: undefined }))
+      : (items as OpenFoodFactsSearchHit[]).map((hit) => ({
+          hit,
+          unit: 'g' as const,
+          grams: undefined,
+        }))
 
     void (async () => {
       let journal = getJournalForDate(selectedDateKey)
@@ -418,13 +425,17 @@ export function NutritionDashboard({
           snapshot.portionLabel =
             sel.portionLabel?.trim() || formatGramsCountLabel(sel.grams)
         }
-        const mealId = crypto.randomUUID()
+        // PC-07 : mealId fourni par l’écran (une fois), pas regeneré ici.
+        const mealId = sel.mealId || crypto.randomUUID()
+        const selectionEventId = sel.selectionEventId || crypto.randomUUID()
         const entry = {
           ...mealEntryFromSnapshot(snapshot, type),
           id: mealId,
           grams: sel.grams,
           pieces: sel.pieces,
           portionLabel: snapshot.portionLabel,
+          entrySource: foodAddV3 ? ('v3' as const) : undefined,
+          selectionEventId: foodAddV3 ? selectionEventId : undefined,
           // V3 : null si inconnu (jamais || 0). OFF : legacy inchangé.
           calories: foodAddV3
             ? sel.hit.calories == null
@@ -448,7 +459,7 @@ export function NutritionDashboard({
             : snapshot.fatG,
         }
 
-        // B111-14 : V3 en ligne — serveur d’abord ; refus → rien en local.
+        // B111-14 / PC-06 : V3 en ligne — serveur d’abord ; refus → rien en local.
         if (foodAddV3 && isConvexDomainActive() && user) {
           try {
             await addFoodSnapshotViaConvex({
@@ -462,6 +473,7 @@ export function NutritionDashboard({
               imageStorageId: snapshot.imageStorageId as never,
               grams: sel.unit === 'pieces' ? undefined : (sel.grams ?? snapshot.grams),
               pieces: sel.pieces,
+              selectionEventId,
               updatedAt: snapshot.updatedAt,
             })
           } catch (error: unknown) {
@@ -648,7 +660,9 @@ export function NutritionDashboard({
       showToast('Modification indisponible pour ce compte.', 'error')
       return
     }
-    if (patch.grams != null) {
+    // V3 ON seulement : validateFoodQuantity + portionLabel + clear pieces.
+    // V3 OFF (= d33b724) : pas de gate, pieces intact.
+    if (foodAddV3 && patch.grams != null) {
       const checked = validateFoodQuantity({ unit: 'g', value: patch.grams })
       if (!checked.ok) {
         showToast(foodAddQuantityUserMessage(checked.reason, checked.unit), 'error')
@@ -660,41 +674,18 @@ export function NutritionDashboard({
         grams: checked.grams,
         portionLabel: formatGramsCountLabel(checked.grams),
         pieces: undefined,
+        entrySource: patch.entrySource ?? 'v3',
       }
+    } else if (foodAddV3) {
+      patch = { ...patch, entrySource: patch.entrySource ?? 'v3' }
     }
 
-    const applyLocal = (nextPatch: Partial<MealEntry>) => {
-      const journal = updateMealOnDate(selectedDateKey, mealId, nextPatch)
-      setMeals(journal.meals)
-      setTick((n) => n + 1)
-      setEditingMeal(null)
-    }
-
-    // B111-11 : V3 en ligne — serveur valide + réécrit portionLabel avant le journal.
-    if (foodAddV3 && isConvexDomainActive() && user) {
-      const current = getJournalForDate(selectedDateKey).meals.find((m) => m.id === mealId)
-      if (!current) return
-      const merged: MealEntry = { ...current, ...patch }
-      void pushConvexMeal(merged, selectedDateKey, Date.now())
-        .then((result) => {
-          applyLocal({
-            ...patch,
-            portionLabel: result.portionLabel ?? patch.portionLabel,
-          })
-        })
-        .catch((error: unknown) => {
-          const qtyMsg = mapFoodAddQuantityError(error)
-          if (qtyMsg) showToast(qtyMsg, 'error')
-          else {
-            const access = mapAccessError(error)
-            if (access) showToast(access.message, 'error')
-            else showToast('Modification refusée par le serveur.', 'error')
-          }
-        })
-      return
-    }
-
-    applyLocal(patch)
+    // Local d’abord ; la file renvoie (quantityRules via entrySource). PC-08 : hors ligne
+    // = erreur passagère dans la file — jamais toast « refusée par le serveur » ici.
+    const journal = updateMealOnDate(selectedDateKey, mealId, patch)
+    setMeals(journal.meals)
+    setTick((n) => n + 1)
+    setEditingMeal(null)
   }
 
   const handleQuickWater = () => {

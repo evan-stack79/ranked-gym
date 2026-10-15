@@ -54,7 +54,6 @@ describe('AddFoodScreenV3 — parcours court (recherche → quantité → valide
           onMealTypeChange={noop}
           onSubmitManual={(e) => e.preventDefault()}
           onClose={noop}
-          forceOfflineImages
         />,
       )
     })
@@ -153,7 +152,6 @@ describe('AddFoodScreenV3 — parcours court (recherche → quantité → valide
           onClose={noop}
           manualGrams={120}
           onManualGramsChange={onGrams}
-          forceOfflineImages
         />,
       )
     })

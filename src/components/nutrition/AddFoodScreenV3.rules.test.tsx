@@ -99,7 +99,9 @@ describe('AddFoodScreenV3 — règles produit', () => {
     expect(text).toContain('CC BY-SA 3.0')
     expect(text).toContain('Tout')
     expect(text).toContain('Fruits')
-    expect(text).toMatch(/Hors ligne/)
+    // PC-06 : plus « Hors ligne • l'ajout marche… » — connexion requise.
+    expect(text).toMatch(/Connexion requise pour ajouter un aliment/)
+    expect(text).not.toMatch(/marche quand même/)
     expect(text).not.toMatch(FORBIDDEN)
     expect(document.querySelector('[data-food-offline-banner]')).toBeTruthy()
 

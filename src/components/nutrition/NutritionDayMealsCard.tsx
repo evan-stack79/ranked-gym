@@ -204,6 +204,14 @@ export function NutritionDayMealsCard({
                                       : `${Math.round(meal.calories).toLocaleString('fr-FR')} kcal${
                                           portion ? ` · ${portion}` : ''
                                         }`}
+                                  {meal.syncRejected ? (
+                                    <span
+                                      className="mt-0.5 block text-[11px] font-semibold text-[#FF6961]"
+                                      data-meal-sync-rejected
+                                    >
+                                      Pas enregistré
+                                    </span>
+                                  ) : null}
                                 </span>
                               </span>
                             </button>

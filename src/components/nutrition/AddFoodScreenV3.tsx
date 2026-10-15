@@ -29,11 +29,19 @@ export type FoodAddV3QuantityUnit = FoodQuantityUnit
 /** Sélection validée V3 — name + quantité (jamais de kcal dans l’UI). */
 export type FoodAddV3Selection = {
   hit: OpenFoodFactsSearchHit
+  /** mealId créé une fois à l’ouverture de l’étape quantité (PC-07). */
+  mealId: string
+  /** Id stable pour retries / selectedCount (PC-09). */
+  selectionEventId: string
   grams?: number
   pieces?: number
   unit: FoodAddV3QuantityUnit
   portionLabel?: string
 }
+
+/** Texte hors ligne V3 — à faire relire par le Vérificateur. */
+export const FOOD_ADD_V3_OFFLINE_REQUIRED_MSG =
+  'Connexion requise pour ajouter un aliment.' as const
 
 type QtyState = { unit: FoodAddV3QuantityUnit; value: number | '' }
 
@@ -137,7 +145,15 @@ export function AddFoodScreenV3({
   const [qtyByKey, setQtyByKey] = useState<Record<string, QtyState>>({})
   const [qtyError, setQtyError] = useState<string | null>(null)
   const [manualError, setManualError] = useState<string | null>(null)
+  /** mealId + selectionEventId figés à l’ouverture de l’étape quantité. */
+  const [addIdsByKey, setAddIdsByKey] = useState<
+    Record<string, { mealId: string; selectionEventId: string }>
+  >({})
+  const [submitting, setSubmitting] = useState(false)
   const online = useOnlineStatus()
+  // forceOfflineImages simule aussi le hors-ligne (tests empty / fixture).
+  // Les tests quantité / e2e ne passent PAS forceOfflineImages.
+  const networkOk = online && !forceOfflineImages
   const searchActive = searchQuery.trim().length > 0
 
   const filteredHits = useMemo(() => {
@@ -184,12 +200,22 @@ export function AddFoodScreenV3({
 
   const openQuantityStep = () => {
     if (selectedHits.length === 0) return
+    if (!networkOk) return
     const next: Record<string, QtyState> = {}
+    const ids: Record<string, { mealId: string; selectionEventId: string }> = {}
     for (const hit of selectedHits) {
-      next[hitKey(hit)] = { unit: 'g', value: '' }
+      const key = hitKey(hit)
+      next[key] = { unit: 'g', value: '' }
+      // PC-07 / PC-09 : ids créés une seule fois à l’ouverture (pas à chaque Valider).
+      ids[key] = {
+        mealId: crypto.randomUUID(),
+        selectionEventId: crypto.randomUUID(),
+      }
     }
     setQtyByKey(next)
+    setAddIdsByKey(ids)
     setQtyError(null)
+    setSubmitting(false)
     setQuantityStep(true)
   }
 
@@ -219,10 +245,16 @@ export function AddFoodScreenV3({
   })
 
   const confirmQuantities = () => {
+    if (!networkOk || submitting) return
     const items: FoodAddV3Selection[] = []
     for (const hit of selectedHits) {
       const key = hitKey(hit)
       const qty = qtyByKey[key] ?? { unit: 'g' as const, value: '' as const }
+      const ids = addIdsByKey[key]
+      if (!ids) {
+        setQtyError(FOOD_ADD_V3_OFFLINE_REQUIRED_MSG)
+        return
+      }
       const checked = validateFoodQuantity({
         unit: qty.unit,
         value: qty.value,
@@ -236,6 +268,8 @@ export function AddFoodScreenV3({
         const n = checked.pieces
         items.push({
           hit,
+          mealId: ids.mealId,
+          selectionEventId: ids.selectionEventId,
           pieces: n,
           unit: 'pieces',
           portionLabel: formatPiecesCountLabel(n),
@@ -243,6 +277,8 @@ export function AddFoodScreenV3({
       } else {
         items.push({
           hit,
+          mealId: ids.mealId,
+          selectionEventId: ids.selectionEventId,
           grams: checked.grams,
           unit: 'g',
           portionLabel: formatGramsCountLabel(checked.grams),
@@ -250,10 +286,13 @@ export function AddFoodScreenV3({
       }
     }
     setQtyError(null)
+    setSubmitting(true)
     onValidateSelection(items)
     setSelectedKeys([])
     setQuantityStep(false)
     setQtyByKey({})
+    setAddIdsByKey({})
+    setSubmitting(false)
   }
 
   const handleManualSubmit = (event: FormEvent) => {
@@ -342,14 +381,14 @@ export function AddFoodScreenV3({
           />
         </label>
 
-        {!online || forceOfflineImages ? (
+        {!networkOk ? (
           <p
             data-food-offline-banner
             className="flex items-center justify-center gap-2 rounded-xl bg-white/[0.04] px-3 py-2 text-[12px] text-[#AEAEB2]"
             role="status"
           >
             <WifiOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Hors ligne • l&apos;ajout marche quand même
+            {FOOD_ADD_V3_OFFLINE_REQUIRED_MSG}
           </p>
         ) : null}
       </div>
@@ -629,10 +668,19 @@ export function AddFoodScreenV3({
                 {qtyError}
               </p>
             ) : null}
+            {!networkOk ? (
+              <p
+                className="mt-2 text-[12px] text-[#FF6961]"
+                role="alert"
+                data-food-offline-required
+              >
+                {FOOD_ADD_V3_OFFLINE_REQUIRED_MSG}
+              </p>
+            ) : null}
             <button
               type="button"
               onClick={confirmQuantities}
-              disabled={!allQuantitiesValid}
+              disabled={!allQuantitiesValid || !networkOk || submitting}
               className="btn-brand mt-3 w-full rounded-xl border border-white/15 py-3 text-[15px] font-semibold text-white disabled:opacity-40"
               data-testid="food-quantity-confirm"
             >
@@ -645,6 +693,7 @@ export function AddFoodScreenV3({
           selected={selectedHits}
           onValidate={openQuantityStep}
           forceOfflineImages={forceOfflineImages}
+          disabled={!networkOk}
         />
       </div>
     </div>,
