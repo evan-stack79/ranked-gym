@@ -71,12 +71,13 @@ export function nextSetHint(
 }
 
 /**
- * Reprendre (skip repos) : n’append une série que s’il n’existe pas
- * déjà une série suivante `!done` après `setIndex`.
+ * DEV-RG-07 : plus aucun append automatique de série (Reprendre / skip repos inclus).
+ * Conservé pour les tests / appelants historiques — retourne toujours `false`.
+ * Seul le bouton « + Ajouter une série » crée une série.
  */
 export function shouldAppendNextSetOnRestSkip(
-  sets: Array<{ done?: boolean }>,
-  setIndex: number,
+  _sets: Array<{ done?: boolean }>,
+  _setIndex: number,
 ): boolean {
-  return !sets.some((s, i) => i > setIndex && s.done !== true)
+  return false
 }

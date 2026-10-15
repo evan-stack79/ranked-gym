@@ -2,8 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import { ChevronLeft, ChevronRight, Ellipsis, Pencil, RotateCcw, Trash2, X } from 'lucide-react'
 import type { BodyMorphology, CalorieProfile, MealEntry, MealType } from '../../types/nutrition'
 import { MEAL_TYPE_LABELS } from '../../utils/calories'
-import { remainingMealBudget } from '../../utils/portionGuide'
-import type { PortionMode } from '../../utils/morphology'
 import {
   addMealToDate,
   getJournalForDate,
@@ -11,17 +9,31 @@ import {
   getWaterMlForDate,
   addWaterEntryForDate,
   removeMealFromDate,
+  saveJournalForDate,
   updateMealOnDate,
 } from '../../services/nutritionStorage'
-import { getNutritionTarget } from '../../services/nutritionActivity'
-import { getDailyWaterGoalMl, isTrainingDayToday } from '../../utils/waterGoal'
+import { getNutritionTarget, hasMealTargets } from '../../services/nutritionActivity'
+import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
+import { isFoodAddV3Enabled } from '../../backend/foodAddV3FeatureFlag'
+import { canAccessFoodAdd, canShowMealJournal, needsAgePrompt } from '../../services/foodAddAccess'
+import { AgeRequiredPrompt } from './AgeRequiredPrompt'
+import { readHealthDeclarations } from '../../services/nutritionSafetyRules'
+import { isConvexDomainActive } from '../../backend/adapter'
+import { addFoodSnapshotViaConvex } from '../../services/convexNutritionService'
+import { M_CAL_2, M_INFO_1 } from '../../content/safetyCopy'
+import { NeedToTalkScreen } from '../settings/NeedToTalkScreen'
+import { SafetyNote } from './SafetyNote'
 import {
   canSubmitHomeQuickWater,
 } from '../../utils/homeNutritionQuickActions'
 import {
+  getUserWaterGoalMl,
+  WATER_GOAL_CHANGED_EVENT,
+} from '../../utils/userWaterGoal'
+import {
   listPersonalFoods,
-  setPersonalFoodFavorite,
   searchOpenFoodFacts,
+  setPersonalFoodFavorite,
   type OpenFoodFactsProduct,
   type OpenFoodFactsSearchHit,
 } from '../../services/alimentsService'
@@ -46,12 +58,40 @@ import {
   MealPhotoAnalyzer,
   type MealPhotoAnalyzerHandle,
 } from './MealPhotoAnalyzer'
-import { AddFoodScreen } from './AddFoodScreen'
+import { AddFoodScreenV3 } from './AddFoodScreenV3'
+import { AddFoodScreenLegacy } from './AddFoodScreenLegacy'
 import { IosSheet } from '../ui/IosSheet'
 import { SectionSkeleton } from '../ui/AppBootScreen'
-import { dateFromKey, nutritionDateLabel, shiftDateKey } from '../../utils/nutritionDate'
+import { BlurInText, Reveal } from '../motion'
+import {
+  formatNutritionDate,
+  nutritionDateLabel,
+  shiftDateKey,
+} from '../../utils/nutritionDate'
 import { todayKey } from '../../utils/calories'
 import { persistScannedProductSelection } from './persistScannedProductSelection'
+import {
+  primaryOffTagForCategory,
+  type FoodCategoryId,
+} from '../../utils/foodCategories'
+import {
+  buildFoodNutritionSnapshot,
+  mealEntryFromSnapshot,
+} from '../../utils/foodJournalSnapshot'
+
+type DashboardToast = {
+  message: string
+  variant: 'success' | 'error'
+  actionLabel?: string
+  onAction?: () => void
+}
+
+function shortAddDateLabel(dateKey: string): string {
+  const today = todayKey()
+  if (dateKey === today) return 'Aujourd’hui'
+  if (dateKey === shiftDateKey(today, -1)) return `Hier, ${formatNutritionDate(dateKey)}`
+  return formatNutritionDate(dateKey)
+}
 
 interface NutritionDashboardProps {
   profile: CalorieProfile
@@ -68,6 +108,7 @@ export function NutritionDashboard({
   const [tick, setTick] = useState(0)
   const [meals, setMeals] = useState<MealEntry[]>([])
   const [hydrated, setHydrated] = useState(false)
+  const [showNeedToTalk, setShowNeedToTalk] = useState(false)
   const [waterSaving, setWaterSaving] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
@@ -76,6 +117,8 @@ export function NutritionDashboard({
   const [calendarOpen, setCalendarOpen] = useState(false)
 
   const [showForm, setShowForm] = useState(false)
+  /** V3 only — age prompt before Ajouter un aliment (never when flag OFF). */
+  const [showV3AgeGate, setShowV3AgeGate] = useState(false)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [scannedProduct, setScannedProduct] = useState<OpenFoodFactsProduct | null>(null)
   const [editingMeal, setEditingMeal] = useState<MealEntry | null>(null)
@@ -90,16 +133,36 @@ export function NutritionDashboard({
   const [searchHits, setSearchHits] = useState<OpenFoodFactsSearchHit[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
-  const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' } | null>(
-    null,
-  )
+  const [foodCategory, setFoodCategory] = useState<FoodCategoryId>('all')
+  const [toast, setToast] = useState<DashboardToast | null>(null)
   const photoRef = useRef<MealPhotoAnalyzerHandle>(null)
   const journalRef = useRef<HTMLDivElement>(null)
   const swipeStart = useRef<{ x: number; y: number } | null>(null)
+  const toastTimerRef = useRef<number | null>(null)
+  const followTodayRef = useRef(true)
 
   const showToast = useCallback((message: string, variant: 'success' | 'error' = 'success') => {
+    if (toastTimerRef.current != null) window.clearTimeout(toastTimerRef.current)
     setToast({ message, variant })
-    window.setTimeout(() => setToast(null), variant === 'error' ? 5200 : 3400)
+    toastTimerRef.current = window.setTimeout(
+      () => setToast(null),
+      variant === 'error' ? 5200 : 3400,
+    )
+  }, [])
+
+  const showUndoToast = useCallback((message: string, onUndo: () => void) => {
+    if (toastTimerRef.current != null) window.clearTimeout(toastTimerRef.current)
+    setToast({
+      message,
+      variant: 'success',
+      actionLabel: 'Annuler',
+      onAction: () => {
+        onUndo()
+        setToast(null)
+        if (toastTimerRef.current != null) window.clearTimeout(toastTimerRef.current)
+      },
+    })
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 5000)
   }, [])
 
   useEffect(() => {
@@ -109,19 +172,24 @@ export function NutritionDashboard({
 
   useEffect(() => {
     const sync = () => {
+      const today = todayKey()
+      if (followTodayRef.current && selectedDateKey !== today) {
+        setSelectedDateKey(today)
+        return
+      }
       setMeals(getJournalForDate(selectedDateKey).meals)
       setTick((n) => n + 1)
     }
     window.addEventListener('ranked-gym:backup-restored', sync)
     window.addEventListener('ranked-gym:water-changed', sync)
+    window.addEventListener(WATER_GOAL_CHANGED_EVENT, sync)
     window.addEventListener('ranked-gym:profile-changed', sync)
-    window.addEventListener('ranked-gym:training-changed', sync)
     window.addEventListener('focus', sync)
     return () => {
       window.removeEventListener('ranked-gym:backup-restored', sync)
       window.removeEventListener('ranked-gym:water-changed', sync)
+      window.removeEventListener(WATER_GOAL_CHANGED_EVENT, sync)
       window.removeEventListener('ranked-gym:profile-changed', sync)
-      window.removeEventListener('ranked-gym:training-changed', sync)
       window.removeEventListener('focus', sync)
     }
   }, [selectedDateKey])
@@ -135,7 +203,10 @@ export function NutritionDashboard({
     }
 
     const term = searchQuery.trim()
-    if (term.length < 2) {
+    const categoryTag = primaryOffTagForCategory(foodCategory)
+    const needsRemote = term.length >= 2 || Boolean(categoryTag)
+
+    if (!needsRemote) {
       setSearchError(null)
       setSearchLoading(false)
       let cancelled = false
@@ -152,6 +223,8 @@ export function NutritionDashboard({
               glucides: item.glucides,
               lipides: item.lipides,
               imageUrl: item.imageUrl,
+              servingSize: null,
+              categoriesTags: [],
               provenance: item.provenance,
               fetchedAt: item.fetchedAt,
               foodKey: item.foodKey,
@@ -173,7 +246,7 @@ export function NutritionDashboard({
     setSearchError(null)
 
     const timer = window.setTimeout(() => {
-      void searchOpenFoodFacts(term, controller.signal)
+      void searchOpenFoodFacts(term, controller.signal, { categoryTag })
         .then((hits) => {
           if (controller.signal.aborted) return
           setSearchHits(hits)
@@ -187,18 +260,28 @@ export function NutritionDashboard({
         .finally(() => {
           if (!controller.signal.aborted) setSearchLoading(false)
         })
-    }, 500)
+    }, term.length >= 2 ? 500 : 120)
 
     return () => {
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [searchQuery, showForm])
+  }, [searchQuery, showForm, foodCategory])
 
   const nutrition = useMemo(() => {
     void tick
     return getNutritionTarget(profile)
   }, [profile, tick])
+
+  const declarations = useMemo(() => readHealthDeclarations(profile), [profile])
+  const calorieGoalEnabled = isCalorieGoalEnabled()
+  const allowGoalSetup =
+    calorieGoalEnabled &&
+    !declarations.eatingDisorder &&
+    !declarations.diabetes &&
+    !declarations.pregnancy &&
+    !declarations.breastfeeding &&
+    !nutrition.showCalorieGoal
 
   const totals = useMemo(() => {
     return meals.reduce(
@@ -213,18 +296,18 @@ export function NutritionDashboard({
   }, [meals])
 
   const targetCalories = nutrition.targetCalories
+  const mealTargetsActive = hasMealTargets(nutrition)
   const remainingCalories = targetCalories > 0 ? targetCalories - totals.calories : 0
   const calorieProgress =
     targetCalories > 0 ? totals.calories / targetCalories : 0
 
   const hydration = useMemo(() => {
     void tick
-    const isTrainingDay = isTrainingDayToday(undefined, dateFromKey(selectedDateKey))
     return {
       consumedMl: getWaterMlForDate(selectedDateKey),
-      goalMl: getDailyWaterGoalMl(profile.weightKg, isTrainingDay),
+      goalMl: getUserWaterGoalMl(),
     }
-  }, [tick, profile.weightKg, selectedDateKey])
+  }, [tick, selectedDateKey])
 
   const dataDateKeys = useMemo(() => Object.keys(getMealJournal()), [tick])
 
@@ -238,18 +321,82 @@ export function NutritionDashboard({
     setSearchHits([])
     setSearchError(null)
     setSearchLoading(false)
+    setFoodCategory('all')
     setShowForm(false)
   }
+
+  const foodAddV3 = isFoodAddV3Enabled()
+  const foodAddAllowed = canAccessFoodAdd(profile)
+  const showMealJournal = canShowMealJournal(profile)
 
   const openAddFood = (type?: MealType) => {
     if (type) {
       setMealType(type)
       setPendingMealType(type)
+    } else {
+      setPendingMealType(null)
     }
+    // V3 only: ask for age before opening Ajouter un aliment (flag OFF → nothing new).
+    if (foodAddV3 && needsAgePrompt(profile)) {
+      setShowV3AgeGate(true)
+      return
+    }
+    if (!foodAddAllowed) return
     setShowForm(true)
   }
 
+  const handleValidateFoodSelection = (hits: OpenFoodFactsSearchHit[]) => {
+    if (!foodAddAllowed) {
+      showToast('Ajout d’aliment indisponible pour ce compte.', 'error')
+      return
+    }
+    const type = pendingMealType ?? mealType
+    let journal = getJournalForDate(selectedDateKey)
+    for (const hit of hits) {
+      const snapshot = buildFoodNutritionSnapshot(hit)
+      const entry = mealEntryFromSnapshot(snapshot, type)
+      journal = addMealToDate(selectedDateKey, entry)
+      if (user) {
+        void persistScannedProductSelection(hit, user.id, (message) => {
+          showToast(message, 'error')
+        })
+        if (foodAddV3 && isConvexDomainActive()) {
+          void addFoodSnapshotViaConvex({
+            mealId: crypto.randomUUID(),
+            dateKey: selectedDateKey,
+            mealType: type,
+            name: snapshot.name,
+            portionLabel: snapshot.portionLabel,
+            offCode: snapshot.offCode,
+            imageUrl: snapshot.imageStorageId ? snapshot.imageUrl : undefined,
+            imageStorageId: snapshot.imageStorageId as never,
+            calories: snapshot.calories,
+            proteinG: snapshot.proteinG ?? null,
+            carbsG: snapshot.carbsG ?? null,
+            fatG: snapshot.fatG ?? null,
+            grams: snapshot.grams,
+            updatedAt: snapshot.updatedAt,
+          }).catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : String(error)
+            if (message.includes('FOOD_ADD_ACCESS_DENIED')) {
+              showToast('Ajout d’aliment refusé par le serveur.', 'error')
+            }
+          })
+        }
+      }
+    }
+    setMeals(journal.meals)
+    setTick((n) => n + 1)
+    setPendingMealType(null)
+    resetForm()
+    setJournalDetailOpen(true)
+    showToast(
+      hits.length === 1 ? 'Aliment ajouté.' : `${hits.length} aliments ajoutés.`,
+    )
+  }
+
   const selectDate = (dateKey: string) => {
+    followTodayRef.current = dateKey === todayKey()
     setSelectedDateKey(dateKey)
     setJournalDetailOpen(false)
   }
@@ -271,9 +418,12 @@ export function NutritionDashboard({
   }
 
   const openScanner = (forMeal?: MealType) => {
+    if (!foodAddAllowed) return
     if (forMeal) {
       setPendingMealType(forMeal)
       setMealType(forMeal)
+    } else {
+      setPendingMealType(null)
     }
     requireAuth(() => {
       setScannerOpen(true)
@@ -302,65 +452,47 @@ export function NutritionDashboard({
     fatG: number | null
     grams: number
     pieces?: number
-    portionMode: PortionMode
   }) => {
-    const journal = addMealToDate(selectedDateKey, {
-      name: entry.name,
-      mealType: entry.mealType,
-      calories: entry.calories,
-      proteinG: entry.proteinG ?? undefined,
-      carbsG: entry.carbsG ?? undefined,
-      fatG: entry.fatG ?? undefined,
-      grams: entry.grams,
-      pieces: entry.pieces,
-      portionMode: entry.portionMode,
-    })
-    setMeals(journal.meals)
-    setTick((n) => n + 1)
-    setScannedProduct(null)
-    resetForm()
-
-    const remain = remainingMealBudget(
-      targetCalories,
-      entry.mealType,
-      journal.meals,
-      profile.morphology,
-    )
-    if (entry.portionMode === 'with_sides' && remain > 60) {
-      setPendingMealType(entry.mealType)
-    } else if (remain <= 60) {
+    if (!foodAddAllowed) {
+      showToast('Ajout d’aliment indisponible pour ce compte.', 'error')
+      return
+    }
+    try {
+      const journal = addMealToDate(selectedDateKey, {
+        name: entry.name,
+        mealType: entry.mealType,
+        calories: entry.calories,
+        proteinG: entry.proteinG ?? undefined,
+        carbsG: entry.carbsG ?? undefined,
+        fatG: entry.fatG ?? undefined,
+        grams: entry.grams,
+        pieces: entry.pieces,
+      })
+      const added = journal.meals[0]
+      setMeals(journal.meals)
+      setTick((n) => n + 1)
+      setScannedProduct(null)
       setPendingMealType(null)
+      resetForm()
+      showUndoToast(
+        `Ajouté au ${MEAL_TYPE_LABELS[entry.mealType]} · ${entry.calories} kcal`,
+        () => {
+          const next = removeMealFromDate(selectedDateKey, added.id)
+          setMeals(next.meals)
+          setTick((n) => n + 1)
+        },
+      )
+    } catch {
+      showToast("L'ajout n'a pas fonctionné. Réessaie.", 'error')
     }
   }
 
-  const handleToggleFavorite = useCallback(
-    (hit: OpenFoodFactsSearchHit) => {
-      if (!hit.foodKey) return
-      requireAuth(() => {
-        const next = !hit.isFavorite
-        void setPersonalFoodFavorite(hit.foodKey!, next)
-          .then((applied) => {
-            if (!applied) {
-              showToast('Impossible de mettre à jour le favori.', 'error')
-              return
-            }
-            setSearchHits((prev) =>
-              prev.map((item) =>
-                item.foodKey === hit.foodKey ? { ...item, isFavorite: next } : item,
-              ),
-            )
-            showToast(next ? 'Ajouté aux favoris.' : 'Retiré des favoris.')
-          })
-          .catch(() => {
-            showToast('Impossible de mettre à jour le favori.', 'error')
-          })
-      })
-    },
-    [requireAuth, showToast],
-  )
-
   const handleAdd = (event: FormEvent) => {
     event.preventDefault()
+    if (!foodAddAllowed) {
+      showToast('Ajout d’aliment indisponible pour ce compte.', 'error')
+      return
+    }
     const trimmed = name.trim()
     if (!trimmed || calories <= 0) return
 
@@ -378,13 +510,23 @@ export function NutritionDashboard({
   }
 
   const handleRemove = (id: string) => {
+    const snapshot = getJournalForDate(selectedDateKey)
     const journal = removeMealFromDate(selectedDateKey, id)
     setMeals(journal.meals)
     setTick((n) => n + 1)
     setEditingMeal(null)
+    showUndoToast('Supprimé', () => {
+      saveJournalForDate(snapshot)
+      setMeals(snapshot.meals)
+      setTick((n) => n + 1)
+    })
   }
 
   const handleEditSave = (mealId: string, patch: Partial<MealEntry>) => {
+    if (!foodAddAllowed) {
+      showToast('Modification indisponible pour ce compte.', 'error')
+      return
+    }
     const journal = updateMealOnDate(selectedDateKey, mealId, patch)
     setMeals(journal.meals)
     setTick((n) => n + 1)
@@ -436,6 +578,11 @@ export function NutritionDashboard({
     }
   }
 
+  const otherSafetyNotices = useMemo(
+    () => nutrition.safetyNotices.filter((n) => n !== M_INFO_1 && n !== M_CAL_2),
+    [nutrition.safetyNotices],
+  )
+
   if (!hydrated) {
     return (
       <div className="flex flex-col gap-4 pt-2">
@@ -446,11 +593,17 @@ export function NutritionDashboard({
     )
   }
 
+  if (showNeedToTalk) {
+    return <NeedToTalkScreen onBack={() => setShowNeedToTalk(false)} />
+  }
+
   return (
-    <div className="-mx-5 min-h-[70vh] overflow-hidden bg-[#0C0C0E] pb-2">
+    <div className="-mx-5 min-h-[70vh] overflow-x-hidden bg-[#0C0C0E] pb-2">
       <div className="flex flex-col gap-4 px-5 pt-1">
         <header className="flex items-center justify-between gap-3">
-          <h1 className="text-[32px] font-bold tracking-tight text-white">Nutrition</h1>
+          <h1 className="text-[32px] font-bold tracking-tight text-white">
+            <BlurInText as="span">Nutrition</BlurInText>
+          </h1>
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
@@ -492,13 +645,35 @@ export function NutritionDashboard({
               <ChevronRight className="h-5 w-5" />
             </button>
           </div>
-          <NutritionCalorieRing
-            remainingCalories={remainingCalories}
-            consumedCalories={totals.calories}
-            targetCalories={targetCalories}
-            progress={calorieProgress}
-            onOpenSetup={onOpenSetup}
-          />
+          <Reveal>
+            <NutritionCalorieRing
+              remainingCalories={remainingCalories}
+              consumedCalories={totals.calories}
+              targetCalories={targetCalories}
+              progress={calorieProgress}
+              onOpenSetup={onOpenSetup}
+              allowGoalSetup={allowGoalSetup}
+            />
+          </Reveal>
+          {nutrition.showCalorieGoal ? (
+            <div className="mt-3 space-y-2 px-1" data-testid="dashboard-estimation-notices">
+              <p className="text-[12px] leading-relaxed text-[#AEAEB2]">{M_CAL_2}</p>
+              {otherSafetyNotices.map((notice) => (
+                <p key={notice} className="text-[12px] leading-relaxed text-[#8E8E93]">
+                  {notice}
+                </p>
+              ))}
+            </div>
+          ) : otherSafetyNotices.length > 0 ? (
+            <div className="mt-3 space-y-2 px-1" data-testid="dashboard-safety-notices">
+              {otherSafetyNotices.map((notice) => (
+                <p key={notice} className="text-[12px] leading-relaxed text-[#8E8E93]">
+                  {notice}
+                </p>
+              ))}
+            </div>
+          ) : null}
+          <SafetyNote onNeedToTalk={() => setShowNeedToTalk(true)} />
         </div>
 
         <NutritionMacrosRow
@@ -519,26 +694,36 @@ export function NutritionDashboard({
           }}
         />
 
-        <NutritionHydrationCard
-          consumedMl={hydration.consumedMl}
-          goalMl={hydration.goalMl}
-          onAdd250={handleQuickWater}
-          saving={waterSaving}
-        />
+        <Reveal delayMs={60}>
+          <NutritionHydrationCard
+            consumedMl={hydration.consumedMl}
+            goalMl={hydration.goalMl}
+            onAdd250={handleQuickWater}
+            onGoalSaved={() => setTick((n) => n + 1)}
+            saving={waterSaving}
+          />
+        </Reveal>
 
-        <NutritionQuickActions onAction={handleQuickAction} />
+        {foodAddAllowed ? (
+          <NutritionQuickActions onAction={handleQuickAction} />
+        ) : null}
 
+        {showMealJournal ? (
         <NutritionDayMealsCard
           meals={meals}
-          onAddMeal={openAddFood}
-          onEditMeal={setEditingMeal}
+          onAddMeal={foodAddAllowed ? openAddFood : () => undefined}
+          onEditMeal={foodAddAllowed ? setEditingMeal : () => undefined}
+          hideAdd={!foodAddAllowed}
         />
+        ) : null}
 
         <div ref={journalRef} className="scroll-mt-4">
-          {journalDetailOpen ? (
+          {showMealJournal && journalDetailOpen ? (
             <section className="space-y-3" aria-label="Détail du journal">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-[17px] font-semibold text-white">Aliments du jour</h2>
+                <h2 className="text-[17px] font-semibold text-white">
+                  <BlurInText as="span">Aliments du jour</BlurInText>
+                </h2>
                 <button
                   type="button"
                   onClick={() => setJournalDetailOpen(false)}
@@ -567,7 +752,7 @@ export function NutritionDashboard({
                         <button
                           type="button"
                           onClick={() => setEditingMeal(meal)}
-                          className="flex h-9 w-9 items-center justify-center rounded-xl text-[#8E8E93]"
+                          className="flex h-11 w-11 items-center justify-center rounded-xl text-[#8E8E93]"
                           aria-label="Modifier l’aliment"
                         >
                           <Pencil className="h-4 w-4" />
@@ -575,7 +760,7 @@ export function NutritionDashboard({
                         <button
                           type="button"
                           onClick={() => handleRemove(meal.id)}
-                          className="flex h-9 w-9 items-center justify-center rounded-xl text-[#8E8E93]"
+                          className="flex h-11 w-11 items-center justify-center rounded-xl text-[#8E8E93]"
                           aria-label="Supprimer le repas"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -585,20 +770,26 @@ export function NutritionDashboard({
                   ))}
                 </ul>
               )}
-              <MealBudgetsCard
-                targetCalories={targetCalories}
-                morphology={profile.morphology}
-                meals={meals}
-              />
+              {mealTargetsActive ? (
+                <MealBudgetsCard
+                  targetCalories={targetCalories}
+                  morphology={profile.morphology}
+                  meals={meals}
+                />
+              ) : null}
             </section>
           ) : null}
         </div>
 
         {advancedOpen ? (
           <div className="space-y-6 border-t border-white/8 pt-6">
-            <NutritionPlanCard profile={profile} onChange={onChangeProfile} />
-            <WeightPaceCard profile={profile} />
-            <SmartWaterGauge weightKg={profile.weightKg} />
+            {nutrition.showCalorieGoal ? (
+              <>
+                <NutritionPlanCard profile={profile} onChange={onChangeProfile} />
+                <WeightPaceCard profile={profile} />
+              </>
+            ) : null}
+            <SmartWaterGauge />
           </div>
         ) : null}
       </div>
@@ -622,14 +813,81 @@ export function NutritionDashboard({
         }}
       />
 
-      <BarcodeScanner
-        open={scannerOpen && !showForm}
-        onClose={() => setScannerOpen(false)}
-        onProduct={handleScannedProduct}
-      />
+      {foodAddAllowed ? (
+        <BarcodeScanner
+          open={scannerOpen && !showForm}
+          onClose={() => setScannerOpen(false)}
+          onProduct={handleScannedProduct}
+        />
+      ) : null}
 
-      {showForm ? (
-        <AddFoodScreen
+      {foodAddV3 && showV3AgeGate ? (
+        <AgeRequiredPrompt
+          onAgeSubmit={(age) => {
+            const next = { ...profile, age }
+            onChangeProfile(next)
+            setShowV3AgeGate(false)
+            if (canAccessFoodAdd(next)) {
+              setShowForm(true)
+            }
+          }}
+        />
+      ) : null}
+
+      {showForm && foodAddV3 && foodAddAllowed ? (
+        <AddFoodScreenV3
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          searchLoading={searchLoading}
+          searchError={searchError}
+          searchHits={searchHits}
+          category={foodCategory}
+          onCategoryChange={setFoodCategory}
+          onValidateSelection={handleValidateFoodSelection}
+          onOpenScanner={() => openScanner()}
+          scannerSlot={
+            scannerOpen ? (
+              <BarcodeScanner
+                open={scannerOpen}
+                onClose={() => setScannerOpen(false)}
+                onProduct={handleScannedProduct}
+              />
+            ) : null
+          }
+          onToast={showToast}
+          onPhotoAnalyzed={(result) => {
+            const journal = addMealToDate(selectedDateKey, {
+              name: result.name,
+              mealType: result.mealType,
+              calories: result.calories,
+              proteinG: result.proteinG,
+              carbsG: result.carbsG,
+              fatG: result.fatG,
+            })
+            setMeals(journal.meals)
+            setTick((n) => n + 1)
+            resetForm()
+            setJournalDetailOpen(true)
+          }}
+          name={name}
+          onNameChange={setName}
+          calories={calories}
+          onCaloriesChange={setCalories}
+          proteinG={proteinG}
+          onProteinChange={setProteinG}
+          carbsG={carbsG}
+          onCarbsChange={setCarbsG}
+          fatG={fatG}
+          onFatChange={setFatG}
+          mealType={mealType}
+          onMealTypeChange={setMealType}
+          onSubmitManual={handleAdd}
+          onClose={resetForm}
+        />
+      ) : null}
+
+      {showForm && !foodAddV3 && foodAddAllowed ? (
+        <AddFoodScreenLegacy
           searchQuery={searchQuery}
           onSearchQueryChange={setSearchQuery}
           searchLoading={searchLoading}
@@ -640,7 +898,28 @@ export function NutritionDashboard({
             setSearchQuery('')
             setSearchHits([])
           }}
-          onToggleFavorite={handleToggleFavorite}
+          onToggleFavorite={(hit) => {
+            if (!hit.foodKey) return
+            requireAuth(() => {
+              const next = !hit.isFavorite
+              void setPersonalFoodFavorite(hit.foodKey!, next)
+                .then((applied) => {
+                  if (!applied) {
+                    showToast('Impossible de mettre à jour le favori.', 'error')
+                    return
+                  }
+                  setSearchHits((prev) =>
+                    prev.map((item) =>
+                      item.foodKey === hit.foodKey ? { ...item, isFavorite: next } : item,
+                    ),
+                  )
+                  showToast(next ? 'Ajouté aux favoris.' : 'Retiré des favoris.')
+                })
+                .catch(() => {
+                  showToast('Impossible de mettre à jour le favori.', 'error')
+                })
+            })
+          }}
           onOpenScanner={() => openScanner()}
           scannerSlot={
             scannerOpen ? (
@@ -687,10 +966,25 @@ export function NutritionDashboard({
         open={scannedProduct != null}
         product={scannedProduct}
         targetCalories={targetCalories}
+        hasMealTargets={mealTargetsActive}
         morphology={profile.morphology as BodyMorphology}
         meals={meals}
         preferredMealType={pendingMealType}
-        onClose={() => setScannedProduct(null)}
+        dateLabel={shortAddDateLabel(selectedDateKey)}
+        onClose={() => {
+          setScannedProduct(null)
+          setPendingMealType(null)
+        }}
+        onRequestManualEntry={(product) => {
+          setScannedProduct(null)
+          setPendingMealType(null)
+          setName(product.nom)
+          setCalories(0)
+          setProteinG(product.proteines ?? '')
+          setCarbsG(product.glucides ?? '')
+          setFatG(product.lipides ?? '')
+          setShowForm(true)
+        }}
         onSave={handleScanSave}
       />
 
@@ -768,14 +1062,23 @@ export function NutritionDashboard({
 
       {toast ? (
         <div
-          className={`fixed left-1/2 z-[120] max-w-[92%] -translate-x-1/2 rounded-2xl border px-4 py-3 text-center text-[13px] font-medium shadow-lg ${
+          className={`fixed left-1/2 z-[120] flex max-w-[92%] -translate-x-1/2 items-center gap-3 rounded-2xl border px-4 py-3 text-[13px] font-medium shadow-lg ${
             toast.variant === 'error'
               ? 'bottom-[calc(var(--app-bottom-nav)+env(safe-area-inset-bottom,0px)+1rem)] border-[#FF453A]/40 bg-[#2C1014]/95 text-[#FF6961]'
-              : 'bottom-[calc(var(--app-bottom-nav)+env(safe-area-inset-bottom,0px)+1rem)] border-[#30D158]/35 bg-[#102C18]/95 text-white'
+              : 'bottom-[calc(var(--app-bottom-nav)+env(safe-area-inset-bottom,0px)+1rem)] border-white/15 bg-[#1C1C1E]/95 text-white'
           }`}
           role={toast.variant === 'error' ? 'alert' : 'status'}
         >
-          {toast.message}
+          <span className="min-w-0 flex-1 text-left">{toast.message}</span>
+          {toast.actionLabel && toast.onAction ? (
+            <button
+              type="button"
+              onClick={toast.onAction}
+              className="ios-press min-h-11 shrink-0 px-2 text-[14px] font-semibold text-[#64D2FF] underline"
+            >
+              {toast.actionLabel}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>

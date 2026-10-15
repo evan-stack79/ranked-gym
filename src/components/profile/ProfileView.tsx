@@ -1,11 +1,33 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { CloudBackupCard } from './CloudBackupCard'
 import { SettingsScreen } from '../settings/SettingsScreen'
 import { PersonalInformationScreen } from '../settings/PersonalInformationScreen'
 import { SecurityScreen } from '../settings/SecurityScreen'
 import { CameraHeartRateScreen } from '../settings/CameraHeartRateScreen'
+import { NeedToTalkScreen } from '../settings/NeedToTalkScreen'
+import { BetaFeedbackScreen } from '../settings/BetaFeedbackScreen'
+import { EnergyRecoveryInfo } from '../settings/EnergyRecoveryInfo'
+import {
+  HealthSituationsForm,
+  healthSituationsFromProfile,
+  serverLocksFromProfile,
+  type ClearableSafetyField,
+  type HealthSituationsValue,
+  type ServerHealthLocks,
+} from '../settings/HealthSituationsForm'
 import { FullProfileScreen } from './FullProfileScreen'
 import { useAuth } from '../../context/AuthContext'
+import {
+  getCalorieProfile,
+  saveCalorieProfile,
+} from '../../services/nutritionStorage'
+import { clearNutritionSafetyFlag } from '../../services/convexNutritionService'
+import {
+  AGE_CONTACT_US_EVENT,
+  isAgeContactUsNeeded,
+} from '../../services/ageContactNotice'
+import { AGE_CONTACT_US_MESSAGE, M_INFO_1 } from '../../content/safetyCopy'
+import { ContactUsBlock } from '../common/ContactUsBlock'
 import {
   disciplineFromLabel,
   getDiscipline,
@@ -17,6 +39,14 @@ import {
   ProfileNavigationProvider,
   useProfileNavigation,
 } from '../../navigation/profileNavigation'
+import {
+  OPEN_BETA_FEEDBACK_EVENT,
+  consumeBetaFeedbackPendingOpen,
+  setBetaFeedbackPrefillPage,
+  type OpenBetaFeedbackDetail,
+} from '../../services/betaFeedbackNav'
+import { canOpenBetaFeedback } from '../../services/betaFeedbackAccess'
+import { confirmSignOutClearingAvisQueue } from '../../services/avisBetaLogoutWarn'
 
 function ProfileViewContent() {
   const {
@@ -35,12 +65,49 @@ function ProfileViewContent() {
   const [disciplineId, setDisciplineId] = useState<AppDisciplineId>(() =>
     disciplineFromLabel(profile?.discipline) || getStoredDisciplineId(),
   )
+  const [healthValue, setHealthValue] = useState<HealthSituationsValue>(() =>
+    healthSituationsFromProfile(getCalorieProfile()),
+  )
+  const [serverHealthLocks, setServerHealthLocks] = useState<ServerHealthLocks>(() =>
+    serverLocksFromProfile(getCalorieProfile()),
+  )
+  const [healthMessage, setHealthMessage] = useState<string | null>(null)
+  const [showAgeContact, setShowAgeContact] = useState(() => isAgeContactUsNeeded())
+
+  useEffect(() => {
+    const refresh = () => setShowAgeContact(isAgeContactUsNeeded())
+    window.addEventListener(AGE_CONTACT_US_EVENT, refresh)
+    return () => window.removeEventListener(AGE_CONTACT_US_EVENT, refresh)
+  }, [])
 
   useEffect(() => {
     if (isAuthenticated) {
       void refreshProfile()
     }
   }, [isAuthenticated, refreshProfile])
+
+  useEffect(() => {
+    const openFeedback = (page?: string) => {
+      if (!canOpenBetaFeedback()) return
+      if (page) setBetaFeedbackPrefillPage(page)
+      if (!isAuthenticated) {
+        requireAuth(() => navigate('giveFeedback'))
+        return
+      }
+      navigate('giveFeedback')
+    }
+
+    if (consumeBetaFeedbackPendingOpen()) {
+      openFeedback()
+    }
+
+    const onOpenFeedback = (event: Event) => {
+      const detail = (event as CustomEvent<OpenBetaFeedbackDetail>).detail
+      openFeedback(detail?.page?.trim())
+    }
+    window.addEventListener(OPEN_BETA_FEEDBACK_EVENT, onOpenFeedback)
+    return () => window.removeEventListener(OPEN_BETA_FEEDBACK_EVENT, onOpenFeedback)
+  }, [isAuthenticated, navigate, requireAuth])
 
   useEffect(() => {
     if (profile?.discipline) {
@@ -56,6 +123,15 @@ function ProfileViewContent() {
     }
   }, [route, isAuthenticated, user, goBack])
 
+  useEffect(() => {
+    if (route === 'healthSituations') {
+      const profile = getCalorieProfile()
+      setHealthValue(healthSituationsFromProfile(profile))
+      setServerHealthLocks(serverLocksFromProfile(profile))
+      setHealthMessage(null)
+    }
+  }, [route])
+
   const handleGhostModeChange = async (enabled: boolean) => {
     setGhostSaving(true)
     try {
@@ -64,6 +140,31 @@ function ProfileViewContent() {
       setGhostSaving(false)
     }
   }
+
+  const handleHealthChange = useCallback((next: HealthSituationsValue) => {
+    setHealthValue(next)
+    const current = getCalorieProfile()
+    saveCalorieProfile({
+      ...current,
+      ...next,
+      healthAnswerUpdatedAt: Date.now(),
+    })
+  }, [])
+
+  const handleClearSafetyField = useCallback(
+    async (field: ClearableSafetyField): Promise<boolean> => {
+      try {
+        const result = await clearNutritionSafetyFlag(field)
+        if (result.cleared) {
+          setServerHealthLocks((prev) => ({ ...prev, [field]: false }))
+        }
+        return result.cleared
+      } catch {
+        return false
+      }
+    },
+    [],
+  )
 
   if (route === 'personalInfo') {
     if (!isAuthenticated || !user) return null
@@ -86,15 +187,89 @@ function ProfileViewContent() {
           void handleGhostModeChange(enabled)
         }}
         onSignOut={() => {
+          if (!confirmSignOutClearingAvisQueue()) return
           void signOut()
         }}
       />
     )
   }
 
-
   if (route === 'cameraHeartRate') {
     return <CameraHeartRateScreen onBack={goBack} />
+  }
+
+  if (route === 'needToTalk') {
+    return <NeedToTalkScreen onBack={goBack} />
+  }
+
+  if (route === 'giveFeedback') {
+    if (!canOpenBetaFeedback()) {
+      goBack()
+      return null
+    }
+    if (!isAuthenticated || !user) {
+      requireAuth(() => navigate('giveFeedback'))
+      goBack()
+      return null
+    }
+    return (
+      <BetaFeedbackScreen
+        onBack={goBack}
+        onOpenNeedToTalk={() => navigate('needToTalk')}
+        onOpenProfile={() => navigate('personalInfo')}
+      />
+    )
+  }
+
+  if (route === 'energyInfo') {
+    return (
+      <section className="ios-fade-up space-y-4 pb-8">
+        <button
+          type="button"
+          onClick={goBack}
+          className="ios-press rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-[13px] font-semibold text-[#AEAEB2]"
+        >
+          Retour
+        </button>
+        <EnergyRecoveryInfo />
+      </section>
+    )
+  }
+
+  if (route === 'healthSituations') {
+    return (
+      <section className="ios-fade-up space-y-4 pb-8">
+        <button
+          type="button"
+          onClick={goBack}
+          className="ios-press rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-[13px] font-semibold text-[#AEAEB2]"
+        >
+          Retour
+        </button>
+        <h1 className="text-[28px] font-bold tracking-tight text-white">Situations de santé</h1>
+        {showAgeContact ? (
+          <ContactUsBlock message={AGE_CONTACT_US_MESSAGE} testIdPrefix="age-contact" />
+        ) : null}
+        <HealthSituationsForm
+          value={healthValue}
+          onChange={handleHealthChange}
+          onOpenNeedToTalk={() => navigate('needToTalk')}
+          sex={getCalorieProfile().sex}
+          serverLocks={serverHealthLocks}
+          isAuthenticated={isAuthenticated}
+          onClearSafetyField={handleClearSafetyField}
+          onMessage={setHealthMessage}
+        />
+        {healthMessage ? (
+          <p className="text-[13px] text-[#FF9F0A]" data-testid="health-safety-message">
+            {healthMessage}
+          </p>
+        ) : null}
+        {healthValue.healthAnswer === 'prefer_not' ? (
+          <p className="text-[12px] text-[#8E8E93]">{M_INFO_1}</p>
+        ) : null}
+      </section>
+    )
   }
 
   if (route === 'fullProfile') {
@@ -113,6 +288,10 @@ function ProfileViewContent() {
           onOpenPersonalInfo={() => requireAuth(() => navigate('personalInfo'))}
           onOpenSecurity={() => requireAuth(() => navigate('security'))}
           onOpenCameraHeartRate={() => navigate('cameraHeartRate')}
+          onOpenNeedToTalk={() => navigate('needToTalk')}
+          onOpenHealthSituations={() => navigate('healthSituations')}
+          onOpenEnergyInfo={() => navigate('energyInfo')}
+          onOpenGiveFeedback={() => requireAuth(() => navigate('giveFeedback'))}
         />
         <CloudBackupCard />
       </div>
@@ -135,6 +314,10 @@ function ProfileViewContent() {
         onOpenPersonalInfo={() => navigate('personalInfo')}
         onOpenSecurity={() => navigate('security')}
         onOpenCameraHeartRate={() => navigate('cameraHeartRate')}
+        onOpenNeedToTalk={() => navigate('needToTalk')}
+        onOpenHealthSituations={() => navigate('healthSituations')}
+        onOpenEnergyInfo={() => navigate('energyInfo')}
+        onOpenGiveFeedback={() => navigate('giveFeedback')}
         onRequireAuth={() => requireAuth(() => undefined)}
         onDisciplineChange={(label) => {
           setDisciplineId(disciplineFromLabel(label))
@@ -145,6 +328,7 @@ function ProfileViewContent() {
           void refreshProfile()
         }}
         onSignOut={() => {
+          if (!confirmSignOutClearingAvisQueue()) return
           void signOut()
         }}
         showSignOut

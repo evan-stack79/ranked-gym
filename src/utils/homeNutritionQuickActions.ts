@@ -4,8 +4,15 @@ import { getNutritionTarget } from '../services/nutritionActivity'
 /** Même quantité que le preset « Verre » de SmartWaterGauge. */
 export const HOME_QUICK_WATER_ML = 250
 
-export function shouldShowHomeQuickWaterButton(consumedMl: number, goalMl: number): boolean {
-  return consumedMl < goalMl
+/**
+ * Quick-add water stays available without a daily goal.
+ * Goal progress is optional UX; logging water must always work.
+ */
+export function shouldShowHomeQuickWaterButton(
+  _consumedMl?: number,
+  _goalMl?: number | null,
+): boolean {
+  return true
 }
 
 export function canSubmitHomeQuickWater(isSaving: boolean): boolean {

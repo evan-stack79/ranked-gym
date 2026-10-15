@@ -31,6 +31,7 @@ const SOURCE_SHA = 'sha-lock-1'
 
 type TableName =
   | 'auth_users'
+  | 'auth_account_links'
   | 'auth_password_credentials'
   | 'auth_sessions'
   | 'auth_password_reset_outbox'
@@ -54,6 +55,7 @@ type TableName =
   | 'migration_runs'
   | 'migration_entity_map'
   | 'rate_limit_buckets'
+  | 'app_one_shot_migrations'
 
 type StoredRow = Record<string, unknown> & { _id: string }
 
@@ -61,6 +63,7 @@ class FakeDb {
   private idCounter = 1
   private rows: Record<TableName, StoredRow[]> = {
     auth_users: [],
+    auth_account_links: [],
     auth_password_credentials: [],
     auth_sessions: [],
     auth_password_reset_outbox: [],
@@ -84,6 +87,7 @@ class FakeDb {
     migration_runs: [],
     migration_entity_map: [],
     rate_limit_buckets: [],
+    app_one_shot_migrations: [],
   }
 
   insert(table: TableName, value: Record<string, unknown>) {
@@ -809,6 +813,19 @@ describe('Convex admin/migration endpoint lock (C1-C3)', () => {
       checksum: 'auth-extra',
       payload: { userId: 'user-extra', email: 'extra@example.com' },
     })
+    // B7-01 : migration auth_users crée le lien Convex ↔ Supabase
+    expect(db.table('auth_account_links')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ownerUserId: 'user-bundle',
+          supabaseUserId: 'user-bundle',
+        }),
+        expect.objectContaining({
+          ownerUserId: 'user-extra',
+          supabaseUserId: 'user-extra',
+        }),
+      ]),
+    )
 
     const scopedCounts = await getCountsForAdmin(ctx as never, {
       adminSecret: ADMIN_SECRET,

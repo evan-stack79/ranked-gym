@@ -117,7 +117,25 @@ export async function hydrateConvexNutritionJournal(): Promise<{
   const next: Record<string, DayJournal> = { ...current }
   const touchedDateKeys = new Set<string>()
 
-  for (const row of snapshot.meals) touchedDateKeys.add(row.dateKey)
+  // Tombstones sans dateKey : retirer le mealId de tous les jours locaux.
+  const globalTombstoneIds = new Set(
+    snapshot.meals
+      .filter((meal) => meal.deletedAt != null && meal.dateKey == null)
+      .map((meal) => meal.mealId),
+  )
+  if (globalTombstoneIds.size > 0) {
+    for (const [dateKey, day] of Object.entries(next)) {
+      const filtered = day.meals.filter((meal) => !globalTombstoneIds.has(meal.id))
+      if (filtered.length !== day.meals.length) {
+        touchedDateKeys.add(dateKey)
+        next[dateKey] = { ...day, meals: filtered }
+      }
+    }
+  }
+
+  for (const row of snapshot.meals) {
+    if (row.dateKey) touchedDateKeys.add(row.dateKey)
+  }
   for (const row of snapshot.waterEntries) touchedDateKeys.add(row.dateKey)
   for (const row of snapshot.dayStates) touchedDateKeys.add(row.dateKey)
 
@@ -131,7 +149,23 @@ export async function hydrateConvexNutritionJournal(): Promise<{
         mealsById.delete(row.mealId)
         continue
       }
-      mealsById.set(row.mealId, asMealEntry(row))
+      if (row.name == null || row.mealType == null || row.createdAt == null) continue
+      mealsById.set(
+        row.mealId,
+        asMealEntry({
+          mealId: row.mealId,
+          mealType: row.mealType,
+          name: row.name,
+          calories: row.calories ?? null,
+          proteinG: row.proteinG,
+          carbsG: row.carbsG,
+          fatG: row.fatG,
+          grams: row.grams,
+          pieces: row.pieces,
+          portionMode: row.portionMode,
+          createdAt: row.createdAt,
+        }),
+      )
     }
 
     for (const row of snapshot.waterEntries.filter((entry) => entry.dateKey === dateKey)) {

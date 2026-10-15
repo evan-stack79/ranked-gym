@@ -6,6 +6,7 @@ import {
   ProfileSubScreenHeader,
   SettingsActionRow,
 } from './ProfileSubScreenChrome'
+import { YourDataMealsEraseCard } from './YourDataMealsEraseCard'
 import { changePassword, deleteOwnAccount, signInWithEmail } from '../../services/authService'
 import { useAuth } from '../../context/AuthContext'
 import { toUserFacingError } from '../../utils/userFacingError'
@@ -138,6 +139,8 @@ export function SecurityScreen({
           d&apos;entraînement restent privées.
         </p>
       </div>
+
+      <YourDataMealsEraseCard />
 
       <div className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80">
         <div className="border-b border-[#2C2C2E]">

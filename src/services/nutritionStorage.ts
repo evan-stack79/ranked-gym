@@ -13,15 +13,55 @@ import {
   remainingMlToConsumedOnBottle,
 } from '../utils/deriveBottleProgress'
 import { todayKey } from '../utils/calories'
-import { getDailyWaterGoalMl, isTrainingDayToday } from '../utils/waterGoal'
 import { isConvexDomainActive } from '../backend/adapter'
 import { getActiveCloudUserId } from './cloudSession'
 import { enqueueConvexNutritionOp } from './convexNutritionQueue'
 import { safeWarn } from '../utils/safeLog'
-import { readLocal, writeLocal } from './secureLocalStore'
+import { readLocal, removeLocal, writeLocal } from './secureLocalStore'
+import {
+  applySafetyToProfile,
+  clampWeeklyPaceKg,
+  isPlausibleOnboardingAge,
+  sanitizeHeightCm,
+  sanitizeWeightKg,
+} from './nutritionSafetyRules'
+import type { HealthAnswerStatus, Sex } from '../types/nutrition'
+import {
+  clearQueuedConvexNutritionOpsForUser,
+  clearQueuedMealOpsForUser,
+} from './convexNutritionQueue'
 
 const PROFILE_BASE = 'ranked-gym:nutrition-profile'
 const JOURNAL_BASE = 'ranked-gym:nutrition-journal'
+const PIECE_PRESETS_KEY = 'ranked-gym:piece-presets'
+const CONVEX_NUTRITION_QUEUE_PREFIX = 'ranked-gym:convex-nutrition-queue'
+
+/** Préfixes / clés locales liées à la santé ou aux données personnelles sensibles (BUG-34). */
+const HEALTH_LOCAL_KEY_PREFIXES = [
+  PROFILE_BASE,
+  JOURNAL_BASE,
+  'ranked-gym:sleep-log',
+  'ranked-gym:training',
+  'ranked-gym:profile',
+  'ranked-gym:last-location',
+  'ranked-gym:check-in',
+  'ranked-gym:custom-gyms',
+  CONVEX_NUTRITION_QUEUE_PREFIX,
+  // BUG-40 : préférences d’interface (discipline, ghost, streak)
+  'ranked-gym:ghost-mode',
+  'ranked-gym:streak-celebration',
+] as const
+
+const HEALTH_LOCAL_EXACT_KEYS = [
+  PIECE_PRESETS_KEY,
+  'ranked-gym:cloud-backup-meta',
+  'ranked-gym:reminder-fired',
+  'ranked-gym:discipline',
+  'ranked-gym:pro-pass-dismissed',
+] as const
+
+/** Cache sessionStorage (géocodage inverse) — vidé à la suppression de compte (BUG-40). */
+const SESSION_CLEAR_PREFIXES = ['ranked-gym:revgeo'] as const
 
 export type StorageSaveOptions = { skipCloud?: boolean }
 
@@ -49,7 +89,8 @@ function queueJournalDayDiff(dateKey: string, prev: DayJournal | undefined, next
       kind: 'meal-upsert',
       dateKey,
       meal,
-      updatedAt: now,
+      // Chaque aliment a son propre updatedAt (newest wins), comme les verres d’eau.
+      updatedAt: meal.updatedAt ?? meal.createdAt ?? now,
     })
   }
   for (const prevMealId of prevMeals.keys()) {
@@ -105,16 +146,25 @@ function scopedKey(base: string): string {
 
 /** Empty shell for first-time onboarding — never auto-pushed as “real” data. */
 export const BLANK_PROFILE: CalorieProfile = {
-  weightKg: 0,
-  goalWeightKg: 0,
-  heightCm: 0,
+  weightKg: null,
+  goalWeightKg: null,
+  heightCm: null,
   age: 0,
-  sex: 'male',
+  sex: null,
+  sexUpdatedAt: null,
   activity: 'moderate',
   morphology: 'mesomorph',
   goal: 'maintain',
-  weeklyPaceKg: 0.5,
+  weeklyPaceKg: 0,
   onboardingComplete: false,
+  declaredPregnancy: false,
+  declaredBreastfeeding: false,
+  declaredEatingDisorder: false,
+  declaredDiabetes: false,
+  preferNotAnswerHealth: false,
+  healthAnswer: null,
+  healthAnswerUpdatedAt: null,
+  bodyMetricsClearedAt: null,
 }
 
 /** @deprecated Use BLANK_PROFILE — kept for imports that still reference the name. */
@@ -145,32 +195,105 @@ function asFiniteNumber(value: unknown, fallback: number): number {
   return fallback
 }
 
+/** Parse optional body metric — empty/0/invalid → null (never coerced to 0). */
+function asOptionalBodyMetric(value: unknown): number | null {
+  if (value == null) return null
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = parseFloat(value.replace(',', '.'))
+    return Number.isFinite(n) ? n : null
+  }
+  return null
+}
+
 function normalizeGoal(value: unknown, fallback: NutritionGoal): NutritionGoal {
   return typeof value === 'string' && VALID_GOALS.includes(value as NutritionGoal)
     ? (value as NutritionGoal)
     : fallback
 }
 
-/** Persist exactly what the user entered — no mock overwrite. */
+function normalizeSex(value: unknown): Sex | null {
+  if (value === 'female' || value === 'male' || value === 'prefer_not_to_say') return value
+  return null
+}
+
+/** Persist exactly what the user entered — bornes sécurité via nutritionSafetyRules. */
 export function normalizeCalorieProfile(input: CalorieProfile): CalorieProfile {
   const goal = normalizeGoal(input.goal, 'maintain')
+  const weightKg = sanitizeWeightKg(asOptionalBodyMetric(input.weightKg))
+  const heightCm = sanitizeHeightCm(asOptionalBodyMetric(input.heightCm))
+  const goalWeightKg = sanitizeWeightKg(asOptionalBodyMetric(input.goalWeightKg))
+  const rawPace = asFiniteNumber(input.weeklyPaceKg, 0)
   const weeklyPaceKg =
-    goal === 'maintain'
-      ? 0
-      : Math.max(0.1, Math.min(1.5, asFiniteNumber(input.weeklyPaceKg, 0.5)))
+    goal === 'maintain' ? 0 : clampWeeklyPaceKg(rawPace > 0 ? rawPace : 0.5, weightKg ?? 70)
 
-  return {
-    weightKg: asFiniteNumber(input.weightKg, 0),
-    goalWeightKg: asFiniteNumber(input.goalWeightKg, 0),
-    heightCm: asFiniteNumber(input.heightCm, 0),
-    age: Math.round(asFiniteNumber(input.age, 0)),
-    sex: input.sex === 'female' ? 'female' : 'male',
+  let age = Math.round(asFiniteNumber(input.age, 0))
+  if (age !== 0 && !isPlausibleOnboardingAge(age)) {
+    // Valeur hors plage plausible → traitée comme inconnue (pas de plan).
+    age = 0
+  }
+
+  const clearedAt =
+    typeof input.bodyMetricsClearedAt === 'number' && Number.isFinite(input.bodyMetricsClearedAt)
+      ? input.bodyMetricsClearedAt
+      : null
+
+  const healthAnswer = normalizeHealthAnswer(input.healthAnswer)
+  const healthAnswerUpdatedAt =
+    typeof input.healthAnswerUpdatedAt === 'number' && Number.isFinite(input.healthAnswerUpdatedAt)
+      ? input.healthAnswerUpdatedAt
+      : null
+
+  // Sync preferNotAnswerHealth with explicit healthAnswer for back-compat readers.
+  const preferNotAnswerHealth =
+    healthAnswer === 'prefer_not' ? true : healthAnswer != null ? false : Boolean(input.preferNotAnswerHealth)
+
+  const sexUpdatedAt =
+    typeof input.sexUpdatedAt === 'number' && Number.isFinite(input.sexUpdatedAt)
+      ? input.sexUpdatedAt
+      : null
+
+  const draft: CalorieProfile = {
+    weightKg,
+    goalWeightKg,
+    heightCm,
+    age,
+    sex: normalizeSex(input.sex),
+    sexUpdatedAt,
     activity: input.activity || 'moderate',
     morphology: input.morphology || 'mesomorph',
     goal,
     weeklyPaceKg,
     onboardingComplete: Boolean(input.onboardingComplete),
+    declaredPregnancy: healthAnswer === 'situations' ? Boolean(input.declaredPregnancy) : Boolean(input.declaredPregnancy) && healthAnswer == null,
+    declaredBreastfeeding:
+      healthAnswer === 'situations'
+        ? Boolean(input.declaredBreastfeeding)
+        : Boolean(input.declaredBreastfeeding) && healthAnswer == null,
+    declaredEatingDisorder:
+      healthAnswer === 'situations'
+        ? Boolean(input.declaredEatingDisorder)
+        : Boolean(input.declaredEatingDisorder) && healthAnswer == null,
+    declaredDiabetes: Boolean(input.declaredDiabetes),
+    preferNotAnswerHealth,
+    healthAnswer,
+    healthAnswerUpdatedAt,
+    bodyMetricsClearedAt: clearedAt,
   }
+
+  // When explicit none/prefer_not, clear situation flags (diabète conservé).
+  if (healthAnswer === 'none' || healthAnswer === 'prefer_not') {
+    draft.declaredPregnancy = false
+    draft.declaredBreastfeeding = false
+    draft.declaredEatingDisorder = false
+  }
+
+  return applySafetyToProfile(draft)
+}
+
+function normalizeHealthAnswer(value: unknown): HealthAnswerStatus | null {
+  if (value === 'none' || value === 'prefer_not' || value === 'situations') return value
+  return null
 }
 
 export function getCalorieProfile(): CalorieProfile {
@@ -181,26 +304,123 @@ export function getCalorieProfile(): CalorieProfile {
 
   const hasAnyUserData =
     Boolean(stored.onboardingComplete) ||
-    asFiniteNumber(stored.weightKg, 0) > 0 ||
-    asFiniteNumber(stored.goalWeightKg, 0) > 0 ||
-    asFiniteNumber(stored.heightCm, 0) > 0 ||
-    asFiniteNumber(stored.age, 0) > 0
+    sanitizeWeightKg(asOptionalBodyMetric(stored.weightKg)) != null ||
+    sanitizeWeightKg(asOptionalBodyMetric(stored.goalWeightKg)) != null ||
+    sanitizeHeightCm(asOptionalBodyMetric(stored.heightCm)) != null ||
+    asFiniteNumber(stored.age, 0) > 0 ||
+    (typeof stored.bodyMetricsClearedAt === 'number' && stored.bodyMetricsClearedAt > 0)
 
   if (!hasAnyUserData) {
     return { ...BLANK_PROFILE }
   }
 
   return normalizeCalorieProfile({
-    weightKg: asFiniteNumber(stored.weightKg, 0),
-    goalWeightKg: asFiniteNumber(stored.goalWeightKg, asFiniteNumber(stored.weightKg, 0)),
-    heightCm: asFiniteNumber(stored.heightCm, 0),
+    weightKg: asOptionalBodyMetric(stored.weightKg),
+    goalWeightKg: asOptionalBodyMetric(stored.goalWeightKg),
+    heightCm: asOptionalBodyMetric(stored.heightCm),
     age: asFiniteNumber(stored.age, 0),
-    sex: stored.sex === 'female' ? 'female' : 'male',
+    sex: normalizeSex(stored.sex),
+    sexUpdatedAt: typeof stored.sexUpdatedAt === 'number' ? stored.sexUpdatedAt : null,
     activity: stored.activity || 'moderate',
     morphology: stored.morphology || 'mesomorph',
     goal: normalizeGoal(stored.goal, 'maintain'),
-    weeklyPaceKg: asFiniteNumber(stored.weeklyPaceKg, 0.5),
+    weeklyPaceKg: asFiniteNumber(stored.weeklyPaceKg, 0),
     onboardingComplete: Boolean(stored.onboardingComplete),
+    declaredPregnancy: Boolean(stored.declaredPregnancy),
+    declaredBreastfeeding: Boolean(stored.declaredBreastfeeding),
+    declaredEatingDisorder: Boolean(stored.declaredEatingDisorder),
+    declaredDiabetes: Boolean(stored.declaredDiabetes),
+    preferNotAnswerHealth: Boolean(stored.preferNotAnswerHealth),
+    healthAnswer: normalizeHealthAnswer(stored.healthAnswer),
+    healthAnswerUpdatedAt:
+      typeof stored.healthAnswerUpdatedAt === 'number' ? stored.healthAnswerUpdatedAt : null,
+    bodyMetricsClearedAt:
+      typeof stored.bodyMetricsClearedAt === 'number' ? stored.bodyMetricsClearedAt : null,
+  })
+}
+
+/**
+ * Efface taille + poids localement (null, jamais 0) et pose un tombstone pour
+ * que la copie cloud ne les ressuscite pas au prochain sync.
+ */
+export function clearBodyMetrics(opts?: StorageSaveOptions): CalorieProfile {
+  const current = getCalorieProfile()
+  const next = normalizeCalorieProfile({
+    ...current,
+    weightKg: null,
+    heightCm: null,
+    goalWeightKg: null,
+    bodyMetricsClearedAt: Date.now(),
+  })
+  saveCalorieProfile(next, opts)
+  return next
+}
+
+/**
+ * Fusionne un profil cloud avec le local : un effacement local plus récent
+ * (ou un 0 legacy distant) ne doit jamais ressusciter des mensurations.
+ */
+export function mergeCalorieProfilesForSync(
+  local: CalorieProfile,
+  remote: CalorieProfile,
+): CalorieProfile {
+  const localNorm = normalizeCalorieProfile(local)
+  const remoteNorm = normalizeCalorieProfile(remote)
+  const localCleared = localNorm.bodyMetricsClearedAt ?? 0
+  const remoteCleared = remoteNorm.bodyMetricsClearedAt ?? 0
+  const localHealthAt = localNorm.healthAnswerUpdatedAt ?? 0
+  const remoteHealthAt = remoteNorm.healthAnswerUpdatedAt ?? 0
+  const localSexAt = localNorm.sexUpdatedAt ?? 0
+  const remoteSexAt = remoteNorm.sexUpdatedAt ?? 0
+
+  // Newest Santé / sex answers win (same pattern as bodyMetricsClearedAt).
+  const healthWinner = localHealthAt >= remoteHealthAt ? localNorm : remoteNorm
+  const sexWinner = localSexAt >= remoteSexAt ? localNorm : remoteNorm
+
+  // B15 — SAFETY FIELDS : true côté serveur (ou local) ne peut pas passer à false via merge client.
+  const declaredPregnancy = Boolean(
+    localNorm.declaredPregnancy || remoteNorm.declaredPregnancy,
+  )
+  const declaredBreastfeeding = Boolean(
+    localNorm.declaredBreastfeeding || remoteNorm.declaredBreastfeeding,
+  )
+  const declaredEatingDisorder = Boolean(
+    localNorm.declaredEatingDisorder || remoteNorm.declaredEatingDisorder,
+  )
+  const declaredDiabetes = Boolean(localNorm.declaredDiabetes || remoteNorm.declaredDiabetes)
+  const anySituation = declaredPregnancy || declaredBreastfeeding || declaredEatingDisorder
+
+  const base =
+    localCleared > remoteCleared
+      ? {
+          ...remoteNorm,
+          weightKg: null as null,
+          heightCm: null as null,
+          goalWeightKg: null as null,
+          bodyMetricsClearedAt: localCleared,
+          onboardingComplete: localNorm.onboardingComplete || remoteNorm.onboardingComplete,
+          // Âge : le serveur gagne s’il a une valeur valide.
+          age: remoteNorm.age > 0 ? remoteNorm.age : localNorm.age,
+        }
+      : {
+          ...remoteNorm,
+          age: remoteNorm.age > 0 ? remoteNorm.age : localNorm.age,
+        }
+
+  return normalizeCalorieProfile({
+    ...base,
+    sex: sexWinner.sex,
+    sexUpdatedAt: sexWinner.sexUpdatedAt ?? null,
+    declaredPregnancy,
+    declaredBreastfeeding,
+    declaredEatingDisorder,
+    declaredDiabetes,
+    preferNotAnswerHealth: anySituation
+      ? false
+      : healthWinner.preferNotAnswerHealth,
+    // Si une situation true survit, forcer « situations » pour que normalize ne l’efface pas.
+    healthAnswer: anySituation ? 'situations' : (healthWinner.healthAnswer ?? null),
+    healthAnswerUpdatedAt: healthWinner.healthAnswerUpdatedAt ?? null,
   })
 }
 
@@ -229,6 +449,89 @@ export function hasCompletedNutritionOnboarding(): boolean {
   } catch (error) {
     safeWarn('[nutrition] hasCompletedNutritionOnboarding failed', error)
     return false
+  }
+}
+
+function isHealthLocalKey(key: string): boolean {
+  if ((HEALTH_LOCAL_EXACT_KEYS as readonly string[]).includes(key)) return true
+  return HEALTH_LOCAL_KEY_PREFIXES.some(
+    (prefix) => key === prefix || key.startsWith(`${prefix}:`) || key.startsWith(prefix),
+  )
+}
+
+/**
+ * Efface les données de santé locales (nutrition, sommeil, entraînement, GPS,
+ * check-ins, caches) et les préférences d’interface locales — appelé à la
+ * suppression de compte (SEC-DON-02 / R-13 / BUG-34 / BUG-40).
+ */
+export function clearLocalNutritionData(opts?: { userId?: string | null }): void {
+  const uid = opts?.userId ?? getActiveCloudUserId()
+  const keys = new Set<string>([...HEALTH_LOCAL_EXACT_KEYS])
+  for (const prefix of HEALTH_LOCAL_KEY_PREFIXES) {
+    keys.add(prefix)
+    if (uid) keys.add(`${prefix}:u:${uid}`)
+  }
+
+  if (typeof localStorage !== 'undefined') {
+    try {
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i)
+        if (key && isHealthLocalKey(key)) keys.add(key)
+      }
+    } catch (error) {
+      safeWarn('[nutrition] clearLocalNutritionData scan failed', error)
+    }
+  }
+
+  for (const key of keys) {
+    try {
+      removeLocal(key)
+    } catch (error) {
+      safeWarn('[nutrition] clearLocalNutritionData removeLocal failed', error)
+    }
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.removeItem(key)
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  // BUG-40 : cache géocodage inverse en sessionStorage
+  if (typeof sessionStorage !== 'undefined') {
+    try {
+      const sessionKeys: string[] = []
+      for (let i = 0; i < sessionStorage.length; i += 1) {
+        const key = sessionStorage.key(i)
+        if (
+          key &&
+          SESSION_CLEAR_PREFIXES.some(
+            (prefix) => key === prefix || key.startsWith(`${prefix}:`),
+          )
+        ) {
+          sessionKeys.push(key)
+        }
+      }
+      for (const key of sessionKeys) {
+        sessionStorage.removeItem(key)
+      }
+    } catch (error) {
+      safeWarn('[nutrition] clearLocalNutritionData sessionStorage failed', error)
+    }
+  }
+
+  if (uid) {
+    try {
+      clearQueuedConvexNutritionOpsForUser(uid)
+    } catch (error) {
+      safeWarn('[nutrition] clearLocalNutritionData queue clear failed', error)
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('ranked-gym:profile-changed'))
+    window.dispatchEvent(new Event('ranked-gym:training-changed'))
   }
 }
 
@@ -294,20 +597,24 @@ export function saveTodayJournal(journal: DayJournal, opts?: StorageSaveOptions)
 
 export function addMealToDate(
   dateKey: string,
-  meal: Omit<MealEntry, 'id' | 'createdAt'>,
+  meal: Omit<MealEntry, 'id' | 'createdAt'> & { createdAt?: number; updatedAt?: number },
 ): DayJournal {
   const journal = getJournalForDate(dateKey)
+  const now = Date.now()
   const entry: MealEntry = {
     ...meal,
-    id: `meal-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    createdAt: Date.now(),
+    id: `meal-${now}-${Math.random().toString(36).slice(2, 7)}`,
+    createdAt: meal.createdAt ?? now,
+    updatedAt: meal.updatedAt ?? meal.createdAt ?? now,
   }
   const next = { ...journal, meals: [entry, ...journal.meals] }
   saveJournalForDate(next)
   return next
 }
 
-export function addMealToToday(meal: Omit<MealEntry, 'id' | 'createdAt'>): DayJournal {
+export function addMealToToday(
+  meal: Omit<MealEntry, 'id' | 'createdAt'> & { createdAt?: number; updatedAt?: number },
+): DayJournal {
   return addMealToDate(todayKey(), meal)
 }
 
@@ -322,15 +629,67 @@ export function removeMealFromToday(mealId: string): DayJournal {
   return removeMealFromDate(todayKey(), mealId)
 }
 
+/** Nombre de repas locaux (tous les jours) — pas de détails. */
+export function countLocalMeals(): number {
+  const all = getAllJournals()
+  let count = 0
+  for (const day of Object.values(all)) {
+    count += Array.isArray(day.meals) ? day.meals.length : 0
+  }
+  return count
+}
+
+/**
+ * Vide les repas du journal local (garde eau / day-state).
+ * skipCloud évite de refiler des meal-delete dans la queue.
+ */
+export function clearLocalMealsOnly(opts?: StorageSaveOptions): void {
+  const all = getAllJournals()
+  const next: Record<string, DayJournal> = {}
+  for (const [dateKey, day] of Object.entries(all)) {
+    next[dateKey] = {
+      ...day,
+      meals: [],
+    }
+  }
+  writeJson(scopedKey(JOURNAL_BASE), next)
+  if (!opts?.skipCloud && !isConvexDomainActive()) {
+    triggerCloudBackup('journal')
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('ranked-gym:profile-changed'))
+  }
+}
+
+/**
+ * Efface repas locaux + ops repas en file d’attente (rien ne revient au sync).
+ * Appelé après / avec deleteAllMyMeals côté serveur.
+ */
+export function clearLocalMealsAndPendingMealWrites(opts?: { userId?: string | null }): void {
+  const uid = opts?.userId ?? getActiveCloudUserId()
+  clearLocalMealsOnly({ skipCloud: true })
+  if (uid) {
+    clearQueuedMealOpsForUser(uid)
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('ranked-gym:profile-changed'))
+  }
+}
+
 export function updateMealOnDate(
   dateKey: string,
   mealId: string,
   patch: Partial<Omit<MealEntry, 'id' | 'createdAt'>>,
 ): DayJournal {
   const journal = getJournalForDate(dateKey)
+  const now = Date.now()
   const next = {
     ...journal,
-    meals: journal.meals.map((meal) => (meal.id === mealId ? { ...meal, ...patch } : meal)),
+    meals: journal.meals.map((meal) =>
+      meal.id === mealId
+        ? { ...meal, ...patch, updatedAt: patch.updatedAt ?? now }
+        : meal,
+    ),
   }
   saveJournalForDate(next)
   return next
@@ -602,11 +961,6 @@ function emitWaterChanged(): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('ranked-gym:water-changed'))
   }
-}
-
-export function suggestedWaterGoalMl(weightKg?: number): number {
-  const weight = weightKg ?? getCalorieProfile().weightKg ?? 70
-  return getDailyWaterGoalMl(weight, isTrainingDayToday())
 }
 
 export function getTodayWaterMl(): number {

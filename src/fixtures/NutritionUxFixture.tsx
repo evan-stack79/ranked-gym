@@ -114,30 +114,38 @@ function NutritionFixtureShell() {
 
   return (
     <div
-      className="relative flex h-[100dvh] min-h-0 flex-col bg-[#0C0C0E] font-sans"
+      className="relative flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-[#0C0C0E] font-sans"
       data-nutrition-fixture="1"
     >
-      <main
-        className="relative z-10 min-h-0 w-full flex-1 overflow-y-auto"
+      <header
+        className="sticky top-0 z-30 shrink-0 border-b border-white/5"
+        data-app-brand-header="1"
         style={{
-          paddingBottom:
-            'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 1rem)',
+          paddingTop: 'var(--app-safe-area-top, env(safe-area-inset-top, 0px))',
         }}
       >
-        <header
-          className="border-b border-white/5 bg-[#0C0C0E]"
-          data-app-brand-header="1"
-        >
+        <div className="relative">
           <div
-            className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"
-            style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
-          >
+            aria-hidden="true"
+            data-brand-header-bg="1"
+            className="pointer-events-none absolute inset-0 -z-10 bg-[#0C0C0E]"
+          />
+          <div className="mx-auto flex max-w-lg items-center justify-center px-4 pb-2 pt-0">
             <div data-cold-launch-target="compact">
               <BrandMark variant="compact" />
             </div>
           </div>
-        </header>
+        </div>
+      </header>
 
+      <main
+        className="relative z-10 min-h-0 w-full flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+        style={{
+          paddingBottom:
+            'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 1rem)',
+        }}
+        data-app-scroll-main="1"
+      >
         <div className="mx-auto w-full max-w-lg px-5 py-8">{content}</div>
       </main>
       <BottomNav activeTab={activeTab} onTabChange={() => undefined} />

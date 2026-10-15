@@ -18,7 +18,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Permissions-Policy': 'camera=(self), microphone=(), geolocation=(self)',
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
   'Content-Security-Policy':
-    "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://*.supabase.co https://*.convex.cloud https://*.convex.site; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.convex.cloud wss://*.convex.cloud https://*.convex.site https://maps.googleapis.com https://maps.gstatic.com https://photon.komoot.io https://nominatim.openstreetmap.org https://world.openfoodfacts.org; media-src 'self' blob: mediastream:; worker-src 'self' blob:; child-src 'self' blob:; frame-src 'none'; manifest-src 'self'; upgrade-insecure-requests; frame-ancestors 'none'",
+    "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://*.supabase.co https://*.convex.cloud https://*.convex.site; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.convex.cloud wss://*.convex.cloud https://*.convex.site https://maps.googleapis.com https://maps.gstatic.com https://photon.komoot.io https://nominatim.openstreetmap.org; media-src 'self' blob: mediastream:; worker-src 'self' blob:; child-src 'self' blob:; frame-src 'none'; manifest-src 'self'; upgrade-insecure-requests; frame-ancestors 'none'",
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {
@@ -31,6 +31,20 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   // Security headers on every response (assets included).
   for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
     headers.set(key, value)
+  }
+
+  // PWA : ne jamais mettre le SW / HTML en cache HTTP (sinon vieux bundle).
+  if (
+    path === '/sw.js' ||
+    path === '/registerSW.js' ||
+    path === '/index.html' ||
+    path === '/' ||
+    path === '/manifest.webmanifest' ||
+    path === '/boot-t0.js'
+  ) {
+    headers.set('Cache-Control', 'no-cache')
+  } else if (path.startsWith('/assets/')) {
+    headers.set('Cache-Control', 'public, max-age=31536000, immutable')
   }
 
   // Assets statiques : laisser Cloudflare détecter le bon Content-Type

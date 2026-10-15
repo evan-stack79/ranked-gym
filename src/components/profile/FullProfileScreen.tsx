@@ -4,8 +4,6 @@ import {
   Crosshair,
   Dumbbell,
   Pencil,
-  Ruler,
-  Scale,
   Shield,
   Target,
   TrendingUp,
@@ -13,6 +11,7 @@ import {
 } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
 import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
+import { HeightWeightPicker } from '../common/HeightWeightPicker'
 import { ArenaRadarChart } from './charts/ArenaRadarChart'
 import { PowerCurveChart } from './charts/PowerCurveChart'
 import { WeeklyAssiduityGauge } from './charts/WeeklyAssiduityGauge'
@@ -23,10 +22,21 @@ import { BadgeShowcase } from './BadgeShowcase'
 import { useAuth } from '../../context/AuthContext'
 import { uploadUserAvatar } from '../../services/avatarService'
 import {
+  clearBodyMetrics,
   getCalorieProfile,
   normalizeCalorieProfile,
   saveCalorieProfile,
 } from '../../services/nutritionStorage'
+import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
+import {
+  isMinorAge,
+  PLAUSIBLE_AGE_MAX,
+  PLAUSIBLE_AGE_MIN,
+  readHealthDeclarations,
+  sanitizeHeightCm,
+  sanitizeWeightKg,
+  shouldShowHeightWeightPicker,
+} from '../../services/nutritionSafetyRules'
 import { getRankFromLevel } from '../../utils/rank'
 import { fetchUserStats, type UserStatsPayload } from '../../services/userStatsService'
 import { ChartSkeleton } from './charts/ChartSkeleton'
@@ -85,6 +95,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [bodyNoted, setBodyNoted] = useState(false)
   const [statsLoading, setStatsLoading] = useState(true)
   const [arenaStats, setArenaStats] = useState<UserStatsPayload | null>(null)
 
@@ -93,13 +104,33 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
   const currentXp = profile?.xp ?? 0
   const rank = getRankFromLevel(level)
   const displayAvatarUrl = avatarPreview || profile?.avatar_url || null
+  const calorieGoalEnabled = isCalorieGoalEnabled()
+  const [healthFlags, setHealthFlags] = useState(() =>
+    readHealthDeclarations(getCalorieProfile()),
+  )
+  const isMinorProfile = age != null && isMinorAge(age)
+  const showBodyMetrics = shouldShowHeightWeightPicker({
+    age,
+    weightKg,
+    heightCm,
+    sex: getCalorieProfile().sex,
+    declarations: healthFlags,
+  })
+  const showGoalWeight =
+    calorieGoalEnabled &&
+    showBodyMetrics &&
+    !healthFlags.eatingDisorder &&
+    !healthFlags.diabetes &&
+    !healthFlags.pregnancy &&
+    !healthFlags.breastfeeding
 
   useEffect(() => {
     const calorie = getCalorieProfile()
-    setWeightKg(calorie.weightKg > 0 ? calorie.weightKg : null)
-    setGoalWeightKg(calorie.goalWeightKg > 0 ? calorie.goalWeightKg : null)
-    setHeightCm(calorie.heightCm > 0 ? calorie.heightCm : null)
+    setWeightKg(sanitizeWeightKg(calorie.weightKg))
+    setGoalWeightKg(sanitizeWeightKg(calorie.goalWeightKg))
+    setHeightCm(sanitizeHeightCm(calorie.heightCm))
     setAge(calorie.age > 0 ? calorie.age : null)
+    setHealthFlags(readHealthDeclarations(calorie))
   }, [])
 
   useEffect(() => {
@@ -162,28 +193,74 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
     }
   }
 
+  const handleSaveBody = (next: { weightKg: number; heightCm: number }) => {
+    setSaveError(null)
+    setWeightKg(next.weightKg)
+    setHeightCm(next.heightCm)
+    const current = getCalorieProfile()
+    saveCalorieProfile(
+      normalizeCalorieProfile({
+        ...current,
+        weightKg: next.weightKg,
+        heightCm: next.heightCm,
+        goalWeightKg: showGoalWeight ? (goalWeightKg ?? next.weightKg) : current.goalWeightKg,
+        age: age ?? current.age,
+        bodyMetricsClearedAt: null,
+        onboardingComplete: current.onboardingComplete || true,
+      }),
+    )
+    setBodyNoted(true)
+    setSaveMessage('C’est noté.')
+    window.setTimeout(() => {
+      setBodyNoted(false)
+      setSaveMessage(null)
+    }, 1600)
+  }
+
+  const handleEraseBody = () => {
+    clearBodyMetrics()
+    setWeightKg(null)
+    setHeightCm(null)
+    setGoalWeightKg(null)
+    setBodyNoted(false)
+    setSaveMessage('Mensurations effacées.')
+    window.setTimeout(() => setSaveMessage(null), 2000)
+  }
+
+  const handleSkipBody = () => {
+    const calorie = getCalorieProfile()
+    setWeightKg(sanitizeWeightKg(calorie.weightKg))
+    setHeightCm(sanitizeHeightCm(calorie.heightCm))
+    setBodyNoted(false)
+  }
+
   const handleSave = async () => {
     setSaveError(null)
     setSaveMessage(null)
 
-    if (weightKg == null || goalWeightKg == null || heightCm == null || age == null) {
-      setSaveError('Remplis poids actuel, poids cible, taille et âge.')
+    if (age == null || age <= 0) {
+      setSaveError('Indique un âge valide.')
       return
     }
-    if (weightKg <= 0 || goalWeightKg <= 0 || heightCm <= 0 || age <= 0) {
-      setSaveError('Les valeurs doivent être supérieures à zéro.')
+    if (showGoalWeight && goalWeightKg == null) {
+      setSaveError('Indique un poids cible, ou laisse les mensurations vides.')
       return
     }
 
     setSaving(true)
     try {
       const current = getCalorieProfile()
+      const nextWeight = showBodyMetrics ? weightKg : sanitizeWeightKg(current.weightKg)
+      const nextHeight = showBodyMetrics ? heightCm : sanitizeHeightCm(current.heightCm)
+      const nextGoalWeight = showGoalWeight
+        ? goalWeightKg
+        : sanitizeWeightKg(current.goalWeightKg)
       saveCalorieProfile(
         normalizeCalorieProfile({
           ...current,
-          weightKg,
-          goalWeightKg,
-          heightCm,
+          weightKg: nextWeight,
+          goalWeightKg: nextGoalWeight,
+          heightCm: nextHeight,
           age,
           onboardingComplete: current.onboardingComplete || true,
         }),
@@ -331,29 +408,25 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
       <section className="space-y-3">
         <SectionTitle icon={UserRound} title="Corps & métabolisme" />
 
-        <div className="grid grid-cols-2 gap-3">
-          <label className="glass-card block rounded-2xl p-4">
-            <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
-              <Scale className="h-3.5 w-3.5 text-[#FF9F0A]" />
-              Poids actuel
-            </span>
-            <div className="flex items-end gap-1">
-              <ClearableNumberInput
-                value={weightKg}
-                onChange={setWeightKg}
-                min={35}
-                max={250}
-                step={0.1}
-                required={false}
-                placeholder="70.5"
-                aria-label="Poids actuel"
-                className="w-full bg-transparent text-[26px] font-bold text-white outline-none"
-              />
-              <span className="pb-1 text-[13px] text-[#8E8E93]">kg</span>
-            </div>
-          </label>
+        {showBodyMetrics ? (
+          <div data-testid="full-profile-body-metrics">
+            <HeightWeightPicker
+              value={{ weightKg, heightCm }}
+              onChange={(next) => {
+                setWeightKg(next.weightKg)
+                setHeightCm(next.heightCm)
+              }}
+              onSave={handleSaveBody}
+              onSkip={handleSkipBody}
+              onErase={handleEraseBody}
+              allowErase
+              confirmMessage={bodyNoted ? 'C’est noté.' : null}
+            />
+          </div>
+        ) : null}
 
-          <label className="glass-card block rounded-2xl p-4">
+        {showGoalWeight ? (
+          <label className="glass-card block rounded-2xl p-4" data-testid="full-profile-goal-weight">
             <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
               <Target className="h-3.5 w-3.5 text-[#FF6961]" />
               Poids cible
@@ -362,7 +435,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
               <ClearableNumberInput
                 value={goalWeightKg}
                 onChange={setGoalWeightKg}
-                min={35}
+                min={30}
                 max={250}
                 step={0.1}
                 required={false}
@@ -373,46 +446,31 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
               <span className="pb-1 text-[13px] text-[#8E8E93]">kg</span>
             </div>
           </label>
-        </div>
+        ) : null}
 
-        <div className="grid grid-cols-2 gap-3">
-          <label className="glass-card block rounded-2xl p-4">
-            <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
-              <Ruler className="h-3.5 w-3.5 text-[#00B4FF]" />
-              Taille
-            </span>
-            <div className="flex items-end gap-1">
-              <ClearableNumberInput
-                value={heightCm}
-                onChange={setHeightCm}
-                min={120}
-                max={230}
-                required={false}
-                placeholder="175"
-                aria-label="Taille"
-                className="w-full bg-transparent text-[24px] font-bold text-white outline-none"
-              />
-              <span className="pb-0.5 text-[13px] text-[#8E8E93]">cm</span>
-            </div>
-          </label>
+        <label className="glass-card block rounded-2xl p-4">
+          <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
+            <UserRound className="h-3.5 w-3.5 text-[#FF9F0A]" />
+            Âge
+          </span>
+          <ClearableNumberInput
+            value={age}
+            onChange={setAge}
+            min={PLAUSIBLE_AGE_MIN}
+            max={PLAUSIBLE_AGE_MAX}
+            required={false}
+            placeholder="24"
+            aria-label="Âge"
+            className="w-full bg-transparent text-[24px] font-bold text-white outline-none"
+          />
+        </label>
 
-          <label className="glass-card block rounded-2xl p-4">
-            <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
-              <UserRound className="h-3.5 w-3.5 text-[#FF9F0A]" />
-              Âge
-            </span>
-            <ClearableNumberInput
-              value={age}
-              onChange={setAge}
-              min={14}
-              max={90}
-              required={false}
-              placeholder="24"
-              aria-label="Âge"
-              className="w-full bg-transparent text-[24px] font-bold text-white outline-none"
-            />
-          </label>
-        </div>
+        {isMinorProfile ? (
+          <p className="flex items-start gap-2 px-1 text-[12px] text-[#8E8E93]">
+            <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            Mensurations masquées pour les comptes de moins de 18 ans.
+          </p>
+        ) : null}
       </section>
 
       {/* Carte de rang & stats — sans bouton Sauvegarder ici */}

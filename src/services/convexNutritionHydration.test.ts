@@ -182,4 +182,41 @@ describe('hydrateConvexNutritionJournal', () => {
     expect(saved['2026-09-22'].meals).toHaveLength(0)
     expect(saved['2026-09-22'].waterEntries).toBeUndefined()
   })
+
+  it('tombstone hard-delete (id+deletedAt, sans dateKey) retire le repas de tous les jours', async () => {
+    getMealJournal.mockReturnValue({
+      '2026-09-20': {
+        dateKey: '2026-09-20',
+        meals: [{ id: 'meal-gone', name: 'Skyr', mealType: 'lunch', calories: 120, createdAt: 1 }],
+      },
+      '2026-09-22': {
+        dateKey: '2026-09-22',
+        meals: [
+          { id: 'meal-gone', name: 'Skyr', mealType: 'lunch', calories: 120, createdAt: 1 },
+          { id: 'meal-keep', name: 'Pomme', mealType: 'snack', calories: 52, createdAt: 2 },
+        ],
+      },
+    })
+
+    fetchConvexJournalSnapshot.mockResolvedValue({
+      meals: [
+        {
+          mealId: 'meal-gone',
+          updatedAt: 200,
+          deletedAt: 200,
+        },
+      ],
+      waterEntries: [],
+      dayStates: [],
+    })
+
+    const { hydrateConvexNutritionJournal } = await import('./convexNutritionHydration')
+    await hydrateConvexNutritionJournal()
+
+    const saved = saveMealJournal.mock.calls[0]?.[0]
+    expect(saved['2026-09-20'].meals).toHaveLength(0)
+    expect(saved['2026-09-22'].meals).toEqual([
+      expect.objectContaining({ id: 'meal-keep', name: 'Pomme' }),
+    ])
+  })
 })

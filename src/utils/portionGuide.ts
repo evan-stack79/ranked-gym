@@ -121,6 +121,12 @@ export function formatGrams(grams: number): string {
   return String(Math.round(grams * 100) / 100)
 }
 
+/** Entier avec espace fine française (ex. 1 144). */
+export function formatFrInteger(value: number): string {
+  if (!Number.isFinite(value)) return '—'
+  return Math.round(value).toLocaleString('fr-FR')
+}
+
 export function scaleNutrition(
   per100: { calories: number; proteines: number; glucides: number; lipides: number },
   grams: number,

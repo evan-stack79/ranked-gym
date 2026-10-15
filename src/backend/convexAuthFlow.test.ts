@@ -26,6 +26,10 @@ type TableName =
   | 'profiles'
   | 'workouts_state'
   | 'nutrition_state'
+  | 'nutrition_meals'
+  | 'nutrition_water_entries'
+  | 'nutrition_day_state'
+  | 'nutrition_food_catalog'
   | 'sleep_nights'
   | 'checkins'
   | 'custom_spots'
@@ -42,6 +46,7 @@ type TableName =
   | 'user_follows'
   | 'activity_comments'
   | 'activity_reactions'
+  | 'avis_beta'
 
 type StoredRow = Record<string, unknown> & { _id: string }
 
@@ -57,6 +62,10 @@ class FakeDb {
     profiles: [],
     workouts_state: [],
     nutrition_state: [],
+    nutrition_meals: [],
+    nutrition_water_entries: [],
+    nutrition_day_state: [],
+    nutrition_food_catalog: [],
     sleep_nights: [],
     checkins: [],
     custom_spots: [],
@@ -73,6 +82,7 @@ class FakeDb {
     user_follows: [],
     activity_comments: [],
     activity_reactions: [],
+    avis_beta: [],
   }
 
   insert(table: TableName, value: Record<string, unknown>) {

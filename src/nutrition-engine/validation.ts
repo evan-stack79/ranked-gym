@@ -6,7 +6,8 @@ const LIMITS = {
   weight_kg: { min: 30, max: 250 },
   height_m: { min: 1, max: 2.5 },
   activity: { min: 1, max: 4 },
-  deficit_kcal: { min: 0, max: 2000 },
+  /** Lot 1 sécurité : déficit max 600 kcal/j (remplace l’ancien plafond 2000). */
+  deficit_kcal: { min: 0, max: 600 },
   surplus_kcal: { min: 0, max: 1000 },
   duration_h: { min: 0, max: 10 },
   effort_weight_loss_kg: { min: 0 },

@@ -3,10 +3,14 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": "22"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "check:release": "node scripts/check-release-ready.mjs",
     "test": "vitest run",
     "test:streak-browser": "node scripts/test-streak-celeb-browser.mjs",
     "capture:streak": "node scripts/capture-streak-celeb-screenshots.mjs",

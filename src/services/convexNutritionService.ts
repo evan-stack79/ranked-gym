@@ -33,6 +33,9 @@ export type OpenFoodFactsProductCloud = {
   glucides: number | null
   lipides: number | null
   imageUrl?: string
+  imageStorageId?: string
+  servingSize?: string | null
+  categoriesTags?: string[]
   provenance: 'open_food_facts'
   fetchedAt: number
 }
@@ -40,17 +43,18 @@ export type OpenFoodFactsProductCloud = {
 type JournalSnapshot = {
   meals: Array<{
     mealId: string
-    dateKey: string
-    mealType: string
-    name: string
-    calories: number | null
+    /** Absent sur tombstone hard-delete (id + deletedAt seulement). */
+    dateKey?: string
+    mealType?: string
+    name?: string
+    calories?: number | null
     proteinG?: number | null
     carbsG?: number | null
     fatG?: number | null
     grams?: number
     pieces?: number
     portionMode?: 'solo' | 'with_sides'
-    createdAt: number
+    createdAt?: number
     updatedAt: number
     deletedAt?: number
   }>
@@ -110,6 +114,98 @@ export async function deleteConvexMeal(mealId: string, dateKey: string, deletedA
     dateKey,
     deletedAt,
   }) as Promise<{ applied: boolean; stale: boolean; updatedAt: number }>
+}
+
+export async function countActiveMealsViaConvex(): Promise<number> {
+  const sessionToken = await requireToken()
+  const result = (await getConvex().query(api.nutrition.countActiveMeals, {
+    sessionToken,
+  })) as { count: number }
+  return result.count
+}
+
+/** Ids repas actifs Convex — pour dédup avec Supabase (B9-03). */
+export async function listActiveMealIdsViaConvex(): Promise<string[]> {
+  const sessionToken = await requireToken()
+  const result = (await getConvex().query(api.nutrition.listActiveMealIds, {
+    sessionToken,
+  })) as { mealIds: string[] }
+  return Array.isArray(result?.mealIds) ? result.mealIds : []
+}
+
+export async function deleteAllMyMealsViaConvex(deletedAt = Date.now()): Promise<{
+  deletedCount: number
+  updatedAt: number
+}> {
+  const sessionToken = await requireToken()
+  return getConvex().mutation(api.nutrition.deleteAllMyMeals, {
+    sessionToken,
+    deletedAt,
+  }) as Promise<{ deletedCount: number; updatedAt: number }>
+}
+
+/** Compte repas Supabase via Convex (lien + service-role), même si Convex a 0. */
+export async function countSupabaseMealsViaConvex(): Promise<number> {
+  const sessionToken = await requireToken()
+  const result = (await getConvex().action(api.purgeSupabaseMeals.countSupabaseMealCopies, {
+    sessionToken,
+  })) as { count: number }
+  return result.count
+}
+
+/** Meal ids Supabase (lien) — pour dédup B9-03. */
+export async function listSupabaseMealIdsViaConvex(): Promise<string[]> {
+  const sessionToken = await requireToken()
+  const result = (await getConvex().action(api.purgeSupabaseMeals.countSupabaseMealCopies, {
+    sessionToken,
+  })) as { mealIds?: string[] }
+  return Array.isArray(result?.mealIds) ? result.mealIds : []
+}
+
+/** Purge Supabase via Convex — session only, userId résolu serveur. */
+export async function purgeSupabaseMealCopiesViaConvex(): Promise<{
+  deletedCount: number
+  nutritionStatus: 'purged' | 'absent'
+  userBackupsStatus: 'purged' | 'absent'
+  resolvedUserId: string
+}> {
+  const sessionToken = await requireToken()
+  return getConvex().action(api.purgeSupabaseMeals.purgeSupabaseMealCopies, {
+    sessionToken,
+  }) as Promise<{
+    deletedCount: number
+    nutritionStatus: 'purged' | 'absent'
+    userBackupsStatus: 'purged' | 'absent'
+    resolvedUserId: string
+  }>
+}
+
+/** Compte Supabase-only via access token (pas de lien). */
+export async function countSupabaseMealsByAccessTokenViaConvex(
+  supabaseAccessToken: string,
+): Promise<{ count: number; mealIds: string[]; resolvedUserId: string }> {
+  return getConvex().action(api.purgeSupabaseMeals.countSupabaseMealCopiesByAccessToken, {
+    supabaseAccessToken,
+  }) as Promise<{ count: number; mealIds: string[]; resolvedUserId: string }>
+}
+
+/** Purge Supabase-only via access token vérifié serveur — jamais un autre compte. */
+export async function purgeSupabaseMealCopiesByAccessTokenViaConvex(
+  supabaseAccessToken: string,
+): Promise<{
+  deletedCount: number
+  nutritionStatus: 'purged' | 'absent'
+  userBackupsStatus: 'purged' | 'absent'
+  resolvedUserId: string
+}> {
+  return getConvex().action(api.purgeSupabaseMeals.purgeSupabaseMealCopiesByAccessToken, {
+    supabaseAccessToken,
+  }) as Promise<{
+    deletedCount: number
+    nutritionStatus: 'purged' | 'absent'
+    userBackupsStatus: 'purged' | 'absent'
+    resolvedUserId: string
+  }>
 }
 
 export async function pushConvexWaterEntry(
@@ -190,13 +286,62 @@ export async function fetchOpenFoodFactsViaConvex(
 export async function searchOpenFoodFactsViaConvex(
   term: string,
   limit?: number,
+  options?: { categoryTag?: string | null },
 ): Promise<OpenFoodFactsProductCloud[]> {
   const sessionToken = await requireToken()
   return getConvex().action(api.nutrition.searchOpenFoodFacts, {
     sessionToken,
     term,
+    categoryTag: options?.categoryTag ?? null,
     limit,
   }) as Promise<OpenFoodFactsProductCloud[]>
+}
+
+/** Recherche v3 — action Convex dédiée (quota journalier + images hébergées). */
+export async function searchFoodsV3ViaConvex(input: {
+  term: string
+  categoryTag?: string | null
+  limit?: number
+}): Promise<{
+  hits: OpenFoodFactsProductCloud[]
+  searchCount: number
+  dailyLimit: number
+}> {
+  const sessionToken = await requireToken()
+  return getConvex().action(api.foodAdd.searchFoods, {
+    sessionToken,
+    term: input.term,
+    categoryTag: input.categoryTag ?? null,
+    limit: input.limit,
+  }) as Promise<{
+    hits: OpenFoodFactsProductCloud[]
+    searchCount: number
+    dailyLimit: number
+  }>
+}
+
+export async function addFoodSnapshotViaConvex(input: {
+  mealId: string
+  dateKey: string
+  mealType: string
+  name: string
+  portionLabel: string
+  offCode?: string
+  imageUrl?: string
+  imageStorageId?: string
+  calories: number | null
+  proteinG?: number | null
+  carbsG?: number | null
+  fatG?: number | null
+  grams?: number
+  createdAt?: number
+  updatedAt?: number
+}): Promise<{ applied: boolean; stale: boolean; updatedAt: number }> {
+  const sessionToken = await requireToken()
+  return getConvex().mutation(api.foodAdd.addFoodSnapshot, {
+    sessionToken,
+    ...input,
+  }) as Promise<{ applied: boolean; stale: boolean; updatedAt: number }>
 }
 
 export async function upsertConvexFoodSelection(input: {
@@ -250,4 +395,15 @@ export async function listConvexFoodCatalog(options?: {
     limit: options?.limit,
     favoritesOnly: options?.favoritesOnly,
   }) as Promise<CloudFoodRecord[]>
+}
+
+/** B15 — retrait délibéré diabète / grossesse / allaitement (jamais via sync). */
+export async function clearNutritionSafetyFlag(
+  field: 'declaredDiabetes' | 'declaredPregnancy' | 'declaredBreastfeeding',
+): Promise<{ cleared: boolean }> {
+  const sessionToken = await requireToken()
+  return getConvex().mutation(api.nutrition.clearSafetyFlag, {
+    sessionToken,
+    field,
+  }) as Promise<{ cleared: boolean }>
 }

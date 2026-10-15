@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
+import { isAccueilGalleryEnabled } from '../../backend/accueilGalleryFeatureFlag'
 import { useAuth } from '../../context/AuthContext'
 import { getTrainingState } from '../../services/trainingStorage'
-import { getHomeGreeting, resolveDisplayFirstName } from '../../utils/homeGreeting'
+import {
+  getHomeGreetingSubtitle,
+  resolveDisplayFirstName,
+} from '../../utils/homeGreeting'
 import { getTodayWorkout } from '../../utils/todayWorkout'
+import { BlurInText, Reveal, SoftBlurIn, TextFlip } from '../motion'
 import { DailyStreak } from './DailyStreak'
+import { HomeGalleryView } from './HomeGalleryView'
 import { TodayWorkoutCard } from './TodayWorkoutCard'
 import { NutritionSnapshot } from './NutritionSnapshot'
 import { SleepSnapshot } from './SleepSnapshot'
@@ -12,14 +18,52 @@ interface HomeViewProps {
   onStartTraining: (routineId: string) => void
   onOpenTraining: () => void
   onOpenNutrition: () => void
+  onOpenHistory?: () => void
 }
 
 /**
- * Accueil = dashboard quotidien.
+ * Accueil shell — gallery + floating pill when `VITE_ENABLE_ACCUEIL_GALLERY`
+ * is on (default ON; set false for legacy dashboard + dock nav).
+ */
+export function HomeView({
+  onStartTraining,
+  onOpenTraining,
+  onOpenNutrition,
+  onOpenHistory = onOpenTraining,
+}: HomeViewProps) {
+  if (isAccueilGalleryEnabled()) {
+    return (
+      <HomeGalleryView
+        onStartTraining={onStartTraining}
+        onOpenTraining={onOpenTraining}
+        onOpenHistory={onOpenHistory}
+      />
+    )
+  }
+
+  return (
+    <HomeDashboardView
+      onStartTraining={onStartTraining}
+      onOpenTraining={onOpenTraining}
+      onOpenNutrition={onOpenNutrition}
+    />
+  )
+}
+
+/**
+ * Accueil = dashboard quotidien (default).
  * Ordre : Nutrition (calories + eau) → Séance → Sommeil → Série → Alertes (si besoin).
  * Ghost mode / Lobby / feed social : hors nav principale (infra conservée).
  */
-export function HomeView({ onStartTraining, onOpenTraining, onOpenNutrition }: HomeViewProps) {
+function HomeDashboardView({
+  onStartTraining,
+  onOpenTraining,
+  onOpenNutrition,
+}: {
+  onStartTraining: (routineId: string) => void
+  onOpenTraining: () => void
+  onOpenNutrition: () => void
+}) {
   const { user, profile } = useAuth()
   const [trainingTick, setTrainingTick] = useState(0)
   const [coldEntering, setColdEntering] = useState(() => {
@@ -65,7 +109,7 @@ export function HomeView({ onStartTraining, onOpenTraining, onOpenNutrition }: H
     displayName: user?.displayName,
     pseudo: profile?.pseudo,
   })
-  const greeting = getHomeGreeting(firstName)
+  const subtitle = getHomeGreetingSubtitle()
 
   const todayWorkout = useMemo(
     () => getTodayWorkout(getTrainingState()),
@@ -76,22 +120,29 @@ export function HomeView({ onStartTraining, onOpenTraining, onOpenNutrition }: H
     <div className={`flex flex-col gap-8 ${coldEntering ? 'home-cold-enter home-cold-enter--active' : ''}`}>
       <header className="home-cold-enter__group home-cold-enter__group--0">
         <h1 className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white">
-          {greeting}
+          <TextFlip /><BlurInText as="span" instant={coldEntering} label={`, ${firstName} ?`}>{`, ${firstName} ?`}</BlurInText>
         </h1>
+        <p className="mt-1.5 text-[15px] font-medium text-[#AEAEB2]">
+          <SoftBlurIn instant={coldEntering}>{subtitle}</SoftBlurIn>
+        </p>
       </header>
 
       <div className="home-cold-enter__group home-cold-enter__group--1">
-        <NutritionSnapshot onOpenNutrition={onOpenNutrition} />
+        <Reveal instant={coldEntering}>
+          <NutritionSnapshot onOpenNutrition={onOpenNutrition} />
+        </Reveal>
       </div>
 
       <div className="home-cold-enter__group home-cold-enter__group--2">
-        <TodayWorkoutCard
-          workout={todayWorkout}
-          onStart={() => {
-            if (todayWorkout?.canStart) onStartTraining(todayWorkout.routineId)
-          }}
-          onOpenNotebook={onOpenTraining}
-        />
+        <Reveal delayMs={60} instant={coldEntering}>
+          <TodayWorkoutCard
+            workout={todayWorkout}
+            onStart={() => {
+              if (todayWorkout?.canStart) onStartTraining(todayWorkout.routineId)
+            }}
+            onOpenNotebook={onOpenTraining}
+          />
+        </Reveal>
       </div>
 
       <div className="home-cold-enter__group home-cold-enter__group--3">

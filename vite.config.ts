@@ -3,7 +3,34 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+/**
+ * SHA court pour la pastille Version (Réglages).
+ * Workers Builds → WORKERS_CI_COMMIT_SHA ; Pages → CF_PAGES_COMMIT_SHA.
+ * Sans SHA CI → `local` (dev machine uniquement, jamais en prod).
+ * Doit rester aligné avec `APP_BUILD_SHA_ENV_KEYS` / `pickShortCommitSha` dans
+ * `src/pwa/appBuildId.ts`.
+ */
+function resolveAppBuildId(): string {
+  const fromEnv =
+    process.env.WORKERS_CI_COMMIT_SHA ||
+    process.env.CF_PAGES_COMMIT_SHA ||
+    process.env.VITE_APP_BUILD_ID ||
+    process.env.GITHUB_SHA ||
+    ''
+  const short = fromEnv.trim().slice(0, 7)
+  if (short) return short
+  return 'local'
+}
+
+function resolveAppBuildTimeIso(): string {
+  return new Date().toISOString()
+}
+
 export default defineConfig({
+  define: {
+    __APP_BUILD_ID__: JSON.stringify(resolveAppBuildId()),
+    __APP_BUILD_TIME__: JSON.stringify(resolveAppBuildTimeIso()),
+  },
   server: {
     host: true,
     port: 5173,

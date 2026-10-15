@@ -29,6 +29,8 @@ export const convexTables = {
     emailNorm: v.string(),
     displayName: v.string(),
     mustResetPassword: v.boolean(),
+    /** Present when the Convex account email is confirmed (server-side only). */
+    emailConfirmedAt: v.optional(v.number()),
     role: v.optional(v.union(v.literal('admin'), v.literal('user'))),
     pendingDeletionAt: v.optional(v.number()),
     deletedAt: v.optional(v.number()),
@@ -38,6 +40,48 @@ export const convexTables = {
     .index('by_userId', ['userId'])
     .index('by_emailNorm', ['emailNorm'])
     .index('by_mustResetPassword', ['mustResetPassword']),
+
+  /**
+   * Lien compte Ranked Gym (ownerUserId / Convex) ↔ compte Supabase Auth.
+   * Obligatoire avant purge repas multi-store.
+   */
+  auth_account_links: defineTable({
+    ownerUserId: v.string(),
+    supabaseUserId: v.string(),
+    linkedAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_ownerUserId', ['ownerUserId'])
+    .index('by_supabaseUserId', ['supabaseUserId']),
+
+  /**
+   * Codes e-mail 6 chiffres pour confirmer l’e-mail Convex (liaison compte).
+   * Confirmé uniquement après code correct (ou Google) — jamais à l’inscription/import.
+   */
+  auth_email_verification_codes: defineTable({
+    userId: v.string(),
+    codeHash: v.string(),
+    expiresAt: v.number(),
+    attempts: v.number(),
+    createdAt: v.number(),
+    consumedAt: v.optional(v.number()),
+  }).index('by_userId', ['userId']),
+
+  /** One-shot server migrations (e.g. B10-03 unconfirm reset). */
+  app_one_shot_migrations: defineTable({
+    key: v.string(),
+    ranAt: v.number(),
+    resultCount: v.optional(v.number()),
+  }).index('by_key', ['key']),
+
+  /**
+   * B12-01 : Google takeover of an unconfirmed password account.
+   * Stores account id + timestamp only — never token or password.
+   */
+  auth_google_takeover_audit: defineTable({
+    userId: v.string(),
+    at: v.number(),
+  }).index('by_userId', ['userId']),
 
   auth_password_credentials: defineTable({
     userId: v.string(),
@@ -154,23 +198,61 @@ export const convexTables = {
     .index('by_userId', ['userId'])
     .index('by_updatedAt', ['updatedAt']),
 
+  /**
+   * B14 — passage mineur → 18+ via sync/import/update.
+   * userId + at uniquement (jamais l’âge ni d’autres données).
+   */
+  nutrition_age_majority_audit: defineTable({
+    userId: v.string(),
+    at: v.number(),
+  }).index('by_userId', ['userId']),
+
+  /**
+   * B15 — retrait délibéré d’un flag de sécurité (diabète / grossesse / allaitement).
+   * userId + at uniquement (jamais le nom du flag ni d’autres données).
+   */
+  nutrition_safety_clear_audit: defineTable({
+    userId: v.string(),
+    at: v.number(),
+  }).index('by_userId', ['userId']),
+
+  /**
+   * B15 — correction équipe (dashboard) d’un SAFETY FIELD.
+   * userId + field + at (pas la valeur santé au-delà du nom du champ).
+   */
+  nutrition_safety_admin_audit: defineTable({
+    userId: v.string(),
+    field: v.string(),
+    at: v.number(),
+  }).index('by_userId', ['userId']),
+
+  /**
+   * Repas actifs : champs complets.
+   * Tombstone sync (après delete / delete-all) : uniquement userId + mealId +
+   * deletedAt + updatedAt — aucun nom / calorie / macro / dateKey résiduel.
+   */
   nutrition_meals: defineTable({
     userId: v.string(),
     mealId: v.string(),
-    dateKey: v.string(),
-    mealType: v.string(),
-    name: v.string(),
-    calories: v.union(v.number(), v.null()),
+    dateKey: v.optional(v.string()),
+    mealType: v.optional(v.string()),
+    name: v.optional(v.string()),
+    calories: v.optional(v.union(v.number(), v.null())),
     proteinG: v.optional(v.union(v.number(), v.null())),
     carbsG: v.optional(v.union(v.number(), v.null())),
     fatG: v.optional(v.union(v.number(), v.null())),
     grams: v.optional(v.number()),
     pieces: v.optional(v.number()),
     portionMode: v.optional(v.union(v.literal('solo'), v.literal('with_sides'))),
-    createdAt: v.number(),
+    /** Snapshot v3 — portion / OFF / image Ranked Gym. */
+    portionLabel: v.optional(v.string()),
+    offCode: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    imageStorageId: v.optional(v.id('_storage')),
+    createdAt: v.optional(v.number()),
     updatedAt: v.number(),
     deletedAt: v.optional(v.number()),
-    schemaVersion: v.number(),
+    schemaVersion: v.optional(v.number()),
   })
     .index('by_userId_mealId', ['userId', 'mealId'])
     .index('by_userId_dateKey', ['userId', 'dateKey'])
@@ -213,7 +295,12 @@ export const convexTables = {
     proteinPer100g: v.union(v.number(), v.null()),
     carbsPer100g: v.union(v.number(), v.null()),
     fatPer100g: v.union(v.number(), v.null()),
+    /** URL de NOTRE stockage (Convex) — jamais un hotlink OFF. */
     imageUrl: v.optional(v.string()),
+    imageStorageId: v.optional(v.id('_storage')),
+    servingSize: v.optional(v.union(v.string(), v.null())),
+    portionLabel: v.optional(v.string()),
+    categoriesTags: v.optional(v.array(v.string())),
     source: v.union(
       v.literal('open_food_facts'),
       v.literal('manual'),
@@ -233,6 +320,26 @@ export const convexTables = {
     .index('by_userId_lastSelectedAt', ['userId', 'lastSelectedAt'])
     .index('by_userId_favorite', ['userId', 'isFavorite'])
     .index('by_userId_barcode', ['userId', 'barcode']),
+
+  /** Quota recherche aliments OFF — limite journalière par utilisateur. */
+  food_search_usage: defineTable({
+    userId: v.string(),
+    dateKey: v.string(),
+    searchCount: v.number(),
+    updatedAt: v.number(),
+  }).index('by_userId_dateKey', ['userId', 'dateKey']),
+
+  /**
+   * Cache global des images OFF copiées dans Convex storage.
+   * Le client ne hotlink jamais images.openfoodfacts.org.
+   */
+  off_product_images: defineTable({
+    offCode: v.string(),
+    storageId: v.id('_storage'),
+    contentType: v.string(),
+    sourceUrl: v.optional(v.string()),
+    updatedAt: v.number(),
+  }).index('by_offCode', ['offCode']),
 
   sleep_nights: defineTable({
     userId: v.string(),
@@ -412,6 +519,46 @@ export const convexTables = {
     updatedAt: v.number(),
     source: v.literal('supabase_user_backups'),
   }).index('by_userId', ['userId']),
+
+  /**
+   * Avis bêta (« Donner mon avis ») — SPEC_AVIS_BETA.
+   * Pas d’âge, poids, e-mail, IP ni donnée de santé en colonnes.
+   * Garde 18+ : âge lu côté serveur dans `nutrition_state.profileJson` (jamais stocké ici).
+   */
+  avis_beta: defineTable({
+    userId: v.string(),
+    type: v.union(v.literal('bug'), v.literal('idee'), v.literal('autre')),
+    texte: v.string(),
+    texteMasque: v.optional(v.string()),
+    page: v.string(),
+    version: v.string(),
+    creeLe: v.number(),
+    consentementDate: v.number(),
+    consentementVersion: v.string(),
+    statut: v.union(
+      v.literal('nouveau'),
+      v.literal('urgent'),
+      v.literal('garde'),
+      v.literal('mis_de_cote'),
+      v.literal('transmis'),
+      v.literal('traite'),
+      v.literal('trie'),
+    ),
+    signalUrgent: v.boolean(),
+    /** 1 = TCA/mal-être · 2 = idées suicidaires (jamais de diagnostic stocké au-delà). */
+    signalNiveau: v.optional(v.union(v.literal(1), v.literal(2))),
+    motsMasques: v.boolean(),
+    notif: v.union(v.literal('a_envoyer'), v.literal('envoyee'), v.literal('echec')),
+    notifEssais: v.number(),
+    cleAntiDoublon: v.string(),
+    decision: v.optional(v.string()),
+    noteTri: v.optional(v.string()),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_userId_creeLe', ['userId', 'creeLe'])
+    .index('by_cleAntiDoublon', ['cleAntiDoublon'])
+    .index('by_notif', ['notif'])
+    .index('by_statut', ['statut']),
 }
 
 export default defineSchema(convexTables)

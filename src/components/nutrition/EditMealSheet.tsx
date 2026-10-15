@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { MealEntry, MealType } from '../../types/nutrition'
 import { MEAL_TYPE_LABELS } from '../../utils/calories'
 import { IosSheet } from '../ui/IosSheet'
@@ -14,6 +14,14 @@ interface EditMealSheetProps {
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
+type Baseline = {
+  grams: number
+  calories: number
+  proteinG: number | null
+  carbsG: number | null
+  fatG: number | null
+}
+
 export function EditMealSheet({ open, meal, onClose, onSave, onDelete }: EditMealSheetProps) {
   const [name, setName] = useState('')
   const [mealType, setMealType] = useState<MealType>('lunch')
@@ -22,6 +30,8 @@ export function EditMealSheet({ open, meal, onClose, onSave, onDelete }: EditMea
   const [carbsG, setCarbsG] = useState<number | null>(null)
   const [fatG, setFatG] = useState<number | null>(null)
   const [grams, setGrams] = useState<number | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const baselineRef = useRef<Baseline | null>(null)
 
   useEffect(() => {
     if (!meal) return
@@ -32,11 +42,35 @@ export function EditMealSheet({ open, meal, onClose, onSave, onDelete }: EditMea
     setCarbsG(meal.carbsG ?? null)
     setFatG(meal.fatG ?? null)
     setGrams(meal.grams ?? null)
+    setConfirmDelete(false)
+    baselineRef.current =
+      meal.grams != null && meal.grams > 0
+        ? {
+            grams: meal.grams,
+            calories: meal.calories,
+            proteinG: meal.proteinG ?? null,
+            carbsG: meal.carbsG ?? null,
+            fatG: meal.fatG ?? null,
+          }
+        : null
   }, [meal])
 
   if (!meal) return null
 
-  const canSave = name.trim().length > 0 && calories != null && calories > 0
+  const canSave = name.trim().length > 0 && calories != null && calories >= 0
+
+  const applyGrams = (nextGrams: number | null) => {
+    setGrams(nextGrams)
+    const base = baselineRef.current
+    if (base == null || nextGrams == null || !(nextGrams > 0)) return
+    const ratio = nextGrams / base.grams
+    setCalories(Math.max(0, Math.round(base.calories * ratio)))
+    setProteinG(
+      base.proteinG == null ? null : Math.round(base.proteinG * ratio * 10) / 10,
+    )
+    setCarbsG(base.carbsG == null ? null : Math.round(base.carbsG * ratio * 10) / 10)
+    setFatG(base.fatG == null ? null : Math.round(base.fatG * ratio * 10) / 10)
+  }
 
   return (
     <IosSheet
@@ -47,26 +81,26 @@ export function EditMealSheet({ open, meal, onClose, onSave, onDelete }: EditMea
     >
       <div className="space-y-4 pb-2">
         <label className="block">
-          <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Nom</span>
+          <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">Nom</span>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#34C759]/40"
+            className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none focus:border-white/25"
           />
         </label>
 
         <div>
-          <p className="mb-1.5 text-[12px] font-semibold text-[#8E8E93]">Repas</p>
+          <p className="mb-1.5 text-[13px] font-semibold text-[#8E8E93]">Repas</p>
           <div className="flex flex-wrap gap-1.5">
             {MEAL_TYPES.map((type) => (
               <button
                 key={type}
                 type="button"
                 onClick={() => setMealType(type)}
-                className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
+                className={`min-h-11 rounded-2xl border px-3 py-2 text-[13px] font-semibold ${
                   mealType === type
-                    ? 'border-[#34C759]/45 bg-[#34C759]/20 text-[#30D158]'
+                    ? 'border-white/35 bg-white/[0.12] text-white'
                     : 'border-white/10 bg-black/25 text-[#8E8E93]'
                 }`}
               >
@@ -78,33 +112,37 @@ export function EditMealSheet({ open, meal, onClose, onSave, onDelete }: EditMea
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
-            <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Calories</span>
+            <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">Calories</span>
             <ClearableNumberInput
               value={calories}
               onChange={setCalories}
-              min={1}
+              min={0}
               max={5000}
               aria-label="Calories"
-              className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none"
+              className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
             />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Grammes</span>
+            <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">
+              Quantité (g)
+            </span>
             <ClearableNumberInput
               value={grams}
-              onChange={setGrams}
-              min={0.01}
-              max={5000}
-              step={0.01}
+              onChange={applyGrams}
+              min={1}
+              max={3000}
+              step={0.1}
               required={false}
+              clampOnBlur={false}
+              sanitizeUnits
               placeholder="Optionnel"
-              placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[15px] text-[#636366]"
-              aria-label="Grammes"
-              className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none"
+              placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#636366]"
+              aria-label="Quantité en grammes"
+              className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
             />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Protéines</span>
+            <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">Protéines</span>
             <ClearableNumberInput
               value={proteinG}
               onChange={setProteinG}
@@ -113,13 +151,13 @@ export function EditMealSheet({ open, meal, onClose, onSave, onDelete }: EditMea
               step={0.1}
               required={false}
               placeholder="—"
-              placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[15px] text-[#636366]"
+              placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#636366]"
               aria-label="Protéines"
-              className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none"
+              className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
             />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Glucides</span>
+            <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">Glucides</span>
             <ClearableNumberInput
               value={carbsG}
               onChange={setCarbsG}
@@ -128,13 +166,13 @@ export function EditMealSheet({ open, meal, onClose, onSave, onDelete }: EditMea
               step={0.1}
               required={false}
               placeholder="—"
-              placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[15px] text-[#636366]"
+              placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#636366]"
               aria-label="Glucides"
-              className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none"
+              className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
             />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Lipides</span>
+            <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">Lipides</span>
             <ClearableNumberInput
               value={fatG}
               onChange={setFatG}
@@ -143,9 +181,9 @@ export function EditMealSheet({ open, meal, onClose, onSave, onDelete }: EditMea
               step={0.1}
               required={false}
               placeholder="—"
-              placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[15px] text-[#636366]"
+              placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#636366]"
               aria-label="Lipides"
-              className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none"
+              className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
             />
           </label>
         </div>
@@ -165,18 +203,42 @@ export function EditMealSheet({ open, meal, onClose, onSave, onDelete }: EditMea
               grams: grams ?? undefined,
             })
           }}
-          className="btn-brand ios-press w-full rounded-2xl py-3.5 text-[16px] font-semibold text-white disabled:opacity-40"
+          className="ios-press w-full rounded-2xl bg-[#30D158] py-3.5 text-[16px] font-semibold text-black disabled:opacity-40"
         >
           Enregistrer
         </button>
 
-        <button
-          type="button"
-          onClick={() => onDelete(meal.id)}
-          className="ios-press w-full rounded-2xl border border-[#FF453A]/30 bg-[#FF453A]/10 py-3 text-[14px] font-semibold text-[#FF6961]"
-        >
-          Supprimer
-        </button>
+        {confirmDelete ? (
+          <div className="space-y-2 rounded-2xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3.5 py-3">
+            <p className="text-[14px] text-white">
+              Supprimer « {meal.name} » ?
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                className="ios-press min-h-11 rounded-2xl border border-white/15 bg-white/[0.08] text-[14px] font-semibold text-white"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => onDelete(meal.id)}
+                className="ios-press min-h-11 rounded-2xl bg-[#FF453A] text-[14px] font-semibold text-white"
+              >
+                Supprimer
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            className="ios-press min-h-11 w-full rounded-2xl border border-[#FF453A]/30 bg-[#FF453A]/10 py-3 text-[14px] font-semibold text-[#FF6961]"
+          >
+            Supprimer
+          </button>
+        )}
       </div>
     </IosSheet>
   )

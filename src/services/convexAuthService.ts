@@ -96,6 +96,21 @@ export async function signInWithPassword(
   }
 }
 
+/**
+ * B11-01 : client stays off by default (kill switch).
+ * Server verifies ID token only when CONVEX_GOOGLE_SIGNIN_ENABLED=true.
+ */
+export async function signInWithGoogle(_idToken: string): Promise<{
+  user: AuthUser
+  sessionToken: string
+  mustResetPassword: boolean
+  emailConfirmed: true
+}> {
+  void _idToken
+  // Client default OFF — do not call Convex until an explicit client enable lands.
+  throw new Error('AUTH_GOOGLE_DISABLED')
+}
+
 export async function signOut(): Promise<void> {
   const token = await getStoredSessionToken()
   const client = requireConvexClient()

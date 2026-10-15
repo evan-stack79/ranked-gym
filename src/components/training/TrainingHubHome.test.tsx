@@ -195,8 +195,15 @@ describe('accueil Train — maquette unique', () => {
       cta?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     expect(host.querySelector('[data-training-hub]')).toBeNull()
-    expect(host.querySelector('[aria-label="Série 1 poids"]')).toBeTruthy()
-    expect(host.querySelector('[aria-label="Série 1 reps"]')).toBeTruthy()
+    // Série vide + historique → placeholders « dernière fois » (aria) ; sinon labels série.
+    expect(
+      host.querySelector('[aria-label="Série 1 poids"]') ||
+        host.querySelector('input[aria-label^="kg, la dernière fois"]'),
+    ).toBeTruthy()
+    expect(
+      host.querySelector('[aria-label="Série 1 reps"]') ||
+        host.querySelector('input[aria-label^="reps, la dernière fois"]'),
+    ).toBeTruthy()
     expect(host.querySelectorAll('[data-set-row="active"]').length).toBe(1)
     const stored = JSON.parse(localStorage.getItem('ranked-gym:training') ?? '{}') as {
       routines?: Array<{ id?: string; exercises?: Array<{ canonicalExerciseId?: string }> }>

@@ -22,7 +22,7 @@ function note(patch: Partial<WorkoutNote> & Pick<WorkoutNote, 'id'>): WorkoutNot
 }
 
 describe('historySessionDetail', () => {
-  it('force legacy : durée estimée, volume réel, kcal si > 0', () => {
+  it('force legacy : durée estimée, volume réel, kcal jamais affichées (Q15)', () => {
     const metrics = historySessionMetrics(
       note({
         id: 'legacy',
@@ -33,7 +33,7 @@ describe('historySessionDetail', () => {
     expect(metrics.kind).toBe('strength')
     expect(metrics.duration).toBe(15)
     expect(metrics.volume).toBe(400)
-    expect(metrics.kcal).toBe(120)
+    expect(metrics.kcal).toBeNull()
   })
 
   it('course sans durée : pas de minutes inventées, pas de volume, pas de kcal 0', () => {

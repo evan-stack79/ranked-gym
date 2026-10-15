@@ -370,6 +370,13 @@ describe('planning typé et brouillon actif rétrocompatibles', () => {
     expect(started.activeWorkoutDraft).toMatchObject({
       routineId: 'custom-biceps', sportId: 'musculation',
     })
+    expect(started.activeWorkoutDraft?.sessionId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    )
+    const preserved = saveRoutineDraft('custom-biceps', [
+      { id: 'e', name: 'Curl', sets: [{ reps: 8, weightKg: 20, done: true }] },
+    ])
+    expect(preserved.activeWorkoutDraft?.sessionId).toBe(started.activeWorkoutDraft?.sessionId)
     expect(started.routines).toEqual(before)
   })
 })
@@ -737,6 +744,32 @@ describe('soft-leave séance → Train (pas Abandonner)', () => {
     const after = getTrainingState()
     expect(after.activeWorkoutDraft).toBeNull()
     expect(after.lastVoluntaryRoute).toBeNull()
+  })
+
+  it('saveWorkoutNote copie le sessionId du brouillon live', async () => {
+    const { saveWorkoutNote } = await import('./trainingStorage')
+    seedActiveBiceps()
+    const sessionId = getTrainingState().activeWorkoutDraft?.sessionId
+    expect(sessionId).toBeTruthy()
+    saveWorkoutNote({
+      title: 'Biceps',
+      routineId: 'custom-biceps',
+      sportId: 'musculation',
+      sessionKind: 'strength',
+      source: 'manual',
+      estimatedKcal: 100,
+      durationMin: 30,
+      exercises: [
+        {
+          id: 'e1',
+          name: 'Curl',
+          sets: [{ reps: 10, weightKg: 12, done: true }],
+        },
+      ],
+    })
+    const saved = getTrainingState().workoutNotes[0]
+    expect(saved?.sessionId).toBe(sessionId)
+    expect(getTrainingState().activeWorkoutDraft).toBeNull()
   })
 
   it('repos endsAt survit soft-leave (pas de wipe)', async () => {

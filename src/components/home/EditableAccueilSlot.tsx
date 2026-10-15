@@ -1,0 +1,439 @@
+import { Minus } from 'lucide-react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react'
+import { createPortal } from 'react-dom'
+import {
+  ACCUEIL_LONG_PRESS_MOVE_PX,
+  ACCUEIL_LONG_PRESS_MS,
+  movementExceedsThreshold,
+} from '../../utils/accueilEditGestures'
+import {
+  ACCUEIL_DROP_MS,
+  cancelElementAnimations,
+  playFlipTranslate,
+} from '../../utils/accueilFlip'
+import type { AccueilWidgetId } from '../../utils/accueilWidgetPrefs'
+
+export type DragPoint = { clientX: number; clientY: number; offsetX: number; offsetY: number }
+
+export type DropGlideFrom = {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
+/** Absolute floating rect under the finger — survives remount; portal target. */
+export type DragFloatRect = {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
+/** Survives remount mid-drag so the layout hole keeps size (sibling FLIP). */
+const dragSlotSizeCache = new Map<string, { width: number; height: number }>()
+
+/** Last absolute float rect — restored on remount before parent re-renders. */
+const dragFloatCache = new Map<string, DragFloatRect>()
+
+interface EditableAccueilSlotProps {
+  id: AccueilWidgetId
+  editMode: boolean
+  reducedMotion: boolean
+  dragging: boolean
+  exiting?: boolean
+  entering?: boolean
+  /** Visual rect of the floating body at drop — glide into the layout slot. */
+  dropGlide?: DropGlideFrom | null
+  /**
+   * Absolute viewport rect of the lifted tile (finger − grab offset).
+   * Preferred over slotBox+delta so remount never jumps/vanishes the drag body.
+   */
+  dragFloat?: DragFloatRect | null
+  onEnterEdit: () => void
+  onHide: (id: AccueilWidgetId) => void
+  onDragStart: (id: AccueilWidgetId, point: DragPoint) => void
+  onDragMove: (clientX: number, clientY: number) => void
+  onDragEnd: () => void
+  onDropGlideDone?: (id: AccueilWidgetId) => void
+  children: ReactNode
+}
+
+/**
+ * Wraps an Accueil widget for iOS-style home edit:
+ * long-press to enter, wiggle / dashed outline, trash badge, drag reorder.
+ *
+ * While dragging, the layout slot stays as an empty placeholder and the tile
+ * body is portaled to document.body as position:fixed under the finger
+ * (opaque, z-index above siblings). On drop, the body glides into the slot
+ * via transform (FLIP) before wiggle resumes.
+ */
+export function EditableAccueilSlot({
+  id,
+  editMode,
+  reducedMotion,
+  dragging,
+  exiting = false,
+  entering = false,
+  dropGlide = null,
+  dragFloat = null,
+  onEnterEdit,
+  onHide,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  onDropGlideDone,
+  children,
+}: EditableAccueilSlotProps) {
+  const rootRef = useRef<HTMLDivElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const pressRef = useRef<{
+    timer: number | null
+    startX: number
+    startY: number
+    pointerId: number | null
+    dragging: boolean
+  }>({ timer: null, startX: 0, startY: 0, pointerId: null, dragging: false })
+  const [slotSize, setSlotSize] = useState<{ width: number; height: number } | null>(null)
+  const [settling, setSettling] = useState(false)
+  const dropGlideGenRef = useRef(0)
+  // Client-only portal host — must be true on the first client paint after a
+  // remount mid-drag (useEffect-deferred true caused a one-frame vanish).
+  const portalReady = typeof document !== 'undefined'
+
+  const clearPressTimer = () => {
+    const p = pressRef.current
+    if (p.timer != null) {
+      window.clearTimeout(p.timer)
+      p.timer = null
+    }
+  }
+
+  const endDrag = (pointerId: number | null) => {
+    clearPressTimer()
+    const p = pressRef.current
+    const wasDragging = p.dragging
+    p.dragging = false
+    p.pointerId = null
+    if (pointerId != null) {
+      try {
+        rootRef.current?.releasePointerCapture(pointerId)
+      } catch {
+        /* ignore */
+      }
+    }
+    if (wasDragging) onDragEnd()
+  }
+
+  useEffect(() => () => clearPressTimer(), [])
+
+  // Remount mid-drag: re-sync local press flag from parent dragging prop.
+  useEffect(() => {
+    if (dragging) {
+      pressRef.current.dragging = true
+    }
+  }, [dragging])
+
+  // Parent clearDrag (sheet open / exit) must drop local press + size cache.
+  useLayoutEffect(() => {
+    if (!dragging) {
+      pressRef.current.dragging = false
+      setSlotSize(null)
+      dragSlotSizeCache.delete(id)
+      dragFloatCache.delete(id)
+      return
+    }
+    const el = rootRef.current
+    if (!el) return
+    setSlotSize((prev) => {
+      if (prev) return prev
+      const cached = dragSlotSizeCache.get(id)
+      if (cached) return cached
+      const r = el.getBoundingClientRect()
+      const next = { width: r.width, height: r.height }
+      if (next.height > 0) dragSlotSizeCache.set(id, next)
+      return next
+    })
+  }, [dragging, id])
+
+  // Keep module cache in sync with parent absolute float (survives remount).
+  if (dragging && dragFloat && !reducedMotion) {
+    dragFloatCache.set(id, dragFloat)
+  }
+
+  // Drop glide: invert from the last floating rect → play into the layout slot.
+  useLayoutEffect(() => {
+    if (!dropGlide || reducedMotion) {
+      if (!dropGlide) setSettling(false)
+      return
+    }
+    const body = bodyRef.current
+    const root = rootRef.current
+    if (!body || !root) {
+      onDropGlideDone?.(id)
+      return
+    }
+
+    const gen = ++dropGlideGenRef.current
+    setSettling(true)
+
+    const to = root.getBoundingClientRect()
+    const dx = dropGlide.left - to.left
+    const dy = dropGlide.top - to.top
+
+    cancelElementAnimations(body)
+    const anim = playFlipTranslate(body, dx, dy, {
+      ms: ACCUEIL_DROP_MS,
+      fromScale: 1.03,
+      toScale: 1,
+    })
+
+    const done = () => {
+      if (dropGlideGenRef.current !== gen) return
+      setSettling(false)
+      onDropGlideDone?.(id)
+    }
+
+    if (!anim) {
+      done()
+      return
+    }
+    anim.finished.then(done).catch(done)
+  }, [dropGlide, reducedMotion, id, onDropGlideDone])
+
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    const target = e.target as HTMLElement | null
+    if (target?.closest('[data-accueil-tile-trash]')) return
+
+    pressRef.current.startX = e.clientX
+    pressRef.current.startY = e.clientY
+    pressRef.current.pointerId = e.pointerId
+    pressRef.current.dragging = false
+    clearPressTimer()
+
+    if (editMode) {
+      const rect = rootRef.current?.getBoundingClientRect()
+      if (rect) {
+        const size = { width: rect.width, height: rect.height }
+        setSlotSize(size)
+        if (size.height > 0) {
+          dragSlotSizeCache.set(id, size)
+          dragFloatCache.set(id, {
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+          })
+        }
+      }
+      pressRef.current.dragging = true
+      onDragStart(id, {
+        clientX: e.clientX,
+        clientY: e.clientY,
+        offsetX: rect ? e.clientX - rect.left : 0,
+        offsetY: rect ? e.clientY - rect.top : 0,
+      })
+      try {
+        rootRef.current?.setPointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
+      return
+    }
+
+    pressRef.current.timer = window.setTimeout(() => {
+      pressRef.current.timer = null
+      onEnterEdit()
+    }, ACCUEIL_LONG_PRESS_MS)
+  }
+
+  const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const p = pressRef.current
+    if (p.pointerId !== e.pointerId) return
+
+    if (!editMode && p.timer != null) {
+      if (
+        movementExceedsThreshold(
+          p.startX,
+          p.startY,
+          e.clientX,
+          e.clientY,
+          ACCUEIL_LONG_PRESS_MOVE_PX,
+        )
+      ) {
+        clearPressTimer()
+      }
+      return
+    }
+
+    if (editMode && p.dragging) {
+      onDragMove(e.clientX, e.clientY)
+    }
+  }
+
+  const endPointer = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const p = pressRef.current
+    if (p.pointerId !== e.pointerId) return
+    endDrag(e.pointerId)
+  }
+
+  // Reorder remounts release pointer capture on the old node. Do NOT call
+  // onDragEnd here — that was vanishing the lifted tile (empty placeholder
+  // under the finger). HomeGalleryView window pointerup/cancel + sheet
+  // effects own drag teardown.
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    const onLost = () => {
+      pressRef.current.dragging = false
+      pressRef.current.pointerId = null
+    }
+    el.addEventListener('lostpointercapture', onLost)
+    return () => el.removeEventListener('lostpointercapture', onLost)
+  })
+
+  const cachedSize = dragSlotSizeCache.get(id)
+  const cachedFloat = dragFloatCache.get(id)
+  const layoutH = slotSize?.height ?? cachedSize?.height
+  const layoutW = slotSize?.width ?? cachedSize?.width
+
+  // Absolute float under finger — parent rect, else remount cache. Never slotBox+delta.
+  const absFloat: DragFloatRect | null =
+    dragging && !reducedMotion ? (dragFloat ?? cachedFloat ?? null) : null
+
+  const floatingStyle: CSSProperties | undefined = absFloat
+    ? {
+        position: 'fixed',
+        left: absFloat.left,
+        top: absFloat.top,
+        width: absFloat.width,
+        height: absFloat.height,
+        zIndex: 200,
+        margin: 0,
+        transform: 'scale(1.03)',
+        transition: 'none',
+        boxShadow: '0 16px 36px rgb(0 0 0 / 0.55)',
+        pointerEvents: 'none',
+        backgroundColor: '#111113',
+        background: '#111113',
+        borderRadius: '1.5rem',
+        overflow: 'hidden',
+        isolation: 'isolate',
+        opacity: 1,
+        visibility: 'visible',
+      }
+    : undefined
+
+  const rootStyle: CSSProperties | undefined =
+    dragging && layoutH
+      ? { minHeight: layoutH, height: layoutH }
+      : undefined
+
+  const wiggling =
+    editMode &&
+    !reducedMotion &&
+    !dragging &&
+    !settling &&
+    !dropGlide &&
+    !exiting &&
+    !entering
+
+  const bodyClass = [
+    'accueil-edit-slot__body',
+    editMode ? 'accueil-edit-slot__body--edit-solid' : '',
+    absFloat ? 'accueil-edit-slot__body--floating' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const tileBody = (
+    <div
+      ref={bodyRef}
+      className={bodyClass}
+      style={floatingStyle}
+      data-accueil-edit-body={id}
+      data-accueil-drag-float={absFloat ? '1' : '0'}
+    >
+      {editMode ? (
+        <button
+          type="button"
+          className="accueil-edit-slot__trash"
+          aria-label="Masquer ce bloc"
+          data-accueil-tile-trash={id}
+          onClick={(ev) => {
+            ev.stopPropagation()
+            onHide(id)
+          }}
+          onPointerDown={(ev) => ev.stopPropagation()}
+        >
+          <Minus className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" />
+        </button>
+      ) : null}
+      {children}
+    </div>
+  )
+
+  // Portal the lifted tile to <body> so ancestor FLIP transforms never trap
+  // position:fixed and remount of the slot never unmounts the visible drag body
+  // without a cached absolute rect ready on the next paint.
+  const showPortaledFloat = Boolean(dragging && !reducedMotion && absFloat && portalReady)
+  const showInFlowBody = !(dragging && !reducedMotion)
+
+  return (
+    <div
+      ref={rootRef}
+      className={[
+        'accueil-edit-slot',
+        editMode ? 'accueil-edit-slot--editing' : '',
+        wiggling ? 'accueil-edit-slot--wiggle' : '',
+        editMode && reducedMotion ? 'accueil-edit-slot--dashed' : '',
+        dragging ? 'accueil-edit-slot--dragging' : '',
+        exiting ? 'accueil-edit-slot--exiting' : '',
+        entering ? 'accueil-edit-slot--entering' : '',
+        settling ? 'accueil-edit-slot--settling' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      style={rootStyle}
+      data-accueil-edit-slot={id}
+      data-accueil-editing={editMode ? '1' : '0'}
+      data-accueil-dragging={dragging ? '1' : '0'}
+      data-accueil-exiting={exiting ? '1' : '0'}
+      data-accueil-entering={entering ? '1' : '0'}
+      data-accueil-settling={settling ? '1' : '0'}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endPointer}
+      onPointerCancel={endPointer}
+    >
+      {dragging ? (
+        <div
+          className="accueil-edit-slot__placeholder"
+          aria-hidden="true"
+          data-accueil-drag-placeholder={id}
+          style={
+            layoutH
+              ? { minHeight: layoutH, height: layoutH, width: layoutW ?? '100%' }
+              : undefined
+          }
+        />
+      ) : null}
+      {/*
+        In-flow body only when not dragging (or reduced-motion). While dragging,
+        the body is portaled — avoids one paint of Eau text inside the new slot
+        (ghost under Séries) and keeps the lifted tile under the finger.
+      */}
+      {showInFlowBody ? tileBody : null}
+      {showPortaledFloat ? createPortal(tileBody, document.body) : null}
+    </div>
+  )
+}

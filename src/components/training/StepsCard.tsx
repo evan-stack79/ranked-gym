@@ -1,9 +1,10 @@
-import { Footprints, Link2, Sparkles } from 'lucide-react'
+import { Footprints, Link2 } from 'lucide-react'
 import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
 
 interface StepsCardProps {
   steps: number
-  burnedKcal: number
+  /** @deprecated Q15 — plus affiché ; conservé pour compatibilité d’appel. */
+  burnedKcal?: number
   goalLabel: string
   healthLinked: boolean
   onStepsChange: (steps: number) => void
@@ -12,7 +13,6 @@ interface StepsCardProps {
 
 export function StepsCard({
   steps,
-  burnedKcal,
   goalLabel,
   healthLinked,
   onStepsChange,
@@ -32,7 +32,7 @@ export function StepsCard({
           <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
             Aujourd’hui
           </p>
-          <h2 className="text-[20px] font-bold text-white">Pas & énergie</h2>
+          <h2 className="text-[20px] font-bold text-white">Pas du jour</h2>
         </div>
         <button
           type="button"
@@ -80,14 +80,10 @@ export function StepsCard({
         </div>
       </div>
 
-      <div className="mt-3 flex items-start gap-2 rounded-2xl border border-[#30D158]/25 bg-[#30D158]/10 px-3.5 py-3">
-        <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#30D158]" />
-        <p className="text-[12px] leading-relaxed text-[#AEAEB2]">
-          ~{burnedKcal} kcal estimées aujourd&apos;hui (pas + séances). Ta cible Nutri (
-          <span className="text-white">{goalLabel}</span>) inclut déjà ton niveau d&apos;activité
-          habituel via l&apos;EER — ces calories ne s&apos;ajoutent pas au plan.
-        </p>
-      </div>
+      <p className="mt-3 text-[12px] leading-relaxed text-[#8E8E93]">
+        Objectif Nutri : <span className="text-white">{goalLabel}</span>. Les pas ne modifient
+        pas ta cible alimentaire.
+      </p>
     </section>
   )
 }

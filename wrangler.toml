@@ -8,6 +8,10 @@
 #
 # Déploiement CLI manuel :
 #   npm run pages:deploy
+#
+# Pastille Version (Réglages) : SHA injecté au `vite build` via
+#   WORKERS_CI_COMMIT_SHA (Workers Builds) ou CF_PAGES_COMMIT_SHA (Pages).
+# Format : « Version YYYY-MM-DD HH:mm · <shortSHA> » (Europe/Paris).
 name = "ranked-gym"
 compatibility_date = "2024-08-01"
 pages_build_output_dir = "./dist"

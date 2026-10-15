@@ -1,16 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Pencil, Ruler, Scale } from 'lucide-react'
+import { Loader2, Pencil } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
-import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
+import { HeightWeightPicker } from '../common/HeightWeightPicker'
 import { ProfileSubScreenHeader } from '../settings/ProfileSubScreenChrome'
 import { useAuth } from '../../context/AuthContext'
 import { uploadUserAvatar } from '../../services/avatarService'
 import { updateProfileProgress } from '../../services/authService'
 import {
+  clearBodyMetrics,
   getCalorieProfile,
   normalizeCalorieProfile,
   saveCalorieProfile,
 } from '../../services/nutritionStorage'
+import {
+  readHealthDeclarations,
+  sanitizeHeightCm,
+  sanitizeWeightKg,
+  shouldShowHeightWeightPicker,
+} from '../../services/nutritionSafetyRules'
 import { getTrainingState, setTrainingSports } from '../../services/trainingStorage'
 import { SportsMultiSelect } from '../onboarding/SportsMultiSelect'
 
@@ -29,16 +36,28 @@ export function PersonalInformationScreen({
   const [pseudo, setPseudo] = useState(profile?.pseudo || user?.displayName || '')
   const [weightKg, setWeightKg] = useState<number | null>(null)
   const [heightCm, setHeightCm] = useState<number | null>(null)
+  const [profileAge, setProfileAge] = useState(0)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarError, setAvatarError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [bodyNoted, setBodyNoted] = useState(false)
   const [sportIds, setSportIds] = useState<string[]>([])
+  const [healthFlags, setHealthFlags] = useState(() =>
+    readHealthDeclarations(getCalorieProfile()),
+  )
 
   const displayAvatar = avatarPreview || profile?.avatar_url || null
   const email = user?.email ?? ''
+  const showBodyMetrics = shouldShowHeightWeightPicker({
+    age: profileAge > 0 ? profileAge : null,
+    weightKg,
+    heightCm,
+    sex: getCalorieProfile().sex,
+    declarations: healthFlags,
+  })
 
   useEffect(() => {
     setPseudo(profile?.pseudo || user?.displayName || '')
@@ -46,8 +65,10 @@ export function PersonalInformationScreen({
 
   useEffect(() => {
     const calorie = getCalorieProfile()
-    setWeightKg(calorie.weightKg > 0 ? calorie.weightKg : null)
-    setHeightCm(calorie.heightCm > 0 ? calorie.heightCm : null)
+    setWeightKg(sanitizeWeightKg(calorie.weightKg))
+    setHeightCm(sanitizeHeightCm(calorie.heightCm))
+    setProfileAge(calorie.age > 0 ? calorie.age : 0)
+    setHealthFlags(readHealthDeclarations(calorie))
     const training = getTrainingState()
     setSportIds(training.sportsUndecided ? [] : training.favoriteSportIds)
   }, [])
@@ -82,6 +103,44 @@ export function PersonalInformationScreen({
     }
   }
 
+  const handleSaveBody = (next: { weightKg: number; heightCm: number }) => {
+    setError(null)
+    setWeightKg(next.weightKg)
+    setHeightCm(next.heightCm)
+    const current = getCalorieProfile()
+    saveCalorieProfile(
+      normalizeCalorieProfile({
+        ...current,
+        weightKg: next.weightKg,
+        heightCm: next.heightCm,
+        bodyMetricsClearedAt: null,
+        onboardingComplete: current.onboardingComplete || true,
+      }),
+    )
+    setBodyNoted(true)
+    setMessage('C’est noté.')
+    window.setTimeout(() => {
+      setBodyNoted(false)
+      setMessage(null)
+    }, 1600)
+  }
+
+  const handleEraseBody = () => {
+    clearBodyMetrics()
+    setWeightKg(null)
+    setHeightCm(null)
+    setBodyNoted(false)
+    setMessage('Mensurations effacées.')
+    window.setTimeout(() => setMessage(null), 2000)
+  }
+
+  const handleSkipBody = () => {
+    const calorie = getCalorieProfile()
+    setWeightKg(sanitizeWeightKg(calorie.weightKg))
+    setHeightCm(sanitizeHeightCm(calorie.heightCm))
+    setBodyNoted(false)
+  }
+
   const handleSave = async () => {
     if (!user?.id) return
     setError(null)
@@ -90,10 +149,6 @@ export function PersonalInformationScreen({
     const trimmed = pseudo.trim()
     if (trimmed.length < 2) {
       setError('Le pseudo doit contenir au moins 2 caractères.')
-      return
-    }
-    if (weightKg == null || heightCm == null || weightKg <= 0 || heightCm <= 0) {
-      setError('Indique un poids et une taille valides.')
       return
     }
 
@@ -106,8 +161,8 @@ export function PersonalInformationScreen({
       saveCalorieProfile(
         normalizeCalorieProfile({
           ...current,
-          weightKg,
-          heightCm,
+          weightKg: showBodyMetrics ? weightKg : sanitizeWeightKg(current.weightKg),
+          heightCm: showBodyMetrics ? heightCm : sanitizeHeightCm(current.heightCm),
           onboardingComplete: current.onboardingComplete || true,
         }),
       )
@@ -196,45 +251,23 @@ export function PersonalInformationScreen({
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <label className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80 px-4 py-3">
-            <span className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-[#8E8E93]">
-              <Scale className="h-3.5 w-3.5" aria-hidden />
-              Poids
-            </span>
-            <div className="flex items-end gap-1">
-              <ClearableNumberInput
-                value={weightKg}
-                onChange={setWeightKg}
-                min={35}
-                max={250}
-                step={0.1}
-                aria-label="Poids en kg"
-                className="w-full bg-transparent text-[22px] font-bold text-white outline-none"
-              />
-              <span className="pb-0.5 text-[13px] text-[#8E8E93]">kg</span>
-            </div>
-          </label>
-
-          <label className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80 px-4 py-3">
-            <span className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-[#8E8E93]">
-              <Ruler className="h-3.5 w-3.5" aria-hidden />
-              Taille
-            </span>
-            <div className="flex items-end gap-1">
-              <ClearableNumberInput
-                value={heightCm}
-                onChange={setHeightCm}
-                min={120}
-                max={230}
-                step={1}
-                aria-label="Taille en cm"
-                className="w-full bg-transparent text-[22px] font-bold text-white outline-none"
-              />
-              <span className="pb-0.5 text-[13px] text-[#8E8E93]">cm</span>
-            </div>
-          </label>
-        </div>
+        {/* SAFETY (PM / Vérificateur): body weight is a form input — never CountUpNumber. */}
+        {showBodyMetrics ? (
+          <div className="rg-no-motion" data-testid="personal-info-body-metrics">
+            <HeightWeightPicker
+              value={{ weightKg, heightCm }}
+              onChange={(next) => {
+                setWeightKg(next.weightKg)
+                setHeightCm(next.heightCm)
+              }}
+              onSave={handleSaveBody}
+              onSkip={handleSkipBody}
+              onErase={handleEraseBody}
+              allowErase
+              confirmMessage={bodyNoted ? 'C’est noté.' : null}
+            />
+          </div>
+        ) : null}
 
         <div
           className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80 px-4 py-3"

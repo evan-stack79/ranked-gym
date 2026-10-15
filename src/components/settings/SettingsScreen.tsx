@@ -2,8 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import {
   ChevronRight,
   CreditCard,
+  HeartHandshake,
   HeartPulse,
+  Info,
   LogOut,
+  MessageCircle,
   Pencil,
   Settings2,
   Shield,
@@ -14,6 +17,7 @@ import { Avatar } from '../ui/Avatar'
 import { uploadUserAvatar } from '../../services/avatarService'
 import { IosSheet } from '../ui/IosSheet'
 import { DisciplinePicker } from '../discipline/DisciplinePicker'
+import { AppVersionFooter } from './AppVersionFooter'
 import { ProPassCard } from './ProPassCard'
 import { SettingsMenuRow } from './SettingsMenuRow'
 import {
@@ -21,12 +25,23 @@ import {
   getDiscipline,
   type AppDisciplineId,
 } from '../../data/disciplines'
+import { BETA_FEEDBACK_SETTINGS_LABEL } from '../../content/betaFeedbackCopy'
+import { canOpenBetaFeedback } from '../../services/betaFeedbackAccess'
 
 const PRO_PASS_DISMISSED_KEY = 'ranked-gym:pro-pass-dismissed'
 
 export type SettingsSheet = 'payment' | 'preferences' | null
 
-export type SettingsMenuId = 'personal' | 'privacy' | 'payment' | 'preferences' | 'cameraHeartRate'
+export type SettingsMenuId =
+  | 'personal'
+  | 'privacy'
+  | 'payment'
+  | 'preferences'
+  | 'cameraHeartRate'
+  | 'needToTalk'
+  | 'healthSituations'
+  | 'energyInfo'
+  | 'giveFeedback'
 
 interface SettingsScreenProps {
   username: string
@@ -38,6 +53,10 @@ interface SettingsScreenProps {
   onOpenPersonalInfo?: () => void
   onOpenSecurity?: () => void
   onOpenCameraHeartRate?: () => void
+  onOpenNeedToTalk?: () => void
+  onOpenHealthSituations?: () => void
+  onOpenEnergyInfo?: () => void
+  onOpenGiveFeedback?: () => void
   onRequireAuth?: () => void
   onTryPro?: () => void
   onDisciplineChange?: (disciplineLabel: string) => void
@@ -72,6 +91,10 @@ export function SettingsScreen({
   onOpenPersonalInfo,
   onOpenSecurity,
   onOpenCameraHeartRate,
+  onOpenNeedToTalk,
+  onOpenHealthSituations,
+  onOpenEnergyInfo,
+  onOpenGiveFeedback,
   onRequireAuth,
   onTryPro,
   onDisciplineChange,
@@ -80,6 +103,7 @@ export function SettingsScreen({
   userId,
   onAvatarUpdated,
 }: SettingsScreenProps) {
+  const showGiveFeedback = canOpenBetaFeedback()
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const [proDismissed, setProDismissed] = useState(readProPassDismissed)
   const [sheet, setSheet] = useState<SettingsSheet>(null)
@@ -157,17 +181,29 @@ export function SettingsScreen({
   }
 
   const menuSections: Array<{
+    title?: string
     items: Array<{ id: SettingsMenuId; icon: typeof UserRound; label: string }>
   }> = [
     {
       items: [
         { id: 'personal', icon: UserRound, label: 'Informations personnelles' },
         { id: 'privacy', icon: Shield, label: 'Sécurité & Confidentialité' },
+        { id: 'healthSituations', icon: HeartHandshake, label: 'Situations de santé' },
+        { id: 'energyInfo', icon: Info, label: 'Informations' },
         { id: 'payment', icon: CreditCard, label: 'Méthodes de paiement' },
         { id: 'preferences', icon: Settings2, label: 'Préférences' },
         ...(isCameraHeartRateEnabled()
           ? [{ id: 'cameraHeartRate' as const, icon: HeartPulse, label: 'Tester la mesure BPM' }]
           : []),
+      ],
+    },
+    {
+      title: 'Aide',
+      items: [
+        ...(showGiveFeedback
+          ? [{ id: 'giveFeedback' as const, icon: MessageCircle, label: BETA_FEEDBACK_SETTINGS_LABEL }]
+          : []),
+        { id: 'needToTalk', icon: HeartHandshake, label: "Besoin d'en parler ?" },
       ],
     },
   ]
@@ -234,42 +270,69 @@ export function SettingsScreen({
         />
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80">
-        {menuSections.map((section, sectionIdx) => (
-          <div key={sectionIdx}>
-            {section.items.map((item, itemIdx) => (
-              <div
-                key={item.id}
-                className={itemIdx < section.items.length - 1 ? 'border-b border-[#2C2C2E]' : ''}
-              >
-                <SettingsMenuRow
-                  icon={item.icon}
-                  label={item.label}
-                  onClick={() => {
-                    if (item.id === 'cameraHeartRate') {
-                      onOpenCameraHeartRate?.()
-                      return
-                    }
-                    if (item.id === 'personal') {
-                      openPersonal()
-                      return
-                    }
-                    if (item.id === 'privacy') {
-                      openSecurity()
-                      return
-                    }
-                    if (!isAuthenticated) {
-                      onRequireAuth?.()
-                      return
-                    }
-                    setSheet(item.id)
-                  }}
-                />
-              </div>
-            ))}
+      {menuSections.map((section, sectionIdx) =>
+        section.items.length === 0 ? null : (
+          <div key={sectionIdx} className="space-y-2">
+            {section.title ? (
+              <p className="px-1 text-[13px] font-semibold uppercase tracking-wide text-[#8E8E93]">
+                {section.title}
+              </p>
+            ) : null}
+            <div className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80">
+              {section.items.map((item, itemIdx) => (
+                <div
+                  key={item.id}
+                  className={itemIdx < section.items.length - 1 ? 'border-b border-[#2C2C2E]' : ''}
+                >
+                  <SettingsMenuRow
+                    icon={item.icon}
+                    label={item.label}
+                    onClick={() => {
+                      if (item.id === 'cameraHeartRate') {
+                        onOpenCameraHeartRate?.()
+                        return
+                      }
+                      if (item.id === 'personal') {
+                        openPersonal()
+                        return
+                      }
+                      if (item.id === 'privacy') {
+                        openSecurity()
+                        return
+                      }
+                      if (item.id === 'needToTalk') {
+                        onOpenNeedToTalk?.()
+                        return
+                      }
+                      if (item.id === 'giveFeedback') {
+                        if (!isAuthenticated) {
+                          onRequireAuth?.()
+                          return
+                        }
+                        onOpenGiveFeedback?.()
+                        return
+                      }
+                      if (item.id === 'healthSituations') {
+                        onOpenHealthSituations?.()
+                        return
+                      }
+                      if (item.id === 'energyInfo') {
+                        onOpenEnergyInfo?.()
+                        return
+                      }
+                      if (!isAuthenticated) {
+                        onRequireAuth?.()
+                        return
+                      }
+                      setSheet(item.id as SettingsSheet)
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
-      </div>
+        ),
+      )}
 
       {showSignOut && onSignOut && (
         <button
@@ -281,6 +344,8 @@ export function SettingsScreen({
           Se déconnecter
         </button>
       )}
+
+      <AppVersionFooter />
 
       <IosSheet
         open={sheet === 'payment'}

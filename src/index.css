@@ -16,10 +16,24 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Accessible full-text twin for word-by-word title blur-in */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
 html,
 body,
 #root {
   height: 100%;
+  height: 100dvh;
 }
 
 html {
@@ -38,6 +52,63 @@ body {
   touch-action: manipulation;
 }
 
+/*
+ * PWA shell: no text selection / iOS long-press callout while scrolling Accueil.
+ * Covers shell, cards, nav, tilt surfaces — typing fields re-enabled below.
+ */
+#root,
+.mesh-bg,
+[data-app-scroll-main],
+[data-app-brand-header],
+[data-bottom-nav-host],
+.accueil-gallery__hero,
+.accueil-gallery__tile,
+.accueil-metric-tile,
+.accueil-edit-slot,
+.rg-tilt,
+.ios-press,
+.bottom-nav-pill,
+button,
+a,
+[role='button'] {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/*
+ * Accueil vertical scroll precision (iPhone Safari PWA):
+ * overflow-y:auto alone computes overflow-x to auto too — the page can pan
+ * left on a diagonal swipe. Clip X on the main scroller + gallery shell.
+ * #99 user-select lock must NOT set touch-action: none globally (it doesn't).
+ */
+[data-app-scroll-main] {
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+}
+
+.accueil-gallery {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+/* Keep caret, selection, and copy/paste in fields you type in */
+input,
+textarea,
+select,
+[contenteditable],
+[contenteditable='true'] {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+/* Cards / heroes: no drag ghost or iOS long-press save */
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
 /* Layout dock — BottomNav + îlot repos (Train) */
 :root {
   /* Hauteur utile BottomNav (hors safe-area), ~70–80px */
@@ -48,7 +119,7 @@ body {
   --rest-island-h: 3.25rem;
   --rest-island-gap: 10px;
   /* Ancrage fixed : juste au-dessus de la nav */
-  --rest-bar-bottom: calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px));
+  --rest-bar-bottom: calc(var(--app-bottom-nav) + var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
   /* Espace scroll supplémentaire sous le contenu Train */
   --rest-content-clearance: calc(var(--rest-island-h) + var(--rest-island-gap));
   /* Surchageables par le harness navigateur; production = vraies safe areas. */
@@ -59,10 +130,16 @@ body {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
-  --dur-press: 140ms;
+  --dur-press: 120ms;
   --dur-fast: 180ms;
   --dur-ui: 220ms;
   --dur-drawer: 260ms;
+  /* Motion tokens — Evan choices (Blur In Up / Soft Blur / Mask Reveal / Flip) */
+  --dur-reveal: 450ms;
+  --dur-word: 400ms;
+  --dur-soft-blur: 400ms;
+  --dur-text-flip: 420ms;
+  --stagger-max: 80ms;
   --color-card: #141416;
   --color-muted: #aeaeb2;
 }
@@ -94,6 +171,764 @@ body {
 
 .mesh-bg {
   background-color: #0c0c0e;
+}
+
+/* Accueil gallery — gutters match page px-5; safe-area aware for notched devices */
+:root {
+  --accueil-gutter: max(
+    1.25rem,
+    var(--app-safe-area-left, env(safe-area-inset-left, 0px))
+  );
+  --accueil-gutter-end: max(
+    1.25rem,
+    var(--app-safe-area-right, env(safe-area-inset-right, 0px))
+  );
+  --accueil-tile-gap: 0.75rem;
+  /* Clean tile size across iPhone 14–17 widths (~390–440px) */
+  --accueil-tile-size: clamp(7.5rem, 31.5vw, 8.25rem);
+  --accueil-hero-width: min(78vw, 18.5rem);
+}
+
+/* Accueil gallery preview — hero gradients (no body photos) */
+.accueil-gallery__hero-bg--brand {
+  background:
+    radial-gradient(120% 80% at 20% 10%, rgb(255 43 43 / 0.55), transparent 55%),
+    linear-gradient(160deg, #3a1212 0%, #1a0c0c 45%, #0c0c0e 100%);
+}
+
+.accueil-gallery__hero-bg--graphite {
+  background:
+    radial-gradient(120% 80% at 80% 0%, rgb(125 211 252 / 0.18), transparent 50%),
+    linear-gradient(160deg, #2a2a2e 0%, #161618 50%, #0c0c0e 100%);
+}
+
+.accueil-gallery__carousel,
+.accueil-gallery__tiles {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* Align snap stops with the gutter spacers (iOS ignores padding on overflow flex) */
+  scroll-padding-left: var(--accueil-gutter);
+  scroll-padding-right: var(--accueil-gutter-end);
+  /* Keep sideways rubber-band inside the strip — never shift the page left. */
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
+  /* Prefer horizontal when the gesture is clearly sideways; vertical still pans the page. */
+  touch-action: pan-x pan-y;
+}
+
+/* Vertical-dominant gesture: freeze the strip so scroll-snap cannot yank left. */
+.accueil-gallery__carousel[data-accueil-axis='y'],
+.accueil-gallery__tiles[data-accueil-axis='y'] {
+  overflow-x: hidden;
+  scroll-snap-type: none !important;
+  touch-action: pan-y;
+}
+
+.accueil-gallery__carousel::-webkit-scrollbar,
+.accueil-gallery__tiles::-webkit-scrollbar {
+  display: none;
+}
+
+/* Edge spacers — reliable left/right inset on WebKit overflow flex (padding often collapses) */
+.accueil-gallery__edge-spacer {
+  flex: 0 0 var(--accueil-gutter);
+  width: var(--accueil-gutter);
+  min-width: var(--accueil-gutter);
+  pointer-events: none;
+}
+
+.accueil-gallery__edge-spacer--end {
+  flex-basis: var(--accueil-gutter-end);
+  width: var(--accueil-gutter-end);
+  min-width: var(--accueil-gutter-end);
+}
+
+.accueil-gallery__tile-gap {
+  margin-left: var(--accueil-tile-gap);
+}
+
+.accueil-gallery__snap {
+  scroll-snap-align: start;
+}
+
+.accueil-gallery__tile {
+  width: var(--accueil-tile-size);
+}
+
+.accueil-gallery__tile-media {
+  /* Ensure cover images clip to rounded tile */
+  isolation: isolate;
+}
+
+/*
+ * Wave-1 PNGs ship with transparent padding around the figure.
+ * object-cover alone still shows the empty alpha as the tile bg —
+ * a light zoom crops that padding so the subject fills the square.
+ * Opaque photos (e.g. developpe-couche.webp) are unaffected.
+ */
+.accueil-gallery__tile-media img[src*='.png'],
+.history-thumb--tile img[src*='.png'],
+.accueil-gallery__hero img[src*='.png'] {
+  transform: scale(1.52);
+  transform-origin: center center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .accueil-gallery__tile-media img[src*='.png'],
+  .history-thumb--tile img[src*='.png'],
+  .accueil-gallery__hero img[src*='.png'] {
+    /* Keep the static crop; no animated transition on the zoom */
+    transition: none;
+  }
+}
+
+.accueil-gallery__hero {
+  width: var(--accueil-hero-width);
+  aspect-ratio: 3 / 4;
+  scroll-snap-align: start;
+}
+
+/* Accueil coloured metric tiles (fitness-widget style) */
+.accueil-widgets__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.accueil-widgets__cell,
+.accueil-widgets__wide {
+  min-width: 0;
+}
+
+.accueil-widgets__cell [data-accueil-widget],
+.accueil-widgets__cell .rg-mask-reveal {
+  height: 100%;
+}
+
+.accueil-metric-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 9.5rem;
+  overflow: hidden;
+  border-radius: 1.5rem;
+  padding: 1rem 1.05rem 1.05rem;
+  background: #111113;
+  color: #fff;
+  isolation: isolate;
+}
+
+.accueil-metric-tile--wide {
+  min-height: 10.5rem;
+}
+
+.accueil-metric-tile__glow {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(90% 70% at 100% 0%, color-mix(in srgb, var(--tile-accent) 42%, transparent), transparent 58%),
+    radial-gradient(70% 55% at 0% 100%, color-mix(in srgb, var(--tile-accent) 14%, transparent), transparent 55%);
+  opacity: 0.95;
+  z-index: 0;
+}
+
+.accueil-metric-tile__label,
+.accueil-metric-tile > :not(.accueil-metric-tile__glow) {
+  position: relative;
+  z-index: 1;
+}
+
+.accueil-metric-tile__label {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.accueil-metric-tile__value {
+  font-size: 1.875rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.accueil-metric-tile__unit {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #8e8e93;
+}
+
+.accueil-metric-tile__corner {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.accueil-metric-tile__drop {
+  display: flex;
+  height: 2rem;
+  width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgb(10 132 255 / 0.14);
+  color: #0a84ff;
+}
+
+.accueil-metric-tile__stack {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  max-width: 100%;
+  padding-right: 0;
+}
+
+.accueil-metric-tile__value-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.25rem;
+  max-width: calc(100% - 0.25rem);
+}
+
+.accueil-metric-tile__hint {
+  margin: 0;
+  max-width: 100%;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.3;
+  color: #8e8e93;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* Eau: keep title + value clear of the top-right drop/ring */
+.accueil-metric-tile[data-accueil-metric-tile='eau'] .accueil-metric-tile__label {
+  padding-right: 2.5rem;
+}
+
+.accueil-metric-tile[data-accueil-metric-tile='eau'] .accueil-metric-tile__stack {
+  /* Number/hint live under the corner visual — never share its horizontal band */
+  max-width: 100%;
+  padding-top: 0.15rem;
+}
+
+.accueil-metric-tile[data-accueil-metric-tile='eau'] .accueil-metric-tile__value {
+  font-size: 1.625rem;
+}
+
+/* —— In-place Accueil edit (iOS home widgets) —— */
+.accueil-edit-slot {
+  position: relative;
+  height: 100%;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  /*
+   * Outside edit: allow native pan (manipulation = pan + no double-tap zoom).
+   * Prefer manipulation over pan-y so a stationary long-press is not pointercancel’d
+   * when the browser claims a vertical gesture; carousel axis-lock + overflow-x:clip
+   * stop the “bas gauche” jerk.
+   */
+  touch-action: manipulation;
+}
+
+.accueil-edit-slot__body {
+  position: relative;
+  height: 100%;
+}
+
+/* Opaque plate in edit — FLIP siblings never show foreign text through. */
+.accueil-edit-slot__body--edit-solid {
+  background-color: #111113;
+  border-radius: 1.5rem;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.accueil-edit-slot--editing {
+  /* Reorder drag needs full pointer freedom. */
+  touch-action: none;
+}
+
+.accueil-edit-slot--wiggle .accueil-edit-slot__body {
+  animation: accueil-tile-wiggle 0.28s ease-in-out infinite alternate;
+  transform-origin: center center;
+}
+
+.accueil-edit-slot--dashed .accueil-edit-slot__body {
+  outline: 1.5px dashed rgb(255 255 255 / 0.35);
+  outline-offset: 2px;
+  border-radius: 1.5rem;
+}
+
+.accueil-edit-slot--dragging {
+  z-index: 1;
+  /* Placeholder only — never paint tile content in the layout hole. */
+  background: transparent;
+}
+
+/* Empty layout hole while the body is position:fixed under the finger. */
+.accueil-edit-slot__placeholder {
+  width: 100%;
+  border-radius: 1.5rem;
+  border: 1.5px dashed rgb(255 255 255 / 0.22);
+  background: rgb(17 17 19 / 0.55);
+  box-sizing: border-box;
+}
+
+.accueil-edit-slot__body--floating {
+  animation: none !important;
+  will-change: left, top, transform;
+  background-color: #111113 !important;
+  opacity: 1 !important;
+}
+
+.accueil-edit-slot--exiting {
+  pointer-events: none;
+  z-index: 1;
+}
+
+.accueil-edit-slot--exiting .accueil-edit-slot__body {
+  animation: accueil-tile-exit var(--dur-fast) var(--ease-out) forwards !important;
+  transform-origin: center center;
+}
+
+.accueil-edit-slot--entering .accueil-edit-slot__body {
+  animation: accueil-tile-enter var(--dur-ui) var(--ease-out) both !important;
+  transform-origin: center center;
+}
+
+.accueil-edit-slot--settling .accueil-edit-slot__body {
+  /* Drop glide owns transform — keep wiggle off. */
+  animation: none !important;
+  will-change: transform;
+}
+
+.accueil-edit-slot[data-accueil-flipping='1'] {
+  will-change: transform;
+  pointer-events: none;
+  /* Solid slot during FLIP so overlapping slides never ghost text. */
+  background-color: #111113;
+  border-radius: 1.5rem;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.accueil-edit-slot[data-accueil-flipping='1'] .accueil-edit-slot__body {
+  background-color: #111113;
+}
+
+@keyframes accueil-tile-exit {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+}
+
+@keyframes accueil-tile-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.accueil-edit-slot__trash {
+  position: absolute;
+  top: -0.35rem;
+  left: -0.35rem;
+  z-index: 6;
+  display: flex;
+  height: 1.5rem;
+  width: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #8e8e93;
+  color: #0c0c0e;
+  border: 2px solid #0c0c0e;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.4);
+}
+
+@keyframes accueil-tile-wiggle {
+  from {
+    transform: rotate(-0.7deg);
+  }
+  to {
+    transform: rotate(0.7deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .accueil-edit-slot--wiggle .accueil-edit-slot__body {
+    animation: none;
+  }
+
+  .accueil-edit-slot--exiting .accueil-edit-slot__body {
+    animation: none !important;
+    opacity: 0;
+    transform: none;
+  }
+
+  .accueil-edit-slot--entering .accueil-edit-slot__body {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+
+  .accueil-edit-slot--settling .accueil-edit-slot__body {
+    animation: none !important;
+    transform: none;
+  }
+}
+
+/*
+ * Accueil edit chrome — pinned OUTSIDE [data-app-scroll-main] (portaled into
+ * [data-app-top-pin-host]), same strategy as the brand header. Fixed so the
+ * flex shell does not resize when entering/leaving edit.
+ *
+ * pointer-events: none on the plate — only buttons capture taps, so tile drag
+ * near the top edge is not stolen by the glass bar.
+ */
+.accueil-edit-chrome-pin {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 45;
+  pointer-events: none;
+  padding-top: var(--app-safe-area-top, env(safe-area-inset-top, 0px));
+}
+
+.accueil-edit-chrome-pin__glass {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+  background-color: rgb(12 12 14 / 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .accueil-edit-chrome-pin__glass {
+    background-color: rgb(12 12 14 / 0.94);
+  }
+}
+
+.accueil-edit-chrome-pin__inner {
+  position: relative;
+  z-index: 1;
+  margin: 0 auto;
+  max-width: 32rem; /* match max-w-lg */
+  padding: 0.65rem 1.25rem 0.75rem;
+}
+
+.accueil-edit-chrome-pin .accueil-edit-chrome__ok,
+.accueil-edit-chrome-pin .accueil-edit-chrome__add {
+  pointer-events: auto;
+}
+
+.accueil-edit-chrome-spacer {
+  /* Match pin inner vertical padding + button min-height — no safe-area here
+     (page wrapper already pads the notch; pin owns safe-area). */
+  min-height: calc(0.65rem + 2.5rem + 0.75rem);
+}
+
+/*
+ * Scroll anchoring can retarget scrollTop when tiles reorder, cancelling the
+ * visual FLIP slide (siblings look like they teleport). Opt out on the widget
+ * tree; the scroll scroller is toggled from HomeGalleryView (ancestor node).
+ */
+.accueil-gallery--editing,
+.accueil-gallery--editing .accueil-widgets,
+.accueil-gallery--editing .accueil-edit-slot {
+  overflow-anchor: none;
+}
+
+.accueil-edit-chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.accueil-edit-chrome__ok {
+  min-height: 2.5rem;
+  border-radius: 999px;
+  background: #fff;
+  padding: 0.5rem 1.15rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #0c0c0e;
+}
+
+.accueil-edit-chrome__add {
+  min-height: 2.5rem;
+  border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  background: rgb(255 255 255 / 0.08);
+  padding: 0.5rem 0.95rem;
+  font-size: 0.875rem;
+  font-weight: 650;
+  color: #fff;
+}
+
+.accueil-metric-tile__bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.35rem;
+  height: 4.25rem;
+}
+
+.accueil-metric-tile__bar-col {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  height: 100%;
+}
+
+.accueil-metric-tile__bar-track {
+  display: flex;
+  flex: 1;
+  width: 100%;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.accueil-metric-tile__bar {
+  width: 55%;
+  max-width: 1.15rem;
+  min-height: 0.25rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.accueil-metric-tile__bar--filled {
+  background: linear-gradient(180deg, #5dde7a 0%, #34c759 100%);
+  box-shadow: 0 0 12px rgb(52 199 89 / 0.35);
+}
+
+.accueil-metric-tile__bar--today.accueil-metric-tile__bar--filled {
+  background: linear-gradient(180deg, #8ef0a2 0%, #34c759 100%);
+  box-shadow: 0 0 14px rgb(52 199 89 / 0.55);
+}
+
+.accueil-metric-tile__bar-label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: #8e8e93;
+}
+
+.accueil-metric-tile__progress {
+  height: 0.55rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.accueil-metric-tile__progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff2b2b 0%, #ff6b4a 100%);
+  box-shadow: 0 0 10px rgb(255 43 43 / 0.4);
+  transition: width 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.accueil-metric-tile__cta {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #fff;
+  padding: 0.55rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #0c0c0e;
+}
+
+.accueil-metric-tile__cta--ghost {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .accueil-metric-tile__progress-fill {
+    transition: none;
+  }
+}
+
+/* Accueil hero — subtle 3D tilt + glare (inner plane; Reveal/clip-path untouched) */
+.rg-tilt {
+  position: relative;
+  /* Inside horizontal carousel: browser keeps vertical + horizontal pan; JS never preventDefault */
+  touch-action: pan-x pan-y;
+  perspective: 640px;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.rg-tilt img,
+.accueil-gallery__hero img,
+.accueil-gallery__tile-media img {
+  -webkit-user-drag: none;
+  user-drag: none;
+  pointer-events: none;
+}
+
+.rg-tilt__plane {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  transform: perspective(640px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))
+    scale(var(--tilt-scale, 1));
+  transform-style: preserve-3d;
+  box-shadow: var(--sx, 0px) var(--sy, 0px) 28px rgb(0 0 0 / 0);
+  transition:
+    transform var(--tilt-reset-ms, 360ms) var(--ease-out),
+    box-shadow var(--tilt-reset-ms, 360ms) var(--ease-out);
+}
+
+.rg-tilt--active .rg-tilt__plane {
+  will-change: transform;
+  transition: none;
+  box-shadow: var(--sx, 0px) var(--sy, 0px) 28px rgb(0 0 0 / 0.45);
+}
+
+.rg-tilt__glare {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  mix-blend-mode: soft-light;
+  background: radial-gradient(
+    circle at var(--gx, 50%) var(--gy, 50%),
+    rgb(255 255 255 / 0.18) 0%,
+    rgb(255 255 255 / 0.08) 32%,
+    transparent 60%
+  );
+  transition: opacity var(--tilt-reset-ms, 360ms) var(--ease-out);
+}
+
+.rg-tilt--active .rg-tilt__glare {
+  opacity: 1;
+  transition: none;
+}
+
+.rg-tilt[data-rg-tilt='off'] .rg-tilt__plane {
+  transform: none;
+  transition: none;
+}
+
+.rg-tilt[data-rg-tilt='off'] .rg-tilt__glare {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rg-tilt__plane {
+    transform: none !important;
+    transition: none !important;
+    will-change: auto !important;
+  }
+
+  .rg-tilt__glare {
+    display: none !important;
+  }
+}
+
+.history-thumb--tile {
+  position: absolute;
+  inset: 0;
+}
+
+/* Floating pill nav — clearance for pill + elevated red centre CTA + safe area */
+:root[data-bottom-nav-preview='floating-pill'] {
+  --app-bottom-nav: 120px;
+}
+
+/* Liquid glass floating pill — blur limited to the pill (not full-screen) */
+.bottom-nav-pill {
+  isolation: isolate;
+  border: 1px solid rgb(255 255 255 / 0.22);
+  background-color: rgb(20 20 24 / 0.32);
+  box-shadow:
+    0 12px 36px rgb(0 0 0 / 0.36),
+    inset 0 1px 0 rgb(255 255 255 / 0.4),
+    inset 0 -0.5px 0 rgb(255 255 255 / 0.08);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .bottom-nav-pill {
+    background-color: rgb(23 23 25 / 0.94);
+  }
+}
+
+/* Soft light bubble behind the active tab icon (4 tabs only — skips centre play) */
+.bottom-nav-pill__bubble {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  z-index: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: rgb(255 255 255 / 0.18);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.34),
+    0 0 14px rgb(255 255 255 / 0.08);
+  will-change: transform;
+  transition:
+    transform 350ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Keep tab icons readable when light imagery blurs through the glass */
+.bottom-nav-pill__tab {
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.65));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bottom-nav-pill__bubble {
+    transition: none;
+  }
 }
 
 .xp-fill {
@@ -370,13 +1205,15 @@ body {
 
 .ios-press {
   transition:
-    transform var(--dur-fast) var(--ease-out),
-    opacity var(--dur-fast) var(--ease-out),
-    background-color var(--dur-fast) var(--ease-out),
-    color var(--dur-fast) var(--ease-out);
+    transform var(--dur-press) var(--ease-out),
+    opacity var(--dur-press) var(--ease-out),
+    background-color var(--dur-press) var(--ease-out),
+    color var(--dur-press) var(--ease-out);
 }
 
-.ios-press:active {
+/* Press feedback: scale(0.96) on :active / pointerdown (~120ms ease-out) */
+.ios-press:active,
+.ios-press[data-pressed='true'] {
   transform: scale(0.96);
   opacity: 0.88;
 }
@@ -440,6 +1277,241 @@ body {
 
 .ios-fade-up-delay-3 {
   animation-delay: 0.15s;
+}
+
+/* --- Motion (MIT-inspired Animata / Magic UI, pure CSS) --- */
+
+/* Cards: Mask Reveal Up — clip-path inset bottom→top + slight translateY */
+.rg-mask-reveal {
+  clip-path: inset(100% 0 0 0);
+  transform: translate3d(0, 10px, 0);
+  will-change: clip-path, transform;
+}
+
+.rg-mask-reveal--in {
+  animation: rg-mask-reveal-up var(--dur-reveal) var(--ease-out) both;
+  animation-delay: var(--rg-reveal-delay, 0ms);
+}
+
+.rg-mask-reveal--instant,
+.rg-mask-reveal--instant.rg-mask-reveal--in {
+  animation: none !important;
+  /* none (not inset(0)) so post-reveal 3D tilt can paint outside the box */
+  clip-path: none;
+  transform: none;
+  will-change: auto;
+}
+
+@keyframes rg-mask-reveal-up {
+  from {
+    clip-path: inset(100% 0 0 0);
+    transform: translate3d(0, 10px, 0);
+  }
+  to {
+    /* Drop clipping when settled — inset(0) still clips tilted descendants */
+    clip-path: none;
+    transform: none;
+  }
+}
+
+/* Legacy class aliases kept for any residual selectors */
+.rg-reveal {
+  clip-path: inset(100% 0 0 0);
+  transform: translate3d(0, 10px, 0);
+}
+.rg-reveal--in {
+  animation: rg-mask-reveal-up var(--dur-reveal) var(--ease-out) both;
+  animation-delay: var(--rg-reveal-delay, 0ms);
+}
+.rg-reveal--instant,
+.rg-reveal--instant.rg-reveal--in {
+  animation: none !important;
+  clip-path: none;
+  transform: none;
+}
+
+/* Blur In Up — big titles, word by word (blur 10px, translateY 12px) */
+.rg-blur-in {
+  display: inline-block;
+  max-width: 100%;
+}
+
+.rg-blur-words {
+  display: inline;
+}
+
+.rg-blur-word {
+  display: inline-block;
+  opacity: 0;
+  filter: blur(10px);
+  transform: translate3d(0, 12px, 0);
+  will-change: opacity, transform, filter;
+}
+
+.rg-blur-in--in:not(.rg-blur-in--settled) .rg-blur-word {
+  animation: rg-blur-in-up var(--rg-word-dur, var(--dur-word)) var(--ease-out) both;
+  animation-delay: var(--rg-word-delay, 0ms);
+}
+
+.rg-blur-in--settled,
+.rg-blur-in--settled.rg-blur-in--in,
+.rg-blur-in--settled .rg-blur-word,
+.rg-blur-in--settled.rg-blur-in--in .rg-blur-word {
+  animation: none !important;
+  opacity: 1;
+  filter: none;
+  transform: none;
+  will-change: auto;
+}
+
+@keyframes rg-blur-in-up {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+    transform: translate3d(0, 12px, 0);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
+
+/* Soft Blur In — small texts / subtitles, whole line (~400ms) */
+.rg-soft-blur {
+  display: inline-block;
+  max-width: 100%;
+  opacity: 0;
+  filter: blur(4px);
+  transform: translate3d(0, 4px, 0);
+  will-change: opacity, transform, filter;
+}
+
+.rg-soft-blur--in:not(.rg-soft-blur--settled) {
+  animation: rg-soft-blur-in var(--dur-soft-blur) var(--ease-out) both;
+  animation-delay: var(--rg-soft-blur-delay, 0ms);
+}
+
+.rg-soft-blur--settled,
+.rg-soft-blur--settled.rg-soft-blur--in {
+  animation: none !important;
+  opacity: 1;
+  filter: none;
+  transform: none;
+  will-change: auto;
+}
+
+@keyframes rg-soft-blur-in {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translate3d(0, 4px, 0);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
+
+/* Text Flip — Accueil greeting word cycle (stable width, rotateX) */
+.rg-text-flip {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  vertical-align: baseline;
+  perspective: 480px;
+}
+
+.rg-text-flip__viewport {
+  display: inline-block;
+  width: 100%;
+  overflow: hidden;
+  line-height: 1.15;
+  text-align: right;
+  transform-style: preserve-3d;
+}
+
+.rg-text-flip__word {
+  display: inline-block;
+  transform-origin: 50% 50%;
+  backface-visibility: hidden;
+}
+
+.rg-text-flip__word--out {
+  animation: rg-text-flip-out var(--dur-text-flip) var(--ease-in-out) both;
+}
+
+.rg-text-flip__word--in {
+  animation: rg-text-flip-in var(--dur-text-flip) var(--ease-out) both;
+}
+
+.rg-text-flip__word--idle {
+  transform: none;
+  opacity: 1;
+}
+
+@keyframes rg-text-flip-out {
+  from {
+    opacity: 1;
+    transform: rotateX(0deg) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: rotateX(-75deg) translateY(-0.35em);
+  }
+}
+
+@keyframes rg-text-flip-in {
+  from {
+    opacity: 0;
+    transform: rotateX(75deg) translateY(0.35em);
+  }
+  to {
+    opacity: 1;
+    transform: rotateX(0deg) translateY(0);
+  }
+}
+
+.rg-text-flip__measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
+  height: 0;
+  overflow: hidden;
+}
+
+.rg-text-flip__measure-item {
+  display: inline-block;
+}
+
+/* Avis bêta distress (level 1 TCA / level 2 suicide — 3114 / 15 / 112): no motion */
+[data-distress-level='1'],
+[data-distress-level='2'],
+[data-distress-level='1'] *,
+[data-distress-level='2'] * {
+  animation: none !important;
+  transition: none !important;
+}
+
+[data-distress-level='1'] .ios-press:active,
+[data-distress-level='2'] .ios-press:active,
+[data-distress-level='1'] .ios-press[data-pressed='true'],
+[data-distress-level='2'] .ios-press[data-pressed='true'] {
+  transform: none !important;
+  opacity: 1 !important;
+}
+
+/* Forms / inputs: never animate typed values or field chrome */
+input,
+textarea,
+select,
+[contenteditable='true'],
+.rg-no-motion,
+.rg-no-motion * {
+  animation: none !important;
 }
 
 @keyframes skeleton-shimmer {
@@ -1532,7 +2604,7 @@ body {
   transform: translate3d(0, 0, 0) scale(1.04);
 }
 
-/* ——— Cold launch Ranked Gym ——— */
+/* ——— Cold launch Shockwave Ranked Gym ——— */
 .app-cold-launch {
   position: fixed;
   inset: 0;
@@ -1541,38 +2613,29 @@ body {
   align-items: center;
   justify-content: center;
   background: transparent;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: default;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .app-cold-launch__dimmer {
   position: absolute;
   inset: 0;
-  background: #000;
+  /* Même fond que theme-color / body / splash HTML — pas de flash blanc iOS */
+  background: #0c0c0e;
   opacity: 1;
   transition: opacity 280ms var(--ease-out);
 }
 
-.app-cold-launch[data-phase='morphing'] .app-cold-launch__dimmer {
-  opacity: 0.4;
-}
-
-.app-cold-launch[data-phase='handoff'] .app-cold-launch__dimmer,
 .app-cold-launch[data-phase='exiting'] .app-cold-launch__dimmer {
-  opacity: 0;
-}
-
-.app-cold-launch[data-phase='handoff'] [data-cold-launch-panther-flyer],
-.app-cold-launch[data-phase='exiting'] [data-cold-launch-panther-flyer] {
-  opacity: 0;
-}
-
-:root[data-cold-launch-handoff='done'] .app-cold-launch [data-cold-launch-panther-flyer] {
   opacity: 0;
 }
 
 .app-cold-launch[data-phase='exiting'] {
   opacity: 0;
-  transition: opacity 80ms linear;
+  transition: opacity 280ms var(--ease-out);
+  pointer-events: none;
 }
 
 .app-cold-launch__safe {
@@ -1582,7 +2645,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.7rem;
+  gap: 1rem;
   padding:
     var(--app-safe-area-top, env(safe-area-inset-top, 0px))
     var(--app-safe-area-right, env(safe-area-inset-right, 0px))
@@ -1590,106 +2653,236 @@ body {
     var(--app-safe-area-left, env(safe-area-inset-left, 0px));
 }
 
+/* Scène centrée — taille = boot-splash index.html (180) pour handoff sans saut */
+.app-cold-launch__stage {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Laisse les anneaux déborder jusqu’à ~largeur écran */
+  overflow: visible;
+}
+
+.app-cold-launch__flash {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 220px;
+  height: 220px;
+  margin-left: -110px;
+  margin-top: -110px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--color-brand, #ff2b2b) 55%, transparent) 0%,
+    color-mix(in srgb, var(--color-brand, #ff2b2b) 18%, transparent) 42%,
+    transparent 72%
+  );
+  opacity: 0;
+  transform: scale(0.55);
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform, opacity;
+}
+
+.app-cold-launch[data-phase='playing'][data-reduced='false'] .app-cold-launch__flash {
+  animation: shockwave-flash 420ms var(--ease-out) both;
+}
+
 .app-cold-launch__mark {
-  width: 132px;
-  height: 132px;
+  position: relative;
+  z-index: 2;
+  width: 180px;
+  height: 180px;
   object-fit: contain;
   user-select: none;
-}
-
-.app-cold-launch__flyer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.65rem;
-}
-
-.app-cold-launch__stack {
-  position: relative;
-  width: 132px;
-  height: 132px;
-  margin: 0 auto;
-  transform-origin: center center;
-  will-change: transform, opacity;
-  transition: opacity 50ms linear;
-}
-
-.app-cold-launch__stack .app-cold-launch__mark {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transform: scale(0.98);
-  transition:
-    opacity var(--dur-ui) var(--ease-out),
-    transform var(--dur-ui) var(--ease-out);
-}
-
-.app-cold-launch__mark--calm[data-active='true'] {
-  opacity: 1;
+  display: block;
   transform: scale(1);
 }
 
-.app-cold-launch__mark--roar[data-active='true'] {
-  opacity: 1;
-  transform: scale(1.025);
+.app-cold-launch[data-phase='playing'][data-reduced='false'] .app-cold-launch__mark {
+  animation: shockwave-impact 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.app-cold-launch[data-phase='roar'] .app-cold-launch__mark--calm {
+.app-cold-launch__ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 140px;
+  height: 140px;
+  margin-left: -70px;
+  margin-top: -70px;
+  border-radius: 50%;
+  border: 4px solid var(--color-brand, #ff2b2b);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-brand, #ff2b2b) 40%, transparent),
+    0 0 28px 6px color-mix(in srgb, var(--color-brand, #ff2b2b) 55%, transparent),
+    0 0 56px 14px color-mix(in srgb, var(--color-brand, #ff2b2b) 28%, transparent);
   opacity: 0;
+  transform: scale(0.45);
+  pointer-events: none;
+  z-index: 1;
+  will-change: transform, opacity;
+}
+
+.app-cold-launch[data-phase='playing'][data-reduced='false'] .app-cold-launch__ring--1 {
+  animation: shockwave-ring 780ms cubic-bezier(0.16, 1, 0.3, 1) 40ms both;
+}
+
+.app-cold-launch[data-phase='playing'][data-reduced='false'] .app-cold-launch__ring--2 {
+  border-width: 3px;
+  border-color: color-mix(in srgb, var(--color-brand, #ff2b2b) 88%, white 12%);
+  box-shadow:
+    0 0 22px 5px color-mix(in srgb, var(--color-brand, #ff2b2b) 48%, transparent),
+    0 0 48px 12px color-mix(in srgb, var(--color-brand, #ff2b2b) 22%, transparent);
+  animation: shockwave-ring 780ms cubic-bezier(0.16, 1, 0.3, 1) 130ms both;
+}
+
+.app-cold-launch[data-phase='playing'][data-reduced='false'] .app-cold-launch__ring--3 {
+  border-width: 2px;
+  border-color: color-mix(in srgb, var(--color-brand, #ff2b2b) 70%, transparent);
+  box-shadow:
+    0 0 18px 4px color-mix(in srgb, var(--color-brand, #ff2b2b) 35%, transparent),
+    0 0 40px 10px color-mix(in srgb, var(--color-brand, #ff2b2b) 16%, transparent);
+  animation: shockwave-ring 780ms cubic-bezier(0.16, 1, 0.3, 1) 220ms both;
+}
+
+/* scale ~0.45 → ~3.4 ≈ largeur téléphone (140×3.4 ≈ 476px) */
+@keyframes shockwave-ring {
+  0% {
+    opacity: 1;
+    transform: scale(0.45);
+  }
+  12% {
+    opacity: 0.95;
+  }
+  55% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(3.4);
+  }
+}
+
+@keyframes shockwave-impact {
+  0% {
+    transform: scale(0.85);
+  }
+  38% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes shockwave-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  18% {
+    opacity: 0.85;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.55);
+  }
 }
 
 .app-cold-launch__wordmark {
   margin: 0;
   text-align: center;
-  font-size: 1.9rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 1.125rem;
   font-weight: 600;
   letter-spacing: -0.02em;
   color: #ffffff;
   opacity: 1;
-  transition: opacity 140ms var(--ease-out);
-}
-
-.app-cold-launch__wordmark[data-visible='false'] {
-  opacity: 0;
 }
 
 .app-cold-launch__wordmark span {
   color: #ff2b2b;
 }
 
+.app-cold-launch[data-phase='exiting'] .app-cold-launch__wordmark,
+.app-cold-launch[data-phase='exiting'] .app-cold-launch__mark {
+  opacity: 0;
+  transition: opacity 220ms var(--ease-out);
+}
+
 .app-cold-launch[data-reduced='true'] .app-cold-launch__mark {
   animation: none !important;
-  transition: opacity 120ms linear !important;
   transform: scale(1) !important;
+}
+
+.app-cold-launch[data-reduced='true'] .app-cold-launch__ring,
+.app-cold-launch[data-reduced='true'] .app-cold-launch__flash {
+  display: none !important;
 }
 
 .app-cold-launch[data-reduced='true'] .app-cold-launch__dimmer {
   transition-duration: 120ms !important;
 }
 
-:root:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-mark-image='compact'] {
+/*
+ * Header compact PNG : jamais d’opacity/fade sur le logo (anti-flou iOS WebKit).
+ * Masquage pré-handoff via visibility seule — révélation instantanée, opaque.
+ */
+:root:not([data-cold-launch-played='1']):not([data-cold-launch-handoff='done'])
+  [data-cold-launch-target='compact']
+  [data-brand-mark-image='compact'] {
   visibility: hidden;
-  opacity: 0;
 }
 
-[data-cold-launch-target='compact'] [data-brand-mark-image='compact'],
+:root[data-cold-launch-handoff='done'] [data-cold-launch-target='compact'] [data-brand-mark-image='compact'],
+:root[data-cold-launch-played='1'] [data-cold-launch-target='compact'] [data-brand-mark-image='compact'] {
+  visibility: visible;
+}
+
 [data-cold-launch-target='compact'] [data-brand-wordmark='compact'] {
   transition: opacity 140ms var(--ease-out);
 }
 
-:root[data-cold-launch-handoff='done']:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-mark-image='compact'],
-:root[data-cold-launch-played='1'] [data-cold-launch-target='compact'] [data-brand-mark-image='compact'] {
-  visibility: visible;
-  opacity: 1;
-}
-
-:root:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-wordmark='compact'] {
+:root:not([data-cold-launch-played='1']):not([data-cold-launch-handoff='done'])
+  [data-cold-launch-target='compact']
+  [data-brand-wordmark='compact'] {
   opacity: 0;
 }
 
-:root[data-cold-launch-header-wordmark='1']:not([data-cold-launch-played='1']) [data-cold-launch-target='compact'] [data-brand-wordmark='compact'],
+:root[data-cold-launch-handoff='done'] [data-cold-launch-target='compact'] [data-brand-wordmark='compact'],
 :root[data-cold-launch-played='1'] [data-cold-launch-target='compact'] [data-brand-wordmark='compact'] {
-  opacity: 1;
+  opacity: unset;
+  transition: none;
+  filter: none;
+}
+
+/*
+ * Header marque au repos : jamais opacity/filter/transform (anti-flou iOS WebKit).
+ * Le fond blur éventuel vit uniquement sur [data-brand-header-bg], frère sous le contenu.
+ */
+.brand-mark-image,
+:root[data-cold-launch-played='1'] [data-brand-wordmark='compact'] {
+  filter: none !important;
+  opacity: unset !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+.brand-mark-image {
+  filter: none !important;
+  opacity: unset !important;
+  /* Safari iOS : contraste net. Éviter crisp-edges (pixelise la photo panthère). */
+  image-rendering: -webkit-optimize-contrast;
+}
+
+/* Fond header : calque séparé — blur autorisé ICI seulement, jamais sur <header> parent. */
+[data-brand-header-bg='1'] {
+  background-color: #0c0c0e;
 }
 
 .home-cold-enter--active .home-cold-enter__group {
@@ -1763,8 +2956,13 @@ body {
 
   .app-cold-launch__mark {
     animation: none !important;
-    transition: opacity 120ms linear !important;
     transform: scale(1) !important;
+  }
+
+  .app-cold-launch__ring,
+  .app-cold-launch__flash {
+    display: none !important;
+    animation: none !important;
   }
 
   .home-cold-enter--active .home-cold-enter__group,
@@ -1781,6 +2979,20 @@ body {
   .ios-fade-up-delay-1,
   .ios-fade-up-delay-2,
   .ios-fade-up-delay-3,
+  .rg-reveal,
+  .rg-reveal--in,
+  .rg-mask-reveal,
+  .rg-mask-reveal--in,
+  .rg-blur-in,
+  .rg-blur-in--in,
+  .rg-blur-in--settled,
+  .rg-blur-word,
+  .rg-soft-blur,
+  .rg-soft-blur--in,
+  .rg-soft-blur--settled,
+  .rg-text-flip__word,
+  .rg-text-flip__word--out,
+  .rg-text-flip__word--in,
   .skeleton-shimmer,
   .arena-glow,
   .streak-card--lit,
@@ -1798,7 +3010,27 @@ body {
     animation: none !important;
   }
 
-  .ios-press:active {
+  .rg-reveal,
+  .rg-reveal--in,
+  .rg-mask-reveal,
+  .rg-mask-reveal--in,
+  .rg-blur-in,
+  .rg-blur-in--in,
+  .rg-blur-in--settled,
+  .rg-blur-word,
+  .rg-soft-blur,
+  .rg-soft-blur--in,
+  .rg-soft-blur--settled,
+  .rg-text-flip__word {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    clip-path: none !important;
+    will-change: auto !important;
+  }
+
+  .ios-press:active,
+  .ios-press[data-pressed='true'] {
     transform: none;
   }
 

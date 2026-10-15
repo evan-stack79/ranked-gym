@@ -3,8 +3,9 @@ import { createRoot } from 'react-dom/client'
 import '../../src/index.css'
 import { ImmersiveExerciseSession } from '../../src/components/training/ImmersiveExerciseSession'
 import { RestTimerProvider, useRestTimerContext } from '../../src/context/RestTimerContext'
-import type { ExerciseEntry, WorkoutSet } from '../../src/types/training'
+import type { ExerciseEntry, WorkoutNote, WorkoutSet } from '../../src/types/training'
 import { CANONICAL_REST_SEC } from '../../src/utils/restDuration'
+import { nextSetFromPrevious } from '../../src/utils/lastPerformance'
 import {
   getTrainingState,
   saveTrainingState,
@@ -27,6 +28,30 @@ const SESSION_FIXTURE: ExerciseEntry[] = [
     sets: [
       { reps: 0, weightKg: 0 },
       { reps: 6, weightKg: 80 },
+    ],
+  },
+]
+
+/** Historique réaliste — hint « La dernière fois » sous chaque série. */
+const HISTORY_FIXTURE: WorkoutNote[] = [
+  {
+    id: 'note-last',
+    title: 'Push',
+    dateKey: '2026-10-05',
+    createdAt: Date.now() - 3 * 24 * 60 * 60 * 1000,
+    estimatedKcal: 280,
+    sportId: 'musculation',
+    sessionKind: 'strength',
+    exercises: [
+      {
+        id: 'ex-hist-bench',
+        name: 'DÉVELOPPÉ COUCHÉ',
+        canonicalExerciseId: 'bench_press',
+        sets: [
+          { reps: 8, weightKg: 60, rpe: 8, done: true },
+          { reps: 6, weightKg: 65, rpe: 9, done: true },
+        ],
+      },
     ],
   },
 ]
@@ -169,7 +194,10 @@ function HarnessApp() {
           setExercises((prev) =>
             prev.map((e) =>
               e.id === exerciseId
-                ? { ...e, sets: [...e.sets, { reps: 8, weightKg: 20 }] }
+                ? {
+                    ...e,
+                    sets: [...e.sets, nextSetFromPrevious(e.sets[e.sets.length - 1])],
+                  }
                 : e,
             ),
           )
@@ -194,6 +222,7 @@ function HarnessApp() {
         restPrefSec={restPrefSec}
         onRestPrefChange={setRestPrefSec}
         autoValidate={autoValidate}
+        history={HISTORY_FIXTURE}
       />
     </div>
   )

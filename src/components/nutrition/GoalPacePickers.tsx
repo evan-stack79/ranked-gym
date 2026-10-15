@@ -1,9 +1,17 @@
 import type { NutritionGoal } from '../../types/nutrition'
-import { GOAL_LABELS, WEEKLY_PACE_OPTIONS_KG } from '../../utils/calories'
+import { GOAL_LABELS } from '../../utils/calories'
+import {
+  clampWeeklyPaceKg,
+  defaultWeeklyPaceKg,
+  maxWeeklyPaceKgWithDeficit,
+} from '../../services/nutritionSafetyRules'
+import { Q3_VITESSE, SEC_NUT_05_ORIGINE } from '../../content/safetyCopy'
 
 interface GoalPickerProps {
-  value: NutritionGoal
+  value: NutritionGoal | null
   onChange: (goal: NutritionGoal) => void
+  /** Si false, l'objectif « perte » (cut) n'est pas proposé. */
+  allowCut?: boolean
 }
 
 const GOAL_OPTIONS: Array<{ value: NutritionGoal; hint: string }> = [
@@ -12,12 +20,13 @@ const GOAL_OPTIONS: Array<{ value: NutritionGoal; hint: string }> = [
   { value: 'bulk', hint: 'Surplus · prendre du muscle' },
 ]
 
-export function GoalPicker({ value, onChange }: GoalPickerProps) {
+export function GoalPicker({ value, onChange, allowCut = true }: GoalPickerProps) {
+  const options = allowCut ? GOAL_OPTIONS : GOAL_OPTIONS.filter((o) => o.value !== 'cut')
   return (
     <div className="space-y-2">
       <p className="text-[12px] font-semibold text-[#8E8E93]">Objectif</p>
-      <div className="grid grid-cols-3 gap-2">
-        {GOAL_OPTIONS.map((option) => {
+      <div className={`grid gap-2 ${options.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        {options.map((option) => {
           const selected = value === option.value
           return (
             <button
@@ -48,12 +57,17 @@ interface WeeklyPacePickerProps {
   value: number
   onChange: (kgPerWeek: number) => void
   goal: NutritionGoal
+  weightKg: number
 }
 
-export function WeeklyPacePicker({ value, onChange, goal }: WeeklyPacePickerProps) {
+export function WeeklyPacePicker({ value, onChange, goal, weightKg }: WeeklyPacePickerProps) {
   if (goal === 'maintain') return null
 
   const verb = goal === 'cut' ? 'perdre' : 'prendre'
+  const maxPace = maxWeeklyPaceKgWithDeficit(weightKg > 0 ? weightKg : 70)
+  const minPace = 0.1
+  const safeValue = clampWeeklyPaceKg(value > 0 ? value : defaultWeeklyPaceKg(weightKg || 70), weightKg || 70)
+  const defaultPctLabel = ((weightKg || 70) * 0.005).toFixed(2)
 
   return (
     <div className="space-y-2">
@@ -61,40 +75,24 @@ export function WeeklyPacePicker({ value, onChange, goal }: WeeklyPacePickerProp
         <p className="text-[12px] font-semibold text-[#8E8E93]">
           Rythme · {verb} / semaine
         </p>
-        <p className="text-[15px] font-bold text-white">{value.toFixed(1)} kg</p>
+        <p className="text-[15px] font-bold text-white">{safeValue.toFixed(2)} kg</p>
       </div>
       <input
         type="range"
-        min={0.2}
-        max={0.75}
-        step={0.05}
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
+        min={minPace}
+        max={maxPace}
+        step={0.01}
+        value={Math.min(safeValue, maxPace)}
+        onChange={(e) => onChange(clampWeeklyPaceKg(parseFloat(e.target.value), weightKg || 70))}
         className="w-full accent-[#30D158]"
         aria-label="Rythme hebdomadaire en kg"
       />
-      <div className="flex flex-wrap gap-1.5">
-        {WEEKLY_PACE_OPTIONS_KG.map((pace) => {
-          const selected = Math.abs(value - pace) < 0.001
-          return (
-            <button
-              key={pace}
-              type="button"
-              onClick={() => onChange(pace)}
-              className={`ios-press rounded-full border px-2.5 py-1 text-[12px] font-semibold ${
-                selected
-                  ? 'border-[#30D158]/50 bg-[#30D158]/20 text-[#30D158]'
-                  : 'border-white/10 bg-black/20 text-[#AEAEB2]'
-              }`}
-            >
-              {pace.toFixed(1)}
-            </button>
-          )
-        })}
-      </div>
       <p className="text-[11px] text-[#8E8E93]">
-        Ce rythme fixe ton déficit / surplus calorique dans Nutri.
+        Défaut proposé : 0,5 % du poids (~{defaultPctLabel} kg/sem). Plafond : {maxPace.toFixed(2)}{' '}
+        kg/sem.
       </p>
+      <p className="text-[11px] leading-relaxed text-[#8E8E93]">{Q3_VITESSE}</p>
+      <p className="text-[11px] leading-relaxed text-[#8E8E93]">{SEC_NUT_05_ORIGINE}</p>
     </div>
   )
 }

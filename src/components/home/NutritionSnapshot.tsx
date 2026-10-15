@@ -1,13 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getNutritionTarget } from '../../services/nutritionActivity'
 import { getCalorieProfile, getTodayJournal, getTodayWaterMl } from '../../services/nutritionStorage'
-import { formatWaterMl, getDailyWaterGoalMl, isTrainingDayToday } from '../../utils/waterGoal'
+import { formatWaterMl } from '../../utils/waterGoal'
 import {
   canSubmitHomeQuickWater,
   HOME_QUICK_WATER_ML,
   shouldShowHomeQuickWaterButton,
   tryAddHomeQuickWater,
 } from '../../utils/homeNutritionQuickActions'
+import {
+  getUserWaterGoalMl,
+  WATER_GOAL_CHANGED_EVENT,
+} from '../../utils/userWaterGoal'
+import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
+import { isMinorAge } from '../../services/nutritionSafetyRules'
+import { CountUpNumber, SoftBlurIn, StaticKcalNumber } from '../motion'
+import { WaterGoalChooser } from '../nutrition/WaterGoalChooser'
 
 interface NutritionSnapshotProps {
   onOpenNutrition?: () => void
@@ -26,13 +34,13 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
     window.addEventListener('ranked-gym:profile-changed', sync)
     window.addEventListener('ranked-gym:backup-restored', sync)
     window.addEventListener('ranked-gym:water-changed', sync)
-    window.addEventListener('ranked-gym:training-changed', sync)
+    window.addEventListener(WATER_GOAL_CHANGED_EVENT, sync)
     window.addEventListener('focus', sync)
     return () => {
       window.removeEventListener('ranked-gym:profile-changed', sync)
       window.removeEventListener('ranked-gym:backup-restored', sync)
       window.removeEventListener('ranked-gym:water-changed', sync)
-      window.removeEventListener('ranked-gym:training-changed', sync)
+      window.removeEventListener(WATER_GOAL_CHANGED_EVENT, sync)
       window.removeEventListener('focus', sync)
       if (toastTimerRef.current != null) {
         window.clearTimeout(toastTimerRef.current)
@@ -56,8 +64,7 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
     const profile = getCalorieProfile()
     const meals = getTodayJournal().meals
     const waterMl = getTodayWaterMl()
-    const isTrainingDay = isTrainingDayToday()
-    const waterGoalMl = getDailyWaterGoalMl(profile.weightKg, isTrainingDay)
+    const waterGoalMl = getUserWaterGoalMl()
     const consumedCalories = meals.reduce((sum, meal) => sum + meal.calories, 0)
 
     const targetCalories = nutrition.targetCalories
@@ -69,20 +76,27 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
       targetAvailable && targetCalories > 0
         ? Math.min(consumedCalories / targetCalories, 1)
         : 0
+    const hasWaterGoal = waterGoalMl != null && waterGoalMl > 0
     const waterProgress =
-      waterGoalMl > 0 ? Math.min(Math.max(0, waterMl) / waterGoalMl, 1) : 0
+      hasWaterGoal ? Math.min(Math.max(0, waterMl) / waterGoalMl, 1) : 0
     const showQuickWater = shouldShowHomeQuickWaterButton(waterMl, waterGoalMl)
-    const waterGoalReached = waterMl >= waterGoalMl
+    const waterGoalReached = hasWaterGoal && waterMl >= waterGoalMl
+
+    const calorieGoalEnabled = isCalorieGoalEnabled()
+    const minor = isMinorAge(profile.age)
 
     return {
       onboardingComplete: nutrition.profile.onboardingComplete,
       targetAvailable,
+      // BUG-16 : drapeau OFF / mineur → carte neutre, jamais « Objectif indisponible »
+      showUnavailableGoal: !targetAvailable && calorieGoalEnabled && !minor,
       targetCalories,
       remainingCalories,
       consumedCalories,
       progress,
       waterMl,
       waterGoalMl,
+      hasWaterGoal,
       waterProgress,
       showQuickWater,
       waterGoalReached,
@@ -116,21 +130,31 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
   return (
     <section className="glass-card rounded-2xl p-4" aria-label="Nutrition du jour">
       <div>
-        <p className="text-[11px] font-medium text-[#8E8E93]">Aujourd&apos;hui</p>
+        <p className="text-[11px] font-medium text-[#8E8E93]">
+          <SoftBlurIn>Aujourd&apos;hui</SoftBlurIn>
+        </p>
         {snapshot.targetAvailable ? (
           <>
             <p className="mt-1 text-[22px] font-bold leading-tight tracking-tight text-white">
-              Il te reste {snapshot.remainingCalories.toLocaleString('fr-FR')} kcal
+              {/* SAFETY: kcal must stay static — never CountUpNumber (PM / Vérificateur). */}
+              Il te reste <StaticKcalNumber value={snapshot.remainingCalories} /> kcal
             </p>
             <p className="mt-1 text-[13px] text-[#AEAEB2]">
-              {Math.round(snapshot.consumedCalories).toLocaleString('fr-FR')} consommées sur{' '}
-              {snapshot.targetCalories.toLocaleString('fr-FR')}
+              <StaticKcalNumber value={snapshot.consumedCalories} /> consommées sur{' '}
+              <StaticKcalNumber value={snapshot.targetCalories} />
             </p>
           </>
-        ) : (
+        ) : snapshot.showUnavailableGoal ? (
           <>
             <p className="mt-1 text-[17px] font-semibold text-white">Objectif indisponible</p>
             <p className="mt-1 text-[13px] text-[#AEAEB2]">Ouvre Nutri pour vérifier ton plan.</p>
+          </>
+        ) : (
+          <>
+            <p className="mt-1 text-[17px] font-semibold text-white">Suivi du jour</p>
+            <p className="mt-1 text-[13px] text-[#AEAEB2]">
+              <StaticKcalNumber value={snapshot.consumedCalories} /> kcal consommées
+            </p>
           </>
         )}
 
@@ -164,27 +188,49 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
       <div className="mt-4 border-t border-white/8 pt-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-medium text-[#8E8E93]">Eau</p>
-            {snapshot.waterGoalReached ? (
-              <p className="mt-0.5 text-[15px] font-semibold text-[#7DD3FC]">Objectif atteint</p>
+            <p className="text-[11px] font-medium text-[#8E8E93]">
+              <SoftBlurIn>Eau</SoftBlurIn>
+            </p>
+            {snapshot.hasWaterGoal ? (
+              snapshot.waterGoalReached ? (
+                <p className="mt-0.5 text-[15px] font-semibold text-[#7DD3FC]">Objectif atteint</p>
+              ) : (
+                <p className="mt-0.5 text-[15px] font-semibold text-white">
+                  <CountUpNumber
+                    kind="water"
+                    value={snapshot.waterMl}
+                    format={(n) => formatWaterMl(Math.round(n))}
+                  />{' '}
+                  sur {formatWaterMl(snapshot.waterGoalMl!)}
+                </p>
+              )
             ) : (
               <p className="mt-0.5 text-[15px] font-semibold text-white">
-                {formatWaterMl(snapshot.waterMl)} sur {formatWaterMl(snapshot.waterGoalMl)}
+                <CountUpNumber
+                  kind="water"
+                  value={snapshot.waterMl}
+                  format={(n) => formatWaterMl(Math.round(n))}
+                />{' '}
+                bus aujourd&apos;hui
               </p>
             )}
-            <div
-              className="mt-2 h-1 overflow-hidden rounded-full bg-white/10"
-              role="progressbar"
-              aria-valuenow={Math.round(snapshot.waterProgress * 100)}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label="Progression hydrique"
-            >
+            {snapshot.hasWaterGoal ? (
               <div
-                className="motion-progress-fill h-full rounded-full bg-gradient-to-r from-[#0891B2] to-[#38BDF8]"
-                style={{ transform: `scaleX(${Math.max(0, Math.min(snapshot.waterProgress, 1))})` }}
-              />
-            </div>
+                className="mt-2 h-1 overflow-hidden rounded-full bg-white/10"
+                role="progressbar"
+                aria-valuenow={Math.round(snapshot.waterProgress * 100)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Progression hydrique"
+              >
+                <div
+                  className="motion-progress-fill h-full rounded-full bg-gradient-to-r from-[#0891B2] to-[#38BDF8]"
+                  style={{ transform: `scaleX(${Math.max(0, Math.min(snapshot.waterProgress, 1))})` }}
+                />
+              </div>
+            ) : (
+              <WaterGoalChooser className="mt-2" onSaved={() => setTick((n) => n + 1)} />
+            )}
           </div>
 
           {snapshot.showQuickWater ? (

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpen, Check, Pause, Pencil, Play, Plus, Trash2, X } from 'lucide-react'
 import type {
   ExerciseEntry,
@@ -25,6 +25,16 @@ import {
   findLastExerciseSets,
   formatSetLoadLabel,
 } from '../../utils/workoutHistory'
+import {
+  findLastPerformance,
+  formatLastRepsAriaLabel,
+  formatLastRepsPlaceholder,
+  formatLastWeightAriaLabel,
+  formatLastWeightPlaceholder,
+  isSetLoadBlank,
+  lastPerformanceToSetPatch,
+  nextSetFromPrevious,
+} from '../../utils/lastPerformance'
 import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
 import { WorkoutHistory } from './WorkoutHistory'
 import { ImmersiveExerciseSession } from './ImmersiveExerciseSession'
@@ -38,7 +48,6 @@ import {
   AUTO_VALIDATE_UNDO_MS,
   isSetReadyForAutoValidate,
   makeAutoValidateKey,
-  shouldAppendNextSetOnRestSkip,
   shouldCommitAutoValidate,
 } from '../../utils/autoValidateSet'
 import { CANONICAL_REST_SEC, resolveRestDuration } from '../../utils/restDuration'
@@ -121,7 +130,12 @@ const DIFF_OPTIONS: { id: SetDifficulty; label: string }[] = [
 ]
 
 function emptySet(): WorkoutSet {
-  return { reps: 8, weightKg: 20 }
+  return nextSetFromPrevious(undefined)
+}
+
+/** Nouvelle série : reprend poids/reps de la série précédente de la séance courante. */
+function appendSet(sets: WorkoutSet[]): WorkoutSet[] {
+  return [...sets, nextSetFromPrevious(sets[sets.length - 1])]
 }
 
 function emptyExercise(): ExerciseEntry {
@@ -370,25 +384,14 @@ export function WorkoutNotebook({
 
   useEffect(() => {
     if (!restLogRequest || draftBlocked.current) return
-    const { exerciseId, setIndex, restSec, addNextSet } = restLogRequest
+    // DEV-RG-07 : journaliser repos uniquement — jamais d’append de série ici.
+    // (addNextSet était l’ancien enchaînement Reprendre → nouvelle série ; seul « + Ajouter une série » crée.)
+    const { exerciseId, setIndex, restSec } = restLogRequest
     setExercises((prev) => {
       draftDirty.current = true
       const next = prev.map((e) => {
         if (e.id !== exerciseId) return e
-        let sets = e.sets.map((s, i) => (i === setIndex ? { ...s, restSec, done: true } : s))
-        // Reprendre : append seulement s’il n’existe pas déjà une série suivante !done.
-        if (addNextSet && shouldAppendNextSetOnRestSkip(sets, setIndex)) {
-          const last = sets[sets.length - 1]
-          sets = [
-            ...sets,
-            {
-              reps: last?.reps ?? 8,
-              weightKg: last?.weightKg ?? 20,
-              difficulty: last?.difficulty,
-              rpe: last?.rpe,
-            },
-          ]
-        }
+        const sets = e.sets.map((s, i) => (i === setIndex ? { ...s, restSec, done: true } : s))
         return { ...e, sets }
       })
       onDraftSave?.(routineId, next)
@@ -432,7 +435,7 @@ export function WorkoutNotebook({
     }
   }, [onDraftSave, onRegisterDraftFlush])
 
-  const handleActiveIndexChange = (index: number) => {
+  const focusExercise = useCallback((index: number) => {
     setActiveExerciseIndex(index)
     if (!editingNote) {
       try {
@@ -441,20 +444,16 @@ export function WorkoutNotebook({
         // persist error déjà émis par trainingStorage
       }
     }
-  }
+  }, [editingNote])
+
+  const handleActiveIndexChange = focusExercise
 
   const handleSoftBack = () => {
     if (!draftBlocked.current && draftDirty.current && onDraftSave) {
       onDraftSave(routineIdRef.current, exercisesRef.current)
       draftDirty.current = false
     }
-    if (!editingNote) {
-      try {
-        persistActiveExerciseIndex(activeExerciseIndex)
-      } catch {
-        // ignore
-      }
-    }
+    focusExercise(activeExerciseIndex)
     onBack?.()
   }
 
@@ -582,14 +581,25 @@ export function WorkoutNotebook({
 
   useEffect(() => {
     if (!immersiveLive || exercises.length === 0) return
-    setActiveExerciseIndex((i) => Math.min(i, exercises.length - 1))
-  }, [exercises.length, immersiveLive])
+    if (activeExerciseIndex > exercises.length - 1) {
+      focusExercise(exercises.length - 1)
+    }
+  }, [exercises.length, immersiveLive, activeExerciseIndex, focusExercise])
 
-  // Au démarrage immersif : focus sur le premier exercice avec série en cours.
+  // Au démarrage immersif : l’index enregistré gagne ; sinon premier exo avec série en cours.
   useEffect(() => {
     if (!immersiveLive) return
+    let stored: number | undefined
+    if (resume) {
+      try {
+        stored = getTrainingState().activeWorkoutDraft?.activeExerciseIndex
+      } catch {
+        stored = undefined
+      }
+    }
+    if (typeof stored === 'number' && stored >= 0 && stored < exercises.length) return
     const idx = exercises.findIndex((e) => e.sets.some((s) => !s.done))
-    if (idx >= 0) setActiveExerciseIndex(idx)
+    focusExercise(idx >= 0 ? idx : 0)
     // Montage immersif uniquement
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [immersiveLive])
@@ -600,8 +610,9 @@ export function WorkoutNotebook({
     const next = [...base, entry]
     const nextIndex = next.length - 1
     setExercises(next)
-    setActiveExerciseIndex(nextIndex)
+    // persistActiveExerciseIndex no-op sans brouillon : onDraftSave le crée / le maintient d’abord.
     if (!draftBlocked.current) onDraftSave?.(routineId, next)
+    focusExercise(nextIndex)
     draftDirty.current = false
     setPickerMode(null)
   }
@@ -725,7 +736,7 @@ export function WorkoutNotebook({
         onAddSet={(exerciseId) => {
           const ex = exercises.find((e) => e.id === exerciseId)
           if (!ex) return
-          updateExercise(exerciseId, { sets: [...ex.sets, emptySet()] })
+          updateExercise(exerciseId, { sets: appendSet(ex.sets) })
         }}
         onAddExercise={() => setPickerMode('add')}
         onValidateSet={(ex, setIndex, restSec) => finishSet(ex, setIndex, undefined, restSec)}
@@ -738,6 +749,7 @@ export function WorkoutNotebook({
           Boolean(undoSnapshot) && Date.now() < (undoSnapshot?.expiresAt ?? 0)
         }
         onUndoValidation={undoValidation}
+        history={history}
       />
     )
   }
@@ -979,89 +991,124 @@ export function WorkoutNotebook({
                 </p>
 
                 <div className="space-y-1.5">
-                  {ex.sets.map((set, idx) => (
-                    <div
-                      key={idx}
-                      className="grid grid-cols-[auto_1fr_1fr_auto_auto] items-end gap-2"
-                    >
-                      <span
-                        className={`pb-2 text-[11px] font-bold ${
-                          set.done ? 'text-[#30D158]' : 'text-[#8E8E93]'
-                        }`}
+                  {ex.sets.map((set, idx) => {
+                    const lastPerf = findLastPerformance(history, ex, idx, {
+                      excludeNoteId: editingNote?.id,
+                    })
+                    const showLastHint = Boolean(lastPerf && isSetLoadBlank(set))
+                    const applyLast = () => {
+                      if (!lastPerf || !isSetLoadBlank(set)) return
+                      updateSet(ex.id, idx, lastPerformanceToSetPatch(lastPerf))
+                    }
+                    return (
+                      <div
+                        key={idx}
+                        data-last-hint={showLastHint ? '1' : undefined}
+                        className="grid grid-cols-[auto_1fr_1fr_auto_auto] items-end gap-2"
                       >
-                        {idx + 1}
-                      </span>
-                      <label className="block">
-                        <span className="mb-0.5 block text-[10px] text-[#636366]">kg</span>
-                        <ClearableNumberInput
-                          value={set.weightKg}
-                          onChange={(v) => updateSet(ex.id, idx, { weightKg: v ?? 0 })}
-                          min={0}
-                          max={500}
-                          step={0.5}
-                          aria-label="Poids"
-                          className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
-                        />
-                      </label>
-                      <label className="block">
-                        <span className="mb-0.5 block text-[10px] text-[#636366]">Reps</span>
-                        <ClearableNumberInput
-                          value={set.reps}
-                          onChange={(v) =>
-                            updateSet(ex.id, idx, { reps: v != null ? Math.round(v) : 0 })
-                          }
-                          min={1}
-                          max={50}
-                          aria-label="Reps"
-                          className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
-                        />
-                      </label>
-                      <label className="block w-[3.75rem]">
-                        <span className="mb-0.5 block text-[10px] text-[#636366]">Effort</span>
-                        <ClearableNumberInput
-                          value={set.rpe ?? null}
-                          onChange={(v) =>
-                            updateSet(ex.id, idx, {
-                              rpe:
-                                v != null ? Math.min(10, Math.max(1, Math.round(v))) : undefined,
-                            })
-                          }
-                          min={1}
-                          max={10}
-                          required={false}
-                          deferAmbiguousIntegerPrefix
-                          placeholder="1–10"
-                          placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2 text-[12px] font-semibold text-[#636366]"
-                          aria-label="Effort facultatif, 1 à 10"
-                          className="w-full rounded-xl border border-white/10 bg-black/40 px-2 py-2 text-[13px] font-semibold text-[#AEAEB2] outline-none"
-                        />
-                      </label>
-                      {ex.sets.length > 1 ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateExercise(ex.id, {
-                              sets: ex.sets.filter((_, i) => i !== idx),
-                            })
-                          }
-                          className="mb-2 flex min-h-11 min-w-11 items-center justify-center text-[#636366]"
-                          aria-label="Supprimer série"
+                        <span
+                          className={`pb-2 text-[11px] font-bold ${
+                            set.done ? 'text-[#30D158]' : 'text-[#8E8E93]'
+                          }`}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      ) : (
-                        <span className="w-11" />
-                      )}
-                    </div>
-                  ))}
+                          {idx + 1}
+                        </span>
+                        <label className="block">
+                          <span className="mb-0.5 block text-[10px] text-[#636366]">kg</span>
+                          <ClearableNumberInput
+                            value={showLastHint ? null : set.weightKg}
+                            onChange={(v) => updateSet(ex.id, idx, { weightKg: v ?? 0 })}
+                            onFocus={showLastHint ? applyLast : undefined}
+                            min={0}
+                            max={500}
+                            step={0.5}
+                            required={!showLastHint}
+                            placeholder={
+                              showLastHint && lastPerf
+                                ? formatLastWeightPlaceholder(lastPerf.weightKg)
+                                : undefined
+                            }
+                            placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2.5 text-[15px] font-semibold tabular-nums text-[#636366]"
+                            aria-label={
+                              showLastHint && lastPerf
+                                ? formatLastWeightAriaLabel(lastPerf.weightKg)
+                                : 'Poids'
+                            }
+                            className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="mb-0.5 block text-[10px] text-[#636366]">Reps</span>
+                          <ClearableNumberInput
+                            value={showLastHint ? null : set.reps}
+                            onChange={(v) =>
+                              updateSet(ex.id, idx, { reps: v != null ? Math.round(v) : 0 })
+                            }
+                            onFocus={showLastHint ? applyLast : undefined}
+                            min={1}
+                            max={50}
+                            required={!showLastHint}
+                            placeholder={
+                              showLastHint && lastPerf
+                                ? formatLastRepsPlaceholder(lastPerf.reps)
+                                : undefined
+                            }
+                            placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2.5 text-[15px] font-semibold tabular-nums text-[#636366]"
+                            aria-label={
+                              showLastHint && lastPerf
+                                ? formatLastRepsAriaLabel(lastPerf.reps)
+                                : 'Reps'
+                            }
+                            className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
+                          />
+                        </label>
+                        <label className="block w-[3.75rem]">
+                          <span className="mb-0.5 block text-[10px] text-[#636366]">Effort</span>
+                          <ClearableNumberInput
+                            value={set.rpe ?? null}
+                            onChange={(v) =>
+                              updateSet(ex.id, idx, {
+                                rpe:
+                                  v != null
+                                    ? Math.min(10, Math.max(1, Math.round(v)))
+                                    : undefined,
+                              })
+                            }
+                            min={1}
+                            max={10}
+                            required={false}
+                            deferAmbiguousIntegerPrefix
+                            placeholder="1–10"
+                            placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2 text-[12px] font-semibold text-[#636366]"
+                            aria-label="Effort facultatif, 1 à 10"
+                            className="w-full rounded-xl border border-white/10 bg-black/40 px-2 py-2 text-[13px] font-semibold text-[#AEAEB2] outline-none"
+                          />
+                        </label>
+                        {ex.sets.length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateExercise(ex.id, {
+                                sets: ex.sets.filter((_, i) => i !== idx),
+                              })
+                            }
+                            className="mb-2 flex min-h-11 min-w-11 items-center justify-center text-[#636366]"
+                            aria-label="Supprimer série"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        ) : (
+                          <span className="w-11" />
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
 
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() =>
-                      updateExercise(ex.id, { sets: [...ex.sets, emptySet()] })
-                    }
+                    onClick={() => updateExercise(ex.id, { sets: appendSet(ex.sets) })}
                     className="ios-press inline-flex min-h-11 items-center rounded-full border border-white/10 px-3 text-[11px] font-semibold text-[#AEAEB2]"
                   >
                     + Ajouter une série
@@ -1132,9 +1179,6 @@ export function WorkoutNotebook({
             className="btn-brand ios-press flex flex-[1.4] flex-col items-center justify-center rounded-2xl py-2.5 text-[13px] font-semibold leading-tight text-white disabled:opacity-60"
           >
             <span>{saving ? 'Synchro…' : editingNote ? 'Sauvegarder' : 'Terminer la séance'}</span>
-            {!saving && (
-              <span className="mt-0.5 text-[11px] font-normal text-white/65">~{stats.kcal} kcal</span>
-            )}
           </button>
         </div>
 

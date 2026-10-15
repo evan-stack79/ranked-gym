@@ -25,6 +25,7 @@ export type SessionUser = {
   email: string
   displayName: string
   mustResetPassword: boolean
+  emailConfirmed: boolean
   role: 'admin' | 'user'
   deletedAt?: number
 }
@@ -58,6 +59,7 @@ export async function requireSessionUser(ctx: SessionCtx, sessionToken: string):
     email: user.email,
     displayName: user.displayName,
     mustResetPassword: user.mustResetPassword,
+    emailConfirmed: typeof user.emailConfirmedAt === 'number' && user.emailConfirmedAt > 0,
     role: user.role === 'admin' ? 'admin' : 'user',
     deletedAt: user.deletedAt,
   }
@@ -95,13 +97,16 @@ export async function revokeSessionByToken(
   return true
 }
 
-export async function revokeAllUserSessions(ctx: MutationCtx, userId: string): Promise<number> {
+export async function revokeAllUserSessions(
+  ctx: MutationCtx,
+  userId: string,
+  now = Date.now(),
+): Promise<number> {
   const sessions = await ctx.db
     .query('auth_sessions')
     .withIndex('by_userId', (q) => q.eq('userId', userId))
     .collect()
   let revoked = 0
-  const now = Date.now()
   for (const session of sessions) {
     if (!session.revokedAt) {
       revoked += 1

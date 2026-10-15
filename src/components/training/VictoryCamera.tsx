@@ -9,6 +9,10 @@ import {
 } from '../../utils/victoryCardExport'
 import { vibrate } from '../../utils/haptics'
 import { useRestTimerContext } from '../../context/RestTimerContext'
+import { BETA_FEEDBACK_SESSION_LINK } from '../../content/betaFeedbackCopy'
+import { canOpenBetaFeedback } from '../../services/betaFeedbackAccess'
+import { requestOpenBetaFeedback } from '../../services/betaFeedbackNav'
+import { BETA_FEEDBACK_PAGE_SESSION_END } from '../../services/betaFeedbackPages'
 
 interface VictoryCameraProps {
   stats: VictorySessionStats
@@ -401,6 +405,20 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
                 <X className="h-[18px] w-[18px]" strokeWidth={2.5} aria-hidden />
               </button>
             </div>
+
+            {canOpenBetaFeedback() ? (
+              <button
+                type="button"
+                className="mx-auto mt-3 block text-center text-[12px] font-medium text-[#AEAEB2] underline"
+                data-testid="beta-feedback-session-link"
+                onClick={() => {
+                  onComplete()
+                  requestOpenBetaFeedback(BETA_FEEDBACK_PAGE_SESSION_END)
+                }}
+              >
+                {BETA_FEEDBACK_SESSION_LINK}
+              </button>
+            ) : null}
           </div>
         </>
       )}

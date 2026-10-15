@@ -15,6 +15,10 @@ import { getConvexConfigError, isConvexConfigured } from '../lib/convex'
 
 const PHASE_E_TABLES = [
   'auth_users',
+  'auth_account_links',
+  'auth_email_verification_codes',
+  'app_one_shot_migrations',
+  'auth_google_takeover_audit',
   'auth_password_credentials',
   'auth_sessions',
   'auth_password_reset_tokens',
@@ -24,10 +28,15 @@ const PHASE_E_TABLES = [
   'profiles',
   'workouts_state',
   'nutrition_state',
+  'nutrition_age_majority_audit',
+  'nutrition_safety_clear_audit',
+  'nutrition_safety_admin_audit',
   'nutrition_meals',
   'nutrition_water_entries',
   'nutrition_day_state',
   'nutrition_food_catalog',
+  'food_search_usage',
+  'off_product_images',
   'sleep_nights',
   'checkins',
   'custom_spots',
@@ -44,6 +53,7 @@ const PHASE_E_TABLES = [
   'user_follows',
   'activity_comments',
   'activity_reactions',
+  'avis_beta',
 ] as const
 
 describe('Convex Phase A feature flag', () => {

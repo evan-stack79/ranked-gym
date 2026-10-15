@@ -19,13 +19,22 @@ export interface BrandMarkProps {
 
 /** Asset PWA — boot / hero uniquement. */
 export const BRAND_MARK_HERO_SRC = '/pwa-192x192.png'
-/** Marque header compacte — fond transparent, cadrage serré (`brand:assets`). */
+/**
+ * Marque header compacte — fond transparent, cadrage serré (`brand:assets`).
+ * Affichage CSS 38×38 → sources @2x / @3x pour netteté retina (pas de SVG photo).
+ */
 export const BRAND_MARK_COMPACT_SRC = '/brand-header-mark.png'
+export const BRAND_MARK_COMPACT_SRC_2X = '/brand-header-mark@2x.png'
+export const BRAND_MARK_COMPACT_SRC_3X = '/brand-header-mark@3x.png'
+export const BRAND_MARK_COMPACT_SRC_4X = '/brand-header-mark@4x.png'
+/** Taille CSS du mark compact (header Nutrition / Train). */
+export const BRAND_MARK_COMPACT_CSS_PX = 38
 
 const VARIANT = {
   compact: {
-    size: 38,
-    src: BRAND_MARK_COMPACT_SRC,
+    size: BRAND_MARK_COMPACT_CSS_PX,
+    src: BRAND_MARK_COMPACT_SRC_3X,
+    srcSet: `${BRAND_MARK_COMPACT_SRC_2X} 2x, ${BRAND_MARK_COMPACT_SRC_3X} 3x, ${BRAND_MARK_COMPACT_SRC_4X} 4x`,
     textClass: 'text-[17px] font-semibold tracking-tight',
     stackClass: 'flex-row items-center gap-2',
     taglineClass: 'text-[11px]',
@@ -33,6 +42,7 @@ const VARIANT = {
   hero: {
     size: 96,
     src: BRAND_MARK_HERO_SRC,
+    srcSet: undefined as string | undefined,
     textClass: 'text-[22px] font-semibold tracking-tight',
     stackClass: 'flex-col items-center gap-3',
     taglineClass: 'text-[13px]',
@@ -64,6 +74,7 @@ export function BrandMark({
       {renderMark ? (
         <img
           src={markSrc}
+          srcSet={cfg.srcSet}
           width={size}
           height={size}
           alt=""
@@ -72,8 +83,14 @@ export function BrandMark({
           draggable={false}
           onError={() => setImageFailed(true)}
           data-brand-mark-image={variant}
-          className="shrink-0 select-none object-contain"
-          style={{ width: size, height: size }}
+          className="brand-mark-image shrink-0 select-none object-contain"
+          style={{
+            width: size,
+            height: size,
+            /* Pas d’opacity/filter/transform — calque GPU iOS = flou. */
+            filter: 'none',
+            transform: 'none',
+          }}
         />
       ) : null}
 
@@ -83,7 +100,10 @@ export function BrandMark({
             variant === 'hero' ? 'flex flex-col items-center text-center' : 'min-w-0'
           }
         >
-          <p className={`${cfg.textClass} text-white`}>
+          <p
+            className={`${cfg.textClass} text-white`}
+            style={{ filter: 'none', transform: 'none' }}
+          >
             <span data-brand-wordmark={variant}>
               Ranked <span className="text-[#FF2B2B]">Gym</span>
             </span>

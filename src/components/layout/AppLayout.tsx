@@ -1,4 +1,5 @@
-import { useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
+import { isAccueilGalleryEnabled } from '../../backend/accueilGalleryFeatureFlag'
 import { useAuth } from '../../context/AuthContext'
 import { BrandMark } from '../brand/BrandMark'
 import { BottomNav } from './BottomNav'
@@ -7,6 +8,7 @@ import { RestTimerOverlay, REST_BAR_CONTENT_PAD } from '../training/RestTimerOve
 import { useRestTimerContext, type RestPresetSec } from '../../context/RestTimerContext'
 import type { TabId } from '../../types'
 import { useAdaptiveBottomNav } from '../../hooks/useAdaptiveBottomNav'
+import { shouldShowBrandHeader } from './shouldShowBrandHeader'
 
 interface AppLayoutProps {
   activeTab: TabId
@@ -41,22 +43,78 @@ export function AppLayout({
   } = useRestTimerContext()
 
   const streakCelebrationActive = Boolean(streakCelebration)
-  const showHeader = !chromeHidden
+  const showHeader = shouldShowBrandHeader(activeTab, chromeHidden)
   const { mode: bottomNavMode, keyboardOpen, expand } = useAdaptiveBottomNav({ mainRef, resetKey: activeTab })
   const showBottomNav = !chromeHidden && !hideBottomNav && !keyboardOpen
   const bottomNavObscured = streakCelebrationActive
   const showReadyBar = !chromeHidden && activeTab === 'training' && readyBarEnabled
+  const floatingPillNav = isAccueilGalleryEnabled()
+
+  useEffect(() => {
+    if (floatingPillNav) {
+      document.documentElement.dataset.bottomNavPreview = 'floating-pill'
+    } else {
+      delete document.documentElement.dataset.bottomNavPreview
+    }
+    return () => {
+      delete document.documentElement.dataset.bottomNavPreview
+    }
+  }, [floatingPillNav])
 
   return (
     <div
       ref={shellRef}
-      className="relative flex h-full min-h-0 flex-col mesh-bg font-sans"
+      className="relative flex h-[100dvh] min-h-0 flex-col overflow-hidden mesh-bg font-sans"
+      data-app-shell="1"
       data-streak-celebration-active={streakCelebrationActive ? '' : undefined}
       inert={streakCelebrationActive ? true : undefined}
     >
+      {/*
+        Barre marque HORS du conteneur de scroll (`main`) : elle reste visible
+        pendant le scroll sans dépendre de `position: sticky` (souvent cassé
+        sur iOS PWA quand un ancêtre scroll/overflow est en jeu).
+      */}
+      {showHeader ? (
+        <header
+          className="sticky top-0 z-30 shrink-0 border-b border-white/5"
+          data-app-brand-header="1"
+          aria-hidden={streakCelebrationActive ? true : undefined}
+          /* Safe-area seule — pas de padding fixe empilé par-dessus (Dynamic Island). */
+          style={{
+            paddingTop: 'var(--app-safe-area-top, env(safe-area-inset-top, 0px))',
+          }}
+        >
+          {/*
+            Fond (et éventuel blur) en calque frère ABSOLU sous le contenu —
+            jamais backdrop-filter / opacity / filter sur un ancêtre du logo/texte
+            (WebKit iOS rasterise alors les enfants en basse résolution).
+          */}
+          <div className="relative">
+            <div
+              aria-hidden="true"
+              data-brand-header-bg="1"
+              className="pointer-events-none absolute inset-0 -z-10 bg-[#0C0C0E]"
+            />
+            <div className="mx-auto flex max-w-lg items-center justify-center px-4 pb-2 pt-0">
+              <div data-cold-launch-target="compact">
+                <BrandMark variant="compact" />
+              </div>
+            </div>
+          </div>
+        </header>
+      ) : null}
+
+      {/*
+        Accueil edit chrome (OK / + Ajouter) portals here — outside
+        [data-app-scroll-main], same pin strategy as the brand header.
+        Host stays zero-height in the flex column; the portaled bar is fixed
+        so entering/leaving edit does not resize `main`.
+      */}
+      <div data-app-top-pin-host="1" className="relative z-40 shrink-0" />
+
       <main
         ref={mainRef}
-        className={`relative z-10 min-h-0 w-full flex-1 overflow-y-auto ${
+        className={`relative z-10 min-h-0 w-full flex-1 overflow-x-clip overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch] ${
           chromeHidden ? 'max-w-none' : ''
         }`}
         style={
@@ -67,32 +125,24 @@ export function AppLayout({
                   bottomNavObscured
                     ? '1.5rem'
                     : isBarVisible
-                      ? `calc(var(--app-bottom-nav) + ${REST_BAR_CONTENT_PAD} + env(safe-area-inset-bottom, 0px) + 1.5rem)`
-                      : 'calc(var(--app-bottom-nav) + env(safe-area-inset-bottom, 0px) + 1.5rem)',
+                      ? `calc(var(--app-bottom-nav) + ${REST_BAR_CONTENT_PAD} + var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 1.75rem)`
+                      : 'calc(var(--app-bottom-nav) + var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 1.75rem)',
               }
         }
         aria-hidden={streakCelebrationActive ? true : undefined}
+        data-app-scroll-main="1"
       >
-        {showHeader ? (
-          <header
-            className="border-b border-white/5 bg-[#0C0C0E]"
-            data-app-brand-header="1"
-            aria-hidden={streakCelebrationActive ? true : undefined}
-          >
-            <div
-              className="mx-auto flex max-w-lg items-center justify-center px-4 py-3"
-              style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
-            >
-              <div data-cold-launch-target="compact">
-                <BrandMark variant="compact" />
-              </div>
-            </div>
-          </header>
-        ) : null}
-
         <div
           className={
             chromeHidden ? undefined : 'mx-auto w-full max-w-lg px-5 py-8'
+          }
+          style={
+            chromeHidden || showHeader
+              ? undefined
+              : {
+                  /* Pas de barre marque : le contenu gère l’encoche iOS (safe-area). */
+                  paddingTop: 'max(2rem, calc(env(safe-area-inset-top, 0px) + 1rem))',
+                }
           }
         >
           {children}

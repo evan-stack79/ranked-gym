@@ -42,6 +42,61 @@ Convex CLI / backend (local `.env.local` only, never git):
 | `CONVEX_AUTH_SESSION_TTL_HOURS` | Session lifetime (optional override) |
 | `CONVEX_FILE_SIGNED_URL_TTL_SEC` | Avatar URL TTL (later phase) |
 | `MIGRATION_ADMIN_SECRET` | Server-only Convex env + local script env. Gates internal migration/auth-admin functions. Never `VITE_*`. High-entropy, ≥16 chars. |
+| `AVIS_BETA_WEBHOOK_URL` | HTTPS endpoint that receives new avis (HMAC-signed JSON). Dashboard only. |
+| `AVIS_BETA_WEBHOOK_SECRET` | HMAC-SHA256 secret for `X-Ranked-Gym-Signature`. Dashboard only. |
+| `AVIS_BETA_USER_HASH_SALT` | Salt used to hash `userId` in webhook + triage payloads (never raw user ids). |
+| `AVIS_BETA_ADMIN_KEY` | Shared secret for admin triage (`listAvisForTriage` / `triageAvis`). Fail-closed if unset. Never `VITE_*`. |
+
+### Avis bêta webhook payload
+
+`deliverAvisWebhook` POSTs a stable-key JSON body (HMAC over the exact bytes when `AVIS_BETA_WEBHOOK_SECRET` is set). Retries and rate-limiting are unchanged.
+
+| Field | Type | Notes |
+|-------|------|--------|
+| `id` | string | Convex `avis_beta` id |
+| `type` | `"bug" \| "idee" \| "autre"` | |
+| `texte` | string | Masked text when insults were masked |
+| `page` | string | |
+| `version` | string | App version |
+| `date` | string | ISO-8601 UTC (`creeLe`) |
+| `id_utilisateur_hache` | string | HMAC-SHA256 hex of `userId` with `AVIS_BETA_USER_HASH_SALT` |
+| `statut` | string | e.g. `nouveau`, `urgent`, … |
+| `signalUrgent` | boolean | Distress flag |
+| `signalNiveau` | `1 \| 2 \| null` | 1 = TCA/mal-être, 2 = idées suicidaires, `null` if none |
+
+### Avis bêta admin triage
+
+Public Convex functions gated by `AVIS_BETA_ADMIN_KEY` (constant-time compare; fail-closed if unset). Responses never include raw `userId` or age — only `id_utilisateur_hache`.
+
+List (urgent first, then nouveau; optional `statut` filter; cursor pagination):
+
+```bash
+curl -sS "$CONVEX_URL/api/query" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "path": "avisBeta:listAvisForTriage",
+    "args": { "adminKey": "'"$AVIS_BETA_ADMIN_KEY"'", "limit": 20 },
+    "format": "json"
+  }'
+```
+
+Triage mutation (`decision` + `noteTri`, optional `statut` e.g. `"trie"`):
+
+```bash
+curl -sS "$CONVEX_URL/api/mutation" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "path": "avisBeta:triageAvis",
+    "args": {
+      "adminKey": "'"$AVIS_BETA_ADMIN_KEY"'",
+      "avisId": "AVIS_ID",
+      "decision": "garde",
+      "noteTri": "Suivi humain OK",
+      "statut": "trie"
+    },
+    "format": "json"
+  }'
+```
 
 Migration scripts (runtime env only):
 

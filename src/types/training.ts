@@ -142,6 +142,11 @@ export interface WorkoutNote {
    * depuis les exercices. Absent sur les notes legacy — ne pas inventer à la lecture.
    */
   titleSource?: 'user' | 'derived'
+  /**
+   * Identifiant stable de la séance live d’origine (`ActiveWorkoutDraft.sessionId`).
+   * Copié à la sauvegarde. Absent sur les notes legacy — ne pas inventer à la lecture.
+   */
+  sessionId?: string
 }
 
 /** Détails typés par module — extensible (endurance, team, …). */
@@ -222,6 +227,12 @@ export interface ActiveWorkoutDraft {
    * Restauré à la reprise ; absent = 0.
    */
   activeExerciseIndex?: number
+  /**
+   * Identifiant stable de cette séance live (UUID).
+   * Posé au démarrage, conservé par les autosaves, copié sur la `WorkoutNote`
+   * à la fin. Absent sur les brouillons legacy — ne pas inventer à la lecture.
+   */
+  sessionId?: string
 }
 
 /** Dernière route quittée volontairement (soft-leave séance → hub). */

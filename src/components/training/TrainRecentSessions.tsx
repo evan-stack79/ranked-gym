@@ -1,4 +1,5 @@
 import type { RecentSessionItem } from '../../utils/trainHub'
+import { SoftBlurIn } from '../motion'
 
 interface TrainRecentSessionsProps {
   items: RecentSessionItem[]
@@ -20,7 +21,7 @@ export function TrainRecentSessions({
     <section aria-label={single ? 'Dernière séance' : 'Dernières séances'}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-[13px] font-semibold text-[#8E8E93]">
-          {single ? 'Dernière séance' : 'Dernières séances'}
+          <SoftBlurIn>{single ? 'Dernière séance' : 'Dernières séances'}</SoftBlurIn>
         </p>
         {single ? null : (
           <button

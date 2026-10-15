@@ -4,20 +4,27 @@ import type { OpenFoodFactsProduct } from './alimentsService'
 const isConvexDomainActive = vi.fn()
 const fetchOpenFoodFactsViaConvex = vi.fn()
 const searchOpenFoodFactsViaConvex = vi.fn()
+const searchFoodsV3ViaConvex = vi.fn()
 const listConvexFoodCatalog = vi.fn()
 const upsertConvexFoodSelection = vi.fn()
 const setConvexFoodFavorite = vi.fn()
 const isSupabaseConfigured = vi.fn()
 const getSupabase = vi.fn()
 const safeWarn = vi.fn()
+const isFoodAddV3Enabled = vi.fn(() => false)
 
 vi.mock('../backend/adapter', () => ({
   isConvexDomainActive,
 }))
 
+vi.mock('../backend/foodAddV3FeatureFlag', () => ({
+  isFoodAddV3Enabled,
+}))
+
 vi.mock('./convexNutritionService', () => ({
   fetchOpenFoodFactsViaConvex,
   searchOpenFoodFactsViaConvex,
+  searchFoodsV3ViaConvex,
   listConvexFoodCatalog,
   upsertConvexFoodSelection,
   setConvexFoodFavorite,
@@ -86,24 +93,19 @@ describe('alimentsService Convex primary migration', () => {
     expect(hits[1]?.nom).toBe('Poulet Grille')
   })
 
-  it('keeps missing nutrients as null (never coerced to 0)', async () => {
-    isConvexDomainActive.mockReturnValue(false)
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          status: 1,
-          product: {
-            code: '456',
-            product_name: 'Produit Incomplet',
-            nutriments: {
-              proteins_100g: 10,
-            },
-          },
-        }),
-      }),
-    )
+  it('keeps missing nutrients as null (never coerced to 0) via Convex', async () => {
+    isConvexDomainActive.mockReturnValue(true)
+    fetchOpenFoodFactsViaConvex.mockResolvedValue({
+      barcode: '456',
+      nom: 'Produit Incomplet',
+      brands: '',
+      calories: null,
+      proteines: 10,
+      glucides: null,
+      lipides: null,
+      provenance: 'open_food_facts',
+      fetchedAt: 1,
+    })
 
     const { fetchOpenFoodFacts } = await import('./alimentsService')
     const product = await fetchOpenFoodFacts('456')
@@ -114,38 +116,19 @@ describe('alimentsService Convex primary migration', () => {
     expect(product.proteines).toBe(10)
   })
 
-  it('falls back to direct OFF search when Convex action fails', async () => {
+  it('never calls world.openfoodfacts.org when Convex search fails (cache only)', async () => {
     isConvexDomainActive.mockReturnValue(true)
     searchOpenFoodFactsViaConvex.mockRejectedValue(new Error('convex unavailable'))
     listConvexFoodCatalog.mockRejectedValue(new Error('convex unavailable'))
 
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          products: [
-            {
-              code: '111',
-              product_name: 'Riz Basmati',
-              brands: 'Brand R',
-              nutriments: {
-                'energy-kcal_100g': 350,
-                proteins_100g: 7,
-                carbohydrates_100g: 77,
-                fat_100g: 1.2,
-              },
-            },
-          ],
-        }),
-      }),
-    )
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
 
     const { searchOpenFoodFacts } = await import('./alimentsService')
     const hits = await searchOpenFoodFacts('riz')
 
-    expect(hits).toHaveLength(1)
-    expect(hits[0]?.nom).toBe('Riz Basmati')
+    expect(hits).toEqual([])
+    expect(fetchSpy).not.toHaveBeenCalled()
     expect(safeWarn).toHaveBeenCalled()
   })
 

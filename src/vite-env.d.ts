@@ -1,5 +1,10 @@
 /// <reference types="vite/client" />
 
+/** Short SHA / id de build injecté par Vite (`vite.config.ts`). */
+declare const __APP_BUILD_ID__: string
+/** ISO du moment de build injecté par Vite (`vite.config.ts`). */
+declare const __APP_BUILD_TIME__: string
+
 interface ImportMetaEnv {
   readonly VITE_PUBLIC_APP_URL?: string
   readonly VITE_SUPABASE_URL: string
@@ -19,6 +24,16 @@ interface ImportMetaEnv {
   readonly VITE_ENABLE_AUTO_SET_VALIDATION?: string
   /** Onboarding multisport. Unset = ON en DEV/test, OFF en prod. */
   readonly VITE_ENABLE_SPORTS_ONBOARDING?: string
+  /**
+   * Accueil gallery + floating pill nav.
+   * Unset/empty = ON. Explicit false restores legacy dashboard + dock nav.
+   */
+  readonly VITE_ENABLE_ACCUEIL_GALLERY?: string
+  /**
+   * « Ajouter un aliment » v3 (roue ARC, cartes photo, recherche Convex).
+   * Unset/empty/false = OFF (écran legacy).
+   */
+  readonly VITE_ENABLE_FOOD_ADD_V3?: string
 }
 
 interface ImportMeta {

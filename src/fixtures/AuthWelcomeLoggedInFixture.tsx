@@ -3,7 +3,9 @@ import { AppShell } from '../App'
 import { AuthStateProvider } from '../context/AuthContext'
 import { RestTimerProvider } from '../context/RestTimerContext'
 import { saveCalorieProfile } from '../services/nutritionStorage'
+import { getTrainingState, saveTrainingState } from '../services/trainingStorage'
 import { buildAuthContextValue, FIXTURE_AUTH_USER } from '../test/authFixtureValue'
+import type { WorkoutRoutine } from '../types/training'
 
 function seedOnboarding() {
   saveCalorieProfile(
@@ -18,6 +20,55 @@ function seedOnboarding() {
       goal: 'cut',
       weeklyPaceKg: 0.4,
       onboardingComplete: true,
+    },
+    { skipCloud: true },
+  )
+
+  const current = getTrainingState()
+  if (current.routines.length > 0) return
+  const push: WorkoutRoutine = {
+    id: 'push',
+    label: 'Push',
+    subtitle: 'Poussée',
+    accent: '#FF2B2B',
+    updatedAt: Date.now(),
+    exercises: [
+      {
+        id: 'e1',
+        name: 'Développé couché',
+        canonicalExerciseId: 'bench_press',
+        sets: [
+          { reps: 8, weightKg: 60, done: true },
+          { reps: 8, weightKg: 60 },
+          { reps: 8, weightKg: 60 },
+        ],
+      },
+    ],
+  }
+  saveTrainingState(
+    {
+      ...current,
+      primarySportId: 'musculation',
+      favoriteSportIds: ['musculation'],
+      sportsOnboardingComplete: true,
+      routines: [push, ...(current.routines ?? [])],
+      lastSelectedRoutineId: 'push',
+      lastSelectedSportId: 'musculation',
+      workoutNotes: [
+        {
+          id: 'n-seed',
+          title: 'Push',
+          dateKey: new Date().toISOString().slice(0, 10),
+          createdAt: Date.now() - 86_400_000,
+          estimatedKcal: 280,
+          durationMin: 40,
+          sessionKind: 'strength',
+          sportId: 'musculation',
+          routineId: 'push',
+          exercises: push.exercises,
+        },
+        ...(current.workoutNotes ?? []),
+      ],
     },
     { skipCloud: true },
   )
@@ -48,6 +99,15 @@ export function AuthWelcomeLoggedInFixture() {
   return (
     <AuthStateProvider value={value}>
       <RestTimerProvider>
+        {/*
+          Fixture-only : masque le bandeau config backend (Convex/Supabase absents
+          en local/QA). Ne change pas le comportement app en production.
+        */}
+        <style>{`
+          [data-logged-in-fixture="1"] [role="alert"].sticky {
+            display: none !important;
+          }
+        `}</style>
         <div data-logged-in-fixture="1" className="h-[100dvh]">
           <AppShell />
         </div>

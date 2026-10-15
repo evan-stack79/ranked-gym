@@ -97,6 +97,7 @@ import {
   shouldAutoReopenSession,
 } from '../../utils/sessionBackNav'
 import { deriveSessionDisplayTitle } from '../../utils/sessionDisplayTitle'
+import { BlurInText, Reveal } from '../motion'
 
 type TrainPanel = 'hub' | 'notebook' | 'endurance' | 'agenda' | 'history' | 'steps'
 
@@ -106,6 +107,7 @@ export function TrainingView({
   onLaunchConsumed,
   onGoToLobby,
   openActivitySheet = false,
+  openHistory = false,
 }: {
   launchRoutineId?: string | null
   resumeActiveWorkout?: boolean
@@ -113,6 +115,8 @@ export function TrainingView({
   onGoToLobby?: () => void
   /** Navbar « Nouvelle séance » — ouvre le sheet, sans créer de 2e brouillon. */
   openActivitySheet?: boolean
+  /** Accueil gallery « Récent » — ouvre le panneau Historique. */
+  openHistory?: boolean
 }) {
   const { isLoading: isBootLoading, isAuthenticated, requireAuth } = useAuth()
   const [state, setState] = useState<TrainingState>(() => getTrainingState())
@@ -200,7 +204,7 @@ export function TrainingView({
   ])
   const nutrition = useMemo(() => getNutritionTarget(profile), [profile])
 
-  const stepsKcal = stepsToKcal(state.stepsToday, profile.weightKg)
+  const stepsKcal = stepsToKcal(state.stepsToday, profile.weightKg ?? 70)
   const workoutKcal = todayWorkoutKcal(state)
 
   const disciplineId = useMemo(() => getStoredDisciplineId(), [disciplineTick, state.primarySportId])
@@ -332,6 +336,12 @@ export function TrainingView({
     }
     onLaunchConsumed?.()
   }, [openActivitySheet, onLaunchConsumed, openNotebook])
+
+  useEffect(() => {
+    if (!openHistory) return
+    setPanel('history')
+    onLaunchConsumed?.()
+  }, [openHistory, onLaunchConsumed])
 
   /** Cold start / remount OS : rouvrir la séance sauf soft-leave volontaire. */
   useEffect(() => {
@@ -505,7 +515,7 @@ export function TrainingView({
   const openPumpCheck = useCallback((note: Parameters<typeof saveWorkoutNote>[0]) => {
     const priorNotes = getTrainingState().workoutNotes
     const prCount = countSessionPersonalRecords(note.exercises, priorNotes, note.id)
-    const bodyWeightKg = getCalorieProfile().weightKg
+    const bodyWeightKg = getCalorieProfile().weightKg ?? 70
     const liftStats = computeStrengthSessionStats(note.exercises, bodyWeightKg)
     setPumpCheckSession({
       title: deriveSessionDisplayTitle(note),
@@ -588,7 +598,7 @@ export function TrainingView({
 
   const confirmCardio = async () => {
     const kcalPerHour = sport?.kcalPerHour ?? 500
-    const estimated = estimateSessionKcal(durationMin, kcalPerHour, profile.weightKg)
+    const estimated = estimateSessionKcal(durationMin, kcalPerHour, profile.weightKg ?? 70)
     const meta = manualSessionMeta(activeSportId, activeSessionKind)
 
     let details =
@@ -634,7 +644,7 @@ export function TrainingView({
     setCardioOpen(false)
     resetCardioSheet()
     setPanel('hub')
-    showToast(`${sport?.name ?? 'Séance'} · ~${estimated} kcal → Nutri`)
+    showToast(`${sport?.name ?? 'Séance'} enregistrée`)
   }
 
   const handleQuickActivity = (id: QuickActivityId) => {
@@ -692,7 +702,9 @@ export function TrainingView({
       {panel === 'hub' ? (
         <header className="relative ios-fade-up">
           <div className="flex items-start justify-between gap-3">
-            <h1 className="text-[34px] font-bold tracking-tight text-white">Train</h1>
+            <h1 className="text-[34px] font-bold tracking-tight text-white">
+              <BlurInText as="span">Train</BlurInText>
+            </h1>
             <button
               type="button"
               onClick={() => setPanel('agenda')}
@@ -743,22 +755,26 @@ export function TrainingView({
             </p>
           ) : null}
 
-          <TrainWeeklySummary
-            summary={weeklySummary}
-            filter={summaryFilter}
-            onFilterChange={setSummaryFilter}
-            compact
-          />
+          <Reveal>
+            <TrainWeeklySummary
+              summary={weeklySummary}
+              filter={summaryFilter}
+              onFilterChange={setSummaryFilter}
+              compact
+            />
+          </Reveal>
 
-          <TrainRecentSessions
-            items={recentSessions}
-            single
-            onOpen={(id) => {
-              setFocusNoteId(id)
-              setPanel('history')
-            }}
-            onSeeAll={() => setPanel('history')}
-          />
+          <Reveal delayMs={60}>
+            <TrainRecentSessions
+              items={recentSessions}
+              single
+              onOpen={(id) => {
+                setFocusNoteId(id)
+                setPanel('history')
+              }}
+              onSeeAll={() => setPanel('history')}
+            />
+          </Reveal>
         </div>
       ) : null}
 
@@ -767,7 +783,7 @@ export function TrainingView({
           <WorkoutNotebook
             key={`notebook-${notebookLaunchId ?? 'boot'}-${notebookEditNote?.id ?? 'live'}-${activeSportId}-${notebookStartEmpty ? 'empty' : 'fill'}`}
             id="workout-notebook"
-            bodyWeightKg={profile.weightKg}
+            bodyWeightKg={profile.weightKg ?? 70}
             routines={state.routines}
             schedule={state.schedule}
             history={state.workoutNotes}
@@ -825,7 +841,7 @@ export function TrainingView({
         showEnduranceTools ? (
           <EnduranceSessionCard
             disciplineId={disciplineId}
-            bodyWeightKg={profile.weightKg}
+            bodyWeightKg={profile.weightKg ?? 70}
             onLog={(entry) => {
               const meta = manualSessionMeta(activeSportId, 'endurance')
               const details = buildEnduranceDetails(entry.distanceKm)
@@ -851,7 +867,7 @@ export function TrainingView({
                   ...(details ? { details } : {}),
                 }),
               )
-              showToast(`${entry.title} · ~${entry.estimatedKcal} kcal → Nutri`)
+              showToast(`${entry.title} enregistrée`)
               setPanel('hub')
             }}
           />

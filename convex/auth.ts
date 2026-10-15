@@ -2,6 +2,7 @@ import { v } from 'convex/values'
 import { makeFunctionReference } from 'convex/server'
 import type { Id } from './_generated/dataModel'
 import {
+  action,
   mutation,
   query,
   internalMutation,
@@ -35,6 +36,21 @@ import {
   isPasswordResetEmailConfigured,
   sendPasswordResetEmail,
 } from './lib/passwordResetMailer'
+import {
+  invalidateAllEmailCodesForUser,
+  markEmailConfirmedViaGoogleForUser,
+} from './emailVerification'
+import { internal } from './_generated/api'
+import {
+  AUTH_GOOGLE_DISABLED,
+  AUTH_GOOGLE_TOKEN_INVALID,
+  requireGoogleSignInReady,
+  verifyGoogleIdToken,
+} from './lib/googleIdToken'
+
+/** Shown when Google takes over an unconfirmed password account (B12-01). */
+export const GOOGLE_PASSWORD_REMOVED_MESSAGE =
+  'Ton ancien mot de passe a été retiré. Tu peux en créer un nouveau dans ton profil.'
 
 const RESET_ROUTE_PATH = '/auth/reset-password'
 const RESET_LINK_PURGE_GRACE_MS = 5 * 60 * 1000
@@ -137,6 +153,69 @@ async function deleteRows(
     await ctx.db.delete(row._id as never)
     deletedDocIds.add(String(row._id))
   }
+}
+
+/** Lot 1 SEC-DON-02 — suppression nutrition granulaire par lots. */
+export const NUTRITION_DELETE_BATCH_SIZE = 500
+
+/**
+ * Tables nutrition contenant userId (hors nutrition_state déjà géré à part).
+ * Toute nouvelle table user-scoped nutrition doit être ajoutée ici.
+ */
+export const NUTRITION_USER_CHILD_TABLES = [
+  { table: 'nutrition_meals' as const, index: 'by_userId_updatedAt' as const },
+  { table: 'nutrition_water_entries' as const, index: 'by_userId_updatedAt' as const },
+  { table: 'nutrition_day_state' as const, index: 'by_userId_updatedAt' as const },
+  { table: 'nutrition_food_catalog' as const, index: 'by_userId_lastSelectedAt' as const },
+]
+
+const continuePurgeNutritionUserDataRef = makeFunctionReference<
+  'mutation',
+  { userId: string },
+  { done: boolean; deleted: number }
+>('auth:continuePurgeNutritionUserData')
+
+/**
+ * Supprime jusqu'à NUTRITION_DELETE_BATCH_SIZE lignes par table enfant.
+ * @returns true s'il reste des lignes (continuation nécessaire).
+ */
+export async function purgeNutritionUserDataBatch(
+  ctx: MutationCtx,
+  userId: string,
+  deletedDocIds: Set<string>,
+  batchSize: number = NUTRITION_DELETE_BATCH_SIZE,
+): Promise<{ remaining: boolean; deleted: number }> {
+  let deleted = 0
+  let remaining = false
+
+  const batches = [
+    await ctx.db
+      .query('nutrition_meals')
+      .withIndex('by_userId_updatedAt', (q) => q.eq('userId', userId))
+      .take(batchSize),
+    await ctx.db
+      .query('nutrition_water_entries')
+      .withIndex('by_userId_updatedAt', (q) => q.eq('userId', userId))
+      .take(batchSize),
+    await ctx.db
+      .query('nutrition_day_state')
+      .withIndex('by_userId_updatedAt', (q) => q.eq('userId', userId))
+      .take(batchSize),
+    await ctx.db
+      .query('nutrition_food_catalog')
+      .withIndex('by_userId_lastSelectedAt', (q) => q.eq('userId', userId))
+      .take(batchSize),
+  ]
+
+  for (const rows of batches) {
+    await deleteRows(ctx, rows, deletedDocIds)
+    deleted += rows.length
+    if (rows.length >= batchSize) {
+      remaining = true
+    }
+  }
+
+  return { remaining, deleted }
 }
 
 type IssuePasswordResetOptions = {
@@ -284,6 +363,7 @@ export async function upsertImportedUserWithoutPassword(
       emailNorm,
       displayName: toDisplayName(emailNorm, rawUser.displayName),
       mustResetPassword: true,
+      // B9-01 : import sans confirmation — l’utilisateur passera par le code e-mail.
       createdAt: now,
       updatedAt: now,
     })
@@ -331,6 +411,7 @@ export async function registerUserWithEmail(
     emailNorm,
     displayName,
     mustResetPassword: false,
+    // B9-01 : jamais auto-confirmé à l’inscription — seulement code e-mail ou Google.
     createdAt: now,
     updatedAt: now,
   })
@@ -377,6 +458,23 @@ export async function deleteAccountAndUserData(
   }
 
   const deletedDocIds = new Set<string>()
+
+  // SEC-DON-02 : enfants nutrition d'abord (lots + continuation planifiée si plein).
+  // auth_users n'est supprimé qu'après ce batch initial + planification fiable.
+  const nutritionPurge = await purgeNutritionUserDataBatch(ctx, user.userId, deletedDocIds)
+  if (nutritionPurge.remaining && hasScheduler(ctx)) {
+    await ctx.scheduler.runAfter(0, continuePurgeNutritionUserDataRef, {
+      userId: user.userId,
+    })
+  } else if (nutritionPurge.remaining) {
+    // Sans scheduler (tests) : vider jusqu'à épuisement dans la même mutation.
+    let guard = 0
+    while (guard < 10_000) {
+      const next = await purgeNutritionUserDataBatch(ctx, user.userId, deletedDocIds)
+      if (!next.remaining) break
+      guard += 1
+    }
+  }
 
   await deleteRows(
     ctx,
@@ -509,6 +607,11 @@ export async function deleteAccountAndUserData(
     await ctx.db.query('auth_private_notes').withIndex('by_userId', (q) => q.eq('userId', user.userId)).collect(),
     deletedDocIds,
   )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('avis_beta').withIndex('by_userId', (q) => q.eq('userId', user.userId)).collect(),
+    deletedDocIds,
+  )
 
   const userFiles = await ctx.db
     .query('user_files')
@@ -632,6 +735,164 @@ export const signInWithPassword = mutation({
     }),
   }),
   handler: (ctx, args) => signInWithPasswordForEmail(ctx, args),
+})
+
+/**
+ * B11-01 / B12-01 : session from JWKS-verified claims only.
+ * Unconfirmed + password ⇒ atomic takeover: drop password, revoke sessions,
+ * invalidate email codes, confirm via Google, audit (userId+at only).
+ */
+export async function completeGoogleSignInFromVerifiedClaims(
+  ctx: MutationCtx,
+  args: {
+    email: string
+    googleSub: string
+    displayName?: string
+    emailVerified: true
+    now?: number
+  },
+): Promise<{
+  sessionToken: string
+  expiresAt: number
+  mustResetPassword: boolean
+  emailConfirmed: true
+  passwordRemoved: boolean
+  user: { userId: string; email: string; displayName: string }
+}> {
+  if (args.emailVerified !== true) throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
+  const emailNorm = normalizeEmail(args.email)
+  const googleSub = args.googleSub.trim()
+  if (!emailNorm || !googleSub) throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
+  const now = args.now ?? Date.now()
+  await consumeRateLimit(ctx, 'signInEmail', { kind: 'email', value: emailNorm })
+
+  let user = await findUserByEmailNorm(ctx, emailNorm)
+  if (!user || user.deletedAt) {
+    const userId = crypto.randomUUID()
+    await ctx.db.insert('auth_users', {
+      userId,
+      email: emailNorm,
+      emailNorm,
+      displayName: toDisplayName(emailNorm, args.displayName),
+      mustResetPassword: false,
+      createdAt: now,
+      updatedAt: now,
+    })
+    user = await findUserByEmailNorm(ctx, emailNorm)
+  }
+  if (!user || user.deletedAt) throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
+
+  const alreadyConfirmed =
+    typeof user.emailConfirmedAt === 'number' && user.emailConfirmedAt > 0
+  const credential = await getPasswordCredential(ctx, user.userId)
+  const takeover = Boolean(credential) && !alreadyConfirmed
+
+  if (takeover) {
+    // Atomic takeover (Convex mutation = single transaction).
+    const credentials = await ctx.db
+      .query('auth_password_credentials')
+      .withIndex('by_userId', (q) => q.eq('userId', user!.userId))
+      .collect()
+    for (const row of credentials) {
+      await ctx.db.delete(row._id)
+    }
+    await revokeAllUserSessions(ctx, user.userId, now)
+    await invalidateAllEmailCodesForUser(ctx, user.userId, now)
+    await markEmailConfirmedViaGoogleForUser(ctx, { userId: user.userId, now })
+    await ctx.db.insert('auth_google_takeover_audit', {
+      userId: user.userId,
+      at: now,
+    })
+  } else {
+    await markEmailConfirmedViaGoogleForUser(ctx, { userId: user.userId, now })
+  }
+
+  const session = await createSession(ctx, user.userId)
+  return {
+    sessionToken: session.sessionToken,
+    expiresAt: session.expiresAt,
+    mustResetPassword: takeover,
+    emailConfirmed: true as const,
+    passwordRemoved: takeover,
+    user: {
+      userId: user.userId,
+      email: user.email,
+      displayName: user.displayName,
+    },
+  }
+}
+
+export const completeGoogleSignInFromVerifiedClaimsMutation = internalMutation({
+  args: {
+    email: v.string(),
+    googleSub: v.string(),
+    displayName: v.optional(v.string()),
+    emailVerified: v.literal(true),
+    now: v.optional(v.number()),
+  },
+  returns: v.object({
+    sessionToken: v.string(),
+    expiresAt: v.number(),
+    mustResetPassword: v.boolean(),
+    emailConfirmed: v.literal(true),
+    passwordRemoved: v.boolean(),
+    user: v.object({
+      userId: v.string(),
+      email: v.string(),
+      displayName: v.string(),
+    }),
+  }),
+  handler: (ctx, args) => completeGoogleSignInFromVerifiedClaims(ctx, args),
+})
+
+/**
+ * B11-01 : phone sends ONLY the Google ID token.
+ * Kill switch (6a32d91): throws AUTH_GOOGLE_DISABLED unless CONVEX_GOOGLE_SIGNIN_ENABLED=true.
+ * When enabled: JWKS verify (cached) + iss/aud/exp/iat/email_verified; fail-closed if no client id.
+ */
+type GoogleSignInResult = {
+  sessionToken: string
+  expiresAt: number
+  mustResetPassword: boolean
+  emailConfirmed: true
+  passwordRemoved: boolean
+  user: { userId: string; email: string; displayName: string }
+}
+
+export const signInWithGoogle = action({
+  args: {
+    idToken: v.string(),
+  },
+  returns: v.object({
+    sessionToken: v.string(),
+    expiresAt: v.number(),
+    mustResetPassword: v.boolean(),
+    emailConfirmed: v.literal(true),
+    passwordRemoved: v.boolean(),
+    user: v.object({
+      userId: v.string(),
+      email: v.string(),
+      displayName: v.string(),
+    }),
+  }),
+  handler: async (ctx, args): Promise<GoogleSignInResult> => {
+    // Kill switch first — no session when disabled (default).
+    const clientId = requireGoogleSignInReady()
+    let verified
+    try {
+      verified = await verifyGoogleIdToken(args.idToken, { clientId })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ''
+      if (message === AUTH_GOOGLE_DISABLED) throw new Error(AUTH_GOOGLE_DISABLED)
+      throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
+    }
+    return await ctx.runMutation(internal.auth.completeGoogleSignInFromVerifiedClaimsMutation, {
+      email: verified.email,
+      googleSub: verified.sub,
+      displayName: verified.name,
+      emailVerified: true as const,
+    })
+  },
 })
 
 export const signOut = mutation({
@@ -1007,6 +1268,37 @@ export const changePassword = mutation({
     expiresAt: v.number(),
   }),
   handler: (ctx, args) => changePasswordForSession(ctx, args),
+})
+
+/**
+ * Continuation planifiée — purge les lignes nutrition restantes pour userId.
+ * Peut s'exécuter après suppression de auth_users (pas d'orphelins durables).
+ */
+export const continuePurgeNutritionUserData = internalMutation({
+  args: { userId: v.string() },
+  returns: v.object({ done: v.boolean(), deleted: v.number() }),
+  handler: async (ctx, args) => {
+    const deletedDocIds = new Set<string>()
+    const result = await purgeNutritionUserDataBatch(ctx, args.userId, deletedDocIds)
+    if (result.remaining && hasScheduler(ctx)) {
+      await ctx.scheduler.runAfter(0, continuePurgeNutritionUserDataRef, {
+        userId: args.userId,
+      })
+      return { done: false, deleted: result.deleted }
+    }
+    if (result.remaining) {
+      let guard = 0
+      let deleted = result.deleted
+      while (guard < 10_000) {
+        const next = await purgeNutritionUserDataBatch(ctx, args.userId, deletedDocIds)
+        deleted += next.deleted
+        if (!next.remaining) return { done: true, deleted }
+        guard += 1
+      }
+      return { done: false, deleted }
+    }
+    return { done: true, deleted: result.deleted }
+  },
 })
 
 export const deleteOwnAccount = mutation({
