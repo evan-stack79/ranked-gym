@@ -37,6 +37,8 @@ interface NutritionDayMealsCardProps {
   onEditMeal?: (meal: MealEntry) => void
   /** Masque le bouton + (TCA / mineurs). */
   hideAdd?: boolean
+  /** V3 ON — name + quantité seulement (pas de kcal). */
+  hideNutritionNumbers?: boolean
 }
 
 export function NutritionDayMealsCard({
@@ -44,6 +46,7 @@ export function NutritionDayMealsCard({
   onAddMeal,
   onEditMeal,
   hideAdd = false,
+  hideNutritionNumbers = false,
 }: NutritionDayMealsCardProps) {
   const baseId = useId()
   const [openTypes, setOpenTypes] = useState<Partial<Record<MealType, boolean>>>({})
@@ -107,19 +110,27 @@ export function NutritionDayMealsCard({
                       <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-white">
                         {MEAL_ROW_LABELS[type]}
                       </span>
-                      <span className="shrink-0 text-[14px] tabular-nums text-[#8E8E93]">
-                        {/* SAFETY: meal kcal stays static — never CountUpNumber. */}
-                        <StaticKcalNumber value={kcal} /> kcal
-                      </span>
+                      {hideNutritionNumbers ? (
+                        <span className="shrink-0 text-[14px] tabular-nums text-[#8E8E93]">
+                          {items.length}
+                        </span>
+                      ) : (
+                        <span className="shrink-0 text-[14px] tabular-nums text-[#8E8E93]">
+                          {/* SAFETY: meal kcal stays static — never CountUpNumber. */}
+                          <StaticKcalNumber value={kcal} /> kcal
+                        </span>
+                      )}
                     </button>
                   ) : (
                     <div className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-2 py-2">
                       <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-white">
                         {MEAL_ROW_LABELS[type]}
                       </span>
-                      <span className="shrink-0 text-[14px] tabular-nums text-[#8E8E93]">
-                        <StaticKcalNumber value={kcal} /> kcal
-                      </span>
+                      {hideNutritionNumbers ? null : (
+                        <span className="shrink-0 text-[14px] tabular-nums text-[#8E8E93]">
+                          <StaticKcalNumber value={kcal} /> kcal
+                        </span>
+                      )}
                     </div>
                   )}
                   {hideAdd ? null : (
@@ -162,8 +173,11 @@ export function NutritionDayMealsCard({
                                   {meal.name}
                                 </span>
                                 <span className="mt-0.5 block text-[12px] text-[#8E8E93]">
-                                  {Math.round(meal.calories).toLocaleString('fr-FR')} kcal
-                                  {portion ? ` · ${portion}` : ''}
+                                  {hideNutritionNumbers
+                                    ? portion ?? ''
+                                    : `${Math.round(meal.calories).toLocaleString('fr-FR')} kcal${
+                                        portion ? ` · ${portion}` : ''
+                                      }`}
                                 </span>
                               </span>
                             </button>

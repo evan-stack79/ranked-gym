@@ -10,6 +10,8 @@ interface EditMealSheetProps {
   onClose: () => void
   onSave: (mealId: string, patch: Partial<MealEntry>) => void
   onDelete: (mealId: string) => void
+  /** V3 only — masque calories / macros (flag OFF → défaut false, UI legacy). */
+  hideNutritionNumbers?: boolean
 }
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -22,7 +24,14 @@ type Baseline = {
   fatG: number | null
 }
 
-export function EditMealSheet({ open, meal, onClose, onSave, onDelete }: EditMealSheetProps) {
+export function EditMealSheet({
+  open,
+  meal,
+  onClose,
+  onSave,
+  onDelete,
+  hideNutritionNumbers = false,
+}: EditMealSheetProps) {
   const [name, setName] = useState('')
   const [mealType, setMealType] = useState<MealType>('lunch')
   const [calories, setCalories] = useState<number | null>(0)
@@ -57,10 +66,13 @@ export function EditMealSheet({ open, meal, onClose, onSave, onDelete }: EditMea
 
   if (!meal) return null
 
-  const canSave = name.trim().length > 0 && calories != null && calories >= 0
+  const canSave = hideNutritionNumbers
+    ? name.trim().length > 0
+    : name.trim().length > 0 && calories != null && calories >= 0
 
   const applyGrams = (nextGrams: number | null) => {
     setGrams(nextGrams)
+    if (hideNutritionNumbers) return
     const base = baselineRef.current
     if (base == null || nextGrams == null || !(nextGrams > 0)) return
     const ratio = nextGrams / base.grams
@@ -77,7 +89,11 @@ export function EditMealSheet({ open, meal, onClose, onSave, onDelete }: EditMea
       open={open}
       onClose={onClose}
       title="Modifier l’aliment"
-      subtitle="Change le repas, les calories ou les grammes"
+      subtitle={
+        hideNutritionNumbers
+          ? 'Change le repas ou la quantité'
+          : 'Change le repas, les calories ou les grammes'
+      }
     >
       <div className="space-y-4 pb-2">
         <label className="block">
@@ -110,18 +126,20 @@ export function EditMealSheet({ open, meal, onClose, onSave, onDelete }: EditMea
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">Calories</span>
-            <ClearableNumberInput
-              value={calories}
-              onChange={setCalories}
-              min={0}
-              max={5000}
-              aria-label="Calories"
-              className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
-            />
-          </label>
+        <div className={`grid gap-3 ${hideNutritionNumbers ? 'grid-cols-1' : 'grid-cols-2'}`}>
+          {hideNutritionNumbers ? null : (
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">Calories</span>
+              <ClearableNumberInput
+                value={calories}
+                onChange={setCalories}
+                min={0}
+                max={5000}
+                aria-label="Calories"
+                className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
+              />
+            </label>
+          )}
           <label className="block">
             <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">
               Quantité (g)
@@ -141,58 +159,71 @@ export function EditMealSheet({ open, meal, onClose, onSave, onDelete }: EditMea
               className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
             />
           </label>
-          <label className="block">
-            <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">Protéines</span>
-            <ClearableNumberInput
-              value={proteinG}
-              onChange={setProteinG}
-              min={0}
-              max={400}
-              step={0.1}
-              required={false}
-              placeholder="—"
-              placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#636366]"
-              aria-label="Protéines"
-              className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">Glucides</span>
-            <ClearableNumberInput
-              value={carbsG}
-              onChange={setCarbsG}
-              min={0}
-              max={400}
-              step={0.1}
-              required={false}
-              placeholder="—"
-              placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#636366]"
-              aria-label="Glucides"
-              className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">Lipides</span>
-            <ClearableNumberInput
-              value={fatG}
-              onChange={setFatG}
-              min={0}
-              max={400}
-              step={0.1}
-              required={false}
-              placeholder="—"
-              placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#636366]"
-              aria-label="Lipides"
-              className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
-            />
-          </label>
+          {hideNutritionNumbers ? null : (
+            <>
+              <label className="block">
+                <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">Protéines</span>
+                <ClearableNumberInput
+                  value={proteinG}
+                  onChange={setProteinG}
+                  min={0}
+                  max={400}
+                  step={0.1}
+                  required={false}
+                  placeholder="—"
+                  placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#636366]"
+                  aria-label="Protéines"
+                  className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">Glucides</span>
+                <ClearableNumberInput
+                  value={carbsG}
+                  onChange={setCarbsG}
+                  min={0}
+                  max={400}
+                  step={0.1}
+                  required={false}
+                  placeholder="—"
+                  placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#636366]"
+                  aria-label="Glucides"
+                  className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">Lipides</span>
+                <ClearableNumberInput
+                  value={fatG}
+                  onChange={setFatG}
+                  min={0}
+                  max={400}
+                  step={0.1}
+                  required={false}
+                  placeholder="—"
+                  placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#636366]"
+                  aria-label="Lipides"
+                  className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
+                />
+              </label>
+            </>
+          )}
         </div>
 
         <button
           type="button"
           disabled={!canSave}
           onClick={() => {
-            if (!canSave || calories == null) return
+            if (!canSave) return
+            if (hideNutritionNumbers) {
+              onSave(meal.id, {
+                name: name.trim(),
+                mealType,
+                grams: grams ?? undefined,
+              })
+              return
+            }
+            if (calories == null) return
             onSave(meal.id, {
               name: name.trim(),
               mealType,

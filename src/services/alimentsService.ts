@@ -59,14 +59,32 @@ export interface PersonalFoodItem {
 
 const SEARCH_PAGE_SIZE = 20
 
-function mapCloudProduct(product: OpenFoodFactsProductCloud): OpenFoodFactsSearchHit {
+function mapCloudProduct(
+  product: OpenFoodFactsProductCloud | {
+    barcode: string
+    nom: string
+    brands: string
+    servingSize?: string | null
+    portionLabel?: string
+    categoriesTags?: string[]
+    imageUrl?: string
+    imageStorageId?: string
+    provenance: 'open_food_facts'
+    fetchedAt: number
+    calories?: number | null
+    proteines?: number | null
+    glucides?: number | null
+    lipides?: number | null
+  },
+): OpenFoodFactsSearchHit {
   return {
     barcode: product.barcode,
     nom: product.nom,
-    calories: product.calories,
-    proteines: product.proteines,
-    glucides: product.glucides,
-    lipides: product.lipides,
+    // V3 public hits n’envoient plus de macros — null côté client.
+    calories: 'calories' in product ? (product.calories ?? null) : null,
+    proteines: 'proteines' in product ? (product.proteines ?? null) : null,
+    glucides: 'glucides' in product ? (product.glucides ?? null) : null,
+    lipides: 'lipides' in product ? (product.lipides ?? null) : null,
     imageUrl: product.imageUrl,
     imageStorageId: product.imageStorageId,
     brands: product.brands ?? '',

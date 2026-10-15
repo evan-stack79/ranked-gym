@@ -40,6 +40,20 @@ export type OpenFoodFactsProductCloud = {
   fetchedAt: number
 }
 
+/** Hit recherche V3 (app-facing) — jamais de kcal / macros. */
+export type FoodAddV3SearchHitCloud = {
+  barcode: string
+  nom: string
+  brands: string
+  servingSize: string | null
+  portionLabel: string
+  categoriesTags: string[]
+  imageUrl?: string
+  imageStorageId?: string
+  provenance: 'open_food_facts'
+  fetchedAt: number
+}
+
 type JournalSnapshot = {
   meals: Array<{
     mealId: string
@@ -303,7 +317,7 @@ export async function searchFoodsV3ViaConvex(input: {
   categoryTag?: string | null
   limit?: number
 }): Promise<{
-  hits: OpenFoodFactsProductCloud[]
+  hits: FoodAddV3SearchHitCloud[]
   searchCount: number
   dailyLimit: number
 }> {
@@ -314,9 +328,68 @@ export async function searchFoodsV3ViaConvex(input: {
     categoryTag: input.categoryTag ?? null,
     limit: input.limit,
   }) as Promise<{
-    hits: OpenFoodFactsProductCloud[]
+    hits: FoodAddV3SearchHitCloud[]
     searchCount: number
     dailyLimit: number
+  }>
+}
+
+/** Garde serveur V3 — appeler avant d’ouvrir l’écran (pas seulement à l’écriture). */
+export async function checkFoodAddAccessViaConvex(): Promise<{
+  ok: boolean
+  error?: string
+  diabetes?: boolean
+}> {
+  const sessionToken = await requireToken()
+  return getConvex().query(api.nutrition.checkFoodAddAccess, {
+    sessionToken,
+  }) as Promise<{ ok: boolean; error?: string; diabetes?: boolean }>
+}
+
+/** Journal V3 app-facing (sans kcal / macros). */
+export async function fetchConvexJournalSnapshotV3(options?: {
+  startDateKey?: string
+  endDateKey?: string
+  includeDeleted?: boolean
+}): Promise<{
+  meals: Array<{
+    mealId: string
+    dateKey?: string
+    mealType?: string
+    name?: string
+    grams?: number
+    pieces?: number
+    portionLabel?: string
+    imageUrl?: string
+    imageStorageId?: string
+    offCode?: string
+    createdAt?: number
+    updatedAt: number
+    deletedAt?: number
+  }>
+}> {
+  const sessionToken = await requireToken()
+  return getConvex().query(api.foodAdd.listJournalEntriesV3, {
+    sessionToken,
+    startDateKey: options?.startDateKey,
+    endDateKey: options?.endDateKey,
+    includeDeleted: options?.includeDeleted,
+  }) as Promise<{
+    meals: Array<{
+      mealId: string
+      dateKey?: string
+      mealType?: string
+      name?: string
+      grams?: number
+      pieces?: number
+      portionLabel?: string
+      imageUrl?: string
+      imageStorageId?: string
+      offCode?: string
+      createdAt?: number
+      updatedAt: number
+      deletedAt?: number
+    }>
   }>
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Camera, ScanBarcode, Search, WifiOff, X } from 'lucide-react'
+import { Search, WifiOff, X } from 'lucide-react'
 import type { MealType } from '../../types/nutrition'
 import { MEAL_TYPE_LABELS } from '../../utils/calories'
 import type { OpenFoodFactsSearchHit } from '../../services/alimentsService'
@@ -10,12 +10,22 @@ import {
   type FoodCategoryId,
 } from '../../utils/foodCategories'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
-import { MealPhotoAnalyzer } from './MealPhotoAnalyzer'
+import { parseGramsFromServingSize } from '../../utils/foodDisplay'
 import { FoodCategoryWheel } from './FoodCategoryWheel'
 import { FoodProductCard } from './FoodProductCard'
 import { FoodSelectionBar } from './FoodSelectionBar'
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
+
+export type FoodAddV3QuantityUnit = 'g' | 'pieces'
+
+/** Sélection validée V3 — name + quantité (jamais de kcal dans l’UI). */
+export type FoodAddV3Selection = {
+  hit: OpenFoodFactsSearchHit
+  grams?: number
+  pieces?: number
+  unit: FoodAddV3QuantityUnit
+}
 
 function MealTypeChip({
   type,
@@ -53,12 +63,13 @@ interface AddFoodScreenProps {
   searchHits: OpenFoodFactsSearchHit[]
   category: FoodCategoryId
   onCategoryChange: (id: FoodCategoryId) => void
-  /** Ajoute immédiatement les aliments choisis (snapshots). */
-  onValidateSelection: (hits: OpenFoodFactsSearchHit[]) => void
-  onOpenScanner: () => void
+  /** Ajoute les aliments choisis après saisie de quantité. */
+  onValidateSelection: (items: FoodAddV3Selection[]) => void
+  /** Conservé pour compat props ; court = recherche seule (non affiché). */
+  onOpenScanner?: () => void
   scannerSlot?: ReactNode
-  onToast: (message: string, variant?: 'success' | 'error') => void
-  onPhotoAnalyzed: (result: {
+  onToast?: (message: string, variant?: 'success' | 'error') => void
+  onPhotoAnalyzed?: (result: {
     name: string
     mealType: MealType
     calories: number
@@ -68,25 +79,28 @@ interface AddFoodScreenProps {
   }) => void
   name: string
   onNameChange: (value: string) => void
-  calories: number
-  onCaloriesChange: (value: number) => void
-  proteinG: number | ''
-  onProteinChange: (value: number | '') => void
-  carbsG: number | ''
-  onCarbsChange: (value: number | '') => void
-  fatG: number | ''
-  onFatChange: (value: number | '') => void
+  calories?: number
+  onCaloriesChange?: (value: number) => void
+  proteinG?: number | ''
+  onProteinChange?: (value: number | '') => void
+  carbsG?: number | ''
+  onCarbsChange?: (value: number | '') => void
+  fatG?: number | ''
+  onFatChange?: (value: number | '') => void
   mealType: MealType
   onMealTypeChange: (type: MealType) => void
   onSubmitManual: (event: FormEvent) => void
   onClose: () => void
   /** Tests : force icônes neutres. */
   forceOfflineImages?: boolean
+  /** Quantité manuelle (grammes) — parent. */
+  manualGrams?: number | ''
+  onManualGramsChange?: (value: number | '') => void
 }
 
 /**
- * Plein écran « Ajouter un aliment » — design v3 (roue ARC + cartes 2 col).
- * Insets via env(safe-area-inset-*) pour encoche / Dynamic Island.
+ * Plein écran « Ajouter un aliment » v3 court — recherche seule.
+ * Pas de scanner / photo. Pas de kcal / macros à l’écran.
  */
 export function AddFoodScreenV3({
   searchQuery,
@@ -97,30 +111,22 @@ export function AddFoodScreenV3({
   category,
   onCategoryChange,
   onValidateSelection,
-  onOpenScanner,
-  scannerSlot,
-  onToast,
-  onPhotoAnalyzed,
   name,
   onNameChange,
-  calories: _calories,
-  onCaloriesChange: _onCaloriesChange,
-  proteinG,
-  onProteinChange,
-  carbsG,
-  onCarbsChange,
-  fatG,
-  onFatChange,
   mealType,
   onMealTypeChange,
   onSubmitManual,
   onClose,
   forceOfflineImages = false,
+  manualGrams = '',
+  onManualGramsChange,
 }: AddFoodScreenProps) {
-  void _calories
-  void _onCaloriesChange
   const [manualOpen, setManualOpen] = useState(false)
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
+  const [quantityStep, setQuantityStep] = useState(false)
+  const [qtyByKey, setQtyByKey] = useState<
+    Record<string, { unit: FoodAddV3QuantityUnit; value: number }>
+  >({})
   const online = useOnlineStatus()
   const searchActive = searchQuery.trim().length > 0
 
@@ -131,7 +137,6 @@ export function AddFoodScreenV3({
 
   const selectedHits = useMemo(() => {
     const map = new Map(filteredHits.map((h) => [hitKey(h), h] as const))
-    // Keep selection even if filtered out of current view
     for (const h of searchHits) map.set(hitKey(h), h)
     return selectedKeys.map((k) => map.get(k)).filter((h): h is OpenFoodFactsSearchHit => Boolean(h))
   }, [selectedKeys, filteredHits, searchHits])
@@ -150,21 +155,50 @@ export function AddFoodScreenV3({
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') {
+        if (quantityStep) {
+          setQuantityStep(false)
+          return
+        }
+        onClose()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, quantityStep])
 
   const toggleHit = (hit: OpenFoodFactsSearchHit) => {
     const key = hitKey(hit)
     setSelectedKeys((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]))
   }
 
-  const handleValidate = () => {
+  const openQuantityStep = () => {
     if (selectedHits.length === 0) return
-    onValidateSelection(selectedHits)
+    const next: Record<string, { unit: FoodAddV3QuantityUnit; value: number }> = {}
+    for (const hit of selectedHits) {
+      const key = hitKey(hit)
+      const parsed = parseGramsFromServingSize(hit.servingSize)
+      next[key] = { unit: 'g', value: parsed && parsed > 0 ? parsed : 100 }
+    }
+    setQtyByKey(next)
+    setQuantityStep(true)
+  }
+
+  const confirmQuantities = () => {
+    const items: FoodAddV3Selection[] = []
+    for (const hit of selectedHits) {
+      const key = hitKey(hit)
+      const qty = qtyByKey[key] ?? { unit: 'g' as const, value: 100 }
+      if (qty.unit === 'pieces') {
+        items.push({ hit, pieces: qty.value, unit: 'pieces' })
+      } else {
+        items.push({ hit, grams: qty.value, unit: 'g' })
+      }
+    }
+    onValidateSelection(items)
     setSelectedKeys([])
+    setQuantityStep(false)
+    setQtyByKey({})
   }
 
   const idleBrowse = !searchActive && filteredHits.length === 0 && !searchLoading
@@ -176,6 +210,7 @@ export function AddFoodScreenV3({
       aria-modal="true"
       aria-labelledby="add-food-title"
       data-add-food-screen
+      data-food-add-v3-court="true"
       className="fixed inset-0 z-[90] flex h-[100dvh] w-screen flex-col"
       style={{
         paddingTop: 'env(safe-area-inset-top, 0px)',
@@ -230,39 +265,6 @@ export function AddFoodScreenV3({
             aria-label="Rechercher un aliment Open Food Facts"
           />
         </label>
-
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onOpenScanner}
-            className="ios-press flex min-w-0 flex-1 items-center justify-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-[13px] font-semibold text-white"
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white">
-              <ScanBarcode className="h-4 w-4" aria-hidden />
-            </span>
-            Scan Code-Barre
-          </button>
-          <MealPhotoAnalyzer
-            variant="button"
-            buttonClassName="ios-press flex w-full items-center justify-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-[13px] font-semibold text-white disabled:opacity-50"
-            iconSlot={
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white">
-                <Camera className="h-4 w-4" aria-hidden />
-              </span>
-            }
-            onToast={onToast}
-            onAnalyzed={(result) => {
-              onPhotoAnalyzed({
-                name: result.name,
-                mealType: result.mealType,
-                calories: result.calories,
-                proteinG: result.proteines,
-                carbsG: result.glucides,
-                fatG: result.lipides,
-              })
-            }}
-          />
-        </div>
 
         {!online || forceOfflineImages ? (
           <p
@@ -367,6 +369,7 @@ export function AddFoodScreenV3({
                 <form
                   onSubmit={onSubmitManual}
                   className="mt-2 max-h-[42vh] space-y-3 overflow-y-auto overscroll-contain"
+                  data-manual-form
                 >
                   <div className="flex flex-wrap gap-1.5">
                     {MEAL_TYPES.map((type) => (
@@ -388,66 +391,35 @@ export function AddFoodScreenV3({
                       placeholder="Poulet riz brocoli…"
                       className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/40"
                       required
+                      data-testid="food-add-manual-name"
                     />
                   </label>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className="block">
-                      <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
-                        Protéines (g)
-                      </span>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        min={0}
-                        max={400}
-                        value={proteinG}
-                        onChange={(e) =>
-                          onProteinChange(e.target.value === '' ? '' : Number(e.target.value))
-                        }
-                        placeholder="Optionnel"
-                        className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/40"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
-                        Glucides (g)
-                      </span>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        min={0}
-                        max={400}
-                        value={carbsG}
-                        onChange={(e) =>
-                          onCarbsChange(e.target.value === '' ? '' : Number(e.target.value))
-                        }
-                        placeholder="Optionnel"
-                        className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/40"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
-                        Lipides (g)
-                      </span>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        min={0}
-                        max={400}
-                        value={fatG}
-                        onChange={(e) =>
-                          onFatChange(e.target.value === '' ? '' : Number(e.target.value))
-                        }
-                        placeholder="Optionnel"
-                        className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/40"
-                      />
-                    </label>
-                  </div>
+                  <label className="block">
+                    <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                      Quantité (g)
+                    </span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min={1}
+                      max={5000}
+                      value={manualGrams}
+                      onChange={(e) =>
+                        onManualGramsChange?.(
+                          e.target.value === '' ? '' : Number(e.target.value),
+                        )
+                      }
+                      placeholder="ex. 120"
+                      className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/40"
+                      data-testid="food-add-manual-grams"
+                    />
+                  </label>
 
                   <button
                     type="submit"
                     className="btn-brand w-full rounded-xl border border-white/15 py-3 text-[15px] font-semibold text-white"
+                    data-testid="food-add-manual-submit"
                   >
                     Enregistrer
                   </button>
@@ -457,13 +429,108 @@ export function AddFoodScreenV3({
           ) : null}
         </div>
 
-        {scannerSlot ? (
-          <div className="absolute inset-0 z-20 overflow-y-auto overscroll-contain">{scannerSlot}</div>
+        {quantityStep ? (
+          <div
+            className="absolute inset-0 z-40 flex flex-col bg-[#0C0C0E]/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-3"
+            data-food-quantity-step
+            role="dialog"
+            aria-label="Choisir la quantité"
+          >
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h2 className="text-[17px] font-semibold text-white">Quantité</h2>
+              <button
+                type="button"
+                className="ios-press text-[13px] font-semibold text-[#8E8E93]"
+                onClick={() => setQuantityStep(false)}
+              >
+                Retour
+              </button>
+            </div>
+            <ul className="min-h-0 flex-1 space-y-3 overflow-y-auto">
+              {selectedHits.map((hit) => {
+                const key = hitKey(hit)
+                const qty = qtyByKey[key] ?? { unit: 'g' as const, value: 100 }
+                return (
+                  <li
+                    key={key}
+                    className="rounded-2xl border border-white/10 bg-black/30 p-3"
+                    data-food-quantity-row
+                  >
+                    <p className="truncate text-[14px] font-semibold text-white">{hit.nom}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
+                          qty.unit === 'g'
+                            ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-white'
+                            : 'border-white/10 text-[#8E8E93]'
+                        }`}
+                        onClick={() =>
+                          setQtyByKey((prev) => ({
+                            ...prev,
+                            [key]: { unit: 'g', value: prev[key]?.value || 100 },
+                          }))
+                        }
+                      >
+                        Grammes
+                      </button>
+                      <button
+                        type="button"
+                        className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
+                          qty.unit === 'pieces'
+                            ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-white'
+                            : 'border-white/10 text-[#8E8E93]'
+                        }`}
+                        onClick={() =>
+                          setQtyByKey((prev) => ({
+                            ...prev,
+                            [key]: { unit: 'pieces', value: prev[key]?.value || 1 },
+                          }))
+                        }
+                      >
+                        Pièces
+                      </button>
+                    </div>
+                    <label className="mt-2 block">
+                      <span className="sr-only">
+                        {qty.unit === 'pieces' ? 'Nombre de pièces' : 'Grammes'}
+                      </span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min={1}
+                        max={qty.unit === 'pieces' ? 99 : 5000}
+                        value={qty.value}
+                        onChange={(e) => {
+                          const n = Number(e.target.value)
+                          if (!Number.isFinite(n)) return
+                          setQtyByKey((prev) => ({
+                            ...prev,
+                            [key]: { unit: qty.unit, value: n },
+                          }))
+                        }}
+                        className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#FF2B2B]/40"
+                        data-testid={`food-qty-input-${key}`}
+                      />
+                    </label>
+                  </li>
+                )
+              })}
+            </ul>
+            <button
+              type="button"
+              onClick={confirmQuantities}
+              className="btn-brand mt-3 w-full rounded-xl border border-white/15 py-3 text-[15px] font-semibold text-white"
+              data-testid="food-quantity-confirm"
+            >
+              Valider
+            </button>
+          </div>
         ) : null}
 
         <FoodSelectionBar
           selected={selectedHits}
-          onValidate={handleValidate}
+          onValidate={openQuantityStep}
           forceOfflineImages={forceOfflineImages}
         />
       </div>

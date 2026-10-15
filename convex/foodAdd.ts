@@ -24,6 +24,12 @@ import {
   FOOD_ADD_ACCESS_DENIED_MINOR,
   FOOD_ADD_ACCESS_DENIED_TCA,
 } from './lib/foodAddAccess'
+import {
+  formatPortionLabelFromServing,
+  toFoodAddV3PublicHit,
+  toFoodAddV3PublicMeal,
+  type FoodAddV3PublicHit,
+} from './lib/foodAddPublic'
 
 const OFF_USER_AGENT = 'RankedGym/1.0 (support@rankedgym.app)'
 const OFF_TIMEOUT_MS = 8_000
@@ -56,7 +62,8 @@ type OwnedImageRef = {
   url: string | null
 }
 
-type FoodHit = {
+/** Hit interne OFF (avec nutriments pour stockage serveur uniquement). */
+type FoodHitInternal = {
   barcode: string
   nom: string
   brands: string
@@ -78,8 +85,9 @@ type FoodSearchQuota = {
   dailyLimit: number
 }
 
+/** Réponse app-facing V3 — jamais de kcal / macros. */
 type SearchFoodsResult = {
-  hits: FoodHit[]
+  hits: FoodAddV3PublicHit[]
   searchCount: number
   dailyLimit: number
 }
@@ -180,15 +188,13 @@ function mapOffProduct(raw: OffApiProduct, fallbackBarcode: string) {
   }
 }
 
-const foodHitValidator = v.object({
+/** Validateur app-facing V3 — name / portion / ids uniquement. */
+const foodHitPublicValidator = v.object({
   barcode: v.string(),
   nom: v.string(),
   brands: v.string(),
-  calories: v.union(v.number(), v.null()),
-  proteines: v.union(v.number(), v.null()),
-  glucides: v.union(v.number(), v.null()),
-  lipides: v.union(v.number(), v.null()),
   servingSize: v.union(v.string(), v.null()),
+  portionLabel: v.string(),
   categoriesTags: v.array(v.string()),
   imageUrl: v.optional(v.string()),
   imageStorageId: v.optional(v.string()),
@@ -414,7 +420,7 @@ export const searchFoods = action({
     limit: v.optional(v.number()),
   },
   returns: v.object({
-    hits: v.array(foodHitValidator),
+    hits: v.array(foodHitPublicValidator),
     searchCount: v.number(),
     dailyLimit: v.number(),
   }),
@@ -453,7 +459,7 @@ export const searchFoods = action({
       `https://world.openfoodfacts.org/cgi/search.pl?${params.toString()}`,
     )) as { products?: OffApiProduct[] }
     const products = Array.isArray(data.products) ? data.products : []
-    const hits: FoodHit[] = []
+    const hits: FoodAddV3PublicHit[] = []
 
     for (const product of products) {
       const mapped = mapOffProduct(product, String(product.code || product._id || ''))
@@ -473,21 +479,21 @@ export const searchFoods = action({
           imageStorageId = cached.storageId
         }
       }
-      hits.push({
-        barcode: mapped.barcode,
-        nom: mapped.nom,
-        brands: mapped.brands,
-        calories: mapped.calories,
-        proteines: mapped.proteines,
-        glucides: mapped.glucides,
-        lipides: mapped.lipides,
-        servingSize: mapped.servingSize,
-        categoriesTags: mapped.categoriesTags,
-        imageUrl,
-        imageStorageId,
-        provenance: 'open_food_facts',
-        fetchedAt: mapped.fetchedAt,
-      })
+      // Nutriments lus côté serveur pour stockage ultérieur ; non renvoyés à l’app.
+      void (mapped as FoodHitInternal)
+      hits.push(
+        toFoodAddV3PublicHit({
+          barcode: mapped.barcode,
+          nom: mapped.nom,
+          brands: mapped.brands,
+          servingSize: mapped.servingSize,
+          categoriesTags: mapped.categoriesTags,
+          imageUrl,
+          imageStorageId,
+          provenance: 'open_food_facts',
+          fetchedAt: mapped.fetchedAt,
+        }),
+      )
       if (hits.length >= limit) break
     }
 
@@ -635,6 +641,88 @@ export const addFoodSnapshot = mutation({
   },
 })
 
+/**
+ * Journal V3 app-facing — name / quantité / unité (+ ids, timestamps).
+ * Ne remplace pas listJournalEntries (legacy V3-OFF inchangé).
+ */
+export const listJournalEntriesV3 = query({
+  args: {
+    sessionToken: v.string(),
+    startDateKey: v.optional(v.string()),
+    endDateKey: v.optional(v.string()),
+    includeDeleted: v.optional(v.boolean()),
+  },
+  returns: v.object({
+    meals: v.array(
+      v.object({
+        mealId: v.string(),
+        dateKey: v.optional(v.string()),
+        mealType: v.optional(v.string()),
+        name: v.optional(v.string()),
+        grams: v.optional(v.number()),
+        pieces: v.optional(v.number()),
+        portionLabel: v.optional(v.string()),
+        imageUrl: v.optional(v.string()),
+        imageStorageId: v.optional(v.string()),
+        offCode: v.optional(v.string()),
+        createdAt: v.optional(v.number()),
+        updatedAt: v.number(),
+        deletedAt: v.optional(v.number()),
+      }),
+    ),
+  }),
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx, args.sessionToken)
+    const includeDeleted = Boolean(args.includeDeleted)
+    const startDateKey = args.startDateKey ? normalizeDateKey(args.startDateKey) : undefined
+    const endDateKey = args.endDateKey ? normalizeDateKey(args.endDateKey) : undefined
+
+    const mealRows = await ctx.db
+      .query('nutrition_meals')
+      .withIndex('by_userId_updatedAt', (q) => q.eq('userId', user.userId))
+      .collect()
+
+    const meals = mealRows
+      .filter((row) => {
+        if (!includeDeleted && row.deletedAt) return false
+        if (row.dateKey == null) {
+          return includeDeleted && !startDateKey && !endDateKey
+        }
+        if (startDateKey && row.dateKey < startDateKey) return false
+        if (endDateKey && row.dateKey > endDateKey) return false
+        return true
+      })
+      .map((row) => {
+        assertUserOwnership(row.userId, user.userId)
+        if (row.deletedAt != null && row.name == null && row.dateKey == null) {
+          return toFoodAddV3PublicMeal({
+            mealId: row.mealId,
+            updatedAt: row.updatedAt,
+            deletedAt: row.deletedAt,
+          })
+        }
+        return toFoodAddV3PublicMeal({
+          mealId: row.mealId,
+          dateKey: row.dateKey,
+          mealType: row.mealType,
+          name: row.name,
+          grams: row.grams,
+          pieces: row.pieces,
+          portionLabel: row.portionLabel,
+          imageUrl: row.imageUrl,
+          imageStorageId: row.imageStorageId,
+          offCode: row.offCode,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+          deletedAt: row.deletedAt,
+        })
+      })
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+
+    return { meals }
+  },
+})
+
 /** Exposé pour tests unitaires (sans Convex runtime). */
 export const __test = {
   mapOffProduct,
@@ -643,4 +731,5 @@ export const __test = {
   FOOD_ADD_ACCESS_DENIED_MINOR,
   FOOD_ADD_ACCESS_DENIED_TCA,
   toDateKey,
+  formatPortionLabelFromServing,
 }

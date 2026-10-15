@@ -121,9 +121,11 @@ describe('AddFoodScreenV3 — règles produit', () => {
       (el) => el.textContent?.trim() === 'Calories',
     )
     expect(calorieLabels).toHaveLength(0)
-    expect(document.querySelector('[data-add-food-screen] form')?.textContent ?? '').toContain(
-      'Protéines',
-    )
+    const manualText = document.querySelector('[data-add-food-screen] form')?.textContent ?? ''
+    expect(manualText).not.toContain('Protéines')
+    expect(manualText).not.toContain('Glucides')
+    expect(manualText).not.toContain('Lipides')
+    expect(manualText).toContain('Quantité (g)')
 
     // Cartes : image dans le flux (pas absolute overlapping), portion non truncatée.
     const card = document.querySelector('[data-food-card]') as HTMLElement
