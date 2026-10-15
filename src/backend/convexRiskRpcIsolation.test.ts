@@ -157,6 +157,10 @@ describe('Convex PR-G RPC isolation', () => {
     expect(rowsA).toHaveLength(0)
     expect(rowsB).toHaveLength(1)
     expect(rowsB[0]?.user_id).toBe('user-b')
+    // Old clients may still send coords — server always strips them.
+    expect(rowsB[0]?.salle_lat).toBeNull()
+    expect(rowsB[0]?.salle_lng).toBeNull()
+    expect(rowsB[0]?.gym_payload).toBeNull()
 
     const countA = await countCheckinsForSession(ctx as never, 'session-a')
     const countB = await countCheckinsForSession(ctx as never, 'session-b')
