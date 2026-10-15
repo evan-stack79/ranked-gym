@@ -35,10 +35,10 @@ export function extractAgeFromProfileJson(profileJson: unknown): unknown {
   return asRecord(profileJson)?.age
 }
 
+/** B16-01 — TCA true refuse toujours, quel que soit healthAnswer. */
 export function extractEatingDisorderFromProfileJson(profileJson: unknown): boolean {
   const record = asRecord(profileJson)
   if (!record) return false
-  if (record.healthAnswer === 'none' || record.healthAnswer === 'prefer_not') return false
   return Boolean(record.declaredEatingDisorder)
 }
 

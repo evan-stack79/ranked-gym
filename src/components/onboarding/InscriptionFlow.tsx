@@ -283,7 +283,8 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
   }
 
   const pickExclusive = (answer: 'none' | 'prefer_not') => {
-    if (answer === 'none' && noneLocked) return
+    // B16-01 — Aucune et « Je préfère ne pas répondre » verrouillés si flag serveur.
+    if (noneLocked) return
     setDraft((d) => ({
       ...d,
       healthAnswer: d.healthAnswer === answer ? null : answer,
@@ -467,6 +468,8 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
                 onToggle={() => pickExclusive('prefer_not')}
                 testId="inscription-health-prefer-not"
                 exclusive
+                disabled={noneLocked}
+                hint={noneLocked ? AUCUNE_LOCKED_HINT : undefined}
               />
             </div>
           </div>

@@ -192,7 +192,9 @@ export function HealthSituationsForm({
   }
 
   const pickExclusive = (next: 'none' | 'prefer_not') => {
-    if (next === 'none' && noneLocked) return
+    // B16-01 — Aucune et « Je préfère ne pas répondre » ne peuvent pas
+    // contourner un flag déjà true serveur.
+    if (noneLocked) return
     const cleared = answer === next ? null : next
     emit({
       healthAnswer: cleared,
@@ -264,6 +266,8 @@ export function HealthSituationsForm({
           checked={answer === 'prefer_not'}
           onToggle={() => pickExclusive('prefer_not')}
           testId="health-prefer-not"
+          disabled={noneLocked}
+          hint={noneLocked ? AUCUNE_LOCKED_HINT : undefined}
         />
       </div>
 

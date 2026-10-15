@@ -1,9 +1,11 @@
 /**
  * Unique point d’écriture de `nutrition_state.profileJson`.
  *
- * B15 — SAFETY FIELDS : sync/import ne peuvent jamais les effacer ni passer true→false.
- * Âge mineur : hausse limitée (temps écoulé depuis ageRecordedAt + 1 an de marge).
- * Refus food-add : toujours depuis l’âge / flags STOCKÉS.
+ * B15/B16 — SAFETY FIELDS : sync/import ne peuvent jamais les effacer ni passer true→false.
+ * healthAnswer : calculé serveur (jamais confiance client).
+ * Âge mineur : limite via minorAgeRef { age, at } (première référence <18).
+ * Client ageRecordedAt : toujours ignoré.
+ * clear / admin : passent uniquement par writeNutritionProfileJson.
  */
 import type { MutationCtx } from '../_generated/server'
 
@@ -19,6 +21,7 @@ export const NUTRITION_PROFILE_SAFETY_FIELDS = [
   'declaredDiabetes',
   'declaredPregnancy',
   'declaredBreastfeeding',
+  'minorAgeRef',
 ] as const
 
 export type NutritionSafetyBoolField =
@@ -43,6 +46,7 @@ export function isNutritionProfileWriteAuthorized(): boolean {
 
 export const NUTRITION_AGE_MAJORITY_AUDIT_TABLE = 'nutrition_age_majority_audit' as const
 export const NUTRITION_SAFETY_CLEAR_AUDIT_TABLE = 'nutrition_safety_clear_audit' as const
+export const NUTRITION_SAFETY_ADMIN_AUDIT_TABLE = 'nutrition_safety_admin_audit' as const
 
 export const AGE_CONTACT_US_MESSAGE = 'Pour corriger ton âge, écris-nous.' as const
 export const DIABETES_CLEAR_CONFIRM =
@@ -54,12 +58,13 @@ export const BREASTFEEDING_CLEAR_CONFIRM =
 export const SAFETY_CLEAR_SIGN_IN = 'Connecte-toi pour retirer cette situation.' as const
 export const TCA_LOCKED_MESSAGE =
   'Cette situation reste enregistrée pour te protéger. Pour la retirer, écris-nous.' as const
-export const NUTRITION_SAFETY_ADMIN_AUDIT_TABLE = 'nutrition_safety_admin_audit' as const
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   return value as Record<string, unknown>
 }
+
+export type MinorAgeRef = { age: number; at: number }
 
 /**
  * Âge valide entrant / stocké : entier ou string d’entier seul, 10–120 inclus.
@@ -94,39 +99,114 @@ export function extractAgeRecordedAt(profileJson: unknown): number | null {
   return null
 }
 
+export function extractMinorAgeRef(profileJson: unknown): MinorAgeRef | null {
+  const raw = asRecord(profileJson)?.minorAgeRef
+  const rec = asRecord(raw)
+  if (!rec) return null
+  const age = parseValidNutritionAge(rec.age)
+  const at = typeof rec.at === 'number' && Number.isFinite(rec.at) && rec.at > 0 ? rec.at : null
+  if (age == null || at == null || age >= NUTRITION_ADULT_MIN) return null
+  return { age, at }
+}
+
 export function isSafetyBoolTrue(profileJson: unknown, field: NutritionSafetyBoolField): boolean {
   return Boolean(asRecord(profileJson)?.[field])
 }
 
+export function anySafetyBoolTrue(profileJson: unknown): boolean {
+  const rec = asRecord(profileJson) ?? {}
+  return NUTRITION_SAFETY_BOOL_FIELDS.some((f) => Boolean(rec[f]))
+}
+
 /**
- * Hausse max autorisée pour un mineur : années écoulées depuis ageRecordedAt + 1.
- * Ex. enregistré aujourd’hui → +1 an max (anniversaire).
+ * healthAnswer serveur.
+ * Si un flag booléen de sécurité est true → toujours 'situations' (client ignoré).
+ * Sinon → null (le merge peut alors garder none / prefer_not client).
  */
+export function computeServerHealthAnswer(
+  flags: Record<string, unknown>,
+): 'situations' | null {
+  for (const field of NUTRITION_SAFETY_BOOL_FIELDS) {
+    if (Boolean(flags[field])) return 'situations'
+  }
+  return null
+}
+
+function applyServerHealthAnswer(
+  target: Record<string, unknown>,
+  clientHealthAnswer?: unknown,
+): void {
+  const forced = computeServerHealthAnswer(target)
+  if (forced) {
+    target.healthAnswer = forced
+    return
+  }
+  // Aucun flag true : autoriser none / prefer_not / situations client ; sinon retirer.
+  if (
+    clientHealthAnswer === 'none' ||
+    clientHealthAnswer === 'prefer_not' ||
+    clientHealthAnswer === 'situations'
+  ) {
+    target.healthAnswer = clientHealthAnswer
+  } else {
+    delete target.healthAnswer
+  }
+}
+
+/**
+ * Âge max autorisé pour un mineur : refAge + années écoulées depuis ref.at + 1.
+ * Sans ref : +1 an de marge depuis « maintenant » (strict).
+ */
+export function maxAllowedAgeFromMinorRef(ref: MinorAgeRef | null, now: number): number | null {
+  if (ref == null) return null
+  const elapsedYears =
+    ref.at <= 0 || now < ref.at ? 0 : Math.floor((now - ref.at) / MS_PER_YEAR)
+  return ref.age + elapsedYears + 1
+}
+
+/** @deprecated Prefer maxAllowedAgeFromMinorRef — conservé pour tests B15. */
 export function maxMinorAgeIncrease(ageRecordedAt: number | null, now: number): number {
   if (ageRecordedAt == null || ageRecordedAt <= 0 || now < ageRecordedAt) return 1
   return Math.floor((now - ageRecordedAt) / MS_PER_YEAR) + 1
 }
 
+/**
+ * Décide âge + minorAgeRef.
+ * - Client ageRecordedAt toujours ignoré.
+ * - minorAgeRef : première référence <18, jamais changée par sync (sauf admin).
+ * - Baisse d’âge acceptée sans reset de la ref.
+ */
 export function decideMergedAge(args: {
   prevAge: number | null
   nextAge: number | null
-  ageRecordedAt: number | null
+  prevMinorAgeRef: MinorAgeRef | null
+  /** Legacy server ageRecordedAt — seed minorAgeRef if ref absent. */
+  prevAgeRecordedAt: number | null
   now: number
-  /** Conservé à la première écriture (import / seed) si déjà présent. */
-  incomingAgeRecordedAt?: number | null
+  /** Admin : ignore la limite mineur. */
+  bypassMinorLimit?: boolean
 }): {
   age: number | null
+  minorAgeRef: MinorAgeRef | null
   ageRecordedAt: number | null
   ageChanged: boolean
   ageRejectedContactUs: boolean
   becameAdultFromMinor: boolean
 } {
-  const { prevAge, nextAge, ageRecordedAt, now, incomingAgeRecordedAt } = args
+  const { prevAge, nextAge, prevMinorAgeRef, prevAgeRecordedAt, now, bypassMinorLimit } = args
+
+  // Seed / conserve la ref mineur.
+  let minorAgeRef = prevMinorAgeRef
+  if (minorAgeRef == null && prevAge != null && prevAge < NUTRITION_ADULT_MIN) {
+    // Ancienne ligne : date = ageRecordedAt serveur s’il existe, sinon now (strictest B16-03).
+    minorAgeRef = { age: prevAge, at: prevAgeRecordedAt ?? now }
+  }
 
   if (nextAge == null) {
     return {
       age: prevAge,
-      ageRecordedAt: prevAge != null ? ageRecordedAt : null,
+      minorAgeRef,
+      ageRecordedAt: prevAge != null ? prevAgeRecordedAt : null,
       ageChanged: false,
       ageRejectedContactUs: false,
       becameAdultFromMinor: false,
@@ -134,22 +214,25 @@ export function decideMergedAge(args: {
   }
 
   if (prevAge == null) {
+    const ref =
+      nextAge < NUTRITION_ADULT_MIN
+        ? ({ age: nextAge, at: now } satisfies MinorAgeRef)
+        : minorAgeRef
     return {
       age: nextAge,
-      ageRecordedAt:
-        incomingAgeRecordedAt != null && incomingAgeRecordedAt > 0
-          ? incomingAgeRecordedAt
-          : now,
+      minorAgeRef: ref,
+      ageRecordedAt: now,
       ageChanged: true,
       ageRejectedContactUs: false,
       becameAdultFromMinor: false,
     }
   }
 
-  // Baisse toujours acceptée.
+  // Baisse toujours acceptée — ne reset PAS la ref.
   if (nextAge < prevAge) {
     return {
       age: nextAge,
+      minorAgeRef,
       ageRecordedAt: now,
       ageChanged: true,
       ageRejectedContactUs: false,
@@ -160,7 +243,8 @@ export function decideMergedAge(args: {
   if (nextAge === prevAge) {
     return {
       age: prevAge,
-      ageRecordedAt: ageRecordedAt ?? now,
+      minorAgeRef,
+      ageRecordedAt: prevAgeRecordedAt ?? now,
       ageChanged: false,
       ageRejectedContactUs: false,
       becameAdultFromMinor: false,
@@ -168,10 +252,10 @@ export function decideMergedAge(args: {
   }
 
   // Hausse.
-  if (prevAge >= NUTRITION_ADULT_MIN) {
-    // Adulte : libre dans 10–120.
+  if (prevAge >= NUTRITION_ADULT_MIN && (minorAgeRef == null || bypassMinorLimit)) {
     return {
       age: nextAge,
+      minorAgeRef,
       ageRecordedAt: now,
       ageChanged: true,
       ageRejectedContactUs: false,
@@ -179,24 +263,32 @@ export function decideMergedAge(args: {
     }
   }
 
-  // Mineur : limite temps + 1 an de marge (AV-01).
-  const maxUp = maxMinorAgeIncrease(ageRecordedAt, now)
-  if (nextAge > prevAge + maxUp) {
-    return {
-      age: prevAge,
-      ageRecordedAt: ageRecordedAt ?? now,
-      ageChanged: false,
-      ageRejectedContactUs: true,
-      becameAdultFromMinor: false,
+  // Limite mineur via minorAgeRef (pas via ageRecordedAt resettable).
+  if (!bypassMinorLimit) {
+    // Ensure ref exists for current minor.
+    if (minorAgeRef == null && prevAge < NUTRITION_ADULT_MIN) {
+      minorAgeRef = { age: prevAge, at: now }
+    }
+    const maxAllowed = maxAllowedAgeFromMinorRef(minorAgeRef, now)
+    if (maxAllowed != null && nextAge > maxAllowed) {
+      return {
+        age: prevAge,
+        minorAgeRef,
+        ageRecordedAt: prevAgeRecordedAt ?? now,
+        ageChanged: false,
+        ageRejectedContactUs: true,
+        becameAdultFromMinor: false,
+      }
     }
   }
 
   return {
     age: nextAge,
+    minorAgeRef,
     ageRecordedAt: now,
     ageChanged: true,
     ageRejectedContactUs: false,
-    becameAdultFromMinor: nextAge >= NUTRITION_ADULT_MIN,
+    becameAdultFromMinor: prevAge < NUTRITION_ADULT_MIN && nextAge >= NUTRITION_ADULT_MIN,
   }
 }
 
@@ -204,10 +296,7 @@ export function decideMergedAge(args: {
  * true stocké ne peut pas passer à false / absent via sync.
  * false → true toujours accepté.
  */
-export function mergeSafetyBool(
-  stored: boolean,
-  incoming: unknown,
-): boolean {
+export function mergeSafetyBool(stored: boolean, incoming: unknown): boolean {
   if (stored) return true
   return Boolean(incoming)
 }
@@ -218,44 +307,135 @@ export type MergeNutritionProfileResult = {
   ageRejectedContactUs: boolean
 }
 
+export type WriteNutritionDeliberate =
+  | { kind: 'clearSafetyBool'; field: NutritionSafetyBoolField }
+  | {
+      kind: 'adminCorrect'
+      field: AdminCorrectableField
+      value: boolean | number | null
+    }
+
 /**
  * Fusionne le profil entrant en préservant les SAFETY FIELDS.
  * `incoming` non-objet (null, string, …) → conserve le profil précédent (sécurité).
+ * healthAnswer client ignoré ; forcé à 'situations' si un flag booléen est true.
+ * Client ageRecordedAt toujours ignoré.
  */
 export function mergeNutritionProfileJson(
   previousProfileJson: unknown,
   incomingProfileJson: unknown,
   now = Date.now(),
+  deliberate?: WriteNutritionDeliberate,
 ): MergeNutritionProfileResult {
   const prevRecord = asRecord(previousProfileJson) ?? {}
   const prevAge = parseValidNutritionAge(prevRecord.age)
   const prevRecordedAt = extractAgeRecordedAt(previousProfileJson)
+  const prevMinorRef = extractMinorAgeRef(previousProfileJson)
 
+  // --- Chemins délibérés (clear / admin) : partent du profil stocké. ---
+  if (deliberate?.kind === 'clearSafetyBool') {
+    if (deliberate.field === 'declaredEatingDisorder') {
+      throw new Error('NUTRITION_SAFETY_TCA_LOCKED')
+    }
+    const next = { ...prevRecord }
+    if (!Boolean(next[deliberate.field])) {
+      return { profileJson: next, becameAdultFromMinor: false, ageRejectedContactUs: false }
+    }
+    delete next[deliberate.field]
+    applyServerHealthAnswer(next)
+    return { profileJson: next, becameAdultFromMinor: false, ageRejectedContactUs: false }
+  }
+
+  if (deliberate?.kind === 'adminCorrect') {
+    const next = { ...prevRecord }
+    if (deliberate.field === 'age') {
+      if (deliberate.value == null) {
+        delete next.age
+        delete next.ageRecordedAt
+        delete next.minorAgeRef
+      } else {
+        const age = parseValidNutritionAge(deliberate.value)
+        if (age == null) {
+          return {
+            profileJson: prevRecord,
+            becameAdultFromMinor: false,
+            ageRejectedContactUs: false,
+          }
+        }
+        const wasMinor = prevAge != null && prevAge < NUTRITION_ADULT_MIN
+        next.age = age
+        next.ageRecordedAt = now
+        if (age < NUTRITION_ADULT_MIN) {
+          next.minorAgeRef = { age, at: now }
+        } else {
+          // Admin peut lever la ref en passant à 18+.
+          delete next.minorAgeRef
+        }
+        applyServerHealthAnswer(next)
+        return {
+          profileJson: next,
+          becameAdultFromMinor: Boolean(wasMinor && age >= NUTRITION_ADULT_MIN),
+          ageRejectedContactUs: false,
+        }
+      }
+    } else if (typeof deliberate.value === 'boolean') {
+      if (deliberate.value) next[deliberate.field] = true
+      else delete next[deliberate.field]
+    } else {
+      return {
+        profileJson: prevRecord,
+        becameAdultFromMinor: false,
+        ageRejectedContactUs: false,
+      }
+    }
+    applyServerHealthAnswer(next)
+    // Preserve minorAgeRef unless age was admin-cleared above.
+    if (prevMinorRef && deliberate.field !== 'age') {
+      next.minorAgeRef = prevMinorRef
+    }
+    return { profileJson: next, becameAdultFromMinor: false, ageRejectedContactUs: false }
+  }
+
+  // --- Sync / import / update normal ---
   if (
     incomingProfileJson == null ||
     typeof incomingProfileJson !== 'object' ||
     Array.isArray(incomingProfileJson)
   ) {
     const kept = { ...prevRecord }
+    // Ignore any client ageRecordedAt; preserve server dates / ref.
     if (prevAge != null) {
       kept.age = prevAge
       if (prevRecordedAt != null) kept.ageRecordedAt = prevRecordedAt
     }
     for (const field of NUTRITION_SAFETY_BOOL_FIELDS) {
       if (Boolean(prevRecord[field])) kept[field] = true
+      else delete kept[field]
     }
+    // Seed minorAgeRef if missing on old minor row.
+    let ref = prevMinorRef
+    if (ref == null && prevAge != null && prevAge < NUTRITION_ADULT_MIN) {
+      ref = { age: prevAge, at: prevRecordedAt ?? now }
+    }
+    if (ref) kept.minorAgeRef = ref
+    else delete kept.minorAgeRef
+    applyServerHealthAnswer(kept, prevRecord.healthAnswer)
     return { profileJson: kept, becameAdultFromMinor: false, ageRejectedContactUs: false }
   }
 
   const incoming = { ...(incomingProfileJson as Record<string, unknown>) }
+  const clientHealthAnswer = incoming.healthAnswer
+  // B16-03 — toujours ignorer ageRecordedAt / minorAgeRef client.
+  delete incoming.ageRecordedAt
+  delete incoming.minorAgeRef
+
   const nextAge = parseValidNutritionAge(incoming.age)
-  const incomingRecordedAt = extractAgeRecordedAt(incoming)
   const ageDecision = decideMergedAge({
     prevAge,
     nextAge,
-    ageRecordedAt: prevRecordedAt,
+    prevMinorAgeRef: prevMinorRef,
+    prevAgeRecordedAt: prevRecordedAt,
     now,
-    incomingAgeRecordedAt: incomingRecordedAt,
   })
 
   if (ageDecision.age != null) {
@@ -266,11 +446,17 @@ export function mergeNutritionProfileJson(
     delete incoming.ageRecordedAt
   }
 
+  if (ageDecision.minorAgeRef) incoming.minorAgeRef = ageDecision.minorAgeRef
+  else delete incoming.minorAgeRef
+
   for (const field of NUTRITION_SAFETY_BOOL_FIELDS) {
     const stored = Boolean(prevRecord[field])
     incoming[field] = mergeSafetyBool(stored, incoming[field])
     if (!incoming[field]) delete incoming[field]
   }
+
+  // healthAnswer : forcé 'situations' si flag true ; sinon none/prefer_not client OK.
+  applyServerHealthAnswer(incoming, clientHealthAnswer)
 
   return {
     profileJson: incoming,
@@ -289,6 +475,7 @@ export async function writeNutritionProfileJson(
     incomingProfileJson: unknown
     updatedAt: number
     journalJson?: unknown
+    deliberate?: WriteNutritionDeliberate
   },
 ): Promise<{
   profileJson: Record<string, unknown>
@@ -306,6 +493,7 @@ export async function writeNutritionProfileJson(
       existing?.profileJson,
       args.incomingProfileJson,
       args.updatedAt,
+      args.deliberate,
     )
 
     if (becameAdultFromMinor) {
@@ -361,7 +549,7 @@ export async function applyNutritionProfileFromAccountLink(
 
 /**
  * Action délibérée : retire un flag booléen de sécurité (jamais via sync).
- * Audit : userId + at uniquement.
+ * Passe uniquement par writeNutritionProfileJson. Audit : userId + at uniquement.
  */
 export async function clearNutritionSafetyBoolField(
   ctx: MutationCtx,
@@ -371,38 +559,31 @@ export async function clearNutritionSafetyBoolField(
     updatedAt?: number
   },
 ): Promise<{ cleared: boolean }> {
-  // TCA : pas de retrait via l’app dans ce PR.
   if (args.field === 'declaredEatingDisorder') {
     throw new Error('NUTRITION_SAFETY_TCA_LOCKED')
   }
 
   const now = args.updatedAt ?? Date.now()
-  nutritionProfileWriteDepth += 1
-  try {
-    const existing = await ctx.db
-      .query('nutrition_state')
-      .withIndex('by_userId', (q) => q.eq('userId', args.userId))
-      .first()
-    if (!existing) return { cleared: false }
+  const existing = await ctx.db
+    .query('nutrition_state')
+    .withIndex('by_userId', (q) => q.eq('userId', args.userId))
+    .first()
+  if (!existing) return { cleared: false }
 
-    const prev = asRecord(existing.profileJson) ?? {}
-    if (!Boolean(prev[args.field])) return { cleared: false }
+  const prev = asRecord(existing.profileJson) ?? {}
+  if (!Boolean(prev[args.field])) return { cleared: false }
 
-    const next = { ...prev }
-    delete next[args.field]
-
-    await ctx.db.patch(existing._id, {
-      profileJson: next,
-      updatedAt: now,
-    })
-    await ctx.db.insert(NUTRITION_SAFETY_CLEAR_AUDIT_TABLE, {
-      userId: args.userId,
-      at: now,
-    })
-    return { cleared: true }
-  } finally {
-    nutritionProfileWriteDepth -= 1
-  }
+  await writeNutritionProfileJson(ctx, {
+    userId: args.userId,
+    incomingProfileJson: {},
+    updatedAt: now,
+    deliberate: { kind: 'clearSafetyBool', field: args.field },
+  })
+  await ctx.db.insert(NUTRITION_SAFETY_CLEAR_AUDIT_TABLE, {
+    userId: args.userId,
+    at: now,
+  })
+  return { cleared: true }
 }
 
 export type AdminCorrectableField = NutritionSafetyBoolField | 'age'
@@ -412,8 +593,8 @@ export type AdminCorrectableField = NutritionSafetyBoolField | 'age'
  * Avant de corriger quoi que ce soit, vérifier que l’e-mail de la demande
  * vient bien de l’adresse du compte.
  *
- * Passe par le write-depth token (même garde FakeDb) mais contourne
- * uniquement : never-true→false pour le champ nommé, et la limite d’âge mineur.
+ * Passe uniquement par writeNutritionProfileJson (bypass never-true→false
+ * et limite âge mineur pour le champ nommé).
  * Audit : userId + field + at (pas la valeur santé au-delà du nom du champ).
  */
 export async function adminCorrectNutritionSafetyField(
@@ -426,51 +607,29 @@ export async function adminCorrectNutritionSafetyField(
   },
 ): Promise<{ applied: boolean }> {
   const now = args.updatedAt ?? Date.now()
-  nutritionProfileWriteDepth += 1
-  try {
-    const existing = await ctx.db
-      .query('nutrition_state')
-      .withIndex('by_userId', (q) => q.eq('userId', args.userId))
-      .first()
 
-    const prev = asRecord(existing?.profileJson) ?? {}
-    const next: Record<string, unknown> = { ...prev }
-
-    if (args.field === 'age') {
-      if (args.value == null) {
-        delete next.age
-        delete next.ageRecordedAt
-      } else {
-        const age = parseValidNutritionAge(args.value)
-        if (age == null) return { applied: false }
-        next.age = age
-        next.ageRecordedAt = now
-      }
-    } else if (typeof args.value === 'boolean') {
-      if (args.value) next[args.field] = true
-      else delete next[args.field]
-    } else {
+  if (args.field === 'age') {
+    if (args.value != null && parseValidNutritionAge(args.value) == null) {
       return { applied: false }
     }
-
-    if (existing) {
-      await ctx.db.patch(existing._id, { profileJson: next, updatedAt: now })
-    } else {
-      await ctx.db.insert('nutrition_state', {
-        userId: args.userId,
-        profileJson: next,
-        journalJson: {},
-        updatedAt: now,
-      })
-    }
-
-    await ctx.db.insert(NUTRITION_SAFETY_ADMIN_AUDIT_TABLE, {
-      userId: args.userId,
-      field: args.field,
-      at: now,
-    })
-    return { applied: true }
-  } finally {
-    nutritionProfileWriteDepth -= 1
+  } else if (typeof args.value !== 'boolean') {
+    return { applied: false }
   }
+
+  await writeNutritionProfileJson(ctx, {
+    userId: args.userId,
+    incomingProfileJson: {},
+    updatedAt: now,
+    deliberate: {
+      kind: 'adminCorrect',
+      field: args.field,
+      value: args.value,
+    },
+  })
+  await ctx.db.insert(NUTRITION_SAFETY_ADMIN_AUDIT_TABLE, {
+    userId: args.userId,
+    field: args.field,
+    at: now,
+  })
+  return { applied: true }
 }

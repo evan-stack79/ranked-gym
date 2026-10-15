@@ -85,12 +85,19 @@ describe('Convex foodAddAccess (serveur)', () => {
         declaredEatingDisorder: true,
       }),
     ).toBe(true)
+    // B16-01 — TCA true ignore healthAnswer (none / prefer_not ne contournent plus).
     expect(
       extractEatingDisorderFromProfileJson({
         healthAnswer: 'none',
         declaredEatingDisorder: true,
       }),
-    ).toBe(false)
+    ).toBe(true)
+    expect(
+      extractEatingDisorderFromProfileJson({
+        healthAnswer: 'prefer_not',
+        declaredEatingDisorder: true,
+      }),
+    ).toBe(true)
     expect(extractDiabetesFromProfileJson({ declaredDiabetes: true })).toBe(true)
   })
 })

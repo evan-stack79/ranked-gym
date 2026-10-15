@@ -184,13 +184,14 @@ async function seedProfile(db: GuardedFakeDb, profile: Record<string, unknown>) 
 }
 
 describe('B15 — liste SAFETY FIELDS', () => {
-  it('expose exactement les 5 clés réelles profileJson', () => {
+  it('expose exactement les clés réelles profileJson (dont minorAgeRef B16)', () => {
     expect([...NUTRITION_PROFILE_SAFETY_FIELDS]).toEqual([
       'age',
       'declaredEatingDisorder',
       'declaredDiabetes',
       'declaredPregnancy',
       'declaredBreastfeeding',
+      'minorAgeRef',
     ])
   })
 })
@@ -386,11 +387,17 @@ describe('B15-04 — âge mineur temps + 1 an', () => {
     expect(profileOf(db).age).toBe(17)
   })
 
-  it('avec ageRecordedAt ancien : hausse dans la marge ; audit majorité', async () => {
+  it('avec minorAgeRef ancien : hausse dans la marge ; audit majorité', async () => {
     const db = new GuardedFakeDb()
     await seedAuth(db)
     const now = Date.now()
-    await seedProfile(db, { age: 16, ageRecordedAt: now - MS_PER_YEAR })
+    // B16 — client ageRecordedAt ignoré ; ancrer la ref via updatedAt d’écriture.
+    await writeNutritionProfileJson({ db } as never, {
+      userId: USER,
+      incomingProfileJson: { age: 16 },
+      updatedAt: now - MS_PER_YEAR,
+      journalJson: {},
+    })
     const result = await writeNutritionProfileJson({ db } as never, {
       userId: USER,
       incomingProfileJson: { age: 18 },

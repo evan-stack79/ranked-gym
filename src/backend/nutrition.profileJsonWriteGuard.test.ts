@@ -1,7 +1,7 @@
 /**
- * Garde structurelle B14/B15 : seul `lib/nutritionProfile.ts` peut écrire
+ * Garde structurelle B14/B16 : seul `writeNutritionProfileJson` peut écrire
  * `profileJson` via db.insert / db.patch / db.replace sous convex/.
- * Écritures runtime protégées par `isNutritionProfileWriteAuthorized` (write depth).
+ * clear / admin doivent appeler writeNutritionProfileJson (pas de patch direct).
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -12,7 +12,7 @@ import {
 } from '../../convex/lib/nutritionProfile'
 
 const CONVEX_ROOT = new URL('../../convex', import.meta.url).pathname
-const ALLOWED_WRITE_FILE = 'lib/nutritionProfile.ts'
+const PROFILE_FILE = 'lib/nutritionProfile.ts'
 
 function listTsFiles(dir: string): string[] {
   const out: string[] = []
@@ -26,22 +26,27 @@ function listTsFiles(dir: string): string[] {
   return out
 }
 
-/**
- * Écritures interdites hors lib/nutritionProfile.ts :
- * - db.insert('nutrition_state', …)
- * - db.patch/replace dont l’objet littéral contient la clé profileJson
- * (validators v.object({ profileJson }) et lectures `.profileJson` sont OK).
- */
 const INSERT_NUTRITION_STATE = /db\.insert\(\s*['"]nutrition_state['"]/
 const PATCH_REPLACE_PROFILE_JSON =
   /db\.(?:patch|replace)\s*\(\s*[^,]+,\s*\{[^{}]*\bprofileJson\s*:/
 
-describe('B14 — garde structurelle profileJson', () => {
-  it('aucun fichier hors writeNutritionProfileJson n’écrit profileJson via db.*', () => {
+function extractFunction(source: string, name: string): { body: string; startLine: number } {
+  const marker = `export async function ${name}`
+  const start = source.indexOf(marker)
+  if (start < 0) throw new Error(`missing ${name}`)
+  const startLine = source.slice(0, start).split('\n').length
+  const rest = source.slice(start)
+  const next = rest.search(/\nexport (?:async )?function |\nexport type |\nexport const /)
+  const body = next < 0 ? rest : rest.slice(0, next)
+  return { body, startLine }
+}
+
+describe('B14/B16 — garde structurelle profileJson (fichiers convex/ réels)', () => {
+  it('aucun fichier hors nutritionProfile.ts n’écrit profileJson via db.*', () => {
     const offenders: string[] = []
     for (const file of listTsFiles(CONVEX_ROOT)) {
       const rel = relative(CONVEX_ROOT, file).replace(/\\/g, '/')
-      if (rel === ALLOWED_WRITE_FILE) continue
+      if (rel === PROFILE_FILE) continue
       if (rel === 'schema.ts') continue
       const source = readFileSync(file, 'utf8')
       if (INSERT_NUTRITION_STATE.test(source) || PATCH_REPLACE_PROFILE_JSON.test(source)) {
@@ -51,14 +56,32 @@ describe('B14 — garde structurelle profileJson', () => {
     expect(offenders).toEqual([])
   })
 
-  it('writeNutritionProfileJson est le seul writer déclaré', () => {
-    const source = readFileSync(join(CONVEX_ROOT, ALLOWED_WRITE_FILE), 'utf8')
+  it('writeNutritionProfileJson est le seul writer db.* profileJson dans nutritionProfile.ts', () => {
+    const source = readFileSync(join(CONVEX_ROOT, PROFILE_FILE), 'utf8')
     expect(source).toContain('export async function writeNutritionProfileJson')
-    expect(source).toContain('export async function clearNutritionSafetyBoolField')
-    expect(source).toContain('isNutritionProfileWriteAuthorized')
-    expect(source).toContain("args.field === 'declaredEatingDisorder'")
     expect(source).toMatch(/db\.patch\([\s\S]*profileJson/)
     expect(source).toMatch(/db\.insert\('nutrition_state'[\s\S]*profileJson/)
+
+    // B16-04 — clear / admin ne patchent plus profileJson directement.
+    for (const name of [
+      'clearNutritionSafetyBoolField',
+      'adminCorrectNutritionSafetyField',
+    ] as const) {
+      const { body, startLine } = extractFunction(source, name)
+      const hits: string[] = []
+      const patchHit = body.match(/db\.(?:patch|replace)\s*\([\s\S]*?\bprofileJson\s*:/)
+      const insertHit = body.match(/db\.insert\(\s*['"]nutrition_state['"]/)
+      if (patchHit) {
+        const line = startLine + body.slice(0, patchHit.index ?? 0).split('\n').length - 1
+        hits.push(`convex/lib/nutritionProfile.ts:${line}:${name}:db.patch/replace profileJson`)
+      }
+      if (insertHit) {
+        const line = startLine + body.slice(0, insertHit.index ?? 0).split('\n').length - 1
+        hits.push(`convex/lib/nutritionProfile.ts:${line}:${name}:db.insert nutrition_state`)
+      }
+      expect(body).toContain('writeNutritionProfileJson')
+      expect(hits, hits.join('\n')).toEqual([])
+    }
   })
 })
 
