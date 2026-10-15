@@ -30,6 +30,7 @@ const PHASE_E_TABLES = [
   'nutrition_state',
   'nutrition_age_majority_audit',
   'nutrition_safety_clear_audit',
+  'nutrition_safety_admin_audit',
   'nutrition_meals',
   'nutrition_water_entries',
   'nutrition_day_state',

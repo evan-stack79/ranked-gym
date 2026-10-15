@@ -5,7 +5,8 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { TCA_LOCKED_MESSAGE } from '../../content/safetyCopy'
+import { AUCUNE_LOCKED_HINT, TCA_LOCKED_MESSAGE } from '../../content/safetyCopy'
+import { CONTACT_UNAVAILABLE_MESSAGE, WRITE_TO_US_LABEL } from '../../config/contact'
 import { BLANK_PROFILE } from '../../services/nutritionStorage'
 import type { CalorieProfile } from '../../types/nutrition'
 import { InscriptionFlow } from './InscriptionFlow'
@@ -57,7 +58,7 @@ describe('B15 — InscriptionFlow TCA / Aucune locks', () => {
     expect(tca.getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('TCA true serveur : case cochée, disabled, hint exact', async () => {
+  it('TCA true serveur : case cochée, disabled, message + Nous écrire', async () => {
     await goToHealth({
       ...BLANK_PROFILE,
       declaredEatingDisorder: true,
@@ -67,17 +68,22 @@ describe('B15 — InscriptionFlow TCA / Aucune locks', () => {
     expect(tca.getAttribute('data-disabled')).toBe('true')
     expect(tca.getAttribute('aria-pressed')).toBe('true')
     expect(tca.disabled).toBe(true)
-    expect(container.querySelector('[data-testid="inscription-health-tca-lock-hint"]')?.textContent).toBe(
-      TCA_LOCKED_MESSAGE,
-    )
-    // Clic no-op
+    expect(
+      container.querySelector('[data-testid="inscription-health-tca-contact-message"]')?.textContent,
+    ).toBe(TCA_LOCKED_MESSAGE)
+    expect(
+      container.querySelector('[data-testid="inscription-health-tca-contact-write-btn"]')?.textContent,
+    ).toBe(WRITE_TO_US_LABEL)
+    expect(
+      container.querySelector('[data-testid="inscription-health-tca-contact-address"]')?.textContent,
+    ).toBe(CONTACT_UNAVAILABLE_MESSAGE)
     await act(async () => {
       tca.click()
     })
     expect(tca.getAttribute('aria-pressed')).toBe('true')
   })
 
-  it('situation true serveur : Aucune disabled, rien n’est effacé', async () => {
+  it('situation true serveur : Aucune disabled + hint, rien n’est effacé', async () => {
     await goToHealth({
       ...BLANK_PROFILE,
       declaredDiabetes: true,
@@ -89,6 +95,9 @@ describe('B15 — InscriptionFlow TCA / Aucune locks', () => {
     ) as HTMLButtonElement
     expect(none.getAttribute('data-disabled')).toBe('true')
     expect(none.disabled).toBe(true)
+    expect(container.querySelector('[data-testid="inscription-health-none-lock-hint"]')?.textContent).toBe(
+      AUCUNE_LOCKED_HINT,
+    )
     await act(async () => {
       none.click()
     })

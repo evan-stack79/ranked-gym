@@ -18,7 +18,13 @@ import {
   shouldShowPregnancyBreastfeedingChoices,
   shouldShowWeightScreen,
 } from '../../services/nutritionSafetyRules'
-import { M_INFO_1, Q7_INTRO, TCA_LOCKED_MESSAGE } from '../../content/safetyCopy'
+import {
+  AUCUNE_LOCKED_HINT,
+  M_INFO_1,
+  Q7_INTRO,
+  TCA_LOCKED_MESSAGE,
+} from '../../content/safetyCopy'
+import { ContactUsBlock } from '../common/ContactUsBlock'
 
 export type InscriptionStep =
   | 'welcome'
@@ -436,8 +442,13 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
                 onToggle={() => toggleSituation('eatingDisorder')}
                 testId="inscription-health-tca"
                 disabled={tcaLocked}
-                hint={tcaLocked ? TCA_LOCKED_MESSAGE : undefined}
               />
+              {tcaLocked ? (
+                <ContactUsBlock
+                  message={TCA_LOCKED_MESSAGE}
+                  testIdPrefix="inscription-health-tca-contact"
+                />
+              ) : null}
             </div>
             <div className="h-2" aria-hidden />
             <div className="space-y-2">
@@ -448,6 +459,7 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
                 testId="inscription-health-none"
                 exclusive
                 disabled={noneLocked}
+                hint={noneLocked ? AUCUNE_LOCKED_HINT : undefined}
               />
               <HealthChoice
                 label="Je préfère ne pas répondre"

@@ -217,6 +217,16 @@ export const convexTables = {
   }).index('by_userId', ['userId']),
 
   /**
+   * B15 — correction équipe (dashboard) d’un SAFETY FIELD.
+   * userId + field + at (pas la valeur santé au-delà du nom du champ).
+   */
+  nutrition_safety_admin_audit: defineTable({
+    userId: v.string(),
+    field: v.string(),
+    at: v.number(),
+  }).index('by_userId', ['userId']),
+
+  /**
    * Repas actifs : champs complets.
    * Tombstone sync (après delete / delete-all) : uniquement userId + mealId +
    * deletedAt + updatedAt — aucun nom / calorie / macro / dateKey résiduel.

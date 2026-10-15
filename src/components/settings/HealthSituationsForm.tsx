@@ -1,17 +1,22 @@
+import { useState } from 'react'
 import {
   Q7_INTRO,
   M_TCA_1,
   DIABETES_CLEAR_CONFIRM,
   PREGNANCY_CLEAR_CONFIRM,
   BREASTFEEDING_CLEAR_CONFIRM,
+  SAFETY_CLEAR_CONFIRM_YES,
+  SAFETY_CLEAR_CONFIRM_CANCEL,
   SAFETY_CLEAR_SIGN_IN,
   TCA_LOCKED_MESSAGE,
+  AUCUNE_LOCKED_HINT,
 } from '../../content/safetyCopy'
 import type { CalorieProfile, HealthAnswerStatus } from '../../types/nutrition'
 import {
   readHealthAnswer,
   shouldShowPregnancyBreastfeedingChoices,
 } from '../../services/nutritionSafetyRules'
+import { ContactUsBlock } from '../common/ContactUsBlock'
 
 export interface HealthSituationsValue {
   declaredPregnancy: boolean
@@ -47,7 +52,7 @@ interface HealthSituationsFormProps {
   /** Compte connecté — requis pour retirer diabète / grossesse / allaitement. */
   isAuthenticated?: boolean
   /**
-   * Retrait délibéré (hors sync). Parent confirme + appelle clearSafetyFlag.
+   * Retrait délibéré (hors sync). Parent appelle clearSafetyFlag après Oui.
    * Doit renvoyer true si le serveur a bien clear.
    */
   onClearSafetyField?: (field: ClearableSafetyField) => boolean | Promise<boolean>
@@ -103,6 +108,8 @@ export function HealthSituationsForm({
     Boolean(locks.declaredBreastfeeding) ||
     Boolean(locks.declaredDiabetes)
 
+  const [pendingClear, setPendingClear] = useState<ClearableSafetyField | null>(null)
+
   const emit = (partial: Partial<HealthSituationsValue>) => {
     const next = { ...value, ...partial }
     onChange({
@@ -112,24 +119,34 @@ export function HealthSituationsForm({
     })
   }
 
-  const requestClear = async (field: ClearableSafetyField) => {
+  const requestClear = (field: ClearableSafetyField) => {
     const serverTrue = Boolean(locks[field])
     if (!isAuthenticated) {
       if (serverTrue) {
         onMessage?.(SAFETY_CLEAR_SIGN_IN)
         return
       }
-      // Local-only : décocher librement (jamais syncé).
       emit({ [field]: false } as Partial<HealthSituationsValue>)
       return
     }
-    if (!window.confirm(CLEAR_CONFIRM[field])) return
+    setPendingClear(field)
+  }
+
+  const confirmClearOui = async () => {
+    const field = pendingClear
+    if (!field) return
+    setPendingClear(null)
+    const serverTrue = Boolean(locks[field])
     if (serverTrue) {
       if (!onClearSafetyField) return
       const ok = await onClearSafetyField(field)
       if (!ok) return
     }
     emit({ [field]: false } as Partial<HealthSituationsValue>)
+  }
+
+  const confirmClearAnnuler = () => {
+    setPendingClear(null)
   }
 
   const toggleSituation = (
@@ -142,9 +159,8 @@ export function HealthSituationsForm({
         ? tcaLocked || (answer === 'situations' && value.declaredEatingDisorder)
         : Boolean(locks[key]) || (answer === 'situations' && value[key])
 
-    // Retrait délibéré grossesse / allaitement (confirm + clear serveur si besoin).
     if (currentlyOn && (key === 'declaredPregnancy' || key === 'declaredBreastfeeding')) {
-      void requestClear(key)
+      requestClear(key)
       return
     }
 
@@ -153,7 +169,6 @@ export function HealthSituationsForm({
     const breastfeeding = key === 'declaredBreastfeeding' ? flipped : value.declaredBreastfeeding
     const eatingDisorder =
       key === 'declaredEatingDisorder' ? flipped : value.declaredEatingDisorder
-    // Ne jamais effacer un TCA verrouillé serveur.
     const nextEating = tcaLocked ? true : eatingDisorder
     const any =
       Boolean(pregnancy || locks.declaredPregnancy) ||
@@ -170,7 +185,7 @@ export function HealthSituationsForm({
 
   const toggleDiabetes = () => {
     if (value.declaredDiabetes || locks.declaredDiabetes) {
-      void requestClear('declaredDiabetes')
+      requestClear('declaredDiabetes')
       return
     }
     emit({ declaredDiabetes: true })
@@ -181,7 +196,6 @@ export function HealthSituationsForm({
     const cleared = answer === next ? null : next
     emit({
       healthAnswer: cleared,
-      // « Aucune » ne retire jamais une situation true côté serveur.
       declaredPregnancy: Boolean(locks.declaredPregnancy),
       declaredBreastfeeding: Boolean(locks.declaredBreastfeeding),
       declaredEatingDisorder: tcaLocked ? true : false,
@@ -224,8 +238,10 @@ export function HealthSituationsForm({
           onToggle={() => toggleSituation('declaredEatingDisorder')}
           testId="health-tca"
           disabled={tcaLocked}
-          hint={tcaLocked ? TCA_LOCKED_MESSAGE : undefined}
         />
+        {tcaLocked ? (
+          <ContactUsBlock message={TCA_LOCKED_MESSAGE} testIdPrefix="health-tca-contact" />
+        ) : null}
         <HealthRow
           label="Diabète"
           checked={diabetesChecked}
@@ -241,6 +257,7 @@ export function HealthSituationsForm({
           onToggle={() => pickExclusive('none')}
           testId="health-none"
           disabled={noneLocked}
+          hint={noneLocked ? AUCUNE_LOCKED_HINT : undefined}
         />
         <HealthRow
           label="Je préfère ne pas répondre"
@@ -249,6 +266,37 @@ export function HealthSituationsForm({
           testId="health-prefer-not"
         />
       </div>
+
+      {pendingClear ? (
+        <div
+          className="space-y-3 rounded-2xl border border-white/15 bg-black/40 p-3.5"
+          data-testid="health-clear-confirm"
+          role="dialog"
+          aria-modal="true"
+        >
+          <p className="text-[13px] leading-relaxed text-[#EBEBF5]" data-testid="health-clear-confirm-text">
+            {CLEAR_CONFIRM[pendingClear]}
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => void confirmClearOui()}
+              className="btn-brand ios-press flex-1 rounded-xl py-2.5 text-[14px] font-bold text-white"
+              data-testid="health-clear-confirm-yes"
+            >
+              {SAFETY_CLEAR_CONFIRM_YES}
+            </button>
+            <button
+              type="button"
+              onClick={confirmClearAnnuler}
+              className="ios-press flex-1 rounded-xl border border-white/15 bg-white/5 py-2.5 text-[14px] font-semibold text-[#AEAEB2]"
+              data-testid="health-clear-confirm-cancel"
+            >
+              {SAFETY_CLEAR_CONFIRM_CANCEL}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {showTcaMessage && tcaChecked ? (
         <div className="space-y-2 rounded-2xl border border-white/10 bg-[#FF9F0A]/10 p-3.5">

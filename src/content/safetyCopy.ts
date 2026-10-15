@@ -42,20 +42,26 @@ export const Q10_ENERGIE = "Bien manger et bien récupérer aident à progresser
 
 export const Q7_INTRO = "Ces questions sont facultatives. Elles servent à adapter ce que l'app te propose. Ce n'est pas un diagnostic et ça ne remplace pas l'avis d'un professionnel de santé. Tu peux répondre « Je préfère ne pas répondre »."
 
-export const M_TCA_1 = "Merci de nous l'avoir dit. On retire de ton app les objectifs chiffrés et le classement. Tu peux les remettre quand tu veux, dans Réglages. Parler à un professionnel peut aider : voici des ressources."
+export const M_TCA_1 =
+  "Merci de nous l'avoir dit. On retire de ton app les objectifs chiffrés et le classement. Si tu veux les remettre plus tard, écris-nous. Parler à un professionnel peut aider : voici des ressources."
 
 export const Q8_SCREEN_TITLE = "Besoin d'en parler ?"
 
-/** B15 — retraits délibérés / verrous (verbatim Architect). */
+/** B15 — retraits / verrous (verbatim Vérificateur + Architect). */
 export const DIABETES_CLEAR_CONFIRM =
-  'Tu retires le diabète. Les objectifs de calories et de perte de poids pourront revenir. Tu confirmes ?'
+  'Tu retires le diabète de ta liste ? Les objectifs de calories et de perte de poids pourront revenir. Si tu as un diabète, garde la case cochée.'
 export const PREGNANCY_CLEAR_CONFIRM =
-  'Tu retires la grossesse. Les objectifs de calories et de perte de poids pourront revenir. Tu confirmes ?'
+  'Tu retires la grossesse ? Les objectifs de calories pourront revenir. Demande à ta sage-femme ou à ton médecin avant de viser une perte de poids.'
 export const BREASTFEEDING_CLEAR_CONFIRM =
-  'Tu retires l’allaitement. Les objectifs de calories et de perte de poids pourront revenir. Tu confirmes ?'
+  'Tu retires l’allaitement ? Les objectifs de calories pourront revenir. Demande à ta sage-femme ou à ton médecin avant de viser une perte de poids.'
+export const SAFETY_CLEAR_CONFIRM_YES = 'Oui'
+export const SAFETY_CLEAR_CONFIRM_CANCEL = 'Annuler'
 export const SAFETY_CLEAR_SIGN_IN = 'Connecte-toi pour retirer cette situation.'
-export const TCA_LOCKED_MESSAGE = 'Pour retirer cette situation, contacte-nous.'
-export const AGE_CONTACT_US_MESSAGE = 'Contacte-nous pour corriger ton âge.'
+export const TCA_LOCKED_MESSAGE =
+  'Cette situation reste enregistrée pour te protéger. Pour la retirer, écris-nous.'
+export const AGE_CONTACT_US_MESSAGE = 'Pour corriger ton âge, écris-nous.'
+export const AUCUNE_LOCKED_HINT =
+  'Une situation est déjà cochée. Retire-la d’abord avec sa case.'
 
 /** Numéros affichés (espaces conservés) + liens tel: */
 export const TCA_PHONE_DISPLAY = {

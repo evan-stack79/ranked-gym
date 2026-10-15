@@ -22,7 +22,12 @@ import {
   saveCalorieProfile,
 } from '../../services/nutritionStorage'
 import { clearNutritionSafetyFlag } from '../../services/convexNutritionService'
-import { M_INFO_1 } from '../../content/safetyCopy'
+import {
+  AGE_CONTACT_US_EVENT,
+  isAgeContactUsNeeded,
+} from '../../services/ageContactNotice'
+import { AGE_CONTACT_US_MESSAGE, M_INFO_1 } from '../../content/safetyCopy'
+import { ContactUsBlock } from '../common/ContactUsBlock'
 import {
   disciplineFromLabel,
   getDiscipline,
@@ -67,6 +72,13 @@ function ProfileViewContent() {
     serverLocksFromProfile(getCalorieProfile()),
   )
   const [healthMessage, setHealthMessage] = useState<string | null>(null)
+  const [showAgeContact, setShowAgeContact] = useState(() => isAgeContactUsNeeded())
+
+  useEffect(() => {
+    const refresh = () => setShowAgeContact(isAgeContactUsNeeded())
+    window.addEventListener(AGE_CONTACT_US_EVENT, refresh)
+    return () => window.removeEventListener(AGE_CONTACT_US_EVENT, refresh)
+  }, [])
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -235,6 +247,9 @@ function ProfileViewContent() {
           Retour
         </button>
         <h1 className="text-[28px] font-bold tracking-tight text-white">Situations de santé</h1>
+        {showAgeContact ? (
+          <ContactUsBlock message={AGE_CONTACT_US_MESSAGE} testIdPrefix="age-contact" />
+        ) : null}
         <HealthSituationsForm
           value={healthValue}
           onChange={handleHealthChange}

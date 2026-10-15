@@ -44,15 +44,17 @@ export function isNutritionProfileWriteAuthorized(): boolean {
 export const NUTRITION_AGE_MAJORITY_AUDIT_TABLE = 'nutrition_age_majority_audit' as const
 export const NUTRITION_SAFETY_CLEAR_AUDIT_TABLE = 'nutrition_safety_clear_audit' as const
 
-export const AGE_CONTACT_US_MESSAGE = 'Contacte-nous pour corriger ton âge.' as const
+export const AGE_CONTACT_US_MESSAGE = 'Pour corriger ton âge, écris-nous.' as const
 export const DIABETES_CLEAR_CONFIRM =
-  'Tu retires le diabète. Les objectifs de calories et de perte de poids pourront revenir. Tu confirmes ?' as const
+  'Tu retires le diabète de ta liste ? Les objectifs de calories et de perte de poids pourront revenir. Si tu as un diabète, garde la case cochée.' as const
 export const PREGNANCY_CLEAR_CONFIRM =
-  'Tu retires la grossesse. Les objectifs de calories et de perte de poids pourront revenir. Tu confirmes ?' as const
+  'Tu retires la grossesse ? Les objectifs de calories pourront revenir. Demande à ta sage-femme ou à ton médecin avant de viser une perte de poids.' as const
 export const BREASTFEEDING_CLEAR_CONFIRM =
-  'Tu retires l’allaitement. Les objectifs de calories et de perte de poids pourront revenir. Tu confirmes ?' as const
+  'Tu retires l’allaitement ? Les objectifs de calories pourront revenir. Demande à ta sage-femme ou à ton médecin avant de viser une perte de poids.' as const
 export const SAFETY_CLEAR_SIGN_IN = 'Connecte-toi pour retirer cette situation.' as const
-export const TCA_LOCKED_MESSAGE = 'Pour retirer cette situation, contacte-nous.' as const
+export const TCA_LOCKED_MESSAGE =
+  'Cette situation reste enregistrée pour te protéger. Pour la retirer, écris-nous.' as const
+export const NUTRITION_SAFETY_ADMIN_AUDIT_TABLE = 'nutrition_safety_admin_audit' as const
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
@@ -398,6 +400,76 @@ export async function clearNutritionSafetyBoolField(
       at: now,
     })
     return { cleared: true }
+  } finally {
+    nutritionProfileWriteDepth -= 1
+  }
+}
+
+export type AdminCorrectableField = NutritionSafetyBoolField | 'age'
+
+/**
+ * Correction équipe (dashboard Convex uniquement — internalMutation).
+ * Avant de corriger quoi que ce soit, vérifier que l’e-mail de la demande
+ * vient bien de l’adresse du compte.
+ *
+ * Passe par le write-depth token (même garde FakeDb) mais contourne
+ * uniquement : never-true→false pour le champ nommé, et la limite d’âge mineur.
+ * Audit : userId + field + at (pas la valeur santé au-delà du nom du champ).
+ */
+export async function adminCorrectNutritionSafetyField(
+  ctx: MutationCtx,
+  args: {
+    userId: string
+    field: AdminCorrectableField
+    value: boolean | number | null
+    updatedAt?: number
+  },
+): Promise<{ applied: boolean }> {
+  const now = args.updatedAt ?? Date.now()
+  nutritionProfileWriteDepth += 1
+  try {
+    const existing = await ctx.db
+      .query('nutrition_state')
+      .withIndex('by_userId', (q) => q.eq('userId', args.userId))
+      .first()
+
+    const prev = asRecord(existing?.profileJson) ?? {}
+    const next: Record<string, unknown> = { ...prev }
+
+    if (args.field === 'age') {
+      if (args.value == null) {
+        delete next.age
+        delete next.ageRecordedAt
+      } else {
+        const age = parseValidNutritionAge(args.value)
+        if (age == null) return { applied: false }
+        next.age = age
+        next.ageRecordedAt = now
+      }
+    } else if (typeof args.value === 'boolean') {
+      if (args.value) next[args.field] = true
+      else delete next[args.field]
+    } else {
+      return { applied: false }
+    }
+
+    if (existing) {
+      await ctx.db.patch(existing._id, { profileJson: next, updatedAt: now })
+    } else {
+      await ctx.db.insert('nutrition_state', {
+        userId: args.userId,
+        profileJson: next,
+        journalJson: {},
+        updatedAt: now,
+      })
+    }
+
+    await ctx.db.insert(NUTRITION_SAFETY_ADMIN_AUDIT_TABLE, {
+      userId: args.userId,
+      field: args.field,
+      at: now,
+    })
+    return { applied: true }
   } finally {
     nutritionProfileWriteDepth -= 1
   }

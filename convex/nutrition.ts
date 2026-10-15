@@ -2,6 +2,7 @@ import { v } from 'convex/values'
 import { api, internal } from './_generated/api'
 import {
   action,
+  internalMutation,
   mutation,
   query,
   type ActionCtx,
@@ -11,7 +12,9 @@ import {
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
 import { assertFoodAddAccessFromStoredProfile } from './lib/foodAddAccess'
 import {
+  adminCorrectNutritionSafetyField,
   clearNutritionSafetyBoolField,
+  type AdminCorrectableField,
   type NutritionSafetyBoolField,
 } from './lib/nutritionProfile'
 import {
@@ -216,6 +219,34 @@ export const clearSafetyFlag = mutation({
     return clearNutritionSafetyBoolField(ctx, {
       userId: user.userId,
       field: args.field as NutritionSafetyBoolField,
+    })
+  },
+})
+
+/**
+ * Correction équipe — dashboard Convex uniquement (internalMutation).
+ * Avant de corriger quoi que ce soit, vérifier que l’e-mail de la demande
+ * vient bien de l’adresse du compte.
+ * Non appelable depuis l’app / l’API publique.
+ */
+export const adminCorrectSafetyField = internalMutation({
+  args: {
+    userId: v.string(),
+    field: v.union(
+      v.literal('age'),
+      v.literal('declaredEatingDisorder'),
+      v.literal('declaredDiabetes'),
+      v.literal('declaredPregnancy'),
+      v.literal('declaredBreastfeeding'),
+    ),
+    value: v.union(v.boolean(), v.number(), v.null()),
+  },
+  returns: v.object({ applied: v.boolean() }),
+  handler: async (ctx, args) => {
+    return adminCorrectNutritionSafetyField(ctx, {
+      userId: args.userId,
+      field: args.field as AdminCorrectableField,
+      value: args.value,
     })
   },
 })
