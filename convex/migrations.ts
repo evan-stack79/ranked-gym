@@ -9,6 +9,7 @@ import {
   requireAuthorizedMigrationRun,
   type AdminAuthz,
 } from './lib/migrationAdmin'
+import { writeNutritionProfileJson } from './lib/nutritionProfile'
 
 export const MIGRATION_ENTITY_TYPES = [
   'auth_users',
@@ -356,7 +357,8 @@ async function upsertWorkouts(
   return { convexId: String(inserted), operation: 'inserted' }
 }
 
-async function upsertNutrition(
+/** Import / migration nutrition — écrit profileJson uniquement via writeNutritionProfileJson. */
+export async function upsertNutrition(
   ctx: MutationCtx,
   payload: Record<string, unknown>,
   options: { prune: boolean },
@@ -369,25 +371,20 @@ async function upsertNutrition(
     .query('nutrition_state')
     .withIndex('by_userId', (q) => q.eq('userId', userId))
     .first()
-  const patch = {
-    profileJson: payload.profileJson ?? {},
+  // SEUL écriture profileJson : via writeNutritionProfileJson (règle âge B14).
+  await writeNutritionProfileJson(ctx, {
+    userId,
+    incomingProfileJson: payload.profileJson ?? {},
     journalJson: payload.journalJson ?? {},
     updatedAt,
-  }
-  let operation: 'inserted' | 'updated'
-  let convexId: string
-  if (existing) {
-    await ctx.db.patch(existing._id, patch)
-    operation = 'updated'
-    convexId = String(existing._id)
-  } else {
-    const inserted = await ctx.db.insert('nutrition_state', {
-      userId,
-      ...patch,
-    })
-    operation = 'inserted'
-    convexId = String(inserted)
-  }
+  })
+  const after = await ctx.db
+    .query('nutrition_state')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .first()
+  if (!after) throw new Error('MIGRATION_NUTRITION_WRITE_FAILED')
+  const operation: 'inserted' | 'updated' = existing ? 'updated' : 'inserted'
+  const convexId = String(after._id)
 
   const incomingMeals = (Array.isArray(payload.normalizedMeals) ? payload.normalizedMeals : [])
     .map((row) => asRecord(row))

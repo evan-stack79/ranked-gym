@@ -491,18 +491,21 @@ describe('submitAvisBetaForSession', () => {
     expect(db.table('avis_beta')).toHaveLength(AVIS_PAR_JOUR + 1)
   })
 
-  it('AV-01 — sanitize : saut, contournement vide, anniversaire 17→18', () => {
-    const kept = sanitizeSyncedNutritionProfileJson({ age: 15 }, { age: 30, weightKg: 70 })
-    expect(extractAgeFromNutritionProfileJson(kept)).toBe(15)
-    expect((kept as { weightKg: number }).weightKg).toBe(70)
+  it('AV-01 / B14 — sanitize : préserve âge si invalide ; accepte 18+ valide', () => {
+    // B14 : mineur → adulte valide est accepté (audit écrit côté writeNutritionProfileJson)
+    const jumped = sanitizeSyncedNutritionProfileJson({ age: 15 }, { age: 30, weightKg: 70 })
+    expect(extractAgeFromNutritionProfileJson(jumped)).toBe(30)
+    expect((jumped as { weightKg: number }).weightKg).toBe(70)
 
-    // Contournement 15 → vide → 30 : l’âge mineur est conservé
+    // Contournement 15 → vide : l’âge mineur est conservé
     const cleared = sanitizeSyncedNutritionProfileJson({ age: 15 }, { age: null, weightKg: 70 })
     expect(extractAgeFromNutritionProfileJson(cleared)).toBe(15)
-    const afterClear = sanitizeSyncedNutritionProfileJson(cleared, { age: 30 })
-    expect(extractAgeFromNutritionProfileJson(afterClear)).toBe(15)
 
-    // Anniversaire autorisé
+    // Âge invalide entrant : conserve le précédent
+    const invalid = sanitizeSyncedNutritionProfileJson({ age: 16 }, { age: 150 })
+    expect(extractAgeFromNutritionProfileJson(invalid)).toBe(16)
+
+    // Anniversaire / 18+ autorisé
     expect(extractAgeFromNutritionProfileJson(
       sanitizeSyncedNutritionProfileJson({ age: 17 }, { age: 18 }),
     )).toBe(18)

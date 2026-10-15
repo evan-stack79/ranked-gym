@@ -199,6 +199,15 @@ export const convexTables = {
     .index('by_updatedAt', ['updatedAt']),
 
   /**
+   * B14 — passage mineur → 18+ via sync/import/update.
+   * userId + at uniquement (jamais l’âge ni d’autres données).
+   */
+  nutrition_age_majority_audit: defineTable({
+    userId: v.string(),
+    at: v.number(),
+  }).index('by_userId', ['userId']),
+
+  /**
    * Repas actifs : champs complets.
    * Tombstone sync (après delete / delete-all) : uniquement userId + mealId +
    * deletedAt + updatedAt — aucun nom / calorie / macro / dateKey résiduel.

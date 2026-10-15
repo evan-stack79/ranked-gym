@@ -28,6 +28,7 @@ const PHASE_E_TABLES = [
   'profiles',
   'workouts_state',
   'nutrition_state',
+  'nutrition_age_majority_audit',
   'nutrition_meals',
   'nutrition_water_entries',
   'nutrition_day_state',

@@ -9,6 +9,11 @@
  * La suppression de repas n’utilise PAS cette garde (droit sur ses données).
  */
 import type { MutationCtx, QueryCtx } from '../_generated/server'
+import {
+  extractStoredNutritionAge,
+  NUTRITION_ADULT_MIN,
+  parseValidNutritionAge,
+} from './nutritionProfile'
 
 export const FOOD_ADD_ACCESS_DENIED = 'FOOD_ADD_ACCESS_DENIED' as const
 export const FOOD_ADD_ACCESS_DENIED_MINOR = 'FOOD_ADD_ACCESS_DENIED_MINOR' as const
@@ -18,8 +23,6 @@ export const FOOD_ADD_ACCESS_DENIED_TCA = 'FOOD_ADD_ACCESS_DENIED_TCA' as const
  * (âge manquant = accès autorisé).
  */
 export const FOOD_ADD_ACCESS_AGE_REQUIRED = 'age_required' as const
-
-const ADULT_MIN = 18
 
 type DbCtx = MutationCtx | QueryCtx
 
@@ -45,13 +48,14 @@ export function extractDiabetesFromProfileJson(profileJson: unknown): boolean {
   return Boolean(record.declaredDiabetes)
 }
 
-/** Âge présent et numérique (même mineur). */
+/** Âge stocké valide (10–120), y compris string d’entier seul héritée. */
 export function hasStoredAge(age: unknown): age is number {
-  return typeof age === 'number' && Number.isFinite(age) && age > 0 && age <= 120
+  return parseValidNutritionAge(age) != null
 }
 
 export function isAdultStoredAge(age: unknown): age is number {
-  return hasStoredAge(age) && age >= ADULT_MIN
+  const parsed = parseValidNutritionAge(age)
+  return parsed != null && parsed >= NUTRITION_ADULT_MIN
 }
 
 export type FoodAddAccessResult =
@@ -70,10 +74,11 @@ export async function assertFoodAddAccessFromStoredProfile(
     .withIndex('by_userId', (q) => q.eq('userId', userId))
     .first()
   const profileJson = nutrition?.profileJson
-  const age = extractAgeFromProfileJson(profileJson)
+  // Refus toujours depuis l’âge STOCKÉ (jamais le payload téléphone).
+  const age = extractStoredNutritionAge(profileJson)
   // Âge manquant : ne pas refuser (comportement pré-PR #110).
   // Âge enregistré sous 18 : refuser.
-  if (hasStoredAge(age) && !isAdultStoredAge(age)) {
+  if (age != null && age < NUTRITION_ADULT_MIN) {
     return { ok: false, error: FOOD_ADD_ACCESS_DENIED_MINOR }
   }
   if (extractEatingDisorderFromProfileJson(profileJson)) {
