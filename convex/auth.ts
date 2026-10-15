@@ -36,7 +36,10 @@ import {
   isPasswordResetEmailConfigured,
   sendPasswordResetEmail,
 } from './lib/passwordResetMailer'
-import { markEmailConfirmedViaGoogleForUser } from './emailVerification'
+import {
+  invalidateAllEmailCodesForUser,
+  markEmailConfirmedViaGoogleForUser,
+} from './emailVerification'
 import { internal } from './_generated/api'
 import {
   AUTH_GOOGLE_DISABLED,
@@ -44,6 +47,10 @@ import {
   requireGoogleSignInReady,
   verifyGoogleIdToken,
 } from './lib/googleIdToken'
+
+/** Shown when Google takes over an unconfirmed password account (B12-01). */
+export const GOOGLE_PASSWORD_REMOVED_MESSAGE =
+  'Ton ancien mot de passe a été retiré. Tu peux en créer un nouveau dans ton profil.'
 
 const RESET_ROUTE_PATH = '/auth/reset-password'
 const RESET_LINK_PURGE_GRACE_MS = 5 * 60 * 1000
@@ -731,8 +738,9 @@ export const signInWithPassword = mutation({
 })
 
 /**
- * B11-01 : session creation ONLY from claims already verified via Google JWKS.
- * Never accepts client-supplied email/sub — those come from verifyGoogleIdToken.
+ * B11-01 / B12-01 : session from JWKS-verified claims only.
+ * Unconfirmed + password ⇒ atomic takeover: drop password, revoke sessions,
+ * invalidate email codes, confirm via Google, audit (userId+at only).
  */
 export async function completeGoogleSignInFromVerifiedClaims(
   ctx: MutationCtx,
@@ -748,6 +756,7 @@ export async function completeGoogleSignInFromVerifiedClaims(
   expiresAt: number
   mustResetPassword: boolean
   emailConfirmed: true
+  passwordRemoved: boolean
   user: { userId: string; email: string; displayName: string }
 }> {
   if (args.emailVerified !== true) throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
@@ -773,14 +782,38 @@ export async function completeGoogleSignInFromVerifiedClaims(
   }
   if (!user || user.deletedAt) throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
 
-  await markEmailConfirmedViaGoogleForUser(ctx, { userId: user.userId, now })
+  const alreadyConfirmed =
+    typeof user.emailConfirmedAt === 'number' && user.emailConfirmedAt > 0
+  const credential = await getPasswordCredential(ctx, user.userId)
+  const takeover = Boolean(credential) && !alreadyConfirmed
+
+  if (takeover) {
+    // Atomic takeover (Convex mutation = single transaction).
+    const credentials = await ctx.db
+      .query('auth_password_credentials')
+      .withIndex('by_userId', (q) => q.eq('userId', user!.userId))
+      .collect()
+    for (const row of credentials) {
+      await ctx.db.delete(row._id)
+    }
+    await revokeAllUserSessions(ctx, user.userId, now)
+    await invalidateAllEmailCodesForUser(ctx, user.userId, now)
+    await markEmailConfirmedViaGoogleForUser(ctx, { userId: user.userId, now })
+    await ctx.db.insert('auth_google_takeover_audit', {
+      userId: user.userId,
+      at: now,
+    })
+  } else {
+    await markEmailConfirmedViaGoogleForUser(ctx, { userId: user.userId, now })
+  }
 
   const session = await createSession(ctx, user.userId)
   return {
     sessionToken: session.sessionToken,
     expiresAt: session.expiresAt,
-    mustResetPassword: false,
+    mustResetPassword: takeover,
     emailConfirmed: true as const,
+    passwordRemoved: takeover,
     user: {
       userId: user.userId,
       email: user.email,
@@ -802,6 +835,7 @@ export const completeGoogleSignInFromVerifiedClaimsMutation = internalMutation({
     expiresAt: v.number(),
     mustResetPassword: v.boolean(),
     emailConfirmed: v.literal(true),
+    passwordRemoved: v.boolean(),
     user: v.object({
       userId: v.string(),
       email: v.string(),
@@ -821,6 +855,7 @@ type GoogleSignInResult = {
   expiresAt: number
   mustResetPassword: boolean
   emailConfirmed: true
+  passwordRemoved: boolean
   user: { userId: string; email: string; displayName: string }
 }
 
@@ -833,6 +868,7 @@ export const signInWithGoogle = action({
     expiresAt: v.number(),
     mustResetPassword: v.boolean(),
     emailConfirmed: v.literal(true),
+    passwordRemoved: v.boolean(),
     user: v.object({
       userId: v.string(),
       email: v.string(),

@@ -19,6 +19,8 @@ type TableName =
   | 'auth_password_credentials'
   | 'auth_sessions'
   | 'rate_limit_buckets'
+  | 'auth_google_takeover_audit'
+  | 'auth_email_verification_codes'
 type StoredRow = Record<string, unknown> & { _id: string }
 
 class FakeDb {
@@ -28,6 +30,8 @@ class FakeDb {
     auth_password_credentials: [],
     auth_sessions: [],
     rate_limit_buckets: [],
+    auth_google_takeover_audit: [],
+    auth_email_verification_codes: [],
   }
 
   insert(table: TableName, value: Record<string, unknown>) {
@@ -58,6 +62,16 @@ class FakeDb {
         else next[field] = fieldValue
       }
       this.rows[key][idx] = next
+      return Promise.resolve()
+    }
+    return Promise.reject(new Error('missing'))
+  }
+
+  delete(id: string) {
+    for (const key of Object.keys(this.rows) as TableName[]) {
+      const idx = this.rows[key].findIndex((row) => row._id === id)
+      if (idx === -1) continue
+      this.rows[key].splice(idx, 1)
       return Promise.resolve()
     }
     return Promise.reject(new Error('missing'))
@@ -99,6 +113,9 @@ class FakeQuery {
 }
 
 const OUR_CLIENT_ID = 'ranked-gym-google-client.apps.googleusercontent.com'
+/** Fixed clock for exp/iat — never depend on wall clock or TZ. */
+const FIXED_NOW_MS = 1_700_000_000_000
+const FIXED_NOW_SEC = Math.floor(FIXED_NOW_MS / 1000)
 
 async function attemptGoogleSignIn(
   db: FakeDb,
@@ -109,7 +126,6 @@ async function attemptGoogleSignIn(
     fetchJwks: () => Promise<{ keys: Array<JsonWebKey & { kid?: string }> }>
   },
 ): Promise<void> {
-  // Mirrors signInWithGoogle action: verify first; session only on success.
   const verified = await verifyGoogleIdToken(idToken, {
     clientId: opts.clientId,
     nowMs: opts.nowMs,
@@ -128,12 +144,12 @@ async function attemptGoogleSignIn(
   )
 }
 
-function baseClaims(nowSec: number, overrides: Record<string, unknown> = {}) {
+function baseClaims(overrides: Record<string, unknown> = {}) {
   return {
     iss: 'https://accounts.google.com',
     aud: OUR_CLIENT_ID,
-    exp: nowSec + 3600,
-    iat: nowSec,
+    exp: FIXED_NOW_SEC + 3600,
+    iat: FIXED_NOW_SEC,
     email: 'user@example.com',
     email_verified: true,
     sub: 'google-sub-1',
@@ -144,32 +160,36 @@ function baseClaims(nowSec: number, overrides: Record<string, unknown> = {}) {
 describe('Google ID token sign-in — B11-01', () => {
   beforeEach(() => {
     clearGoogleJwksCache()
+    // Never hit the network for Google JWKS in tests / CI.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('NETWORK_FORBIDDEN_IN_TESTS')
+      }),
+    )
   })
 
   afterEach(() => {
+    vi.unstubAllEnvs()
     vi.unstubAllGlobals()
     clearGoogleJwksCache()
   })
 
   it('fail-closed when Google client id env is not configured', () => {
-    vi.stubGlobal('process', { env: { CONVEX_GOOGLE_SIGNIN_ENABLED: 'true' } })
+    vi.stubEnv('CONVEX_GOOGLE_SIGNIN_ENABLED', 'true')
+    vi.stubEnv('GOOGLE_CLIENT_ID', '')
+    vi.stubEnv('CONVEX_GOOGLE_CLIENT_ID', '')
     expect(isGoogleSignInConfigured()).toBe(false)
     expect(() => requireGoogleSignInReady()).toThrow(AUTH_GOOGLE_DISABLED)
   })
 
   it('fail-closed unless CONVEX_GOOGLE_SIGNIN_ENABLED=true even with client id', () => {
-    vi.stubGlobal('process', {
-      env: { GOOGLE_CLIENT_ID: OUR_CLIENT_ID },
-    })
+    vi.stubEnv('GOOGLE_CLIENT_ID', OUR_CLIENT_ID)
+    vi.stubEnv('CONVEX_GOOGLE_SIGNIN_ENABLED', '')
     expect(isGoogleSignInEnabled()).toBe(false)
     expect(isGoogleSignInConfigured()).toBe(false)
     expect(() => requireGoogleSignInReady()).toThrow(AUTH_GOOGLE_DISABLED)
-    vi.stubGlobal('process', {
-      env: {
-        GOOGLE_CLIENT_ID: OUR_CLIENT_ID,
-        CONVEX_GOOGLE_SIGNIN_ENABLED: 'true',
-      },
-    })
+    vi.stubEnv('CONVEX_GOOGLE_SIGNIN_ENABLED', 'true')
     expect(isGoogleSignInConfigured()).toBe(true)
     expect(requireGoogleSignInReady()).toBe(OUR_CLIENT_ID)
   })
@@ -178,7 +198,9 @@ describe('Google ID token sign-in — B11-01', () => {
     await expect(
       verifyGoogleIdToken('a.b.c', { clientId: '' }),
     ).rejects.toThrow(AUTH_GOOGLE_DISABLED)
-    vi.stubGlobal('process', { env: { CONVEX_GOOGLE_SIGNIN_ENABLED: 'true' } })
+    vi.stubEnv('CONVEX_GOOGLE_SIGNIN_ENABLED', 'true')
+    vi.stubEnv('GOOGLE_CLIENT_ID', '')
+    vi.stubEnv('CONVEX_GOOGLE_CLIENT_ID', '')
     expect(() => requireGoogleSignInReady()).toThrow(AUTH_GOOGLE_DISABLED)
   })
 
@@ -186,18 +208,15 @@ describe('Google ID token sign-in — B11-01', () => {
     const db = new FakeDb()
     const signer = await generateTestGoogleKeyPair()
     const other = await generateTestGoogleKeyPair()
-    const nowMs = 1_700_000_000_000
-    const nowSec = Math.floor(nowMs / 1000)
     const idToken = await mintTestGoogleIdToken({
       privateKey: signer.privateKey,
       publicJwk: signer.publicJwk,
-      claims: baseClaims(nowSec),
+      claims: baseClaims(),
     })
-    // Verify against a different public key → signature fails.
     await expect(
       attemptGoogleSignIn(db, idToken, {
         clientId: OUR_CLIENT_ID,
-        nowMs,
+        nowMs: FIXED_NOW_MS,
         fetchJwks: async () => ({ keys: [other.publicJwk] }),
       }),
     ).rejects.toThrow(AUTH_GOOGLE_TOKEN_INVALID)
@@ -208,12 +227,10 @@ describe('Google ID token sign-in — B11-01', () => {
   it('wrong aud => refused, no session', async () => {
     const db = new FakeDb()
     const { privateKey, publicJwk } = await generateTestGoogleKeyPair()
-    const nowMs = 1_700_000_000_000
-    const nowSec = Math.floor(nowMs / 1000)
     const idToken = await mintTestGoogleIdToken({
       privateKey,
       publicJwk,
-      claims: baseClaims(nowSec, {
+      claims: baseClaims({
         iss: 'accounts.google.com',
         aud: 'other-app-client-id.apps.googleusercontent.com',
         sub: 'google-sub-2',
@@ -222,7 +239,7 @@ describe('Google ID token sign-in — B11-01', () => {
     await expect(
       attemptGoogleSignIn(db, idToken, {
         clientId: OUR_CLIENT_ID,
-        nowMs,
+        nowMs: FIXED_NOW_MS,
         fetchJwks: async () => ({ keys: [publicJwk] }),
       }),
     ).rejects.toThrow(AUTH_GOOGLE_TOKEN_INVALID)
@@ -233,20 +250,18 @@ describe('Google ID token sign-in — B11-01', () => {
   it('expired token => refused, no session', async () => {
     const db = new FakeDb()
     const { privateKey, publicJwk } = await generateTestGoogleKeyPair()
-    const nowMs = 1_700_000_000_000
-    const nowSec = Math.floor(nowMs / 1000)
     const idToken = await mintTestGoogleIdToken({
       privateKey,
       publicJwk,
-      claims: baseClaims(nowSec, {
-        exp: nowSec - 60,
-        iat: nowSec - 120,
+      claims: baseClaims({
+        exp: FIXED_NOW_SEC - 60,
+        iat: FIXED_NOW_SEC - 120,
       }),
     })
     await expect(
       attemptGoogleSignIn(db, idToken, {
         clientId: OUR_CLIENT_ID,
-        nowMs,
+        nowMs: FIXED_NOW_MS,
         fetchJwks: async () => ({ keys: [publicJwk] }),
       }),
     ).rejects.toThrow(AUTH_GOOGLE_TOKEN_INVALID)
@@ -257,12 +272,10 @@ describe('Google ID token sign-in — B11-01', () => {
   it('email_verified false => refused, no session', async () => {
     const db = new FakeDb()
     const { privateKey, publicJwk } = await generateTestGoogleKeyPair()
-    const nowMs = 1_700_000_000_000
-    const nowSec = Math.floor(nowMs / 1000)
     const idToken = await mintTestGoogleIdToken({
       privateKey,
       publicJwk,
-      claims: baseClaims(nowSec, {
+      claims: baseClaims({
         email_verified: false,
         sub: 'google-sub-3',
       }),
@@ -270,7 +283,7 @@ describe('Google ID token sign-in — B11-01', () => {
     await expect(
       attemptGoogleSignIn(db, idToken, {
         clientId: OUR_CLIENT_ID,
-        nowMs,
+        nowMs: FIXED_NOW_MS,
         fetchJwks: async () => ({ keys: [publicJwk] }),
       }),
     ).rejects.toThrow(AUTH_GOOGLE_TOKEN_INVALID)
@@ -279,22 +292,16 @@ describe('Google ID token sign-in — B11-01', () => {
   })
 
   it('valid token works when enabled', async () => {
-    vi.stubGlobal('process', {
-      env: {
-        GOOGLE_CLIENT_ID: OUR_CLIENT_ID,
-        CONVEX_GOOGLE_SIGNIN_ENABLED: 'true',
-      },
-    })
+    vi.stubEnv('GOOGLE_CLIENT_ID', OUR_CLIENT_ID)
+    vi.stubEnv('CONVEX_GOOGLE_SIGNIN_ENABLED', 'true')
     expect(requireGoogleSignInReady()).toBe(OUR_CLIENT_ID)
 
     const db = new FakeDb()
     const { privateKey, publicJwk } = await generateTestGoogleKeyPair()
-    const nowMs = 1_700_000_000_000
-    const nowSec = Math.floor(nowMs / 1000)
     const idToken = await mintTestGoogleIdToken({
       privateKey,
       publicJwk,
-      claims: baseClaims(nowSec, {
+      claims: baseClaims({
         email: 'google.user@example.com',
         sub: 'google-sub-ok',
         name: 'G User',
@@ -302,23 +309,21 @@ describe('Google ID token sign-in — B11-01', () => {
     })
     await attemptGoogleSignIn(db, idToken, {
       clientId: OUR_CLIENT_ID,
-      nowMs,
+      nowMs: FIXED_NOW_MS,
       fetchJwks: async () => ({ keys: [publicJwk] }),
     })
     expect(db.table('auth_sessions')).toHaveLength(1)
     const user = db.table('auth_users').find((u) => u.emailNorm === 'google.user@example.com')!
-    expect(user.emailConfirmedAt).toBe(nowMs)
+    expect(user.emailConfirmedAt).toBe(FIXED_NOW_MS)
   })
 
   it('B10-04 : valid Google ID token marks email confirmed via Google', async () => {
     const db = new FakeDb()
     const { privateKey, publicJwk } = await generateTestGoogleKeyPair()
-    const nowMs = 1_700_000_000_000
-    const nowSec = Math.floor(nowMs / 1000)
     const idToken = await mintTestGoogleIdToken({
       privateKey,
       publicJwk,
-      claims: baseClaims(nowSec, {
+      claims: baseClaims({
         email: 'google.user@example.com',
         sub: 'google-sub-ok',
         name: 'G User',
@@ -326,22 +331,21 @@ describe('Google ID token sign-in — B11-01', () => {
     })
     await attemptGoogleSignIn(db, idToken, {
       clientId: OUR_CLIENT_ID,
-      nowMs,
+      nowMs: FIXED_NOW_MS,
       fetchJwks: async () => ({ keys: [publicJwk] }),
     })
     expect(db.table('auth_sessions')).toHaveLength(1)
     const user = db.table('auth_users').find((u) => u.emailNorm === 'google.user@example.com')!
-    expect(user.emailConfirmedAt).toBe(nowMs)
+    expect(user.emailConfirmedAt).toBe(FIXED_NOW_MS)
   })
 
   it('fake token => refused, no session', async () => {
     const db = new FakeDb()
     const { publicJwk } = await generateTestGoogleKeyPair()
-    const nowMs = Date.now()
     await expect(
       attemptGoogleSignIn(db, 'not.a.jwt', {
         clientId: OUR_CLIENT_ID,
-        nowMs,
+        nowMs: FIXED_NOW_MS,
         fetchJwks: async () => ({ keys: [publicJwk] }),
       }),
     ).rejects.toThrow(AUTH_GOOGLE_TOKEN_INVALID)
@@ -354,13 +358,13 @@ describe('Google ID token sign-in — B11-01', () => {
         {
           iss: 'https://evil.example',
           aud: OUR_CLIENT_ID,
-          exp: Math.floor(Date.now() / 1000) + 60,
-          iat: Math.floor(Date.now() / 1000),
+          exp: FIXED_NOW_SEC + 60,
+          iat: FIXED_NOW_SEC,
           email: 'a@b.c',
           email_verified: true,
           sub: 'x',
         },
-        { clientId: OUR_CLIENT_ID },
+        { clientId: OUR_CLIENT_ID, nowMs: FIXED_NOW_MS },
       ),
     ).toThrow(AUTH_GOOGLE_TOKEN_INVALID)
   })

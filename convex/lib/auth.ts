@@ -97,13 +97,16 @@ export async function revokeSessionByToken(
   return true
 }
 
-export async function revokeAllUserSessions(ctx: MutationCtx, userId: string): Promise<number> {
+export async function revokeAllUserSessions(
+  ctx: MutationCtx,
+  userId: string,
+  now = Date.now(),
+): Promise<number> {
   const sessions = await ctx.db
     .query('auth_sessions')
     .withIndex('by_userId', (q) => q.eq('userId', userId))
     .collect()
   let revoked = 0
-  const now = Date.now()
   for (const session of sessions) {
     if (!session.revokedAt) {
       revoked += 1

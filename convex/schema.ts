@@ -74,6 +74,15 @@ export const convexTables = {
     resultCount: v.optional(v.number()),
   }).index('by_key', ['key']),
 
+  /**
+   * B12-01 : Google takeover of an unconfirmed password account.
+   * Stores account id + timestamp only — never token or password.
+   */
+  auth_google_takeover_audit: defineTable({
+    userId: v.string(),
+    at: v.number(),
+  }).index('by_userId', ['userId']),
+
   auth_password_credentials: defineTable({
     userId: v.string(),
     passwordHash: v.string(),

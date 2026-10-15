@@ -251,6 +251,26 @@ export const recordCodeAttempt = internalMutation({
   handler: async (ctx, args) => recordEmailCodeAttempt(ctx, args),
 })
 
+/** B12-01 : invalidate every pending/active email code for an account. */
+export async function invalidateAllEmailCodesForUser(
+  ctx: { db: MutationCtx['db'] },
+  userId: string,
+  now: number,
+): Promise<number> {
+  const rows = await ctx.db
+    .query('auth_email_verification_codes')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .collect()
+  let invalidated = 0
+  for (const row of rows) {
+    if (row.consumedAt == null) {
+      await ctx.db.patch(row._id, { consumedAt: now })
+      invalidated += 1
+    }
+  }
+  return invalidated
+}
+
 /** Google-verified email only (exception B9-01 / B10-04). */
 export async function markEmailConfirmedViaGoogleForUser(
   ctx: { db: MutationCtx['db'] },
