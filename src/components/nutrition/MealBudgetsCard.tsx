@@ -13,7 +13,7 @@ const ICONS: Record<MealType, typeof Coffee> = {
 interface MealBudgetsCardProps {
   targetCalories: number
   morphology: BodyMorphology
-  meals: Array<{ mealType: MealType; calories: number }>
+  meals: Array<{ mealType: MealType; calories: number | null }>
 }
 
 export function MealBudgetsCard({ targetCalories, morphology, meals }: MealBudgetsCardProps) {

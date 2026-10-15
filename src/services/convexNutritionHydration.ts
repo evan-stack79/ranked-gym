@@ -18,19 +18,28 @@ function asMealEntry(input: {
   grams?: number
   pieces?: number
   portionMode?: 'solo' | 'with_sides'
+  portionLabel?: string
+  entrySource?: 'v3'
   createdAt: number
 }): MealEntry {
+  // B3-01 : null reste null (jamais ?? 0) ; vrai 0 reste 0.
+  const calories =
+    typeof input.calories === 'number' && Number.isFinite(input.calories)
+      ? Math.max(0, Math.round(input.calories))
+      : null
   return {
     id: input.mealId,
     mealType: input.mealType as MealEntry['mealType'],
     name: input.name,
-    calories: Math.max(0, Math.round(input.calories ?? 0)),
-    proteinG: input.proteinG ?? undefined,
-    carbsG: input.carbsG ?? undefined,
-    fatG: input.fatG ?? undefined,
+    calories,
+    proteinG: input.proteinG,
+    carbsG: input.carbsG,
+    fatG: input.fatG,
     grams: input.grams,
     pieces: input.pieces,
     portionMode: input.portionMode,
+    portionLabel: input.portionLabel,
+    entrySource: input.entrySource,
     createdAt: input.createdAt,
   }
 }
@@ -163,6 +172,8 @@ export async function hydrateConvexNutritionJournal(): Promise<{
           grams: row.grams,
           pieces: row.pieces,
           portionMode: row.portionMode,
+          portionLabel: row.portionLabel,
+          entrySource: row.entrySource,
           createdAt: row.createdAt,
         }),
       )

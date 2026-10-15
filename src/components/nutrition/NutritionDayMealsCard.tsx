@@ -1,6 +1,11 @@
 import { useId, useState } from 'react'
 import { ChevronDown, Plus } from 'lucide-react'
 import type { MealEntry, MealType } from '../../types/nutrition'
+import { isFoodAddV3Enabled } from '../../backend/foodAddV3FeatureFlag'
+import {
+  formatGramsCountLabel,
+  formatPiecesCountLabel,
+} from '../../../convex/lib/foodAddQuantity'
 import { BlurInText, StaticKcalNumber } from '../motion'
 
 const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -12,9 +17,28 @@ const MEAL_ROW_LABELS: Record<MealType, string> = {
   snack: 'Collation',
 }
 
+/**
+ * Affiche la portion d’un repas.
+ * V3 OFF (= d33b724) : Math.round pièces, puis grammes, puis portionLabel.
+ * V3 ON : virgule / pluriel ≥2 ; grams live prioritaire sur portionLabel stale (B111-11).
+ */
 export function formatMealPortionLabel(
   meal: Pick<MealEntry, 'grams' | 'pieces' | 'portionLabel'>,
 ): string | null {
+  if (isFoodAddV3Enabled()) {
+    if (typeof meal.pieces === 'number' && Number.isFinite(meal.pieces) && meal.pieces > 0) {
+      return formatPiecesCountLabel(meal.pieces)
+    }
+    if (typeof meal.grams === 'number' && Number.isFinite(meal.grams) && meal.grams > 0) {
+      return formatGramsCountLabel(meal.grams)
+    }
+    if (typeof meal.portionLabel === 'string' && meal.portionLabel.trim()) {
+      return meal.portionLabel.trim()
+    }
+    return null
+  }
+
+  // d33b724 V3-OFF — inchangé (B111-13).
   if (typeof meal.pieces === 'number' && Number.isFinite(meal.pieces) && meal.pieces > 0) {
     const n = Math.round(meal.pieces)
     return n === 1 ? '1 pièce' : `${n} pièces`
@@ -37,6 +61,8 @@ interface NutritionDayMealsCardProps {
   onEditMeal?: (meal: MealEntry) => void
   /** Masque le bouton + (TCA / mineurs). */
   hideAdd?: boolean
+  /** V3 ON — name + quantité seulement (pas de kcal). */
+  hideNutritionNumbers?: boolean
 }
 
 export function NutritionDayMealsCard({
@@ -44,6 +70,7 @@ export function NutritionDayMealsCard({
   onAddMeal,
   onEditMeal,
   hideAdd = false,
+  hideNutritionNumbers = false,
 }: NutritionDayMealsCardProps) {
   const baseId = useId()
   const [openTypes, setOpenTypes] = useState<Partial<Record<MealType, boolean>>>({})
@@ -58,7 +85,7 @@ export function NutritionDayMealsCard({
 
   const kcalByType = MEAL_ORDER.reduce(
     (acc, type) => {
-      acc[type] = mealsByType[type].reduce((sum, meal) => sum + meal.calories, 0)
+      acc[type] = mealsByType[type].reduce((sum, meal) => sum + (meal.calories ?? 0), 0)
       return acc
     },
     {} as Record<MealType, number>,
@@ -107,19 +134,27 @@ export function NutritionDayMealsCard({
                       <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-white">
                         {MEAL_ROW_LABELS[type]}
                       </span>
-                      <span className="shrink-0 text-[14px] tabular-nums text-[#8E8E93]">
-                        {/* SAFETY: meal kcal stays static — never CountUpNumber. */}
-                        <StaticKcalNumber value={kcal} /> kcal
-                      </span>
+                      {hideNutritionNumbers ? (
+                        <span className="shrink-0 text-[14px] tabular-nums text-[#8E8E93]">
+                          {items.length}
+                        </span>
+                      ) : (
+                        <span className="shrink-0 text-[14px] tabular-nums text-[#8E8E93]">
+                          {/* SAFETY: meal kcal stays static — never CountUpNumber. */}
+                          <StaticKcalNumber value={kcal} /> kcal
+                        </span>
+                      )}
                     </button>
                   ) : (
                     <div className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-2 py-2">
                       <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-white">
                         {MEAL_ROW_LABELS[type]}
                       </span>
-                      <span className="shrink-0 text-[14px] tabular-nums text-[#8E8E93]">
-                        <StaticKcalNumber value={kcal} /> kcal
-                      </span>
+                      {hideNutritionNumbers ? null : (
+                        <span className="shrink-0 text-[14px] tabular-nums text-[#8E8E93]">
+                          <StaticKcalNumber value={kcal} /> kcal
+                        </span>
+                      )}
                     </div>
                   )}
                   {hideAdd ? null : (
@@ -162,8 +197,21 @@ export function NutritionDayMealsCard({
                                   {meal.name}
                                 </span>
                                 <span className="mt-0.5 block text-[12px] text-[#8E8E93]">
-                                  {Math.round(meal.calories).toLocaleString('fr-FR')} kcal
-                                  {portion ? ` · ${portion}` : ''}
+                                  {hideNutritionNumbers
+                                    ? portion ?? ''
+                                    : meal.calories == null
+                                      ? (portion ?? '')
+                                      : `${Math.round(meal.calories).toLocaleString('fr-FR')} kcal${
+                                          portion ? ` · ${portion}` : ''
+                                        }`}
+                                  {meal.syncRejected ? (
+                                    <span
+                                      className="mt-0.5 block text-[11px] font-semibold text-[#FF6961]"
+                                      data-meal-sync-rejected
+                                    >
+                                      Pas enregistré
+                                    </span>
+                                  ) : null}
                                 </span>
                               </span>
                             </button>

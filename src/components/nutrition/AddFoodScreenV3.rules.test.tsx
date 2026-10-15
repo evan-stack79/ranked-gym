@@ -99,7 +99,9 @@ describe('AddFoodScreenV3 — règles produit', () => {
     expect(text).toContain('CC BY-SA 3.0')
     expect(text).toContain('Tout')
     expect(text).toContain('Fruits')
-    expect(text).toMatch(/Hors ligne/)
+    // PC-06 : plus « Hors ligne • l'ajout marche… » — connexion requise.
+    expect(text).toMatch(/Connexion requise pour ajouter un aliment/)
+    expect(text).not.toMatch(/marche quand même/)
     expect(text).not.toMatch(FORBIDDEN)
     expect(document.querySelector('[data-food-offline-banner]')).toBeTruthy()
 
@@ -121,9 +123,11 @@ describe('AddFoodScreenV3 — règles produit', () => {
       (el) => el.textContent?.trim() === 'Calories',
     )
     expect(calorieLabels).toHaveLength(0)
-    expect(document.querySelector('[data-add-food-screen] form')?.textContent ?? '').toContain(
-      'Protéines',
-    )
+    const manualText = document.querySelector('[data-add-food-screen] form')?.textContent ?? ''
+    expect(manualText).not.toContain('Protéines')
+    expect(manualText).not.toContain('Glucides')
+    expect(manualText).not.toContain('Lipides')
+    expect(manualText).toContain('Quantité (g)')
 
     // Cartes : image dans le flux (pas absolute overlapping), portion non truncatée.
     const card = document.querySelector('[data-food-card]') as HTMLElement

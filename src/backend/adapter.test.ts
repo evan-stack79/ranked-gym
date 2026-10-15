@@ -37,6 +37,7 @@ const PHASE_E_TABLES = [
   'nutrition_food_catalog',
   'food_search_usage',
   'off_product_images',
+  'off_product_nutrients',
   'sleep_nights',
   'checkins',
   'custom_spots',

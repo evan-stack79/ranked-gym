@@ -7,6 +7,8 @@ interface FoodSelectionBarProps {
   selected: OpenFoodFactsSearchHit[]
   onValidate: () => void
   forceOfflineImages?: boolean
+  /** Hors ligne V3 : Valider grisé. */
+  disabled?: boolean
 }
 
 /**
@@ -17,6 +19,7 @@ export function FoodSelectionBar({
   selected,
   onValidate,
   forceOfflineImages = false,
+  disabled = false,
 }: FoodSelectionBarProps) {
   if (selected.length === 0) return null
   const n = selected.length
@@ -58,8 +61,9 @@ export function FoodSelectionBar({
         <button
           type="button"
           onClick={onValidate}
+          disabled={disabled}
           aria-label="Valider la sélection"
-          className="ios-press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white"
+          className="ios-press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white disabled:opacity-40"
         >
           <Check className="h-5 w-5" strokeWidth={2.5} aria-hidden />
         </button>

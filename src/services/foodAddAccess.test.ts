@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   canAccessFoodAdd,
+  canAccessFoodAddV3,
   canShowMealJournal,
   decideFoodAddAccess,
+  decideFoodAddAccessV3,
+  hasDeclaredEatingDisorderFlag,
   needsAgePrompt,
 } from './foodAddAccess'
 import type { CalorieProfile } from '../types/nutrition'
@@ -64,5 +67,44 @@ describe('foodAddAccess — mineur / TCA / diabète / âge', () => {
     expect(needsAgePrompt({ ...ADULT, age: undefined as unknown as number })).toBe(true)
     expect(canShowMealJournal({ ...ADULT, age: null as unknown as number })).toBe(true)
     expect(canAccessFoodAdd({ ...ADULT, age: null as unknown as number })).toBe(true)
+  })
+})
+
+describe('foodAddAccess V3 — TCA même si healthAnswer none/prefer_not', () => {
+  it('declaredEatingDisorder true refuse V3 même si healthAnswer none', () => {
+    const profile = {
+      ...ADULT,
+      healthAnswer: 'none' as const,
+      declaredEatingDisorder: true,
+    }
+    expect(hasDeclaredEatingDisorderFlag(profile)).toBe(true)
+    expect(decideFoodAddAccessV3(profile)).toEqual({
+      allowed: false,
+      reason: 'eating_disorder',
+    })
+    expect(canAccessFoodAddV3(profile)).toBe(false)
+    // Legacy path inchangé : healthAnswer none → declarations.eatingDisorder false
+    expect(canAccessFoodAdd(profile)).toBe(true)
+  })
+
+  it('declaredEatingDisorder true refuse V3 même si healthAnswer prefer_not', () => {
+    const profile = {
+      ...ADULT,
+      healthAnswer: 'prefer_not' as const,
+      declaredEatingDisorder: true,
+    }
+    expect(canAccessFoodAddV3(profile)).toBe(false)
+    expect(decideFoodAddAccessV3(profile).reason).toBe('eating_disorder')
+  })
+
+  it('sans flag TCA déclaré → V3 suit les déclarations healthAnswer', () => {
+    expect(canAccessFoodAddV3({ ...ADULT, healthAnswer: 'none' })).toBe(true)
+    expect(
+      canAccessFoodAddV3({
+        ...ADULT,
+        healthAnswer: 'situations',
+        declaredEatingDisorder: false,
+      }),
+    ).toBe(true)
   })
 })

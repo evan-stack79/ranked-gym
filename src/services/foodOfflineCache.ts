@@ -90,8 +90,16 @@ export function rememberFoodHits(hits: OpenFoodFactsSearchHit[]): void {
   const map = new Map(readAll().map((item) => [keyOf(item), item]))
   for (const hit of hits) {
     const prev = map.get(keyOf(hit))
+    // V3 public hits arrivent sans kcal/macros — ne pas écraser un cache déjà nourri.
     map.set(keyOf(hit), {
       ...hit,
+      calories:
+        hit.calories == null && prev?.calories != null ? prev.calories : hit.calories,
+      proteines:
+        hit.proteines == null && prev?.proteines != null ? prev.proteines : hit.proteines,
+      glucides:
+        hit.glucides == null && prev?.glucides != null ? prev.glucides : hit.glucides,
+      lipides: hit.lipides == null && prev?.lipides != null ? prev.lipides : hit.lipides,
       cachedAt: now,
       imageDataUrl: prev?.imageDataUrl,
     })

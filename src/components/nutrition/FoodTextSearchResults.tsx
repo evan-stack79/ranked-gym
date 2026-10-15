@@ -11,6 +11,8 @@ interface FoodTextSearchResultsProps {
   onToggleFavorite?: (hit: OpenFoodFactsSearchHit) => void
   /** Liste en flex-1 : occupe tout l’espace restant sous la barre de recherche. */
   fill?: boolean
+  /** V3 only — masque kcal/100g (flag OFF → défaut false, liste legacy). */
+  hideNutritionNumbers?: boolean
 }
 
 export function FoodTextSearchResults({
@@ -21,6 +23,7 @@ export function FoodTextSearchResults({
   onSelect,
   onToggleFavorite,
   fill = false,
+  hideNutritionNumbers = false,
 }: FoodTextSearchResultsProps) {
   const online = useOnlineStatus()
   const trimmed = query.trim()
@@ -91,10 +94,12 @@ export function FoodTextSearchResults({
                       {hit.brands || 'Marque inconnue'}
                     </p>
                   </div>
-                  <span className="shrink-0 text-[13px] font-semibold tabular-nums text-[#FF9F0A]">
-                    {hit.calories == null ? 'ND' : hit.calories}
-                    <span className="ml-0.5 text-[11px] font-medium text-[#8E8E93]">kcal/100g</span>
-                  </span>
+                  {hideNutritionNumbers ? null : (
+                    <span className="shrink-0 text-[13px] font-semibold tabular-nums text-[#FF9F0A]">
+                      {hit.calories == null ? 'ND' : hit.calories}
+                      <span className="ml-0.5 text-[11px] font-medium text-[#8E8E93]">kcal/100g</span>
+                    </span>
+                  )}
                 </button>
 
                 {onToggleFavorite && hit.foodKey ? (

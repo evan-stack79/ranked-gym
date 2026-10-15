@@ -597,23 +597,38 @@ export function saveTodayJournal(journal: DayJournal, opts?: StorageSaveOptions)
 
 export function addMealToDate(
   dateKey: string,
-  meal: Omit<MealEntry, 'id' | 'createdAt'> & { createdAt?: number; updatedAt?: number },
+  meal: Omit<MealEntry, 'id' | 'createdAt'> & {
+    id?: string
+    createdAt?: number
+    updatedAt?: number
+  },
 ): DayJournal {
   const journal = getJournalForDate(dateKey)
   const now = Date.now()
   const entry: MealEntry = {
     ...meal,
-    id: `meal-${now}-${Math.random().toString(36).slice(2, 7)}`,
+    // B111-14 : id optionnel pour aligner local ↔ serveur après OK.
+    id: meal.id ?? `meal-${now}-${Math.random().toString(36).slice(2, 7)}`,
     createdAt: meal.createdAt ?? now,
     updatedAt: meal.updatedAt ?? meal.createdAt ?? now,
   }
-  const next = { ...journal, meals: [entry, ...journal.meals] }
+  // B3-05 : même mealId → met à jour la ligne au lieu d’en ajouter une 2e.
+  const existingIdx = journal.meals.findIndex((m) => m.id === entry.id)
+  const meals =
+    existingIdx >= 0
+      ? journal.meals.map((m, i) => (i === existingIdx ? { ...m, ...entry } : m))
+      : [entry, ...journal.meals]
+  const next = { ...journal, meals }
   saveJournalForDate(next)
   return next
 }
 
 export function addMealToToday(
-  meal: Omit<MealEntry, 'id' | 'createdAt'> & { createdAt?: number; updatedAt?: number },
+  meal: Omit<MealEntry, 'id' | 'createdAt'> & {
+    id?: string
+    createdAt?: number
+    updatedAt?: number
+  },
 ): DayJournal {
   return addMealToDate(todayKey(), meal)
 }

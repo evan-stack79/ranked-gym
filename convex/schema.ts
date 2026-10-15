@@ -249,6 +249,13 @@ export const convexTables = {
     offCode: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
     imageStorageId: v.optional(v.id('_storage')),
+    /**
+     * Marqueur V3 (addFoodSnapshot). Une ligne V3 ignore toujours les kcal/macros client
+     * sur upsertMeal, même sans quantityRules:'v3'.
+     */
+    entrySource: v.optional(v.literal('v3')),
+    /** Id stable d’un ajout V3 (retries / selectedCount). */
+    selectionEventId: v.optional(v.string()),
     createdAt: v.optional(v.number()),
     updatedAt: v.number(),
     deletedAt: v.optional(v.number()),
@@ -295,6 +302,12 @@ export const convexTables = {
     proteinPer100g: v.union(v.number(), v.null()),
     carbsPer100g: v.union(v.number(), v.null()),
     fatPer100g: v.union(v.number(), v.null()),
+    /**
+     * Provenance des nutriments catalogue.
+     * 'server' = off_product_nutrients / calcul serveur — peut nourrir V3.
+     * 'client' = saisie téléphone — jamais utilisée par addFoodSnapshot V3.
+     */
+    nutrientsSource: v.optional(v.union(v.literal('server'), v.literal('client'))),
     /** URL de NOTRE stockage (Convex) — jamais un hotlink OFF. */
     imageUrl: v.optional(v.string()),
     imageStorageId: v.optional(v.id('_storage')),
@@ -338,6 +351,22 @@ export const convexTables = {
     storageId: v.id('_storage'),
     contentType: v.string(),
     sourceUrl: v.optional(v.string()),
+    updatedAt: v.number(),
+  }).index('by_offCode', ['offCode']),
+
+  /**
+   * Cache global nutriments OFF (per 100 g + poids portion/pièce si connu).
+   * Rempli à la recherche searchFoods ; lu à addFoodSnapshot — pas de refetch OFF.
+   */
+  off_product_nutrients: defineTable({
+    offCode: v.string(),
+    caloriesPer100g: v.union(v.number(), v.null()),
+    proteinPer100g: v.union(v.number(), v.null()),
+    carbsPer100g: v.union(v.number(), v.null()),
+    fatPer100g: v.union(v.number(), v.null()),
+    servingSize: v.optional(v.union(v.string(), v.null())),
+    /** Grammes d’une portion/pièce OFF ; null si inconnu (ne jamais inventer 100 g). */
+    servingGrams: v.union(v.number(), v.null()),
     updatedAt: v.number(),
   }).index('by_offCode', ['offCode']),
 
