@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<style>
+@font-face { font-family: 'Inter'; font-weight: 500; src: url('assets/fonts/inter-1.ttf'); }
+@font-face { font-family: 'Inter'; font-weight: 700; src: url('assets/fonts/inter-2.ttf'); }
+@font-face { font-family: 'Inter'; font-weight: 800; src: url('assets/fonts/inter-3.ttf'); }
+@font-face { font-family: 'Inter'; font-weight: 900; src: url('assets/fonts/inter-4.ttf'); }
+:root { --red: #ff2b2b; --red-deep: #b91c1c; --bg: #0a0a0b; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); }
+body { font-family: 'Inter', sans-serif; color: #fff; -webkit-font-smoothing: antialiased; }
+.stage { position: absolute; inset: 0; overflow: hidden; }
+.abs { position: absolute; will-change: transform, opacity; }
+.center-x { left: 0; right: 0; text-align: center; }
+
+.glow { position: absolute; border-radius: 50%; }
+#glowA { width: 900px; height: 900px; left: -260px; top: -200px; background: radial-gradient(circle, rgba(255,43,43,.26) 0%, rgba(255,43,43,.10) 38%, rgba(255,43,43,0) 70%); }
+#glowB { width: 800px; height: 800px; right: -300px; bottom: -160px; background: radial-gradient(circle, rgba(255,43,43,.2) 0%, rgba(255,43,43,.08) 38%, rgba(255,43,43,0) 70%); }
+#redWash { inset: 0; background: radial-gradient(120% 80% at 50% 38%, #e01e1e 0%, #9b1111 48%, #3a0606 100%); opacity: 0; }
+#vignette { inset: 0; background: radial-gradient(130% 90% at 50% 45%, transparent 55%, rgba(0,0,0,.55) 100%); pointer-events: none; }
+
+.mask { overflow: hidden; display: block; }
+.mask > span { display: block; will-change: transform, opacity; }
+
+#hookWord { top: 760px; font-weight: 900; font-size: 200px; letter-spacing: -0.04em; line-height: 1; }
+#hookCount { top: 1010px; font-weight: 700; font-size: 34px; letter-spacing: .32em; color: var(--red); }
+#hookTag { top: 300px; font-weight: 700; font-size: 30px; letter-spacing: .4em; color: rgba(255,255,255,.55); }
+#allLine1, #allLine2 { white-space: nowrap; font-weight: 900; font-size: 112px; letter-spacing: -0.035em; line-height: 1.02; }
+#allLine1 { top: 740px; }
+#allLine2 { top: 868px; color: var(--red); }
+
+#logoWrap { left: 50%; top: 520px; width: 520px; height: 520px; margin-left: -260px; }
+#logoWrap img { width: 100%; height: 100%; object-fit: contain; position: relative; }
+#logoHalo { position: absolute; inset: 60px; border-radius: 50%; background: radial-gradient(circle, rgba(255,43,43,.75) 0%, rgba(255,43,43,0) 70%); filter: blur(30px); }
+#wordmark { top: 1090px; font-weight: 900; font-size: 104px; letter-spacing: .12em; }
+#wordmark b { color: var(--red); font-weight: 900; }
+#tagline { top: 1240px; font-weight: 500; font-size: 40px; color: rgba(255,255,255,.72); letter-spacing: .01em; }
+
+.headline { white-space: nowrap; top: 150px; font-weight: 900; font-size: 84px; letter-spacing: -0.03em; line-height: 1.04; }
+.headline .r { color: var(--red); }
+.kicker { top: 96px; font-weight: 700; font-size: 26px; letter-spacing: .34em; color: var(--red); }
+
+#phone { left: 50%; top: 470px; width: 640px; height: 1352px; margin-left: -320px; border-radius: 104px; background: #1b1b1e;
+  box-shadow: 0 0 0 2px #3a3a3f, 0 0 0 10px #0d0d0f, 0 0 0 12px #2c2c30, 0 60px 140px rgba(0,0,0,.7), 0 0 160px rgba(255,43,43,.18); padding: 16px; }
+#screen { position: relative; width: 100%; height: 100%; border-radius: 88px; overflow: hidden; background: #0c0c0e; }
+#screen img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+#island { position: absolute; top: 22px; left: 50%; width: 180px; height: 52px; margin-left: -90px; border-radius: 26px; background: #000; z-index: 5; }
+#screenB { opacity: 0; }
+
+.card { width: 500px; padding: 30px 34px; border-radius: 34px; background: rgba(24,24,27,.86); backdrop-filter: blur(24px);
+  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.08), 0 30px 80px rgba(0,0,0,.55); display: flex; align-items: center; gap: 26px; right: 44px; }
+.card .ic { width: 84px; height: 84px; border-radius: 24px; background: rgba(255,43,43,.14); display: grid; place-items: center; flex: none; }
+.card .ic svg { width: 46px; height: 46px; stroke: var(--red); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.card .t { font-weight: 800; font-size: 38px; letter-spacing: -0.01em; }
+.card .s { font-weight: 500; font-size: 28px; color: rgba(255,255,255,.6); margin-top: 6px; }
+
+#proPill { left: 50%; top: 1700px; transform: translateX(-50%); white-space: nowrap; padding: 26px 42px; border-radius: 999px;
+  background: rgba(20,20,22,.9); box-shadow: inset 0 0 0 2px rgba(255,43,43,.55), 0 20px 60px rgba(0,0,0,.6); font-weight: 700; font-size: 34px; }
+#proPill b { color: var(--red); }
+
+#pct { top: 470px; font-weight: 900; font-size: 420px; letter-spacing: -0.05em; line-height: 1; }
+#pct small { font-size: 230px; letter-spacing: 0; margin-left: 10px; }
+#pctLine1, #pctLine2 { white-space: nowrap; font-weight: 800; font-size: 54px; letter-spacing: -0.02em; line-height: 1.12; }
+#pctLine1 { top: 940px; }
+#pctLine2 { top: 1012px; }
+#causeKicker { top: 330px; font-weight: 700; font-size: 30px; letter-spacing: .38em; color: rgba(255,255,255,.8); }
+.chip { padding: 22px 36px; border-radius: 999px; background: rgba(0,0,0,.28); box-shadow: inset 0 0 0 2px rgba(255,255,255,.35);
+  font-weight: 700; font-size: 36px; white-space: nowrap; left: 50%; }
+#helpLine { top: 1560px; font-weight: 900; font-size: 64px; letter-spacing: -0.02em; }
+#helpLine svg { width: 58px; height: 58px; vertical-align: -6px; margin-right: 18px; fill: #fff; }
+
+#endLogo { left: 50%; top: 300px; width: 300px; height: 300px; margin-left: -150px; }
+#endLogo img { width: 100%; height: 100%; object-fit: contain; }
+#endWord { top: 620px; font-weight: 900; font-size: 60px; letter-spacing: .16em; }
+#endWord b { color: var(--red); }
+#endL1, #endL2, #endL3 { white-space: nowrap; }
+#endL1, #endL2 { font-weight: 900; font-size: 104px; letter-spacing: -0.035em; line-height: 1.02; }
+#endL1 { top: 830px; }
+#endL2 { top: 950px; color: var(--red); }
+#endL3 { top: 1070px; font-weight: 900; font-size: 104px; letter-spacing: -0.035em; color: var(--red); }
+#cta { left: 50%; top: 1340px; transform: translateX(-50%); padding: 40px 72px; border-radius: 999px; background: #fff; color: #0a0a0b;
+  font-weight: 900; font-size: 46px; white-space: nowrap; box-shadow: 0 24px 80px rgba(255,43,43,.35); }
+#endFoot { top: 1530px; font-weight: 600; font-size: 32px; color: rgba(255,255,255,.6); letter-spacing: .02em; }
+#endFoot i { color: var(--red); font-style: normal; padding: 0 14px; }
+#fadeBlack { inset: 0; background: #000; opacity: 0; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <div class="glow" id="glowA"></div>
+  <div class="glow" id="glowB"></div>
+  <div class="abs" id="redWash"></div>
+
+  <div class="abs center-x" id="hookTag">RANKED GYM PRÉSENTE</div>
+  <div class="abs center-x mask" id="hookWord"><span id="hookWordIn">MUSCU</span></div>
+  <div class="abs center-x" id="hookCount">+70 SPORTS</div>
+  <div class="abs center-x mask" id="allLine1"><span>TOUS TES SPORTS.</span></div>
+  <div class="abs center-x mask" id="allLine2"><span>UNE SEULE APP.</span></div>
+
+  <div class="abs" id="logoWrap"><div id="logoHalo"></div><img src="assets/img/logo.png"></div>
+  <div class="abs center-x" id="wordmark">RANKED <b>GYM</b></div>
+  <div class="abs center-x" id="tagline">Entraîne-toi. Mange mieux. Progresse.</div>
+
+  <div class="abs center-x kicker" id="k1">ACCUEIL</div>
+  <div class="abs center-x headline" id="h1"><span class="mask"><span>Ta séance du jour,</span></span><span class="mask"><span class="r">prête quand tu l'es.</span></span></div>
+  <div class="abs center-x kicker" id="k2">MULTISPORT</div>
+  <div class="abs center-x headline" id="h2"><span class="mask"><span>Muscu, foot, yoga…</span></span><span class="mask"><span class="r">Tout compte.</span></span></div>
+  <div class="abs center-x kicker" id="k3">NUTRITION</div>
+  <div class="abs center-x headline" id="h3"><span class="mask"><span>Calories et eau :</span></span><span class="mask"><span class="r">suivi gratuit.</span></span></div>
+
+  <div class="abs" id="phone"><div id="screen"><div id="island"></div><img id="screenA" src="assets/img/home.jpg"><img id="screenB" src="assets/img/train-strength.jpg"></div></div>
+
+  <div class="abs card" id="c1"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="14" cy="4.5" r="2"/><path d="M8 21l3-6 3 3v3M6 12l3-3 4 1 3 4h3M10 9l-1 5"/></svg></div><div><div class="t">Course à pied</div><div class="s">32 min · 5,2 km</div></div></div>
+  <div class="abs card" id="c2"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 4.5h-5L8 10z"/></svg></div><div><div class="t">Football</div><div class="s">Match · 90 min</div></div></div>
+  <div class="abs card" id="c3"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="4.5" r="2"/><path d="M4 20h16M12 7v6M6 10l6 3 6-3M8 20l4-7 4 7"/></svg></div><div><div class="t">Yoga</div><div class="s">40 min · Effort facile</div></div></div>
+  <div class="abs card" id="c4"><div class="ic"><svg viewBox="0 0 24 24"><path d="M2 12h20M5 8v8M8 6v12M16 6v12M19 8v8"/></svg></div><div><div class="t">Musculation</div><div class="s">Squat · 2 séries</div></div></div>
+
+  <div class="abs" id="proPill">Scan code-barres &amp; Scan IA · <b>Pass Pro 6,99 €/mois</b></div>
+
+  <div class="abs center-x" id="causeKicker">NOTRE ENGAGEMENT</div>
+  <div class="abs center-x" id="pct"><span id="pctNum">6</span><small>%</small></div>
+  <div class="abs center-x mask" id="pctLine1"><span>du chiffre d'affaires des abonnements</span></div>
+  <div class="abs center-x mask" id="pctLine2"><span>reversé à des associations.</span></div>
+  <div class="abs chip" id="ch1">Lutte contre le cancer</div>
+  <div class="abs chip" id="ch2">Lutte contre la maladie</div>
+  <div class="abs chip" id="ch3">Personnes dans le besoin</div>
+  <div class="abs center-x" id="helpLine"><svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.8 4.5c2.1 0 3.6 1.2 5.2 3 1.6-1.8 3.1-3 5.2-3 3.8 0 5.9 3.9 4.4 7.3C19.5 16.4 12 21 12 21z"/></svg>Tu progresses. Tu aides.</div>
+
+  <div class="abs" id="endLogo"><img src="assets/img/logo.png"></div>
+  <div class="abs center-x" id="endWord">RANKED <b>GYM</b></div>
+  <div class="abs center-x mask" id="endL1"><span>Sois en bonne santé.</span></div>
+  <div class="abs center-x mask" id="endL2"><span>Construis le corps</span></div>
+  <div class="abs center-x mask" id="endL3"><span>de tes rêves.</span></div>
+  <div class="abs" id="cta">Télécharge l'app gratuitement</div>
+  <div class="abs center-x" id="endFoot">Disponible maintenant<i>•</i>+70 sports<i>•</i>6 % reversés</div>
+
+  <div class="abs" id="vignette"></div>
+  <div class="abs" id="fadeBlack"></div>
+</div>
+
+<script>
+function bezier(x1, y1, x2, y2) {
+  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx
+  const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by
+  const sx = (t) => ((ax * t + bx) * t + cx) * t
+  const sy = (t) => ((ay * t + by) * t + cy) * t
+  const dx = (t) => (3 * ax * t + 2 * bx) * t + cx
+  return (x) => {
+    if (x <= 0) return 0
+    if (x >= 1) return 1
+    let t = x
+    for (let i = 0; i < 8; i++) {
+      const e = sx(t) - x
+      if (Math.abs(e) < 1e-6) break
+      const d = dx(t)
+      if (Math.abs(d) < 1e-6) break
+      t -= e / d
+    }
+    return sy(t)
+  }
+}
+const easeOut = bezier(0.23, 1, 0.32, 1)
+const easeInOut = bezier(0.77, 0, 0.175, 1)
+const clamp = (v) => Math.max(0, Math.min(1, v))
+const prog = (t, a, d) => clamp((t - a) / d)
+const lerp = (a, b, p) => a + (b - a) * p
+const $ = (id) => document.getElementById(id)
+
+const CUTS = {
+  30: {
+    duration: 30,
+    words: ['MUSCU', 'COURSE', 'FOOT', 'BOXE', 'YOGA', 'NATATION', 'VÉLO', 'TENNIS'], wordStart: 0.25, wordStep: 0.3,
+    all: 2.75, logo: 3.9, home: 6.4, multi: 11.6, nutri: 16.4, cause: 21.0, end: 26.2,
+  },
+  15: {
+    duration: 15,
+    words: ['MUSCU', 'COURSE', 'FOOT', 'BOXE', 'YOGA'], wordStart: 0.15, wordStep: 0.26,
+    all: 1.5, logo: 2.55, home: 4.4, multi: null, nutri: null, cause: 8.0, end: 11.5,
+  },
+}
+const cut = CUTS[new URLSearchParams(location.search).get('cut') || '30']
+window.AD_DURATION = cut.duration
+
+const CLIPS = {
+  home: Array.from({ length: 120 }, (_, i) => `assets/clips/clip-home/f${String(i).padStart(4, '0')}.jpg`),
+  nutri: Array.from({ length: 90 }, (_, i) => `assets/clips/clip-nutrition/f${String(i).padStart(4, '0')}.jpg`),
+}
+const cache = new Map()
+function preload(src) {
+  if (!cache.has(src)) {
+    const img = new Image()
+    img.src = src
+    cache.set(src, img.decode().catch(() => {}))
+  }
+  return cache.get(src)
+}
+window.preloadAll = () => Promise.all([...CLIPS.home, ...CLIPS.nutri, 'assets/img/home.jpg', 'assets/img/train-strength.jpg', 'assets/img/nutrition.jpg', 'assets/img/logo.png'].map(preload).concat(document.fonts.ready))
+
+function set(id, { o = 1, x = 0, y = 0, s = 1, blur = 0, extra = '' } = {}) {
+  const el = typeof id === 'string' ? $(id) : id
+  el.style.opacity = o
+  el.style.transform = `${extra} translate(${x}px, ${y}px) scale(${s})`
+  el.style.filter = blur > 0.05 ? `blur(${blur}px)` : 'none'
+}
+function hide(id) { $(id).style.opacity = 0 }
+
+function maskLines(el, t, start, exitAt, stagger = 0.08) {
+  const spans = el.querySelectorAll('.mask > span, :scope.mask > span')
+  let any = false
+  spans.forEach((sp, i) => {
+    const pin = easeOut(prog(t, start + i * stagger, 0.7))
+    const pout = exitAt == null ? 0 : easeInOut(prog(t, exitAt + i * 0.04, 0.45))
+    sp.style.transform = `translateY(${(1 - pin) * 105 - pout * 105}%)`
+    sp.style.opacity = 1
+    if (pin > 0 && pout < 1) any = true
+  })
+  el.style.opacity = any ? 1 : 0
+  el.style.transform = 'none'
+  el.style.filter = 'none'
+}
+function fadeUp(id, t, start, exitAt, dist = 40, dur = 0.6) {
+  const pin = easeOut(prog(t, start, dur))
+  const pout = exitAt == null ? 0 : easeInOut(prog(t, exitAt, 0.4))
+  if (pin <= 0 || pout >= 1) return hide(id)
+  set(id, { o: pin * (1 - pout), y: (1 - pin) * dist - pout * dist, blur: (1 - pin) * 10 + pout * 8 })
+}
+
+let lastA = null, lastB = null
+function setScreen(srcA, srcB, mixB) {
+  if (srcA !== lastA) { $('screenA').src = srcA; lastA = srcA }
+  if (srcB !== lastB) { $('screenB').src = srcB; lastB = srcB }
+  $('screenB').style.opacity = mixB
+}
+const clipFrame = (list, t, a, b) => list[Math.round(clamp((t - a) / (b - a)) * (list.length - 1))]
+
+window.renderAt = async function renderAt(t) {
+  const c = cut
+  $('glowA').style.transform = `translate(${Math.sin(t * 0.35) * 120}px, ${Math.cos(t * 0.27) * 90}px)`
+  $('glowB').style.transform = `translate(${Math.cos(t * 0.3) * 140}px, ${Math.sin(t * 0.22) * 110}px)`
+
+  // Hook: kinetic sport words
+  const wordsEnd = c.wordStart + c.words.length * c.wordStep
+  fadeUp('hookTag', t, 0.05, c.all - 0.2, 20, 0.5)
+  if (t >= c.wordStart && t < wordsEnd) {
+    const i = Math.min(c.words.length - 1, Math.floor((t - c.wordStart) / c.wordStep))
+    const local = t - c.wordStart - i * c.wordStep
+    $('hookWordIn').textContent = c.words[i]
+    const p = easeOut(prog(local, 0, 0.16))
+    $('hookWord').style.opacity = 1
+    $('hookWordIn').style.transform = `translateY(${(1 - p) * 70}%)`
+    $('hookWordIn').style.color = i % 2 ? 'var(--red)' : '#fff'
+  } else hide('hookWord')
+  fadeUp('hookCount', t, c.wordStart + c.wordStep * 2, wordsEnd - 0.05, 20, 0.4)
+  maskLines($('allLine1'), t, c.all, c.logo - 0.35)
+  maskLines($('allLine2'), t, c.all + 0.1, c.logo - 0.3)
+
+  // Logo reveal
+  {
+    const pin = easeOut(prog(t, c.logo, 0.9))
+    const pout = easeInOut(prog(t, c.home - 0.45, 0.5))
+    if (pin > 0 && pout < 1) {
+      set('logoWrap', { o: pin * (1 - pout), s: lerp(0.9, 1, pin) * lerp(1, 0.94, pout), y: -pout * 60, blur: (1 - pin) * 16 })
+      const pulse = 0.65 + 0.35 * Math.sin((t - c.logo) * 3.2)
+      $('logoHalo').style.opacity = pin * pulse
+    } else hide('logoWrap')
+    const wp = easeOut(prog(t, c.logo + 0.35, 1.0))
+    if (wp > 0 && pout < 1) {
+      $('wordmark').style.letterSpacing = `${lerp(0.4, 0.12, wp)}em`
+      set('wordmark', { o: wp * (1 - pout), y: -pout * 40, blur: (1 - wp) * 8 })
+    } else hide('wordmark')
+    fadeUp('tagline', t, c.logo + 0.8, c.home - 0.5, 24)
+  }
+
+  // Phone timeline
+  const phoneOn = c.home + 0.25
+  const phoneOff = c.cause
+  {
+    const pin = easeInOut(prog(t, phoneOn, 1.0))
+    const pout = easeInOut(prog(t, phoneOff - 0.1, 0.7))
+    if (pin > 0 && pout < 1) {
+      let x = 0, s = 1, rot = 0
+      if (c.multi != null) {
+        const toLeft = easeInOut(prog(t, c.multi, 0.8))
+        const back = easeInOut(prog(t, c.nutri, 0.8))
+        const m = toLeft * (1 - back)
+        x = -150 * m
+        s = 1 - 0.06 * m
+        rot = -3 * m
+      }
+      const y = (1 - pin) * 1500 + pout * 1600
+      set('phone', { o: 1, x, y, s, extra: `rotate(${rot}deg)` })
+    } else hide('phone')
+
+    const homeClip = [c.home + 1.3, (c.multi ?? c.cause) - 0.5]
+    if (c.multi != null && t >= c.multi) {
+      if (t < c.nutri) {
+        const mix = easeInOut(prog(t, c.multi + 0.2, 0.5))
+        setScreen(clipFrame(CLIPS.home, t, ...homeClip), 'assets/img/train-strength.jpg', mix)
+      } else {
+        const mix = easeInOut(prog(t, c.nutri + 0.2, 0.5))
+        setScreen('assets/img/train-strength.jpg', clipFrame(CLIPS.nutri, t, c.nutri + 1.0, c.cause - 0.6), mix)
+      }
+    } else {
+      setScreen(clipFrame(CLIPS.home, t, ...homeClip), 'assets/img/train-strength.jpg', 0)
+    }
+  }
+
+  // Section headlines
+  fadeUp('k1', t, c.home + 0.3, (c.multi ?? c.cause) - 0.4, 20)
+  maskLines($('h1'), t, c.home + 0.35, (c.multi ?? c.cause) - 0.4)
+  if (c.multi != null) {
+    fadeUp('k2', t, c.multi + 0.3, c.nutri - 0.4, 20)
+    maskLines($('h2'), t, c.multi + 0.35, c.nutri - 0.4)
+    ;['c1', 'c2', 'c3', 'c4'].forEach((id, i) => {
+      const a = c.multi + 0.9 + i * 0.45
+      const pin = easeOut(prog(t, a, 0.7))
+      const pout = easeInOut(prog(t, c.nutri - 0.35 + i * 0.05, 0.4))
+      if (pin <= 0 || pout >= 1) return hide(id)
+      $(id).style.top = `${720 + i * 210}px`
+      set(id, { o: pin * (1 - pout), x: (1 - pin) * 260 + pout * 260, s: lerp(0.96, 1, pin), blur: (1 - pin) * 8 })
+    })
+    fadeUp('k3', t, c.nutri + 0.3, c.cause - 0.4, 20)
+    maskLines($('h3'), t, c.nutri + 0.35, c.cause - 0.4)
+    fadeUp('proPill', t, c.nutri + 1.8, c.cause - 0.35, 30)
+    if ($('proPill').style.opacity > 0) $('proPill').style.transform = `translateX(-50%) ${$('proPill').style.transform}`
+  } else {
+    ;['k2', 'h2', 'k3', 'h3', 'c1', 'c2', 'c3', 'c4', 'proPill'].forEach(hide)
+  }
+
+  // Cause: 6 %
+  {
+    const washIn = easeInOut(prog(t, c.cause - 0.2, 0.8))
+    const washOut = easeInOut(prog(t, c.end - 0.2, 0.8))
+    $('redWash').style.opacity = washIn * (1 - washOut)
+    fadeUp('causeKicker', t, c.cause + 0.3, c.end - 0.4, 20)
+    const pin = easeOut(prog(t, c.cause + 0.35, 0.8))
+    const pout = easeInOut(prog(t, c.end - 0.4, 0.45))
+    if (pin > 0 && pout < 1) {
+      const count = Math.round(easeOut(prog(t, c.cause + 0.35, 1.1)) * 6)
+      $('pctNum').textContent = count
+      const beat = (tt) => Math.exp(-Math.pow((tt % 1.1) / 0.09, 2))
+      const pulse = t > c.cause + 1.5 ? 0.035 * beat(t - c.cause - 1.5) : 0
+      set('pct', { o: pin * (1 - pout), s: lerp(0.92, 1, pin) + pulse, y: -pout * 50, blur: (1 - pin) * 14 })
+    } else hide('pct')
+    maskLines($('pctLine1'), t, c.cause + 1.2, c.end - 0.4)
+    maskLines($('pctLine2'), t, c.cause + 1.3, c.end - 0.4)
+    const chipY = [1190, 1300, 1410]
+    ;['ch1', 'ch2', 'ch3'].forEach((id, i) => {
+      const a = c.cause + 1.9 + i * 0.12
+      const p = easeOut(prog(t, a, 0.6))
+      const po = easeInOut(prog(t, c.end - 0.4, 0.4))
+      if (p <= 0 || po >= 1) return hide(id)
+      $(id).style.top = `${chipY[i]}px`
+      set(id, { o: p * (1 - po), y: (1 - p) * 30, s: lerp(0.95, 1, p), extra: 'translateX(-50%)' })
+    })
+    fadeUp('helpLine', t, c.cause + 2.6, c.end - 0.4, 30)
+  }
+
+  // End card
+  {
+    const e = c.end
+    const lp = easeOut(prog(t, e + 0.3, 0.8))
+    if (lp > 0) set('endLogo', { o: lp, s: lerp(0.92, 1, lp), blur: (1 - lp) * 12 }); else hide('endLogo')
+    fadeUp('endWord', t, e + 0.5, null, 20)
+    maskLines($('endL1'), t, e + 0.7, null)
+    maskLines($('endL2'), t, e + 0.95, null)
+    maskLines($('endL3'), t, e + 1.05, null)
+    const cp = easeOut(prog(t, e + 1.6, 0.6))
+    if (cp > 0) {
+      const breathe = t > e + 2.3 ? 0.018 * Math.sin((t - e - 2.3) * 4) : 0
+      set('cta', { o: cp, y: (1 - cp) * 30, s: lerp(0.95, 1, cp) + breathe, extra: 'translateX(-50%)' })
+    } else hide('cta')
+    fadeUp('endFoot', t, e + 2.0, null, 20)
+  }
+
+  $('fadeBlack').style.opacity = 1 - easeOut(prog(t, 0, 0.25))
+
+  const pending = [$('screenA'), $('screenB')].map((img) => (img.complete ? null : img.decode().catch(() => {}))).filter(Boolean)
+  await Promise.all(pending)
+}
+</script>
+</body>
+</html>
