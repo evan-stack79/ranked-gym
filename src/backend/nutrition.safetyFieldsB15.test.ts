@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { hashToken } from '../../convex/lib/authCrypto'
+import { FOOD_ADD_ACCESS_DENIED_TCA } from '../../convex/lib/foodAddAccess'
 import {
   NUTRITION_PROFILE_SAFETY_FIELDS,
   NUTRITION_SAFETY_CLEAR_AUDIT_TABLE,
@@ -16,8 +17,11 @@ import {
   writeNutritionProfileJson,
 } from '../../convex/lib/nutritionProfile'
 import { upsertNutrition } from '../../convex/migrations'
-import { clearSafetyFlag } from '../../convex/nutrition'
+import { clearSafetyFlag, upsertMeal } from '../../convex/nutrition'
 import { pushSyncForSession } from '../../convex/sync'
+import { getNutritionTarget, hasMealTargets } from '../services/nutritionActivity'
+import { decideEstimationEligibility, decideLossEligibility } from '../services/nutritionSafetyRules'
+import type { CalorieProfile } from '../types/nutrition'
 
 type TableName =
   | 'auth_users'
@@ -60,14 +64,17 @@ class GuardedFakeDb {
     }
   }
 
-  insert(table: TableName, value: Record<string, unknown>) {
+  insert(table: string, value: Record<string, unknown>) {
     try {
+      // Runtime : table peut être une variable dont la valeur est nutrition_state.
       if (table === 'nutrition_state') this.assertProfileWriteAuthorized(value)
     } catch (err) {
       return Promise.reject(err)
     }
+    const typed = table as TableName
+    if (!this.rows[typed]) this.rows[typed] = []
     const row = { _id: `${table}:${(this.idCounter += 1)}`, ...value }
-    this.rows[table].push(row)
+    this.rows[typed].push(row)
     return Promise.resolve(row._id)
   }
 
@@ -351,6 +358,34 @@ describe('B15-04 — âge mineur temps + 1 an', () => {
     expect(ok.ageRejectedContactUs).toBe(false)
   })
 
+  it('(e) âge stocké 16 → 25 le même jour : refusé, âge reste 16', async () => {
+    const db = new GuardedFakeDb()
+    await seedAuth(db)
+    const now = Date.now()
+    await seedProfile(db, { age: 16, ageRecordedAt: now })
+    const result = await writeNutritionProfileJson({ db } as never, {
+      userId: USER,
+      incomingProfileJson: { age: 25 },
+      updatedAt: now,
+    })
+    expect(result.ageRejectedContactUs).toBe(true)
+    expect(profileOf(db).age).toBe(16)
+  })
+
+  it('(f) âge stocké 16 → 17 le même jour : accepté', async () => {
+    const db = new GuardedFakeDb()
+    await seedAuth(db)
+    const now = Date.now()
+    await seedProfile(db, { age: 16, ageRecordedAt: now })
+    const result = await writeNutritionProfileJson({ db } as never, {
+      userId: USER,
+      incomingProfileJson: { age: 17 },
+      updatedAt: now,
+    })
+    expect(result.ageRejectedContactUs).toBe(false)
+    expect(profileOf(db).age).toBe(17)
+  })
+
   it('avec ageRecordedAt ancien : hausse dans la marge ; audit majorité', async () => {
     const db = new GuardedFakeDb()
     await seedAuth(db)
@@ -367,23 +402,191 @@ describe('B15-04 — âge mineur temps + 1 an', () => {
   })
 })
 
-describe('B15-02 — FakeDb refuse écriture profileJson sans token', () => {
-  it('insert nutrition_state.profileJson direct → UNAUTHORIZED', async () => {
-    const db = new GuardedFakeDb()
-    await expect(
-      db.insert('nutrition_state', {
-        userId: USER,
-        profileJson: { age: 20 },
-        journalJson: {},
+describe('B15 permanent — TCA / diabète / import / old client', () => {
+  async function tryUpsertMeal(db: GuardedFakeDb) {
+    return handlerOf(upsertMeal)(
+      { db },
+      {
+        sessionToken: SESSION,
+        mealId: 'meal-b15-perm',
+        dateKey: '2026-10-15',
+        mealType: 'lunch',
+        name: 'Riz',
+        calories: 200,
         updatedAt: Date.now(),
-      }),
-    ).rejects.toThrow('UNAUTHORIZED_PROFILE_JSON_WRITE')
+      },
+    )
+  }
+
+  const journal = {
+    '2026-10-15': { meals: [{ id: 'm1', name: 'Pain', calories: 80 }], waterMl: 0 },
+  }
+
+  it('(a) TCA true + sync profile {} : flag gardé et upsertMeal refusé', async () => {
+    const db = new GuardedFakeDb()
+    await seedAuth(db)
+    await seedProfile(db, {
+      age: 30,
+      declaredEatingDisorder: true,
+      healthAnswer: 'situations',
+    })
+    await pushSyncForSession({ db } as never, SESSION, {
+      nutrition: { profileJson: {}, journalJson: journal },
+    })
+    expect(profileOf(db).declaredEatingDisorder).toBe(true)
+    await expect(tryUpsertMeal(db)).rejects.toThrow(FOOD_ADD_ACCESS_DENIED_TCA)
   })
 
+  it('(b) TCA true + sync {declaredEatingDisorder:false} : flag gardé et upsertMeal refusé', async () => {
+    const db = new GuardedFakeDb()
+    await seedAuth(db)
+    await seedProfile(db, {
+      age: 30,
+      declaredEatingDisorder: true,
+      healthAnswer: 'situations',
+    })
+    await pushSyncForSession({ db } as never, SESSION, {
+      nutrition: {
+        profileJson: { age: 30, declaredEatingDisorder: false },
+        journalJson: journal,
+      },
+    })
+    expect(profileOf(db).declaredEatingDisorder).toBe(true)
+    await expect(tryUpsertMeal(db)).rejects.toThrow(FOOD_ADD_ACCESS_DENIED_TCA)
+  })
+
+  it('(c) IMPORT profile null + TCA true : flag gardé et upsertMeal refusé', async () => {
+    const db = new GuardedFakeDb()
+    await seedAuth(db)
+    await seedProfile(db, {
+      age: 30,
+      declaredEatingDisorder: true,
+      healthAnswer: 'situations',
+    })
+    await upsertNutrition(
+      { db } as never,
+      { userId: USER, profileJson: null, journalJson: {} },
+      { prune: false },
+    )
+    expect(profileOf(db).declaredEatingDisorder).toBe(true)
+    await expect(tryUpsertMeal(db)).rejects.toThrow(FOOD_ADD_ACCESS_DENIED_TCA)
+  })
+
+  it('(d) diabète true + sync {} : flag gardé et objectif kcal bloqué', async () => {
+    const db = new GuardedFakeDb()
+    await seedAuth(db)
+    await seedProfile(db, {
+      age: 34,
+      sex: 'male',
+      weightKg: 80,
+      heightCm: 178,
+      goal: 'cut',
+      weeklyPaceKg: 0.4,
+      onboardingComplete: true,
+      declaredDiabetes: true,
+      healthAnswer: 'none',
+    })
+    await pushSyncForSession({ db } as never, SESSION, {
+      nutrition: { profileJson: {}, journalJson: journal },
+    })
+    const p = profileOf(db)
+    expect(p.declaredDiabetes).toBe(true)
+    const asCalorie = p as unknown as CalorieProfile
+    const nutrition = getNutritionTarget(asCalorie, { calorieGoalEnabled: true })
+    expect(nutrition.showCalorieGoal).toBe(false)
+    expect(hasMealTargets(nutrition)).toBe(false)
+    expect(decideEstimationEligibility(asCalorie, { calorieGoalEnabled: true }).allowed).toBe(
+      false,
+    )
+    expect(decideLossEligibility(asCalorie, { calorieGoalEnabled: true }).reason).toBe('diabetes')
+  })
+
+  it('(h) old client 1657a82 payload (profile ?? {}) n’efface aucun SAFETY FIELD', async () => {
+    const db = new GuardedFakeDb()
+    await seedAuth(db)
+    await seedProfile(db, {
+      age: 30,
+      declaredEatingDisorder: true,
+      declaredDiabetes: true,
+      declaredPregnancy: true,
+      declaredBreastfeeding: true,
+      healthAnswer: 'situations',
+    })
+    // Mimique convexCloudBackup.backupPayloadToPushArgs : profileJson: profile ?? {}
+    const profile: Record<string, unknown> | undefined = undefined
+    const profileJson = profile ?? {}
+    await pushSyncForSession({ db } as never, SESSION, {
+      nutrition: { profileJson, journalJson: journal },
+    })
+    const p = profileOf(db)
+    expect(p.age).toBe(30)
+    expect(p.declaredEatingDisorder).toBe(true)
+    expect(p.declaredDiabetes).toBe(true)
+    expect(p.declaredPregnancy).toBe(true)
+    expect(p.declaredBreastfeeding).toBe(true)
+  })
+})
+
+describe('B15-02 — FakeDb refuse écriture profileJson sans token', () => {
   it('writeNutritionProfileJson passe le garde', async () => {
     const db = new GuardedFakeDb()
     await seedAuth(db)
     await seedProfile(db, { age: 22 })
+    expect(profileOf(db).age).toBe(22)
+  })
+
+  it.each([
+    [
+      '(g1) shorthand { profileJson }',
+      async (db: GuardedFakeDb, rowId: string) => {
+        await db.patch(rowId, { profileJson: { age: 99 } })
+      },
+    ],
+    [
+      '(g2) object in a variable',
+      async (db: GuardedFakeDb, rowId: string) => {
+        const patch = { profileJson: { age: 99 }, updatedAt: Date.now() }
+        await db.patch(rowId, patch)
+      },
+    ],
+    [
+      '(g3) {...payload} spread',
+      async (db: GuardedFakeDb, rowId: string) => {
+        const payload = { profileJson: { age: 99 }, updatedAt: Date.now() }
+        await db.patch(rowId, { ...payload })
+      },
+    ],
+    [
+      '(g4) nested object before the key',
+      async (db: GuardedFakeDb, rowId: string) => {
+        await db.patch(rowId, { updatedAt: Date.now(), journalJson: {}, profileJson: { age: 99 } })
+      },
+    ],
+    [
+      '(g5) table name in a variable',
+      async (db: GuardedFakeDb) => {
+        const tableName = 'nutrition_state'
+        await db.insert(tableName, {
+          userId: 'other',
+          profileJson: { age: 99 },
+          journalJson: {},
+          updatedAt: Date.now(),
+        })
+      },
+    ],
+    [
+      '(g6) computed key',
+      async (db: GuardedFakeDb, rowId: string) => {
+        const key = 'profileJson'
+        await db.patch(rowId, { [key]: { age: 99 }, updatedAt: Date.now() })
+      },
+    ],
+  ] as const)('%s → UNAUTHORIZED', async (_label, run) => {
+    const db = new GuardedFakeDb()
+    await seedAuth(db)
+    await seedProfile(db, { age: 22 })
+    const rowId = db.table('nutrition_state')[0]._id
+    await expect(run(db, rowId)).rejects.toThrow('UNAUTHORIZED_PROFILE_JSON_WRITE')
     expect(profileOf(db).age).toBe(22)
   })
 })
