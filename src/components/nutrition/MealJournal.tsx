@@ -53,10 +53,11 @@ import {
 } from '../../utils/foodJournalSnapshot'
 import { isConvexDomainActive } from '../../backend/adapter'
 import { isFoodAddV3Enabled } from '../../backend/foodAddV3FeatureFlag'
-import { canAccessFoodAdd } from '../../services/foodAddAccess'
+import { canAccessFoodAdd, needsAgePrompt } from '../../services/foodAddAccess'
 import { addFoodSnapshotViaConvex } from '../../services/convexNutritionService'
-import { getCalorieProfile } from '../../services/nutritionStorage'
+import { getCalorieProfile, saveCalorieProfile } from '../../services/nutritionStorage'
 import { todayKey } from '../../utils/calories'
+import { AgeRequiredPrompt } from './AgeRequiredPrompt'
 
 interface MealJournalProps {
   targetCalories: number
@@ -79,6 +80,8 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   const [hydrated, setHydrated] = useState(false)
   const [waterTick, setWaterTick] = useState(0)
   const [showForm, setShowForm] = useState(false)
+  /** V3 only — age prompt before Ajouter un aliment (never when flag OFF). */
+  const [showV3AgeGate, setShowV3AgeGate] = useState(false)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [scannedProduct, setScannedProduct] = useState<OpenFoodFactsProduct | null>(null)
   const [editingMeal, setEditingMeal] = useState<MealEntry | null>(null)
@@ -237,6 +240,19 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   const foodAddV3 = isFoodAddV3Enabled()
   const calorieProfile = getCalorieProfile()
   const foodAddAllowed = canAccessFoodAdd(calorieProfile)
+
+  const requestShowAddFood = () => {
+    if (showForm) {
+      setShowForm(false)
+      return
+    }
+    if (foodAddV3 && needsAgePrompt(calorieProfile)) {
+      setShowV3AgeGate(true)
+      return
+    }
+    if (!foodAddAllowed) return
+    setShowForm(true)
+  }
 
   const handleValidateFoodSelection = (hits: OpenFoodFactsSearchHit[]) => {
     if (!foodAddAllowed) {
@@ -416,7 +432,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
               </button>
               <button
                 type="button"
-                onClick={() => setShowForm((v) => !v)}
+                onClick={requestShowAddFood}
                 className="btn-brand inline-flex items-center gap-1.5 rounded-full border border-white/15 px-3.5 py-2 text-[13px] font-semibold text-white"
               >
                 <Plus className="h-4 w-4" />
@@ -559,6 +575,19 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
           </div>
         </div>
       )}
+
+      {foodAddV3 && showV3AgeGate ? (
+        <AgeRequiredPrompt
+          onAgeSubmit={(age) => {
+            const next = { ...getCalorieProfile(), age }
+            saveCalorieProfile(next)
+            setShowV3AgeGate(false)
+            if (canAccessFoodAdd(next)) {
+              setShowForm(true)
+            }
+          }}
+        />
+      ) : null}
 
       {showForm && foodAddV3 && canAccessFoodAdd(calorieProfile) ? (
         <AddFoodScreenV3

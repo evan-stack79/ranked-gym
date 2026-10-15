@@ -3,7 +3,6 @@ import {
   assertFoodAddAccessFromStoredProfile,
   extractDiabetesFromProfileJson,
   extractEatingDisorderFromProfileJson,
-  FOOD_ADD_ACCESS_AGE_REQUIRED,
   FOOD_ADD_ACCESS_DENIED_MINOR,
   FOOD_ADD_ACCESS_DENIED_TCA,
   isAdultStoredAge,
@@ -66,14 +65,13 @@ describe('Convex foodAddAccess (serveur)', () => {
     expect(result).toEqual({ ok: true, diabetes: true })
   })
 
-  it('refuse un âge inconnu avec age_required (pas mineur)', async () => {
+  it('âge inconnu : accès autorisé (ne bloque pas le legacy)', async () => {
     const ctx = fakeCtx({
       userId: 'u1',
       profileJson: { declaredEatingDisorder: false },
     })
     const result = await assertFoodAddAccessFromStoredProfile(ctx as never, 'u1')
-    expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.error).toBe(FOOD_ADD_ACCESS_AGE_REQUIRED)
+    expect(result).toEqual({ ok: true, diabetes: false })
   })
 
   it('helpers lecture profil', () => {

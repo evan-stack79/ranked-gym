@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   assertFoodAddAccessFromStoredProfile,
-  FOOD_ADD_ACCESS_AGE_REQUIRED,
   FOOD_ADD_ACCESS_DENIED_MINOR,
   FOOD_ADD_ACCESS_DENIED_TCA,
 } from '../../convex/lib/foodAddAccess'
@@ -58,13 +57,11 @@ describe('N-01 — droits repas (add/edit vs delete)', () => {
     expect(deleteBlock).toContain('sessionUserId')
   })
 
-  it('âge manquant → erreur claire age_required (pas mineur silencieux)', async () => {
+  it('âge manquant → accès autorisé (pas de refus serveur age_required)', async () => {
     const result = await assertFoodAddAccessFromStoredProfile(
       fakeCtx({ userId: 'u1', profileJson: { declaredEatingDisorder: false } }) as never,
       'u1',
     )
-    expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.error).toBe(FOOD_ADD_ACCESS_AGE_REQUIRED)
-    expect(result.ok === false && result.error).toBe('age_required')
+    expect(result).toEqual({ ok: true, diabetes: false })
   })
 })

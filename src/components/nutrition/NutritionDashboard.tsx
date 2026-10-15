@@ -15,7 +15,8 @@ import {
 import { getNutritionTarget, hasMealTargets } from '../../services/nutritionActivity'
 import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
 import { isFoodAddV3Enabled } from '../../backend/foodAddV3FeatureFlag'
-import { canAccessFoodAdd, canShowMealJournal } from '../../services/foodAddAccess'
+import { canAccessFoodAdd, canShowMealJournal, needsAgePrompt } from '../../services/foodAddAccess'
+import { AgeRequiredPrompt } from './AgeRequiredPrompt'
 import { readHealthDeclarations } from '../../services/nutritionSafetyRules'
 import { isConvexDomainActive } from '../../backend/adapter'
 import { addFoodSnapshotViaConvex } from '../../services/convexNutritionService'
@@ -116,6 +117,8 @@ export function NutritionDashboard({
   const [calendarOpen, setCalendarOpen] = useState(false)
 
   const [showForm, setShowForm] = useState(false)
+  /** V3 only — age prompt before Ajouter un aliment (never when flag OFF). */
+  const [showV3AgeGate, setShowV3AgeGate] = useState(false)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [scannedProduct, setScannedProduct] = useState<OpenFoodFactsProduct | null>(null)
   const [editingMeal, setEditingMeal] = useState<MealEntry | null>(null)
@@ -327,13 +330,18 @@ export function NutritionDashboard({
   const showMealJournal = canShowMealJournal(profile)
 
   const openAddFood = (type?: MealType) => {
-    if (!foodAddAllowed) return
     if (type) {
       setMealType(type)
       setPendingMealType(type)
     } else {
       setPendingMealType(null)
     }
+    // V3 only: ask for age before opening Ajouter un aliment (flag OFF → nothing new).
+    if (foodAddV3 && needsAgePrompt(profile)) {
+      setShowV3AgeGate(true)
+      return
+    }
+    if (!foodAddAllowed) return
     setShowForm(true)
   }
 
@@ -810,6 +818,19 @@ export function NutritionDashboard({
           open={scannerOpen && !showForm}
           onClose={() => setScannerOpen(false)}
           onProduct={handleScannedProduct}
+        />
+      ) : null}
+
+      {foodAddV3 && showV3AgeGate ? (
+        <AgeRequiredPrompt
+          onAgeSubmit={(age) => {
+            const next = { ...profile, age }
+            onChangeProfile(next)
+            setShowV3AgeGate(false)
+            if (canAccessFoodAdd(next)) {
+              setShowForm(true)
+            }
+          }}
         />
       ) : null}
 

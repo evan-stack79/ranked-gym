@@ -1,8 +1,9 @@
 /**
  * Accès à l’écran / mutation « Ajouter un aliment » et journal repas.
  *
- * - Âge manquant → `age_required` (prompt bloquant côté client ; erreur serveur claire).
- * - Mineur (<18) / TCA → ajout & édition refusés ; suppression toujours OK.
+ * - Âge manquant → accès legacy autorisé (ne bloque pas ce qui marchait déjà).
+ *   Pour V3 uniquement : `needsAgePrompt` → demander l’âge avant d’ouvrir l’écran.
+ * - Mineur (<18, âge connu) / TCA → ajout & édition refusés ; suppression toujours OK.
  * - Diabète → accès autorisé (perd seulement l’objectif kcal / perte).
  */
 import type { CalorieProfile } from '../types/nutrition'
@@ -27,12 +28,10 @@ export function decideFoodAddAccess(
   profile: FoodAddProfile,
 ): { allowed: boolean; reason: FoodAddAccessReason } {
   if (!profile) {
-    return { allowed: false, reason: 'age_required' }
+    // Pas de profil stocké ≠ mineur : legacy reste utilisable.
+    return { allowed: true, reason: 'allowed' }
   }
-  if (!isValidAge(profile.age)) {
-    return { allowed: false, reason: 'age_required' }
-  }
-  if (isMinorAge(profile.age)) {
+  if (isValidAge(profile.age) && isMinorAge(profile.age)) {
     return { allowed: false, reason: 'minor' }
   }
   const declarations = readHealthDeclarations(profile)
@@ -46,13 +45,18 @@ export function canAccessFoodAdd(profile: FoodAddProfile): boolean {
   return decideFoodAddAccess(profile).allowed
 }
 
-/** Âge manquant → afficher le prompt bloquant (ne pas traiter comme mineur). */
+/**
+ * Âge manquant → prompt V3 « Ajouter un aliment » uniquement
+ * (derrière `VITE_ENABLE_FOOD_ADD_V3`). Ne pas utiliser pour bloquer le legacy.
+ */
 export function needsAgePrompt(profile: FoodAddProfile): boolean {
-  return decideFoodAddAccess(profile).reason === 'age_required'
+  if (!profile) return true
+  return !isValidAge(profile.age)
 }
 
 /**
- * Journal repas visible seulement si âge adulte connu et pas de TCA.
+ * Journal repas : masqué pour mineur (âge connu) et TCA.
+ * Âge manquant → visible (ne bloque pas le legacy).
  * Les repas locaux ne sont jamais effacés quand le journal est masqué.
  */
 export function canShowMealJournal(profile: FoodAddProfile): boolean {

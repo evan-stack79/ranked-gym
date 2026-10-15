@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { createRoot } from 'react-dom/client'
 import { act } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AgeRequiredPrompt } from './AgeRequiredPrompt'
 import {
   addMealToToday,
@@ -12,6 +12,7 @@ import {
 } from '../../services/nutritionStorage'
 import { canShowMealJournal, needsAgePrompt } from '../../services/foodAddAccess'
 import { NutritionView } from './NutritionView'
+import { NutritionDashboard } from './NutritionDashboard'
 
 vi.mock('../../context/AuthContext', () => ({
   useAuth: () => ({
@@ -22,8 +23,19 @@ vi.mock('../../context/AuthContext', () => ({
   }),
 }))
 
-describe('Âge manquant — prompt + journal masqué + repas conservés', () => {
-  it('affiche la question d’âge (prompt bloquant)', async () => {
+describe('Âge manquant — prompt V3 + journal legacy intact', () => {
+  const prevFoodAddV3 = import.meta.env.VITE_ENABLE_FOOD_ADD_V3
+
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  afterEach(() => {
+    if (prevFoodAddV3 == null) vi.stubEnv('VITE_ENABLE_FOOD_ADD_V3', '')
+    else vi.stubEnv('VITE_ENABLE_FOOD_ADD_V3', prevFoodAddV3)
+  })
+
+  it('affiche la question d’âge (composant réutilisé)', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const root = createRoot(host)
@@ -42,8 +54,7 @@ describe('Âge manquant — prompt + journal masqué + repas conservés', () => 
     host.remove()
   })
 
-  it('sans âge : journal masqué, repas locaux préservés ; âge ≥18 restaure le journal', () => {
-    localStorage.clear()
+  it('sans âge : journal legacy visible, repas locaux préservés', () => {
     saveCalorieProfile({ ...BLANK_PROFILE, age: null as unknown as number, onboardingComplete: true })
     addMealToToday({
       name: 'Yaourt conservé',
@@ -55,8 +66,7 @@ describe('Âge manquant — prompt + journal masqué + repas conservés', () => 
 
     const noAge = getCalorieProfile()
     expect(needsAgePrompt(noAge)).toBe(true)
-    expect(canShowMealJournal(noAge)).toBe(false)
-    // Les repas restent en storage même si le journal UI est masqué.
+    expect(canShowMealJournal(noAge)).toBe(true)
     expect(getTodayJournal().meals.some((m) => m.name === 'Yaourt conservé')).toBe(true)
 
     saveCalorieProfile({ ...noAge, age: 28 })
@@ -66,8 +76,8 @@ describe('Âge manquant — prompt + journal masqué + repas conservés', () => 
     expect(getTodayJournal().meals.some((m) => m.name === 'Yaourt conservé')).toBe(true)
   })
 
-  it('NutritionView montre le prompt quand l’âge manque', async () => {
-    localStorage.clear()
+  it('flag OFF : NutritionView ne montre pas le prompt âge (rien de nouveau)', async () => {
+    vi.stubEnv('VITE_ENABLE_FOOD_ADD_V3', '')
     saveCalorieProfile({ ...BLANK_PROFILE, age: null as unknown as number, onboardingComplete: true })
 
     const host = document.createElement('div')
@@ -78,8 +88,49 @@ describe('Âge manquant — prompt + journal masqué + repas conservés', () => 
       root.render(<NutritionView />)
     })
 
+    expect(host.querySelector('[data-testid="age-required-prompt"]')).toBeNull()
+
+    await act(async () => {
+      root.unmount()
+    })
+    host.remove()
+  })
+
+  it('flag ON : ouvrir Ajouter demande l’âge avant V3', async () => {
+    vi.stubEnv('VITE_ENABLE_FOOD_ADD_V3', 'true')
+    const profile = {
+      ...BLANK_PROFILE,
+      age: null as unknown as number,
+      onboardingComplete: true,
+    }
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(
+        <NutritionDashboard
+          profile={profile}
+          onChangeProfile={() => undefined}
+          onOpenSetup={() => undefined}
+        />,
+      )
+    })
+    // Wait hydration (useEffect → setHydrated)
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    const searchBtn = Array.from(host.querySelectorAll('button')).find((b) =>
+      /recherche/i.test(b.textContent ?? ''),
+    )
+    expect(searchBtn).toBeTruthy()
+    await act(async () => {
+      searchBtn!.click()
+    })
+
     expect(host.querySelector('[data-testid="age-required-prompt"]')).toBeTruthy()
-    expect(host.querySelector('[aria-label="Détail du journal"]')).toBeNull()
 
     await act(async () => {
       root.unmount()

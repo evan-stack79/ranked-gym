@@ -56,12 +56,13 @@ describe('foodAddAccess — mineur / TCA / diabète / âge', () => {
     expect(canShowMealJournal(ADULT)).toBe(true)
   })
 
-  it('âge inconnu → age_required (pas un refus silencieux / mineur)', () => {
+  it('âge inconnu → legacy autorisé ; needsAgePrompt vrai (gate V3 seulement)', () => {
     expect(decideFoodAddAccess({ ...ADULT, age: null as unknown as number })).toEqual({
-      allowed: false,
-      reason: 'age_required',
+      allowed: true,
+      reason: 'allowed',
     })
     expect(needsAgePrompt({ ...ADULT, age: undefined as unknown as number })).toBe(true)
-    expect(canShowMealJournal({ ...ADULT, age: null as unknown as number })).toBe(false)
+    expect(canShowMealJournal({ ...ADULT, age: null as unknown as number })).toBe(true)
+    expect(canAccessFoodAdd({ ...ADULT, age: null as unknown as number })).toBe(true)
   })
 })
