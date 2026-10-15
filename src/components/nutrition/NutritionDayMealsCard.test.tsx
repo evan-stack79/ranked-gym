@@ -70,6 +70,9 @@ describe('formatMealPortionLabel', () => {
   it('préfère pièces, sinon grammes, sinon null', () => {
     expect(formatMealPortionLabel({ pieces: 4 })).toBe('4 pièces')
     expect(formatMealPortionLabel({ pieces: 1 })).toBe('1 pièce')
+    expect(formatMealPortionLabel({ pieces: 0.5 })).toBe('0.5 pièces')
+    expect(formatMealPortionLabel({ pieces: 2, portionLabel: '2 pièces' })).toBe('2 pièces')
+    expect(formatMealPortionLabel({ pieces: 2, portionLabel: 'pour 100 g' })).toBe('2 pièces')
     expect(formatMealPortionLabel({ grams: 125 })).toBe('125 g')
     expect(formatMealPortionLabel({ grams: 12.5 })).toBe('12.5 g')
     expect(formatMealPortionLabel({})).toBeNull()

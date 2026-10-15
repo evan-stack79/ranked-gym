@@ -96,10 +96,11 @@ export interface MealEntry {
   id: string
   name: string
   mealType: MealType
-  calories: number
-  proteinG?: number
-  carbsG?: number
-  fatG?: number
+  /** V3 : null si kcal inconnue (jamais inventer 0). Legacy : nombre. */
+  calories: number | null
+  proteinG?: number | null
+  carbsG?: number | null
+  fatG?: number | null
   /** Portion weight when logged from a scale / scan / piece count */
   grams?: number
   /** Number of pieces when logged without a scale (nuggets, boulettes…) */

@@ -18,7 +18,7 @@ const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
 type Baseline = {
   grams: number
-  calories: number
+  calories: number | null
   proteinG: number | null
   carbsG: number | null
   fatG: number | null
@@ -76,7 +76,9 @@ export function EditMealSheet({
     const base = baselineRef.current
     if (base == null || nextGrams == null || !(nextGrams > 0)) return
     const ratio = nextGrams / base.grams
-    setCalories(Math.max(0, Math.round(base.calories * ratio)))
+    if (base.calories != null) {
+      setCalories(Math.max(0, Math.round(base.calories * ratio)))
+    }
     setProteinG(
       base.proteinG == null ? null : Math.round(base.proteinG * ratio * 10) / 10,
     )

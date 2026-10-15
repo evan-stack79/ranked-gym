@@ -26,11 +26,13 @@ import { HydrationProgressBar } from './HydrationProgressBar'
 import { WaterGoalChooser } from './WaterGoalChooser'
 import {
   listPersonalFoods,
+  mapFoodAddQuantityError,
   searchOpenFoodFacts,
   setPersonalFoodFavorite,
   type OpenFoodFactsProduct,
   type OpenFoodFactsSearchHit,
 } from '../../services/alimentsService'
+import { validateFoodQuantity } from '../../../convex/lib/foodAddQuantity'
 import { useAuth } from '../../context/AuthContext'
 import { IconBadge } from '../ui/IconBadge'
 import { MacroRing } from './MacroRing'
@@ -276,15 +278,39 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
       const snapshot = buildFoodNutritionSnapshot(hit)
       if (sel.unit === 'pieces' && sel.pieces != null) {
         snapshot.grams = undefined
+        const n = sel.pieces
+        snapshot.portionLabel =
+          sel.portionLabel?.trim() || (n === 1 ? '1 pièce' : `${n} pièces`)
       } else if (sel.grams != null) {
         snapshot.grams = sel.grams
-        snapshot.portionLabel = `${sel.grams} g`
+        snapshot.portionLabel = sel.portionLabel?.trim() || `${sel.grams} g`
       }
       const entry = {
         ...mealEntryFromSnapshot(snapshot, type),
         grams: sel.grams,
         pieces: sel.pieces,
-        calories: foodAddV3 ? (snapshot.calories || 0) : snapshot.calories,
+        portionLabel: snapshot.portionLabel,
+        // V3 : null si inconnu (jamais || 0). OFF : legacy inchangé.
+        calories: foodAddV3
+          ? hit.calories == null
+            ? null
+            : snapshot.calories
+          : snapshot.calories,
+        proteinG: foodAddV3
+          ? hit.proteines == null
+            ? null
+            : snapshot.proteinG
+          : snapshot.proteinG,
+        carbsG: foodAddV3
+          ? hit.glucides == null
+            ? null
+            : snapshot.carbsG
+          : snapshot.carbsG,
+        fatG: foodAddV3
+          ? hit.lipides == null
+            ? null
+            : snapshot.fatG
+          : snapshot.fatG,
       }
       journal = addMealToToday(entry)
       if (user) {
@@ -301,13 +327,15 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
             offCode: snapshot.offCode,
             imageUrl: snapshot.imageStorageId ? snapshot.imageUrl : undefined,
             imageStorageId: snapshot.imageStorageId as never,
-            calories: snapshot.calories,
-            proteinG: snapshot.proteinG ?? null,
-            carbsG: snapshot.carbsG ?? null,
-            fatG: snapshot.fatG ?? null,
-            grams: sel.grams ?? snapshot.grams,
+            grams: sel.unit === 'pieces' ? undefined : (sel.grams ?? snapshot.grams),
+            pieces: sel.pieces,
             updatedAt: snapshot.updatedAt,
           }).catch((error: unknown) => {
+            const qtyMsg = mapFoodAddQuantityError(error)
+            if (qtyMsg) {
+              showToast(qtyMsg, 'error')
+              return
+            }
             const message = error instanceof Error ? error.message : String(error)
             if (message.includes('FOOD_ADD_ACCESS_DENIED')) {
               showToast('Ajout d’aliment refusé par le serveur.', 'error')
@@ -366,7 +394,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   const totals = useMemo(() => {
     return meals.reduce(
       (acc, meal) => ({
-        calories: acc.calories + meal.calories,
+        calories: acc.calories + (meal.calories ?? 0),
         protein: acc.protein + (meal.proteinG ?? 0),
         carbs: acc.carbs + (meal.carbsG ?? 0),
         fat: acc.fat + (meal.fatG ?? 0),
@@ -392,6 +420,14 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     if (!trimmed) return
     if (!foodAddV3 && calories <= 0) return
 
+    if (foodAddV3) {
+      const qty = validateFoodQuantity({ unit: 'g', value: manualGrams })
+      if (!qty.ok) {
+        showToast(mapFoodAddQuantityError(new Error(`${qty.code}:${qty.reason}`))!, 'error')
+        return
+      }
+    }
+
     const grams =
       foodAddV3 && typeof manualGrams === 'number' && Number.isFinite(manualGrams)
         ? manualGrams
@@ -400,10 +436,10 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     const journal = addMealToToday({
       name: trimmed,
       mealType,
-      calories: foodAddV3 ? 0 : Math.round(calories),
-      proteinG: foodAddV3 ? undefined : proteinG === '' ? undefined : Number(proteinG),
-      carbsG: foodAddV3 ? undefined : carbsG === '' ? undefined : Number(carbsG),
-      fatG: foodAddV3 ? undefined : fatG === '' ? undefined : Number(fatG),
+      calories: foodAddV3 ? null : Math.round(calories),
+      proteinG: foodAddV3 ? null : proteinG === '' ? undefined : Number(proteinG),
+      carbsG: foodAddV3 ? null : carbsG === '' ? undefined : Number(carbsG),
+      fatG: foodAddV3 ? null : fatG === '' ? undefined : Number(fatG),
       grams,
       portionLabel: grams != null ? `${grams} g` : undefined,
     })

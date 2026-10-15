@@ -341,6 +341,22 @@ export const convexTables = {
     updatedAt: v.number(),
   }).index('by_offCode', ['offCode']),
 
+  /**
+   * Cache global nutriments OFF (per 100 g + poids portion/pièce si connu).
+   * Rempli à la recherche searchFoods ; lu à addFoodSnapshot — pas de refetch OFF.
+   */
+  off_product_nutrients: defineTable({
+    offCode: v.string(),
+    caloriesPer100g: v.union(v.number(), v.null()),
+    proteinPer100g: v.union(v.number(), v.null()),
+    carbsPer100g: v.union(v.number(), v.null()),
+    fatPer100g: v.union(v.number(), v.null()),
+    servingSize: v.optional(v.union(v.string(), v.null())),
+    /** Grammes d’une portion/pièce OFF ; null si inconnu (ne jamais inventer 100 g). */
+    servingGrams: v.union(v.number(), v.null()),
+    updatedAt: v.number(),
+  }).index('by_offCode', ['offCode']),
+
   sleep_nights: defineTable({
     userId: v.string(),
     dateKey: v.string(),

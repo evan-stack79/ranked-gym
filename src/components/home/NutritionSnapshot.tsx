@@ -65,7 +65,7 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
     const meals = getTodayJournal().meals
     const waterMl = getTodayWaterMl()
     const waterGoalMl = getUserWaterGoalMl()
-    const consumedCalories = meals.reduce((sum, meal) => sum + meal.calories, 0)
+    const consumedCalories = meals.reduce((sum, meal) => sum + (meal.calories ?? 0), 0)
 
     const targetCalories = nutrition.targetCalories
     const targetAvailable = nutrition.engineOk && targetCalories > 0

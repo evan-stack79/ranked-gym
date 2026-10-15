@@ -1,5 +1,6 @@
 import { isConvexDomainActive } from '../backend/adapter'
 import { isFoodAddV3Enabled } from '../backend/foodAddV3FeatureFlag'
+import { foodAddQuantityUserMessage } from '../../convex/lib/foodAddQuantity'
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 import type { AlimentRow } from '../types/database'
 import { safeWarn } from '../utils/safeLog'
@@ -111,6 +112,15 @@ function mapAccessError(error: unknown): Error | null {
     return new Error('Ajout d’aliment indisponible pour ce compte.')
   }
   return null
+}
+
+/** Mappe FOOD_ADD_QUANTITY_INVALID → message FR exact (jamais le code brut). */
+export function mapFoodAddQuantityError(error: unknown): string | null {
+  const message = error instanceof Error ? error.message : String(error)
+  if (!message.includes('FOOD_ADD_QUANTITY_INVALID')) return null
+  if (message.includes('above_max')) return foodAddQuantityUserMessage('above_max')
+  if (message.includes('below_min')) return foodAddQuantityUserMessage('below_min')
+  return foodAddQuantityUserMessage('invalid')
 }
 
 /**

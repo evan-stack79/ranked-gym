@@ -4,6 +4,7 @@
  * Garantit que V3 OFF (défaut) conserve le rendu legacy : kcal dans l’historique,
  * liste de recherche, formulaire manuel — inchangé vs d33b724.
  */
+import { readFileSync } from 'node:fs'
 import { createRoot } from 'react-dom/client'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -67,6 +68,42 @@ describe('V3 OFF — history / legacy list / manual form inchangés', () => {
 
   it('flag OFF par défaut', () => {
     expect(isFoodAddV3Enabled()).toBe(false)
+  })
+
+  it('empty-state journal V3-OFF : apostrophe rendue (pas &apos; littéral)', async () => {
+    // jsdom : import.meta.url n’est pas file:// — lire depuis le cwd du repo.
+    const source = readFileSync('src/components/nutrition/NutritionDashboard.tsx', 'utf8')
+    // cc068d8 : double-quoted JS string (jamais JSX &apos; à ce spot).
+    expect(source).toContain(
+      `"Aucun aliment pour l'instant — utilise Scanner, Scan IA ou Recherche."`,
+    )
+    expect(source).not.toContain(
+      'Aucun aliment pour l&apos;instant — utilise Scanner, Scan IA ou Recherche.',
+    )
+
+    // Texte rendu (React) — apostrophe ASCII, jamais la séquence &apos;
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const foodAddV3 = false
+    await act(async () => {
+      root.render(
+        <p data-testid="food-empty-v3-off">
+          {foodAddV3
+            ? 'Aucun aliment pour l’instant — utilise Recherche.'
+            : "Aucun aliment pour l'instant — utilise Scanner, Scan IA ou Recherche."}
+        </p>,
+      )
+    })
+    expect(host.textContent).toBe(
+      "Aucun aliment pour l'instant — utilise Scanner, Scan IA ou Recherche.",
+    )
+    expect(host.textContent).not.toContain('&apos;')
+    expect(host.innerHTML).not.toContain('&apos;')
+    await act(async () => {
+      root.unmount()
+    })
+    host.remove()
   })
 
   it('liste legacy FoodTextSearchResults affiche kcal/100g (sans hideNutritionNumbers)', async () => {

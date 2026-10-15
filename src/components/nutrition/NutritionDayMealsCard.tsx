@@ -15,19 +15,23 @@ const MEAL_ROW_LABELS: Record<MealType, string> = {
 export function formatMealPortionLabel(
   meal: Pick<MealEntry, 'grams' | 'pieces' | 'portionLabel'>,
 ): string | null {
+  const rawLabel =
+    typeof meal.portionLabel === 'string' && meal.portionLabel.trim()
+      ? meal.portionLabel.trim()
+      : null
+  // Pièces : jamais afficher « pour 100 g » ; préférer le libellé pièces.
   if (typeof meal.pieces === 'number' && Number.isFinite(meal.pieces) && meal.pieces > 0) {
-    const n = Math.round(meal.pieces)
+    if (rawLabel && !/pour\s*100\s*g/i.test(rawLabel)) return rawLabel
+    const n = meal.pieces
     return n === 1 ? '1 pièce' : `${n} pièces`
   }
   if (typeof meal.grams === 'number' && Number.isFinite(meal.grams) && meal.grams > 0) {
+    if (rawLabel) return rawLabel
     const g = meal.grams
     const label = Number.isInteger(g) ? String(g) : g.toFixed(1).replace(/\.0$/, '')
     return `${label} g`
   }
-  if (typeof meal.portionLabel === 'string' && meal.portionLabel.trim()) {
-    return meal.portionLabel.trim()
-  }
-  return null
+  return rawLabel
 }
 
 interface NutritionDayMealsCardProps {
@@ -61,7 +65,7 @@ export function NutritionDayMealsCard({
 
   const kcalByType = MEAL_ORDER.reduce(
     (acc, type) => {
-      acc[type] = mealsByType[type].reduce((sum, meal) => sum + meal.calories, 0)
+      acc[type] = mealsByType[type].reduce((sum, meal) => sum + (meal.calories ?? 0), 0)
       return acc
     },
     {} as Record<MealType, number>,
@@ -175,9 +179,11 @@ export function NutritionDayMealsCard({
                                 <span className="mt-0.5 block text-[12px] text-[#8E8E93]">
                                   {hideNutritionNumbers
                                     ? portion ?? ''
-                                    : `${Math.round(meal.calories).toLocaleString('fr-FR')} kcal${
-                                        portion ? ` · ${portion}` : ''
-                                      }`}
+                                    : meal.calories == null
+                                      ? (portion ?? '')
+                                      : `${Math.round(meal.calories).toLocaleString('fr-FR')} kcal${
+                                          portion ? ` · ${portion}` : ''
+                                        }`}
                                 </span>
                               </span>
                             </button>

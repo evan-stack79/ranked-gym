@@ -30,6 +30,15 @@ import {
   toFoodAddV3PublicMeal,
   type FoodAddV3PublicHit,
 } from './lib/foodAddPublic'
+import {
+  computeMealNutritionFromOffCache,
+  parseServingGrams,
+  type OffProductNutrientCache,
+} from './lib/foodAddNutrients'
+import {
+  FOOD_ADD_QUANTITY_INVALID,
+  validateFoodQuantity,
+} from './lib/foodAddQuantity'
 
 const OFF_USER_AGENT = 'RankedGym/1.0 (support@rankedgym.app)'
 const OFF_TIMEOUT_MS = 8_000
@@ -60,23 +69,6 @@ type OffApiProduct = {
 type OwnedImageRef = {
   storageId: Id<'_storage'>
   url: string | null
-}
-
-/** Hit interne OFF (avec nutriments pour stockage serveur uniquement). */
-type FoodHitInternal = {
-  barcode: string
-  nom: string
-  brands: string
-  calories: number | null
-  proteines: number | null
-  glucides: number | null
-  lipides: number | null
-  servingSize: string | null
-  categoriesTags: string[]
-  imageUrl?: string
-  imageStorageId?: string
-  provenance: 'open_food_facts'
-  fetchedAt: number
 }
 
 type FoodSearchQuota = {
@@ -331,6 +323,68 @@ export const getOffImageCache = internalQuery({
   },
 })
 
+/** Upsert nutriments OFF (per 100 g + poids portion) — clé offCode. */
+export const upsertOffProductNutrients = internalMutation({
+  args: {
+    offCode: v.string(),
+    caloriesPer100g: v.union(v.number(), v.null()),
+    proteinPer100g: v.union(v.number(), v.null()),
+    carbsPer100g: v.union(v.number(), v.null()),
+    fatPer100g: v.union(v.number(), v.null()),
+    servingSize: v.union(v.string(), v.null()),
+    servingGrams: v.union(v.number(), v.null()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const code = args.offCode.trim()
+    if (!code) return null
+    const existing = await ctx.db
+      .query('off_product_nutrients')
+      .withIndex('by_offCode', (q) => q.eq('offCode', code))
+      .first()
+    const now = Date.now()
+    const patch = {
+      caloriesPer100g: args.caloriesPer100g,
+      proteinPer100g: args.proteinPer100g,
+      carbsPer100g: args.carbsPer100g,
+      fatPer100g: args.fatPer100g,
+      servingSize: args.servingSize,
+      servingGrams: args.servingGrams,
+      updatedAt: now,
+    }
+    if (existing) {
+      await ctx.db.patch(existing._id, patch)
+      return null
+    }
+    await ctx.db.insert('off_product_nutrients', {
+      offCode: code,
+      ...patch,
+    })
+    return null
+  },
+})
+
+async function loadOffProductNutrients(
+  ctx: MutationCtx,
+  offCode: string | undefined,
+): Promise<OffProductNutrientCache | null> {
+  const code = offCode?.trim()
+  if (!code) return null
+  const row = await ctx.db
+    .query('off_product_nutrients')
+    .withIndex('by_offCode', (q) => q.eq('offCode', code))
+    .first()
+  if (!row) return null
+  return {
+    caloriesPer100g: row.caloriesPer100g,
+    proteinPer100g: row.proteinPer100g,
+    carbsPer100g: row.carbsPer100g,
+    fatPer100g: row.fatPer100g,
+    servingSize: row.servingSize ?? null,
+    servingGrams: row.servingGrams,
+  }
+}
+
 /** Copie une image OFF dans Convex storage (best-effort). */
 export const mirrorOffImage = internalAction({
   args: {
@@ -479,8 +533,17 @@ export const searchFoods = action({
           imageStorageId = cached.storageId
         }
       }
-      // Nutriments lus côté serveur pour stockage ultérieur ; non renvoyés à l’app.
-      void (mapped as FoodHitInternal)
+      if (mapped.barcode) {
+        await ctx.runMutation(internal.foodAdd.upsertOffProductNutrients, {
+          offCode: mapped.barcode,
+          caloriesPer100g: mapped.calories,
+          proteinPer100g: mapped.proteines,
+          carbsPer100g: mapped.glucides,
+          fatPer100g: mapped.lipides,
+          servingSize: mapped.servingSize,
+          servingGrams: parseServingGrams(mapped.servingSize),
+        })
+      }
       hits.push(
         toFoodAddV3PublicHit({
           barcode: mapped.barcode,
@@ -503,7 +566,8 @@ export const searchFoods = action({
 
 /**
  * Ajoute un snapshot aliment au journal — refuse mineur / TCA côté serveur.
- * Stocke name, portion, offCode, image ref, updatedAt (jamais juste un lien).
+ * kcal/macros : calculés serveur depuis off_product_nutrients + grams/pieces.
+ * Les args calories/proteinG/carbsG/fatG client sont optionnels et jamais lus.
  * imageUrl / imageStorageId : uniquement nos refs Convex.
  */
 export const addFoodSnapshot = mutation({
@@ -517,11 +581,13 @@ export const addFoodSnapshot = mutation({
     offCode: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
     imageStorageId: v.optional(v.id('_storage')),
-    calories: v.union(v.number(), v.null()),
+    /** Ignoré — conservé optionnel pour compat clients ; jamais lu. */
+    calories: v.optional(v.union(v.number(), v.null())),
     proteinG: v.optional(v.union(v.number(), v.null())),
     carbsG: v.optional(v.union(v.number(), v.null())),
     fatG: v.optional(v.union(v.number(), v.null())),
     grams: v.optional(v.number()),
+    pieces: v.optional(v.number()),
     servingSize: v.optional(v.union(v.string(), v.null())),
     createdAt: v.optional(v.number()),
     updatedAt: v.optional(v.number()),
@@ -558,16 +624,68 @@ export const addFoodSnapshot = mutation({
       .withIndex('by_userId_mealId', (q) => q.eq('userId', userId).eq('mealId', args.mealId))
       .first()
 
+    // Jamais lire args.calories / proteinG / carbsG / fatG — calcul serveur seul.
+    void args.calories
+    void args.proteinG
+    void args.carbsG
+    void args.fatG
+
+    const nutrientCache = await loadOffProductNutrients(ctx, args.offCode)
+    const hasPieces =
+      typeof args.pieces === 'number' && Number.isFinite(args.pieces) && args.pieces > 0
+    const hasGrams =
+      typeof args.grams === 'number' && Number.isFinite(args.grams) && args.grams > 0
+
+    if (hasPieces || hasGrams) {
+      const qty = validateFoodQuantity({
+        unit: hasPieces ? 'pieces' : 'g',
+        value: hasPieces ? args.pieces! : args.grams!,
+        servingGrams: nutrientCache?.servingGrams ?? null,
+      })
+      if (!qty.ok) {
+        throw new Error(`${FOOD_ADD_QUANTITY_INVALID}:${qty.reason}`)
+      }
+    }
+
+    // Pièces : stocke le compte ; grams = pieces × servingGrams si connu, sinon null.
+    let storeGrams: number | undefined
+    let storePieces: number | undefined
+    let portionLabel: string
+    if (hasPieces) {
+      storePieces = args.pieces
+      const sg = nutrientCache?.servingGrams
+      storeGrams =
+        typeof sg === 'number' && sg > 0 ? args.pieces! * sg : undefined
+      const rawLabel = args.portionLabel.trim()
+      // Jamais « pour 100 g » en mode pièces.
+      if (rawLabel && !/pour\s*100\s*g/i.test(rawLabel)) {
+        portionLabel = rawLabel.slice(0, 80)
+      } else {
+        const n = args.pieces!
+        portionLabel = n === 1 ? '1 pièce' : `${n} pièces`
+      }
+    } else {
+      storeGrams = hasGrams ? args.grams : undefined
+      storePieces = undefined
+      portionLabel = args.portionLabel.trim().slice(0, 80) || 'pour 100 g'
+    }
+
+    const computed = computeMealNutritionFromOffCache(nutrientCache, {
+      grams: storeGrams,
+      pieces: hasPieces && storeGrams == null ? args.pieces : undefined,
+    })
+
     const patch = {
       dateKey: normalizeDateKey(args.dateKey),
       mealType: args.mealType.trim().slice(0, 24),
       name: mealName(args.name),
-      calories: args.calories,
-      proteinG: args.proteinG,
-      carbsG: args.carbsG,
-      fatG: args.fatG,
-      grams: args.grams,
-      portionLabel: args.portionLabel.trim().slice(0, 80) || 'pour 100 g',
+      calories: computed.calories,
+      proteinG: computed.proteinG,
+      carbsG: computed.carbsG,
+      fatG: computed.fatG,
+      grams: storeGrams,
+      pieces: storePieces,
+      portionLabel,
       offCode: args.offCode?.trim() || undefined,
       imageUrl: ownedImageUrl,
       imageStorageId: ownedStorageId,
@@ -602,14 +720,16 @@ export const addFoodSnapshot = mutation({
         .withIndex('by_userId_foodKey', (q) => q.eq('userId', userId).eq('foodKey', foodKey))
         .first()
       const servingSize =
-        typeof args.servingSize === 'string' ? args.servingSize.trim() || null : null
+        typeof args.servingSize === 'string'
+          ? args.servingSize.trim() || null
+          : (nutrientCache?.servingSize ?? null)
       const catalogPatch = {
         barcode: args.offCode?.trim() || undefined,
         name: mealName(args.name),
-        caloriesPer100g: args.calories,
-        proteinPer100g: args.proteinG ?? null,
-        carbsPer100g: args.carbsG ?? null,
-        fatPer100g: args.fatG ?? null,
+        caloriesPer100g: nutrientCache?.caloriesPer100g ?? null,
+        proteinPer100g: nutrientCache?.proteinPer100g ?? null,
+        carbsPer100g: nutrientCache?.carbsPer100g ?? null,
+        fatPer100g: nutrientCache?.fatPer100g ?? null,
         imageUrl: ownedImageUrl,
         imageStorageId: ownedStorageId,
         servingSize,
@@ -629,7 +749,7 @@ export const addFoodSnapshot = mutation({
           userId,
           foodKey,
           ...catalogPatch,
-          source: 'open_food_facts',
+          source: args.offCode?.trim() ? 'open_food_facts' : 'manual',
           selectedCount: 1,
           isFavorite: false,
           schemaVersion: NUTRITION_SCHEMA_VERSION,
@@ -730,6 +850,10 @@ export const __test = {
   FOOD_SEARCH_DAILY_LIMIT,
   FOOD_ADD_ACCESS_DENIED_MINOR,
   FOOD_ADD_ACCESS_DENIED_TCA,
+  FOOD_ADD_QUANTITY_INVALID,
   toDateKey,
   formatPortionLabelFromServing,
+  parseServingGrams,
+  computeMealNutritionFromOffCache,
+  validateFoodQuantity,
 }

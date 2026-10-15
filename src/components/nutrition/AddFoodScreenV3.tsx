@@ -11,13 +11,18 @@ import {
 } from '../../utils/foodCategories'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { parseGramsFromServingSize } from '../../utils/foodDisplay'
+import {
+  foodAddQuantityUserMessage,
+  validateFoodQuantity,
+  type FoodQuantityUnit,
+} from '../../../convex/lib/foodAddQuantity'
 import { FoodCategoryWheel } from './FoodCategoryWheel'
 import { FoodProductCard } from './FoodProductCard'
 import { FoodSelectionBar } from './FoodSelectionBar'
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
-export type FoodAddV3QuantityUnit = 'g' | 'pieces'
+export type FoodAddV3QuantityUnit = FoodQuantityUnit
 
 /** Sélection validée V3 — name + quantité (jamais de kcal dans l’UI). */
 export type FoodAddV3Selection = {
@@ -25,7 +30,10 @@ export type FoodAddV3Selection = {
   grams?: number
   pieces?: number
   unit: FoodAddV3QuantityUnit
+  portionLabel?: string
 }
+
+type QtyState = { unit: FoodAddV3QuantityUnit; value: number | '' }
 
 function MealTypeChip({
   type,
@@ -124,9 +132,9 @@ export function AddFoodScreenV3({
   const [manualOpen, setManualOpen] = useState(false)
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
   const [quantityStep, setQuantityStep] = useState(false)
-  const [qtyByKey, setQtyByKey] = useState<
-    Record<string, { unit: FoodAddV3QuantityUnit; value: number }>
-  >({})
+  const [qtyByKey, setQtyByKey] = useState<Record<string, QtyState>>({})
+  const [qtyError, setQtyError] = useState<string | null>(null)
+  const [manualError, setManualError] = useState<string | null>(null)
   const online = useOnlineStatus()
   const searchActive = searchQuery.trim().length > 0
 
@@ -174,32 +182,86 @@ export function AddFoodScreenV3({
 
   const openQuantityStep = () => {
     if (selectedHits.length === 0) return
-    const next: Record<string, { unit: FoodAddV3QuantityUnit; value: number }> = {}
+    const next: Record<string, QtyState> = {}
     for (const hit of selectedHits) {
-      const key = hitKey(hit)
-      const parsed = parseGramsFromServingSize(hit.servingSize)
-      next[key] = { unit: 'g', value: parsed && parsed > 0 ? parsed : 100 }
+      next[hitKey(hit)] = { unit: 'g', value: '' }
     }
     setQtyByKey(next)
+    setQtyError(null)
     setQuantityStep(true)
   }
+
+  const servingGramsFor = (hit: OpenFoodFactsSearchHit) =>
+    parseGramsFromServingSize(hit.servingSize)
+
+  const allQuantitiesValid = selectedHits.every((hit) => {
+    const qty = qtyByKey[hitKey(hit)]
+    if (!qty || qty.value === '') return false
+    return validateFoodQuantity({
+      unit: qty.unit,
+      value: qty.value,
+      servingGrams: qty.unit === 'pieces' ? servingGramsFor(hit) : null,
+    }).ok
+  })
 
   const confirmQuantities = () => {
     const items: FoodAddV3Selection[] = []
     for (const hit of selectedHits) {
       const key = hitKey(hit)
-      const qty = qtyByKey[key] ?? { unit: 'g' as const, value: 100 }
-      if (qty.unit === 'pieces') {
-        items.push({ hit, pieces: qty.value, unit: 'pieces' })
+      const qty = qtyByKey[key] ?? { unit: 'g' as const, value: '' as const }
+      const checked = validateFoodQuantity({
+        unit: qty.unit,
+        value: qty.value,
+        servingGrams: qty.unit === 'pieces' ? servingGramsFor(hit) : null,
+      })
+      if (!checked.ok) {
+        setQtyError(foodAddQuantityUserMessage(checked.reason))
+        return
+      }
+      if (checked.unit === 'pieces') {
+        const n = checked.pieces
+        items.push({
+          hit,
+          pieces: n,
+          unit: 'pieces',
+          portionLabel: n === 1 ? '1 pièce' : `${n} pièces`,
+        })
       } else {
-        items.push({ hit, grams: qty.value, unit: 'g' })
+        items.push({
+          hit,
+          grams: checked.grams,
+          unit: 'g',
+          portionLabel: `${checked.grams} g`,
+        })
       }
     }
+    setQtyError(null)
     onValidateSelection(items)
     setSelectedKeys([])
     setQuantityStep(false)
     setQtyByKey({})
   }
+
+  const handleManualSubmit = (event: FormEvent) => {
+    event.preventDefault()
+    if (!name.trim()) return
+    if (manualGrams === '') {
+      setManualError(foodAddQuantityUserMessage('below_min'))
+      return
+    }
+    const checked = validateFoodQuantity({ unit: 'g', value: manualGrams })
+    if (!checked.ok) {
+      setManualError(foodAddQuantityUserMessage(checked.reason))
+      return
+    }
+    setManualError(null)
+    onSubmitManual(event)
+  }
+
+  const manualSubmitEnabled =
+    name.trim().length > 0 &&
+    manualGrams !== '' &&
+    validateFoodQuantity({ unit: 'g', value: manualGrams }).ok
 
   const idleBrowse = !searchActive && filteredHits.length === 0 && !searchLoading
   const categoryLabel = FOOD_CATEGORIES.find((c) => c.id === category)?.label ?? 'Tout'
@@ -367,7 +429,7 @@ export function AddFoodScreenV3({
 
               {manualOpen ? (
                 <form
-                  onSubmit={onSubmitManual}
+                  onSubmit={handleManualSubmit}
                   className="mt-2 max-h-[42vh] space-y-3 overflow-y-auto overscroll-contain"
                   data-manual-form
                 >
@@ -401,24 +463,32 @@ export function AddFoodScreenV3({
                     </span>
                     <input
                       type="number"
-                      inputMode="decimal"
+                      inputMode="numeric"
                       min={1}
-                      max={5000}
+                      max={2000}
+                      step={1}
                       value={manualGrams}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        setManualError(null)
                         onManualGramsChange?.(
                           e.target.value === '' ? '' : Number(e.target.value),
                         )
-                      }
+                      }}
                       placeholder="ex. 120"
                       className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/40"
                       data-testid="food-add-manual-grams"
                     />
                   </label>
+                  {manualError ? (
+                    <p className="text-[12px] text-[#FF6961]" role="alert" data-food-qty-error>
+                      {manualError}
+                    </p>
+                  ) : null}
 
                   <button
                     type="submit"
-                    className="btn-brand w-full rounded-xl border border-white/15 py-3 text-[15px] font-semibold text-white"
+                    disabled={!manualSubmitEnabled}
+                    className="btn-brand w-full rounded-xl border border-white/15 py-3 text-[15px] font-semibold text-white disabled:opacity-40"
                     data-testid="food-add-manual-submit"
                   >
                     Enregistrer
@@ -449,7 +519,7 @@ export function AddFoodScreenV3({
             <ul className="min-h-0 flex-1 space-y-3 overflow-y-auto">
               {selectedHits.map((hit) => {
                 const key = hitKey(hit)
-                const qty = qtyByKey[key] ?? { unit: 'g' as const, value: 100 }
+                const qty = qtyByKey[key] ?? { unit: 'g' as const, value: '' as const }
                 return (
                   <li
                     key={key}
@@ -465,12 +535,13 @@ export function AddFoodScreenV3({
                             ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-white'
                             : 'border-white/10 text-[#8E8E93]'
                         }`}
-                        onClick={() =>
+                        onClick={() => {
+                          setQtyError(null)
                           setQtyByKey((prev) => ({
                             ...prev,
-                            [key]: { unit: 'g', value: prev[key]?.value || 100 },
+                            [key]: { unit: 'g', value: '' },
                           }))
-                        }
+                        }}
                       >
                         Grammes
                       </button>
@@ -481,12 +552,13 @@ export function AddFoodScreenV3({
                             ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-white'
                             : 'border-white/10 text-[#8E8E93]'
                         }`}
-                        onClick={() =>
+                        onClick={() => {
+                          setQtyError(null)
                           setQtyByKey((prev) => ({
                             ...prev,
-                            [key]: { unit: 'pieces', value: prev[key]?.value || 1 },
+                            [key]: { unit: 'pieces', value: '' },
                           }))
-                        }
+                        }}
                       >
                         Pièces
                       </button>
@@ -498,15 +570,19 @@ export function AddFoodScreenV3({
                       <input
                         type="number"
                         inputMode="decimal"
-                        min={1}
-                        max={qty.unit === 'pieces' ? 99 : 5000}
+                        min={qty.unit === 'pieces' ? 0.5 : 1}
+                        max={qty.unit === 'pieces' ? 50 : 2000}
+                        step={qty.unit === 'pieces' ? 0.5 : 1}
                         value={qty.value}
                         onChange={(e) => {
-                          const n = Number(e.target.value)
-                          if (!Number.isFinite(n)) return
+                          setQtyError(null)
+                          const raw = e.target.value
                           setQtyByKey((prev) => ({
                             ...prev,
-                            [key]: { unit: qty.unit, value: n },
+                            [key]: {
+                              unit: qty.unit,
+                              value: raw === '' ? '' : Number(raw),
+                            },
                           }))
                         }}
                         className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#FF2B2B]/40"
@@ -517,10 +593,16 @@ export function AddFoodScreenV3({
                 )
               })}
             </ul>
+            {qtyError ? (
+              <p className="mt-2 text-[12px] text-[#FF6961]" role="alert" data-food-qty-error>
+                {qtyError}
+              </p>
+            ) : null}
             <button
               type="button"
               onClick={confirmQuantities}
-              className="btn-brand mt-3 w-full rounded-xl border border-white/15 py-3 text-[15px] font-semibold text-white"
+              disabled={!allQuantitiesValid}
+              className="btn-brand mt-3 w-full rounded-xl border border-white/15 py-3 text-[15px] font-semibold text-white disabled:opacity-40"
               data-testid="food-quantity-confirm"
             >
               Valider

@@ -402,18 +402,32 @@ export async function addFoodSnapshotViaConvex(input: {
   offCode?: string
   imageUrl?: string
   imageStorageId?: string
-  calories: number | null
+  /** V3 : ne plus envoyer — le serveur calcule depuis off_product_nutrients. */
+  calories?: number | null
   proteinG?: number | null
   carbsG?: number | null
   fatG?: number | null
   grams?: number
+  pieces?: number
   createdAt?: number
   updatedAt?: number
 }): Promise<{ applied: boolean; stale: boolean; updatedAt: number }> {
   const sessionToken = await requireToken()
+  // V3 : ne jamais transmettre kcal/macros — le serveur les calcule.
+  const {
+    calories: _c,
+    proteinG: _p,
+    carbsG: _carbs,
+    fatG: _f,
+    ...safe
+  } = input
+  void _c
+  void _p
+  void _carbs
+  void _f
   return getConvex().mutation(api.foodAdd.addFoodSnapshot, {
     sessionToken,
-    ...input,
+    ...safe,
   }) as Promise<{ applied: boolean; stale: boolean; updatedAt: number }>
 }
 
