@@ -377,6 +377,19 @@ export function mergeCalorieProfilesForSync(
   const healthWinner = localHealthAt >= remoteHealthAt ? localNorm : remoteNorm
   const sexWinner = localSexAt >= remoteSexAt ? localNorm : remoteNorm
 
+  // B15 — SAFETY FIELDS : true côté serveur (ou local) ne peut pas passer à false via merge client.
+  const declaredPregnancy = Boolean(
+    localNorm.declaredPregnancy || remoteNorm.declaredPregnancy,
+  )
+  const declaredBreastfeeding = Boolean(
+    localNorm.declaredBreastfeeding || remoteNorm.declaredBreastfeeding,
+  )
+  const declaredEatingDisorder = Boolean(
+    localNorm.declaredEatingDisorder || remoteNorm.declaredEatingDisorder,
+  )
+  const declaredDiabetes = Boolean(localNorm.declaredDiabetes || remoteNorm.declaredDiabetes)
+  const anySituation = declaredPregnancy || declaredBreastfeeding || declaredEatingDisorder
+
   const base =
     localCleared > remoteCleared
       ? {
@@ -386,20 +399,27 @@ export function mergeCalorieProfilesForSync(
           goalWeightKg: null as null,
           bodyMetricsClearedAt: localCleared,
           onboardingComplete: localNorm.onboardingComplete || remoteNorm.onboardingComplete,
-          age: localNorm.age > 0 ? localNorm.age : remoteNorm.age,
+          // Âge : le serveur gagne s’il a une valeur valide.
+          age: remoteNorm.age > 0 ? remoteNorm.age : localNorm.age,
         }
-      : { ...remoteNorm }
+      : {
+          ...remoteNorm,
+          age: remoteNorm.age > 0 ? remoteNorm.age : localNorm.age,
+        }
 
   return normalizeCalorieProfile({
     ...base,
     sex: sexWinner.sex,
     sexUpdatedAt: sexWinner.sexUpdatedAt ?? null,
-    declaredPregnancy: healthWinner.declaredPregnancy,
-    declaredBreastfeeding: healthWinner.declaredBreastfeeding,
-    declaredEatingDisorder: healthWinner.declaredEatingDisorder,
-    declaredDiabetes: Boolean(localNorm.declaredDiabetes || remoteNorm.declaredDiabetes),
-    preferNotAnswerHealth: healthWinner.preferNotAnswerHealth,
-    healthAnswer: healthWinner.healthAnswer ?? null,
+    declaredPregnancy,
+    declaredBreastfeeding,
+    declaredEatingDisorder,
+    declaredDiabetes,
+    preferNotAnswerHealth: anySituation
+      ? false
+      : healthWinner.preferNotAnswerHealth,
+    // Si une situation true survit, forcer « situations » pour que normalize ne l’efface pas.
+    healthAnswer: anySituation ? 'situations' : (healthWinner.healthAnswer ?? null),
     healthAnswerUpdatedAt: healthWinner.healthAnswerUpdatedAt ?? null,
   })
 }

@@ -85,6 +85,8 @@ export type SyncPushResult = {
   serverVersion: number
   updatedAt: number
   clientMutationId?: string
+  /** B15 — hausse d’âge mineur refusée ; le client affiche AGE_CONTACT_US_MESSAGE. */
+  ageRejectedContactUs?: boolean
 }
 
 const sleepNightValidator = v.object({
@@ -388,19 +390,19 @@ async function upsertNutrition(
   userId: string,
   nutrition: { profileJson?: unknown; journalJson?: unknown },
   now: number,
-) {
+): Promise<{ ageRejectedContactUs: boolean }> {
   const existing = await findNutritionDoc(ctx, userId)
   if (existing) {
     assertUserOwnership(existing.userId, userId)
     if (nutrition.profileJson !== undefined) {
-      // SEUL écriture profileJson : via writeNutritionProfileJson (règle âge B14).
-      await writeNutritionProfileJson(ctx, {
+      // SEUL écriture profileJson : via writeNutritionProfileJson (règle âge B15).
+      const result = await writeNutritionProfileJson(ctx, {
         userId,
         incomingProfileJson: nutrition.profileJson,
         journalJson: nutrition.journalJson,
         updatedAt: now,
       })
-      return
+      return { ageRejectedContactUs: result.ageRejectedContactUs }
     }
     if (nutrition.journalJson !== undefined) {
       await ctx.db.patch(existing._id, {
@@ -408,14 +410,15 @@ async function upsertNutrition(
         updatedAt: now,
       })
     }
-    return
+    return { ageRejectedContactUs: false }
   }
-  await writeNutritionProfileJson(ctx, {
+  const result = await writeNutritionProfileJson(ctx, {
     userId,
     incomingProfileJson: nutrition.profileJson ?? {},
     journalJson: nutrition.journalJson ?? {},
     updatedAt: now,
   })
+  return { ageRejectedContactUs: result.ageRejectedContactUs }
 }
 
 async function replaceSleepNights(
@@ -577,8 +580,10 @@ export async function pushSyncForSession(
   }
 
   const now = Date.now()
+  let ageRejectedContactUs = false
   if (input.nutrition) {
-    await upsertNutrition(ctx, user.userId, input.nutrition, now)
+    const nutritionWrite = await upsertNutrition(ctx, user.userId, input.nutrition, now)
+    ageRejectedContactUs = nutritionWrite.ageRejectedContactUs
   }
   if (input.workouts) {
     await upsertWorkouts(
@@ -618,6 +623,7 @@ export async function pushSyncForSession(
     serverVersion: now,
     updatedAt: now,
     clientMutationId: input.clientMutationId,
+    ageRejectedContactUs,
   }
 }
 
@@ -677,6 +683,7 @@ export const pushSync = mutation({
     serverVersion: v.number(),
     updatedAt: v.number(),
     clientMutationId: v.optional(v.string()),
+    ageRejectedContactUs: v.optional(v.boolean()),
   }),
   handler: (ctx, args) =>
     pushSyncForSession(ctx, args.sessionToken, {

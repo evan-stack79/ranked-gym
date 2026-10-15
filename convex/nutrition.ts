@@ -11,6 +11,10 @@ import {
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
 import { assertFoodAddAccessFromStoredProfile } from './lib/foodAddAccess'
 import {
+  clearNutritionSafetyBoolField,
+  type NutritionSafetyBoolField,
+} from './lib/nutritionProfile'
+import {
   stripMealsFromBackupPayload,
   stripMealsFromJournalJson,
 } from './lib/stripJournalMeals'
@@ -190,6 +194,29 @@ export const checkFoodAddAccess = query({
     const access = await assertFoodAddAccessFromStoredProfile(ctx, user.userId)
     if (!access.ok) return { ok: false, error: access.error }
     return { ok: true, diabetes: access.diabetes }
+  },
+})
+
+/**
+ * B15 — retrait délibéré d’un flag de sécurité (diabète / grossesse / allaitement).
+ * Jamais via sync. TCA verrouillé (NUTRITION_SAFETY_TCA_LOCKED).
+ */
+export const clearSafetyFlag = mutation({
+  args: {
+    sessionToken: v.string(),
+    field: v.union(
+      v.literal('declaredDiabetes'),
+      v.literal('declaredPregnancy'),
+      v.literal('declaredBreastfeeding'),
+    ),
+  },
+  returns: v.object({ cleared: v.boolean() }),
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx, args.sessionToken)
+    return clearNutritionSafetyBoolField(ctx, {
+      userId: user.userId,
+      field: args.field as NutritionSafetyBoolField,
+    })
   },
 })
 

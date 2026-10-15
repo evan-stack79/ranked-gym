@@ -173,14 +173,15 @@ export function extractAgeFromNutritionProfileJson(profileJson: unknown): unknow
 }
 
 /**
- * B14 — délègue à mergeNutritionProfileJson (préserve âge valide ; accepte 18+ avec audit côté write).
- * Conservé pour les appels / tests AV-01.
+ * AV-01 / B15 — délègue à mergeNutritionProfileJson (préserve SAFETY FIELDS ;
+ * mineur : hausse limitée temps + 1 an ; adulte libre 10–120).
  */
 export function sanitizeSyncedNutritionProfileJson(
   previousProfileJson: unknown,
   incomingProfileJson: unknown,
+  now = Date.now(),
 ): unknown {
-  return mergeNutritionProfileJson(previousProfileJson, incomingProfileJson).profileJson
+  return mergeNutritionProfileJson(previousProfileJson, incomingProfileJson, now).profileJson
 }
 
 /**

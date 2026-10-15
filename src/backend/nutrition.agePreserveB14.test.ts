@@ -289,8 +289,10 @@ describe('B14-02 — âge absent puis entrant', () => {
 describe('B14 — audit mineur → 18+', () => {
   it('écrit nutrition_age_majority_audit (userId + at seulement) sur 16→18', async () => {
     const db = new FakeDb()
-    await seedMinor16(db)
+    // ageRecordedAt ≥ 1 an → marge +2 (temps+1) autorise 16→18
+    const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000
     const at = Date.now()
+    await seedMinor16(db, { ageRecordedAt: at - MS_PER_YEAR })
     const result = await writeNutritionProfileJson({ db } as never, {
       userId: USER,
       incomingProfileJson: { age: 18 },

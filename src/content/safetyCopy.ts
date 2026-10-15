@@ -46,6 +46,17 @@ export const M_TCA_1 = "Merci de nous l'avoir dit. On retire de ton app les obje
 
 export const Q8_SCREEN_TITLE = "Besoin d'en parler ?"
 
+/** B15 — retraits délibérés / verrous (verbatim Architect). */
+export const DIABETES_CLEAR_CONFIRM =
+  'Tu retires le diabète. Les objectifs de calories et de perte de poids pourront revenir. Tu confirmes ?'
+export const PREGNANCY_CLEAR_CONFIRM =
+  'Tu retires la grossesse. Les objectifs de calories et de perte de poids pourront revenir. Tu confirmes ?'
+export const BREASTFEEDING_CLEAR_CONFIRM =
+  'Tu retires l’allaitement. Les objectifs de calories et de perte de poids pourront revenir. Tu confirmes ?'
+export const SAFETY_CLEAR_SIGN_IN = 'Connecte-toi pour retirer cette situation.'
+export const TCA_LOCKED_MESSAGE = 'Pour retirer cette situation, contacte-nous.'
+export const AGE_CONTACT_US_MESSAGE = 'Contacte-nous pour corriger ton âge.'
+
 /** Numéros affichés (espaces conservés) + liens tel: */
 export const TCA_PHONE_DISPLAY = {
   anorexieBoulimie: '09 69 325 900',

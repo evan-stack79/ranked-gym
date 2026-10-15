@@ -396,3 +396,14 @@ export async function listConvexFoodCatalog(options?: {
     favoritesOnly: options?.favoritesOnly,
   }) as Promise<CloudFoodRecord[]>
 }
+
+/** B15 — retrait délibéré diabète / grossesse / allaitement (jamais via sync). */
+export async function clearNutritionSafetyFlag(
+  field: 'declaredDiabetes' | 'declaredPregnancy' | 'declaredBreastfeeding',
+): Promise<{ cleared: boolean }> {
+  const sessionToken = await requireToken()
+  return getConvex().mutation(api.nutrition.clearSafetyFlag, {
+    sessionToken,
+    field,
+  }) as Promise<{ cleared: boolean }>
+}
