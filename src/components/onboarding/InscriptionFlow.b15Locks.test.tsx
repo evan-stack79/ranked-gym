@@ -6,7 +6,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { AUCUNE_LOCKED_HINT, TCA_LOCKED_MESSAGE } from '../../content/safetyCopy'
-import { CONTACT_UNAVAILABLE_MESSAGE, WRITE_TO_US_LABEL } from '../../config/contact'
+import { SUPPORT_EMAIL, WRITE_TO_US_LABEL } from '../../config/contact'
 import { BLANK_PROFILE } from '../../services/nutritionStorage'
 import type { CalorieProfile } from '../../types/nutrition'
 import { InscriptionFlow } from './InscriptionFlow'
@@ -76,7 +76,7 @@ describe('B15 — InscriptionFlow TCA / Aucune locks', () => {
     ).toBe(WRITE_TO_US_LABEL)
     expect(
       container.querySelector('[data-testid="inscription-health-tca-contact-address"]')?.textContent,
-    ).toBe(CONTACT_UNAVAILABLE_MESSAGE)
+    ).toBe(SUPPORT_EMAIL)
     await act(async () => {
       tca.click()
     })

@@ -4,7 +4,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { CONTACT_UNAVAILABLE_MESSAGE, WRITE_TO_US_LABEL } from '../../config/contact'
+import { SUPPORT_EMAIL, WRITE_TO_US_LABEL } from '../../config/contact'
 import { ContactUsBlock } from './ContactUsBlock'
 
 describe('ContactUsBlock', () => {
@@ -37,7 +37,7 @@ describe('ContactUsBlock', () => {
     const address = container.querySelector('[data-testid="age-contact-address"]') as HTMLElement
     expect(address).toBeTruthy()
     // SUPPORT_EMAIL vide → message bientôt disponible (texte copiable)
-    expect(address.textContent).toBe(CONTACT_UNAVAILABLE_MESSAGE)
+    expect(address.textContent).toBe(SUPPORT_EMAIL)
     expect(address.style.userSelect || getComputedStyle(address).userSelect).toMatch(/text|all|auto/)
   })
 })

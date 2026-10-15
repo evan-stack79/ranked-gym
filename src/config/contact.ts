@@ -2,7 +2,7 @@
  * Adresse de contact unique pour « Nous écrire » (corrections âge / TCA).
  * Remplir avant mise en ligne — `npm run check:release` refuse un déploiement si vide.
  */
-export const SUPPORT_EMAIL = ''
+export const SUPPORT_EMAIL = 'contact.rankedgym@gmail.com'
 
 /** Objet mailto fixe — jamais de données santé. */
 export const SUPPORT_MAIL_SUBJECT = 'Ranked Gym : demande de correction' as const

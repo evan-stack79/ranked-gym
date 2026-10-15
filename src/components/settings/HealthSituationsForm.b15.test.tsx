@@ -15,7 +15,7 @@ import {
   SAFETY_CLEAR_SIGN_IN,
   TCA_LOCKED_MESSAGE,
 } from '../../content/safetyCopy'
-import { CONTACT_UNAVAILABLE_MESSAGE, WRITE_TO_US_LABEL } from '../../config/contact'
+import { SUPPORT_EMAIL, WRITE_TO_US_LABEL } from '../../config/contact'
 import {
   HealthSituationsForm,
   type HealthSituationsValue,
@@ -94,7 +94,7 @@ describe('B15 — HealthSituationsForm verrous / clear', () => {
       WRITE_TO_US_LABEL,
     )
     expect(container.querySelector('[data-testid="health-tca-contact-address"]')?.textContent).toBe(
-      CONTACT_UNAVAILABLE_MESSAGE,
+      SUPPORT_EMAIL,
     )
   })
 
