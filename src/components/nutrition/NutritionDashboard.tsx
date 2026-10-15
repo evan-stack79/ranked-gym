@@ -916,9 +916,12 @@ export function NutritionDashboard({
                                 ]
                                   .filter(Boolean)
                                   .join(' · ')
-                              : `${MEAL_TYPE_LABELS[meal.mealType]} · ${meal.calories} kcal${
-                                  meal.proteinG != null ? ` · ${meal.proteinG} g P` : ''
-                                }`}
+                              : meal.calories == null
+                                ? // R4-01 : kcal vides → type seul (jamais « null kcal »).
+                                  MEAL_TYPE_LABELS[meal.mealType]
+                                : `${MEAL_TYPE_LABELS[meal.mealType]} · ${meal.calories} kcal${
+                                    meal.proteinG != null ? ` · ${meal.proteinG} g P` : ''
+                                  }`}
                           </p>
                         </div>
                         <button

@@ -46,6 +46,8 @@ export function EditMealSheet({
   const [grams, setGrams] = useState<number | null>(null)
   const [qtyError, setQtyError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  /** R4-02 : case Calories touchée (legacy) — vide après touch → règles d33b724. */
+  const [caloriesTouched, setCaloriesTouched] = useState(false)
   const baselineRef = useRef<Baseline | null>(null)
 
   useEffect(() => {
@@ -59,6 +61,7 @@ export function EditMealSheet({
     setGrams(meal.grams ?? null)
     setQtyError(null)
     setConfirmDelete(false)
+    setCaloriesTouched(false)
     baselineRef.current =
       meal.grams != null && meal.grams > 0
         ? {
@@ -89,6 +92,11 @@ export function EditMealSheet({
         ? foodAddQuantityUserMessage(gramsValidation.reason, gramsValidation.unit)
         : null
 
+  // R4-02 legacy : kcal vides + non touchées → Enregistrer OK (envoie null, jamais Number('')→0).
+  // Touchée puis vidée → d33b724 (calories obligatoires).
+  const legacyCaloriesOk =
+    calories == null ? !caloriesTouched : Number.isFinite(calories) && calories >= 0
+
   const canSave = strictV3Edit
     ? hideNutritionNumbers
       ? name.trim().length > 0 && (grams == null || Boolean(gramsValidation?.ok))
@@ -96,8 +104,7 @@ export function EditMealSheet({
         calories != null &&
         calories >= 0 &&
         (grams == null || Boolean(gramsValidation?.ok))
-    : // d33b724 : name + calories >= 0 ; pas de gate quantité.
-      name.trim().length > 0 && calories != null && calories >= 0
+    : name.trim().length > 0 && legacyCaloriesOk
 
   const applyGrams = (nextGrams: number | null) => {
     setGrams(nextGrams)
@@ -174,9 +181,14 @@ export function EditMealSheet({
               <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">Calories</span>
               <ClearableNumberInput
                 value={calories}
-                onChange={setCalories}
+                onChange={(next) => {
+                  setCaloriesTouched(true)
+                  setCalories(next)
+                }}
                 min={0}
                 max={5000}
+                // R4-02 legacy : vide initial autorisé ; blur ne restaure pas un faux 0.
+                required={strictV3Edit}
                 aria-label="Calories"
                 className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
               />
@@ -301,14 +313,15 @@ export function EditMealSheet({
               return
             }
             // Sans marque V3 (= d33b724) : ne pas toucher pieces, pas de portionLabel forcé.
-            if (calories == null) return
+            // R4-02 : kcal/macros vides → null explicite (jamais Number('')→0).
+            if (calories == null && caloriesTouched) return
             onSave(meal.id, {
               name: name.trim(),
               mealType,
-              calories: Math.round(calories),
-              proteinG: proteinG ?? undefined,
-              carbsG: carbsG ?? undefined,
-              fatG: fatG ?? undefined,
+              calories: calories == null ? null : Math.round(calories),
+              proteinG: proteinG == null ? null : proteinG,
+              carbsG: carbsG == null ? null : carbsG,
+              fatG: fatG == null ? null : fatG,
               grams: grams ?? undefined,
               ...(meal.entrySource ? { entrySource: meal.entrySource } : {}),
             })
