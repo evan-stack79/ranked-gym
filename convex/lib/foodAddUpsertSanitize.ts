@@ -129,6 +129,32 @@ export function isV3MealContext(input: {
   return input.existingEntrySource === 'v3' || input.quantityRules === 'v3'
 }
 
+/**
+ * Ignorer kcal/macros client : ligne déjà V3, ou création avec quantityRules:'v3'.
+ * Une ligne ancienne existante garde les chiffres app même si quantityRules:'v3'.
+ */
+export function shouldIgnoreClientMealMacros(input: {
+  existingEntrySource?: string | null
+  hasExisting: boolean
+  quantityRules?: 'v3' | string | null
+}): boolean {
+  if (input.existingEntrySource === 'v3') return true
+  if (!input.hasExisting && input.quantityRules === 'v3') return true
+  return false
+}
+
+/** Marque V3 posée seulement à la création (jamais sur une ligne existante). */
+export function resolveEntrySourceOnUpsert(input: {
+  existingEntrySource?: string | null
+  hasExisting: boolean
+  quantityRules?: 'v3' | string | null
+}): 'v3' | undefined {
+  if (input.hasExisting) {
+    return input.existingEntrySource === 'v3' ? 'v3' : undefined
+  }
+  return input.quantityRules === 'v3' ? 'v3' : undefined
+}
+
 /** Proportion kcal (unité) / macros (dixième) quand les grammes changent. */
 export function scaleNutritionOnGramsChange(input: {
   oldGrams: number
@@ -186,17 +212,17 @@ export type UpsertMealQuantityResult =
 
 /**
  * Résout grams/pieces/portionLabel pour upsertMeal.
- * V3 : validateFoodQuantity + réécrit portionLabel ; efface l’autre unité.
- * Legacy : n’efface jamais grams si pieces présent ; portionLabel client intact ;
- * valeurs invalides omises — jamais de throw.
+ * Refus / rewrite seulement si enforceQuantityRules (args.quantityRules === 'v3').
+ * Sinon : jamais de throw — sanitize legacy (valeurs invalides omises).
  */
 export function resolveUpsertMealQuantity(input: {
-  isV3: boolean
+  /** Uniquement true quand l’appel envoie quantityRules:'v3'. */
+  enforceQuantityRules: boolean
   grams?: number
   pieces?: number
   portionLabel?: string
 }): UpsertMealQuantityResult {
-  if (input.isV3) {
+  if (input.enforceQuantityRules) {
     const piecesPresent = input.pieces !== undefined
     const gramsPresent = input.grams !== undefined
     if (!piecesPresent && !gramsPresent) {
@@ -238,7 +264,7 @@ export function resolveUpsertMealQuantity(input: {
     }
   }
 
-  // Legacy d33b724 : conserver grams ET pieces s’ils sont stockables ; portionLabel tel quel.
+  // Sans quantityRules:'v3' : ne jamais refuser — omettre invalides.
   const storeGrams = sanitizeLegacyQuantity(input.grams)
   const storePieces = sanitizeLegacyQuantity(input.pieces)
   return {
@@ -248,4 +274,26 @@ export function resolveUpsertMealQuantity(input: {
     portionLabel: input.portionLabel,
     rewritePortionLabel: false,
   }
+}
+
+/**
+ * Ligne V3 + appel SANS quantityRules + quantité qui échouerait V3 :
+ * conserver grams/pieces/portionLabel déjà enregistrés (pas d’erreur).
+ */
+export function shouldKeepExistingV3Quantity(input: {
+  existingEntrySource?: string | null
+  enforceQuantityRules: boolean
+  grams?: number
+  pieces?: number
+}): boolean {
+  if (input.enforceQuantityRules) return false
+  if (input.existingEntrySource !== 'v3') return false
+  const piecesPresent = input.pieces !== undefined
+  const gramsPresent = input.grams !== undefined
+  if (!piecesPresent && !gramsPresent) return true
+  const checked = validateFoodQuantity({
+    unit: piecesPresent ? 'pieces' : 'g',
+    value: piecesPresent ? input.pieces : input.grams,
+  })
+  return !checked.ok
 }

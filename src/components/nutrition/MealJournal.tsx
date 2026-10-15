@@ -478,7 +478,11 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   }
 
   const handleEditSave = (mealId: string, patch: Partial<MealEntry>) => {
-    if (foodAddV3 && patch.grams != null) {
+    // Strict V3 seulement si la ligne est déjà marquée (jamais ?? 'v3').
+    const current = meals.find((m) => m.id === mealId)
+    const strictV3Row =
+      current?.entrySource === 'v3' || patch.entrySource === 'v3'
+    if (strictV3Row && patch.grams != null) {
       const checked = validateFoodQuantity({ unit: 'g', value: patch.grams })
       if (!checked.ok) {
         showToast(foodAddQuantityUserMessage(checked.reason, checked.unit), 'error')
@@ -490,10 +494,8 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
         grams: checked.grams,
         portionLabel: formatGramsCountLabel(checked.grams),
         pieces: undefined,
-        entrySource: patch.entrySource ?? 'v3',
+        entrySource: current?.entrySource ?? patch.entrySource,
       }
-    } else if (foodAddV3) {
-      patch = { ...patch, entrySource: patch.entrySource ?? 'v3' }
     }
 
     // Local d’abord ; file sync. PC-08 : pas de toast « refusée » hors ligne ici.

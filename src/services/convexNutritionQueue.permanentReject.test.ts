@@ -42,6 +42,7 @@ import {
   flushConvexNutritionQueue,
   isPermanentConvexQueueError,
 } from './convexNutritionQueue'
+import { saveJournalForDate } from './nutritionStorage'
 
 const USER = 'user-queue-pc'
 
@@ -53,6 +54,7 @@ describe('convexNutritionQueue — refus définitif vs passager', () => {
     deleteConvexMeal.mockReset()
     deleteConvexWaterEntry.mockReset()
     pushConvexDayState.mockReset()
+    vi.mocked(saveJournalForDate).mockClear()
     getActiveCloudUserId.mockReturnValue(USER)
   })
 
@@ -62,8 +64,22 @@ describe('convexNutritionQueue — refus définitif vs passager', () => {
         new ConvexError({ code: 'FOOD_ADD_QUANTITY_INVALID', reason: 'above_max', unit: 'g' }),
       ),
     ).toBe(true)
+    expect(
+      isPermanentConvexQueueError(
+        new ConvexError({ code: 'FOOD_ADD_ACCESS_DENIED_MINOR' }),
+      ),
+    ).toBe(true)
     expect(isPermanentConvexQueueError(new TypeError('Failed to fetch'))).toBe(false)
     expect(isPermanentConvexQueueError(new Error('timeout'))).toBe(false)
+    // AGE_REQUIRED = passager (âge peut être complété).
+    expect(
+      isPermanentConvexQueueError(
+        new ConvexError({ code: 'FOOD_ADD_ACCESS_AGE_REQUIRED' }),
+      ),
+    ).toBe(false)
+    expect(
+      isPermanentConvexQueueError(new ConvexError({ code: 'age_required' })),
+    ).toBe(false)
   })
 
   it('file [ok, refusé, ok] : 2 envoyés, 1 dans refusés — suite continue', async () => {
@@ -176,5 +192,68 @@ describe('convexNutritionQueue — refus définitif vs passager', () => {
     expect(queue[0]!.attempts).toBe(1)
     expect(queue[0]!.nextAttemptAt).toBeGreaterThan(Date.now())
     expect(__testReadRejectedQueue(USER)).toHaveLength(0)
+  })
+
+  it('FOOD_ADD_ACCESS_AGE_REQUIRED : passager — op reste, pas syncRejected', async () => {
+    pushConvexMeal.mockRejectedValueOnce(
+      new ConvexError({ code: 'FOOD_ADD_ACCESS_AGE_REQUIRED' }),
+    )
+    __testWriteNutritionQueue(USER, [
+      {
+        id: 'op-age',
+        kind: 'meal-upsert',
+        dateKey: '2026-10-15',
+        meal: {
+          id: 'meal-bad',
+          name: 'Age',
+          mealType: 'lunch',
+          calories: 100,
+          grams: 100,
+          createdAt: 1,
+        },
+        updatedAt: 1,
+        enqueuedAt: 1,
+      },
+    ])
+    await flushConvexNutritionQueue()
+    const queue = __testReadNutritionQueue(USER)
+    expect(queue).toHaveLength(1)
+    expect(queue[0]!.id).toBe('op-age')
+    expect(queue[0]!.attempts).toBe(1)
+    expect(__testReadRejectedQueue(USER)).toHaveLength(0)
+    expect(saveJournalForDate).not.toHaveBeenCalled()
+  })
+
+  it('FOOD_ADD_ACCESS_DENIED_MINOR : définitif — refusés + syncRejected', async () => {
+    pushConvexMeal.mockRejectedValueOnce(
+      new ConvexError({ code: 'FOOD_ADD_ACCESS_DENIED_MINOR' }),
+    )
+    __testWriteNutritionQueue(USER, [
+      {
+        id: 'op-minor',
+        kind: 'meal-upsert',
+        dateKey: '2026-10-15',
+        meal: {
+          id: 'meal-bad',
+          name: 'Minor',
+          mealType: 'lunch',
+          calories: 100,
+          grams: 100,
+          createdAt: 1,
+        },
+        updatedAt: 1,
+        enqueuedAt: 1,
+      },
+    ])
+    await flushConvexNutritionQueue()
+    expect(__testReadNutritionQueue(USER)).toHaveLength(0)
+    const rejected = __testReadRejectedQueue(USER)
+    expect(rejected).toHaveLength(1)
+    expect(rejected[0]!.code).toBe('FOOD_ADD_ACCESS_DENIED_MINOR')
+    expect(saveJournalForDate).toHaveBeenCalled()
+    const saved = vi.mocked(saveJournalForDate).mock.calls[0]![0] as {
+      meals: Array<{ syncRejected?: boolean }>
+    }
+    expect(saved.meals.some((m) => m.syncRejected === true)).toBe(true)
   })
 })

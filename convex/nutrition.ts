@@ -13,11 +13,13 @@ import { assertUserOwnership, requireSessionUser } from './lib/auth'
 import { assertFoodAddAccessFromStoredProfile } from './lib/foodAddAccess'
 import { FOOD_ADD_QUANTITY_INVALID } from './lib/foodAddQuantity'
 import {
-  isV3MealContext,
+  resolveEntrySourceOnUpsert,
   resolveUpsertMealQuantity,
   sanitizeLegacyMealNutrient,
   sanitizePer100gNutrients,
   scaleNutritionOnGramsChange,
+  shouldIgnoreClientMealMacros,
+  shouldKeepExistingV3Quantity,
 } from './lib/foodAddUpsertSanitize'
 import {
   adminCorrectNutritionSafetyField,
@@ -360,14 +362,23 @@ export const upsertMeal = mutation({
     const existing = await findMealRow(ctx, userId, args.mealId)
     const nextUpdatedAt = args.updatedAt ?? Date.now()
 
-    // Marqueur ligne gagne toujours : entrySource:'v3' OU quantityRules:'v3'.
-    const isV3 = isV3MealContext({
+    // Refus quantité uniquement si l’appel envoie quantityRules:'v3'.
+    const enforceQuantityRules = args.quantityRules === 'v3'
+    // Kcal client ignorés seulement si ligne déjà V3, ou création V3.
+    const ignoreClientMacros = shouldIgnoreClientMealMacros({
       existingEntrySource: existing?.entrySource,
+      hasExisting: Boolean(existing),
+      quantityRules: args.quantityRules,
+    })
+    // Marque V3 posée seulement à la création.
+    const entrySource = resolveEntrySourceOnUpsert({
+      existingEntrySource: existing?.entrySource,
+      hasExisting: Boolean(existing),
       quantityRules: args.quantityRules,
     })
 
     const qty = resolveUpsertMealQuantity({
-      isV3,
+      enforceQuantityRules,
       grams: args.grams,
       pieces: args.pieces,
       portionLabel: args.portionLabel,
@@ -384,8 +395,26 @@ export const upsertMeal = mutation({
     let storePieces = qty.storePieces
     let portionLabel = qty.portionLabel
 
-    // Legacy : si l’appel ommet grams/pieces (undefined), conserver l’existant.
-    if (!isV3 && existing) {
+    // Ligne V3 + sans quantityRules + qty invalide → garder qty déjà enregistrée.
+    if (
+      existing &&
+      shouldKeepExistingV3Quantity({
+        existingEntrySource: existing.entrySource,
+        enforceQuantityRules,
+        grams: args.grams,
+        pieces: args.pieces,
+      })
+    ) {
+      storeGrams = existing.grams
+      storePieces = existing.pieces
+      portionLabel = existing.portionLabel
+    } else if (existing && args.grams === undefined && args.pieces === undefined) {
+      // Omise → ne pas effacer la qty déjà enregistrée (même avec quantityRules).
+      storeGrams = existing.grams
+      storePieces = existing.pieces
+      if (args.portionLabel === undefined) portionLabel = existing.portionLabel
+    } else if (!enforceQuantityRules && existing) {
+      // Legacy / non-enforce : champ omis → conserver l’existant.
       if (args.grams === undefined) storeGrams = existing.grams
       if (args.pieces === undefined) storePieces = existing.pieces
       if (args.portionLabel === undefined) portionLabel = existing.portionLabel
@@ -396,7 +425,7 @@ export const upsertMeal = mutation({
     let carbsG: number | null | undefined
     let fatG: number | null | undefined
 
-    if (isV3) {
+    if (ignoreClientMacros) {
       // PC-02 : ignorer kcal/macros client ; proportion si grams changent.
       void args.calories
       void args.proteinG
@@ -433,14 +462,12 @@ export const upsertMeal = mutation({
         fatG = prevF
       }
     } else {
-      // Legacy d33b724 : chiffres app ; NaN/inf/négatif → null (jamais de throw).
+      // Ligne ancienne (ou création sans V3) : chiffres app ; NaN/inf/négatif → null.
       calories = sanitizeLegacyMealNutrient(args.calories)
       proteinG = sanitizeLegacyMealNutrient(args.proteinG ?? null)
       carbsG = sanitizeLegacyMealNutrient(args.carbsG ?? null)
       fatG = sanitizeLegacyMealNutrient(args.fatG ?? null)
     }
-
-    const entrySource = isV3 ? ('v3' as const) : existing?.entrySource
 
     if (existing) {
       assertUserOwnership(existing.userId, userId)

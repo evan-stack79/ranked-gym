@@ -560,3 +560,138 @@ describe('sanitize helpers — legacy ignore / per100g guards', () => {
     expect(r.caloriesPer100g).toBe(400)
   })
 })
+
+describe('Addendum 19h05 — marque V3 à la création seulement', () => {
+  let db: FakeDb
+
+  beforeEach(async () => {
+    db = new FakeDb()
+    await seedAuth(db)
+  })
+
+  it('ligne ancienne 120,5 g / 300 kcal : mealType seul (V3 ON, sans marque) → entrySource vide, 300 gardées', async () => {
+    await db.insert('nutrition_meals', {
+      userId: USER_ID,
+      mealId: 'legacy-edit',
+      dateKey: '2026-10-15',
+      mealType: 'lunch',
+      name: 'Riz',
+      calories: 300,
+      proteinG: 8,
+      carbsG: 60,
+      fatG: 2,
+      grams: 120.5,
+      updatedAt: 1,
+      schemaVersion: 1,
+    })
+    // Client sans marque n’envoie pas quantityRules (même flag V3 ON).
+    const result = (await callUpsertMeal(db, {
+      mealId: 'legacy-edit',
+      mealType: 'dinner',
+      grams: 120.5,
+      calories: 300,
+      proteinG: 8,
+      carbsG: 60,
+      fatG: 2,
+      updatedAt: 2,
+    })) as { applied: boolean }
+    expect(result.applied).toBe(true)
+    const row = db.table('nutrition_meals').find((r) => r.mealId === 'legacy-edit')!
+    expect(row.mealType).toBe('dinner')
+    expect(row.entrySource).toBeUndefined()
+    expect(row.calories).toBe(300)
+    expect(row.grams).toBe(120.5)
+
+    // Même avec quantityRules sur ligne ancienne : marque non posée, kcal app gardées.
+    const again = (await callUpsertMeal(db, {
+      mealId: 'legacy-edit',
+      mealType: 'snack',
+      grams: 120,
+      calories: 300,
+      quantityRules: 'v3',
+      updatedAt: 3,
+    })) as { applied: boolean }
+    expect(again.applied).toBe(true)
+    const row2 = db.table('nutrition_meals').find((r) => r.mealId === 'legacy-edit')!
+    expect(row2.entrySource).toBeUndefined()
+    expect(row2.calories).toBe(300)
+    expect(row2.mealType).toBe('snack')
+  })
+
+  it('ligne V3 + sans quantityRules + qty invalide → applied, quantité inchangée, kcal inchangées', async () => {
+    await db.insert('nutrition_meals', {
+      userId: USER_ID,
+      mealId: 'v3-keep-qty',
+      dateKey: '2026-10-15',
+      mealType: 'lunch',
+      name: 'Yaourt',
+      calories: 90,
+      proteinG: 6,
+      carbsG: 9,
+      fatG: 1.5,
+      grams: 120,
+      portionLabel: '120 g',
+      entrySource: 'v3',
+      updatedAt: 1,
+      schemaVersion: 1,
+    })
+    for (const [label, grams, pieces] of [
+      ['0', 0, undefined],
+      ['neg', -5, undefined],
+      ['nan', Number.NaN, undefined],
+      ['120.5', 120.5, undefined],
+      ['1.3p', undefined, 1.3],
+    ] as const) {
+      const result = (await callUpsertMeal(db, {
+        mealId: 'v3-keep-qty',
+        name: `Yaourt-${label}`,
+        grams,
+        pieces,
+        calories: 9999,
+        updatedAt: Date.now(),
+      })) as { applied: boolean }
+      expect(result.applied, label).toBe(true)
+      const row = db.table('nutrition_meals').find((r) => r.mealId === 'v3-keep-qty')!
+      expect(row.grams, label).toBe(120)
+      expect(row.portionLabel, label).toBe('120 g')
+      expect(row.calories, label).toBe(90)
+      expect(row.proteinG, label).toBe(6)
+    }
+  })
+
+  it('limite connue : pas de recalcul par pièces (1→2 garde 90 kcal / 3 P)', async () => {
+    // Prochain lot : attendu passera à 180 kcal et proteinG 6 (nouvelles ÷ anciennes pièces).
+    await db.insert('nutrition_meals', {
+      userId: USER_ID,
+      mealId: 'pieces-limit',
+      dateKey: '2026-10-15',
+      mealType: 'lunch',
+      name: 'Nugget',
+      calories: 90,
+      proteinG: 3,
+      carbsG: null,
+      fatG: null,
+      pieces: 1,
+      grams: undefined,
+      portionLabel: '1 pièce',
+      entrySource: 'v3',
+      updatedAt: 1,
+      schemaVersion: 1,
+    })
+    const result = (await callUpsertMeal(db, {
+      mealId: 'pieces-limit',
+      pieces: 2,
+      quantityRules: 'v3',
+      calories: 999,
+      proteinG: 999,
+      updatedAt: 2,
+    })) as { applied: boolean; portionLabel?: string }
+    expect(result.applied).toBe(true)
+    const row = db.table('nutrition_meals').find((r) => r.mealId === 'pieces-limit')!
+    expect(row.pieces).toBe(2)
+    expect(row.grams).toBeUndefined()
+    expect(row.calories).toBe(90)
+    expect(row.proteinG).toBe(3)
+    expect(row.portionLabel).toBe('2 pièces')
+  })
+})

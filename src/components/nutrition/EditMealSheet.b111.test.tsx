@@ -22,6 +22,7 @@ const meal120: MealEntry = {
   calories: 90,
   grams: 120,
   portionLabel: '120 g',
+  entrySource: 'v3',
   createdAt: 1,
 }
 

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MealEntry, MealType } from '../../types/nutrition'
 import { MEAL_TYPE_LABELS } from '../../utils/calories'
-import { isFoodAddV3Enabled } from '../../backend/foodAddV3FeatureFlag'
 import {
   foodAddQuantityUserMessage,
   formatGramsCountLabel,
@@ -38,7 +37,6 @@ export function EditMealSheet({
   onDelete,
   hideNutritionNumbers = false,
 }: EditMealSheetProps) {
-  const foodAddV3 = isFoodAddV3Enabled()
   const [name, setName] = useState('')
   const [mealType, setMealType] = useState<MealType>('lunch')
   const [calories, setCalories] = useState<number | null>(0)
@@ -75,20 +73,23 @@ export function EditMealSheet({
 
   if (!meal) return null
 
-  // V3 ON : validateFoodQuantity (max 2000, entier). V3 OFF : d33b724 (pas de gate).
+  // Strict V3 edit = ligne marquée entrySource:'v3' seulement.
+  // Sans marque, même flag V3 ON → chemin d33b724 (max 3000, step 0.1, pas de gate).
+  const strictV3Edit = meal.entrySource === 'v3'
+
   const gramsValidation =
-    !foodAddV3 || grams == null
+    !strictV3Edit || grams == null
       ? null
       : validateFoodQuantity({ unit: 'g', value: grams })
 
   const gramsFieldMessage =
-    !foodAddV3 || grams == null
+    !strictV3Edit || grams == null
       ? null
       : gramsValidation && !gramsValidation.ok
         ? foodAddQuantityUserMessage(gramsValidation.reason, gramsValidation.unit)
         : null
 
-  const canSave = foodAddV3
+  const canSave = strictV3Edit
     ? hideNutritionNumbers
       ? name.trim().length > 0 && (grams == null || Boolean(gramsValidation?.ok))
       : name.trim().length > 0 &&
@@ -100,7 +101,7 @@ export function EditMealSheet({
 
   const applyGrams = (nextGrams: number | null) => {
     setGrams(nextGrams)
-    if (foodAddV3) {
+    if (strictV3Edit) {
       if (nextGrams == null) {
         setQtyError(null)
       } else {
@@ -110,11 +111,8 @@ export function EditMealSheet({
         )
       }
     }
-    if (hideNutritionNumbers || foodAddV3) {
-      // V3 hideNutritionNumbers : pas de rescale client (serveur proportionne).
-      if (foodAddV3 && hideNutritionNumbers) return
-    }
-    if (foodAddV3 && hideNutritionNumbers) return
+    // Ligne V3 + hideNutritionNumbers : rescale serveur, pas client.
+    if (strictV3Edit && hideNutritionNumbers) return
     const base = baselineRef.current
     if (base == null || nextGrams == null || !(nextGrams > 0)) return
     const ratio = nextGrams / base.grams
@@ -191,18 +189,18 @@ export function EditMealSheet({
             <ClearableNumberInput
               value={grams}
               onChange={applyGrams}
-              min={foodAddV3 ? 1 : 0}
-              max={foodAddV3 ? 2000 : 3000}
-              step={foodAddV3 ? 1 : 0.1}
+              min={strictV3Edit ? 1 : 0}
+              max={strictV3Edit ? 2000 : 3000}
+              step={strictV3Edit ? 1 : 0.1}
               required={false}
-              clampOnBlur={foodAddV3 ? false : true}
+              clampOnBlur={strictV3Edit ? false : true}
               sanitizeUnits
               placeholder="Optionnel"
               placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#636366]"
               aria-label="Quantité en grammes"
               className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
             />
-            {foodAddV3 && (gramsFieldMessage || qtyError) ? (
+            {strictV3Edit && (gramsFieldMessage || qtyError) ? (
               <p className="mt-1.5 text-[12px] text-[#FF6961]" role="alert" data-food-qty-error>
                 {gramsFieldMessage ?? qtyError}
               </p>
@@ -265,7 +263,7 @@ export function EditMealSheet({
           data-testid="edit-meal-save"
           onClick={() => {
             if (!canSave) return
-            if (foodAddV3) {
+            if (strictV3Edit) {
               if (grams != null) {
                 const checked = validateFoodQuantity({ unit: 'g', value: grams })
                 if (!checked.ok) {
@@ -281,8 +279,9 @@ export function EditMealSheet({
                   mealType,
                   grams: grams ?? undefined,
                   portionLabel,
+                  // Ne jamais inventer de pièces : 1 ou undefined (gardées).
                   pieces: grams != null ? undefined : meal.pieces,
-                  entrySource: meal.entrySource ?? 'v3',
+                  entrySource: meal.entrySource,
                 })
                 return
               }
@@ -297,11 +296,11 @@ export function EditMealSheet({
                 grams: grams ?? undefined,
                 portionLabel,
                 pieces: grams != null ? undefined : meal.pieces,
-                entrySource: meal.entrySource ?? 'v3',
+                entrySource: meal.entrySource,
               })
               return
             }
-            // d33b724 V3 OFF : ne pas toucher pieces, pas de portionLabel forcé.
+            // Sans marque V3 (= d33b724) : ne pas toucher pieces, pas de portionLabel forcé.
             if (calories == null) return
             onSave(meal.id, {
               name: name.trim(),
@@ -311,6 +310,7 @@ export function EditMealSheet({
               carbsG: carbsG ?? undefined,
               fatG: fatG ?? undefined,
               grams: grams ?? undefined,
+              ...(meal.entrySource ? { entrySource: meal.entrySource } : {}),
             })
           }}
           className="ios-press w-full rounded-2xl bg-[#30D158] py-3.5 text-[16px] font-semibold text-black disabled:opacity-40"

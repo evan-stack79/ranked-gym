@@ -129,14 +129,20 @@ function removeQueueOpById(entries: StoredQueueOp[], opId: string): StoredQueueO
   return [...entries.slice(0, index), ...entries.slice(index + 1)]
 }
 
-/** Codes Convex connus = refus définitif (sortie file → refusés). */
+/**
+ * Codes Convex connus = refus définitif (sortie file → refusés).
+ * FOOD_ADD_ACCESS_AGE_REQUIRED / age_required = passager (l’âge peut être
+ * complété) — reste en file, backoff, pas « Pas enregistré ».
+ */
 export function isPermanentConvexQueueError(error: unknown): boolean {
   const data = readFoodAddErrorData(error)
   const code = data?.code
   if (!code) return false
+  if (code === 'age_required' || code === 'FOOD_ADD_ACCESS_AGE_REQUIRED') {
+    return false
+  }
   if (code.startsWith('FOOD_ADD_')) return true
   if (code === 'FOOD_SEARCH_DAILY_LIMIT') return true
-  if (code === 'FOOD_ADD_QUANTITY_INVALID') return true
   return false
 }
 

@@ -660,9 +660,11 @@ export function NutritionDashboard({
       showToast('Modification indisponible pour ce compte.', 'error')
       return
     }
-    // V3 ON seulement : validateFoodQuantity + portionLabel + clear pieces.
-    // V3 OFF (= d33b724) : pas de gate, pieces intact.
-    if (foodAddV3 && patch.grams != null) {
+    // Strict V3 seulement si la ligne est déjà marquée (jamais ?? 'v3').
+    const current = meals.find((m) => m.id === mealId)
+    const strictV3Row =
+      current?.entrySource === 'v3' || patch.entrySource === 'v3'
+    if (strictV3Row && patch.grams != null) {
       const checked = validateFoodQuantity({ unit: 'g', value: patch.grams })
       if (!checked.ok) {
         showToast(foodAddQuantityUserMessage(checked.reason, checked.unit), 'error')
@@ -674,10 +676,8 @@ export function NutritionDashboard({
         grams: checked.grams,
         portionLabel: formatGramsCountLabel(checked.grams),
         pieces: undefined,
-        entrySource: patch.entrySource ?? 'v3',
+        entrySource: current?.entrySource ?? patch.entrySource,
       }
-    } else if (foodAddV3) {
-      patch = { ...patch, entrySource: patch.entrySource ?? 'v3' }
     }
 
     // Local d’abord ; la file renvoie (quantityRules via entrySource). PC-08 : hors ligne
