@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Search, WifiOff, X } from 'lucide-react'
 import type { MealType } from '../../types/nutrition'
@@ -150,6 +150,8 @@ export function AddFoodScreenV3({
     Record<string, { mealId: string; selectionEventId: string }>
   >({})
   const [submitting, setSubmitting] = useState(false)
+  /** B3-05 : verrou synchrone (useState seul laisse passer 2 clics même tick). */
+  const submittingRef = useRef(false)
   const online = useOnlineStatus()
   // forceOfflineImages simule aussi le hors-ligne (tests empty / fixture).
   // Les tests quantité / e2e ne passent PAS forceOfflineImages.
@@ -215,6 +217,7 @@ export function AddFoodScreenV3({
     setQtyByKey(next)
     setAddIdsByKey(ids)
     setQtyError(null)
+    submittingRef.current = false
     setSubmitting(false)
     setQuantityStep(true)
   }
@@ -245,7 +248,9 @@ export function AddFoodScreenV3({
   })
 
   const confirmQuantities = () => {
-    if (!networkOk || submitting) return
+    if (!networkOk || submitting || submittingRef.current) return
+    submittingRef.current = true
+    setSubmitting(true)
     const items: FoodAddV3Selection[] = []
     for (const hit of selectedHits) {
       const key = hitKey(hit)
@@ -253,6 +258,8 @@ export function AddFoodScreenV3({
       const ids = addIdsByKey[key]
       if (!ids) {
         setQtyError(FOOD_ADD_V3_OFFLINE_REQUIRED_MSG)
+        submittingRef.current = false
+        setSubmitting(false)
         return
       }
       const checked = validateFoodQuantity({
@@ -262,6 +269,8 @@ export function AddFoodScreenV3({
       })
       if (!checked.ok) {
         setQtyError(foodAddQuantityUserMessage(checked.reason, checked.unit))
+        submittingRef.current = false
+        setSubmitting(false)
         return
       }
       if (checked.unit === 'pieces') {
@@ -286,12 +295,12 @@ export function AddFoodScreenV3({
       }
     }
     setQtyError(null)
-    setSubmitting(true)
     onValidateSelection(items)
     setSelectedKeys([])
     setQuantityStep(false)
     setQtyByKey({})
     setAddIdsByKey({})
+    // Ref reste true jusqu’à une nouvelle ouverture d’étape quantité (B3-05).
     setSubmitting(false)
   }
 

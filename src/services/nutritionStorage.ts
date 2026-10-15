@@ -612,7 +612,13 @@ export function addMealToDate(
     createdAt: meal.createdAt ?? now,
     updatedAt: meal.updatedAt ?? meal.createdAt ?? now,
   }
-  const next = { ...journal, meals: [entry, ...journal.meals] }
+  // B3-05 : même mealId → met à jour la ligne au lieu d’en ajouter une 2e.
+  const existingIdx = journal.meals.findIndex((m) => m.id === entry.id)
+  const meals =
+    existingIdx >= 0
+      ? journal.meals.map((m, i) => (i === existingIdx ? { ...m, ...entry } : m))
+      : [entry, ...journal.meals]
+  const next = { ...journal, meals }
   saveJournalForDate(next)
   return next
 }

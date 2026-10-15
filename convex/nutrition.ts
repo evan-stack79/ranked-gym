@@ -11,7 +11,10 @@ import {
 } from './_generated/server'
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
 import { assertFoodAddAccessFromStoredProfile } from './lib/foodAddAccess'
-import { FOOD_ADD_QUANTITY_INVALID } from './lib/foodAddQuantity'
+import {
+  FOOD_ADD_QUANTITY_INVALID,
+  formatGramsCountLabel,
+} from './lib/foodAddQuantity'
 import {
   resolveEntrySourceOnUpsert,
   resolveUpsertMealQuantity,
@@ -274,6 +277,9 @@ const mealValidator = v.object({
   grams: v.optional(v.number()),
   pieces: v.optional(v.number()),
   portionMode: v.optional(v.union(v.literal('solo'), v.literal('with_sides'))),
+  /** B3-01 — marque / libellé pour hydratation client (d33b724 ignore). */
+  portionLabel: v.optional(v.string()),
+  entrySource: v.optional(v.literal('v3')),
   createdAt: v.optional(v.number()),
   updatedAt: v.number(),
   deletedAt: v.optional(v.number()),
@@ -361,6 +367,19 @@ export const upsertMeal = mutation({
     const userId = await assertFoodWriteAccess(ctx, args.sessionToken)
     const existing = await findMealRow(ctx, userId, args.mealId)
     const nextUpdatedAt = args.updatedAt ?? Date.now()
+
+    // B3-04 : stale AVANT toute vérif quantité (jamais FOOD_ADD_QUANTITY_INVALID sur envoi plus ancien).
+    if (existing) {
+      assertUserOwnership(existing.userId, userId)
+      if (existing.updatedAt > nextUpdatedAt) {
+        return {
+          applied: false,
+          stale: true,
+          updatedAt: existing.updatedAt,
+          portionLabel: existing.portionLabel,
+        }
+      }
+    }
 
     // Refus quantité uniquement si l’appel envoie quantityRules:'v3'.
     const enforceQuantityRules = args.quantityRules === 'v3'
@@ -455,6 +474,8 @@ export const upsertMeal = mutation({
         proteinG = scaled.proteinG
         carbsG = scaled.carbsG
         fatG = scaled.fatG
+        // B3-03 : réécrire portionLabel quand grammes changent (y compris ancien chemin).
+        portionLabel = formatGramsCountLabel(storeGrams!)
       } else {
         calories = prevCal
         proteinG = prevP
@@ -470,15 +491,6 @@ export const upsertMeal = mutation({
     }
 
     if (existing) {
-      assertUserOwnership(existing.userId, userId)
-      if (existing.updatedAt > nextUpdatedAt) {
-        return {
-          applied: false,
-          stale: true,
-          updatedAt: existing.updatedAt,
-          portionLabel: existing.portionLabel,
-        }
-      }
       await ctx.db.patch(existing._id, {
         dateKey: normalizeDateKey(args.dateKey),
         mealType: args.mealType.trim().slice(0, 24),
@@ -875,6 +887,8 @@ export const listJournalEntries = query({
           grams: row.grams,
           pieces: row.pieces,
           portionMode: row.portionMode,
+          portionLabel: row.portionLabel,
+          entrySource: row.entrySource,
           createdAt: row.createdAt,
           updatedAt: row.updatedAt,
           deletedAt: row.deletedAt,

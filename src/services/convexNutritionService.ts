@@ -68,6 +68,8 @@ type JournalSnapshot = {
     grams?: number
     pieces?: number
     portionMode?: 'solo' | 'with_sides'
+    portionLabel?: string
+    entrySource?: 'v3'
     createdAt?: number
     updatedAt: number
     deletedAt?: number

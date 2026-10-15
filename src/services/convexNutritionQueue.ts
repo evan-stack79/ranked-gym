@@ -176,6 +176,32 @@ function markMealSyncRejected(dateKey: string, mealId: string, code: string): vo
   }
 }
 
+/** B3-06 : envoi réussi → effacer la marque « Pas enregistré ». */
+function clearMealSyncRejected(dateKey: string, mealId: string): void {
+  try {
+    const journal = getJournalForDate(dateKey)
+    let changed = false
+    const meals = journal.meals.map((m) => {
+      if (m.id !== mealId || !m.syncRejected) return m
+      changed = true
+      const { syncRejected: _a, syncRejectCode: _b, syncRejectedAt: _c, ...rest } = m
+      void _a
+      void _b
+      void _c
+      return rest
+    })
+    if (!changed) return
+    saveJournalForDate({ ...journal, meals }, { skipCloud: true })
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('ranked-gym:profile-changed'))
+    }
+  } catch (error) {
+    safeWarn('[nutrition-sync] clear syncRejected failed', error)
+  }
+}
+
+const REJECTED_QUEUE_MAX = 50
+
 async function applyQueueOperation(op: StoredQueueOp): Promise<void> {
   switch (op.kind) {
     case 'meal-upsert':
@@ -240,6 +266,9 @@ export async function flushConvexNutritionQueue(): Promise<void> {
       }
       try {
         await applyQueueOperation(current)
+        if (current.kind === 'meal-upsert') {
+          clearMealSyncRejected(current.dateKey, current.meal.id)
+        }
         const latestQueue = readQueue(userId)
         const nextQueue = removeQueueOpById(latestQueue, current.id)
         writeQueue(userId, nextQueue)
@@ -264,7 +293,8 @@ export async function flushConvexNutritionQueue(): Promise<void> {
                   ? current.mealId
                   : undefined,
           })
-          writeRejected(userId, rejected)
+          // B3-06 : garder seulement les 50 derniers refus.
+          writeRejected(userId, rejected.slice(-REJECTED_QUEUE_MAX))
           if (current.kind === 'meal-upsert') {
             markMealSyncRejected(current.dateKey, current.meal.id, code)
           }

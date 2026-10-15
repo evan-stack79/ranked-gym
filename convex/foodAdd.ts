@@ -815,36 +815,58 @@ export const addFoodSnapshot = mutation({
     }
 
     if (foodKey) {
-      // Catalogue : off d’abord, sinon conserver catalog server (y compris 0).
+      // Catalogue : OFF d’abord. Sinon B3-02 — ne jamais écraser des valeurs client
+      // connues par null (aliments récents V3 OFF). Toujours nutrientsSource client
+      // si pas OFF → jamais lu pour kcal repas V3 (A1).
       const servingSize =
         typeof args.servingSize === 'string'
           ? args.servingSize.trim() || null
           : (nutrientCache?.servingSize ?? catalog?.servingSize ?? null)
       const hasOff = Boolean(nutrientCache)
+      const keepClientCatalog =
+        !hasOff &&
+        catalog &&
+        (catalog.nutrientsSource === 'client' || catalog.nutrientsSource == null)
       const catalogPatch = {
         barcode: args.offCode?.trim() || undefined,
         name: mealName(args.name),
-        caloriesPer100g: pickCatalogNutrient(
-          nutrientCache?.caloriesPer100g,
-          catalog?.nutrientsSource === 'server' ? catalog?.caloriesPer100g : null,
-        ),
-        proteinPer100g: pickCatalogNutrient(
-          nutrientCache?.proteinPer100g,
-          catalog?.nutrientsSource === 'server' ? catalog?.proteinPer100g : null,
-        ),
-        carbsPer100g: pickCatalogNutrient(
-          nutrientCache?.carbsPer100g,
-          catalog?.nutrientsSource === 'server' ? catalog?.carbsPer100g : null,
-        ),
-        fatPer100g: pickCatalogNutrient(
-          nutrientCache?.fatPer100g,
-          catalog?.nutrientsSource === 'server' ? catalog?.fatPer100g : null,
-        ),
+        caloriesPer100g: hasOff
+          ? pickCatalogNutrient(nutrientCache?.caloriesPer100g, null)
+          : keepClientCatalog
+            ? pickCatalogNutrient(null, catalog.caloriesPer100g)
+            : catalog?.nutrientsSource === 'server'
+              ? pickCatalogNutrient(null, catalog.caloriesPer100g)
+              : null,
+        proteinPer100g: hasOff
+          ? pickCatalogNutrient(nutrientCache?.proteinPer100g, null)
+          : keepClientCatalog
+            ? pickCatalogNutrient(null, catalog.proteinPer100g)
+            : catalog?.nutrientsSource === 'server'
+              ? pickCatalogNutrient(null, catalog.proteinPer100g)
+              : null,
+        carbsPer100g: hasOff
+          ? pickCatalogNutrient(nutrientCache?.carbsPer100g, null)
+          : keepClientCatalog
+            ? pickCatalogNutrient(null, catalog.carbsPer100g)
+            : catalog?.nutrientsSource === 'server'
+              ? pickCatalogNutrient(null, catalog.carbsPer100g)
+              : null,
+        fatPer100g: hasOff
+          ? pickCatalogNutrient(nutrientCache?.fatPer100g, null)
+          : keepClientCatalog
+            ? pickCatalogNutrient(null, catalog.fatPer100g)
+            : catalog?.nutrientsSource === 'server'
+              ? pickCatalogNutrient(null, catalog.fatPer100g)
+              : null,
         nutrientsSource: hasOff
           ? ('server' as const)
           : catalog?.nutrientsSource === 'server'
             ? ('server' as const)
-            : catalog?.nutrientsSource,
+            : keepClientCatalog
+              ? ('client' as const)
+              : catalog?.nutrientsSource === 'client'
+                ? ('client' as const)
+                : catalog?.nutrientsSource,
         imageUrl: ownedImageUrl,
         imageStorageId: ownedStorageId,
         servingSize,
