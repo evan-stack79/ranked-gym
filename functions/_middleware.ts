@@ -18,7 +18,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Permissions-Policy': 'camera=(self), microphone=(), geolocation=(self)',
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
   'Content-Security-Policy':
-    "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://*.supabase.co https://*.convex.cloud https://*.convex.site; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.convex.cloud wss://*.convex.cloud https://*.convex.site https://maps.googleapis.com https://maps.gstatic.com https://photon.komoot.io https://nominatim.openstreetmap.org https://world.openfoodfacts.org; media-src 'self' blob: mediastream:; worker-src 'self' blob:; child-src 'self' blob:; frame-src 'none'; manifest-src 'self'; upgrade-insecure-requests; frame-ancestors 'none'",
+    "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://*.supabase.co https://*.convex.cloud https://*.convex.site; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.convex.cloud wss://*.convex.cloud https://*.convex.site https://maps.googleapis.com https://maps.gstatic.com https://photon.komoot.io https://nominatim.openstreetmap.org; media-src 'self' blob: mediastream:; worker-src 'self' blob:; child-src 'self' blob:; frame-src 'none'; manifest-src 'self'; upgrade-insecure-requests; frame-ancestors 'none'",
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {

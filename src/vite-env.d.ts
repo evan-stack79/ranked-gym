@@ -29,6 +29,11 @@ interface ImportMetaEnv {
    * Unset/empty = ON. Explicit false restores legacy dashboard + dock nav.
    */
   readonly VITE_ENABLE_ACCUEIL_GALLERY?: string
+  /**
+   * « Ajouter un aliment » v3 (roue ARC, cartes photo, recherche Convex).
+   * Unset/empty/false = OFF (écran legacy).
+   */
+  readonly VITE_ENABLE_FOOD_ADD_V3?: string
 }
 
 interface ImportMeta {

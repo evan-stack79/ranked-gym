@@ -53,6 +53,7 @@ export type LossEligibilityReason =
   | 'age_over_75_no_loss'
   | 'pregnancy_or_breastfeeding'
   | 'eating_disorder'
+  | 'diabetes'
   | 'low_bmi'
   | 'low_target_bmi'
   | 'calorie_goal_disabled'
@@ -64,6 +65,7 @@ export type EstimationEligibilityReason =
   | 'minor'
   | 'pregnancy_or_breastfeeding'
   | 'eating_disorder'
+  | 'diabetes'
   | 'health_not_none'
   | 'calorie_goal_disabled'
 
@@ -71,6 +73,7 @@ export interface HealthDeclarations {
   pregnancy: boolean
   breastfeeding: boolean
   eatingDisorder: boolean
+  diabetes: boolean
   preferNotToAnswer: boolean
 }
 
@@ -109,12 +112,19 @@ export function readHealthDeclarations(
     | 'declaredPregnancy'
     | 'declaredBreastfeeding'
     | 'declaredEatingDisorder'
+    | 'declaredDiabetes'
     | 'preferNotAnswerHealth'
     | 'healthAnswer'
   > | SafetyProfileInput | null | undefined,
 ): HealthDeclarations {
   if (!input) {
-    return { pregnancy: false, breastfeeding: false, eatingDisorder: false, preferNotToAnswer: false }
+    return {
+      pregnancy: false,
+      breastfeeding: false,
+      eatingDisorder: false,
+      diabetes: false,
+      preferNotToAnswer: false,
+    }
   }
   if ('declarations' in input && input.declarations) {
     const d = input.declarations
@@ -122,6 +132,7 @@ export function readHealthDeclarations(
       pregnancy: Boolean(d.pregnancy),
       breastfeeding: Boolean(d.breastfeeding),
       eatingDisorder: Boolean(d.eatingDisorder),
+      diabetes: Boolean(d.diabetes),
       preferNotToAnswer: Boolean(d.preferNotToAnswer),
     }
   }
@@ -131,11 +142,15 @@ export function readHealthDeclarations(
   // Legacy (no healthAnswer): keep declared* for safety gates, but prefer-not
   // alone without healthAnswer is NOT treated as an answered prefer_not
   // (missing ≠ « non » / ≠ prefer_not for the 3-state rule).
+  // Diabète : flag indépendant — survit à « Aucune de ces situations »
+  // (il retire seulement objectif kcal / perte, pas l’accès aliment).
+  const diabetes = Boolean(p.declaredDiabetes)
   if (answer === 'none' || answer === 'prefer_not') {
     return {
       pregnancy: false,
       breastfeeding: false,
       eatingDisorder: false,
+      diabetes,
       preferNotToAnswer: answer === 'prefer_not',
     }
   }
@@ -143,6 +158,7 @@ export function readHealthDeclarations(
     pregnancy: Boolean(p.declaredPregnancy),
     breastfeeding: Boolean(p.declaredBreastfeeding),
     eatingDisorder: Boolean(p.declaredEatingDisorder),
+    diabetes,
     preferNotToAnswer: false,
   }
 }
@@ -305,6 +321,9 @@ export function decideLossEligibility(
   if (declarations.eatingDisorder) {
     return { eligible: false, reason: 'eating_disorder' }
   }
+  if (declarations.diabetes) {
+    return { eligible: false, reason: 'diabetes' }
+  }
   const pb = effectivePregnancyBreastfeeding(input)
   if (pb.pregnancy || pb.breastfeeding) {
     return { eligible: false, reason: 'pregnancy_or_breastfeeding' }
@@ -360,6 +379,9 @@ export function decideEstimationEligibility(
   }
   if (declarations.eatingDisorder) {
     return { allowed: false, reason: 'eating_disorder', disclaimer: M_INFO_1 }
+  }
+  if (declarations.diabetes) {
+    return { allowed: false, reason: 'diabetes', disclaimer: M_INFO_1 }
   }
   // Mifflin only when Santé = « Aucune de ces situations » (explicit).
   if (healthAnswer !== 'none') {
@@ -595,6 +617,7 @@ export function applySafetyToProfile(
     declaredPregnancy: declarations.pregnancy,
     declaredBreastfeeding: declarations.breastfeeding,
     declaredEatingDisorder: declarations.eatingDisorder,
+    declaredDiabetes: declarations.diabetes,
     preferNotAnswerHealth: declarations.preferNotToAnswer,
   }
 }

@@ -56,6 +56,11 @@ export interface CalorieProfile {
   declaredPregnancy?: boolean
   declaredBreastfeeding?: boolean
   declaredEatingDisorder?: boolean
+  /**
+   * Diabète déclaré — conserve l’accès à « Ajouter un aliment »,
+   * mais retire l’objectif calorique auto et l’objectif de perte de poids.
+   */
+  declaredDiabetes?: boolean
   /** @deprecated Prefer `healthAnswer === 'prefer_not'`. Kept for back-compat reads. */
   preferNotAnswerHealth?: boolean
   /**
@@ -101,7 +106,23 @@ export interface MealEntry {
   pieces?: number
   /** How the user intended this food in the meal */
   portionMode?: 'solo' | 'with_sides'
+  /**
+   * Libellé de portion figé à l’ajout (serving_size OFF ou « pour 100 g »).
+   * Snapshot — un repas passé ne se met pas à jour si OFF change.
+   */
+  portionLabel?: string
+  /** URL photo (stockage Ranked Gym) figée ; absente / offline → icône neutre. */
+  imageUrl?: string
+  /** Réf. image Convex storage (jamais un hotlink OFF). */
+  imageStorageId?: string
+  /** Code-barres / code OFF figé au snapshot. */
+  offCode?: string
   createdAt: number
+  /**
+   * Horodatage propre à cette entrée (sync newest-wins, comme les verres d’eau).
+   * Absent sur les repas legacy → traité comme createdAt.
+   */
+  updatedAt?: number
 }
 
 /** Compteurs journaliers des raccourcis d’hydratation (verre, shaker…). */

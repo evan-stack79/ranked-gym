@@ -26,7 +26,10 @@ import {
   sanitizeWeightKg,
 } from './nutritionSafetyRules'
 import type { HealthAnswerStatus, Sex } from '../types/nutrition'
-import { clearQueuedConvexNutritionOpsForUser } from './convexNutritionQueue'
+import {
+  clearQueuedConvexNutritionOpsForUser,
+  clearQueuedMealOpsForUser,
+} from './convexNutritionQueue'
 
 const PROFILE_BASE = 'ranked-gym:nutrition-profile'
 const JOURNAL_BASE = 'ranked-gym:nutrition-journal'
@@ -86,7 +89,8 @@ function queueJournalDayDiff(dateKey: string, prev: DayJournal | undefined, next
       kind: 'meal-upsert',
       dateKey,
       meal,
-      updatedAt: now,
+      // Chaque aliment a son propre updatedAt (newest wins), comme les verres d’eau.
+      updatedAt: meal.updatedAt ?? meal.createdAt ?? now,
     })
   }
   for (const prevMealId of prevMeals.keys()) {
@@ -156,6 +160,7 @@ export const BLANK_PROFILE: CalorieProfile = {
   declaredPregnancy: false,
   declaredBreastfeeding: false,
   declaredEatingDisorder: false,
+  declaredDiabetes: false,
   preferNotAnswerHealth: false,
   healthAnswer: null,
   healthAnswerUpdatedAt: null,
@@ -269,13 +274,14 @@ export function normalizeCalorieProfile(input: CalorieProfile): CalorieProfile {
       healthAnswer === 'situations'
         ? Boolean(input.declaredEatingDisorder)
         : Boolean(input.declaredEatingDisorder) && healthAnswer == null,
+    declaredDiabetes: Boolean(input.declaredDiabetes),
     preferNotAnswerHealth,
     healthAnswer,
     healthAnswerUpdatedAt,
     bodyMetricsClearedAt: clearedAt,
   }
 
-  // When explicit none/prefer_not, clear situation flags.
+  // When explicit none/prefer_not, clear situation flags (diabète conservé).
   if (healthAnswer === 'none' || healthAnswer === 'prefer_not') {
     draft.declaredPregnancy = false
     draft.declaredBreastfeeding = false
@@ -323,6 +329,7 @@ export function getCalorieProfile(): CalorieProfile {
     declaredPregnancy: Boolean(stored.declaredPregnancy),
     declaredBreastfeeding: Boolean(stored.declaredBreastfeeding),
     declaredEatingDisorder: Boolean(stored.declaredEatingDisorder),
+    declaredDiabetes: Boolean(stored.declaredDiabetes),
     preferNotAnswerHealth: Boolean(stored.preferNotAnswerHealth),
     healthAnswer: normalizeHealthAnswer(stored.healthAnswer),
     healthAnswerUpdatedAt:
@@ -370,6 +377,19 @@ export function mergeCalorieProfilesForSync(
   const healthWinner = localHealthAt >= remoteHealthAt ? localNorm : remoteNorm
   const sexWinner = localSexAt >= remoteSexAt ? localNorm : remoteNorm
 
+  // B15 — SAFETY FIELDS : true côté serveur (ou local) ne peut pas passer à false via merge client.
+  const declaredPregnancy = Boolean(
+    localNorm.declaredPregnancy || remoteNorm.declaredPregnancy,
+  )
+  const declaredBreastfeeding = Boolean(
+    localNorm.declaredBreastfeeding || remoteNorm.declaredBreastfeeding,
+  )
+  const declaredEatingDisorder = Boolean(
+    localNorm.declaredEatingDisorder || remoteNorm.declaredEatingDisorder,
+  )
+  const declaredDiabetes = Boolean(localNorm.declaredDiabetes || remoteNorm.declaredDiabetes)
+  const anySituation = declaredPregnancy || declaredBreastfeeding || declaredEatingDisorder
+
   const base =
     localCleared > remoteCleared
       ? {
@@ -379,19 +399,27 @@ export function mergeCalorieProfilesForSync(
           goalWeightKg: null as null,
           bodyMetricsClearedAt: localCleared,
           onboardingComplete: localNorm.onboardingComplete || remoteNorm.onboardingComplete,
-          age: localNorm.age > 0 ? localNorm.age : remoteNorm.age,
+          // Âge : le serveur gagne s’il a une valeur valide.
+          age: remoteNorm.age > 0 ? remoteNorm.age : localNorm.age,
         }
-      : { ...remoteNorm }
+      : {
+          ...remoteNorm,
+          age: remoteNorm.age > 0 ? remoteNorm.age : localNorm.age,
+        }
 
   return normalizeCalorieProfile({
     ...base,
     sex: sexWinner.sex,
     sexUpdatedAt: sexWinner.sexUpdatedAt ?? null,
-    declaredPregnancy: healthWinner.declaredPregnancy,
-    declaredBreastfeeding: healthWinner.declaredBreastfeeding,
-    declaredEatingDisorder: healthWinner.declaredEatingDisorder,
-    preferNotAnswerHealth: healthWinner.preferNotAnswerHealth,
-    healthAnswer: healthWinner.healthAnswer ?? null,
+    declaredPregnancy,
+    declaredBreastfeeding,
+    declaredEatingDisorder,
+    declaredDiabetes,
+    preferNotAnswerHealth: anySituation
+      ? false
+      : healthWinner.preferNotAnswerHealth,
+    // Si une situation true survit, forcer « situations » pour que normalize ne l’efface pas.
+    healthAnswer: anySituation ? 'situations' : (healthWinner.healthAnswer ?? null),
     healthAnswerUpdatedAt: healthWinner.healthAnswerUpdatedAt ?? null,
   })
 }
@@ -569,20 +597,24 @@ export function saveTodayJournal(journal: DayJournal, opts?: StorageSaveOptions)
 
 export function addMealToDate(
   dateKey: string,
-  meal: Omit<MealEntry, 'id' | 'createdAt'>,
+  meal: Omit<MealEntry, 'id' | 'createdAt'> & { createdAt?: number; updatedAt?: number },
 ): DayJournal {
   const journal = getJournalForDate(dateKey)
+  const now = Date.now()
   const entry: MealEntry = {
     ...meal,
-    id: `meal-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    createdAt: Date.now(),
+    id: `meal-${now}-${Math.random().toString(36).slice(2, 7)}`,
+    createdAt: meal.createdAt ?? now,
+    updatedAt: meal.updatedAt ?? meal.createdAt ?? now,
   }
   const next = { ...journal, meals: [entry, ...journal.meals] }
   saveJournalForDate(next)
   return next
 }
 
-export function addMealToToday(meal: Omit<MealEntry, 'id' | 'createdAt'>): DayJournal {
+export function addMealToToday(
+  meal: Omit<MealEntry, 'id' | 'createdAt'> & { createdAt?: number; updatedAt?: number },
+): DayJournal {
   return addMealToDate(todayKey(), meal)
 }
 
@@ -597,15 +629,67 @@ export function removeMealFromToday(mealId: string): DayJournal {
   return removeMealFromDate(todayKey(), mealId)
 }
 
+/** Nombre de repas locaux (tous les jours) — pas de détails. */
+export function countLocalMeals(): number {
+  const all = getAllJournals()
+  let count = 0
+  for (const day of Object.values(all)) {
+    count += Array.isArray(day.meals) ? day.meals.length : 0
+  }
+  return count
+}
+
+/**
+ * Vide les repas du journal local (garde eau / day-state).
+ * skipCloud évite de refiler des meal-delete dans la queue.
+ */
+export function clearLocalMealsOnly(opts?: StorageSaveOptions): void {
+  const all = getAllJournals()
+  const next: Record<string, DayJournal> = {}
+  for (const [dateKey, day] of Object.entries(all)) {
+    next[dateKey] = {
+      ...day,
+      meals: [],
+    }
+  }
+  writeJson(scopedKey(JOURNAL_BASE), next)
+  if (!opts?.skipCloud && !isConvexDomainActive()) {
+    triggerCloudBackup('journal')
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('ranked-gym:profile-changed'))
+  }
+}
+
+/**
+ * Efface repas locaux + ops repas en file d’attente (rien ne revient au sync).
+ * Appelé après / avec deleteAllMyMeals côté serveur.
+ */
+export function clearLocalMealsAndPendingMealWrites(opts?: { userId?: string | null }): void {
+  const uid = opts?.userId ?? getActiveCloudUserId()
+  clearLocalMealsOnly({ skipCloud: true })
+  if (uid) {
+    clearQueuedMealOpsForUser(uid)
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('ranked-gym:profile-changed'))
+  }
+}
+
 export function updateMealOnDate(
   dateKey: string,
   mealId: string,
   patch: Partial<Omit<MealEntry, 'id' | 'createdAt'>>,
 ): DayJournal {
   const journal = getJournalForDate(dateKey)
+  const now = Date.now()
   const next = {
     ...journal,
-    meals: journal.meals.map((meal) => (meal.id === mealId ? { ...meal, ...patch } : meal)),
+    meals: journal.meals.map((meal) =>
+      meal.id === mealId
+        ? { ...meal, ...patch, updatedAt: patch.updatedAt ?? now }
+        : meal,
+    ),
   }
   saveJournalForDate(next)
   return next

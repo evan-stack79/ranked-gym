@@ -9,7 +9,7 @@ import { useAuth } from '../../context/AuthContext'
 import type { CalorieProfile } from '../../types/nutrition'
 import { HomeBootSkeleton } from '../ui/AppBootScreen'
 import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
-import { isMinorAge, readHealthDeclarations } from '../../services/nutritionSafetyRules'
+import { isMinorAge, isValidAge, readHealthDeclarations } from '../../services/nutritionSafetyRules'
 import {
   HealthSituationsForm,
   healthSituationsFromProfile,
@@ -81,7 +81,9 @@ export function NutritionView() {
     return <NeedToTalkScreen onBack={() => setShowNeedToTalk(false)} />
   }
 
-  if (isMinorAge(profile.age)) {
+  // Âge manquant : ne bloque plus Nutrition (legacy). Prompt âge = V3 Ajouter un aliment.
+  // Mineur seulement si un âge valide < 18 est déjà enregistré.
+  if (isValidAge(profile.age) && isMinorAge(profile.age)) {
     return <MinorNutritionScreen />
   }
 

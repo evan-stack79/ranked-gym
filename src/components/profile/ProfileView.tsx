@@ -10,7 +10,10 @@ import { EnergyRecoveryInfo } from '../settings/EnergyRecoveryInfo'
 import {
   HealthSituationsForm,
   healthSituationsFromProfile,
+  serverLocksFromProfile,
+  type ClearableSafetyField,
   type HealthSituationsValue,
+  type ServerHealthLocks,
 } from '../settings/HealthSituationsForm'
 import { FullProfileScreen } from './FullProfileScreen'
 import { useAuth } from '../../context/AuthContext'
@@ -18,7 +21,13 @@ import {
   getCalorieProfile,
   saveCalorieProfile,
 } from '../../services/nutritionStorage'
-import { M_INFO_1 } from '../../content/safetyCopy'
+import { clearNutritionSafetyFlag } from '../../services/convexNutritionService'
+import {
+  AGE_CONTACT_US_EVENT,
+  isAgeContactUsNeeded,
+} from '../../services/ageContactNotice'
+import { AGE_CONTACT_US_MESSAGE, M_INFO_1 } from '../../content/safetyCopy'
+import { ContactUsBlock } from '../common/ContactUsBlock'
 import {
   disciplineFromLabel,
   getDiscipline,
@@ -59,6 +68,17 @@ function ProfileViewContent() {
   const [healthValue, setHealthValue] = useState<HealthSituationsValue>(() =>
     healthSituationsFromProfile(getCalorieProfile()),
   )
+  const [serverHealthLocks, setServerHealthLocks] = useState<ServerHealthLocks>(() =>
+    serverLocksFromProfile(getCalorieProfile()),
+  )
+  const [healthMessage, setHealthMessage] = useState<string | null>(null)
+  const [showAgeContact, setShowAgeContact] = useState(() => isAgeContactUsNeeded())
+
+  useEffect(() => {
+    const refresh = () => setShowAgeContact(isAgeContactUsNeeded())
+    window.addEventListener(AGE_CONTACT_US_EVENT, refresh)
+    return () => window.removeEventListener(AGE_CONTACT_US_EVENT, refresh)
+  }, [])
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -105,7 +125,10 @@ function ProfileViewContent() {
 
   useEffect(() => {
     if (route === 'healthSituations') {
-      setHealthValue(healthSituationsFromProfile(getCalorieProfile()))
+      const profile = getCalorieProfile()
+      setHealthValue(healthSituationsFromProfile(profile))
+      setServerHealthLocks(serverLocksFromProfile(profile))
+      setHealthMessage(null)
     }
   }, [route])
 
@@ -127,6 +150,21 @@ function ProfileViewContent() {
       healthAnswerUpdatedAt: Date.now(),
     })
   }, [])
+
+  const handleClearSafetyField = useCallback(
+    async (field: ClearableSafetyField): Promise<boolean> => {
+      try {
+        const result = await clearNutritionSafetyFlag(field)
+        if (result.cleared) {
+          setServerHealthLocks((prev) => ({ ...prev, [field]: false }))
+        }
+        return result.cleared
+      } catch {
+        return false
+      }
+    },
+    [],
+  )
 
   if (route === 'personalInfo') {
     if (!isAuthenticated || !user) return null
@@ -209,12 +247,24 @@ function ProfileViewContent() {
           Retour
         </button>
         <h1 className="text-[28px] font-bold tracking-tight text-white">Situations de santé</h1>
+        {showAgeContact ? (
+          <ContactUsBlock message={AGE_CONTACT_US_MESSAGE} testIdPrefix="age-contact" />
+        ) : null}
         <HealthSituationsForm
           value={healthValue}
           onChange={handleHealthChange}
           onOpenNeedToTalk={() => navigate('needToTalk')}
           sex={getCalorieProfile().sex}
+          serverLocks={serverHealthLocks}
+          isAuthenticated={isAuthenticated}
+          onClearSafetyField={handleClearSafetyField}
+          onMessage={setHealthMessage}
         />
+        {healthMessage ? (
+          <p className="text-[13px] text-[#FF9F0A]" data-testid="health-safety-message">
+            {healthMessage}
+          </p>
+        ) : null}
         {healthValue.healthAnswer === 'prefer_not' ? (
           <p className="text-[12px] text-[#8E8E93]">{M_INFO_1}</p>
         ) : null}

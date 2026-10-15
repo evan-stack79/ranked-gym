@@ -1,5 +1,7 @@
 import { v } from 'convex/values'
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from './_generated/server'
+import { createImmutableAccountLink } from './accountLinks'
+import { runUnconfirmResetMigrationOnce } from './emailVerification'
 import {
   assertRunSecretStrength,
   hashMigrationSecret,
@@ -7,6 +9,7 @@ import {
   requireAuthorizedMigrationRun,
   type AdminAuthz,
 } from './lib/migrationAdmin'
+import { writeNutritionProfileJson } from './lib/nutritionProfile'
 
 export const MIGRATION_ENTITY_TYPES = [
   'auth_users',
@@ -166,7 +169,8 @@ function mergeSummaryJson(existing: unknown, incoming: unknown): unknown {
   }
 }
 
-async function upsertAuthUser(
+/** Exported for FakeDb migration tests (B9 — must run against DB, not grep). */
+export async function upsertAuthUser(
   ctx: MutationCtx,
   payload: Record<string, unknown>,
 ): Promise<{ convexId: string; operation: Exclude<ImportOperation, 'skipped'> }> {
@@ -192,13 +196,19 @@ async function upsertAuthUser(
     updatedAt: Number(payload.updatedAt ?? now),
   }
   if (existing) {
+    // B10-05 : re-import ne retire jamais une confirmation obtenue via code ou Google.
     await ctx.db.patch(existing._id, patch)
     return { convexId: String(existing._id), operation: 'updated' }
   }
+  // Insert : jamais auto-confirmé (B9-01).
   const inserted = await ctx.db.insert('auth_users', {
     userId,
     createdAt: Number(payload.createdAt ?? now),
-    ...patch,
+    email: patch.email,
+    emailNorm: patch.emailNorm,
+    displayName: patch.displayName,
+    mustResetPassword: patch.mustResetPassword,
+    updatedAt: patch.updatedAt,
   })
   return { convexId: String(inserted), operation: 'inserted' }
 }
@@ -347,7 +357,8 @@ async function upsertWorkouts(
   return { convexId: String(inserted), operation: 'inserted' }
 }
 
-async function upsertNutrition(
+/** Import / migration nutrition — écrit profileJson uniquement via writeNutritionProfileJson. */
+export async function upsertNutrition(
   ctx: MutationCtx,
   payload: Record<string, unknown>,
   options: { prune: boolean },
@@ -360,25 +371,20 @@ async function upsertNutrition(
     .query('nutrition_state')
     .withIndex('by_userId', (q) => q.eq('userId', userId))
     .first()
-  const patch = {
-    profileJson: payload.profileJson ?? {},
+  // SEUL écriture profileJson : via writeNutritionProfileJson (règle âge B14).
+  await writeNutritionProfileJson(ctx, {
+    userId,
+    incomingProfileJson: payload.profileJson ?? {},
     journalJson: payload.journalJson ?? {},
     updatedAt,
-  }
-  let operation: 'inserted' | 'updated'
-  let convexId: string
-  if (existing) {
-    await ctx.db.patch(existing._id, patch)
-    operation = 'updated'
-    convexId = String(existing._id)
-  } else {
-    const inserted = await ctx.db.insert('nutrition_state', {
-      userId,
-      ...patch,
-    })
-    operation = 'inserted'
-    convexId = String(inserted)
-  }
+  })
+  const after = await ctx.db
+    .query('nutrition_state')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .first()
+  if (!after) throw new Error('MIGRATION_NUTRITION_WRITE_FAILED')
+  const operation: 'inserted' | 'updated' = existing ? 'updated' : 'inserted'
+  const convexId = String(after._id)
 
   const incomingMeals = (Array.isArray(payload.normalizedMeals) ? payload.normalizedMeals : [])
     .map((row) => asRecord(row))
@@ -782,20 +788,29 @@ export async function startRunForAdmin(
       runId: args.runId,
       runSecret: args.runSecret,
     })
+    const unconfirm = await runUnconfirmResetMigrationOnce(ctx, now)
     await ctx.db.patch(existing._id, {
       status: 'running',
       sourceSha: args.sourceSha || existing.sourceSha,
-      summaryJson: { ...(existing.summaryJson ?? {}), resumedAt: now },
+      summaryJson: {
+        ...(existing.summaryJson ?? {}),
+        resumedAt: now,
+        emailConfirmUnverifiedReset: unconfirm,
+      },
     })
     return { created: false }
   }
+  // B10-03 : one-shot unconfirm reset — runs once when a migration run starts.
+  const unconfirm = await runUnconfirmResetMigrationOnce(ctx, now)
   await ctx.db.insert('migration_runs', {
     runId: args.runId,
     startedAt: now,
     status: 'running',
     sourceSha: args.sourceSha,
     adminSecretHash,
-    summaryJson: {},
+    summaryJson: {
+      emailConfirmUnverifiedReset: unconfirm,
+    },
   })
   return { created: true }
 }
@@ -840,6 +855,15 @@ export async function importEntityForRun(
     mapConvexId: existingMap?.convexId ?? null,
     prune: args.prune === true,
   })
+
+  // B7-01 : lien Convex ↔ Supabase créé à la migration auth_users (serveur only).
+  if (args.entityType === 'auth_users') {
+    const ownerUserId = String(args.payload.userId ?? '').trim()
+    const supabaseUserId = String(args.supabaseId ?? '').trim()
+    if (ownerUserId && supabaseUserId) {
+      await createImmutableAccountLink(ctx, ownerUserId, supabaseUserId, now)
+    }
+  }
 
   if (existingMap) {
     await ctx.db.patch(existingMap._id, {

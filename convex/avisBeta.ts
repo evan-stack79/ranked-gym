@@ -10,6 +10,7 @@ import {
   type QueryCtx,
 } from './_generated/server'
 import { requireSessionUser } from './lib/auth'
+import { mergeNutritionProfileJson } from './lib/nutritionProfile'
 import { detectDistressLevel, type DistressLevel } from './avisDistress'
 import { detectInsultWords, maskInsultWords } from './avisInsults'
 
@@ -171,41 +172,16 @@ export function extractAgeFromNutritionProfileJson(profileJson: unknown): unknow
   return record.age
 }
 
-function isStoredMinorAge(age: unknown): age is number {
-  return typeof age === 'number' && Number.isFinite(age) && age > 0 && age < AVIS_AGE_MIN_ADULT
-}
-
-function isPlausibleStoredAge(age: unknown): age is number {
-  return typeof age === 'number' && Number.isFinite(age) && age > 0 && age <= AVIS_AGE_MAX
-}
-
 /**
- * AV-01 — refuse un saut d’âge synchronisé mineur → adulte (ex. 15 → 30).
- * Refuse aussi mineur → âge vide/invalide (contournement en deux synchros).
- * Autorise l’anniversaire : +1 an au plus (17 → 18).
+ * AV-01 / B15 — délègue à mergeNutritionProfileJson (préserve SAFETY FIELDS ;
+ * mineur : hausse limitée temps + 1 an ; adulte libre 10–120).
  */
 export function sanitizeSyncedNutritionProfileJson(
   previousProfileJson: unknown,
   incomingProfileJson: unknown,
+  now = Date.now(),
 ): unknown {
-  if (!incomingProfileJson || typeof incomingProfileJson !== 'object') {
-    return incomingProfileJson
-  }
-  const prevAge = extractAgeFromNutritionProfileJson(previousProfileJson)
-  const nextAge = extractAgeFromNutritionProfileJson(incomingProfileJson)
-  const incoming = { ...(incomingProfileJson as Record<string, unknown>) }
-
-  if (isStoredMinorAge(prevAge)) {
-    // Contournement 15 → vide → 30 : ne pas effacer l’âge mineur.
-    if (!isPlausibleStoredAge(nextAge)) {
-      return { ...incoming, age: prevAge }
-    }
-    // Saut vers adulte : seulement +1 an max (anniversaire).
-    if (isAdultStoredAge(nextAge) && nextAge > prevAge + 1) {
-      return { ...incoming, age: prevAge }
-    }
-  }
-  return incomingProfileJson
+  return mergeNutritionProfileJson(previousProfileJson, incomingProfileJson, now).profileJson
 }
 
 /**

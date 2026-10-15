@@ -12,7 +12,9 @@ const MEAL_ROW_LABELS: Record<MealType, string> = {
   snack: 'Collation',
 }
 
-export function formatMealPortionLabel(meal: Pick<MealEntry, 'grams' | 'pieces'>): string | null {
+export function formatMealPortionLabel(
+  meal: Pick<MealEntry, 'grams' | 'pieces' | 'portionLabel'>,
+): string | null {
   if (typeof meal.pieces === 'number' && Number.isFinite(meal.pieces) && meal.pieces > 0) {
     const n = Math.round(meal.pieces)
     return n === 1 ? '1 pièce' : `${n} pièces`
@@ -22,6 +24,9 @@ export function formatMealPortionLabel(meal: Pick<MealEntry, 'grams' | 'pieces'>
     const label = Number.isInteger(g) ? String(g) : g.toFixed(1).replace(/\.0$/, '')
     return `${label} g`
   }
+  if (typeof meal.portionLabel === 'string' && meal.portionLabel.trim()) {
+    return meal.portionLabel.trim()
+  }
   return null
 }
 
@@ -30,12 +35,15 @@ interface NutritionDayMealsCardProps {
   onAddMeal: (mealType: MealType) => void
   /** Ouvre l’édition existante (EditMealSheet). */
   onEditMeal?: (meal: MealEntry) => void
+  /** Masque le bouton + (TCA / mineurs). */
+  hideAdd?: boolean
 }
 
 export function NutritionDayMealsCard({
   meals,
   onAddMeal,
   onEditMeal,
+  hideAdd = false,
 }: NutritionDayMealsCardProps) {
   const baseId = useId()
   const [openTypes, setOpenTypes] = useState<Partial<Record<MealType, boolean>>>({})
@@ -114,18 +122,20 @@ export function NutritionDayMealsCard({
                       </span>
                     </div>
                   )}
-                  <button
-                    type="button"
-                    data-meal-add={type}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onAddMeal(type)
-                    }}
-                    className="ios-press flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#FF2B2B]"
-                    aria-label={`Ajouter un aliment · ${MEAL_ROW_LABELS[type]}`}
-                  >
-                    <Plus className="h-5 w-5" strokeWidth={2.25} />
-                  </button>
+                  {hideAdd ? null : (
+                    <button
+                      type="button"
+                      data-meal-add={type}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onAddMeal(type)
+                      }}
+                      className="ios-press flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#FF2B2B]"
+                      aria-label={`Ajouter un aliment · ${MEAL_ROW_LABELS[type]}`}
+                    >
+                      <Plus className="h-5 w-5" strokeWidth={2.25} />
+                    </button>
+                  )}
                 </div>
 
                 {hasItems ? (

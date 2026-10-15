@@ -491,23 +491,47 @@ describe('submitAvisBetaForSession', () => {
     expect(db.table('avis_beta')).toHaveLength(AVIS_PAR_JOUR + 1)
   })
 
-  it('AV-01 — sanitize : saut, contournement vide, anniversaire 17→18', () => {
-    const kept = sanitizeSyncedNutritionProfileJson({ age: 15 }, { age: 30, weightKg: 70 })
-    expect(extractAgeFromNutritionProfileJson(kept)).toBe(15)
-    expect((kept as { weightKg: number }).weightKg).toBe(70)
+  it('AV-01 / B15 — sanitize : mineur limité temps+1 an ; adulte libre 10–120', () => {
+    const now = Date.now()
+    // Sans ageRecordedAt : +1 an max → 15→30 refusé, 15 conservé
+    const jumped = sanitizeSyncedNutritionProfileJson(
+      { age: 15 },
+      { age: 30, weightKg: 70 },
+      now,
+    )
+    expect(extractAgeFromNutritionProfileJson(jumped)).toBe(15)
+    expect((jumped as { weightKg: number }).weightKg).toBe(70)
 
-    // Contournement 15 → vide → 30 : l’âge mineur est conservé
-    const cleared = sanitizeSyncedNutritionProfileJson({ age: 15 }, { age: null, weightKg: 70 })
+    // Contournement 15 → vide : l’âge mineur est conservé
+    const cleared = sanitizeSyncedNutritionProfileJson({ age: 15 }, { age: null, weightKg: 70 }, now)
     expect(extractAgeFromNutritionProfileJson(cleared)).toBe(15)
-    const afterClear = sanitizeSyncedNutritionProfileJson(cleared, { age: 30 })
-    expect(extractAgeFromNutritionProfileJson(afterClear)).toBe(15)
 
-    // Anniversaire autorisé
-    expect(extractAgeFromNutritionProfileJson(
-      sanitizeSyncedNutritionProfileJson({ age: 17 }, { age: 18 }),
-    )).toBe(18)
+    // Âge invalide entrant : conserve le précédent
+    const invalid = sanitizeSyncedNutritionProfileJson({ age: 16 }, { age: 150 }, now)
+    expect(extractAgeFromNutritionProfileJson(invalid)).toBe(16)
 
-    const ok = sanitizeSyncedNutritionProfileJson({ age: 20 }, { age: 30 })
+    // Anniversaire / +1 an autorisé (17→18)
+    expect(
+      extractAgeFromNutritionProfileJson(
+        sanitizeSyncedNutritionProfileJson({ age: 17 }, { age: 18 }, now),
+      ),
+    ).toBe(18)
+
+    // Avec ageRecordedAt assez ancien : hausse dans la marge temps+1
+    const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000
+    const recorded = now - 2 * MS_PER_YEAR
+    expect(
+      extractAgeFromNutritionProfileJson(
+        sanitizeSyncedNutritionProfileJson(
+          { age: 15, ageRecordedAt: recorded },
+          { age: 17 },
+          now,
+        ),
+      ),
+    ).toBe(17)
+
+    // Adulte : libre
+    const ok = sanitizeSyncedNutritionProfileJson({ age: 20 }, { age: 30 }, now)
     expect(extractAgeFromNutritionProfileJson(ok)).toBe(30)
   })
 

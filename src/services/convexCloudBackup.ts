@@ -60,6 +60,7 @@ type ConvexPushResult = {
   serverVersion: number
   updatedAt: number
   clientMutationId?: string
+  ageRejectedContactUs?: boolean
 }
 
 async function requireToken(): Promise<string> {
@@ -171,7 +172,12 @@ export async function fetchConvexBackupPayload(
 export async function pushConvexBackupPayload(
   payload: ConvexBackupPayload,
   options?: { baseUpdatedAt?: number; clientMutationId?: string; includeNutritionJournal?: boolean },
-): Promise<{ error?: string; skippedEmptyOverwrite?: boolean; stale?: boolean }> {
+): Promise<{
+  error?: string
+  skippedEmptyOverwrite?: boolean
+  stale?: boolean
+  ageRejectedContactUs?: boolean
+}> {
   try {
     const sessionToken = await requireToken()
     const result = (await getConvex().mutation(api.sync.pushSync, {
@@ -182,13 +188,21 @@ export async function pushConvexBackupPayload(
         includeNutritionJournal: options?.includeNutritionJournal,
       }),
     })) as ConvexPushResult
+    if (result.ageRejectedContactUs) {
+      const { markAgeContactUsNeeded } = await import('./ageContactNotice')
+      markAgeContactUsNeeded()
+    }
     if (result.skippedEmptyOverwrite) {
-      return { skippedEmptyOverwrite: true }
+      return { skippedEmptyOverwrite: true, ageRejectedContactUs: result.ageRejectedContactUs }
     }
     if (result.stale) {
-      return { stale: true, error: 'SYNC_STALE_BASE_VERSION' }
+      return {
+        stale: true,
+        error: 'SYNC_STALE_BASE_VERSION',
+        ageRejectedContactUs: result.ageRejectedContactUs,
+      }
     }
-    return {}
+    return { ageRejectedContactUs: result.ageRejectedContactUs }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erreur Convex upsert'
     return { error: message }

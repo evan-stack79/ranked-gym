@@ -18,7 +18,13 @@ import {
   shouldShowPregnancyBreastfeedingChoices,
   shouldShowWeightScreen,
 } from '../../services/nutritionSafetyRules'
-import { M_INFO_1, Q7_INTRO } from '../../content/safetyCopy'
+import {
+  AUCUNE_LOCKED_HINT,
+  M_INFO_1,
+  Q7_INTRO,
+  TCA_LOCKED_MESSAGE,
+} from '../../content/safetyCopy'
+import { ContactUsBlock } from '../common/ContactUsBlock'
 
 export type InscriptionStep =
   | 'welcome'
@@ -104,6 +110,26 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
     weightKg: sanitizeWeightKg(initial.weightKg),
   }))
 
+  /**
+   * B15 — flags déjà true sur le serveur (compte lié / profil syncé).
+   * Tant que le profil n’a jamais été envoyé, initial est vierge → pas de verrou.
+   */
+  const serverLocks = useMemo(
+    () => ({
+      pregnancy: Boolean(initial.declaredPregnancy),
+      breastfeeding: Boolean(initial.declaredBreastfeeding),
+      eatingDisorder: Boolean(initial.declaredEatingDisorder),
+      diabetes: Boolean(initial.declaredDiabetes),
+    }),
+    [initial],
+  )
+  const tcaLocked = serverLocks.eatingDisorder
+  const noneLocked =
+    serverLocks.eatingDisorder ||
+    serverLocks.pregnancy ||
+    serverLocks.breastfeeding ||
+    serverLocks.diabetes
+
   const steps = useMemo(() => buildInscriptionSteps(draft), [draft])
   const [step, setStep] = useState<InscriptionStep>('welcome')
 
@@ -149,6 +175,14 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
       },
     })
     const now = Date.now()
+    const declaredPregnancy =
+      serverLocks.pregnancy || (healthAnswer === 'situations' ? answers.pregnancy : false)
+    const declaredBreastfeeding =
+      serverLocks.breastfeeding ||
+      (healthAnswer === 'situations' ? answers.breastfeeding : false)
+    const declaredEatingDisorder =
+      tcaLocked || (healthAnswer === 'situations' ? answers.eatingDisorder : false)
+    const anySituation = declaredPregnancy || declaredBreastfeeding || declaredEatingDisorder
     const next = normalizeCalorieProfile({
       ...initial,
       age: answers.age ?? 0,
@@ -156,12 +190,13 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
       sexUpdatedAt: sex != null ? now : (initial.sexUpdatedAt ?? null),
       heightCm: answers.heightCm,
       weightKg: showWeight ? answers.weightKg : null,
-      declaredPregnancy: healthAnswer === 'situations' ? answers.pregnancy : false,
-      declaredBreastfeeding: healthAnswer === 'situations' ? answers.breastfeeding : false,
-      declaredEatingDisorder: healthAnswer === 'situations' ? answers.eatingDisorder : false,
-      preferNotAnswerHealth: healthAnswer === 'prefer_not',
-      healthAnswer,
-      healthAnswerUpdatedAt: healthAnswer != null ? now : (initial.healthAnswerUpdatedAt ?? null),
+      declaredPregnancy,
+      declaredBreastfeeding,
+      declaredEatingDisorder,
+      declaredDiabetes: Boolean(initial.declaredDiabetes || serverLocks.diabetes),
+      preferNotAnswerHealth: healthAnswer === 'prefer_not' && !anySituation,
+      healthAnswer: anySituation ? 'situations' : healthAnswer,
+      healthAnswerUpdatedAt: healthAnswer != null || anySituation ? now : (initial.healthAnswerUpdatedAt ?? null),
       onboardingComplete: true,
       bodyMetricsClearedAt:
         answers.heightCm == null && (!showWeight || answers.weightKg == null)
@@ -208,9 +243,9 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
       ...(activeStep === 'health'
         ? {
             healthAnswer: null as HealthAnswerStatus | null,
-            pregnancy: false,
-            breastfeeding: false,
-            eatingDisorder: false,
+            pregnancy: serverLocks.pregnancy,
+            breastfeeding: serverLocks.breastfeeding,
+            eatingDisorder: tcaLocked,
           }
         : {}),
       ...(activeStep === 'height' ? { heightCm: null } : {}),
@@ -221,6 +256,7 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
   }
 
   const toggleSituation = (key: 'pregnancy' | 'breastfeeding' | 'eatingDisorder') => {
+    if (key === 'eatingDisorder' && tcaLocked) return
     setDraft((d) => {
       const flipped = !d[key]
       const next = {
@@ -228,8 +264,17 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
         healthAnswer: 'situations' as const,
         pregnancy: key === 'pregnancy' ? flipped : d.pregnancy,
         breastfeeding: key === 'breastfeeding' ? flipped : d.breastfeeding,
-        eatingDisorder: key === 'eatingDisorder' ? flipped : d.eatingDisorder,
+        eatingDisorder:
+          key === 'eatingDisorder'
+            ? flipped
+            : tcaLocked
+              ? true
+              : d.eatingDisorder,
       }
+      // Ne jamais effacer un flag déjà true serveur.
+      if (serverLocks.pregnancy) next.pregnancy = true
+      if (serverLocks.breastfeeding) next.breastfeeding = true
+      if (tcaLocked) next.eatingDisorder = true
       if (!next.pregnancy && !next.breastfeeding && !next.eatingDisorder) {
         return { ...next, healthAnswer: null }
       }
@@ -238,12 +283,14 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
   }
 
   const pickExclusive = (answer: 'none' | 'prefer_not') => {
+    // B16-01 — Aucune et « Je préfère ne pas répondre » verrouillés si flag serveur.
+    if (noneLocked) return
     setDraft((d) => ({
       ...d,
       healthAnswer: d.healthAnswer === answer ? null : answer,
-      pregnancy: false,
-      breastfeeding: false,
-      eatingDisorder: false,
+      pregnancy: serverLocks.pregnancy,
+      breastfeeding: serverLocks.breastfeeding,
+      eatingDisorder: tcaLocked,
     }))
   }
 
@@ -392,10 +439,17 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
               ) : null}
               <HealthChoice
                 label="Trouble du comportement alimentaire (actuel ou passé)"
-                checked={draft.healthAnswer === 'situations' && draft.eatingDisorder}
+                checked={tcaLocked || (draft.healthAnswer === 'situations' && draft.eatingDisorder)}
                 onToggle={() => toggleSituation('eatingDisorder')}
                 testId="inscription-health-tca"
+                disabled={tcaLocked}
               />
+              {tcaLocked ? (
+                <ContactUsBlock
+                  message={TCA_LOCKED_MESSAGE}
+                  testIdPrefix="inscription-health-tca-contact"
+                />
+              ) : null}
             </div>
             <div className="h-2" aria-hidden />
             <div className="space-y-2">
@@ -405,6 +459,8 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
                 onToggle={() => pickExclusive('none')}
                 testId="inscription-health-none"
                 exclusive
+                disabled={noneLocked}
+                hint={noneLocked ? AUCUNE_LOCKED_HINT : undefined}
               />
               <HealthChoice
                 label="Je préfère ne pas répondre"
@@ -412,6 +468,8 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
                 onToggle={() => pickExclusive('prefer_not')}
                 testId="inscription-health-prefer-not"
                 exclusive
+                disabled={noneLocked}
+                hint={noneLocked ? AUCUNE_LOCKED_HINT : undefined}
               />
             </div>
           </div>
@@ -503,58 +561,75 @@ function HealthChoice({
   onToggle,
   testId,
   exclusive = false,
+  disabled = false,
+  hint,
 }: {
   label: string
   checked: boolean
   onToggle: () => void
   testId: string
   exclusive?: boolean
+  disabled?: boolean
+  hint?: string
 }) {
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={`ios-press flex w-full items-start gap-3 rounded-2xl border px-3.5 py-3 text-left ${
-        checked ? 'border-white/25 bg-white/10' : 'border-white/10 bg-black/25'
-      }`}
-      data-testid={testId}
-      data-exclusive={exclusive || undefined}
-      data-choice-style={exclusive ? 'radio' : 'checkbox'}
-      aria-pressed={checked}
-    >
-      {exclusive ? (
-        <span
-          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-            checked ? 'border-brand bg-brand' : 'border-white/30'
-          }`}
-          aria-hidden
-          data-testid={`${testId}-radio`}
+    <div className="space-y-1">
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={disabled}
+        className={`ios-press flex w-full items-start gap-3 rounded-2xl border px-3.5 py-3 text-left ${
+          disabled ? 'cursor-not-allowed opacity-55' : ''
+        } ${checked ? 'border-white/25 bg-white/10' : 'border-white/10 bg-black/25'}`}
+        data-testid={testId}
+        data-exclusive={exclusive || undefined}
+        data-choice-style={exclusive ? 'radio' : 'checkbox'}
+        data-disabled={disabled ? 'true' : 'false'}
+        aria-pressed={checked}
+        aria-disabled={disabled || undefined}
+      >
+        {exclusive ? (
+          <span
+            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+              checked ? 'border-brand bg-brand' : 'border-white/30'
+            }`}
+            aria-hidden
+            data-testid={`${testId}-radio`}
+          >
+            {checked ? <span className="h-2 w-2 rounded-full bg-white" /> : null}
+          </span>
+        ) : (
+          <span
+            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] border ${
+              checked ? 'border-brand bg-brand' : 'border-white/30 bg-transparent'
+            }`}
+            aria-hidden
+            data-testid={`${testId}-checkbox`}
+          >
+            {checked ? (
+              <svg viewBox="0 0 12 12" className="h-3 w-3 text-white" aria-hidden>
+                <path
+                  d="M2.5 6.2 5 8.7 9.5 3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            ) : null}
+          </span>
+        )}
+        <span className="text-[14px] font-medium text-white">{label}</span>
+      </button>
+      {hint ? (
+        <p
+          className="px-1 text-[12px] leading-snug text-[#8E8E93]"
+          data-testid={`${testId}-lock-hint`}
         >
-          {checked ? <span className="h-2 w-2 rounded-full bg-white" /> : null}
-        </span>
-      ) : (
-        <span
-          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] border ${
-            checked ? 'border-brand bg-brand' : 'border-white/30 bg-transparent'
-          }`}
-          aria-hidden
-          data-testid={`${testId}-checkbox`}
-        >
-          {checked ? (
-            <svg viewBox="0 0 12 12" className="h-3 w-3 text-white" aria-hidden>
-              <path
-                d="M2.5 6.2 5 8.7 9.5 3.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          ) : null}
-        </span>
-      )}
-      <span className="text-[14px] font-medium text-white">{label}</span>
-    </button>
+          {hint}
+        </p>
+      ) : null}
+    </div>
   )
 }

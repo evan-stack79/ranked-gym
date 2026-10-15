@@ -1,5 +1,6 @@
 import { Loader2, Search, Star } from 'lucide-react'
 import type { OpenFoodFactsSearchHit } from '../../services/alimentsService'
+import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 
 interface FoodTextSearchResultsProps {
   query: string
@@ -21,6 +22,7 @@ export function FoodTextSearchResults({
   onToggleFavorite,
   fill = false,
 }: FoodTextSearchResultsProps) {
+  const online = useOnlineStatus()
   const trimmed = query.trim()
   const idle = trimmed.length < 2
 
@@ -56,8 +58,14 @@ export function FoodTextSearchResults({
       ) : null}
 
       {!idle && !loading && !error && hits.length === 0 ? (
-        <p className="flex min-h-0 flex-1 items-center px-3.5 py-3 text-[13px] text-[#8E8E93]">
-          Aucun produit trouvé.
+        <p
+          className="flex min-h-0 flex-1 items-center px-3.5 py-3 text-[13px] text-[#8E8E93]"
+          data-food-empty-state
+          role="status"
+        >
+          {!online
+            ? 'Pas de connexion. Réessaie quand tu as du réseau.'
+            : 'Aucun produit trouvé.'}
         </p>
       ) : null}
 
