@@ -72,7 +72,9 @@ Produit B2C — personas d’usage (pas d’achat multi-stakeholders) :
 - Freemium clair : gratuit = calories + hydratation + entraînements ; Premium **6,99 €/mois** = scanner code-barres + analyse aliments IA (+ parcours objectifs poussé)
 - Positionnement “rank / arène” : ranks Bronze→Légende avec titres (“Recrue de la Fonte”, “Légende Vivante”…)
 - Unification entraînement + nutrition + sommeil (là où MFP/Cal AI et Gym Rank restent chacun d’un côté)
-- Multi-disciplines (pas muscu-only)
+- Multi-disciplines (pas muscu-only) : 79 sports dans l’app → en pub « +70 sports »
+- Engagement solidaire : **6 % du chiffre d’affaires des abonnements reversés à des associations** (lutte contre le cancer, la maladie, personnes dans le besoin) — « Tu progresses. Tu aides. »
+- Promesse finale : être en bonne santé et construire le corps de ses rêves
 - Lobby géolocalisé (spots proches + check-in)
 - Pump Check (carte photo post-séance partageable)
 - Brand dark crimson + panthère, ton FR tutoiement “Hero & Arena”
@@ -86,7 +88,7 @@ Produit B2C — personas d’usage (pas d’achat multi-stakeholders) :
 | « Encore une app fitness » | Une progression pour tous tes sports — train, nutri, récup au même endroit, pas un logger de plus |
 | « J’ai déjà MyFitnessPal / Cal AI » | Tu logges les repas ; ici tu progresses aussi en salle, en rank, et sur ton objectif global |
 | « Gym Rank / les apps ranked font déjà ça » | Le classement ne suffit pas — on couple ranks + nutrition + récup pour pousser tes objectifs |
-| « Pourquoi payer 6,99 € ? » | Gratuit = calories, eau, entraînements. Premium = scanner code-barres + analyse IA pour logger plus vite et pousser tes objectifs |
+| « Pourquoi payer 6,99 € ? » | Gratuit = calories, eau, entraînements. Premium = scanner code-barres + analyse IA pour logger plus vite et pousser tes objectifs ; et 6 % de ton abonnement part à des associations (cancer, maladie) |
 | « C’est fermé / bêta » | Oui : bêta privée sur invitation pour soigner l’expérience avant une ouverture plus large |
 | « Et ma vie privée en salle ? » | Mode Furtif (Stealth) : masque ta localisation dans le feed |
 
@@ -144,6 +146,7 @@ Produit B2C — personas d’usage (pas d’achat multi-stakeholders) :
 | All-in-one train/nutri/sleep | Engines + onglets Accueil / Train / Nutri / Profil |
 | Social salle | Lobby + check-in + feed + Mode Furtif |
 | Shareable wins | Pump Check / Victory Camera |
+| Impact solidaire | 6 % du CA des abonnements reversés à des associations (noms à publier dès que les partenariats sont signés) |
 
 ## Goals
 **Business goal:** Lancement commercial Ranked Gym → acquisition utilisateurs (install / ouverture app) → activation freemium → upgrade Premium 6,99 €
@@ -152,6 +155,7 @@ Produit B2C — personas d’usage (pas d’achat multi-stakeholders) :
 
 ## Changelog
 *Newest first. One line per revision: what changed and why.*
+- v6 (2026-10-15) — Added solidarity commitment (6 % of subscription revenue to charities: cancer, illness, people in need), “+70 sports” proof (79 in-app), and health / dream-physique end promise used in the 15s/30s video ad.
 - v5 (2026-09-30) — Shifted from private beta to commercial launch; primary CTA is download / start free (not DM BÊTA).
 - v4 (2026-09-28) — Added VOC from Reddit/TikTok research (abandon after 2 weeks, MFP barcode paywall hate, Hevy+MFP stack, Cal AI snap hook).
 - v3 (2026-09-28) — Defined free vs Premium: free = calories + hydration + training; paid = barcode scan + AI food analysis; BPM still undecided.
