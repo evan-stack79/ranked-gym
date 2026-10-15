@@ -1,11 +1,17 @@
 /**
  * Google ID token verification (B11-01).
  * Phone sends only the ID token; email/sub are read from verified claims.
- * Fail-closed when GOOGLE_CLIENT_ID / CONVEX_GOOGLE_CLIENT_ID is unset.
+ * Fail-closed when client id is unset; kill-switch via CONVEX_GOOGLE_SIGNIN_ENABLED.
  */
 
 const GOOGLE_JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs'
 const ALLOWED_ISSUERS = new Set(['accounts.google.com', 'https://accounts.google.com'])
+/** Cache Google JWKS for 1h (refresh on miss / expiry). */
+export const GOOGLE_JWKS_CACHE_TTL_MS = 60 * 60 * 1000
+/** Allow small clock skew for iat in the future. */
+const IAT_FUTURE_SKEW_SEC = 5 * 60
+/** Reject tokens whose iat is older than 24h (sane bound). */
+const IAT_MAX_AGE_SEC = 24 * 60 * 60
 
 export const AUTH_GOOGLE_DISABLED = 'AUTH_GOOGLE_DISABLED'
 export const AUTH_GOOGLE_TOKEN_INVALID = 'AUTH_GOOGLE_TOKEN_INVALID'
@@ -13,6 +19,17 @@ export const AUTH_GOOGLE_TOKEN_INVALID = 'AUTH_GOOGLE_TOKEN_INVALID'
 function readEnv(name: string): string | undefined {
   const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
   return proc?.env?.[name]
+}
+
+function parseBooleanFlag(value: string | undefined): boolean {
+  if (!value) return false
+  const normalized = value.trim().toLowerCase()
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on'
+}
+
+/** Kill switch from 6a32d91 — off unless explicitly enabled. */
+export function isGoogleSignInEnabled(): boolean {
+  return parseBooleanFlag(readEnv('CONVEX_GOOGLE_SIGNIN_ENABLED'))
 }
 
 /** Server Google OAuth client id — required for Google sign-in. */
@@ -25,16 +42,21 @@ export function getGoogleClientId(): string {
 }
 
 /**
- * Google sign-in stays fail-closed by default.
- * Requires client id AND explicit CONVEX_GOOGLE_SIGNIN_ENABLED=true.
- * (Public action currently hard-throws regardless — emergency kill-switch.)
+ * Ready to verify: kill switch ON and client id configured.
+ * Fail-closed by default (enabled flag false OR missing client id).
  */
 export function isGoogleSignInConfigured(): boolean {
-  const enabled = (() => {
-    const raw = readEnv('CONVEX_GOOGLE_SIGNIN_ENABLED')?.trim().toLowerCase()
-    return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on'
-  })()
-  return enabled && getGoogleClientId().length > 0
+  return isGoogleSignInEnabled() && getGoogleClientId().length > 0
+}
+
+/**
+ * Throws AUTH_GOOGLE_DISABLED when kill switch is off or client id missing.
+ */
+export function requireGoogleSignInReady(): string {
+  if (!isGoogleSignInEnabled()) throw new Error(AUTH_GOOGLE_DISABLED)
+  const clientId = getGoogleClientId()
+  if (!clientId) throw new Error(AUTH_GOOGLE_DISABLED)
+  return clientId
 }
 
 export type GoogleJwks = {
@@ -46,6 +68,15 @@ export type VerifiedGoogleIdToken = {
   sub: string
   emailVerified: true
   name?: string
+}
+
+type JwksCacheEntry = { fetchedAtMs: number; jwks: GoogleJwks }
+
+let jwksCache: JwksCacheEntry | null = null
+
+/** Test / admin helper — clear in-memory JWKS cache. */
+export function clearGoogleJwksCache(): void {
+  jwksCache = null
 }
 
 function base64UrlToBytes(input: string): Uint8Array {
@@ -78,6 +109,8 @@ export type GoogleIdTokenVerifyDeps = {
   clientId: string
   nowMs?: number
   fetchJwks?: () => Promise<GoogleJwks>
+  /** Skip cache when injecting test JWKS. */
+  bypassJwksCache?: boolean
 }
 
 async function defaultFetchGoogleJwks(): Promise<GoogleJwks> {
@@ -86,6 +119,19 @@ async function defaultFetchGoogleJwks(): Promise<GoogleJwks> {
   const body = (await response.json()) as GoogleJwks
   if (!body?.keys || !Array.isArray(body.keys)) throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
   return body
+}
+
+/** Cached JWKS fetch — production default. */
+export async function fetchGoogleJwksCached(
+  nowMs = Date.now(),
+  fetchJwks: () => Promise<GoogleJwks> = defaultFetchGoogleJwks,
+): Promise<GoogleJwks> {
+  if (jwksCache && nowMs - jwksCache.fetchedAtMs < GOOGLE_JWKS_CACHE_TTL_MS) {
+    return jwksCache.jwks
+  }
+  const jwks = await fetchJwks()
+  jwksCache = { fetchedAtMs: nowMs, jwks }
+  return jwks
 }
 
 async function verifyRs256Signature(
@@ -110,7 +156,6 @@ async function verifyRs256Signature(
 
 /**
  * Validate Google ID token claims after signature verification.
- * Exported for permanent B11 tests (fake / expired / wrong aud / unverified).
  */
 export function assertGoogleIdTokenClaims(
   payload: Record<string, unknown>,
@@ -131,6 +176,11 @@ export function assertGoogleIdTokenClaims(
   const exp = typeof payload.exp === 'number' ? payload.exp : NaN
   if (!Number.isFinite(exp) || exp <= nowSec) throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
 
+  const iat = typeof payload.iat === 'number' ? payload.iat : NaN
+  if (!Number.isFinite(iat)) throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
+  if (iat > nowSec + IAT_FUTURE_SKEW_SEC) throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
+  if (iat < nowSec - IAT_MAX_AGE_SEC) throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
+
   const emailVerified = payload.email_verified === true || payload.email_verified === 'true'
   if (!emailVerified) throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
 
@@ -147,7 +197,7 @@ export function assertGoogleIdTokenClaims(
   }
 }
 
-/** Full verify: JWKS signature + Google claim rules. */
+/** Full verify: JWKS signature (cached) + Google claim rules. */
 export async function verifyGoogleIdToken(
   idToken: string,
   deps: GoogleIdTokenVerifyDeps,
@@ -161,7 +211,12 @@ export async function verifyGoogleIdToken(
   const payload = decodeJsonPart(payloadB64)
   if (header.alg !== 'RS256') throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
 
-  const jwks = await (deps.fetchJwks ?? defaultFetchGoogleJwks)()
+  const nowMs = deps.nowMs ?? Date.now()
+  const fetchFn = deps.fetchJwks ?? defaultFetchGoogleJwks
+  const jwks = deps.bypassJwksCache
+    ? await fetchFn()
+    : await fetchGoogleJwksCached(nowMs, fetchFn)
+
   const kid = typeof header.kid === 'string' ? header.kid : undefined
   const candidates = jwks.keys.filter((key) => {
     if (key.kty !== 'RSA') return false
@@ -187,7 +242,7 @@ export async function verifyGoogleIdToken(
 
   return assertGoogleIdTokenClaims(payload, {
     clientId: deps.clientId,
-    nowMs: deps.nowMs,
+    nowMs,
   })
 }
 

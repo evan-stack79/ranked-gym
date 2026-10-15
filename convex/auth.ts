@@ -37,9 +37,12 @@ import {
   sendPasswordResetEmail,
 } from './lib/passwordResetMailer'
 import { markEmailConfirmedViaGoogleForUser } from './emailVerification'
+import { internal } from './_generated/api'
 import {
   AUTH_GOOGLE_DISABLED,
   AUTH_GOOGLE_TOKEN_INVALID,
+  requireGoogleSignInReady,
+  verifyGoogleIdToken,
 } from './lib/googleIdToken'
 
 const RESET_ROUTE_PATH = '/auth/reset-password'
@@ -810,7 +813,8 @@ export const completeGoogleSignInFromVerifiedClaimsMutation = internalMutation({
 
 /**
  * B11-01 : phone sends ONLY the Google ID token.
- * Server verifies JWKS signature + iss/aud/exp/email_verified; fail-closed if unset client id.
+ * Kill switch (6a32d91): throws AUTH_GOOGLE_DISABLED unless CONVEX_GOOGLE_SIGNIN_ENABLED=true.
+ * When enabled: JWKS verify (cached) + iss/aud/exp/iat/email_verified; fail-closed if no client id.
  */
 type GoogleSignInResult = {
   sessionToken: string
@@ -835,15 +839,23 @@ export const signInWithGoogle = action({
       displayName: v.string(),
     }),
   }),
-  handler: async (_ctx, _args): Promise<GoogleSignInResult> => {
-    // EMERGENCY FAIL-CLOSED (B11): Cloudflare Workers production
-    // (ranked-gym.lembrezevan.workers.dev) deploys this PR branch against real
-    // Convex `fortunate-bloodhound-90` + Supabase `jivqfrkwvnzzefnerpii`.
-    // Throw before any token parse / session creation until Google sign-in is
-    // re-enabled behind an isolated non-prod Convex deployment.
-    void _ctx
-    void _args
-    throw new Error(AUTH_GOOGLE_DISABLED)
+  handler: async (ctx, args): Promise<GoogleSignInResult> => {
+    // Kill switch first — no session when disabled (default).
+    const clientId = requireGoogleSignInReady()
+    let verified
+    try {
+      verified = await verifyGoogleIdToken(args.idToken, { clientId })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ''
+      if (message === AUTH_GOOGLE_DISABLED) throw new Error(AUTH_GOOGLE_DISABLED)
+      throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
+    }
+    return await ctx.runMutation(internal.auth.completeGoogleSignInFromVerifiedClaimsMutation, {
+      email: verified.email,
+      googleSub: verified.sub,
+      displayName: verified.name,
+      emailVerified: true as const,
+    })
   },
 })
 

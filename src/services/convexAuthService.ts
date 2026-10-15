@@ -96,7 +96,10 @@ export async function signInWithPassword(
   }
 }
 
-/** B11-01 / emergency: Google sign-in fail-closed on prod-linked deployments. */
+/**
+ * B11-01 : client stays off by default (kill switch).
+ * Server verifies ID token only when CONVEX_GOOGLE_SIGNIN_ENABLED=true.
+ */
 export async function signInWithGoogle(_idToken: string): Promise<{
   user: AuthUser
   sessionToken: string
@@ -104,7 +107,7 @@ export async function signInWithGoogle(_idToken: string): Promise<{
   emailConfirmed: true
 }> {
   void _idToken
-  // Do not call Convex — production Worker shares real Convex/Supabase.
+  // Client default OFF — do not call Convex until an explicit client enable lands.
   throw new Error('AUTH_GOOGLE_DISABLED')
 }
 
