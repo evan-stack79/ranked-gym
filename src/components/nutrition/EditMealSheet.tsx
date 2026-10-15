@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MealEntry, MealType } from '../../types/nutrition'
 import { MEAL_TYPE_LABELS } from '../../utils/calories'
+import {
+  foodAddQuantityUserMessage,
+  formatGramsCountLabel,
+  validateFoodQuantity,
+} from '../../../convex/lib/foodAddQuantity'
 import { IosSheet } from '../ui/IosSheet'
 import { ClearableNumberInput } from './ClearableNumberInput'
 
@@ -39,6 +44,7 @@ export function EditMealSheet({
   const [carbsG, setCarbsG] = useState<number | null>(null)
   const [fatG, setFatG] = useState<number | null>(null)
   const [grams, setGrams] = useState<number | null>(null)
+  const [qtyError, setQtyError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const baselineRef = useRef<Baseline | null>(null)
 
@@ -51,6 +57,7 @@ export function EditMealSheet({
     setCarbsG(meal.carbsG ?? null)
     setFatG(meal.fatG ?? null)
     setGrams(meal.grams ?? null)
+    setQtyError(null)
     setConfirmDelete(false)
     baselineRef.current =
       meal.grams != null && meal.grams > 0
@@ -66,12 +73,35 @@ export function EditMealSheet({
 
   if (!meal) return null
 
+  const gramsValidation =
+    grams == null
+      ? null
+      : validateFoodQuantity({ unit: 'g', value: grams })
+
+  const gramsFieldMessage =
+    grams == null
+      ? null
+      : gramsValidation && !gramsValidation.ok
+        ? foodAddQuantityUserMessage(gramsValidation.reason, gramsValidation.unit)
+        : null
+
   const canSave = hideNutritionNumbers
-    ? name.trim().length > 0
-    : name.trim().length > 0 && calories != null && calories >= 0
+    ? name.trim().length > 0 && (grams == null || Boolean(gramsValidation?.ok))
+    : name.trim().length > 0 &&
+      calories != null &&
+      calories >= 0 &&
+      (grams == null || Boolean(gramsValidation?.ok))
 
   const applyGrams = (nextGrams: number | null) => {
     setGrams(nextGrams)
+    if (nextGrams == null) {
+      setQtyError(null)
+    } else {
+      const checked = validateFoodQuantity({ unit: 'g', value: nextGrams })
+      setQtyError(
+        checked.ok ? null : foodAddQuantityUserMessage(checked.reason, checked.unit),
+      )
+    }
     if (hideNutritionNumbers) return
     const base = baselineRef.current
     if (base == null || nextGrams == null || !(nextGrams > 0)) return
@@ -150,8 +180,8 @@ export function EditMealSheet({
               value={grams}
               onChange={applyGrams}
               min={1}
-              max={3000}
-              step={0.1}
+              max={2000}
+              step={1}
               required={false}
               clampOnBlur={false}
               sanitizeUnits
@@ -160,6 +190,11 @@ export function EditMealSheet({
               aria-label="Quantité en grammes"
               className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
             />
+            {gramsFieldMessage || qtyError ? (
+              <p className="mt-1.5 text-[12px] text-[#FF6961]" role="alert" data-food-qty-error>
+                {gramsFieldMessage ?? qtyError}
+              </p>
+            ) : null}
           </label>
           {hideNutritionNumbers ? null : (
             <>
@@ -215,13 +250,25 @@ export function EditMealSheet({
         <button
           type="button"
           disabled={!canSave}
+          data-testid="edit-meal-save"
           onClick={() => {
             if (!canSave) return
+            if (grams != null) {
+              const checked = validateFoodQuantity({ unit: 'g', value: grams })
+              if (!checked.ok) {
+                setQtyError(foodAddQuantityUserMessage(checked.reason, checked.unit))
+                return
+              }
+            }
+            const portionLabel =
+              grams != null ? formatGramsCountLabel(grams) : meal.portionLabel
             if (hideNutritionNumbers) {
               onSave(meal.id, {
                 name: name.trim(),
                 mealType,
                 grams: grams ?? undefined,
+                portionLabel,
+                pieces: grams != null ? undefined : meal.pieces,
               })
               return
             }
@@ -234,6 +281,8 @@ export function EditMealSheet({
               carbsG: carbsG ?? undefined,
               fatG: fatG ?? undefined,
               grams: grams ?? undefined,
+              portionLabel,
+              pieces: grams != null ? undefined : meal.pieces,
             })
           }}
           className="ios-press w-full rounded-2xl bg-[#30D158] py-3.5 text-[16px] font-semibold text-black disabled:opacity-40"

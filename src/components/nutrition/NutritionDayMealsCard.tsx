@@ -1,6 +1,11 @@
 import { useId, useState } from 'react'
 import { ChevronDown, Plus } from 'lucide-react'
 import type { MealEntry, MealType } from '../../types/nutrition'
+import { isFoodAddV3Enabled } from '../../backend/foodAddV3FeatureFlag'
+import {
+  formatGramsCountLabel,
+  formatPiecesCountLabel,
+} from '../../../convex/lib/foodAddQuantity'
 import { BlurInText, StaticKcalNumber } from '../motion'
 
 const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -12,26 +17,41 @@ const MEAL_ROW_LABELS: Record<MealType, string> = {
   snack: 'Collation',
 }
 
+/**
+ * Affiche la portion d’un repas.
+ * V3 OFF (= d33b724) : Math.round pièces, puis grammes, puis portionLabel.
+ * V3 ON : virgule / pluriel ≥2 ; grams live prioritaire sur portionLabel stale (B111-11).
+ */
 export function formatMealPortionLabel(
   meal: Pick<MealEntry, 'grams' | 'pieces' | 'portionLabel'>,
 ): string | null {
-  const rawLabel =
-    typeof meal.portionLabel === 'string' && meal.portionLabel.trim()
-      ? meal.portionLabel.trim()
-      : null
-  // Pièces : jamais afficher « pour 100 g » ; préférer le libellé pièces.
+  if (isFoodAddV3Enabled()) {
+    if (typeof meal.pieces === 'number' && Number.isFinite(meal.pieces) && meal.pieces > 0) {
+      return formatPiecesCountLabel(meal.pieces)
+    }
+    if (typeof meal.grams === 'number' && Number.isFinite(meal.grams) && meal.grams > 0) {
+      return formatGramsCountLabel(meal.grams)
+    }
+    if (typeof meal.portionLabel === 'string' && meal.portionLabel.trim()) {
+      return meal.portionLabel.trim()
+    }
+    return null
+  }
+
+  // d33b724 V3-OFF — inchangé (B111-13).
   if (typeof meal.pieces === 'number' && Number.isFinite(meal.pieces) && meal.pieces > 0) {
-    if (rawLabel && !/pour\s*100\s*g/i.test(rawLabel)) return rawLabel
-    const n = meal.pieces
+    const n = Math.round(meal.pieces)
     return n === 1 ? '1 pièce' : `${n} pièces`
   }
   if (typeof meal.grams === 'number' && Number.isFinite(meal.grams) && meal.grams > 0) {
-    if (rawLabel) return rawLabel
     const g = meal.grams
     const label = Number.isInteger(g) ? String(g) : g.toFixed(1).replace(/\.0$/, '')
     return `${label} g`
   }
-  return rawLabel
+  if (typeof meal.portionLabel === 'string' && meal.portionLabel.trim()) {
+    return meal.portionLabel.trim()
+  }
+  return null
 }
 
 interface NutritionDayMealsCardProps {

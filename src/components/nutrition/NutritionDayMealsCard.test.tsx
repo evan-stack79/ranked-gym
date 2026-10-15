@@ -67,14 +67,17 @@ afterEach(async () => {
 })
 
 describe('formatMealPortionLabel', () => {
-  it('préfère pièces, sinon grammes, sinon null', () => {
+  it('V3 OFF (= d33b724) : Math.round pièces, puis grammes, puis portionLabel', () => {
+    // Flag OFF par défaut — B111-13.
     expect(formatMealPortionLabel({ pieces: 4 })).toBe('4 pièces')
     expect(formatMealPortionLabel({ pieces: 1 })).toBe('1 pièce')
-    expect(formatMealPortionLabel({ pieces: 0.5 })).toBe('0.5 pièces')
+    expect(formatMealPortionLabel({ pieces: 0.5 })).toBe('1 pièce')
+    expect(formatMealPortionLabel({ pieces: 1.5 })).toBe('2 pièces')
     expect(formatMealPortionLabel({ pieces: 2, portionLabel: '2 pièces' })).toBe('2 pièces')
     expect(formatMealPortionLabel({ pieces: 2, portionLabel: 'pour 100 g' })).toBe('2 pièces')
     expect(formatMealPortionLabel({ grams: 125 })).toBe('125 g')
     expect(formatMealPortionLabel({ grams: 12.5 })).toBe('12.5 g')
+    expect(formatMealPortionLabel({ grams: 200, portionLabel: '120 g' })).toBe('200 g')
     expect(formatMealPortionLabel({})).toBeNull()
   })
 })

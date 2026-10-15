@@ -2,6 +2,7 @@
  * Nutriments OFF côté serveur (cache par offCode) + calcul kcal/macros
  * à l’ajout — jamais de refetch OFF, jamais d’invention (1 pièce ≠ 100 g).
  */
+import { parsePortionGrams } from './foodAddQuantity'
 
 export type OffProductNutrientCache = {
   caloriesPer100g: number | null
@@ -21,32 +22,12 @@ export type MealNutritionComputed = {
 }
 
 /**
- * Extrait des grammes depuis serving_size OFF.
- * ml / cl / l seuls → null (pas de densité inventée).
- * « 250 ml (240 g) » → 240 (gramme explicite).
+ * Extrait des grammes unitaires depuis serving_size OFF (source : parsePortionGrams).
+ * Pièce prioritaire (« 2 x 25 g (50 g) » → 25) ; sinon portion ; ml seul → null.
  */
 export function parseServingGrams(servingSize: string | null | undefined): number | null {
-  const raw = typeof servingSize === 'string' ? servingSize.trim() : ''
-  if (!raw) return null
-
-  // Volume seul (ml/cl/l) sans grammes explicites → null.
-  const hasVolume = /\d+(?:[.,]\d+)?\s*(ml|cl|l)\b/i.test(raw)
-  const hasExplicitGrams = /\d+(?:[.,]\d+)?\s*(kg|g)\b/i.test(raw)
-  if (hasVolume && !hasExplicitGrams) return null
-
-  const kg = raw.match(/(\d+(?:[.,]\d+)?)\s*kg\b/i)
-  if (kg) {
-    const n = Number.parseFloat(kg[1]!.replace(',', '.'))
-    return Number.isFinite(n) && n > 0 ? Math.round(n * 1000) : null
-  }
-  // Si plusieurs mentions « g », prendre la dernière (souvent « 250 ml (240 g) »).
-  const gMatches = [...raw.matchAll(/(\d+(?:[.,]\d+)?)\s*g\b/gi)]
-  const g = gMatches.length > 0 ? gMatches[gMatches.length - 1] : null
-  if (g) {
-    const n = Number.parseFloat(g[1]!.replace(',', '.'))
-    return Number.isFinite(n) && n > 0 ? Math.round(n * 10) / 10 : null
-  }
-  return null
+  const parsed = parsePortionGrams(servingSize)
+  return parsed.pieceGrams ?? parsed.servingGrams
 }
 
 function scalePer100g(

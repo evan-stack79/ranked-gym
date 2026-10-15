@@ -49,6 +49,111 @@ function isHalfStep(n: number): boolean {
   return Math.abs(n * 2 - Math.round(n * 2)) < 1e-9
 }
 
+function parseLocaleNumber(raw: string): number {
+  return Number.parseFloat(raw.replace(',', '.'))
+}
+
+/**
+ * Libellé pièces V3 — virgule décimale, pluriel seulement à partir de 2.
+ * « 0,5 pièce », « 1 pièce », « 1,5 pièce », « 2 pièces ».
+ */
+export function formatPiecesCountLabel(pieces: number): string {
+  const n = pieces
+  const label = Number.isInteger(n)
+    ? String(n)
+    : n.toFixed(1).replace(/\.0$/, '').replace('.', ',')
+  return n >= 2 ? `${label} pièces` : `${label} pièce`
+}
+
+/** Libellé grams serveur / V3. */
+export function formatGramsCountLabel(grams: number): string {
+  const label = Number.isInteger(grams)
+    ? String(grams)
+    : grams.toFixed(1).replace(/\.0$/, '')
+  return `${label} g`
+}
+
+export type ParsedPortionGrams = {
+  /** Poids d’une pièce (ex. 25 dans « 2 x 25 g (50 g) »). */
+  pieceGrams: number | null
+  /** Poids de la portion entière (ex. 50). */
+  servingGrams: number | null
+}
+
+/**
+ * Parse serving_size OFF — source unique app + serveur (B111-14).
+ * « 2 x 25 g (50 g) » → piece 25 / serving 50 ; si 2×25 ≠ 50 → null.
+ * ml seul → null ; « 250 ml (240 g) » → serving 240.
+ */
+export function parsePortionGrams(
+  servingSize: string | null | undefined,
+): ParsedPortionGrams {
+  const raw = typeof servingSize === 'string' ? servingSize.trim() : ''
+  if (!raw) return { pieceGrams: null, servingGrams: null }
+
+  const hasVolume = /\d+(?:[.,]\d+)?\s*(ml|cl|l)\b/i.test(raw)
+  const hasExplicitGrams = /\d+(?:[.,]\d+)?\s*(kg|g)\b/i.test(raw)
+  if (hasVolume && !hasExplicitGrams) {
+    return { pieceGrams: null, servingGrams: null }
+  }
+
+  // « 2 x 25 g (50 g) » / « 2 × 25g (50g) »
+  const multi = raw.match(
+    /(\d+(?:[.,]\d+)?)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*g\b(?:\s*\((\d+(?:[.,]\d+)?)\s*g\))?/i,
+  )
+  if (multi) {
+    const count = parseLocaleNumber(multi[1]!)
+    const piece = parseLocaleNumber(multi[2]!)
+    if (!Number.isFinite(count) || !Number.isFinite(piece) || count <= 0 || piece <= 0) {
+      return { pieceGrams: null, servingGrams: null }
+    }
+    if (multi[3] != null) {
+      const total = parseLocaleNumber(multi[3])
+      if (!Number.isFinite(total) || total <= 0) {
+        return { pieceGrams: null, servingGrams: null }
+      }
+      // Tolérance flottante : 2×25 doit égaler 50.
+      if (Math.abs(count * piece - total) > 0.05) {
+        return { pieceGrams: null, servingGrams: null }
+      }
+      return {
+        pieceGrams: Math.round(piece * 10) / 10,
+        servingGrams: Math.round(total * 10) / 10,
+      }
+    }
+    return {
+      pieceGrams: Math.round(piece * 10) / 10,
+      servingGrams: Math.round(count * piece * 10) / 10,
+    }
+  }
+
+  const kg = raw.match(/(\d+(?:[.,]\d+)?)\s*kg\b/i)
+  if (kg) {
+    const n = parseLocaleNumber(kg[1]!)
+    if (!Number.isFinite(n) || n <= 0) return { pieceGrams: null, servingGrams: null }
+    return { pieceGrams: null, servingGrams: Math.round(n * 1000) }
+  }
+
+  // Dernière mention « g » (souvent « 250 ml (240 g) »).
+  const gMatches = [...raw.matchAll(/(\d+(?:[.,]\d+)?)\s*g\b/gi)]
+  const g = gMatches.length > 0 ? gMatches[gMatches.length - 1] : null
+  if (g) {
+    const n = parseLocaleNumber(g[1]!)
+    if (!Number.isFinite(n) || n <= 0) return { pieceGrams: null, servingGrams: null }
+    return { pieceGrams: null, servingGrams: Math.round(n * 10) / 10 }
+  }
+
+  return { pieceGrams: null, servingGrams: null }
+}
+
+/** Poids à utiliser pour 1 pièce (ou portion unitaire) — pieceGrams prioritaire. */
+export function resolveUnitGramsForPieces(
+  servingSize: string | null | undefined,
+): number | null {
+  const parsed = parsePortionGrams(servingSize)
+  return parsed.pieceGrams ?? parsed.servingGrams
+}
+
 /**
  * Valide grams ou pièces. Champ vide → below_min (l’UI désactive Valider sans soumettre).
  */

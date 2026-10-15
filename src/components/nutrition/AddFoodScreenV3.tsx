@@ -10,9 +10,11 @@ import {
   type FoodCategoryId,
 } from '../../utils/foodCategories'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
-import { parseGramsFromServingSize } from '../../utils/foodDisplay'
 import {
   foodAddQuantityUserMessage,
+  formatGramsCountLabel,
+  formatPiecesCountLabel,
+  resolveUnitGramsForPieces,
   validateFoodQuantity,
   type FoodQuantityUnit,
 } from '../../../convex/lib/foodAddQuantity'
@@ -192,7 +194,19 @@ export function AddFoodScreenV3({
   }
 
   const servingGramsFor = (hit: OpenFoodFactsSearchHit) =>
-    parseGramsFromServingSize(hit.servingSize)
+    resolveUnitGramsForPieces(hit.servingSize)
+
+  const qtyMessageFor = (hit: OpenFoodFactsSearchHit, qty: QtyState): string | null => {
+    // Champ vide : Valider grisé, aucun message (jamais 0) — B111-10.
+    if (qty.value === '') return null
+    const checked = validateFoodQuantity({
+      unit: qty.unit,
+      value: qty.value,
+      servingGrams: qty.unit === 'pieces' ? servingGramsFor(hit) : null,
+    })
+    if (checked.ok) return null
+    return foodAddQuantityUserMessage(checked.reason, checked.unit)
+  }
 
   const allQuantitiesValid = selectedHits.every((hit) => {
     const qty = qtyByKey[hitKey(hit)]
@@ -224,14 +238,14 @@ export function AddFoodScreenV3({
           hit,
           pieces: n,
           unit: 'pieces',
-          portionLabel: n === 1 ? '1 pièce' : `${n} pièces`,
+          portionLabel: formatPiecesCountLabel(n),
         })
       } else {
         items.push({
           hit,
           grams: checked.grams,
           unit: 'g',
-          portionLabel: `${checked.grams} g`,
+          portionLabel: formatGramsCountLabel(checked.grams),
         })
       }
     }
@@ -469,9 +483,17 @@ export function AddFoodScreenV3({
                       step={1}
                       value={manualGrams}
                       onChange={(e) => {
-                        setManualError(null)
-                        onManualGramsChange?.(
-                          e.target.value === '' ? '' : Number(e.target.value),
+                        const next = e.target.value === '' ? '' : Number(e.target.value)
+                        onManualGramsChange?.(next)
+                        if (next === '') {
+                          setManualError(null)
+                          return
+                        }
+                        const checked = validateFoodQuantity({ unit: 'g', value: next })
+                        setManualError(
+                          checked.ok
+                            ? null
+                            : foodAddQuantityUserMessage(checked.reason, checked.unit),
                         )
                       }}
                       placeholder="ex. 120"
@@ -575,7 +597,6 @@ export function AddFoodScreenV3({
                         step={qty.unit === 'pieces' ? 0.5 : 1}
                         value={qty.value}
                         onChange={(e) => {
-                          setQtyError(null)
                           const raw = e.target.value
                           setQtyByKey((prev) => ({
                             ...prev,
@@ -584,11 +605,21 @@ export function AddFoodScreenV3({
                               value: raw === '' ? '' : Number(raw),
                             },
                           }))
+                          setQtyError(null)
                         }}
                         className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#FF2B2B]/40"
                         data-testid={`food-qty-input-${key}`}
                       />
                     </label>
+                    {qtyMessageFor(hit, qty) ? (
+                      <p
+                        className="mt-1.5 text-[12px] text-[#FF6961]"
+                        role="alert"
+                        data-food-qty-error
+                      >
+                        {qtyMessageFor(hit, qty)}
+                      </p>
+                    ) : null}
                   </li>
                 )
               })}

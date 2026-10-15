@@ -35,6 +35,8 @@ import {
 } from '../../services/alimentsService'
 import {
   foodAddQuantityUserMessage,
+  formatGramsCountLabel,
+  formatPiecesCountLabel,
   validateFoodQuantity,
 } from '../../../convex/lib/foodAddQuantity'
 import { useAuth } from '../../context/AuthContext'
@@ -64,7 +66,10 @@ import {
   canAccessFoodAddV3,
   needsAgePrompt,
 } from '../../services/foodAddAccess'
-import { addFoodSnapshotViaConvex } from '../../services/convexNutritionService'
+import {
+  addFoodSnapshotViaConvex,
+  pushConvexMeal,
+} from '../../services/convexNutritionService'
 import { getCalorieProfile, saveCalorieProfile } from '../../services/nutritionStorage'
 import { todayKey } from '../../utils/calories'
 import { AgeRequiredPrompt } from './AgeRequiredPrompt'
@@ -276,82 +281,94 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     }
     const type = pendingMealType ?? mealType
     const dateKey = todayKey()
-    let journal = getTodayJournal()
-    for (const sel of items) {
-      const hit = sel.hit
-      const snapshot = buildFoodNutritionSnapshot(hit)
-      if (sel.unit === 'pieces' && sel.pieces != null) {
-        snapshot.grams = undefined
-        const n = sel.pieces
-        snapshot.portionLabel =
-          sel.portionLabel?.trim() || (n === 1 ? '1 pièce' : `${n} pièces`)
-      } else if (sel.grams != null) {
-        snapshot.grams = sel.grams
-        snapshot.portionLabel = sel.portionLabel?.trim() || `${sel.grams} g`
-      }
-      const entry = {
-        ...mealEntryFromSnapshot(snapshot, type),
-        grams: sel.grams,
-        pieces: sel.pieces,
-        portionLabel: snapshot.portionLabel,
-        // V3 : null si inconnu (jamais || 0). OFF : legacy inchangé.
-        calories: foodAddV3
-          ? hit.calories == null
-            ? null
-            : snapshot.calories
-          : snapshot.calories,
-        proteinG: foodAddV3
-          ? hit.proteines == null
-            ? null
-            : snapshot.proteinG
-          : snapshot.proteinG,
-        carbsG: foodAddV3
-          ? hit.glucides == null
-            ? null
-            : snapshot.carbsG
-          : snapshot.carbsG,
-        fatG: foodAddV3
-          ? hit.lipides == null
-            ? null
-            : snapshot.fatG
-          : snapshot.fatG,
-      }
-      journal = addMealToToday(entry)
-      if (user) {
-        void persistScannedProductSelection(hit, user.id, (message) => {
-          showToast(message, 'error')
-        })
-        if (foodAddV3 && isConvexDomainActive()) {
-          void addFoodSnapshotViaConvex({
-            mealId: crypto.randomUUID(),
-            dateKey,
-            mealType: type,
-            name: snapshot.name,
-            portionLabel: snapshot.portionLabel,
-            offCode: snapshot.offCode,
-            imageUrl: snapshot.imageStorageId ? snapshot.imageUrl : undefined,
-            imageStorageId: snapshot.imageStorageId as never,
-            grams: sel.unit === 'pieces' ? undefined : (sel.grams ?? snapshot.grams),
-            pieces: sel.pieces,
-            updatedAt: snapshot.updatedAt,
-          }).catch((error: unknown) => {
+    void (async () => {
+      let journal = getTodayJournal()
+      let added = 0
+      for (const sel of items) {
+        const hit = sel.hit
+        const snapshot = buildFoodNutritionSnapshot(hit)
+        if (sel.unit === 'pieces' && sel.pieces != null) {
+          snapshot.grams = undefined
+          snapshot.portionLabel =
+            sel.portionLabel?.trim() || formatPiecesCountLabel(sel.pieces)
+        } else if (sel.grams != null) {
+          snapshot.grams = sel.grams
+          snapshot.portionLabel =
+            sel.portionLabel?.trim() || formatGramsCountLabel(sel.grams)
+        }
+        const mealId = crypto.randomUUID()
+        const entry = {
+          ...mealEntryFromSnapshot(snapshot, type),
+          id: mealId,
+          grams: sel.grams,
+          pieces: sel.pieces,
+          portionLabel: snapshot.portionLabel,
+          calories: foodAddV3
+            ? hit.calories == null
+              ? null
+              : snapshot.calories
+            : snapshot.calories,
+          proteinG: foodAddV3
+            ? hit.proteines == null
+              ? null
+              : snapshot.proteinG
+            : snapshot.proteinG,
+          carbsG: foodAddV3
+            ? hit.glucides == null
+              ? null
+              : snapshot.carbsG
+            : snapshot.carbsG,
+          fatG: foodAddV3
+            ? hit.lipides == null
+              ? null
+              : snapshot.fatG
+            : snapshot.fatG,
+        }
+
+        if (foodAddV3 && isConvexDomainActive() && user) {
+          try {
+            await addFoodSnapshotViaConvex({
+              mealId,
+              dateKey,
+              mealType: type,
+              name: snapshot.name,
+              portionLabel: snapshot.portionLabel,
+              offCode: snapshot.offCode,
+              imageUrl: snapshot.imageStorageId ? snapshot.imageUrl : undefined,
+              imageStorageId: snapshot.imageStorageId as never,
+              grams: sel.unit === 'pieces' ? undefined : (sel.grams ?? snapshot.grams),
+              pieces: sel.pieces,
+              updatedAt: snapshot.updatedAt,
+            })
+          } catch (error: unknown) {
             const qtyMsg = mapFoodAddQuantityError(error)
-            if (qtyMsg) {
-              showToast(qtyMsg, 'error')
-              return
+            if (qtyMsg) showToast(qtyMsg, 'error')
+            else {
+              const access = mapAccessError(error)
+              if (access) showToast(access.message, 'error')
+              else showToast("L'ajout n'a pas fonctionné. Réessaie.", 'error')
             }
-            const access = mapAccessError(error)
-            if (access) {
-              showToast(access.message, 'error')
-            }
+            continue
+          }
+          void persistScannedProductSelection(hit, user.id, (message) => {
+            showToast(message, 'error')
+          })
+        } else if (user) {
+          void persistScannedProductSelection(hit, user.id, (message) => {
+            showToast(message, 'error')
           })
         }
+
+        journal = addMealToToday(entry)
+        added += 1
       }
-    }
-    setMeals(journal.meals)
-    setPendingMealType(null)
-    resetForm()
-    showToast(items.length === 1 ? 'Aliment ajouté.' : `${items.length} aliments ajoutés.`)
+      setMeals(journal.meals)
+      setPendingMealType(null)
+      resetForm()
+      if (added > 0) {
+        showToast(added === 1 ? 'Aliment ajouté.' : `${added} aliments ajoutés.`)
+      }
+    })()
   }
 
   const handleScanSave = (entry: {
@@ -458,9 +475,51 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   }
 
   const handleEditSave = (mealId: string, patch: Partial<MealEntry>) => {
-    const journal = updateMealInToday(mealId, patch)
-    setMeals(journal.meals)
-    setEditingMeal(null)
+    if (patch.grams != null) {
+      const checked = validateFoodQuantity({ unit: 'g', value: patch.grams })
+      if (!checked.ok) {
+        showToast(foodAddQuantityUserMessage(checked.reason, checked.unit), 'error')
+        return
+      }
+      if (checked.unit !== 'g') return
+      patch = {
+        ...patch,
+        grams: checked.grams,
+        portionLabel: formatGramsCountLabel(checked.grams),
+        pieces: undefined,
+      }
+    }
+
+    const applyLocal = (nextPatch: Partial<MealEntry>) => {
+      const journal = updateMealInToday(mealId, nextPatch)
+      setMeals(journal.meals)
+      setEditingMeal(null)
+    }
+
+    if (foodAddV3 && isConvexDomainActive() && user) {
+      const current = getTodayJournal().meals.find((m) => m.id === mealId)
+      if (!current) return
+      const merged: MealEntry = { ...current, ...patch }
+      void pushConvexMeal(merged, todayKey(), Date.now())
+        .then((result) => {
+          applyLocal({
+            ...patch,
+            portionLabel: result.portionLabel ?? patch.portionLabel,
+          })
+        })
+        .catch((error: unknown) => {
+          const qtyMsg = mapFoodAddQuantityError(error)
+          if (qtyMsg) showToast(qtyMsg, 'error')
+          else {
+            const access = mapAccessError(error)
+            if (access) showToast(access.message, 'error')
+            else showToast('Modification refusée par le serveur.', 'error')
+          }
+        })
+      return
+    }
+
+    applyLocal(patch)
   }
 
   if (!hydrated) {

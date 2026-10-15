@@ -114,10 +114,16 @@ export async function pushConvexMeal(meal: MealEntry, dateKey: string, updatedAt
     fatG: meal.fatG ?? null,
     grams: meal.grams,
     pieces: meal.pieces,
+    portionLabel: meal.portionLabel,
     portionMode: meal.portionMode,
     createdAt: meal.createdAt,
     updatedAt,
-  }) as Promise<{ applied: boolean; stale: boolean; updatedAt: number }>
+  }) as Promise<{
+    applied: boolean
+    stale: boolean
+    updatedAt: number
+    portionLabel?: string
+  }>
 }
 
 export async function deleteConvexMeal(mealId: string, dateKey: string, deletedAt = Date.now()) {

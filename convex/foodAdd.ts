@@ -37,6 +37,9 @@ import {
 } from './lib/foodAddNutrients'
 import {
   FOOD_ADD_QUANTITY_INVALID,
+  formatGramsCountLabel,
+  formatPiecesCountLabel,
+  parsePortionGrams,
   validateFoodQuantity,
 } from './lib/foodAddQuantity'
 
@@ -187,7 +190,7 @@ export function resolveAddFoodSnapshotQuantity(input: {
     return {
       storeGrams,
       storePieces: n,
-      portionLabel: n === 1 ? '1 pièce' : `${n} pièces`,
+      portionLabel: formatPiecesCountLabel(n),
     }
   }
 
@@ -203,7 +206,7 @@ export function resolveAddFoodSnapshotQuantity(input: {
     storeGrams: qty.grams,
     storePieces: undefined,
     // Jamais le texte client — libellé serveur depuis la quantité validée.
-    portionLabel: `${qty.grams} g`,
+    portionLabel: formatGramsCountLabel(qty.grams),
   }
 }
 
@@ -705,13 +708,56 @@ export const addFoodSnapshot = mutation({
     void args.portionLabel
 
     const nutrientCache = await loadOffProductNutrients(ctx, args.offCode)
+
+    // Catalog existant — fallback nutriments si off_product_nutrients absent (B111-12).
+    const foodKey =
+      args.offCode?.trim() || args.name.trim()
+        ? normalizeFoodKey({ barcode: args.offCode, name: args.name })
+        : null
+    const catalog = foodKey
+      ? await ctx.db
+          .query('nutrition_food_catalog')
+          .withIndex('by_userId_foodKey', (q) => q.eq('userId', userId).eq('foodKey', foodKey))
+          .first()
+      : null
+
+    // B111-12 : off_product_nutrients d’abord, puis catalog, sinon null (par champ).
+    const nutrientForMeal: OffProductNutrientCache | null =
+      nutrientCache || catalog
+        ? {
+            caloriesPer100g: pickCatalogNutrient(
+              nutrientCache?.caloriesPer100g,
+              catalog?.caloriesPer100g,
+            ),
+            proteinPer100g: pickCatalogNutrient(
+              nutrientCache?.proteinPer100g,
+              catalog?.proteinPer100g,
+            ),
+            carbsPer100g: pickCatalogNutrient(
+              nutrientCache?.carbsPer100g,
+              catalog?.carbsPer100g,
+            ),
+            fatPer100g: pickCatalogNutrient(
+              nutrientCache?.fatPer100g,
+              catalog?.fatPer100g,
+            ),
+            servingSize:
+              nutrientCache?.servingSize ?? catalog?.servingSize ?? null,
+            servingGrams:
+              nutrientCache?.servingGrams ??
+              parseServingGrams(
+                nutrientCache?.servingSize ?? catalog?.servingSize ?? null,
+              ),
+          }
+        : null
+
     const { storeGrams, storePieces, portionLabel } = resolveAddFoodSnapshotQuantity({
       grams: args.grams,
       pieces: args.pieces,
-      servingGrams: nutrientCache?.servingGrams ?? null,
+      servingGrams: nutrientForMeal?.servingGrams ?? null,
     })
 
-    const computed = computeMealNutritionFromOffCache(nutrientCache, {
+    const computed = computeMealNutritionFromOffCache(nutrientForMeal, {
       grams: storeGrams,
       pieces: storePieces != null && storeGrams == null ? storePieces : undefined,
     })
@@ -740,37 +786,40 @@ export const addFoodSnapshot = mutation({
         return { applied: false, stale: true, updatedAt: existing.updatedAt }
       }
       await ctx.db.patch(existing._id, patch)
-      return { applied: true, stale: false, updatedAt: nextUpdatedAt }
+      // Fall through to catalog update when applicable.
+    } else {
+      await ctx.db.insert('nutrition_meals', {
+        userId,
+        mealId: args.mealId,
+        ...patch,
+        createdAt: args.createdAt ?? nextUpdatedAt,
+        schemaVersion: NUTRITION_SCHEMA_VERSION,
+      })
     }
 
-    await ctx.db.insert('nutrition_meals', {
-      userId,
-      mealId: args.mealId,
-      ...patch,
-      createdAt: args.createdAt ?? nextUpdatedAt,
-      schemaVersion: NUTRITION_SCHEMA_VERSION,
-    })
-
-    if (args.offCode?.trim() || args.name.trim()) {
-      const foodKey = normalizeFoodKey({
-        barcode: args.offCode,
-        name: args.name,
-      })
-      const catalog = await ctx.db
-        .query('nutrition_food_catalog')
-        .withIndex('by_userId_foodKey', (q) => q.eq('userId', userId).eq('foodKey', foodKey))
-        .first()
+    if (foodKey) {
+      // Architect B111-12 : off_product_nutrients → catalog existant → null.
+      // Jamais écraser une valeur existante avec null/0 ; jamais kcal client.
       const servingSize =
         typeof args.servingSize === 'string'
           ? args.servingSize.trim() || null
-          : (nutrientCache?.servingSize ?? null)
+          : (nutrientCache?.servingSize ?? catalog?.servingSize ?? null)
       const catalogPatch = {
         barcode: args.offCode?.trim() || undefined,
         name: mealName(args.name),
-        caloriesPer100g: nutrientCache?.caloriesPer100g ?? null,
-        proteinPer100g: nutrientCache?.proteinPer100g ?? null,
-        carbsPer100g: nutrientCache?.carbsPer100g ?? null,
-        fatPer100g: nutrientCache?.fatPer100g ?? null,
+        caloriesPer100g: pickCatalogNutrient(
+          nutrientCache?.caloriesPer100g,
+          catalog?.caloriesPer100g,
+        ),
+        proteinPer100g: pickCatalogNutrient(
+          nutrientCache?.proteinPer100g,
+          catalog?.proteinPer100g,
+        ),
+        carbsPer100g: pickCatalogNutrient(
+          nutrientCache?.carbsPer100g,
+          catalog?.carbsPer100g,
+        ),
+        fatPer100g: pickCatalogNutrient(nutrientCache?.fatPer100g, catalog?.fatPer100g),
         imageUrl: ownedImageUrl,
         imageStorageId: ownedStorageId,
         servingSize,
@@ -801,6 +850,18 @@ export const addFoodSnapshot = mutation({
     return { applied: true, stale: false, updatedAt: nextUpdatedAt }
   },
 })
+
+/** B111-12 — off_product_nutrients d’abord, sinon catalog, sinon null (jamais 0 inventé). */
+export function pickCatalogNutrient(
+  fromOff: number | null | undefined,
+  fromCatalog: number | null | undefined,
+): number | null {
+  if (typeof fromOff === 'number' && Number.isFinite(fromOff)) return fromOff
+  if (typeof fromCatalog === 'number' && Number.isFinite(fromCatalog) && fromCatalog !== 0) {
+    return fromCatalog
+  }
+  return null
+}
 
 /**
  * Journal V3 app-facing — name / quantité / unité (+ ids, timestamps).
@@ -890,6 +951,7 @@ export const __test = {
   assertOwnedImageArgs,
   resolveAddFoodSnapshotQuantity,
   throwFoodAddError,
+  pickCatalogNutrient,
   FOOD_SEARCH_DAILY_LIMIT,
   FOOD_ADD_ACCESS_DENIED_MINOR,
   FOOD_ADD_ACCESS_DENIED_TCA,
@@ -897,6 +959,9 @@ export const __test = {
   toDateKey,
   formatPortionLabelFromServing,
   parseServingGrams,
+  parsePortionGrams,
   computeMealNutritionFromOffCache,
   validateFoodQuantity,
+  formatPiecesCountLabel,
+  formatGramsCountLabel,
 }

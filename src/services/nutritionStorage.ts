@@ -597,13 +597,18 @@ export function saveTodayJournal(journal: DayJournal, opts?: StorageSaveOptions)
 
 export function addMealToDate(
   dateKey: string,
-  meal: Omit<MealEntry, 'id' | 'createdAt'> & { createdAt?: number; updatedAt?: number },
+  meal: Omit<MealEntry, 'id' | 'createdAt'> & {
+    id?: string
+    createdAt?: number
+    updatedAt?: number
+  },
 ): DayJournal {
   const journal = getJournalForDate(dateKey)
   const now = Date.now()
   const entry: MealEntry = {
     ...meal,
-    id: `meal-${now}-${Math.random().toString(36).slice(2, 7)}`,
+    // B111-14 : id optionnel pour aligner local ↔ serveur après OK.
+    id: meal.id ?? `meal-${now}-${Math.random().toString(36).slice(2, 7)}`,
     createdAt: meal.createdAt ?? now,
     updatedAt: meal.updatedAt ?? meal.createdAt ?? now,
   }
@@ -613,7 +618,11 @@ export function addMealToDate(
 }
 
 export function addMealToToday(
-  meal: Omit<MealEntry, 'id' | 'createdAt'> & { createdAt?: number; updatedAt?: number },
+  meal: Omit<MealEntry, 'id' | 'createdAt'> & {
+    id?: string
+    createdAt?: number
+    updatedAt?: number
+  },
 ): DayJournal {
   return addMealToDate(todayKey(), meal)
 }

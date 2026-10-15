@@ -138,5 +138,7 @@ describe('addFoodSnapshot — calcul serveur depuis off_product_nutrients', () =
     expect(__test.parseServingGrams('1 serving (100 g)')).toBe(100)
     expect(__test.parseServingGrams('1 piece')).toBeNull()
     expect(__test.parseServingGrams(null)).toBeNull()
+    // B111-14 : pièce unitaire (pas le total entre parenthèses).
+    expect(__test.parseServingGrams('2 x 25 g (50 g)')).toBe(25)
   })
 })

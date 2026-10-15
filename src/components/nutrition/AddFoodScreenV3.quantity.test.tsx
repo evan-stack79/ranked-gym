@@ -7,7 +7,10 @@ import type { OpenFoodFactsSearchHit } from '../../services/alimentsService'
 import {
   FOOD_ADD_QTY_MSG_ABOVE_MAX,
   FOOD_ADD_QTY_MSG_BELOW_MIN,
+  FOOD_ADD_QTY_MSG_INVALID_GRAMS,
+  FOOD_ADD_QTY_MSG_INVALID_PIECES,
 } from '../../../convex/lib/foodAddQuantity'
+import { getByText, queryByText } from './testGetByText'
 
 vi.mock('../../context/AuthContext', () => ({
   useAuth: () => ({
@@ -87,7 +90,7 @@ function setQtyInput(value: string) {
 }
 
 describe('AddFoodScreenV3 — limites quantité (B111-04/05/06)', () => {
-  it('champ vide : Valider désactivé (jamais 0)', async () => {
+  it('champ vide : Valider désactivé, aucun message (jamais 0) — B111-10', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const root = createRoot(host)
@@ -101,6 +104,62 @@ describe('AddFoodScreenV3 — limites quantité (B111-04/05/06)', () => {
       '[data-food-quantity-step] input[type="number"]',
     ) as HTMLInputElement
     expect(qtyInput.value).toBe('')
+    expect(document.querySelector('[data-food-qty-error]')).toBeNull()
+    expect(queryByText(document.body, FOOD_ADD_QTY_MSG_BELOW_MIN)).toBeNull()
+
+    await act(async () => {
+      root.unmount()
+    })
+    host.remove()
+  })
+
+  it('B111-10 : messages visibles sous le champ pour 0 / 2001 / 1.5 g / 1.3 pièce', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await openQuantityStep(root, host)
+    const confirm = () =>
+      document.querySelector('[data-testid="food-quantity-confirm"]') as HTMLButtonElement
+    const step = () =>
+      document.querySelector('[data-food-quantity-step]') as HTMLElement
+
+    await act(async () => {
+      setQtyInput('0')
+    })
+    expect(confirm().disabled).toBe(true)
+    expect(getByText(step(), 'Entre une quantité plus grande que 0.').textContent).toBe(
+      FOOD_ADD_QTY_MSG_BELOW_MIN,
+    )
+
+    await act(async () => {
+      setQtyInput('2001')
+    })
+    expect(confirm().disabled).toBe(true)
+    expect(getByText(step(), 'Vérifie ce chiffre, il semble trop grand.').textContent).toBe(
+      FOOD_ADD_QTY_MSG_ABOVE_MAX,
+    )
+
+    await act(async () => {
+      setQtyInput('1.5')
+    })
+    expect(confirm().disabled).toBe(true)
+    expect(getByText(step(), 'Entre un nombre entier de grammes.').textContent).toBe(
+      FOOD_ADD_QTY_MSG_INVALID_GRAMS,
+    )
+
+    const piecesBtn = Array.from(
+      document.querySelectorAll('[data-food-quantity-step] button'),
+    ).find((b) => b.textContent === 'Pièces') as HTMLButtonElement
+    await act(async () => {
+      piecesBtn.click()
+    })
+    await act(async () => {
+      setQtyInput('1.3')
+    })
+    expect(confirm().disabled).toBe(true)
+    expect(
+      getByText(step(), 'Utilise des demi-pièces : 0,5, 1, 1,5…').textContent,
+    ).toBe(FOOD_ADD_QTY_MSG_INVALID_PIECES)
 
     await act(async () => {
       root.unmount()

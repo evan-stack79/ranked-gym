@@ -12,6 +12,12 @@ import {
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
 import { assertFoodAddAccessFromStoredProfile } from './lib/foodAddAccess'
 import {
+  formatGramsCountLabel,
+  formatPiecesCountLabel,
+  FOOD_ADD_QUANTITY_INVALID,
+  validateFoodQuantity,
+} from './lib/foodAddQuantity'
+import {
   adminCorrectNutritionSafetyField,
   clearNutritionSafetyBoolField,
   type AdminCorrectableField,
@@ -334,6 +340,7 @@ export const upsertMeal = mutation({
     fatG: v.optional(v.union(v.number(), v.null())),
     grams: v.optional(v.number()),
     pieces: v.optional(v.number()),
+    portionLabel: v.optional(v.string()),
     portionMode: v.optional(v.union(v.literal('solo'), v.literal('with_sides'))),
     createdAt: v.optional(v.number()),
     updatedAt: v.optional(v.number()),
@@ -342,15 +349,51 @@ export const upsertMeal = mutation({
     applied: v.boolean(),
     stale: v.boolean(),
     updatedAt: v.number(),
+    portionLabel: v.optional(v.string()),
   }),
   handler: async (ctx, args) => {
     const userId = await assertFoodWriteAccess(ctx, args.sessionToken)
     const existing = await findMealRow(ctx, userId, args.mealId)
     const nextUpdatedAt = args.updatedAt ?? Date.now()
+
+    // B111-11 : valider grams/pieces si présents ; portionLabel réécrit serveur.
+    let storeGrams = args.grams
+    let storePieces = args.pieces
+    let portionLabel: string | undefined = args.portionLabel
+    const piecesPresent = args.pieces !== undefined
+    const gramsPresent = args.grams !== undefined
+    if (piecesPresent || gramsPresent) {
+      const qty = validateFoodQuantity({
+        unit: piecesPresent ? 'pieces' : 'g',
+        value: piecesPresent ? args.pieces : args.grams,
+      })
+      if (!qty.ok) {
+        throw new ConvexError({
+          code: FOOD_ADD_QUANTITY_INVALID,
+          reason: qty.reason,
+          unit: qty.unit,
+        })
+      }
+      if (qty.unit === 'pieces') {
+        storePieces = qty.pieces
+        storeGrams = undefined
+        portionLabel = formatPiecesCountLabel(qty.pieces)
+      } else {
+        storeGrams = qty.grams
+        storePieces = undefined
+        portionLabel = formatGramsCountLabel(qty.grams)
+      }
+    }
+
     if (existing) {
       assertUserOwnership(existing.userId, userId)
       if (existing.updatedAt > nextUpdatedAt) {
-        return { applied: false, stale: true, updatedAt: existing.updatedAt }
+        return {
+          applied: false,
+          stale: true,
+          updatedAt: existing.updatedAt,
+          portionLabel: existing.portionLabel,
+        }
       }
       await ctx.db.patch(existing._id, {
         dateKey: normalizeDateKey(args.dateKey),
@@ -360,13 +403,14 @@ export const upsertMeal = mutation({
         proteinG: args.proteinG,
         carbsG: args.carbsG,
         fatG: args.fatG,
-        grams: args.grams,
-        pieces: args.pieces,
+        grams: storeGrams,
+        pieces: storePieces,
+        portionLabel,
         portionMode: args.portionMode,
         updatedAt: nextUpdatedAt,
         deletedAt: undefined,
       })
-      return { applied: true, stale: false, updatedAt: nextUpdatedAt }
+      return { applied: true, stale: false, updatedAt: nextUpdatedAt, portionLabel }
     }
 
     await ctx.db.insert('nutrition_meals', {
@@ -379,14 +423,15 @@ export const upsertMeal = mutation({
       proteinG: args.proteinG,
       carbsG: args.carbsG,
       fatG: args.fatG,
-      grams: args.grams,
-      pieces: args.pieces,
+      grams: storeGrams,
+      pieces: storePieces,
+      portionLabel,
       portionMode: args.portionMode,
       createdAt: args.createdAt ?? nextUpdatedAt,
       updatedAt: nextUpdatedAt,
       schemaVersion: NUTRITION_SCHEMA_VERSION,
     })
-    return { applied: true, stale: false, updatedAt: nextUpdatedAt }
+    return { applied: true, stale: false, updatedAt: nextUpdatedAt, portionLabel }
   },
 })
 
