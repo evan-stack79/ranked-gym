@@ -1,0 +1,652 @@
+/*
+ * Ranked Gym — team animations adapted from ANIMATIONS_GRATUITES sources.
+ * Restyle via --rg-anim-* tokens. Accent = brand red only.
+ * Durations: all motion ≤ 600ms except play-button breathe (2 slow cycles).
+ * WCAG 2.2 SC 2.3.1: spark/glow flash ≤ 3×/s (play-once sparks ≥ 334ms).
+ */
+
+:root {
+  --rg-anim-accent: #ff2b2b;
+  --rg-anim-accent-soft: rgb(255 43 43 / 0.14);
+  --rg-anim-surface: #141416;
+  --rg-anim-scrim: rgb(12 12 14 / 0.72);
+  --rg-anim-curve: cubic-bezier(0.65, 0, 0.45, 1); /* haniotis */
+  --rg-anim-spring: cubic-bezier(0.16, 1, 0.3, 1); /* codefronts */
+  /* Debug capture: set html[data-rg-anim-slow="4"] to stretch ×4 (see block below). */
+  --rg-anim-slow: 1;
+
+  /* Cap every UI motion ≤ 600ms (play breathe excluded). */
+  --rg-session-total-ms: 580;
+  --rg-session-circle-dur: 420ms;
+  --rg-session-fill-dur: 280ms;
+  --rg-session-fill-delay: 220ms;
+  --rg-session-check-dur: 260ms;
+  --rg-session-check-delay: 300ms;
+  --rg-session-scale-dur: 220ms;
+  --rg-session-scale-delay: 360ms;
+  --rg-session-spark-dur: 400ms;
+  --rg-session-spark-delay: 280ms;
+  --rg-session-label-dur: 220ms;
+  --rg-session-label-delay: 320ms;
+
+  --rg-set-pop-dur: 400ms; /* wicked-catfish wave-46 */
+
+  --rg-tab-fade-dur: 180ms;
+  --rg-card-expand-dur: 280ms;
+  --rg-vt-dur: 280ms;
+
+  --rg-wave-card-dur: 420ms; /* codefronts fi-04, capped <600 */
+  --rg-wave-stagger: 40ms;
+
+  --rg-progress-fill-dur: 420ms;
+  --rg-progress-spark-dur: 400ms;
+
+  /* Exception: 2 slow cycles behind the play button — never blocks taps. */
+  --rg-play-breathe-dur: 900ms;
+  --rg-play-breathe-count: 2;
+}
+
+/* Slow-motion passes for QA capture. Base tokens stay ≤600ms for WCAG contract. */
+html[data-rg-anim-slow='2'] {
+  --rg-anim-slow: 2;
+  --rg-session-total-ms: 1160;
+  --rg-session-circle-dur: 840ms;
+  --rg-session-fill-dur: 560ms;
+  --rg-session-fill-delay: 440ms;
+  --rg-session-check-dur: 520ms;
+  --rg-session-check-delay: 600ms;
+  --rg-session-scale-dur: 440ms;
+  --rg-session-scale-delay: 720ms;
+  --rg-session-spark-dur: 800ms;
+  --rg-session-spark-delay: 560ms;
+  --rg-session-label-dur: 440ms;
+  --rg-session-label-delay: 640ms;
+  --rg-set-pop-dur: 800ms;
+  --rg-tab-fade-dur: 360ms;
+  --rg-card-expand-dur: 560ms;
+  --rg-vt-dur: 560ms;
+  --rg-wave-card-dur: 840ms;
+  --rg-wave-stagger: 80ms;
+  --rg-progress-fill-dur: 840ms;
+  --rg-progress-spark-dur: 800ms;
+  --rg-play-breathe-dur: 1800ms;
+}
+
+html[data-rg-anim-slow='4'] {
+  --rg-anim-slow: 4;
+  --rg-session-total-ms: 2320;
+  --rg-session-circle-dur: 1680ms;
+  --rg-session-fill-dur: 1120ms;
+  --rg-session-fill-delay: 880ms;
+  --rg-session-check-dur: 1040ms;
+  --rg-session-check-delay: 1200ms;
+  --rg-session-scale-dur: 880ms;
+  --rg-session-scale-delay: 1440ms;
+  --rg-session-spark-dur: 1600ms;
+  --rg-session-spark-delay: 1120ms;
+  --rg-session-label-dur: 880ms;
+  --rg-session-label-delay: 1280ms;
+  --rg-set-pop-dur: 1600ms;
+  --rg-tab-fade-dur: 720ms;
+  --rg-card-expand-dur: 1120ms;
+  --rg-vt-dur: 1120ms;
+  --rg-wave-card-dur: 1680ms;
+  --rg-wave-stagger: 160ms;
+  --rg-progress-fill-dur: 1680ms;
+  --rg-progress-spark-dur: 1600ms;
+  --rg-play-breathe-dur: 3600ms;
+}
+
+
+/* Streak overlay — ×2 */
+html[data-rg-anim-slow='2'] .streak-celeb::before { animation-duration: 400ms; }
+html[data-rg-anim-slow='2'] .streak-celeb { animation-duration: 360ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__flash { animation-duration: 360ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__ring { animation-duration: 1040ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__star { animation-duration: 960ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__particle { animation-duration: 1240ms; }
+html[data-rg-anim-slow='2'] .streak-celeb--compress .streak-celeb__flame-wrap { animation-duration: 600ms; }
+html[data-rg-anim-slow='2'] .streak-celeb--launch .streak-celeb__flame-wrap { animation-duration: 600ms; }
+html[data-rg-anim-slow='2'] .streak-celeb--lit .streak-celeb__flame-wrap,
+html[data-rg-anim-slow='2'] .streak-celeb--reveal .streak-celeb__flame-wrap,
+html[data-rg-anim-slow='2'] .streak-celeb--week .streak-celeb__flame-wrap,
+html[data-rg-anim-slow='2'] .streak-celeb--settled .streak-celeb__flame-wrap { animation-duration: 840ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__count--old { animation-duration: 640ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__count--new { animation-duration: 280ms; }
+/* Keep label/message near-full opacity — do not stretch into a long dim hold. */
+html[data-rg-anim-slow='2'] .streak-celeb__label { animation-duration: 160ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__message { animation-duration: 180ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__week { animation-duration: 1040ms; }
+html[data-rg-anim-slow='2'] .streak-celeb--week .streak-celeb__week-fill,
+html[data-rg-anim-slow='2'] .streak-celeb--settled .streak-celeb__week-fill { animation-duration: 1400ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__panther { animation-duration: 1040ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__panther--badge { animation-duration: 760ms; }
+html[data-rg-anim-slow='2'] .streak-celeb__day-flame { animation-duration: 720ms; }
+
+/* Streak overlay uses hardcoded ms in index.css — stretch the visible ones ×4. */
+html[data-rg-anim-slow='4'] .streak-celeb::before {
+  animation-duration: 800ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb {
+  animation-duration: 720ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__flash {
+  animation-duration: 720ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__ring {
+  animation-duration: 2080ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__star {
+  animation-duration: 1920ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__particle {
+  animation-duration: 2480ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb--compress .streak-celeb__flame-wrap {
+  animation-duration: 1200ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb--launch .streak-celeb__flame-wrap {
+  animation-duration: 1200ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb--lit .streak-celeb__flame-wrap,
+html[data-rg-anim-slow='4'] .streak-celeb--reveal .streak-celeb__flame-wrap,
+html[data-rg-anim-slow='4'] .streak-celeb--week .streak-celeb__flame-wrap,
+html[data-rg-anim-slow='4'] .streak-celeb--settled .streak-celeb__flame-wrap {
+  animation-duration: 1680ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__count--old {
+  animation-duration: 1280ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__count--new {
+  animation-duration: 360ms;
+}
+/* Cap label fade — full opacity almost immediately even in the 4× pass. */
+html[data-rg-anim-slow='4'] .streak-celeb__label {
+  animation-duration: 240ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__message {
+  animation-duration: 280ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__week {
+  animation-duration: 2080ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb--week .streak-celeb__week-fill,
+html[data-rg-anim-slow='4'] .streak-celeb--settled .streak-celeb__week-fill {
+  animation-duration: 2800ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__panther {
+  animation-duration: 2080ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__panther--badge {
+  animation-duration: 1520ms;
+}
+html[data-rg-anim-slow='4'] .streak-celeb__day-flame {
+  animation-duration: 1440ms;
+}
+
+/* ── 1. Fin de séance (haniotis KwvYLO + 12 sparks) ───────────── */
+.rg-session-burst {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding:
+    var(--app-safe-area-top, env(safe-area-inset-top, 0px))
+    var(--app-safe-area-right, env(safe-area-inset-right, 0px))
+    var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px))
+    var(--app-safe-area-left, env(safe-area-inset-left, 0px));
+  background: var(--rg-anim-scrim);
+  outline: none;
+  cursor: pointer;
+}
+
+.rg-session-burst__stage {
+  position: relative;
+  width: 5.5rem;
+  height: 5.5rem;
+  display: grid;
+  place-items: center;
+}
+
+/* Adapted from CodePen haniotis/KwvYLO — green → Ranked Gym red */
+.rg-session-burst__mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: block;
+  stroke-width: 2;
+  stroke: #fff;
+  stroke-miterlimit: 10;
+  box-shadow: inset 0 0 0 var(--rg-anim-accent);
+  animation:
+    rg-session-fill var(--rg-session-fill-dur) ease-in-out var(--rg-session-fill-delay) forwards,
+    rg-session-scale var(--rg-session-scale-dur) ease-in-out var(--rg-session-scale-delay) both;
+}
+
+.rg-session-burst__circle {
+  stroke-dasharray: 166;
+  stroke-dashoffset: 166;
+  stroke-width: 2;
+  stroke-miterlimit: 10;
+  stroke: var(--rg-anim-accent);
+  fill: none;
+  animation: rg-session-stroke var(--rg-session-circle-dur) var(--rg-anim-curve) forwards;
+}
+
+.rg-session-burst__check {
+  transform-origin: 50% 50%;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: rg-session-stroke var(--rg-session-check-dur) var(--rg-anim-curve)
+    var(--rg-session-check-delay) forwards;
+}
+
+.rg-session-burst__spark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px;
+  border-radius: 9999px;
+  background: var(--rg-anim-accent);
+  opacity: 0;
+  animation: rg-session-spark var(--rg-session-spark-dur) var(--ease-out)
+    var(--rg-session-spark-delay) both;
+  animation-iteration-count: 1;
+}
+
+/* 12 sparks — identical every session */
+.rg-session-burst__spark--0 { --sx: 44px; --sy: -40px; }
+.rg-session-burst__spark--1 { --sx: -42px; --sy: -36px; }
+.rg-session-burst__spark--2 { --sx: 48px; --sy: 8px; }
+.rg-session-burst__spark--3 { --sx: -46px; --sy: 14px; }
+.rg-session-burst__spark--4 { --sx: 12px; --sy: 48px; }
+.rg-session-burst__spark--5 { --sx: -10px; --sy: -52px; }
+.rg-session-burst__spark--6 { --sx: 36px; --sy: 36px; }
+.rg-session-burst__spark--7 { --sx: -38px; --sy: 34px; }
+.rg-session-burst__spark--8 { --sx: 52px; --sy: -12px; }
+.rg-session-burst__spark--9 { --sx: -50px; --sy: -8px; }
+.rg-session-burst__spark--10 { --sx: 22px; --sy: -48px; }
+.rg-session-burst__spark--11 { --sx: -24px; --sy: 46px; }
+
+.rg-session-burst__label {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+  opacity: 0;
+  animation: rg-session-label-in var(--rg-session-label-dur) var(--ease-out)
+    var(--rg-session-label-delay) both;
+}
+
+.rg-session-burst__skip {
+  margin-top: 0.25rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 1.25rem;
+  border-radius: 9999px;
+  border: 1px solid rgb(255 255 255 / 0.16);
+  background: rgb(255 255 255 / 0.06);
+  color: #aeaeb2;
+  font-size: 0.875rem;
+  font-weight: 600;
+  pointer-events: auto;
+}
+
+@keyframes rg-session-stroke {
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes rg-session-scale {
+  0%,
+  100% { transform: none; }
+  50% { transform: scale3d(1.1, 1.1, 1); }
+}
+
+@keyframes rg-session-fill {
+  100% { box-shadow: inset 0 0 0 30px var(--rg-anim-accent); }
+}
+
+@keyframes rg-session-spark {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) scale(0.6); }
+  40% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--sx), var(--sy), 0) scale(0.2); }
+}
+
+@keyframes rg-session-label-in {
+  from { opacity: 0; transform: translate3d(0, 6px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+/* ── 2. Série validée (wicked-catfish-29 boing → red) ─────────── */
+.rg-set-row--pop {
+  animation: rg-set-row-flash var(--rg-set-pop-dur) ease both;
+  animation-iteration-count: 1;
+}
+
+.rg-set-row--pop [data-rg-set-check] {
+  background: var(--rg-anim-accent) !important;
+  border-color: var(--rg-anim-accent);
+  color: #fff;
+  animation: rg-set-boing var(--rg-set-pop-dur) ease both;
+  animation-iteration-count: 1;
+}
+
+.rg-set-row--pop [data-rg-set-check] svg {
+  color: #fff;
+  stroke: #fff;
+}
+
+@keyframes rg-set-boing {
+  0% { transform: scale(0.72); }
+  55% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+@keyframes rg-set-row-flash {
+  0% { background-color: transparent; }
+  40% { background-color: var(--rg-anim-accent-soft); }
+  100% { background-color: transparent; }
+}
+
+/* ── 3. Tab fade + View Transitions card→page ─────────────────── */
+.rg-tab-fade {
+  position: relative;
+  min-height: 0;
+}
+
+.rg-tab-fade--crossing {
+  /* Reserve space while outgoing is absolutely stacked. */
+  min-height: 12rem;
+}
+
+.rg-tab-fade__layer--out {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  /* Stay fully painted under the incoming cover — never an empty hole. */
+  opacity: 1;
+}
+
+.rg-tab-fade__layer--in {
+  position: relative;
+  z-index: 1;
+  min-height: 0;
+}
+
+.rg-tab-fade__layer--in.rg-tab-fade--in {
+  /*
+   * Opaque app plate + fade-in: covers outgoing text (no double-print) while
+   * outgoing stays at opacity 1 underneath — never an empty hole over mesh-bg.
+   */
+  background: #0c0c0e;
+  animation: rg-tab-fade-in var(--rg-tab-fade-dur) var(--ease-out) both;
+}
+
+@keyframes rg-tab-fade-in {
+  /* Start mostly covered so outgoing never disappears into an empty hole. */
+  from { opacity: 0.55; transform: translate3d(0, 4px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+/* Fallback expand (no View Transitions support) */
+.rg-card-expand {
+  position: fixed;
+  z-index: 8500;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 20% 10%, color-mix(in srgb, var(--rg-anim-accent) 45%, transparent), transparent 55%),
+    var(--rg-anim-surface);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  pointer-events: none;
+  transition:
+    top var(--rg-card-expand-dur) var(--ease-out),
+    left var(--rg-card-expand-dur) var(--ease-out),
+    width var(--rg-card-expand-dur) var(--ease-out),
+    height var(--rg-card-expand-dur) var(--ease-out),
+    border-radius var(--rg-card-expand-dur) var(--ease-out);
+  will-change: top, left, width, height, border-radius;
+}
+
+.rg-card-expand--open {
+  border-color: transparent;
+}
+
+/* Keep expand readable — never a fully blank dark plate. */
+.rg-card-expand__body {
+  box-sizing: border-box;
+  width: 100%;
+  padding:
+    max(20px, calc(var(--app-safe-area-top, 0px) + 16px))
+    20px
+    20px;
+}
+
+.rg-card-expand__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.rg-card-expand__subtitle {
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #aeaeae;
+}
+
+/* Chrome same-document View Transitions */
+::view-transition-old(rg-card-expand),
+::view-transition-new(rg-card-expand) {
+  animation-duration: var(--rg-vt-dur);
+  animation-timing-function: var(--rg-anim-spring);
+}
+
+::view-transition-old(rg-page),
+::view-transition-new(rg-page) {
+  animation-duration: var(--rg-tab-fade-dur);
+  animation-timing-function: var(--ease-out);
+}
+
+[data-rg-vt-card] {
+  view-transition-name: rg-card-expand;
+}
+
+[data-rg-vt-page] {
+  view-transition-name: rg-page;
+}
+
+/* ── 4. Wave enter (codefronts fi-04 stagger fade-up) ─────────── */
+.rg-wave-enter--active .rg-wave-enter__card {
+  opacity: 0;
+  transform: translateY(16px);
+  animation: rg-wave-card-in var(--rg-wave-card-dur) var(--rg-anim-spring) both;
+}
+
+.rg-wave-enter--active .rg-wave-enter__card--0 { animation-delay: calc(var(--rg-wave-stagger) * 0); }
+.rg-wave-enter--active .rg-wave-enter__card--1 { animation-delay: calc(var(--rg-wave-stagger) * 1); }
+.rg-wave-enter--active .rg-wave-enter__card--2 { animation-delay: calc(var(--rg-wave-stagger) * 2); }
+.rg-wave-enter--active .rg-wave-enter__card--3 { animation-delay: calc(var(--rg-wave-stagger) * 3); }
+.rg-wave-enter--active .rg-wave-enter__card--4 { animation-delay: calc(var(--rg-wave-stagger) * 4); }
+
+@keyframes rg-wave-card-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    100deg,
+    rgb(255 255 255 / 0.04) 0%,
+    rgb(255 255 255 / 0.04) 35%,
+    color-mix(in srgb, var(--rg-anim-accent) 12%, transparent) 50%,
+    rgb(255 255 255 / 0.04) 65%,
+    rgb(255 255 255 / 0.04) 100%
+  );
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.2s var(--ease-in-out) infinite;
+}
+
+/* ── 5. Living progress (codefronts color-mix + sparks @100%) ─── */
+.rg-living-progress__track {
+  position: relative;
+  height: 0.625rem;
+  overflow: hidden;
+  border-radius: 9999px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  /* Fallback then color-mix (demo 08) */
+  background: rgb(255 255 255 / 0.08);
+}
+
+@supports (color: color-mix(in oklab, white 10%, transparent)) {
+  .rg-living-progress__track {
+    background: color-mix(in oklab, currentColor 15%, transparent);
+  }
+
+  .rg-living-progress__fill {
+    background: color-mix(in oklab, var(--rg-anim-accent) 90%, white 10%);
+  }
+}
+
+.rg-living-progress__fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--rg-anim-accent);
+  transform-origin: left center;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.16);
+}
+
+.rg-living-progress__sparks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.rg-living-progress__spark {
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px;
+  border-radius: 9999px;
+  background: var(--rg-anim-accent);
+  animation: rg-progress-spark var(--rg-progress-spark-dur) var(--ease-out) both;
+  animation-iteration-count: 1;
+}
+
+.rg-living-progress__spark--0 { --px: -8px; --py: -14px; animation-delay: 0ms; }
+.rg-living-progress__spark--1 { --px: -18px; --py: -6px; animation-delay: 40ms; }
+.rg-living-progress__spark--2 { --px: -4px; --py: 12px; animation-delay: 80ms; }
+.rg-living-progress__spark--3 { --px: -22px; --py: 8px; animation-delay: 120ms; }
+.rg-living-progress__spark--4 { --px: -12px; --py: -18px; animation-delay: 160ms; }
+
+@keyframes rg-progress-spark {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) scale(0.5); }
+  35% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--px), var(--py), 0) scale(0.15); }
+}
+
+/* ── 6a. Press-in (evil-monkey-41) via ios-press ──────────────── */
+.ios-press {
+  transition:
+    transform 120ms cubic-bezier(0.3, 0.7, 0.4, 1),
+    opacity 120ms var(--ease-out),
+    background-color 120ms var(--ease-out),
+    color 120ms var(--ease-out),
+    filter 120ms var(--ease-out);
+}
+
+.ios-press:active,
+.ios-press[data-pressed='true'] {
+  transform: scale(0.96) translateY(1px);
+  opacity: 0.92;
+  filter: brightness(0.96);
+}
+
+/* ── 6b. Play glow breathe ×2 (pink-ladybug-22 pulse, capped) ─── */
+.rg-play-breathe {
+  position: relative;
+  /* Glow lives behind the control — never blocks taps */
+  isolation: isolate;
+}
+
+.rg-play-breathe::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  z-index: -1;
+  pointer-events: none;
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--rg-anim-accent) 55%, transparent);
+  animation: rg-play-glow-breathe var(--rg-play-breathe-dur) cubic-bezier(0.8, 0, 0, 1)
+    var(--rg-play-breathe-count) both;
+}
+
+@keyframes rg-play-glow-breathe {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--rg-anim-accent) 70%, transparent);
+  }
+  45% {
+    box-shadow: 0 0 18px 16px color-mix(in srgb, var(--rg-anim-accent) 45%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 32px color-mix(in srgb, var(--rg-anim-accent) 0%, transparent);
+  }
+}
+
+/* Reduced motion — all team animations off */
+@media (prefers-reduced-motion: reduce) {
+  .rg-session-burst,
+  .rg-session-burst *,
+  .rg-set-row--pop,
+  .rg-set-row--pop [data-rg-set-check],
+  .rg-tab-fade--in,
+  .rg-card-expand,
+  .rg-wave-enter--active .rg-wave-enter__card,
+  .rg-living-progress__spark,
+  .rg-play-breathe,
+  .rg-play-breathe::before,
+  .skeleton-shimmer {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .rg-session-burst__mark {
+    box-shadow: inset 0 0 0 30px var(--rg-anim-accent) !important;
+  }
+
+  .rg-session-burst__circle,
+  .rg-session-burst__check {
+    stroke-dashoffset: 0 !important;
+  }
+
+  .rg-session-burst__label,
+  .rg-wave-enter--active .rg-wave-enter__card,
+  .rg-tab-fade--in {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .rg-card-expand {
+    display: none !important;
+  }
+
+  .ios-press:active,
+  .ios-press[data-pressed='true'] {
+    transform: none;
+    filter: none;
+  }
+}

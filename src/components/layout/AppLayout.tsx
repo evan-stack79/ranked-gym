@@ -9,6 +9,7 @@ import { useRestTimerContext, type RestPresetSec } from '../../context/RestTimer
 import type { TabId } from '../../types'
 import { useAdaptiveBottomNav } from '../../hooks/useAdaptiveBottomNav'
 import { shouldShowBrandHeader } from './shouldShowBrandHeader'
+import { TabPageTransition } from '../motion/TabPageTransition'
 
 interface AppLayoutProps {
   activeTab: TabId
@@ -145,7 +146,9 @@ export function AppLayout({
                 }
           }
         >
-          {children}
+          <TabPageTransition tabId={activeTab}>
+            <div data-rg-vt-page>{children}</div>
+          </TabPageTransition>
         </div>
       </main>
 
