@@ -26,13 +26,17 @@ import { HydrationProgressBar } from './HydrationProgressBar'
 import { WaterGoalChooser } from './WaterGoalChooser'
 import {
   listPersonalFoods,
+  mapAccessError,
   mapFoodAddQuantityError,
   searchOpenFoodFacts,
   setPersonalFoodFavorite,
   type OpenFoodFactsProduct,
   type OpenFoodFactsSearchHit,
 } from '../../services/alimentsService'
-import { validateFoodQuantity } from '../../../convex/lib/foodAddQuantity'
+import {
+  foodAddQuantityUserMessage,
+  validateFoodQuantity,
+} from '../../../convex/lib/foodAddQuantity'
 import { useAuth } from '../../context/AuthContext'
 import { IconBadge } from '../ui/IconBadge'
 import { MacroRing } from './MacroRing'
@@ -336,9 +340,9 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
               showToast(qtyMsg, 'error')
               return
             }
-            const message = error instanceof Error ? error.message : String(error)
-            if (message.includes('FOOD_ADD_ACCESS_DENIED')) {
-              showToast('Ajout d’aliment refusé par le serveur.', 'error')
+            const access = mapAccessError(error)
+            if (access) {
+              showToast(access.message, 'error')
             }
           })
         }
@@ -423,7 +427,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     if (foodAddV3) {
       const qty = validateFoodQuantity({ unit: 'g', value: manualGrams })
       if (!qty.ok) {
-        showToast(mapFoodAddQuantityError(new Error(`${qty.code}:${qty.reason}`))!, 'error')
+        showToast(foodAddQuantityUserMessage(qty.reason, qty.unit), 'error')
         return
       }
     }

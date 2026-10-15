@@ -4,12 +4,15 @@
  * 50.5 / 1000 pièces, pieces×servingGrams > 2000.
  * Acceptés : 1 g, 2000 g, 0.5 / 50 pièces.
  */
+import { ConvexError } from 'convex/values'
 import { describe, expect, it } from 'vitest'
 import { __test } from '../../convex/foodAdd'
 import {
   FOOD_ADD_QUANTITY_INVALID,
   FOOD_ADD_QTY_MSG_ABOVE_MAX,
   FOOD_ADD_QTY_MSG_BELOW_MIN,
+  FOOD_ADD_QTY_MSG_INVALID_GRAMS,
+  FOOD_ADD_QTY_MSG_INVALID_PIECES,
   foodAddQuantityUserMessage,
   validateFoodQuantity,
 } from '../../convex/lib/foodAddQuantity'
@@ -46,10 +49,16 @@ describe('validateFoodQuantity — source unique app + serveur', () => {
     if (!r.ok) expect(r.reason).toBe('above_max')
   })
 
-  it('rejette 1.5 g (pas entier)', () => {
+  it('rejette 1.5 g (pas entier) → message grams', () => {
     const r = validateFoodQuantity({ unit: 'g', value: 1.5 })
     expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toBe('invalid')
+    if (!r.ok) {
+      expect(r.reason).toBe('invalid')
+      expect(foodAddQuantityUserMessage(r.reason, r.unit)).toBe(FOOD_ADD_QTY_MSG_INVALID_GRAMS)
+      expect(foodAddQuantityUserMessage(r.reason, r.unit)).toBe(
+        'Entre un nombre entier de grammes.',
+      )
+    }
   })
 
   it('rejette 0 pièce', () => {
@@ -62,6 +71,18 @@ describe('validateFoodQuantity — source unique app + serveur', () => {
     const r = validateFoodQuantity({ unit: 'pieces', value: 0.3 })
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toBe('invalid')
+  })
+
+  it('rejette 1.3 pièce → message pieces', () => {
+    const r = validateFoodQuantity({ unit: 'pieces', value: 1.3 })
+    expect(r.ok).toBe(false)
+    if (!r.ok) {
+      expect(r.reason).toBe('invalid')
+      expect(foodAddQuantityUserMessage(r.reason, r.unit)).toBe(FOOD_ADD_QTY_MSG_INVALID_PIECES)
+      expect(foodAddQuantityUserMessage(r.reason, r.unit)).toBe(
+        'Utilise des demi-pièces : 0,5, 1, 1,5…',
+      )
+    }
   })
 
   it('rejette 50.5 pièces', () => {
@@ -114,21 +135,35 @@ describe('validateFoodQuantity — source unique app + serveur', () => {
   })
 
   it('message serveur mappé → exact FR (jamais le code brut)', () => {
-    expect(mapFoodAddQuantityError(new Error(`${FOOD_ADD_QUANTITY_INVALID}:below_min`))).toBe(
-      FOOD_ADD_QTY_MSG_BELOW_MIN,
-    )
-    expect(mapFoodAddQuantityError(new Error(`${FOOD_ADD_QUANTITY_INVALID}:above_max`))).toBe(
-      FOOD_ADD_QTY_MSG_ABOVE_MAX,
-    )
-    expect(mapFoodAddQuantityError(new Error(`${FOOD_ADD_QUANTITY_INVALID}:invalid`))).toBe(
-      foodAddQuantityUserMessage('invalid'),
-    )
-    expect(mapFoodAddQuantityError(new Error(`${FOOD_ADD_QUANTITY_INVALID}:above_max`))).toBe(
-      'Vérifie ce chiffre, il semble trop grand.',
-    )
-    expect(mapFoodAddQuantityError(new Error(`${FOOD_ADD_QUANTITY_INVALID}:below_min`))).toBe(
-      'Entre une quantité plus grande que 0.',
-    )
-    expect(mapFoodAddQuantityError(new Error('FOOD_ADD_ACCESS_DENIED'))).toBeNull()
+    expect(
+      mapFoodAddQuantityError(
+        new ConvexError({ code: FOOD_ADD_QUANTITY_INVALID, reason: 'below_min' }),
+      ),
+    ).toBe(FOOD_ADD_QTY_MSG_BELOW_MIN)
+    expect(
+      mapFoodAddQuantityError(
+        new ConvexError({ code: FOOD_ADD_QUANTITY_INVALID, reason: 'above_max' }),
+      ),
+    ).toBe(FOOD_ADD_QTY_MSG_ABOVE_MAX)
+    expect(
+      mapFoodAddQuantityError(
+        new ConvexError({
+          code: FOOD_ADD_QUANTITY_INVALID,
+          reason: 'invalid',
+          unit: 'g',
+        }),
+      ),
+    ).toBe(FOOD_ADD_QTY_MSG_INVALID_GRAMS)
+    expect(
+      mapFoodAddQuantityError(
+        new ConvexError({ code: FOOD_ADD_QUANTITY_INVALID, reason: 'above_max' }),
+      ),
+    ).toBe('Vérifie ce chiffre, il semble trop grand.')
+    expect(
+      mapFoodAddQuantityError(
+        new ConvexError({ code: FOOD_ADD_QUANTITY_INVALID, reason: 'below_min' }),
+      ),
+    ).toBe('Entre une quantité plus grande que 0.')
+    expect(mapFoodAddQuantityError(new ConvexError({ code: 'FOOD_ADD_ACCESS_DENIED' }))).toBeNull()
   })
 })

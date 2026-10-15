@@ -215,7 +215,7 @@ export function AddFoodScreenV3({
         servingGrams: qty.unit === 'pieces' ? servingGramsFor(hit) : null,
       })
       if (!checked.ok) {
-        setQtyError(foodAddQuantityUserMessage(checked.reason))
+        setQtyError(foodAddQuantityUserMessage(checked.reason, checked.unit))
         return
       }
       if (checked.unit === 'pieces') {
@@ -251,7 +251,7 @@ export function AddFoodScreenV3({
     }
     const checked = validateFoodQuantity({ unit: 'g', value: manualGrams })
     if (!checked.ok) {
-      setManualError(foodAddQuantityUserMessage(checked.reason))
+      setManualError(foodAddQuantityUserMessage(checked.reason, checked.unit))
       return
     }
     setManualError(null)

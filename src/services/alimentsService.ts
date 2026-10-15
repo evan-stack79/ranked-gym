@@ -1,6 +1,11 @@
 import { isConvexDomainActive } from '../backend/adapter'
 import { isFoodAddV3Enabled } from '../backend/foodAddV3FeatureFlag'
-import { foodAddQuantityUserMessage } from '../../convex/lib/foodAddQuantity'
+import {
+  FOOD_ADD_QUANTITY_INVALID,
+  foodAddQuantityUserMessage,
+  type FoodQuantityFailReason,
+  type FoodQuantityUnit,
+} from '../../convex/lib/foodAddQuantity'
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 import type { AlimentRow } from '../types/database'
 import { safeWarn } from '../utils/safeLog'
@@ -96,18 +101,47 @@ function mapCloudProduct(
   }
 }
 
-function mapAccessError(error: unknown): Error | null {
-  const message = error instanceof Error ? error.message : String(error)
-  if (message.includes('FOOD_SEARCH_DAILY_LIMIT')) {
+/** Lit error.data d’un ConvexError (prod) — jamais le message brut. */
+export function readFoodAddErrorData(error: unknown): {
+  code?: string
+  reason?: string
+  unit?: string
+} | null {
+  if (!error || typeof error !== 'object') return null
+  if (!('data' in error)) return null
+  const data = (error as { data: unknown }).data
+  if (typeof data === 'string') return { code: data }
+  if (data && typeof data === 'object' && 'code' in data) {
+    const record = data as { code?: unknown; reason?: unknown; unit?: unknown }
+    return {
+      code: typeof record.code === 'string' ? record.code : undefined,
+      reason: typeof record.reason === 'string' ? record.reason : undefined,
+      unit: typeof record.unit === 'string' ? record.unit : undefined,
+    }
+  }
+  return null
+}
+
+/** Mappe erreurs d’accès FOOD_ADD_* / quota → message FR (via error.data.code). */
+export function mapAccessError(error: unknown): Error | null {
+  const data = readFoodAddErrorData(error)
+  const code = data?.code ?? (error instanceof Error ? error.message : String(error))
+  if (code === 'FOOD_SEARCH_DAILY_LIMIT' || code.includes('FOOD_SEARCH_DAILY_LIMIT')) {
     return new Error('Limite quotidienne de recherches atteinte. Réessaie demain.')
   }
-  if (message.includes('age_required') || message.includes('FOOD_ADD_ACCESS_AGE_REQUIRED')) {
+  if (
+    code === 'age_required' ||
+    code === 'FOOD_ADD_ACCESS_AGE_REQUIRED' ||
+    code.includes('age_required') ||
+    code.includes('FOOD_ADD_ACCESS_AGE_REQUIRED')
+  ) {
     return new Error('Indique ton âge pour ajouter un aliment.')
   }
   if (
-    message.includes('FOOD_ADD_ACCESS_DENIED') ||
-    message.includes('FOOD_ADD_ACCESS_DENIED_MINOR') ||
-    message.includes('FOOD_ADD_ACCESS_DENIED_TCA')
+    code === 'FOOD_ADD_ACCESS_DENIED' ||
+    code === 'FOOD_ADD_ACCESS_DENIED_MINOR' ||
+    code === 'FOOD_ADD_ACCESS_DENIED_TCA' ||
+    code.includes('FOOD_ADD_ACCESS_DENIED')
   ) {
     return new Error('Ajout d’aliment indisponible pour ce compte.')
   }
@@ -116,11 +150,19 @@ function mapAccessError(error: unknown): Error | null {
 
 /** Mappe FOOD_ADD_QUANTITY_INVALID → message FR exact (jamais le code brut). */
 export function mapFoodAddQuantityError(error: unknown): string | null {
+  const data = readFoodAddErrorData(error)
+  if (data?.code === FOOD_ADD_QUANTITY_INVALID) {
+    const reason = (data.reason ?? 'invalid') as FoodQuantityFailReason
+    const unit = data.unit as FoodQuantityUnit | undefined
+    return foodAddQuantityUserMessage(reason, unit)
+  }
+  // Repli legacy (message string) — ne plus utilisé côté serveur.
   const message = error instanceof Error ? error.message : String(error)
   if (!message.includes('FOOD_ADD_QUANTITY_INVALID')) return null
   if (message.includes('above_max')) return foodAddQuantityUserMessage('above_max')
   if (message.includes('below_min')) return foodAddQuantityUserMessage('below_min')
-  return foodAddQuantityUserMessage('invalid')
+  if (message.includes('pieces')) return foodAddQuantityUserMessage('invalid', 'pieces')
+  return foodAddQuantityUserMessage('invalid', 'g')
 }
 
 /**

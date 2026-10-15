@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 import { api, internal } from './_generated/api'
 import {
   action,
@@ -90,7 +90,7 @@ async function sessionUserId(ctx: SessionCtx, sessionToken: string): Promise<str
 async function assertFoodWriteAccess(ctx: SessionCtx, sessionToken: string): Promise<string> {
   const user = await requireSessionUser(ctx, sessionToken)
   const access = await assertFoodAddAccessFromStoredProfile(ctx, user.userId)
-  if (!access.ok) throw new Error(access.error)
+  if (!access.ok) throw new ConvexError({ code: access.error })
   return user.userId
 }
 
@@ -98,7 +98,7 @@ async function assertActionSession(ctx: ActionCtx, sessionToken: string): Promis
   const session = await ctx.runQuery(api.auth.getSession, { sessionToken })
   if (!session) throw new Error('Not authenticated')
   const access = await ctx.runQuery(api.nutrition.checkFoodAddAccess, { sessionToken })
-  if (!access.ok) throw new Error(access.error)
+  if (!access.ok) throw new ConvexError({ code: access.error })
   return session.userId
 }
 

@@ -5,7 +5,7 @@
  *
  * Ne pas déployer depuis ce dépôt — le Studio Manager gère Convex prod.
  */
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 import { api, internal } from './_generated/api'
 import type { Id } from './_generated/dataModel'
 import {
@@ -39,6 +39,15 @@ import {
   FOOD_ADD_QUANTITY_INVALID,
   validateFoodQuantity,
 } from './lib/foodAddQuantity'
+
+/** Toutes les erreurs FOOD_ADD_* passent par ConvexError (data.code visible en prod). */
+function throwFoodAddError(data: {
+  code: string
+  reason?: string
+  unit?: 'g' | 'pieces'
+}): never {
+  throw new ConvexError(data)
+}
 
 const OFF_USER_AGENT = 'RankedGym/1.0 (support@rankedgym.app)'
 const OFF_TIMEOUT_MS = 8_000
@@ -128,10 +137,73 @@ export function assertOwnedImageArgs(input: {
   const storageId = input.imageStorageId
   if (!url && !storageId) return
   if (url && /openfoodfacts\.org/i.test(url)) {
-    throw new Error('FOOD_ADD_IMAGE_NOT_OWNED')
+    throwFoodAddError({ code: 'FOOD_ADD_IMAGE_NOT_OWNED' })
   }
   if (!storageId) {
-    throw new Error('FOOD_ADD_IMAGE_NOT_OWNED')
+    throwFoodAddError({ code: 'FOOD_ADD_IMAGE_NOT_OWNED' })
+  }
+}
+
+/**
+ * Quantité addFoodSnapshot — toujours valider si grams/pieces présent (même -5/0/NaN).
+ * Ni l’un ni l’autre → below_min. portionLabel grams écrit côté serveur uniquement.
+ */
+export function resolveAddFoodSnapshotQuantity(input: {
+  grams?: number
+  pieces?: number
+  servingGrams?: number | null
+}): {
+  storeGrams: number | undefined
+  storePieces: number | undefined
+  portionLabel: string
+} {
+  const piecesPresent = input.pieces !== undefined
+  const gramsPresent = input.grams !== undefined
+
+  if (!piecesPresent && !gramsPresent) {
+    throwFoodAddError({
+      code: FOOD_ADD_QUANTITY_INVALID,
+      reason: 'below_min',
+    })
+  }
+
+  if (piecesPresent) {
+    const qty = validateFoodQuantity({
+      unit: 'pieces',
+      value: input.pieces,
+      servingGrams: input.servingGrams ?? null,
+    })
+    if (!qty.ok || qty.unit !== 'pieces') {
+      throwFoodAddError({
+        code: FOOD_ADD_QUANTITY_INVALID,
+        reason: !qty.ok ? qty.reason : 'invalid',
+        unit: 'pieces',
+      })
+    }
+    const n = qty.pieces
+    const sg = input.servingGrams
+    const storeGrams =
+      typeof sg === 'number' && Number.isFinite(sg) && sg > 0 ? n * sg : undefined
+    return {
+      storeGrams,
+      storePieces: n,
+      portionLabel: n === 1 ? '1 pièce' : `${n} pièces`,
+    }
+  }
+
+  const qty = validateFoodQuantity({ unit: 'g', value: input.grams })
+  if (!qty.ok || qty.unit !== 'g') {
+    throwFoodAddError({
+      code: FOOD_ADD_QUANTITY_INVALID,
+      reason: !qty.ok ? qty.reason : 'invalid',
+      unit: 'g',
+    })
+  }
+  return {
+    storeGrams: qty.grams,
+    storePieces: undefined,
+    // Jamais le texte client — libellé serveur depuis la quantité validée.
+    portionLabel: `${qty.grams} g`,
   }
 }
 
@@ -239,7 +311,7 @@ export const reserveFoodSearch = mutation({
     const user = await requireSessionUser(ctx, args.sessionToken)
     const access = await assertFoodAddAccessFromStoredProfile(ctx, user.userId)
     if (!access.ok) {
-      throw new Error(access.error)
+      throwFoodAddError({ code: access.error })
     }
     return reserveFoodSearchForUserId(ctx, user.userId)
   },
@@ -601,7 +673,7 @@ export const addFoodSnapshot = mutation({
     const user = await requireSessionUser(ctx, args.sessionToken)
     const access = await assertFoodAddAccessFromStoredProfile(ctx, user.userId)
     if (!access.ok) {
-      throw new Error(access.error)
+      throwFoodAddError({ code: access.error })
     }
 
     assertOwnedImageArgs({
@@ -613,7 +685,7 @@ export const addFoodSnapshot = mutation({
     let ownedStorageId = args.imageStorageId
     if (ownedStorageId) {
       const url = await ctx.storage.getUrl(ownedStorageId)
-      if (!url) throw new Error('FOOD_ADD_IMAGE_NOT_OWNED')
+      if (!url) throwFoodAddError({ code: 'FOOD_ADD_IMAGE_NOT_OWNED' })
       ownedImageUrl = url
     }
 
@@ -629,50 +701,19 @@ export const addFoodSnapshot = mutation({
     void args.proteinG
     void args.carbsG
     void args.fatG
+    // portionLabel client ignoré en mode grams — le serveur l’écrit (A2).
+    void args.portionLabel
 
     const nutrientCache = await loadOffProductNutrients(ctx, args.offCode)
-    const hasPieces =
-      typeof args.pieces === 'number' && Number.isFinite(args.pieces) && args.pieces > 0
-    const hasGrams =
-      typeof args.grams === 'number' && Number.isFinite(args.grams) && args.grams > 0
-
-    if (hasPieces || hasGrams) {
-      const qty = validateFoodQuantity({
-        unit: hasPieces ? 'pieces' : 'g',
-        value: hasPieces ? args.pieces! : args.grams!,
-        servingGrams: nutrientCache?.servingGrams ?? null,
-      })
-      if (!qty.ok) {
-        throw new Error(`${FOOD_ADD_QUANTITY_INVALID}:${qty.reason}`)
-      }
-    }
-
-    // Pièces : stocke le compte ; grams = pieces × servingGrams si connu, sinon null.
-    let storeGrams: number | undefined
-    let storePieces: number | undefined
-    let portionLabel: string
-    if (hasPieces) {
-      storePieces = args.pieces
-      const sg = nutrientCache?.servingGrams
-      storeGrams =
-        typeof sg === 'number' && sg > 0 ? args.pieces! * sg : undefined
-      const rawLabel = args.portionLabel.trim()
-      // Jamais « pour 100 g » en mode pièces.
-      if (rawLabel && !/pour\s*100\s*g/i.test(rawLabel)) {
-        portionLabel = rawLabel.slice(0, 80)
-      } else {
-        const n = args.pieces!
-        portionLabel = n === 1 ? '1 pièce' : `${n} pièces`
-      }
-    } else {
-      storeGrams = hasGrams ? args.grams : undefined
-      storePieces = undefined
-      portionLabel = args.portionLabel.trim().slice(0, 80) || 'pour 100 g'
-    }
+    const { storeGrams, storePieces, portionLabel } = resolveAddFoodSnapshotQuantity({
+      grams: args.grams,
+      pieces: args.pieces,
+      servingGrams: nutrientCache?.servingGrams ?? null,
+    })
 
     const computed = computeMealNutritionFromOffCache(nutrientCache, {
       grams: storeGrams,
-      pieces: hasPieces && storeGrams == null ? args.pieces : undefined,
+      pieces: storePieces != null && storeGrams == null ? storePieces : undefined,
     })
 
     const patch = {
@@ -847,6 +888,8 @@ export const listJournalEntriesV3 = query({
 export const __test = {
   mapOffProduct,
   assertOwnedImageArgs,
+  resolveAddFoodSnapshotQuantity,
+  throwFoodAddError,
   FOOD_SEARCH_DAILY_LIMIT,
   FOOD_ADD_ACCESS_DENIED_MINOR,
   FOOD_ADD_ACCESS_DENIED_TCA,
