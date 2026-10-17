@@ -1,5 +1,1 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Ranked Gym">
-  <rect width="64" height="64" rx="14" fill="#0C0C0E"/>
-  <image href="/favicon.png" x="0" y="0" width="64" height="64"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" aria-label="Ranked Gym" role="img" viewBox="0 0 64 64"><rect width="64" height="64" fill="#0C0C0E" rx="14"/><image width="64" height="64" x="0" y="0" href="/favicon.png"/></svg>
