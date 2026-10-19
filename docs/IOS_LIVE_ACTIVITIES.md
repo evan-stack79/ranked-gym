@@ -43,6 +43,21 @@ La mesure **BPM** (PPG caméra) n’utilise pas la Dynamic Island. Elle passe pa
 
 Workflow unsigned : `.github/workflows/build-ipa.yml` (`macos-latest`, `CODE_SIGNING_ALLOWED=NO`, artifact `.ipa`).
 
+### Secrets obligatoires (sinon bandeau rouge au lancement)
+
+Vite fige `VITE_*` au `npm run build`. Sans eux, l’IPA affiche
+« Connexion au service indisponible » (`SupabaseConfigBanner`) même avec du Wi‑Fi.
+
+Dans **GitHub → Settings → Secrets and variables → Actions**, ajoute au minimum :
+
+| Secret | Même valeur que |
+|--------|-----------------|
+| `VITE_SUPABASE_URL` | Cloudflare Workers Build env |
+| `VITE_SUPABASE_ANON_KEY` | Cloudflare Workers Build env (clé anon) |
+
+Optionnel : `VITE_CONVEX_URL`, `VITE_PUBLIC_APP_URL`, `VITE_GOOGLE_MAPS_API_KEY`.
+Puis relance le workflow **Build IPA** et réinstalle l’artifact.
+
 ## UI Live Activity (dark)
 
 - Titre : **Temps de repos**

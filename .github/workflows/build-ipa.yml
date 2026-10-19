@@ -54,7 +54,33 @@ jobs:
       - name: Install JS deps
         run: npm ci
 
+      # Vite embeds VITE_* at build time. Without these, the native shell shows
+      # "Connexion au service indisponible" (SupabaseConfigBanner).
+      # Same values as Cloudflare Workers → Settings → Variables and Secrets → Build
+      # (docs/CLOUDFLARE_WORKERS.md). Add as repo Actions secrets.
+      - name: Preflight Vite env for IPA
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VITE_SUPABASE_URL:-}" ] || [ -z "${VITE_SUPABASE_ANON_KEY:-}" ]; then
+            echo "::error::Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY for the IPA web build."
+            echo "Repo → Settings → Secrets and variables → Actions → New repository secret"
+            echo "Copy the same Build env values used on Cloudflare Workers (docs/CLOUDFLARE_WORKERS.md)."
+            exit 1
+          fi
+          echo "Vite env preflight OK (Supabase URL length=${#VITE_SUPABASE_URL}, anon key length=${#VITE_SUPABASE_ANON_KEY})"
+
       - name: Build web assets
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL }}
+          VITE_ENABLE_CONVEX_AUTH: ${{ secrets.VITE_ENABLE_CONVEX_AUTH }}
+          VITE_ENABLE_CONVEX_PRIMARY: ${{ secrets.VITE_ENABLE_CONVEX_PRIMARY }}
+          VITE_PUBLIC_APP_URL: ${{ secrets.VITE_PUBLIC_APP_URL }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
         run: npm run build
 
       - name: Sync Capacitor iOS
