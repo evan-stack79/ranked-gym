@@ -13,7 +13,9 @@ public class RestTimerLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "isAvailable", returnType: CAPPluginReturnPromise),
     ]
 
-    private var currentActivity: Activity<RestTimerAttributes>?
+    /// Opaque box so `Activity` (iOS 16.1+) is never a stored property type on a
+    /// plugin compiled against the App deployment target (iOS 15.0).
+    private var currentActivityBox: Any?
 
     @objc func isAvailable(_ call: CAPPluginCall) {
         if #available(iOS 16.2, *) {
@@ -49,7 +51,7 @@ public class RestTimerLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                     content: .init(state: state, staleDate: nil),
                     pushType: nil
                 )
-                self.currentActivity = activity
+                self.currentActivityBox = activity
                 call.resolve(["activityId": activity.id])
             } catch {
                 call.reject("Unable to start Live Activity", nil, error)
@@ -67,7 +69,7 @@ public class RestTimerLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         let subtitle = call.getString("subtitle")
 
         Task {
-            guard let activity = self.currentActivity else {
+            guard let activity = self.currentActivityBox as? Activity<RestTimerAttributes> else {
                 call.resolve()
                 return
             }
@@ -87,22 +89,24 @@ public class RestTimerLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         let immediate = call.getBool("immediate") ?? true
 
         Task {
-            await self.endCurrentActivity(
-                dismissalPolicy: immediate ? .immediate : .default
-            )
+            if #available(iOS 16.2, *) {
+                await self.endCurrentActivity(
+                    dismissalPolicy: immediate ? .immediate : .default
+                )
+            }
             call.resolve()
         }
     }
 
     @available(iOS 16.2, *)
     private func endCurrentActivity(dismissalPolicy: ActivityUIDismissalPolicy) async {
-        if let activity = currentActivity {
+        if let activity = currentActivityBox as? Activity<RestTimerAttributes> {
             let finalState = activity.content.state
             await activity.end(
                 .init(state: finalState, staleDate: nil),
                 dismissalPolicy: dismissalPolicy
             )
-            currentActivity = nil
+            currentActivityBox = nil
             return
         }
 
