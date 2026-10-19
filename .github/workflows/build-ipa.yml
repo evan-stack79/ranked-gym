@@ -59,20 +59,27 @@ jobs:
           VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL }}
         run: |
           set -euo pipefail
-          if [[ -z "${VITE_CONVEX_URL:-}" ]]; then
+          RAW_CONVEX_URL="${VITE_CONVEX_URL:-}"
+          SANITIZED_CONVEX_URL="${RAW_CONVEX_URL%\"}"
+          SANITIZED_CONVEX_URL="${SANITIZED_CONVEX_URL#\"}"
+          SANITIZED_CONVEX_URL="${SANITIZED_CONVEX_URL%\'}"
+          SANITIZED_CONVEX_URL="${SANITIZED_CONVEX_URL#\'}"
+
+          if [[ -z "$SANITIZED_CONVEX_URL" ]]; then
             echo "::error::Missing VITE_CONVEX_URL for the IPA web build."
             echo "Add the repository secret at Settings > Secrets and variables > Actions."
             exit 1
           fi
-          if [[ ! "$VITE_CONVEX_URL" =~ ^https://[A-Za-z0-9._-]+\.convex\.cloud/?$ ]]; then
+          if [[ ! "$SANITIZED_CONVEX_URL" =~ ^https://[A-Za-z0-9._-]+\.(convex\.cloud|convex\.site)/?$ ]]; then
             echo "::error::VITE_CONVEX_URL must be an HTTPS Convex deployment URL."
             exit 1
           fi
+          echo "VITE_CONVEX_URL_SANITIZED=$SANITIZED_CONVEX_URL" >> "$GITHUB_ENV"
 
       - name: Build web assets
         run: npm run build
         env:
-          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL }}
+          VITE_CONVEX_URL: ${{ env.VITE_CONVEX_URL_SANITIZED }}
           VITE_ENABLE_CONVEX_AUTH: "true"
           VITE_ENABLE_CONVEX_PRIMARY: "true"
 
