@@ -64,7 +64,8 @@ jobs:
             echo "Add the repository secret at Settings > Secrets and variables > Actions."
             exit 1
           fi
-          if [[ ! "$VITE_CONVEX_URL" =~ ^https://[A-Za-z0-9._-]+\.convex\.cloud/?$ ]]; then
+          convex_url="$(printf '%s' "$VITE_CONVEX_URL" | sed -E "s/^[[:space:]\"']+//; s/[[:space:]\"']+$//")"
+          if [[ ! "$convex_url" =~ ^https://[A-Za-z0-9._-]+\.convex\.(cloud|site)/?$ ]]; then
             echo "::error::VITE_CONVEX_URL must be an HTTPS Convex deployment URL."
             exit 1
           fi
