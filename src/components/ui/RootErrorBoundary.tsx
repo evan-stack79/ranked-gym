@@ -36,6 +36,20 @@ export class RootErrorBoundary extends Component<Props, State> {
         >
           <h1 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Ranked Gym</h1>
           <p style={{ marginTop: '0.75rem', fontSize: '1.05rem', fontWeight: 600 }}>{USER_CRASH_TITLE}</p>
+          <p
+            style={{
+              marginTop: '1rem',
+              color: '#FF2B2B',
+              fontSize: '1rem',
+              fontWeight: 800,
+              lineHeight: 1.45,
+              overflowWrap: 'anywhere',
+            }}
+            role="alert"
+            data-boot-error-message="1"
+          >
+            {this.state.error.message || String(this.state.error)}
+          </p>
           <p style={{ marginTop: '0.5rem', color: '#AEAEB2', fontSize: '0.9375rem' }}>{USER_CRASH_BODY}</p>
           <button
             type="button"

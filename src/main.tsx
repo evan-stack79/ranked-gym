@@ -31,6 +31,21 @@ function requireRoot(): HTMLElement {
   return el
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function renderBootError(rootEl: HTMLElement, error: unknown) {
+  rootEl.innerHTML = ''
+  const panel = document.createElement('div')
+  panel.setAttribute('role', 'alert')
+  panel.setAttribute('data-boot-error-message', '1')
+  panel.style.cssText =
+    'min-height:100vh;background:#0C0C0E;color:#FF2B2B;font:800 18px/1.5 system-ui,sans-serif;padding:32px 20px;overflow-wrap:anywhere;'
+  panel.textContent = `Erreur au démarrage : ${errorMessage(error)}`
+  rootEl.appendChild(panel)
+}
+
 const rootEl = requireRoot()
 const QA_FIXTURES_ENABLED =
   import.meta.env.DEV || import.meta.env.VITE_ENABLE_QA_FIXTURES === 'true'
@@ -82,20 +97,26 @@ async function boot() {
   try {
     await initSecureAuthStorage()
     await initSecureLocalStore()
-  } catch {
+  } catch (error) {
     /* least-bad web fallback already used by storage adapters */
+    console.error('[boot] secure storage initialization failed', error)
   }
 
-  const tree = resolveBootTree()
-  createRoot(rootEl).render(
-    <StrictMode>
-      <RootErrorBoundary>
-        <ConvexClientProvider>
-          {isColdLaunchPath() ? <AppColdLaunch>{tree}</AppColdLaunch> : tree}
-        </ConvexClientProvider>
-      </RootErrorBoundary>
-    </StrictMode>,
-  )
+  try {
+    const tree = resolveBootTree()
+    createRoot(rootEl).render(
+      <StrictMode>
+        <RootErrorBoundary>
+          <ConvexClientProvider>
+            {isColdLaunchPath() ? <AppColdLaunch>{tree}</AppColdLaunch> : tree}
+          </ConvexClientProvider>
+        </RootErrorBoundary>
+      </StrictMode>,
+    )
+  } catch (error) {
+    console.error('[boot] application initialization failed', error)
+    renderBootError(rootEl, error)
+  }
 }
 
 void boot()
