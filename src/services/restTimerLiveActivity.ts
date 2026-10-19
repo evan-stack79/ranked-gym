@@ -1,4 +1,4 @@
-import { registerPlugin } from '@capacitor/core'
+import { Capacitor, registerPlugin } from '@capacitor/core'
 import { safeWarn } from '../utils/safeLog'
 
 export type RestLiveActivityPayload = {
@@ -36,14 +36,7 @@ const RestTimerLiveActivity = registerPlugin<RestTimerLiveActivityNative>('RestT
 let availabilityCache: boolean | null = null
 
 export function isNativeIosShell(): boolean {
-  if (typeof window === 'undefined') return false
-  const cap = window.Capacitor as
-    | { getPlatform?: () => string; isNativePlatform?: () => boolean }
-    | undefined
-  if (!cap) return false
-  if (cap.isNativePlatform?.() === false) return false
-  const platform = cap.getPlatform?.()
-  return platform === 'ios'
+  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
 }
 
 export async function isRestLiveActivityAvailable(): Promise<boolean> {

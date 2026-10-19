@@ -5,8 +5,14 @@ const start = vi.fn(async () => ({ activityId: 'a1' }))
 const update = vi.fn(async () => {})
 const end = vi.fn(async () => {})
 const isAvailable = vi.fn(async () => ({ available: true }))
+const isNativePlatform = vi.fn(() => true)
+const getPlatform = vi.fn(() => 'ios')
 
 vi.mock('@capacitor/core', () => ({
+  Capacitor: {
+    isNativePlatform: () => isNativePlatform(),
+    getPlatform: () => getPlatform(),
+  },
   registerPlugin: () => ({ start, update, end, isAvailable }),
 }))
 
@@ -18,10 +24,10 @@ describe('restTimerLiveActivity bridge', () => {
     end.mockClear()
     isAvailable.mockClear()
     isAvailable.mockResolvedValue({ available: true })
-    ;(window as unknown as { Capacitor?: unknown }).Capacitor = {
-      isNativePlatform: () => true,
-      getPlatform: () => 'ios',
-    }
+    isNativePlatform.mockReset()
+    getPlatform.mockReset()
+    isNativePlatform.mockReturnValue(true)
+    getPlatform.mockReturnValue('ios')
   })
 
   it('forwards start/update/end to the native plugin on iOS', async () => {
@@ -45,10 +51,8 @@ describe('restTimerLiveActivity bridge', () => {
   })
 
   it('no-ops on web', async () => {
-    ;(window as unknown as { Capacitor?: unknown }).Capacitor = {
-      isNativePlatform: () => false,
-      getPlatform: () => 'web',
-    }
+    isNativePlatform.mockReturnValue(false)
+    getPlatform.mockReturnValue('web')
     const mod = await import('./restTimerLiveActivity')
     await mod.startRestLiveActivity({ remainingSec: 30, totalSec: 30 })
     expect(start).not.toHaveBeenCalled()
