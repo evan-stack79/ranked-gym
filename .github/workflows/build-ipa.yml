@@ -60,10 +60,15 @@ jobs:
         run: |
           set -euo pipefail
           RAW_CONVEX_URL="${VITE_CONVEX_URL:-}"
-          SANITIZED_CONVEX_URL="${RAW_CONVEX_URL%\"}"
+          SANITIZED_CONVEX_URL="${RAW_CONVEX_URL//$'\r'/}"
+          SANITIZED_CONVEX_URL="${SANITIZED_CONVEX_URL#"${SANITIZED_CONVEX_URL%%[![:space:]]*}"}"
+          SANITIZED_CONVEX_URL="${SANITIZED_CONVEX_URL%"${SANITIZED_CONVEX_URL##*[![:space:]]}"}"
+          SANITIZED_CONVEX_URL="${SANITIZED_CONVEX_URL%\"}"
           SANITIZED_CONVEX_URL="${SANITIZED_CONVEX_URL#\"}"
           SANITIZED_CONVEX_URL="${SANITIZED_CONVEX_URL%\'}"
           SANITIZED_CONVEX_URL="${SANITIZED_CONVEX_URL#\'}"
+          SANITIZED_CONVEX_URL="${SANITIZED_CONVEX_URL#"${SANITIZED_CONVEX_URL%%[![:space:]]*}"}"
+          SANITIZED_CONVEX_URL="${SANITIZED_CONVEX_URL%"${SANITIZED_CONVEX_URL##*[![:space:]]}"}"
 
           if [[ -z "$SANITIZED_CONVEX_URL" ]]; then
             echo "::error::Missing VITE_CONVEX_URL for the IPA web build."
