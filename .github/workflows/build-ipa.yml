@@ -59,15 +59,25 @@ jobs:
           VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL }}
         run: |
           set -euo pipefail
-          if [[ -z "${VITE_CONVEX_URL:-}" ]]; then
-            echo "::error::Missing VITE_CONVEX_URL for the IPA web build."
-            echo "Add the repository secret at Settings > Secrets and variables > Actions."
-            exit 1
-          fi
-          if [[ ! "$VITE_CONVEX_URL" =~ ^https://[A-Za-z0-9._-]+\.convex\.cloud/?$ ]]; then
-            echo "::error::VITE_CONVEX_URL must be an HTTPS Convex deployment URL."
-            exit 1
-          fi
+          python3 - <<'PY'
+          import os
+          import sys
+          from urllib.parse import urlparse
+
+          raw = os.environ.get("VITE_CONVEX_URL", "")
+          url = raw.strip().strip("'\"`")
+          if not url:
+              print("::error::Missing VITE_CONVEX_URL for the IPA web build.")
+              print("Add the repository secret at Settings > Secrets and variables > Actions.")
+              sys.exit(1)
+
+          parsed = urlparse(url)
+          host = (parsed.hostname or "").lower()
+          is_convex_host = host.endswith(".convex.cloud") or host.endswith(".convex.site")
+          if parsed.scheme != "https" or not is_convex_host:
+              print("::error::VITE_CONVEX_URL must be an HTTPS Convex deployment URL.")
+              sys.exit(1)
+          PY
 
       - name: Build web assets
         run: npm run build
