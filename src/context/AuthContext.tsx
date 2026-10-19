@@ -364,7 +364,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const token = await getConvexSessionToken()
         const cachedUser = await readCachedSessionUser()
         try {
-          const existing = await getConvexSessionUser()
+          const existing = await withTimeout(
+            getConvexSessionUser(),
+            HYDRATE_TIMEOUT_MS,
+            'getCurrentSessionUser',
+          )
           if (cancelled) return
           const decision = decideAuthRestore({
             token,

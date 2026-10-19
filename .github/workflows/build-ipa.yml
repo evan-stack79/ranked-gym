@@ -54,6 +54,21 @@ jobs:
       - name: Install JS deps
         run: npm ci
 
+      - name: Preflight Convex URL for IPA
+        env:
+          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${VITE_CONVEX_URL:-}" ]]; then
+            echo "::error::Missing VITE_CONVEX_URL for the IPA web build."
+            echo "Add the repository secret at Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          if [[ ! "$VITE_CONVEX_URL" =~ ^https://[A-Za-z0-9._-]+\.convex\.cloud/?$ ]]; then
+            echo "::error::VITE_CONVEX_URL must be an HTTPS Convex deployment URL."
+            exit 1
+          fi
+
       - name: Build web assets
         run: npm run build
         env:
