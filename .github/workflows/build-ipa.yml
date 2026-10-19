@@ -67,6 +67,9 @@ jobs:
         working-directory: ios/App
         run: |
           set -euo pipefail
+          LOG="$RUNNER_TEMP/xcodebuild-unsigned.log"
+          # Command-line build settings apply to App + dependent Widget Extension.
+          set +e
           xcodebuild \
             -project App.xcodeproj \
             -scheme App \
@@ -76,12 +79,24 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=- \
-            CODE_SIGN_ENTITLEMENTS= \
-            DEVELOPMENT_TEAM= \
-            PROVISIONING_PROFILE_SPECIFIER= \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
             ONLY_ACTIVE_ARCH=NO \
-            build
+            build 2>&1 | tee "$LOG"
+          STATUS=${PIPESTATUS[0]}
+          set -e
+
+          echo "---- xcodebuild filtered (error|warning|BUILD) ----"
+          grep -E "error:|warning:|BUILD " "$LOG" || true
+
+          if [ "$STATUS" -ne 0 ]; then
+            echo "---- xcodebuild tail (last 80 lines) ----"
+            tail -n 80 "$LOG" || true
+            exit "$STATUS"
+          fi
+
+          grep -q "BUILD SUCCEEDED" "$LOG"
 
       - name: Package unsigned IPA
         id: package
