@@ -45,18 +45,22 @@ Workflow unsigned : `.github/workflows/build-ipa.yml` (`macos-latest`, `CODE_SIG
 
 ### Secrets obligatoires (sinon bandeau rouge au lancement)
 
-Vite fige `VITE_*` au `npm run build`. Sans eux, l’IPA affiche
-« Connexion au service indisponible » (`SupabaseConfigBanner`) même avec du Wi‑Fi.
+L’IPA build force **Convex** (`VITE_ENABLE_CONVEX_AUTH=true` + `VITE_ENABLE_CONVEX_PRIMARY=true`).
+Vite fige `VITE_*` au `npm run build`. Sans `VITE_CONVEX_URL`, l’app affiche
+« Connexion au service indisponible » même avec du Wi‑Fi.
 
-Dans **GitHub → Settings → Secrets and variables → Actions**, ajoute au minimum :
+Dans **GitHub → Settings → Secrets and variables → Actions** :
 
-| Secret | Même valeur que |
-|--------|-----------------|
-| `VITE_SUPABASE_URL` | Cloudflare Workers Build env |
-| `VITE_SUPABASE_ANON_KEY` | Cloudflare Workers Build env (clé anon) |
+| Secret | Valeur |
+|--------|--------|
+| `VITE_CONVEX_URL` | `https://….convex.cloud` (voir `docs/CONVEX_SETUP.md`) |
 
-Optionnel : `VITE_CONVEX_URL`, `VITE_PUBLIC_APP_URL`, `VITE_GOOGLE_MAPS_API_KEY`.
-Puis relance le workflow **Build IPA** et réinstalle l’artifact.
+Optionnel : `VITE_PUBLIC_APP_URL`, `VITE_GOOGLE_MAPS_API_KEY`.
+Puis relance **Build IPA** et réinstalle l’artifact.
+
+> Note code : le runtime web/Cloudflare peut encore avoir Supabase en défaut
+> (`VITE_ENABLE_CONVEX_AUTH` false) tant que le cutover global n’est pas fait.
+> L’IPA n’emprunte plus ce chemin.
 
 ## UI Live Activity (dark)
 
