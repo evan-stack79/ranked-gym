@@ -7,9 +7,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Local CAPBridgedPlugin types (CameraHeartRate, SecureStorage) are compiled
-        // into the App target under Plugins/ and auto-registered by Capacitor.
-        // Do not add a second plugin implementation.
+        // Local CAPBridgedPlugin types (CameraHeartRate, SecureStorage,
+        // RestTimerLiveActivity) are compiled into the App target under Plugins/
+        // and auto-registered by Capacitor. Do not add a second plugin implementation.
         return true
     }
 

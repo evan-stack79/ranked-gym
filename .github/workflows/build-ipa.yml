@@ -1,0 +1,136 @@
+name: Build IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'ios/**'
+      - 'ios-native/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'capacitor.config.ts'
+      - '.github/workflows/build-ipa.yml'
+  pull_request:
+    paths:
+      - 'ios/**'
+      - 'ios-native/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'capacitor.config.ts'
+      - '.github/workflows/build-ipa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-ipa:
+    name: Build unsigned iOS IPA
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve Node version
+        id: node
+        run: |
+          if [ -f .nvmrc ]; then
+            echo "version=$(tr -d 'v[:space:]' < .nvmrc)" >> "$GITHUB_OUTPUT"
+          else
+            ver=$(python3 -c 'import json,re,pathlib; p=pathlib.Path("package.json"); e=(json.loads(p.read_text()).get("engines") or {}) if p.exists() else {}; n=str(e.get("node") or ""); m=re.search(r"(\d+)", n); print(m.group(1) if m else "22")')
+            echo "version=$ver" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.node.outputs.version }}
+          cache: npm
+
+      - name: Install JS deps
+        run: npm ci
+
+      - name: Build web assets
+        run: npm run build
+
+      - name: Sync Capacitor iOS
+        run: npx cap sync ios
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build iOS app (unsigned)
+        working-directory: ios/App
+        run: |
+          set -euo pipefail
+          LOG="$RUNNER_TEMP/xcodebuild-unsigned.log"
+          # Command-line build settings apply to App + dependent Widget Extension.
+          set +e
+          xcodebuild \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            ONLY_ACTIVE_ARCH=NO \
+            build 2>&1 | tee "$LOG"
+          STATUS=${PIPESTATUS[0]}
+          set -e
+
+          echo "---- xcodebuild filtered (error|warning|BUILD) ----"
+          grep -E "error:|warning:|BUILD " "$LOG" || true
+
+          if [ "$STATUS" -ne 0 ]; then
+            echo "---- xcodebuild tail (last 80 lines) ----"
+            tail -n 80 "$LOG" || true
+            exit "$STATUS"
+          fi
+
+          grep -q "BUILD SUCCEEDED" "$LOG"
+
+      - name: Package unsigned IPA
+        id: package
+        run: |
+          set -euo pipefail
+          APP_PATH="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphoneos/App.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "App.app not found at $APP_PATH"
+            find "$RUNNER_TEMP/DerivedData/Build/Products" -maxdepth 3 -type d -name '*.app' || true
+            exit 1
+          fi
+
+          STAGE="$RUNNER_TEMP/ipa-stage"
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE/Payload"
+          cp -R "$APP_PATH" "$STAGE/Payload/"
+
+          COMMIT_SHORT="${GITHUB_SHA::7}"
+          IPA_NAME="RankedGym-unsigned-${COMMIT_SHORT}.ipa"
+          IPA_PATH="$RUNNER_TEMP/$IPA_NAME"
+
+          (
+            cd "$STAGE"
+            zip -qry "$IPA_PATH" Payload
+          )
+
+          echo "ipa_name=$IPA_NAME" >> "$GITHUB_OUTPUT"
+          echo "ipa_path=$IPA_PATH" >> "$GITHUB_OUTPUT"
+          ls -lh "$IPA_PATH"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ranked-gym-ios-ipa
+          path: ${{ steps.package.outputs.ipa_path }}
+          if-no-files-found: error
+          retention-days: 14

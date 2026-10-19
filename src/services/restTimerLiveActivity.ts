@@ -1,3 +1,4 @@
+import { Capacitor, registerPlugin } from '@capacitor/core'
 import { safeWarn } from '../utils/safeLog'
 
 export type RestLiveActivityPayload = {
@@ -13,43 +14,39 @@ type RestTimerLiveActivityNative = {
   isAvailable: () => Promise<{ available: boolean }>
 }
 
-declare global {
-  interface Window {
-    Capacitor?: {
-      getPlatform?: () => string
-      isNativePlatform?: () => boolean
-      Plugins?: {
-        RestTimerLiveActivity?: RestTimerLiveActivityNative
-      }
-    }
-  }
+const RestTimerLiveActivityWeb: RestTimerLiveActivityNative = {
+  async start() {
+    return {}
+  },
+  async update() {},
+  async end() {},
+  async isAvailable() {
+    return { available: false }
+  },
 }
+
+/**
+ * Pont Capacitor React → Swift (Dynamic Island / Live Activity).
+ * JS name must match RestTimerLiveActivityPlugin.jsName ("RestTimerLiveActivity").
+ */
+const RestTimerLiveActivity = registerPlugin<RestTimerLiveActivityNative>('RestTimerLiveActivity', {
+  web: () => RestTimerLiveActivityWeb,
+})
 
 let availabilityCache: boolean | null = null
 
-function getNativePlugin(): RestTimerLiveActivityNative | null {
-  if (typeof window === 'undefined') return null
-  return window.Capacitor?.Plugins?.RestTimerLiveActivity ?? null
-}
-
 export function isNativeIosShell(): boolean {
-  if (typeof window === 'undefined') return false
-  const cap = window.Capacitor
-  if (!cap) return false
-  if (cap.isNativePlatform?.() === false) return false
-  const platform = cap.getPlatform?.()
-  return platform === 'ios'
+  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
 }
 
 export async function isRestLiveActivityAvailable(): Promise<boolean> {
   if (availabilityCache != null) return availabilityCache
-  const plugin = getNativePlugin()
-  if (!plugin) {
+  if (!isNativeIosShell()) {
     availabilityCache = false
     return false
   }
   try {
-    const { available } = await plugin.isAvailable()
+    const { available } = await RestTimerLiveActivity.isAvailable()
     availabilityCache = available
     return available
   } catch {
@@ -59,10 +56,9 @@ export async function isRestLiveActivityAvailable(): Promise<boolean> {
 }
 
 export async function startRestLiveActivity(payload: RestLiveActivityPayload): Promise<void> {
-  const plugin = getNativePlugin()
-  if (!plugin || !(await isRestLiveActivityAvailable())) return
+  if (!(await isRestLiveActivityAvailable())) return
   try {
-    await plugin.start({
+    await RestTimerLiveActivity.start({
       remainingSec: Math.max(0, Math.round(payload.remainingSec)),
       totalSec: Math.max(1, Math.round(payload.totalSec)),
       subtitle: payload.subtitle ?? 'Repos en cours',
@@ -76,10 +72,9 @@ export async function updateRestLiveActivity(payload: {
   remainingSec: number
   subtitle?: string
 }): Promise<void> {
-  const plugin = getNativePlugin()
-  if (!plugin || !(await isRestLiveActivityAvailable())) return
+  if (!(await isRestLiveActivityAvailable())) return
   try {
-    await plugin.update({
+    await RestTimerLiveActivity.update({
       remainingSec: Math.max(0, Math.round(payload.remainingSec)),
       subtitle: payload.subtitle,
     })
@@ -89,10 +84,9 @@ export async function updateRestLiveActivity(payload: {
 }
 
 export async function endRestLiveActivity(immediate = true): Promise<void> {
-  const plugin = getNativePlugin()
-  if (!plugin) return
+  if (!isNativeIosShell()) return
   try {
-    await plugin.end({ immediate })
+    await RestTimerLiveActivity.end({ immediate })
   } catch (error) {
     safeWarn('[liveActivity] end failed', error)
   } finally {
