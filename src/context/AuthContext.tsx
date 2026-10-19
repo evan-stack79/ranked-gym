@@ -36,6 +36,7 @@ import { decideAuthRestore } from '../utils/sessionRestore'
 import {
   friendlyAuthError,
   isAccountEnumerationError,
+  rawAuthError,
   validateNewPassword,
 } from '../utils/authErrors'
 import {
@@ -604,7 +605,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
           return
         }
-        setAuthError(friendlyAuthError(err, 'Connexion impossible.'))
+        safeError('[auth] sign-in failed', err)
+        setAuthError(rawAuthError(err) || 'Erreur de connexion inconnue.')
         setAuthErrorCode(code)
         setAuthLoading(false)
       }

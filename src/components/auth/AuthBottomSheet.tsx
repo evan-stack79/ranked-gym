@@ -168,7 +168,12 @@ export function AuthBottomSheet() {
               </label>
 
               {authError && (
-                <p className="px-0.5 text-[13px] leading-snug text-[#FF6961]" role="alert" data-auth-error="1">
+                <p
+                  className="rounded-xl border-2 border-[#FF2B2B] bg-[#2A0000] px-3 py-3 text-[20px] font-extrabold leading-tight text-[#FF2B2B] [overflow-wrap:anywhere]"
+                  role="alert"
+                  data-auth-error="1"
+                  data-auth-error-raw="1"
+                >
                   {authError}
                 </p>
               )}

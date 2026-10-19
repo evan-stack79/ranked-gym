@@ -2,9 +2,35 @@
 
 export const MIN_PASSWORD_LENGTH = 6
 
+function stringifyErrorDetail(value: unknown): string {
+  if (typeof value === 'string') return value
+  try {
+    return JSON.stringify(value) || String(value)
+  } catch {
+    return String(value)
+  }
+}
+
+export function rawAuthError(err: unknown): string {
+  if (err instanceof Error) {
+    const details = err as Error & {
+      cause?: unknown
+      data?: unknown
+      status?: number
+      statusCode?: number
+    }
+    const extra = [details.status, details.statusCode, details.data, details.cause]
+      .filter((value) => value !== undefined && value !== null && value !== '')
+      .map(stringifyErrorDetail)
+    return [details.message, ...extra].filter(Boolean).join(' | ') || err.name
+  }
+  if (typeof err === 'string') return err
+  return stringifyErrorDetail(err)
+}
+
 export function isNetworkAuthError(err: unknown): boolean {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
-  const raw = err instanceof Error ? err.message : String(err ?? '')
+  const raw = rawAuthError(err)
   const lower = raw.toLowerCase()
   return (
     lower.includes('failed to fetch') ||
@@ -20,7 +46,7 @@ export function isNetworkAuthError(err: unknown): boolean {
 
 /** Erreurs qui pourraient indiquer l’existence d’un compte — à masquer. */
 export function isAccountEnumerationError(err: unknown): boolean {
-  const raw = err instanceof Error ? err.message : String(err ?? '')
+  const raw = rawAuthError(err)
   const lower = raw.toLowerCase()
   return (
     lower.includes('user not found') ||
