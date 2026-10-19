@@ -58,6 +58,7 @@ jobs:
         run: npm run build
         env:
           VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL }}
+          VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL }}
           VITE_ENABLE_CONVEX_AUTH: "true"
           VITE_ENABLE_CONVEX_PRIMARY: "true"
 
