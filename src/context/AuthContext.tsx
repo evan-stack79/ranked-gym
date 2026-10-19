@@ -361,8 +361,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let cancelled = false
       setIsLoading(true)
       void (async () => {
-        const token = await getConvexSessionToken()
-        const cachedUser = await readCachedSessionUser()
+        let token: string | null = null
+        let cachedUser: AuthUser | null = null
+        try {
+          token = await withTimeout(
+            getConvexSessionToken(),
+            HYDRATE_TIMEOUT_MS,
+            'getConvexSessionToken',
+          )
+          cachedUser = await withTimeout(
+            readCachedSessionUser(),
+            HYDRATE_TIMEOUT_MS,
+            'readCachedSessionUser',
+          )
+        } catch (error) {
+          safeError('[auth] convex storage restore failed', error)
+          if (!cancelled) {
+            setUser(null)
+            setProfile(null)
+            setIsLoading(false)
+          }
+          return
+        }
         try {
           const existing = await withTimeout(
             getConvexSessionUser(),
@@ -378,14 +398,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
           if (decision.kind === 'authenticated') {
             if (decision.source === 'network') {
-              await writeCachedSessionUser(decision.user)
+              void writeCachedSessionUser(decision.user).catch((error) => {
+                safeWarn('[auth] write cached Convex user failed', error)
+              })
             }
             setUser(decision.user)
             void hydrateUser(decision.user)
             return
           }
-          if (token) await clearConvexSessionToken()
-          await clearCachedSessionUser()
+          if (token) {
+            void withTimeout(
+              clearConvexSessionToken(),
+              HYDRATE_TIMEOUT_MS,
+              'clearConvexSessionToken',
+            ).catch((error) => {
+              safeWarn('[auth] clear Convex session token failed', error)
+            })
+          }
+          void withTimeout(
+            clearCachedSessionUser(),
+            HYDRATE_TIMEOUT_MS,
+            'clearCachedSessionUser',
+          ).catch((error) => {
+            safeWarn('[auth] clear cached Convex user failed', error)
+          })
           setIsLoading(false)
         } catch (error) {
           safeError('[auth] convex getCurrentSessionUser failed', error)
