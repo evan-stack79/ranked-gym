@@ -214,20 +214,27 @@ export async function createCheckinForSession(
   sessionToken: string,
   input: {
     salleNom: string
+    /** Ignored — legacy Lobby coords are stripped (old clients may still send). */
     salleLat?: number | null
+    /** Ignored — legacy Lobby coords are stripped (old clients may still send). */
     salleLng?: number | null
+    /** Ignored — gym payload may contain lat/lng. */
     gymPayload?: unknown
   },
 ): Promise<ConvexCheckinView> {
   const userId = await getSessionUserId(ctx, sessionToken)
   await consumeRateLimit(ctx, 'createCheckin', { kind: 'userId', value: userId })
   const now = Date.now()
+  // Strip location fields even if an old client still sends them.
+  void input.salleLat
+  void input.salleLng
+  void input.gymPayload
   const id = await ctx.db.insert('checkins', {
     userId,
     salleNom: input.salleNom.trim().slice(0, 160) || 'Salle',
-    salleLat: input.salleLat ?? null,
-    salleLng: input.salleLng ?? null,
-    gymPayload: input.gymPayload ?? null,
+    salleLat: null,
+    salleLng: null,
+    gymPayload: null,
     createdAt: now,
   })
   const row = await ctx.db.get(id)
@@ -578,6 +585,7 @@ export const createCheckin = mutation({
     created_at: v.string(),
   }),
   handler: (ctx, args) =>
+    // Accept optional lat/lng/gymPayload for old clients; server always strips them.
     createCheckinForSession(ctx, args.sessionToken, {
       salleNom: args.salleNom,
       salleLat: args.salleLat,
