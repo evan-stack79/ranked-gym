@@ -15,6 +15,11 @@ const config: CapacitorConfig = {
     // Deep links / auth returns stay on the app origin or system browser.
     allowNavigation: [],
   },
+  plugins: {
+    CapacitorHttp: {
+      enabled: true,
+    },
+  },
   ios: {
     contentInset: 'automatic',
     // Info.plist (Capacitor sync) — Pump Check / VictoryCamera (déjà utilisés côté web)

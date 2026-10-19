@@ -1,9 +1,30 @@
 import { api as generatedApi } from '../../convex/_generated/api'
+import { Capacitor } from '@capacitor/core'
+import { ConvexHttpClient } from 'convex/browser'
 import { getConvex, isConvexConfigured } from '../lib/convex'
 import { CONVEX_AUTH_STORAGE_KEY, getSecureAuthStorage } from './secureAuthStorage'
 import type { AuthUser } from './authService'
 
 const api = generatedApi as any
+let httpClient: ConvexHttpClient | null = null
+
+function isNativeRuntime(): boolean {
+  return Capacitor.isNativePlatform()
+}
+
+function requireConvexHttpClient(): ConvexHttpClient {
+  if (!isConvexConfigured()) {
+    throw new Error('Convex auth unavailable: VITE_CONVEX_URL is not configured.')
+  }
+  if (!httpClient) {
+    httpClient = new ConvexHttpClient(getConvex().url)
+  }
+  return httpClient
+}
+
+function requireAuthClient(): ConvexHttpClient | ReturnType<typeof getConvex> {
+  return isNativeRuntime() ? requireConvexHttpClient() : requireConvexClient()
+}
 
 function readTokenFromLocation(): string | null {
   if (typeof window === 'undefined') return null
@@ -68,7 +89,7 @@ export async function signUpWithEmail(
   password: string,
   pseudo?: string,
 ): Promise<{ user: AuthUser; sessionToken: string; mustResetPassword: boolean }> {
-  const client = requireConvexClient()
+  const client = requireAuthClient()
   const result = await client.mutation(api.auth.signUpWithEmail, {
     email,
     password,
@@ -86,7 +107,7 @@ export async function signInWithPassword(
   email: string,
   password: string,
 ): Promise<{ user: AuthUser; sessionToken: string; mustResetPassword: boolean }> {
-  const client = requireConvexClient()
+  const client = requireAuthClient()
   const result = await client.mutation(api.auth.signInWithPassword, { email, password })
   await setStoredSessionToken(result.sessionToken)
   return {
@@ -126,7 +147,7 @@ export async function requestPasswordReset(
   email: string,
   redirectTo?: string,
 ): Promise<{ accepted: boolean; delivery: PasswordResetDelivery }> {
-  const client = requireConvexClient()
+  const client = requireAuthClient()
   const result = (await client.mutation(api.auth.requestPasswordReset, {
     email,
     redirectTo,
@@ -138,7 +159,7 @@ export async function requestPasswordReset(
 }
 
 export async function updatePassword(newPassword: string, resetToken?: string): Promise<void> {
-  const client = requireConvexClient()
+  const client = requireAuthClient()
   const token = resetToken?.trim() || readTokenFromLocation()
   if (!token) {
     throw new Error('AUTH_RESET_TOKEN_MISSING')
