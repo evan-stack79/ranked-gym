@@ -151,10 +151,11 @@ private struct ExpandedLeading: View {
                 .buttonStyle(.plain)
             }
         case "session":
-            SessionSetBars(state: state)
+            // Bars live only in ExpandedCenter (avoid duplicate).
+            EmptyView()
         case "steps":
-            StepsRing(state: state, line: 4)
-                .frame(width: 44, height: 44)
+            StepsRing(state: state, line: 4, showPercent: true)
+                .frame(width: 52, height: 52)
         case "record":
             Text("PR")
                 .font(.caption.weight(.heavy))
@@ -175,63 +176,77 @@ private struct ExpandedLeading: View {
 private struct ExpandedCenter: View {
     let state: RankedGymLiveAttributes.ContentState
     var body: some View {
-        switch state.kind {
-        case "session":
-            VStack(spacing: 2) {
-                Text("\(formatKg(state.weightKg)) kg × \(state.reps)")
-                    .font(.title2.bold())
-                    .foregroundStyle(.white)
-                    .minimumScaleFactor(0.7)
-                    .lineLimit(1)
-                SessionSetBars(state: state)
-                    .frame(maxWidth: 120)
-            }
-        case "steps":
-            VStack(spacing: 2) {
-                Text("\(stepsPercent(state)) %")
-                    .font(.title3.bold())
-                    .monospacedDigit()
-                    .foregroundStyle(colorGreen)
-                Text("Objectif : \(state.stepsGoal)")
-                    .font(.caption2)
-                    .foregroundStyle(colorGray)
-                Text("Encore \(max(0, state.stepsGoal - state.steps)) pas")
-                    .font(.caption2)
-                    .foregroundStyle(.white)
-            }
-        case "record":
-            Text(state.alertBody.isEmpty ? state.exerciseName : state.alertBody)
-                .font(.headline.bold())
-                .foregroundStyle(.white)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-        case "rank":
-            VStack(spacing: 2) {
-                Text("Nouveau rang !")
-                    .font(.headline.bold())
-                    .foregroundStyle(colorGold)
-                Text(state.alertTitle)
-                    .font(.caption)
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-            }
-        default:
-            VStack(spacing: 4) {
-                Text(restNextSeriesLabel(state))
-                    .font(.caption2)
-                    .foregroundStyle(colorGray)
-                    .lineLimit(1)
-                RestCountdownText(
-                    state: state,
-                    font: .system(size: 36, weight: .bold, design: .rounded),
-                    color: .white
-                )
-                Text(restExerciseLabel(state))
-                    .font(.caption2)
-                    .foregroundStyle(colorGray)
-                    .lineLimit(1)
+        Group {
+            switch state.kind {
+            case "session":
+                VStack(spacing: 4) {
+                    Text(state.exerciseName.isEmpty ? "Séance" : state.exerciseName)
+                        .font(.caption.bold())
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    Text(sessionSeriesLabel(state))
+                        .font(.caption.bold())
+                        .foregroundStyle(colorRed)
+                    Text("\(formatKg(state.weightKg)) kg × \(state.reps) reps")
+                        .font(.title2.bold())
+                        .foregroundStyle(.white)
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
+                    SessionSetBars(state: state)
+                        .frame(maxWidth: 140)
+                }
+            case "steps":
+                VStack(spacing: 2) {
+                    Text("Objectif : \(state.stepsGoal)")
+                        .font(.caption2)
+                        .foregroundStyle(colorGray)
+                    Text("Encore \(max(0, state.stepsGoal - state.steps)) pas")
+                        .font(.caption2)
+                        .foregroundStyle(.white)
+                }
+            case "record":
+                VStack(spacing: 4) {
+                    Text("Nouveau record")
+                        .font(.caption.bold())
+                        .foregroundStyle(colorOrange)
+                    Text(state.alertBody.isEmpty ? state.exerciseName : state.alertBody)
+                        .font(.headline.bold())
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                }
+            case "rank":
+                VStack(spacing: 2) {
+                    Text("Nouveau rang !")
+                        .font(.headline.bold())
+                        .foregroundStyle(colorGold)
+                    Text(state.alertTitle)
+                        .font(.caption)
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                }
+            default:
+                VStack(spacing: 4) {
+                    Text(restNextSeriesLabel(state))
+                        .font(.caption2)
+                        .foregroundStyle(colorGray)
+                        .lineLimit(1)
+                    RestCountdownText(
+                        state: state,
+                        font: .system(size: 52, weight: .bold, design: .rounded),
+                        color: .white
+                    )
+                    Text(restExerciseLabel(state))
+                        .font(.caption2)
+                        .foregroundStyle(colorGray)
+                        .lineLimit(1)
+                }
             }
         }
+        // ActivityKit owns the Dynamic Island outer chrome (system black capsule).
+        // We can only stroke our inner content card — not the system island silhouette.
+        .padding(6)
+        .overlay(expandedKindBorder(state.kind))
     }
 }
 
@@ -350,7 +365,7 @@ private struct RestLockView: View {
                 .foregroundStyle(colorGray)
             RestCountdownText(
                 state: state,
-                font: .system(size: 40, weight: .bold, design: .rounded),
+                font: .system(size: 48, weight: .bold, design: .rounded),
                 color: .white
             )
             Text(restExerciseLabel(state))
@@ -402,11 +417,18 @@ private struct SessionLockView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
+                Text(state.exerciseName.isEmpty ? "Séance" : state.exerciseName)
+                    .font(.caption.bold())
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
                 Spacer(minLength: 0)
                 SessionElapsedText(state: state, font: .caption.bold())
                     .foregroundStyle(colorGray)
             }
-            Text("\(formatKg(state.weightKg)) kg × \(state.reps)")
+            Text(sessionSeriesLabel(state))
+                .font(.caption.bold())
+                .foregroundStyle(colorRed)
+            Text("\(formatKg(state.weightKg)) kg × \(state.reps) reps")
                 .font(.system(size: 28, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
             SessionSetBars(state: state)
@@ -433,13 +455,9 @@ private struct StepsLockView: View {
     let state: RankedGymLiveAttributes.ContentState
     var body: some View {
         HStack(spacing: 14) {
-            StepsRing(state: state, line: 5)
-                .frame(width: 52, height: 52)
+            StepsRing(state: state, line: 5, showPercent: true)
+                .frame(width: 56, height: 56)
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(stepsPercent(state)) %")
-                    .font(.title3.bold())
-                    .monospacedDigit()
-                    .foregroundStyle(colorGreen)
                 Text("Objectif : \(state.stepsGoal)")
                     .font(.caption)
                     .foregroundStyle(colorGray)
@@ -460,6 +478,9 @@ private struct RecordLockView: View {
     let state: RankedGymLiveAttributes.ContentState
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            Text("Nouveau record")
+                .font(.caption.bold())
+                .foregroundStyle(colorOrange)
             HStack {
                 Text("PR")
                     .font(.caption.weight(.heavy))
@@ -539,6 +560,7 @@ private struct RestRing: View {
 private struct StepsRing: View {
     let state: RankedGymLiveAttributes.ContentState
     var line: CGFloat = 3
+    var showPercent: Bool = false
 
     var body: some View {
         let p = stepsProgress(state)
@@ -548,6 +570,13 @@ private struct StepsRing: View {
                 .trim(from: 0, to: p)
                 .stroke(colorGreen, style: StrokeStyle(lineWidth: line, lineCap: .round))
                 .rotationEffect(.degrees(-90))
+            if showPercent {
+                Text("\(stepsPercent(state))")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(colorGreen)
+                    .minimumScaleFactor(0.6)
+            }
         }
     }
 }
@@ -556,11 +585,12 @@ private struct SessionSetBars: View {
     let state: RankedGymLiveAttributes.ContentState
     var body: some View {
         let total = max(1, state.setTotal)
-        let done = max(0, min(total, state.setIndex - 1)) // séries faites
+        // Maquette: à la série N, N barres rouges (S2/4 → 2).
+        let filled = sessionFilledSetBars(setIndex: state.setIndex, setTotal: total)
         HStack(spacing: 4) {
             ForEach(0..<total, id: \.self) { i in
                 Capsule()
-                    .fill(i < done ? colorRed : colorTrack)
+                    .fill(i < filled ? colorRed : colorTrack)
                     .frame(height: 6)
             }
         }
@@ -659,11 +689,46 @@ private func stepsPercent(_ state: RankedGymLiveAttributes.ContentState) -> Int 
     return Int((Double(state.steps) / Double(goal) * 100).rounded())
 }
 
-/// « Série X sur Y ensuite » — setIndex = prochaine série (1-based) quand kind rest.
-private func restNextSeriesLabel(_ state: RankedGymLiveAttributes.ContentState) -> String {
+/// Red bar count — mirrored by `sessionFilledSetBars` in liveActivityDisplay.ts.
+private func sessionFilledSetBars(setIndex: Int, setTotal: Int) -> Int {
+    let total = max(1, setTotal)
+    let current = max(0, setIndex)
+    return max(0, min(total, current))
+}
+
+private func sessionSeriesLabel(_ state: RankedGymLiveAttributes.ContentState) -> String {
     let x = max(1, state.setIndex)
     let y = max(x, state.setTotal)
-    return "Série \(x) sur \(y) ensuite"
+    return "Série \(x) sur \(y)"
+}
+
+/// « Série X sur Y ensuite » — setIndex = prochaine série (1-based).
+/// Never « N+1 sur N » after the last set (mirrored in liveActivityDisplay.ts).
+private func restNextSeriesLabel(_ state: RankedGymLiveAttributes.ContentState) -> String {
+    let total = max(1, state.setTotal)
+    let next = max(1, state.setIndex)
+    if next > total {
+        return "Séries terminées"
+    }
+    return "Série \(next) sur \(total) ensuite"
+}
+
+/// Inner content stroke for expanded DI. System island chrome cannot be recolored.
+@ViewBuilder
+private func expandedKindBorder(_ kind: String) -> some View {
+    switch kind {
+    case "rest":
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .stroke(colorRed, lineWidth: 2)
+    case "record":
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .stroke(colorOrange, lineWidth: 2)
+    case "rank":
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .stroke(colorGold, lineWidth: 2)
+    default:
+        EmptyView()
+    }
 }
 
 private func restExerciseLabel(_ state: RankedGymLiveAttributes.ContentState) -> String {
