@@ -1016,13 +1016,15 @@ export function WorkoutNotebook({
                         <label className="block">
                           <span className="mb-0.5 block text-[10px] text-[#636366]">kg</span>
                           <ClearableNumberInput
-                            value={showLastHint ? null : set.weightKg}
+                            value={showLastHint || set.weightKg === 0 ? null : set.weightKg}
                             onChange={(v) => updateSet(ex.id, idx, { weightKg: v ?? 0 })}
                             onFocus={showLastHint ? applyLast : undefined}
                             min={0}
                             max={500}
                             step={0.5}
-                            required={!showLastHint}
+                            required={false}
+                            commitOnBlur
+                            selectOnFocus
                             placeholder={
                               showLastHint && lastPerf
                                 ? formatLastWeightPlaceholder(lastPerf.weightKg)
@@ -1040,14 +1042,16 @@ export function WorkoutNotebook({
                         <label className="block">
                           <span className="mb-0.5 block text-[10px] text-[#636366]">Reps</span>
                           <ClearableNumberInput
-                            value={showLastHint ? null : set.reps}
+                            value={showLastHint || set.reps === 0 ? null : set.reps}
                             onChange={(v) =>
                               updateSet(ex.id, idx, { reps: v != null ? Math.round(v) : 0 })
                             }
                             onFocus={showLastHint ? applyLast : undefined}
                             min={1}
                             max={50}
-                            required={!showLastHint}
+                            required={false}
+                            commitOnBlur
+                            selectOnFocus
                             placeholder={
                               showLastHint && lastPerf
                                 ? formatLastRepsPlaceholder(lastPerf.reps)

@@ -337,13 +337,15 @@ export function ImmersiveExerciseSession({
                   {idx + 1}
                 </span>
                 <ClearableNumberInput
-                  value={showLastHint ? null : set.weightKg}
+                  value={showLastHint || set.weightKg === 0 ? null : set.weightKg}
                   onChange={(v) => patchSet(idx, { weightKg: v ?? 0 })}
                   onFocus={showLastHint ? applyLast : undefined}
                   min={0}
                   max={500}
                   step={0.5}
-                  required={!showLastHint}
+                  required={false}
+                  commitOnBlur
+                  selectOnFocus
                   placeholder={
                     showLastHint && last
                       ? formatLastWeightPlaceholder(last.weightKg)
@@ -358,14 +360,16 @@ export function ImmersiveExerciseSession({
                   className={FIELD}
                 />
                 <ClearableNumberInput
-                  value={showLastHint ? null : set.reps}
+                  value={showLastHint || set.reps === 0 ? null : set.reps}
                   onChange={(v) =>
                     patchSet(idx, { reps: v != null ? Math.round(v) : 0 })
                   }
                   onFocus={showLastHint ? applyLast : undefined}
                   min={1}
                   max={50}
-                  required={!showLastHint}
+                  required={false}
+                  commitOnBlur
+                  selectOnFocus
                   placeholder={
                     showLastHint && last
                       ? formatLastRepsPlaceholder(last.reps)
