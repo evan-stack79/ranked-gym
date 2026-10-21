@@ -107,6 +107,57 @@ describe('ClearableNumberInput — clamp QA boucle 2', () => {
     expect(input().value).toBe('5000')
   })
 
+  it('commitOnInput carnet : 20 → backspace×2 → vide ; taper 5 → 5', async () => {
+    const seen: Array<number | null> = []
+    function Harness() {
+      const [v, setV] = useState<number | null>(20)
+      return (
+        <ClearableNumberInput
+          value={v}
+          onChange={(n) => {
+            seen.push(n)
+            if (n == null) return
+            setV(n)
+          }}
+          min={0}
+          max={500}
+          step={0.5}
+          required
+          commitOnInput
+          aria-label="Poids"
+        />
+      )
+    }
+
+    await act(async () => {
+      root.render(<Harness />)
+    })
+    const input = () => host.querySelector('input[aria-label="Poids"]') as HTMLInputElement
+    expect(input().value).toBe('20')
+
+    await act(async () => {
+      input().focus()
+      typeInto(input(), '2')
+    })
+    expect(input().value).toBe('2')
+    expect(seen.at(-1)).toBe(2)
+
+    const beforeClear = seen.length
+    await act(async () => {
+      typeInto(input(), '')
+    })
+    expect(input().value).toBe('')
+    expect(seen.length).toBe(beforeClear)
+    expect(seen.filter((n) => n === 0)).toHaveLength(0)
+
+    await act(async () => {
+      typeInto(input(), '5')
+      input().blur()
+    })
+    expect(input().value).toBe('5')
+    expect(seen.at(-1)).toBe(5)
+  })
+
   it('âge trop grand : taper au-delà du max, effacer, blur → max', async () => {
     function Harness() {
       const [v, setV] = useState<number | null>(30)
