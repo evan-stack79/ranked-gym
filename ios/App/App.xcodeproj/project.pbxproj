@@ -24,8 +24,8 @@
 		C1A100052FEA0401000C02A5 /* RestTimerAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A100002FEA0401000C02A0 /* RestTimerAttributes.swift */; };
 		C1A100072FEA0401000C02A7 /* RestTimerLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A100062FEA0401000C02A6 /* RestTimerLiveActivityWidget.swift */; };
 		C1A1000B2FEA0401000C02AB /* RestTimerLiveActivityWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C1A1000A2FEA0401000C02AA /* RestTimerLiveActivityWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		C1A100162FEA0401000C02B6 /* LiveActivityIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A100152FEA0401000C02B5 /* LiveActivityIntents.swift */; };
-		C1A100172FEA0401000C02B7 /* LiveActivityIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A100152FEA0401000C02B5 /* LiveActivityIntents.swift */; };
+		E3C200022FEB0201000D02A2 /* LiveActivityIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3C200012FEB0201000D02A1 /* LiveActivityIntents.swift */; };
+		E3C200032FEB0201000D02A3 /* LiveActivityIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3C200012FEB0201000D02A1 /* LiveActivityIntents.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
