@@ -7,7 +7,7 @@ class MainViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(SecureStoragePlugin())
         bridge?.registerPluginInstance(CameraHeartRatePlugin())
-        bridge?.registerPluginInstance(RestTimerLiveActivityPlugin())
+        bridge?.registerPluginInstance(LiveActivityPlugin())
         bridge?.registerPluginInstance(RestTimerSoundPlugin())
     }
 }

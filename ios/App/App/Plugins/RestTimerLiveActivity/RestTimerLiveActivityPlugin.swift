@@ -2,20 +2,31 @@ import ActivityKit
 import Capacitor
 import Foundation
 
-@objc(RestTimerLiveActivityPlugin)
-public class RestTimerLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
-    public let identifier = "RestTimerLiveActivityPlugin"
-    public let jsName = "RestTimerLiveActivity"
+/**
+ * Unified Live Activity plugin (repos / séance / pas / record / rang).
+ * JS name: LiveActivity. One Activity at a time for session+rest.
+ */
+@objc(LiveActivityPlugin)
+public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "LiveActivityPlugin"
+    public let jsName = "LiveActivity"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "start", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "update", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "end", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "isAvailable", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "alert", returnType: CAPPluginReturnPromise),
     ]
 
-    /// Opaque box so `Activity` (iOS 16.1+) is never a stored property type on a
-    /// plugin compiled against the App deployment target (iOS 15.0).
+    /// Opaque box so `Activity` is never a stored property type on iOS 15 deploy target.
     private var currentActivityBox: Any?
+
+    public override func load() {
+        LiveActivityActionBridge.shared.onAction = { [weak self] action in
+            self?.notifyListeners("liveAction", data: ["action": action])
+        }
+        LiveActivityActionBridge.shared.install()
+    }
 
     @objc func isAvailable(_ call: CAPPluginCall) {
         if #available(iOS 16.2, *) {
@@ -31,20 +42,20 @@ public class RestTimerLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        let remaining = max(0, call.getInt("remainingSec") ?? 0)
-        let total = max(1, call.getInt("totalSec") ?? remaining)
-        let subtitle = call.getString("subtitle") ?? "Repos en cours"
+        let state = Self.contentState(from: call)
+        let token = call.getString("activityToken") ?? "ranked-gym.live"
+        let reuse = call.getBool("reuseIfPresent") ?? false
 
         Task {
+            if reuse, let activity = self.currentActivityBox as? Activity<RankedGymLiveAttributes> {
+                await activity.update(.init(state: state, staleDate: nil))
+                call.resolve(["activityId": activity.id, "reused": true])
+                return
+            }
+
             await self.endCurrentActivity(dismissalPolicy: .immediate)
 
-            let attributes = RestTimerAttributes(title: "Temps de repos")
-            let state = RestTimerAttributes.ContentState(
-                remainingSec: remaining,
-                totalSec: total,
-                subtitle: subtitle
-            )
-
+            let attributes = RankedGymLiveAttributes(activityToken: token)
             do {
                 let activity = try Activity.request(
                     attributes: attributes,
@@ -52,7 +63,7 @@ public class RestTimerLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                     pushType: nil
                 )
                 self.currentActivityBox = activity
-                call.resolve(["activityId": activity.id])
+                call.resolve(["activityId": activity.id, "reused": false])
             } catch {
                 call.reject("Unable to start Live Activity", nil, error)
             }
@@ -65,29 +76,53 @@ public class RestTimerLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        let remaining = max(0, call.getInt("remainingSec") ?? 0)
-        let subtitle = call.getString("subtitle")
-
         Task {
-            guard let activity = self.currentActivityBox as? Activity<RestTimerAttributes> else {
-                call.resolve()
+            guard let activity = self.currentActivityBox as? Activity<RankedGymLiveAttributes> else {
+                call.resolve(["updated": false])
                 return
             }
+            let merged = Self.merge(existing: activity.content.state, call: call)
+            await activity.update(.init(state: merged, staleDate: nil))
+            call.resolve(["updated": true])
+        }
+    }
 
-            let nextState = RestTimerAttributes.ContentState(
-                remainingSec: remaining,
-                totalSec: activity.content.state.totalSec,
-                subtitle: subtitle ?? activity.content.state.subtitle
-            )
-
-            await activity.update(.init(state: nextState, staleDate: nil))
+    /// Short alert on the current activity (record / rank).
+    @objc func alert(_ call: CAPPluginCall) {
+        guard #available(iOS 16.2, *) else {
             call.resolve()
+            return
+        }
+
+        let kind = call.getString("kind") ?? "record"
+        let title = call.getString("alertTitle") ?? ""
+        let body = call.getString("alertBody") ?? ""
+
+        Task {
+            guard let activity = self.currentActivityBox as? Activity<RankedGymLiveAttributes> else {
+                call.resolve(["alerted": false])
+                return
+            }
+            var next = activity.content.state
+            next.kind = kind
+            next.alertTitle = title
+            next.alertBody = body
+
+            let alert = AlertConfiguration(
+                title: LocalizedStringResource(stringLiteral: title),
+                body: LocalizedStringResource(stringLiteral: body),
+                sound: .default
+            )
+            await activity.update(
+                ActivityContent(state: next, staleDate: nil),
+                alertConfiguration: alert
+            )
+            call.resolve(["alerted": true])
         }
     }
 
     @objc func end(_ call: CAPPluginCall) {
         let immediate = call.getBool("immediate") ?? true
-
         Task {
             if #available(iOS 16.2, *) {
                 await self.endCurrentActivity(
@@ -100,7 +135,7 @@ public class RestTimerLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @available(iOS 16.2, *)
     private func endCurrentActivity(dismissalPolicy: ActivityUIDismissalPolicy) async {
-        if let activity = currentActivityBox as? Activity<RestTimerAttributes> {
+        if let activity = currentActivityBox as? Activity<RankedGymLiveAttributes> {
             let finalState = activity.content.state
             await activity.end(
                 .init(state: finalState, staleDate: nil),
@@ -109,9 +144,97 @@ public class RestTimerLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             currentActivityBox = nil
             return
         }
-
-        for activity in Activity<RestTimerAttributes>.activities {
+        for activity in Activity<RankedGymLiveAttributes>.activities {
             await activity.end(nil, dismissalPolicy: dismissalPolicy)
+        }
+        currentActivityBox = nil
+    }
+
+    @available(iOS 16.1, *)
+    private static func contentState(from call: CAPPluginCall) -> RankedGymLiveAttributes.ContentState {
+        RankedGymLiveAttributes.ContentState(
+            kind: call.getString("kind") ?? "rest",
+            remainingSec: max(0, call.getInt("remainingSec") ?? 0),
+            totalSec: max(1, call.getInt("totalSec") ?? 1),
+            paused: call.getBool("paused") ?? false,
+            exerciseName: call.getString("exerciseName") ?? "",
+            setIndex: call.getInt("setIndex") ?? 1,
+            setTotal: call.getInt("setTotal") ?? 1,
+            weightKg: call.getDouble("weightKg") ?? 0,
+            reps: call.getInt("reps") ?? 0,
+            startedAtMs: call.getDouble("startedAtMs") ?? 0,
+            steps: call.getInt("steps") ?? 0,
+            stepsGoal: call.getInt("stepsGoal") ?? 0,
+            alertTitle: call.getString("alertTitle") ?? "",
+            alertBody: call.getString("alertBody") ?? "",
+            subtitle: call.getString("subtitle") ?? ""
+        )
+    }
+
+    @available(iOS 16.1, *)
+    private static func merge(
+        existing: RankedGymLiveAttributes.ContentState,
+        call: CAPPluginCall
+    ) -> RankedGymLiveAttributes.ContentState {
+        var next = existing
+        if let v = call.getString("kind") { next.kind = v }
+        if let v = call.getInt("remainingSec") { next.remainingSec = max(0, v) }
+        if let v = call.getInt("totalSec") { next.totalSec = max(1, v) }
+        if let paused = call.getValue("paused") as? Bool { next.paused = paused }
+        if let v = call.getString("exerciseName") { next.exerciseName = v }
+        if let v = call.getInt("setIndex") { next.setIndex = v }
+        if let v = call.getInt("setTotal") { next.setTotal = v }
+        if let v = call.getDouble("weightKg") { next.weightKg = v }
+        if let v = call.getInt("reps") { next.reps = v }
+        if let v = call.getDouble("startedAtMs") { next.startedAtMs = v }
+        if let v = call.getInt("steps") { next.steps = v }
+        if let v = call.getInt("stepsGoal") { next.stepsGoal = v }
+        if let v = call.getString("alertTitle") { next.alertTitle = v }
+        if let v = call.getString("alertBody") { next.alertBody = v }
+        if let v = call.getString("subtitle") { next.subtitle = v }
+        return next
+    }
+}
+
+/// Routes Darwin notifications (App Intents in widget) → Capacitor listeners.
+final class LiveActivityActionBridge {
+    static let shared = LiveActivityActionBridge()
+    var onAction: ((String) -> Void)?
+    private var installed = false
+
+    func install() {
+        guard !installed else { return }
+        installed = true
+        observe(LiveActivityActionNotify.pause, action: "pause")
+        observe(LiveActivityActionNotify.stop, action: "stop")
+        observe(LiveActivityActionNotify.validate, action: "validate")
+    }
+
+    private func observe(_ name: CFString, action: String) {
+        let center = CFNotificationCenterGetDarwinNotifyCenter()
+        let observer = Unmanaged.passRetained(ActionToken(action: action, bridge: self)).toOpaque()
+        CFNotificationCenterAddObserver(
+            center,
+            observer,
+            { _, observer, _, _, _ in
+                guard let observer else { return }
+                let token = Unmanaged<ActionToken>.fromOpaque(observer).takeUnretainedValue()
+                DispatchQueue.main.async {
+                    token.bridge?.onAction?(token.action)
+                }
+            },
+            name,
+            nil,
+            .deliverImmediately
+        )
+    }
+
+    private final class ActionToken {
+        let action: String
+        weak var bridge: LiveActivityActionBridge?
+        init(action: String, bridge: LiveActivityActionBridge) {
+            self.action = action
+            self.bridge = bridge
         }
     }
 }
