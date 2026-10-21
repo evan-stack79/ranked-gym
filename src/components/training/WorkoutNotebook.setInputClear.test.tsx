@@ -1,16 +1,18 @@
 /** @vitest-environment jsdom */
 /**
- * Carnet (liste des séries, pas immersive) — case kg : backspace jusqu’à vide.
- * Repro Evan iPhone : « 20 » → effacer 0 OK, dernier « 2 » refusé.
+ * QA boucle 3 — carnet kg clear / autoValidate blur-only / pas de clamp silencieux.
  */
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { RestTimerProvider } from '../../context/RestTimerContext'
 import { WorkoutNotebook } from './WorkoutNotebook'
 import type { ExerciseEntry, WorkoutRoutine } from '../../types/training'
 
+const autoValidateFlag = vi.hoisted(() => ({ on: false }))
+
 vi.mock('../../backend/trainingFeatureFlags', () => ({
-  isAutoSetValidationEnabled: () => false,
+  isAutoSetValidationEnabled: () => autoValidateFlag.on,
 }))
 
 vi.mock('../../services/trainingStorage', () => ({
@@ -80,6 +82,7 @@ describe('WorkoutNotebook — carnet kg clear (liste séries)', () => {
     host = document.createElement('div')
     document.body.append(host)
     root = createRoot(host)
+    autoValidateFlag.on = false
   })
 
   afterEach(async () => {
@@ -108,7 +111,6 @@ describe('WorkoutNotebook — carnet kg clear (liste séries)', () => {
           onDraftSave={vi.fn()}
           onDeleteNote={vi.fn()}
           onAddRoutine={vi.fn()}
-          // Pas de sessionClock → UI carnet (liste), pas immersive.
           sessionClockLabel={null}
         />,
       )
@@ -120,13 +122,11 @@ describe('WorkoutNotebook — carnet kg clear (liste séries)', () => {
 
     await act(async () => {
       weight.focus()
-      // Backspace 1 : « 20 » → « 2 »
       typeInto(weight, '2')
     })
     expect(weight.value).toBe('2')
 
     await act(async () => {
-      // Backspace 2 : « 2 » → '' (ne doit PAS être refusé / re-rempli)
       typeInto(weight, '')
     })
     expect(weight.value).toBe('')
@@ -140,7 +140,7 @@ describe('WorkoutNotebook — carnet kg clear (liste séries)', () => {
     ).toBe('5')
   })
 
-  it('blur sur kg vide → restaure l’ancienne valeur (pas 0)', async () => {
+  it('kg 20 → tout effacer → blur → 20 (pas 2)', async () => {
     const exercises: ExerciseEntry[] = [
       {
         id: 'ex-1',
@@ -169,11 +169,161 @@ describe('WorkoutNotebook — carnet kg clear (liste séries)', () => {
     const weight = host.querySelector('input[aria-label="Poids"]') as HTMLInputElement
     await act(async () => {
       weight.focus()
+      typeInto(weight, '2')
       typeInto(weight, '')
       weight.blur()
     })
     expect(
       (host.querySelector('input[aria-label="Poids"]') as HTMLInputElement).value,
     ).toBe('20')
+  })
+
+  it('autoValidate ON : backspace×2 kg → case vide, série NON validée, pas de repos ; taper 5 puis blur → 1 validation à 5', async () => {
+    autoValidateFlag.on = true
+    const onRestStart = vi.fn()
+    // resume → copyExercises (garde rpe) ; cloneFromRoutine l’efface.
+    const exercises: ExerciseEntry[] = [
+      {
+        id: 'ex-1',
+        name: 'Squat',
+        sets: [{ reps: 8, weightKg: 20, rpe: 7 }],
+      },
+    ]
+
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <WorkoutNotebook
+            bodyWeightKg={80}
+            routines={[makeRoutine(exercises)]}
+            history={[]}
+            initialRoutineId="live"
+            sportId="musculation"
+            onSave={vi.fn()}
+            onDraftSave={vi.fn()}
+            onDeleteNote={vi.fn()}
+            onAddRoutine={vi.fn()}
+            sessionClockLabel={null}
+            resume
+            onRestStart={onRestStart}
+          />
+        </RestTimerProvider>,
+      )
+    })
+
+    const weight = () => host.querySelector('input[aria-label="Poids"]') as HTMLInputElement
+    const effort = host.querySelector(
+      'input[aria-label="Effort facultatif, 1 à 10"]',
+    ) as HTMLInputElement
+    expect(weight().value).toBe('20')
+    expect(effort.value).toBe('7')
+
+    await act(async () => {
+      weight().focus()
+      typeInto(weight(), '2')
+      typeInto(weight(), '')
+    })
+    expect(weight().value).toBe('')
+    expect(onRestStart).not.toHaveBeenCalled()
+    expect(host.querySelector('[data-recovery-timer]')).toBeNull()
+    expect(host.textContent).not.toMatch(/Annuler/)
+
+    await act(async () => {
+      typeInto(weight(), '5')
+    })
+    expect(weight().value).toBe('5')
+    expect(onRestStart).not.toHaveBeenCalled()
+
+    await act(async () => {
+      weight().blur()
+    })
+    expect(onRestStart).toHaveBeenCalledTimes(1)
+    expect(weight().value).toBe('5')
+  })
+
+  it('600 kg → message d’erreur, rien enregistré (pas de validation)', async () => {
+    autoValidateFlag.on = true
+    const onRestStart = vi.fn()
+    const exercises: ExerciseEntry[] = [
+      {
+        id: 'ex-1',
+        name: 'Squat',
+        sets: [{ reps: 8, weightKg: 20, rpe: 7 }],
+      },
+    ]
+
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <WorkoutNotebook
+            bodyWeightKg={80}
+            routines={[makeRoutine(exercises)]}
+            history={[]}
+            initialRoutineId="live"
+            sportId="musculation"
+            onSave={vi.fn()}
+            onDraftSave={vi.fn()}
+            onDeleteNote={vi.fn()}
+            onAddRoutine={vi.fn()}
+            sessionClockLabel={null}
+            resume
+            onRestStart={onRestStart}
+          />
+        </RestTimerProvider>,
+      )
+    })
+
+    const weight = host.querySelector('input[aria-label="Poids"]') as HTMLInputElement
+    await act(async () => {
+      weight.focus()
+      typeInto(weight, '600')
+      weight.blur()
+    })
+    expect(weight.value).toBe('600')
+    expect(host.textContent).toMatch(/Poids hors limites/)
+    expect(onRestStart).not.toHaveBeenCalled()
+  })
+
+  it('0 rep → message d’erreur, rien enregistré', async () => {
+    autoValidateFlag.on = true
+    const onRestStart = vi.fn()
+    const exercises: ExerciseEntry[] = [
+      {
+        id: 'ex-1',
+        name: 'Squat',
+        sets: [{ reps: 8, weightKg: 20, rpe: 7 }],
+      },
+    ]
+
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <WorkoutNotebook
+            bodyWeightKg={80}
+            routines={[makeRoutine(exercises)]}
+            history={[]}
+            initialRoutineId="live"
+            sportId="musculation"
+            onSave={vi.fn()}
+            onDraftSave={vi.fn()}
+            onDeleteNote={vi.fn()}
+            onAddRoutine={vi.fn()}
+            sessionClockLabel={null}
+            resume
+            onRestStart={onRestStart}
+          />
+        </RestTimerProvider>,
+      )
+    })
+
+    const reps = host.querySelector('input[aria-label="Reps"]') as HTMLInputElement
+    await act(async () => {
+      reps.focus()
+      typeInto(reps, '0')
+      reps.blur()
+    })
+    expect(reps.value).toBe('0')
+    expect(host.textContent).toMatch(/Reps hors limites/)
+    expect(onRestStart).not.toHaveBeenCalled()
   })
 })

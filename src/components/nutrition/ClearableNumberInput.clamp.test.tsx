@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 /**
- * QA boucle 2 — clamp min/max à la propagation ; blur vide restaure le max borné.
+ * Clamp / restore — nutrition garde le clamp ; Train (clampOnBlur false) non.
  */
 import { act, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -14,7 +14,7 @@ function typeInto(input: HTMLInputElement, value: string) {
   input.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
-describe('ClearableNumberInput — clamp QA boucle 2', () => {
+describe('ClearableNumberInput — clamp / restore', () => {
   let host: HTMLDivElement
   let root: Root
 
@@ -31,7 +31,7 @@ describe('ClearableNumberInput — clamp QA boucle 2', () => {
     host.remove()
   })
 
-  it('commitOnInput : 600 kg (max 500) → propage 500 ; vide ne propage pas 0', async () => {
+  it('commitOnInput + clampOnBlur : 600 kg (max 500) → propage 500 ; vide ne propage pas 0', async () => {
     const seen: Array<number | null> = []
     function Harness() {
       const [v, setV] = useState<number | null>(80)
@@ -69,11 +69,45 @@ describe('ClearableNumberInput — clamp QA boucle 2', () => {
     })
     expect(input.value).toBe('')
     expect(seen.length).toBe(before)
-    // Aucun 0 silencieux ajouté par le clear.
     expect(seen.filter((n) => n === 0)).toHaveLength(0)
   })
 
-  it('calories : taper 6000 (max 5000), effacer, blur → affiche 5000', async () => {
+  it('commitOnInput + clampOnBlur false : 600 → 600 (pas de clamp silencieux)', async () => {
+    const seen: Array<number | null> = []
+    function Harness() {
+      const [v, setV] = useState<number | null>(80)
+      return (
+        <ClearableNumberInput
+          value={v}
+          onChange={(n) => {
+            seen.push(n)
+            if (n == null) return
+            setV(n)
+          }}
+          min={0}
+          max={500}
+          required
+          commitOnInput
+          clampOnBlur={false}
+          aria-label="poids-train"
+        />
+      )
+    }
+
+    await act(async () => {
+      root.render(<Harness />)
+    })
+    const input = host.querySelector('input[aria-label="poids-train"]') as HTMLInputElement
+
+    await act(async () => {
+      input.focus()
+      typeInto(input, '600')
+    })
+    expect(seen.at(-1)).toBe(600)
+    expect(input.value).toBe('600')
+  })
+
+  it('calories : taper 6000 (max 5000), effacer, blur → restaure la valeur d’avant focus', async () => {
     function Harness() {
       const [v, setV] = useState<number | null>(200)
       return (
@@ -97,14 +131,14 @@ describe('ClearableNumberInput — clamp QA boucle 2', () => {
       input().focus()
       typeInto(input(), '6000')
     })
-    // Propagation clampée (comme attendu vs max).
     expect(input().value).toBe('6000')
 
     await act(async () => {
       typeInto(input(), '')
       input().blur()
     })
-    expect(input().value).toBe('5000')
+    // Blur vide → valeur au focus (200), pas un max inventé.
+    expect(input().value).toBe('200')
   })
 
   it('commitOnInput carnet : 20 → backspace×2 → vide ; taper 5 → 5', async () => {
@@ -124,6 +158,7 @@ describe('ClearableNumberInput — clamp QA boucle 2', () => {
           step={0.5}
           required
           commitOnInput
+          clampOnBlur={false}
           aria-label="Poids"
         />
       )
@@ -158,7 +193,41 @@ describe('ClearableNumberInput — clamp QA boucle 2', () => {
     expect(seen.at(-1)).toBe(5)
   })
 
-  it('âge trop grand : taper au-delà du max, effacer, blur → max', async () => {
+  it('kg 20 → tout effacer → blur → 20 (pas 2)', async () => {
+    function Harness() {
+      const [v, setV] = useState<number | null>(20)
+      return (
+        <ClearableNumberInput
+          value={v}
+          onChange={(n) => {
+            if (n == null) return
+            setV(n)
+          }}
+          min={0}
+          max={500}
+          required
+          commitOnInput
+          clampOnBlur={false}
+          aria-label="Poids-restore"
+        />
+      )
+    }
+
+    await act(async () => {
+      root.render(<Harness />)
+    })
+    const input = () => host.querySelector('input[aria-label="Poids-restore"]') as HTMLInputElement
+
+    await act(async () => {
+      input().focus()
+      typeInto(input(), '2')
+      typeInto(input(), '')
+      input().blur()
+    })
+    expect(input().value).toBe('20')
+  })
+
+  it('âge trop grand : taper au-delà du max, effacer, blur → valeur d’avant focus', async () => {
     function Harness() {
       const [v, setV] = useState<number | null>(30)
       return (
@@ -186,6 +255,6 @@ describe('ClearableNumberInput — clamp QA boucle 2', () => {
       typeInto(input(), '')
       input().blur()
     })
-    expect(input().value).toBe('100')
+    expect(input().value).toBe('30')
   })
 })
