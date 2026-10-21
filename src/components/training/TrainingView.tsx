@@ -37,6 +37,7 @@ import { getNutritionTarget } from '../../services/nutritionActivity'
 import { SportPicker } from './SportPicker'
 import { StepsCard } from './StepsCard'
 import { TrainingAgenda } from './TrainingAgenda'
+import { RestTimerSoundSettings } from './RestTimerSoundSettings'
 import { WorkoutNotebook } from './WorkoutNotebook'
 import { WorkoutHistory } from './WorkoutHistory'
 import { EnduranceSessionCard } from './EnduranceSessionCard'
@@ -888,16 +889,19 @@ export function TrainingView({
       ) : null}
 
       {panel === 'agenda' ? (
-        <TrainingAgenda
-          schedule={state.schedule}
-          routines={state.routines}
-          primarySportId={activeSportId}
-          notificationsEnabled={state.notificationsEnabled}
-          onSave={(entry) => persist(upsertSchedule(entry))}
-          onRemove={(id) => persist(removeSchedule(id))}
-          onNotificationsChange={(enabled) => persist(setNotificationsEnabled(enabled))}
-          onToast={showToast}
-        />
+        <div className="flex flex-col gap-4">
+          <RestTimerSoundSettings />
+          <TrainingAgenda
+            schedule={state.schedule}
+            routines={state.routines}
+            primarySportId={activeSportId}
+            notificationsEnabled={state.notificationsEnabled}
+            onSave={(entry) => persist(upsertSchedule(entry))}
+            onRemove={(id) => persist(removeSchedule(id))}
+            onNotificationsChange={(enabled) => persist(setNotificationsEnabled(enabled))}
+            onToast={showToast}
+          />
+        </div>
       ) : null}
 
       {panel === 'history' ? (

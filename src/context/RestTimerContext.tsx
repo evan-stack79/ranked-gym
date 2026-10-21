@@ -8,7 +8,13 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { playRestCompleteChime } from '../utils/restTimerSound'
+import {
+  cancelRestTimerSound,
+  maybePlayCountdownBeep,
+  onRestTimerSoundComplete,
+  rescheduleRestTimerSound,
+  scheduleRestTimerSound,
+} from '../utils/restTimerSound'
 import { vibrate } from '../utils/haptics'
 import { CANONICAL_REST_SEC, clampRestSec } from '../utils/restDuration'
 import {
@@ -203,8 +209,8 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     persistSnap(null)
     logRest(false)
     void endRestLiveActivity(true)
-    vibrate([40, 60, 40, 60, 80])
-    playRestCompleteChime()
+    // Son + haptic (mute → vibration seule) — une seule fois, pas de boucle.
+    void onRestTimerSoundComplete()
     // Auto-fermeture : pas d’état « finished » bloquant ni second log via skip.
     goIdle()
   }, [clearTick, goIdle, logRest, persistSnap])
@@ -231,6 +237,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
         subtitle: `${target.exerciseName} · ${target.setLabel}`,
       })
       if (next === 10 || next === 5 || next === 3 || next === 1) vibrate(10)
+      void maybePlayCountdownBeep(next)
     }
   }, [complete])
 
@@ -273,6 +280,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
         totalSec: total,
         subtitle: `${target.exerciseName} · ${target.setLabel}`,
       })
+      void scheduleRestTimerSound(endsAt)
       vibrate(10)
       armTick()
     },
@@ -293,6 +301,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       paused: true,
       target: targetRef.current,
     })
+    void cancelRestTimerSound()
     void updateRestLiveActivity({
       remainingSec: remaining,
       subtitle: `${targetRef.current.exerciseName} · ${targetRef.current.setLabel}`,
@@ -322,29 +331,34 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       paused: false,
       target: targetRef.current,
     })
+    void rescheduleRestTimerSound(endsAtRef.current)
     armTick()
   }, [armTick, complete, persistSnap])
 
   const skip = useCallback(() => {
     // Déjà terminé (course avec auto-fermeture) : fermer sans 2ᵉ rest-logged / append.
     if (finishedRef.current) {
+      void cancelRestTimerSound()
       void endRestLiveActivity(true)
       goIdle()
       return
     }
     if (!targetRef.current) {
+      void cancelRestTimerSound()
       void endRestLiveActivity(true)
       goIdle()
       return
     }
     clearTick()
     logRest(true)
+    void cancelRestTimerSound()
     void endRestLiveActivity(true)
     vibrate(16)
     goIdle()
   }, [clearTick, goIdle, logRest])
 
   const dismiss = useCallback(() => {
+    void cancelRestTimerSound()
     void endRestLiveActivity(true)
     goIdle()
   }, [goIdle])
@@ -361,6 +375,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       if (!pausedRef.current) {
         endsAtRef.current = Date.now() + nextRemaining * 1000
         if (tickIdRef.current == null) armTick()
+        void rescheduleRestTimerSound(endsAtRef.current)
       }
       setState((s) => ({
         ...s,
@@ -457,6 +472,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
           restSec: Math.max(1, Math.round(snap.totalSec)),
           skipped: false,
         })
+        void cancelRestTimerSound()
         void endRestLiveActivity(true)
         targetRef.current = null
         setState(IDLE)
@@ -487,7 +503,12 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       totalSec: snap.totalSec,
       subtitle: `${snap.target.exerciseName} · ${snap.target.setLabel}`,
     })
-    if (!snap.paused) armTickRef.current()
+    if (!snap.paused) {
+      void scheduleRestTimerSound(endsAtRef.current)
+      armTickRef.current()
+    } else {
+      void cancelRestTimerSound()
+    }
 
     return () => {
       cancelled = true
@@ -498,6 +519,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     return () => {
       clearTick()
+      void cancelRestTimerSound()
       void endRestLiveActivity(true)
     }
   }, [clearTick])

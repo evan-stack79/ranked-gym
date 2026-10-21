@@ -15,7 +15,7 @@ vi.mock('../../services/restTimerLiveActivity', () => ({
   updateRestLiveActivity: vi.fn(),
   endRestLiveActivity: vi.fn(),
 }))
-vi.mock('../../utils/restTimerSound', () => ({ playRestCompleteChime: vi.fn() }))
+vi.mock('../../utils/restTimerSound', () => ({ playRestCompleteChime: vi.fn(), scheduleRestTimerSound: vi.fn(async () => {}), cancelRestTimerSound: vi.fn(async () => {}), rescheduleRestTimerSound: vi.fn(async () => {}), onRestTimerSoundComplete: vi.fn(async () => {}), maybePlayCountdownBeep: vi.fn(async () => {}), previewRestTimerSound: vi.fn(async () => {}), getRestTimerSoundPrefs: vi.fn(() => ({ soundEnabled: true, countdownBeeps: false, haptics: true })), setRestTimerSoundEnabled: vi.fn((v) => ({ soundEnabled: v, countdownBeeps: false, haptics: true })), }))
 vi.mock('../../utils/haptics', () => ({ vibrate: vi.fn() }))
 
 const NOW = Date.parse('2026-09-23T10:00:00.000Z')

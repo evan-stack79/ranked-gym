@@ -8,5 +8,6 @@ class MainViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(SecureStoragePlugin())
         bridge?.registerPluginInstance(CameraHeartRatePlugin())
         bridge?.registerPluginInstance(RestTimerLiveActivityPlugin())
+        bridge?.registerPluginInstance(RestTimerSoundPlugin())
     }
 }
