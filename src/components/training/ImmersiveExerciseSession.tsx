@@ -348,7 +348,7 @@ export function ImmersiveExerciseSession({
                   max={500}
                   step={0.5}
                   required={!showLastHint}
-                  commitOnBlur
+                  commitOnInput
                   selectOnFocus
                   placeholder={
                     showLastHint && last
@@ -373,7 +373,7 @@ export function ImmersiveExerciseSession({
                   min={1}
                   max={50}
                   required={!showLastHint}
-                  commitOnBlur
+                  commitOnInput
                   selectOnFocus
                   placeholder={
                     showLastHint && last
@@ -407,6 +407,7 @@ export function ImmersiveExerciseSession({
                     max={10}
                     required={false}
                     selectOnFocus
+                    commitOnInput
                     deferAmbiguousIntegerPrefix
                     placeholder="1–10"
                     placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#636366]"

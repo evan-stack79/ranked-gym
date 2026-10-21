@@ -491,9 +491,10 @@ export function WorkoutNotebook({
     const current = live?.sets[setIndex]
     if (!current || current.done) return
     const merged = difficulty ? { ...current, difficulty } : current
+    // Même gate immersive : effort/reps vides → bloque (jamais rpe 0 inventé), auto ON ou OFF.
+    if (!isSetReadyForAutoValidate(merged)) return
     const key = makeAutoValidateKey(ex.id, setIndex, merged)
     if (autoValidate) {
-      if (!isSetReadyForAutoValidate(merged)) return
       if (
         !shouldCommitAutoValidate({
           ready: true,
@@ -1026,7 +1027,7 @@ export function WorkoutNotebook({
                             max={500}
                             step={0.5}
                             required={!showLastHint}
-                            commitOnBlur
+                            commitOnInput
                             selectOnFocus
                             placeholder={
                               showLastHint && lastPerf
@@ -1054,7 +1055,7 @@ export function WorkoutNotebook({
                             min={1}
                             max={50}
                             required={!showLastHint}
-                            commitOnBlur
+                            commitOnInput
                             selectOnFocus
                             placeholder={
                               showLastHint && lastPerf
@@ -1086,6 +1087,7 @@ export function WorkoutNotebook({
                             max={10}
                             required={false}
                             selectOnFocus
+                            commitOnInput
                             deferAmbiguousIntegerPrefix
                             placeholder="1–10"
                             placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2 text-[12px] font-semibold text-[#636366]"
@@ -1125,7 +1127,13 @@ export function WorkoutNotebook({
                   <button
                     type="button"
                     onClick={() => finishSet(ex, validateIdx)}
-                    className="ios-press inline-flex min-h-11 items-center gap-1 rounded-full border border-[#30D158]/40 bg-[#30D158]/15 px-3.5 text-[12px] font-semibold text-[#30D158]"
+                    disabled={
+                      Boolean(ex.sets[validateIdx]?.done) ||
+                      !isSetReadyForAutoValidate(
+                        ex.sets[validateIdx] ?? { reps: 0, weightKg: 0 },
+                      )
+                    }
+                    className="ios-press inline-flex min-h-11 items-center gap-1 rounded-full border border-[#30D158]/40 bg-[#30D158]/15 px-3.5 text-[12px] font-semibold text-[#30D158] disabled:opacity-40"
                   >
                     <Check className="h-3.5 w-3.5" />
                     Valider
