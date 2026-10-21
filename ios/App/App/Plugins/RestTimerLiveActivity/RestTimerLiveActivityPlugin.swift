@@ -168,6 +168,7 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             remainingSec: max(0, call.getInt("remainingSec") ?? 0),
             totalSec: max(1, call.getInt("totalSec") ?? 1),
             paused: call.getBool("paused") ?? false,
+            startDateMs: max(0, call.getDouble("startDateMs") ?? 0),
             endDateMs: max(0, call.getDouble("endDateMs") ?? 0),
             exerciseName: call.getString("exerciseName") ?? "",
             setIndex: call.getInt("setIndex") ?? 1,
@@ -193,6 +194,9 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         if let v = call.getInt("remainingSec") { next.remainingSec = max(0, v) }
         if let v = call.getInt("totalSec") { next.totalSec = max(1, v) }
         if let paused = call.getValue("paused") as? Bool { next.paused = paused }
+        if call.getValue("startDateMs") != nil {
+            next.startDateMs = max(0, call.getDouble("startDateMs") ?? 0)
+        }
         if call.getValue("endDateMs") != nil {
             next.endDateMs = max(0, call.getDouble("endDateMs") ?? 0)
         }

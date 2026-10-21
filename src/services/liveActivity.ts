@@ -20,7 +20,12 @@ export type LiveActivityPayload = {
   totalSec?: number
   paused?: boolean
   /**
-   * Wall-clock rest end (epoch ms). Widget uses Text(timerInterval:…endDate).
+   * Wall-clock rest window start (epoch ms). Widget ProgressView/Text use
+   * `timerInterval: startDate...endDate`. 0 when paused / N/A.
+   */
+  startDateMs?: number
+  /**
+   * Wall-clock rest end (epoch ms). Native `staleDate` = this value.
    * 0 when paused / N/A — never updated every second.
    */
   endDateMs?: number
@@ -177,21 +182,64 @@ async function nativeAlert(options: {
 
 // ── Rest ────────────────────────────────────────────────────────────────────
 
+/**
+ * Mirrors native `LiveActivityPlugin.staleDate(for:)`:
+ * rest + running + endDateMs > 0 → staleDate == endDateMs; else null.
+ */
+export function restLiveActivityStaleDateMs(opts: {
+  kind?: string
+  endDateMs?: number
+  paused?: boolean
+}): number | null {
+  if ((opts.kind ?? 'rest') !== 'rest') return null
+  if (opts.paused) return null
+  const end = opts.endDateMs ?? 0
+  return end > 0 ? end : null
+}
+
+/** Build start/end wall-clock ms for ProgressView/Text(timerInterval:). */
+export function restLiveActivityWindowMs(opts: {
+  endDateMs: number
+  totalSec: number
+  startDateMs?: number
+  paused?: boolean
+}): { startDateMs: number; endDateMs: number } | null {
+  if (opts.paused) return null
+  const endDateMs = Math.max(0, Math.round(opts.endDateMs))
+  if (endDateMs <= 0) return null
+  const totalMs = Math.max(1, Math.round(opts.totalSec)) * 1000
+  const startDateMs =
+    opts.startDateMs != null && opts.startDateMs > 0
+      ? Math.round(opts.startDateMs)
+      : endDateMs - totalMs
+  return { startDateMs, endDateMs }
+}
+
 export async function startRestLiveActivity(payload: {
   remainingSec: number
   totalSec: number
   /** Wall-clock end; required when not paused so the island ticks offline. */
   endDateMs?: number
+  /** Wall-clock start of this rest window (defaults to end − total). */
+  startDateMs?: number
   subtitle?: string
   paused?: boolean
 }): Promise<void> {
   const paused = payload.paused ?? false
+  const totalSec = Math.max(1, Math.round(payload.totalSec))
+  const window = restLiveActivityWindowMs({
+    endDateMs: payload.endDateMs ?? 0,
+    totalSec,
+    startDateMs: payload.startDateMs,
+    paused,
+  })
   const body: LiveActivityPayload = {
     kind: 'rest',
     activityToken: SESSION_TOKEN,
     remainingSec: Math.max(0, Math.round(payload.remainingSec)),
-    totalSec: Math.max(1, Math.round(payload.totalSec)),
-    endDateMs: paused ? 0 : Math.max(0, Math.round(payload.endDateMs ?? 0)),
+    totalSec,
+    startDateMs: window?.startDateMs ?? 0,
+    endDateMs: window?.endDateMs ?? 0,
     subtitle: payload.subtitle ?? 'Repos en cours',
     paused,
     reuseIfPresent: bridge.sessionActive,
@@ -206,6 +254,7 @@ export async function startRestLiveActivity(payload: {
 
 export async function updateRestLiveActivity(payload: {
   remainingSec?: number
+  startDateMs?: number
   endDateMs?: number
   subtitle?: string
   paused?: boolean
@@ -213,16 +262,28 @@ export async function updateRestLiveActivity(payload: {
 }): Promise<void> {
   if (!bridge.restActive && !bridge.sessionActive) return
   const paused = payload.paused
-  const endDateMs =
-    paused === true
-      ? 0
-      : payload.endDateMs != null
-        ? Math.max(0, Math.round(payload.endDateMs))
-        : undefined
+  let startDateMs: number | undefined
+  let endDateMs: number | undefined
+  if (paused === true) {
+    startDateMs = 0
+    endDateMs = 0
+  } else if (payload.endDateMs != null) {
+    const totalSec = payload.totalSec != null ? Math.max(1, Math.round(payload.totalSec)) : 1
+    const window = restLiveActivityWindowMs({
+      endDateMs: payload.endDateMs,
+      totalSec:
+        payload.remainingSec != null ? Math.max(1, Math.round(payload.remainingSec)) : totalSec,
+      startDateMs: payload.startDateMs,
+      paused: false,
+    })
+    startDateMs = window?.startDateMs
+    endDateMs = window?.endDateMs
+  }
   await nativeUpdate({
     kind: 'rest',
     remainingSec:
       payload.remainingSec != null ? Math.max(0, Math.round(payload.remainingSec)) : undefined,
+    startDateMs,
     endDateMs,
     subtitle: payload.subtitle,
     paused,

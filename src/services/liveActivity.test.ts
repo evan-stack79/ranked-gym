@@ -38,9 +38,11 @@ describe('liveActivity bridge', () => {
     const mod = await import('./liveActivity')
     mod.__resetLiveActivityBridgeForTests()
     const endDateMs = Date.now() + 90_000
+    const startDateMs = endDateMs - 90_000
     await mod.startRestLiveActivity({
       remainingSec: 90.4,
       totalSec: 90,
+      startDateMs,
       endDateMs,
       subtitle: 'Squat · Série 2',
     })
@@ -49,9 +51,13 @@ describe('liveActivity bridge', () => {
         kind: 'rest',
         remainingSec: 90,
         totalSec: 90,
+        startDateMs,
         endDateMs,
         subtitle: 'Squat · Série 2',
       }),
+    )
+    expect(mod.restLiveActivityStaleDateMs({ kind: 'rest', endDateMs, paused: false })).toBe(
+      endDateMs,
     )
     await mod.updateRestLiveActivity({ remainingSec: 44.2, paused: true })
     expect(update).toHaveBeenCalledWith(
@@ -59,6 +65,7 @@ describe('liveActivity bridge', () => {
         kind: 'rest',
         remainingSec: 44,
         paused: true,
+        startDateMs: 0,
         endDateMs: 0,
       }),
     )

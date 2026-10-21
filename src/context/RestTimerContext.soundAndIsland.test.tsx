@@ -158,18 +158,22 @@ describe('RestTimerContext — son + Dynamic Island (intégration)', () => {
       })
     })
 
-    // Activité rest démarrée (même activité séance, reuse) avec endDate fixe
+    // Activité rest démarrée (même activité séance, reuse) avec fenêtre start…end
     expect(laStart).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: 'rest',
         remainingSec: restSec,
         totalSec: restSec,
+        startDateMs: expect.any(Number),
         endDateMs: expect.any(Number),
         reuseIfPresent: true,
       }),
     )
-    const startedEnd = (laStart.mock.calls[0]?.[0] as { endDateMs?: number } | undefined)?.endDateMs
-    expect(startedEnd).toBeGreaterThan(Date.now())
+    const started = laStart.mock.calls[0]?.[0] as
+      | { startDateMs?: number; endDateMs?: number }
+      | undefined
+    expect(started?.endDateMs).toBeGreaterThan(Date.now())
+    expect(started?.startDateMs).toBeLessThan(started?.endDateMs ?? 0)
     // Notif / chime de fin + armement (countdownBeeps ON par défaut produit)
     expect(soundSchedule).toHaveBeenCalled()
     expect(soundSchedule.mock.calls[0]?.[0]).toMatchObject({ soundEnabled: true })

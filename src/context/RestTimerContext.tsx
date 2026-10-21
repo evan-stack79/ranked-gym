@@ -273,9 +273,11 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
         paused: false,
         target,
       })
+      const startAt = endsAt - total * 1000
       void startRestLiveActivity({
         remainingSec: total,
         totalSec: total,
+        startDateMs: startAt,
         endDateMs: endsAt,
         subtitle: `${target.exerciseName} · ${target.setLabel}`,
       })
@@ -303,6 +305,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     void cancelRestTimerSound()
     void updateRestLiveActivity({
       remainingSec: remaining,
+      startDateMs: 0,
       endDateMs: 0,
       subtitle: `${targetRef.current.exerciseName} · ${targetRef.current.setLabel}`,
       paused: true,
@@ -317,7 +320,8 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       complete()
       return
     }
-    endsAtRef.current = Date.now() + remaining * 1000
+    const startAt = Date.now()
+    endsAtRef.current = startAt + remaining * 1000
     setState((s) => ({
       ...s,
       remainingSec: remaining,
@@ -335,6 +339,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     void rescheduleRestTimerSound(endsAtRef.current)
     void updateRestLiveActivity({
       remainingSec: remaining,
+      startDateMs: startAt,
       endDateMs: endsAtRef.current,
       subtitle: `${targetRef.current.exerciseName} · ${targetRef.current.setLabel}`,
       paused: false,
@@ -399,10 +404,14 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
         paused: pausedRef.current,
         target: targetRef.current,
       })
-      // One-shot LA update with new endDate (or fixed remaining while paused).
+      // One-shot LA update with new start/endDate (or fixed remaining while paused).
+      const startAt = pausedRef.current
+        ? 0
+        : endsAtRef.current - nextRemaining * 1000
       void updateRestLiveActivity({
         remainingSec: nextRemaining,
         totalSec: totalRef.current,
+        startDateMs: startAt,
         endDateMs: pausedRef.current ? 0 : endsAtRef.current,
         paused: pausedRef.current,
         subtitle: `${targetRef.current.exerciseName} · ${targetRef.current.setLabel}`,
@@ -516,6 +525,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     void startRestLiveActivity({
       remainingSec: remaining,
       totalSec: snap.totalSec,
+      startDateMs: snap.paused ? 0 : endsAtRef.current - remaining * 1000,
       endDateMs: snap.paused ? 0 : endsAtRef.current,
       paused: snap.paused,
       subtitle: `${snap.target.exerciseName} · ${snap.target.setLabel}`,

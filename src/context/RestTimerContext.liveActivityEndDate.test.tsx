@@ -1,9 +1,9 @@
 /** @vitest-environment jsdom */
 /**
- * DI freeze fix: rest Live Activity is endDate-driven.
- * Simulates app frozen in background (no JS ticks) and asserts:
- * - start payload includes a correct wall-clock endDateMs
- * - no per-second Live Activity updates while the in-app tick runs / is frozen
+ * Architect (CAUSE_CHRONO_ILE) — rest Live Activity is wall-clock driven:
+ * - app frozen in background → no per-second Activity updates
+ * - start payload has correct startDateMs / endDateMs (staleDate == endDateMs)
+ * - pause → fixed remaining; resume → new start/end window
  */
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -63,7 +63,7 @@ vi.mock('../utils/haptics', () => ({
   vibrate: vi.fn(),
 }))
 
-describe('RestTimerContext — Live Activity endDate (background)', () => {
+describe('RestTimerContext — Live Activity endDate / ProgressView window (Architect)', () => {
   let host: HTMLDivElement
   let root: Root
 
@@ -84,11 +84,10 @@ describe('RestTimerContext — Live Activity endDate (background)', () => {
     host.remove()
   })
 
-  it('repos lancé → endDateMs correct ; figé sans tick JS → aucun update /s', async () => {
+  async function mountApi() {
     const { RestTimerProvider, useRestTimerContext } = await import('./RestTimerContext')
     const live = await import('../services/liveActivity')
     const sound = await import('../utils/restTimerSound')
-
     live.__resetLiveActivityBridgeForTests()
     sound.__resetRestTimerSoundTestHooks()
 
@@ -97,7 +96,6 @@ describe('RestTimerContext — Live Activity endDate (background)', () => {
       api = useRestTimerContext()
       return null
     }
-
     await act(async () => {
       root.render(
         <RestTimerProvider>
@@ -106,11 +104,16 @@ describe('RestTimerContext — Live Activity endDate (background)', () => {
       )
     })
     expect(api).not.toBeNull()
+    return { api: api!, live }
+  }
 
+  it('repos lancé → startDate/endDate corrects ; staleDate == endDate ; figé BG → aucun update /s', async () => {
+    const { api, live } = await mountApi()
     const restSec = 60
     const t0 = Date.now()
+
     await act(async () => {
-      api!.start(restSec, {
+      api.start(restSec, {
         exerciseId: 'ex-bg',
         setIndex: 0,
         exerciseName: 'Squat',
@@ -121,24 +124,46 @@ describe('RestTimerContext — Live Activity endDate (background)', () => {
     expect(laStart).toHaveBeenCalledTimes(1)
     const startPayload = laStart.mock.calls[0]?.[0] as {
       kind?: string
+      startDateMs?: number
       endDateMs?: number
       remainingSec?: number
+      totalSec?: number
       paused?: boolean
     }
     expect(startPayload.kind).toBe('rest')
     expect(startPayload.remainingSec).toBe(restSec)
+    expect(startPayload.totalSec).toBe(restSec)
+    expect(startPayload.startDateMs).toBe(t0)
     expect(startPayload.endDateMs).toBe(t0 + restSec * 1000)
     expect(startPayload.paused).toBeFalsy()
+
+    // Native contract: staleDate = endDate when running
+    expect(
+      live.restLiveActivityStaleDateMs({
+        kind: 'rest',
+        endDateMs: startPayload.endDateMs,
+        paused: false,
+      }),
+    ).toBe(startPayload.endDateMs)
+
+    const window = live.restLiveActivityWindowMs({
+      endDateMs: startPayload.endDateMs!,
+      totalSec: restSec,
+      startDateMs: startPayload.startDateMs,
+    })
+    expect(window).toEqual({
+      startDateMs: t0,
+      endDateMs: t0 + restSec * 1000,
+    })
 
     laStart.mockClear()
     laUpdate.mockClear()
 
-    // Appli figée en arrière-plan : aucun tick JS (on n’avance pas les timers).
-    // L’île doit déjà avoir son endDate — pas besoin d’updates.
+    // Appli figée en arrière-plan : aucun tick JS.
     expect(laUpdate).not.toHaveBeenCalled()
     expect(laStart).not.toHaveBeenCalled()
 
-    // Même si le tick in-app reprend (premier plan), plus aucun update/s vers l’activité.
+    // Tick in-app (premier plan) ne doit toujours pas pousser d’update/s vers l’activité.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5_000)
     })
@@ -146,30 +171,11 @@ describe('RestTimerContext — Live Activity endDate (background)', () => {
     expect(laStart).not.toHaveBeenCalled()
   })
 
-  it('pause → remaining fixe + endDateMs 0 ; reprise → nouvelle endDateMs', async () => {
-    const { RestTimerProvider, useRestTimerContext } = await import('./RestTimerContext')
-    const live = await import('../services/liveActivity')
-    const sound = await import('../utils/restTimerSound')
-
-    live.__resetLiveActivityBridgeForTests()
-    sound.__resetRestTimerSoundTestHooks()
-
-    let api: ReturnType<typeof useRestTimerContext> | null = null
-    function Probe() {
-      api = useRestTimerContext()
-      return null
-    }
+  it('pause → remaining fixe + dates à 0 (staleDate null) ; reprise → nouvelle fenêtre start/end', async () => {
+    const { api, live } = await mountApi()
 
     await act(async () => {
-      root.render(
-        <RestTimerProvider>
-          <Probe />
-        </RestTimerProvider>,
-      )
-    })
-
-    await act(async () => {
-      api!.start(60, {
+      api.start(60, {
         exerciseId: 'ex-p',
         setIndex: 0,
         exerciseName: 'Row',
@@ -180,35 +186,59 @@ describe('RestTimerContext — Live Activity endDate (background)', () => {
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10_000)
-      api!.pause()
+      api.pause()
     })
 
     expect(laUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: 'rest',
         paused: true,
+        startDateMs: 0,
         endDateMs: 0,
         remainingSec: expect.any(Number),
       }),
     )
-    const pausedRemaining = (laUpdate.mock.calls.at(-1)?.[0] as { remainingSec: number })
-      .remainingSec
-    expect(pausedRemaining).toBeGreaterThan(0)
-    expect(pausedRemaining).toBeLessThanOrEqual(50)
+    const pausePayload = laUpdate.mock.calls.at(-1)?.[0] as {
+      remainingSec: number
+      endDateMs: number
+      paused: boolean
+    }
+    expect(pausePayload.remainingSec).toBeGreaterThan(0)
+    expect(pausePayload.remainingSec).toBeLessThanOrEqual(50)
+    expect(
+      live.restLiveActivityStaleDateMs({
+        kind: 'rest',
+        endDateMs: pausePayload.endDateMs,
+        paused: true,
+      }),
+    ).toBeNull()
 
     laUpdate.mockClear()
     const resumeAt = Date.now()
     await act(async () => {
-      api!.resume()
+      api.resume()
     })
 
     expect(laUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: 'rest',
         paused: false,
-        remainingSec: pausedRemaining,
-        endDateMs: resumeAt + pausedRemaining * 1000,
+        remainingSec: pausePayload.remainingSec,
+        startDateMs: resumeAt,
+        endDateMs: resumeAt + pausePayload.remainingSec * 1000,
       }),
     )
+    const resumePayload = laUpdate.mock.calls.at(-1)?.[0] as {
+      startDateMs: number
+      endDateMs: number
+      paused: boolean
+    }
+    expect(
+      live.restLiveActivityStaleDateMs({
+        kind: 'rest',
+        endDateMs: resumePayload.endDateMs,
+        paused: false,
+      }),
+    ).toBe(resumePayload.endDateMs)
   })
 })
