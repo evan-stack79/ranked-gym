@@ -384,7 +384,12 @@ describe('WorkoutNotebook — carnet kg clear (liste séries)', () => {
 
   it('kg 20 → vider → Terminer clavier ouvert → 20 enregistré', async () => {
     autoValidateFlag.on = false
-    const onSave = vi.fn(async () => {})
+    const savedWeights: number[] = []
+    const onSave = vi.fn(
+      async (payload: { exercises: Array<{ sets: Array<{ weightKg: number }> }> }) => {
+        savedWeights.push(payload.exercises[0]!.sets[0]!.weightKg)
+      },
+    )
     const exercises: ExerciseEntry[] = [
       {
         id: 'ex-1',
@@ -428,9 +433,6 @@ describe('WorkoutNotebook — carnet kg clear (liste séries)', () => {
     })
 
     expect(onSave).toHaveBeenCalled()
-    const saved = onSave.mock.calls[0]![0] as {
-      exercises: Array<{ sets: Array<{ weightKg: number }> }>
-    }
-    expect(saved.exercises[0]!.sets[0]!.weightKg).toBe(20)
+    expect(savedWeights).toEqual([20])
   })
 })
