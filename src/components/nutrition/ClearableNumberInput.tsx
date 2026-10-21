@@ -30,6 +30,13 @@ interface ClearableNumberInputProps {
    * Empty still reports null immediately when `required` is false.
    */
   commitOnBlur?: boolean
+  /**
+   * Train only: commit a complete valid number on every keystroke (incl. 0).
+   * Empty or incomplete text (`""`, `"."`, `"2."`) does not propagate —
+   * parent keeps the previous value; empty blur restores the display when `required`.
+   * Takes precedence over `commitOnBlur` for the input path.
+   */
+  commitOnInput?: boolean
   /** Select all text on focus (handy when default is prefilled). */
   selectOnFocus?: boolean
   /** Called on focus — e.g. apply « dernière fois » placeholders into the value. */
@@ -60,6 +67,11 @@ export function isAmbiguousIntegerPrefix(raw: string, min: number, max: number):
   return false
 }
 
+/** Empty or trailing decimal separator — not a complete number yet. */
+export function isIncompleteNumberText(raw: string): boolean {
+  return raw === '' || raw === '.' || /^\d*\.$/.test(raw)
+}
+
 function isEmptyValue(value: number | null | undefined): boolean {
   return value == null || !Number.isFinite(value)
 }
@@ -82,6 +94,7 @@ export function ClearableNumberInput({
   sanitizeUnits = false,
   deferAmbiguousIntegerPrefix = false,
   commitOnBlur = false,
+  commitOnInput = false,
   selectOnFocus = false,
   onFocus,
   enterKeyHint,
@@ -154,7 +167,12 @@ export function ClearableNumberInput({
             if (!required) onChange(null)
             return
           }
-          if (commitOnBlur) return
+          if (commitOnInput) {
+            // Incomplet (« 2. ») → ne rien propager ; nombre complet (0 inclus) → commit immédiat.
+            if (isIncompleteNumberText(raw)) return
+          } else if (commitOnBlur) {
+            return
+          }
           if (deferAmbiguousIntegerPrefix && isAmbiguousIntegerPrefix(raw, min, max)) {
             return
           }

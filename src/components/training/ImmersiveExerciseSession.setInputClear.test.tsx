@@ -406,6 +406,149 @@ describe('ImmersiveExerciseSession — clear kg/reps/effort', () => {
     )
   })
 
+  it('taper 100 puis valider sans blur → 100 enregistré', async () => {
+    const onValidate = vi.fn()
+    function Harness() {
+      const [exercises, setExercises] = useState<ExerciseEntry[]>([
+        { id: 'ex-1', name: 'Squat', sets: [{ reps: 8, weightKg: 80 }] },
+      ])
+      return (
+        <RestTimerProvider>
+          <ImmersiveExerciseSession
+            exercises={exercises}
+            activeIndex={0}
+            onActiveIndexChange={vi.fn()}
+            sessionClockLabel="00:01"
+            sessionPaused={false}
+            onBack={vi.fn()}
+            onUpdateSet={(_id, idx, patch) => {
+              setExercises((prev) =>
+                prev.map((e) =>
+                  e.id !== 'ex-1'
+                    ? e
+                    : {
+                        ...e,
+                        sets: e.sets.map((s, i) => (i === idx ? { ...s, ...patch } : s)),
+                      },
+                ),
+              )
+            }}
+            onAddSet={vi.fn()}
+            onValidateSet={(ex, idx, restSec) => {
+              onValidate(ex.sets[idx], idx, restSec)
+              setExercises((prev) =>
+                prev.map((e) =>
+                  e.id !== 'ex-1'
+                    ? e
+                    : {
+                        ...e,
+                        sets: e.sets.map((s, i) =>
+                          i === idx ? { ...s, done: true as const } : s,
+                        ),
+                      },
+                ),
+              )
+            }}
+            onFinishSession={vi.fn()}
+            autoValidate={false}
+          />
+        </RestTimerProvider>
+      )
+    }
+
+    await act(async () => {
+      root.render(<Harness />)
+    })
+
+    const weight = host.querySelector(
+      'input[aria-label="Série 1 poids"]',
+    ) as HTMLInputElement
+    await act(async () => {
+      weight.focus()
+      typeInto(weight, '')
+      typeInto(weight, '100')
+      // pas de blur — commitOnInput doit déjà avoir propagé 100
+    })
+    expect(weight.value).toBe('100')
+
+    const effort = host.querySelector(
+      'input[aria-label="Série 1 effort facultatif"]',
+    ) as HTMLInputElement
+    await act(async () => {
+      effort.focus()
+      typeInto(effort, '7')
+      effort.blur()
+    })
+
+    const validateBtn = [...host.querySelectorAll('button')].find((b) =>
+      (b.textContent ?? '').includes('Valider la série'),
+    )
+    expect(validateBtn).toBeTruthy()
+    expect((validateBtn as HTMLButtonElement).disabled).toBe(false)
+    await act(async () => {
+      validateBtn!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(onValidate).toHaveBeenCalled()
+    const validatedSet = onValidate.mock.calls[0]![0] as { weightKg: number }
+    expect(validatedSet.weightKg).toBe(100)
+  })
+
+  it('saisie incomplète « 2, » → garde l’ancienne valeur', async () => {
+    const onUpdate = vi.fn()
+    function Harness() {
+      const [exercises, setExercises] = useState<ExerciseEntry[]>([
+        { id: 'ex-1', name: 'Squat', sets: [{ reps: 8, weightKg: 80 }] },
+      ])
+      return (
+        <RestTimerProvider>
+          <ImmersiveExerciseSession
+            exercises={exercises}
+            activeIndex={0}
+            onActiveIndexChange={vi.fn()}
+            sessionClockLabel="00:01"
+            sessionPaused={false}
+            onBack={vi.fn()}
+            onUpdateSet={(_id, idx, patch) => {
+              onUpdate(_id, idx, patch)
+              setExercises((prev) =>
+                prev.map((e) =>
+                  e.id !== 'ex-1'
+                    ? e
+                    : {
+                        ...e,
+                        sets: e.sets.map((s, i) => (i === idx ? { ...s, ...patch } : s)),
+                      },
+                ),
+              )
+            }}
+            onAddSet={vi.fn()}
+            onValidateSet={vi.fn()}
+            onFinishSession={vi.fn()}
+          />
+        </RestTimerProvider>
+      )
+    }
+
+    await act(async () => {
+      root.render(<Harness />)
+    })
+
+    const weight = host.querySelector(
+      'input[aria-label="Série 1 poids"]',
+    ) as HTMLInputElement
+    await act(async () => {
+      weight.focus()
+      typeInto(weight, '')
+      typeInto(weight, '2,')
+    })
+    // Affichage local incomplet ; parent garde 80 (aucun patch weightKg:2).
+    expect(weight.value === '2.' || weight.value === '2,').toBe(true)
+    for (const call of onUpdate.mock.calls) {
+      expect(call[2]).not.toEqual(expect.objectContaining({ weightKg: 2 }))
+    }
+  })
+
   it('taper un vrai 0 kg → enregistré 0 (déjà autorisé)', async () => {
     function Harness() {
       const [exercises, setExercises] = useState<ExerciseEntry[]>([
