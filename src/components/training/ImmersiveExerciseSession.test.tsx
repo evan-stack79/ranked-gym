@@ -198,7 +198,7 @@ describe('ImmersiveExerciseSession', () => {
     })
     expect(onValidate).not.toHaveBeenCalled()
 
-    // Effort 8 → validation au blur (jamais pendant la frappe)
+    // Effort 8 → commit + validation au blur (frappe locale seule)
     await act(async () => {
       const effort = host.querySelector(
         'input[aria-label="Série 1 effort facultatif"]',
@@ -206,7 +206,6 @@ describe('ImmersiveExerciseSession', () => {
       effort.focus()
       typeInto(effort, '8')
     })
-    expect(onUpdate).toHaveBeenCalledWith('ex-1', 0, { rpe: 8 }, { autoValidate: false })
     expect(onValidate).not.toHaveBeenCalled()
     await act(async () => {
       const effort = host.querySelector(
@@ -214,6 +213,7 @@ describe('ImmersiveExerciseSession', () => {
       ) as HTMLInputElement
       effort.blur()
     })
+    expect(onUpdate).toHaveBeenCalledWith('ex-1', 0, { rpe: 8 }, { autoValidate: false })
     expect(onValidate).toHaveBeenCalledTimes(1)
     expect(onValidate.mock.calls[0][1]).toBe(0)
   })
@@ -735,11 +735,12 @@ describe('ImmersiveExerciseSession', () => {
     await act(async () => {
       typeInto(effort, '10')
     })
-    expect(onUpdate).toHaveBeenCalledWith('ex-1', 0, { rpe: 10 }, { autoValidate: false })
+    expect(onUpdate).not.toHaveBeenCalled()
     expect(onValidate).not.toHaveBeenCalled()
     await act(async () => {
       effort.blur()
     })
+    expect(onUpdate).toHaveBeenCalledWith('ex-1', 0, { rpe: 10 }, { autoValidate: false })
     expect(onValidate).toHaveBeenCalledTimes(1)
     expect(onValidate.mock.calls[0][1]).toBe(0)
     expect(onAddSet).not.toHaveBeenCalled()

@@ -1,7 +1,10 @@
 import { useMemo, useRef, useState } from 'react'
 import { Check, ChevronLeft, Minus, Pause, Play, Plus, Timer } from 'lucide-react'
 import type { ExerciseEntry, WorkoutNote, WorkoutSet } from '../../types/training'
-import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
+import {
+  ClearableNumberInput,
+  flushPendingClearableNumberInputs,
+} from '../nutrition/ClearableNumberInput'
 import { BRAND_MARK_COMPACT_SRC } from '../brand/BrandMark'
 import {
   formatExerciseMuscles,
@@ -398,7 +401,7 @@ export function ImmersiveExerciseSession({
                           step={0.5}
                           required={!showLastHint}
                           clampOnBlur={false}
-                          commitOnInput
+                          commitOnBlur
                           selectOnFocus
                           placeholder={
                             showLastHint && last
@@ -443,7 +446,7 @@ export function ImmersiveExerciseSession({
                           max={SET_REPS_MAX}
                           required={!showLastHint}
                           clampOnBlur={false}
-                          commitOnInput
+                          commitOnBlur
                           selectOnFocus
                           placeholder={
                             showLastHint && last
@@ -493,7 +496,7 @@ export function ImmersiveExerciseSession({
                             required={false}
                             clampOnBlur={false}
                             selectOnFocus
-                            commitOnInput
+                            commitOnBlur
                             deferAmbiguousIntegerPrefix
                             placeholder="1–10"
                             placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#636366]"
@@ -556,11 +559,17 @@ export function ImmersiveExerciseSession({
             <button
               type="button"
               onClick={() => {
-                const target = exercise.sets[validateIdx]
+                // Architect : commit local (vide → avant-focus) avant Valider.
+                flushPendingClearableNumberInputs()
+                const target = setsRef.current[validateIdx]
                 if (!target || target.done) return
                 // Même gate que l’auto-validate : effort/reps vides → bloque (pas de 0 inventé).
                 if (!isSetReadyForAutoValidate(target)) return
-                onValidateSet(exercise, validateIdx, restSecResolved)
+                onValidateSet(
+                  { ...exercise, sets: setsRef.current.map((s) => ({ ...s })) },
+                  validateIdx,
+                  restSecResolved,
+                )
               }}
               disabled={
                 (Boolean(exercise.sets[validateIdx]?.done) && pendingIdx < 0) ||
@@ -689,7 +698,10 @@ export function ImmersiveExerciseSession({
 
             <button
               type="button"
-              onClick={onFinishSession}
+              onClick={() => {
+                flushPendingClearableNumberInputs()
+                onFinishSession()
+              }}
               disabled={saving}
               className="ios-press mt-3 mb-0.5 min-h-11 w-full text-center text-[13px] font-medium text-[#636366] disabled:opacity-50"
             >
