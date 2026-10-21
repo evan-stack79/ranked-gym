@@ -31,10 +31,9 @@ interface ClearableNumberInputProps {
    */
   commitOnBlur?: boolean
   /**
-   * Train only: commit a complete valid number on every keystroke (incl. 0).
-   * Empty or incomplete text (`""`, `"."`, `"2."`) does not propagate —
-   * parent keeps the previous value; empty blur restores the display when `required`.
-   * Takes precedence over `commitOnBlur` for the input path.
+   * Legacy: commit a complete valid number on every keystroke.
+   * Prefer `commitOnBlur` for Train (Architect) — Valider/Terminer call
+   * `flushPendingClearableNumberInputs()` first.
    */
   commitOnInput?: boolean
   /** Select all text on focus (handy when default is prefilled). */
@@ -45,6 +44,21 @@ interface ClearableNumberInputProps {
   onBlur?: () => void
   enterKeyHint?: 'done' | 'enter' | 'go' | 'next' | 'previous' | 'search' | 'send'
   'aria-label'?: string
+}
+
+type PendingCommit = () => void
+
+/** Focused Train fields — Valider / Terminer flush before reading parent state. */
+const pendingCommits = new Set<PendingCommit>()
+
+/**
+ * Applique le même commit que blur sur toutes les cases encore focalisées
+ * (vide → valeur d’avant le focus). Sans callback `onBlur` parent.
+ */
+export function flushPendingClearableNumberInputs(): void {
+  for (const commit of [...pendingCommits]) {
+    commit()
+  }
 }
 
 /** Remove spaces / common unit suffixes before parsing a quantity. */
@@ -108,6 +122,18 @@ export function ClearableNumberInput({
   const valueRef = useRef(value)
   /** Valeur au moment du focus — blur vide restaure celle-ci (pas la dernière frappe). */
   const focusValueRef = useRef(value)
+  const textRef = useRef(text)
+  const focusedRef = useRef(false)
+  const pendingRef = useRef<PendingCommit | null>(null)
+  const onChangeRef = useRef(onChange)
+  const onBlurRef = useRef(onBlur)
+  const propsRef = useRef({ required, clampOnBlur, min, max, step, value })
+
+  textRef.current = text
+  focusedRef.current = focused
+  onChangeRef.current = onChange
+  onBlurRef.current = onBlur
+  propsRef.current = { required, clampOnBlur, min, max, step, value }
 
   useEffect(() => {
     if (!focused) {
@@ -132,6 +158,72 @@ export function ClearableNumberInput({
       }
     }
   }, [value, focused, step, text])
+
+  const applyCommit = (fireBlurCallback: boolean) => {
+    const {
+      required: req,
+      clampOnBlur: clampBlur,
+      min: lo,
+      max: hi,
+      step: st,
+      value: parentValue,
+    } = propsRef.current
+    const currentText = textRef.current
+    const parsed = parseFloat(currentText)
+    if (currentText === '' || currentText === '.' || Number.isNaN(parsed)) {
+      if (req) {
+        // Vide → valeur d’AVANT le focus (20), pas la dernière frappe (2).
+        let restored = focusValueRef.current
+        if (isEmptyValue(restored)) {
+          restored = parentValue
+        }
+        if (clampBlur && restored != null && Number.isFinite(restored)) {
+          restored = clamp(restored, lo, hi, st)
+        }
+        setText(formatValue(restored, st))
+        if (
+          restored != null &&
+          Number.isFinite(restored) &&
+          restored !== parentValue
+        ) {
+          onChangeRef.current(restored)
+        }
+      } else {
+        onChangeRef.current(null)
+        setText('')
+      }
+    } else if (!clampBlur) {
+      onChangeRef.current(parsed)
+      setText(formatValue(parsed, st))
+    } else {
+      const clamped = clamp(parsed, lo, hi, st)
+      onChangeRef.current(clamped)
+      setText(formatValue(clamped, st))
+    }
+    if (fireBlurCallback) onBlurRef.current?.()
+  }
+
+  const unregisterPending = () => {
+    if (pendingRef.current) {
+      pendingCommits.delete(pendingRef.current)
+      pendingRef.current = null
+    }
+  }
+
+  const registerPending = () => {
+    unregisterPending()
+    const commit: PendingCommit = () => {
+      if (!focusedRef.current) return
+      focusedRef.current = false
+      setFocused(false)
+      unregisterPending()
+      applyCommit(false)
+    }
+    pendingRef.current = commit
+    pendingCommits.add(commit)
+  }
+
+  useEffect(() => () => unregisterPending(), [])
 
   const showPlaceholder = Boolean(placeholder) && text === '' && !focused
 
@@ -158,7 +250,9 @@ export function ClearableNumberInput({
         placeholder={focused ? placeholder : undefined}
         onFocus={(e) => {
           setFocused(true)
+          focusedRef.current = true
           focusValueRef.current = valueRef.current
+          registerPending()
           onFocus?.()
           if (selectOnFocus) {
             const target = e.currentTarget
@@ -171,6 +265,7 @@ export function ClearableNumberInput({
             : e.target.value.replace(',', '.')
           if (raw !== '' && !/^\d*\.?\d*$/.test(raw)) return
           setText(raw)
+          textRef.current = raw
           if (raw === '' || raw === '.') {
             if (!required) onChange(null)
             return
@@ -191,44 +286,11 @@ export function ClearableNumberInput({
           onChange(commitOnInput && clampOnBlur ? clamp(next, min, max, step) : next)
         }}
         onBlur={() => {
+          if (!focusedRef.current) return
+          focusedRef.current = false
           setFocused(false)
-          const parsed = parseFloat(text)
-          if (text === '' || text === '.' || Number.isNaN(parsed)) {
-            if (required) {
-              // Blur vide : valeur d’AVANT le focus (20), pas la dernière frappe (2).
-              let restored = focusValueRef.current
-              if (isEmptyValue(restored)) {
-                restored = value
-              }
-              if (clampOnBlur && restored != null && Number.isFinite(restored)) {
-                restored = clamp(restored, min, max, step)
-              }
-              setText(formatValue(restored, step))
-              if (
-                restored != null &&
-                Number.isFinite(restored) &&
-                restored !== value
-              ) {
-                onChange(restored)
-              }
-              onBlur?.()
-              return
-            }
-            onChange(null)
-            setText('')
-            onBlur?.()
-            return
-          }
-          if (!clampOnBlur) {
-            onChange(parsed)
-            setText(formatValue(parsed, step))
-            onBlur?.()
-            return
-          }
-          const clamped = clamp(parsed, min, max, step)
-          onChange(clamped)
-          setText(formatValue(clamped, step))
-          onBlur?.()
+          unregisterPending()
+          applyCommit(true)
         }}
         className={`${className ?? ''} ${showPlaceholder ? 'caret-white' : ''}`}
       />

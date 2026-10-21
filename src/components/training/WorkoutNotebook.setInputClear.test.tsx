@@ -326,4 +326,111 @@ describe('WorkoutNotebook — carnet kg clear (liste séries)', () => {
     expect(host.textContent).toMatch(/Reps hors limites/)
     expect(onRestStart).not.toHaveBeenCalled()
   })
+
+  it('kg 20 → vider → Valider clavier ouvert → 20 enregistré', async () => {
+    autoValidateFlag.on = false
+    const onRestStart = vi.fn()
+    const exercises: ExerciseEntry[] = [
+      {
+        id: 'ex-1',
+        name: 'Squat',
+        sets: [{ reps: 8, weightKg: 20, rpe: 7 }],
+      },
+    ]
+
+    await act(async () => {
+      root.render(
+        <RestTimerProvider>
+          <WorkoutNotebook
+            bodyWeightKg={80}
+            routines={[makeRoutine(exercises)]}
+            history={[]}
+            initialRoutineId="live"
+            sportId="musculation"
+            onSave={vi.fn()}
+            onDraftSave={vi.fn()}
+            onDeleteNote={vi.fn()}
+            onAddRoutine={vi.fn()}
+            sessionClockLabel={null}
+            resume
+            onRestStart={onRestStart}
+          />
+        </RestTimerProvider>,
+      )
+    })
+
+    const weight = host.querySelector('input[aria-label="Poids"]') as HTMLInputElement
+    await act(async () => {
+      weight.focus()
+      typeInto(weight, '2')
+      typeInto(weight, '')
+      // Pas de blur — clavier ouvert
+    })
+    expect(weight.value).toBe('')
+
+    const validateBtn = [...host.querySelectorAll('button')].find((b) =>
+      (b.textContent ?? '').trim().includes('Valider'),
+    )
+    expect(validateBtn).toBeTruthy()
+    await act(async () => {
+      validateBtn!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(onRestStart).toHaveBeenCalledTimes(1)
+    expect(
+      (host.querySelector('input[aria-label="Poids"]') as HTMLInputElement | null)?.value ?? '20',
+    ).toBe('20')
+  })
+
+  it('kg 20 → vider → Terminer clavier ouvert → 20 enregistré', async () => {
+    autoValidateFlag.on = false
+    const onSave = vi.fn(async () => {})
+    const exercises: ExerciseEntry[] = [
+      {
+        id: 'ex-1',
+        name: 'Squat',
+        sets: [{ reps: 8, weightKg: 20, rpe: 7 }],
+      },
+    ]
+
+    await act(async () => {
+      root.render(
+        <WorkoutNotebook
+          bodyWeightKg={80}
+          routines={[makeRoutine(exercises)]}
+          history={[]}
+          initialRoutineId="live"
+          sportId="musculation"
+          onSave={onSave}
+          onDraftSave={vi.fn()}
+          onDeleteNote={vi.fn()}
+          onAddRoutine={vi.fn()}
+          sessionClockLabel={null}
+          resume
+        />,
+      )
+    })
+
+    const weight = host.querySelector('input[aria-label="Poids"]') as HTMLInputElement
+    await act(async () => {
+      weight.focus()
+      typeInto(weight, '2')
+      typeInto(weight, '')
+    })
+    expect(weight.value).toBe('')
+
+    const finishBtn = [...host.querySelectorAll('button')].find((b) =>
+      (b.textContent ?? '').includes('Terminer la séance'),
+    )
+    expect(finishBtn).toBeTruthy()
+    await act(async () => {
+      finishBtn!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(onSave).toHaveBeenCalled()
+    const saved = onSave.mock.calls[0]![0] as {
+      exercises: Array<{ sets: Array<{ weightKg: number }> }>
+    }
+    expect(saved.exercises[0]!.sets[0]!.weightKg).toBe(20)
+  })
 })

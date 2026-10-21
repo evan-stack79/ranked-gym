@@ -35,7 +35,10 @@ import {
   lastPerformanceToSetPatch,
   nextSetFromPrevious,
 } from '../../utils/lastPerformance'
-import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
+import {
+  ClearableNumberInput,
+  flushPendingClearableNumberInputs,
+} from '../nutrition/ClearableNumberInput'
 import { WorkoutHistory } from './WorkoutHistory'
 import { ImmersiveExerciseSession } from './ImmersiveExerciseSession'
 import {
@@ -664,7 +667,10 @@ export function WorkoutNotebook({
   }
 
   const handleSave = async () => {
-    const cleaned = exercises
+    // Architect : commit cases encore focalisées (vide → avant-focus) avant Terminer.
+    flushPendingClearableNumberInputs()
+    const liveExercises = exercisesRef.current
+    const cleaned = liveExercises
       .map((e) => ({
         ...e,
         name: sanitizeExerciseName(e.name.trim() || 'Exercice'),
@@ -1060,7 +1066,7 @@ export function WorkoutNotebook({
                                   step={0.5}
                                   required={!showLastHint}
                                   clampOnBlur={false}
-                                  commitOnInput
+                                  commitOnBlur
                                   selectOnFocus
                                   placeholder={
                                     showLastHint && lastPerf
@@ -1122,7 +1128,7 @@ export function WorkoutNotebook({
                                   max={SET_REPS_MAX}
                                   required={!showLastHint}
                                   clampOnBlur={false}
-                                  commitOnInput
+                                  commitOnBlur
                                   selectOnFocus
                                   placeholder={
                                     showLastHint && lastPerf
@@ -1172,7 +1178,7 @@ export function WorkoutNotebook({
                                   required={false}
                                   clampOnBlur={false}
                                   selectOnFocus
-                                  commitOnInput
+                                  commitOnBlur
                                   deferAmbiguousIntegerPrefix
                                   placeholder="1–10"
                                   placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2 text-[12px] font-semibold text-[#636366]"
@@ -1221,7 +1227,11 @@ export function WorkoutNotebook({
                   </button>
                   <button
                     type="button"
-                    onClick={() => finishSet(ex, validateIdx)}
+                    onClick={() => {
+                      // Architect : commit local (vide → avant-focus) avant de lire la série.
+                      flushPendingClearableNumberInputs()
+                      finishSet(ex, validateIdx)
+                    }}
                     disabled={
                       Boolean(ex.sets[validateIdx]?.done) ||
                       !isSetReadyForAutoValidate(
