@@ -75,6 +75,9 @@ const LiveActivityWeb: LiveActivityNative = {
   async alert() {
     return { alerted: false }
   },
+  async addListener() {
+    return { remove: () => {} }
+  },
 }
 
 const LiveActivity = registerPlugin<LiveActivityNative>('LiveActivity', {
@@ -224,6 +227,10 @@ export async function startRestLiveActivity(payload: {
   startDateMs?: number
   subtitle?: string
   paused?: boolean
+  /** Next set (1-based) for « Série X sur Y ensuite ». */
+  setIndex?: number
+  setTotal?: number
+  exerciseName?: string
 }): Promise<void> {
   const paused = payload.paused ?? false
   const totalSec = Math.max(1, Math.round(payload.totalSec))
@@ -233,6 +240,18 @@ export async function startRestLiveActivity(payload: {
     startDateMs: payload.startDateMs,
     paused,
   })
+  const nextSet =
+    payload.setIndex != null
+      ? Math.max(1, Math.round(payload.setIndex))
+      : Math.max(1, (bridge.sessionSnapshot?.setIndex ?? 0) + 1)
+  const setTotal = Math.max(
+    nextSet,
+    payload.setTotal != null
+      ? Math.round(payload.setTotal)
+      : (bridge.sessionSnapshot?.setTotal ?? nextSet),
+  )
+  const exerciseName =
+    payload.exerciseName?.trim() || bridge.sessionSnapshot?.exerciseName || ''
   const body: LiveActivityPayload = {
     kind: 'rest',
     activityToken: SESSION_TOKEN,
@@ -240,6 +259,9 @@ export async function startRestLiveActivity(payload: {
     totalSec,
     startDateMs: window?.startDateMs ?? 0,
     endDateMs: window?.endDateMs ?? 0,
+    setIndex: nextSet,
+    setTotal,
+    exerciseName,
     subtitle: payload.subtitle ?? 'Repos en cours',
     paused,
     reuseIfPresent: bridge.sessionActive,
@@ -450,6 +472,36 @@ export async function showRankLiveAlert(payload: {
     }
   }, 5000)
   return true
+}
+
+export type LiveActivityAction = 'pause' | 'stop' | 'validate' | 'add15'
+
+/**
+ * Subscribe to widget App Intent actions (Darwin → Capacitor `liveAction`).
+ */
+export async function subscribeLiveActivityActions(
+  onAction: (action: LiveActivityAction) => void,
+): Promise<{ remove: () => void }> {
+  if (!isNativeIosShell()) {
+    return { remove: () => {} }
+  }
+  try {
+    const handle = await LiveActivity.addListener?.('liveAction', (data) => {
+      const action = data?.action
+      if (
+        action === 'pause' ||
+        action === 'stop' ||
+        action === 'validate' ||
+        action === 'add15'
+      ) {
+        onAction(action)
+      }
+    })
+    return handle ?? { remove: () => {} }
+  } catch (error) {
+    safeWarn('[liveActivity] subscribe liveAction failed', error)
+    return { remove: () => {} }
+  }
 }
 
 /** @deprecated — use isLiveActivityAvailable */

@@ -227,6 +227,7 @@ final class LiveActivityActionBridge {
         observe(LiveActivityActionNotify.pause, action: "pause")
         observe(LiveActivityActionNotify.stop, action: "stop")
         observe(LiveActivityActionNotify.validate, action: "validate")
+        observe(LiveActivityActionNotify.add15, action: "add15")
     }
 
     private func observe(_ name: CFString, action: String) {

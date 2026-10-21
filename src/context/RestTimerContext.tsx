@@ -22,6 +22,7 @@ import {
   startRestLiveActivity,
   updateRestLiveActivity,
 } from '../services/restTimerLiveActivity'
+import { subscribeLiveActivityActions } from '../services/liveActivity'
 import {
   getTrainingState,
   getTrainingStorageScope,
@@ -274,11 +275,15 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
         target,
       })
       const startAt = endsAt - total * 1000
+      // setIndex target is 0-based just-finished → « Série X ensuite » = +2 (1-based next)
+      const nextSet = target.setIndex + 2
       void startRestLiveActivity({
         remainingSec: total,
         totalSec: total,
         startDateMs: startAt,
         endDateMs: endsAt,
+        setIndex: nextSet,
+        exerciseName: target.exerciseName,
         subtitle: `${target.exerciseName} · ${target.setLabel}`,
       })
       void scheduleRestTimerSound(endsAt)
@@ -528,6 +533,8 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       startDateMs: snap.paused ? 0 : endsAtRef.current - remaining * 1000,
       endDateMs: snap.paused ? 0 : endsAtRef.current,
       paused: snap.paused,
+      setIndex: snap.target.setIndex + 2,
+      exerciseName: snap.target.exerciseName,
       subtitle: `${snap.target.exerciseName} · ${snap.target.setLabel}`,
     })
     if (!snap.paused) {
@@ -542,6 +549,26 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       clearTickRef.current()
     }
   }, [hydrateEpoch])
+
+  // Widget App Intents → pause / stop / +15 s / validate (DI-12)
+  useEffect(() => {
+    let remove: (() => void) | undefined
+    void subscribeLiveActivityActions((action) => {
+      if (action === 'pause') {
+        if (pausedRef.current) resume()
+        else pause()
+      } else if (action === 'stop') {
+        skip()
+      } else if (action === 'add15') {
+        addSeconds(15)
+      } else if (action === 'validate') {
+        window.dispatchEvent(new CustomEvent('ranked-gym:live-validate'))
+      }
+    }).then((h) => {
+      remove = () => h.remove()
+    })
+    return () => remove?.()
+  }, [pause, resume, skip, addSeconds])
 
   useEffect(() => {
     return () => {
