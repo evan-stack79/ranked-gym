@@ -177,14 +177,29 @@ export function ClearableNumberInput({
             return
           }
           const next = parseFloat(raw)
-          if (!Number.isNaN(next)) onChange(next)
+          if (Number.isNaN(next)) return
+          // Train commitOnInput : clamp avant propagate (600→500). Nutrition garde onChange brut
+          // (ex. grammes > max → message parent, clampOnBlur false).
+          onChange(commitOnInput ? clamp(next, min, max, step) : next)
         }}
         onBlur={() => {
           setFocused(false)
           const parsed = parseFloat(text)
           if (text === '' || text === '.' || Number.isNaN(parsed)) {
             if (required) {
-              setText(formatValue(value, step))
+              // Blur vide : restaurer la valeur parente bornée (6000 kcal → 5000).
+              const restored =
+                clampOnBlur && value != null && Number.isFinite(value)
+                  ? clamp(value, min, max, step)
+                  : value
+              setText(formatValue(restored, step))
+              if (
+                restored != null &&
+                Number.isFinite(restored) &&
+                restored !== value
+              ) {
+                onChange(restored)
+              }
               return
             }
             onChange(null)
