@@ -44,7 +44,7 @@ vi.mock('../../services/restTimerLiveActivity', () => ({
   endRestLiveActivity: vi.fn(),
 }))
 
-vi.mock('../utils/restTimerSound', () => ({
+vi.mock('../../utils/restTimerSound', () => ({
   playRestCompleteChime: vi.fn(),
   scheduleRestTimerSound: vi.fn(async () => {}),
   cancelRestTimerSound: vi.fn(async () => {}),

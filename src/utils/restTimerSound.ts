@@ -12,23 +12,25 @@ import {
   nativeCancel,
   nativePlayNow,
   nativePreview,
+  nativeReleaseAudioSession,
   nativeSchedule,
   nativeVibrate,
+  type RestTimerSoundCancelOptions,
   type RestTimerSoundPlayNowOptions,
 } from '../services/restTimerSoundNative'
 import { vibrate } from './haptics'
 
 const WEB_CHIME_URL = '/sounds/rest_timer_chime.mp3'
-/** Gain Web Audio ≤ 1.0 (Vérificateur). Même niveau pour chime de fin et bips. */
 const WEB_CHIME_GAIN = 0.2
-/** Bips 3-2-1 : courts (tronqués côté natif / web). */
 const COUNTDOWN_BEEP_MAX_SEC = 0.12
 const COUNTDOWN_BEEP_VOLUME = 1.0
 
 let activeToken: string | null = null
 let playedToken: string | null = null
+let scheduledEndAtMs: number | null = null
 let webEndTimer: number | null = null
 let countdownBeepKeys = new Set<string>()
+let visibilityHookInstalled = false
 
 /** Test / DI seams */
 let scheduleImpl = nativeSchedule
@@ -36,6 +38,7 @@ let cancelImpl = nativeCancel
 let previewImpl = nativePreview
 let playNowImpl = nativePlayNow
 let vibrateNativeImpl = nativeVibrate
+let releaseSessionImpl = nativeReleaseAudioSession
 let isNativeIosImpl = isRestTimerSoundNativeIos
 let prefsLoader = loadRestTimerSoundPrefs
 let audioPlayImpl: ((url: string, gain: number) => void) | null = null
@@ -46,6 +49,7 @@ export function __setRestTimerSoundTestHooks(hooks: {
   preview?: typeof nativePreview
   playNow?: typeof nativePlayNow
   vibrateNative?: typeof nativeVibrate
+  releaseAudioSession?: typeof nativeReleaseAudioSession
   isNativeIos?: typeof isRestTimerSoundNativeIos
   loadPrefs?: typeof loadRestTimerSoundPrefs
   playAudio?: (url: string, gain: number) => void
@@ -55,6 +59,7 @@ export function __setRestTimerSoundTestHooks(hooks: {
   if (hooks.preview) previewImpl = hooks.preview
   if (hooks.playNow) playNowImpl = hooks.playNow
   if (hooks.vibrateNative) vibrateNativeImpl = hooks.vibrateNative
+  if (hooks.releaseAudioSession) releaseSessionImpl = hooks.releaseAudioSession
   if (hooks.isNativeIos) isNativeIosImpl = hooks.isNativeIos
   if (hooks.loadPrefs) prefsLoader = hooks.loadPrefs
   if (hooks.playAudio) audioPlayImpl = hooks.playAudio
@@ -66,11 +71,13 @@ export function __resetRestTimerSoundTestHooks(): void {
   previewImpl = nativePreview
   playNowImpl = nativePlayNow
   vibrateNativeImpl = nativeVibrate
+  releaseSessionImpl = nativeReleaseAudioSession
   isNativeIosImpl = isRestTimerSoundNativeIos
   prefsLoader = loadRestTimerSoundPrefs
   audioPlayImpl = null
   activeToken = null
   playedToken = null
+  scheduledEndAtMs = null
   countdownBeepKeys = new Set()
   if (webEndTimer != null) {
     window.clearTimeout(webEndTimer)
@@ -82,8 +89,14 @@ export function getRestTimerSoundPrefs(): RestTimerSoundPrefs {
   return prefsLoader()
 }
 
+/**
+ * Mute/unmute — releases ducked audio session and reschedules lock-screen
+ * notification so the alert matches the new soundEnabled flag.
+ */
 export function setRestTimerSoundEnabled(enabled: boolean): RestTimerSoundPrefs {
-  return patchRestTimerSoundPrefs({ soundEnabled: enabled })
+  const next = patchRestTimerSoundPrefs({ soundEnabled: enabled })
+  void syncActiveScheduleAfterPrefsChange(next)
+  return next
 }
 
 export function setRestTimerCountdownBeeps(enabled: boolean): RestTimerSoundPrefs {
@@ -91,11 +104,43 @@ export function setRestTimerCountdownBeeps(enabled: boolean): RestTimerSoundPref
 }
 
 export function setRestTimerHaptics(enabled: boolean): RestTimerSoundPrefs {
-  return patchRestTimerSoundPrefs({ haptics: enabled })
+  const next = patchRestTimerSoundPrefs({ haptics: enabled })
+  void syncActiveScheduleAfterPrefsChange(next)
+  return next
+}
+
+async function syncActiveScheduleAfterPrefsChange(
+  prefs: RestTimerSoundPrefs,
+): Promise<void> {
+  // Mute mid-countdown (after bip 3): unduck music immediately.
+  if (!prefs.soundEnabled) {
+    await releaseSessionImpl()
+  }
+  if (activeToken == null || scheduledEndAtMs == null) return
+  if (scheduledEndAtMs <= Date.now()) return
+  // Reschedule lock-screen alert with updated soundEnabled / haptics.
+  await cancelImpl({ releaseSession: false, cancelPending: true })
+  await scheduleImpl({
+    endAtMs: scheduledEndAtMs,
+    soundEnabled: prefs.soundEnabled,
+    haptics: prefs.haptics,
+    token: activeToken,
+  })
 }
 
 function makeToken(endAtMs: number): string {
   return `rest-${Math.round(endAtMs)}`
+}
+
+function ensureVisibilityHook(): void {
+  if (visibilityHookInstalled || typeof document === 'undefined') return
+  visibilityHookInstalled = true
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      // Mid 3-2-1 duck must end when leaving the app.
+      void releaseRestTimerAudioSession()
+    }
+  })
 }
 
 function playWebChime(gain = WEB_CHIME_GAIN, maxDurationSec?: number): void {
@@ -124,7 +169,6 @@ function playWebChime(gain = WEB_CHIME_GAIN, maxDurationSec?: number): void {
   }
 }
 
-/** Repli Web Audio (ancien chime) — gains ≤ 1.0. */
 function playWebAudioFallback(gain = WEB_CHIME_GAIN): void {
   try {
     const AudioCtx =
@@ -157,7 +201,6 @@ function playWebAudioFallback(gain = WEB_CHIME_GAIN): void {
   }
 }
 
-/** Bip court doux (3-2-1) — même gain que le chime, durée courte. */
 function playWebCountdownBeep(): void {
   if (audioPlayImpl) {
     audioPlayImpl(WEB_CHIME_URL, WEB_CHIME_GAIN)
@@ -199,7 +242,6 @@ async function playEndChimeOnce(token: string): Promise<boolean> {
   const prefs = prefsLoader()
   if (!prefs.soundEnabled) return false
   if (isNativeIosImpl()) {
-    // Final: release held countdown session after this play.
     const res = await playNowImpl(token, { holdSession: false })
     return res.played
   }
@@ -207,11 +249,7 @@ async function playEndChimeOnce(token: string): Promise<boolean> {
   return true
 }
 
-/**
- * Vibration de fin : toujours si haptics ON (même avec son actif).
- * iOS natif → AudioServicesPlaySystemSound(kSystemSoundID_Vibrate).
- * Bouton silencieux illisible → vibrer en plus du son est OK.
- */
+/** Une seule vibration de fin (JS) — willPresent natif ne vibre pas. */
 async function fireHapticAtEnd(): Promise<void> {
   const prefs = prefsLoader()
   if (!prefs.haptics) return
@@ -222,15 +260,13 @@ async function fireHapticAtEnd(): Promise<void> {
   }
 }
 
-/**
- * Programme l’alerte de fin (notif locale iOS + garde JS).
- * Une seule fois — pas de boucle.
- */
 export async function scheduleRestTimerSound(endAtMs: number): Promise<void> {
+  ensureVisibilityHook()
   const prefs = prefsLoader()
   const token = makeToken(endAtMs)
   activeToken = token
   playedToken = null
+  scheduledEndAtMs = endAtMs
   countdownBeepKeys = new Set()
 
   if (webEndTimer != null) {
@@ -238,7 +274,7 @@ export async function scheduleRestTimerSound(endAtMs: number): Promise<void> {
     webEndTimer = null
   }
 
-  await cancelImpl()
+  await cancelImpl({ releaseSession: true, cancelPending: true })
   await scheduleImpl({
     endAtMs,
     soundEnabled: prefs.soundEnabled,
@@ -246,7 +282,6 @@ export async function scheduleRestTimerSound(endAtMs: number): Promise<void> {
     token,
   })
 
-  // Web / secours : si le tick JS est suspendu, pas de double lecture (token).
   if (!isNativeIosImpl()) {
     const delay = Math.max(0, endAtMs - Date.now())
     webEndTimer = window.setTimeout(() => {
@@ -256,49 +291,54 @@ export async function scheduleRestTimerSound(endAtMs: number): Promise<void> {
   }
 }
 
-/** Annule l’alerte (Reprendre / dismiss / pause). */
-export async function cancelRestTimerSound(): Promise<void> {
+/** Annule l’alerte (Reprendre / dismiss / pause) — libère la session duckée. */
+export async function cancelRestTimerSound(
+  options?: RestTimerSoundCancelOptions,
+): Promise<void> {
   activeToken = null
+  scheduledEndAtMs = null
   if (webEndTimer != null) {
     window.clearTimeout(webEndTimer)
     webEndTimer = null
   }
-  await cancelImpl()
+  await cancelImpl({
+    releaseSession: options?.releaseSession ?? true,
+    cancelPending: options?.cancelPending ?? true,
+  })
 }
 
-/** Reprogramme (+15 s / reprise). */
+/** Libère la session audio (musique revient) sans annuler la notif. */
+export async function releaseRestTimerAudioSession(): Promise<void> {
+  await releaseSessionImpl()
+}
+
 export async function rescheduleRestTimerSound(endAtMs: number): Promise<void> {
   await scheduleRestTimerSound(endAtMs)
 }
 
-/**
- * Fin naturelle au premier plan : retire la notif, joue une fois (pas de double).
- * Vibration systématique si haptics ON (AudioServices côté iOS) — même avec son.
- */
 export async function onRestTimerSoundComplete(): Promise<void> {
   const token = activeToken
   // Keep held countdown session until final chime (releaseSession: false).
-  await cancelImpl({ releaseSession: false })
+  await cancelImpl({ releaseSession: false, cancelPending: true })
   if (webEndTimer != null) {
     window.clearTimeout(webEndTimer)
     webEndTimer = null
   }
+  scheduledEndAtMs = null
   if (!token) {
-    await fireHapticAtEnd()
+    // Cancel / Reprendre already cleared the token — no stray haptic.
     return
   }
-  // Déjà joué (ex. willPresent natif) → pas de second son ; haptic déjà côté natif.
   if (playedToken === token) {
+    // Already completed (incl. haptic) — no second vibration.
     activeToken = null
     return
   }
-  // Final play (holdSession: false) deactivates with notifyOthersOnDeactivation.
   await playEndChimeOnce(token)
   await fireHapticAtEnd()
   activeToken = null
 }
 
-/** Bouton « Écouter » — toujours le chime court, ignore mute pour l’aperçu. */
 export async function previewRestTimerSound(): Promise<void> {
   if (isNativeIosImpl()) {
     await previewImpl()
@@ -307,11 +347,6 @@ export async function previewRestTimerSound(): Promise<void> {
   playWebChime()
 }
 
-/**
- * Option 3 bips (3,2,1) — ON par défaut. Appelée depuis le tick quand remaining ∈ {3,2,1}.
- * Courts et doux, même volume que le chime de fin.
- * holdSession: session audio ouverte au bip 3, fermée seulement après le bip final.
- */
 export async function maybePlayCountdownBeep(remainingSec: number): Promise<void> {
   const prefs = prefsLoader()
   if (!prefs.countdownBeeps || !prefs.soundEnabled) return
@@ -319,6 +354,7 @@ export async function maybePlayCountdownBeep(remainingSec: number): Promise<void
   const key = `${activeToken ?? 'x'}:${remainingSec}`
   if (countdownBeepKeys.has(key)) return
   countdownBeepKeys.add(key)
+  ensureVisibilityHook()
   if (isNativeIosImpl()) {
     const opts: RestTimerSoundPlayNowOptions = {
       cancelPending: false,
@@ -326,14 +362,13 @@ export async function maybePlayCountdownBeep(remainingSec: number): Promise<void
       maxDurationSec: COUNTDOWN_BEEP_MAX_SEC,
       holdSession: true,
     }
-    // Ne pas annuler la notif de fin pendant les bips 3-2-1.
     await playNowImpl(`${key}-beep`, opts)
     return
   }
   playWebCountdownBeep()
 }
 
-/** @deprecated Use onRestTimerSoundComplete — kept for older call sites / tests. */
+/** @deprecated Use onRestTimerSoundComplete */
 export function playRestCompleteChime(): void {
   void onRestTimerSoundComplete()
 }

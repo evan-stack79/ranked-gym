@@ -16,6 +16,7 @@ import {
   maybePlayCountdownBeep,
   onRestTimerSoundComplete,
   previewRestTimerSound,
+  releaseRestTimerAudioSession,
   rescheduleRestTimerSound,
   scheduleRestTimerSound,
   setRestTimerCountdownBeeps,
@@ -36,7 +37,9 @@ describe('restTimerSound', () => {
       permission: true as boolean,
     }),
   )
-  const cancel = vi.fn(async (_opts?: { releaseSession?: boolean }) => {})
+  const cancel = vi.fn(
+    async (_opts?: { releaseSession?: boolean; cancelPending?: boolean }) => {},
+  )
   const preview = vi.fn(async () => {})
   const playNow = vi.fn(
     async (
@@ -52,6 +55,7 @@ describe('restTimerSound', () => {
     }),
   )
   const vibrateNative = vi.fn(async () => {})
+  const releaseAudioSession = vi.fn(async () => {})
   const playAudio = vi.fn((_url: string, _gain: number) => {})
 
   beforeEach(() => {
@@ -62,6 +66,7 @@ describe('restTimerSound', () => {
     preview.mockClear()
     playNow.mockClear()
     vibrateNative.mockClear()
+    releaseAudioSession.mockClear()
     playAudio.mockClear()
     __resetRestTimerSoundTestHooks()
     __setRestTimerSoundTestHooks({
@@ -70,6 +75,7 @@ describe('restTimerSound', () => {
       preview,
       playNow,
       vibrateNative,
+      releaseAudioSession,
       playAudio,
       loadPrefs: loadRestTimerSoundPrefs,
     })
@@ -105,9 +111,9 @@ describe('restTimerSound', () => {
 
     await cancelRestTimerSound()
     expect(cancel).toHaveBeenCalled()
+    expect(cancel.mock.calls.some((c) => c[0]?.releaseSession !== false)).toBe(true)
 
     await onRestTimerSoundComplete()
-    // Token annulé → pas de playNow (pas de son après Reprendre).
     expect(playNow).not.toHaveBeenCalled()
     expect(playAudio).not.toHaveBeenCalled()
   })
@@ -127,30 +133,29 @@ describe('restTimerSound', () => {
     await scheduleRestTimerSound(endAt)
     await onRestTimerSoundComplete()
     await onRestTimerSoundComplete()
-    // Web path uses playAudio once (token already played).
     expect(playAudio).toHaveBeenCalledTimes(1)
     expect(playAudio.mock.calls[0]?.[1]).toBeLessThanOrEqual(1)
   })
 
-  it('fin de repos → vibration web même avec son actif', async () => {
+  it('fin de repos → une seule vibration web même avec son actif', async () => {
     const vibrateSpy = vi.spyOn(await import('./haptics'), 'vibrate')
     const endAt = Date.now() + 5_000
     await scheduleRestTimerSound(endAt)
     await onRestTimerSoundComplete()
     expect(playAudio).toHaveBeenCalled()
-    expect(vibrateSpy).toHaveBeenCalled()
-    // Complete path keeps countdown session until final chime.
+    expect(vibrateSpy).toHaveBeenCalledTimes(1)
     expect(cancel.mock.calls.some((c) => c[0]?.releaseSession === false)).toBe(true)
     vibrateSpy.mockRestore()
   })
 
-  it('fin de repos iOS → vibrateNative même avec son actif', async () => {
+  it('fin de repos iOS → vibrateNative une seule fois même avec son actif', async () => {
     __setRestTimerSoundTestHooks({
       schedule,
       cancel,
       preview,
       playNow,
       vibrateNative,
+      releaseAudioSession,
       playAudio,
       loadPrefs: loadRestTimerSoundPrefs,
       isNativeIos: () => true,
@@ -161,7 +166,8 @@ describe('restTimerSound', () => {
     expect(playNow).toHaveBeenCalled()
     expect(playNow.mock.calls.some((c) => c[1]?.holdSession === false)).toBe(true)
     expect(vibrateNative).toHaveBeenCalledTimes(1)
-    expect(cancel.mock.calls.some((c) => c[0]?.releaseSession === false)).toBe(true)
+    await onRestTimerSoundComplete()
+    expect(vibrateNative).toHaveBeenCalledTimes(1)
   })
 
   it('countdown iOS → holdSession true sur bips 3-2-1', async () => {
@@ -171,6 +177,7 @@ describe('restTimerSound', () => {
       preview,
       playNow,
       vibrateNative,
+      releaseAudioSession,
       playAudio,
       loadPrefs: loadRestTimerSoundPrefs,
       isNativeIos: () => true,
@@ -188,22 +195,93 @@ describe('restTimerSound', () => {
     }
   })
 
+  it('après bip 3, couper le son → releaseAudioSession + reschedule mute', async () => {
+    __setRestTimerSoundTestHooks({
+      schedule,
+      cancel,
+      preview,
+      playNow,
+      vibrateNative,
+      releaseAudioSession,
+      playAudio,
+      loadPrefs: loadRestTimerSoundPrefs,
+      isNativeIos: () => true,
+    })
+    const endAt = Date.now() + 10_000
+    await scheduleRestTimerSound(endAt)
+    await maybePlayCountdownBeep(3)
+    releaseAudioSession.mockClear()
+    schedule.mockClear()
+    setRestTimerSoundEnabled(false)
+    // Prefs sync is async — flush microtasks.
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(releaseAudioSession).toHaveBeenCalled()
+    expect(schedule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        endAtMs: endAt,
+        soundEnabled: false,
+        haptics: true,
+      }),
+    )
+  })
+
+  it('arrière-plan (visibility hidden) → releaseAudioSession', async () => {
+    __setRestTimerSoundTestHooks({
+      schedule,
+      cancel,
+      preview,
+      playNow,
+      vibrateNative,
+      releaseAudioSession,
+      playAudio,
+      loadPrefs: loadRestTimerSoundPrefs,
+      isNativeIos: () => true,
+    })
+    const endAt = Date.now() + 10_000
+    await scheduleRestTimerSound(endAt)
+    await maybePlayCountdownBeep(3)
+    releaseAudioSession.mockClear()
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'hidden',
+    })
+    document.dispatchEvent(new Event('visibilitychange'))
+    await Promise.resolve()
+    expect(releaseAudioSession).toHaveBeenCalled()
+  })
+
+  it('pause / cancel → releaseSession true (musique revient)', async () => {
+    const endAt = Date.now() + 90_000
+    await scheduleRestTimerSound(endAt)
+    cancel.mockClear()
+    await cancelRestTimerSound()
+    expect(cancel).toHaveBeenCalledWith(
+      expect.objectContaining({ releaseSession: true, cancelPending: true }),
+    )
+  })
+
+  it('releaseRestTimerAudioSession délègue au natif', async () => {
+    await releaseRestTimerAudioSession()
+    expect(releaseAudioSession).toHaveBeenCalled()
+  })
+
   it('son coupé → pas d’audio mais vibration', async () => {
     setRestTimerSoundEnabled(false)
+    await Promise.resolve()
     const endAt = Date.now() + 5_000
     await scheduleRestTimerSound(endAt)
-    expect(schedule.mock.calls[0]?.[0]?.soundEnabled).toBe(false)
+    expect(schedule.mock.calls.at(-1)?.[0]?.soundEnabled).toBe(false)
 
     const vibrateSpy = vi.spyOn(await import('./haptics'), 'vibrate')
     await onRestTimerSoundComplete()
     expect(playAudio).not.toHaveBeenCalled()
-    expect(vibrateSpy).toHaveBeenCalled()
+    expect(vibrateSpy).toHaveBeenCalledTimes(1)
     vibrateSpy.mockRestore()
   })
 
   it('preview appelle le chime (Écouter)', async () => {
     await previewRestTimerSound()
-    // Web: playAudio ; native would call preview mock — stub Capacitor absent → audio.
     expect(playAudio).toHaveBeenCalled()
     expect(playAudio.mock.calls[0]?.[1]).toBeLessThanOrEqual(1)
   })

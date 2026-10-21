@@ -8,16 +8,17 @@ export type RestTimerSoundScheduleOptions = {
   token: string
 }
 
+export type RestTimerSoundCancelOptions = {
+  /** Default true — Reprendre / stop. Complete path passes false until final chime. */
+  releaseSession?: boolean
+  /** Default true. Background release passes false to keep lock-screen notif. */
+  cancelPending?: boolean
+}
+
 export type RestTimerSoundPlayNowOptions = {
   cancelPending?: boolean
-  /** 0…1 — never raise above media volume; no dB UI. */
   volume?: number
-  /** Truncate playback (soft countdown beeps). */
   maxDurationSec?: number
-  /**
-   * Keep AVAudioSession active after this play (countdown 3-2-1).
-   * Final chime omits this so session deactivates with notifyOthersOnDeactivation.
-   */
   holdSession?: boolean
 }
 
@@ -25,7 +26,7 @@ type RestTimerSoundNative = {
   schedule: (
     options: RestTimerSoundScheduleOptions,
   ) => Promise<{ scheduled?: boolean; permission?: boolean }>
-  cancel: (options?: { releaseSession?: boolean }) => Promise<void>
+  cancel: (options?: RestTimerSoundCancelOptions) => Promise<void>
   preview: () => Promise<void>
   playNow: (options?: {
     token?: string
@@ -35,6 +36,7 @@ type RestTimerSoundNative = {
     holdSession?: boolean
   }) => Promise<{ played?: boolean; reason?: string }>
   vibrate: () => Promise<void>
+  releaseAudioSession: () => Promise<void>
 }
 
 const webTimers = new Map<string, number>()
@@ -44,14 +46,14 @@ const RestTimerSoundWeb: RestTimerSoundNative = {
     const delay = Math.max(0, options.endAtMs - Date.now())
     const existing = webTimers.get('end')
     if (existing != null) window.clearTimeout(existing)
-    // Web: no lock-screen notification — foreground timeout only.
     const id = window.setTimeout(() => {
       webTimers.delete('end')
     }, delay)
     webTimers.set('end', id)
     return { scheduled: true, permission: true }
   },
-  async cancel(_options?: { releaseSession?: boolean }) {
+  async cancel(options?: RestTimerSoundCancelOptions) {
+    if (options?.cancelPending === false) return
     const id = webTimers.get('end')
     if (id != null) window.clearTimeout(id)
     webTimers.clear()
@@ -61,6 +63,7 @@ const RestTimerSoundWeb: RestTimerSoundNative = {
     return { played: true }
   },
   async vibrate() {},
+  async releaseAudioSession() {},
 }
 
 const RestTimerSound = registerPlugin<RestTimerSoundNative>('RestTimerSound', {
@@ -86,9 +89,9 @@ export async function nativeSchedule(
   }
 }
 
-export async function nativeCancel(options?: {
-  releaseSession?: boolean
-}): Promise<void> {
+export async function nativeCancel(
+  options?: RestTimerSoundCancelOptions,
+): Promise<void> {
   try {
     await RestTimerSound.cancel(options)
   } catch (error) {
@@ -131,7 +134,14 @@ export async function nativeVibrate(): Promise<void> {
   }
 }
 
-/** Test seam — clear web timeouts. */
+export async function nativeReleaseAudioSession(): Promise<void> {
+  try {
+    await RestTimerSound.releaseAudioSession()
+  } catch (error) {
+    safeWarn('[restTimerSound] releaseAudioSession failed', error)
+  }
+}
+
 export function __resetRestTimerSoundNativeWebForTests(): void {
   for (const id of webTimers.values()) window.clearTimeout(id)
   webTimers.clear()
