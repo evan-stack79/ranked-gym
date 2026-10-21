@@ -5,7 +5,7 @@
  * Interdits: pouls, poids corps, calories, perte de poids.
  */
 import { Capacitor, registerPlugin } from '@capacitor/core'
-import { isMinorAge } from './nutritionSafetyRules'
+import { isMinorOrUnknownAge } from './nutritionSafetyRules'
 import { safeWarn } from '../utils/safeLog'
 
 export type LiveActivityKind = 'rest' | 'session' | 'steps' | 'record' | 'rank'
@@ -353,7 +353,8 @@ export async function showRankLiveAlert(payload: {
   alertBody: string
   age: number | null | undefined
 }): Promise<boolean> {
-  if (isMinorAge(payload.age) || payload.age == null || !Number.isFinite(payload.age)) {
+  // 0 / négatif / NaN / null / < 18 → jamais de classement
+  if (isMinorOrUnknownAge(payload.age)) {
     return false
   }
   if (!bridge.sessionActive) return false

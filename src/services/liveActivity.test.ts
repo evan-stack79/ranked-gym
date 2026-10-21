@@ -147,6 +147,48 @@ describe('liveActivity bridge', () => {
     expect(alert).not.toHaveBeenCalled()
   })
 
+  it('âge 0 → alerte rang bloquée', async () => {
+    const mod = await import('./liveActivity')
+    mod.__resetLiveActivityBridgeForTests()
+    await mod.startSessionLiveActivity({
+      exerciseName: 'Squat',
+      setIndex: 1,
+      setTotal: 1,
+      weightKg: 40,
+      reps: 5,
+      startedAtMs: 1,
+    })
+    alert.mockClear()
+    const shown = await mod.showRankLiveAlert({
+      alertTitle: 'Nouveau rang',
+      alertBody: 'Tu montes',
+      age: 0,
+    })
+    expect(shown).toBe(false)
+    expect(alert).not.toHaveBeenCalled()
+  })
+
+  it('âge -1 → alerte rang bloquée', async () => {
+    const mod = await import('./liveActivity')
+    mod.__resetLiveActivityBridgeForTests()
+    await mod.startSessionLiveActivity({
+      exerciseName: 'Squat',
+      setIndex: 1,
+      setTotal: 1,
+      weightKg: 40,
+      reps: 5,
+      startedAtMs: 1,
+    })
+    alert.mockClear()
+    const shown = await mod.showRankLiveAlert({
+      alertTitle: 'Nouveau rang',
+      alertBody: 'Tu montes',
+      age: -1,
+    })
+    expect(shown).toBe(false)
+    expect(alert).not.toHaveBeenCalled()
+  })
+
   it('adulte : alerte rang autorisée 5 s puis retour session', async () => {
     const mod = await import('./liveActivity')
     mod.__resetLiveActivityBridgeForTests()
