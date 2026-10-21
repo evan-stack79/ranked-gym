@@ -158,7 +158,6 @@ public class RestTimerSoundPlugin: CAPPlugin, CAPBridgedPlugin, UNUserNotificati
             case .denied:
                 DispatchQueue.main.async { completion(false) }
             case .notDetermined:
-                self.permissionAsked = true
                 center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
                     DispatchQueue.main.async { completion(granted) }
                 }
