@@ -41,6 +41,8 @@ interface ClearableNumberInputProps {
   selectOnFocus?: boolean
   /** Called on focus — e.g. apply « dernière fois » placeholders into the value. */
   onFocus?: () => void
+  /** After internal blur commit/restore — e.g. Train auto-validate. */
+  onBlur?: () => void
   enterKeyHint?: 'done' | 'enter' | 'go' | 'next' | 'previous' | 'search' | 'send'
   'aria-label'?: string
 }
@@ -97,12 +99,15 @@ export function ClearableNumberInput({
   commitOnInput = false,
   selectOnFocus = false,
   onFocus,
+  onBlur,
   enterKeyHint,
   'aria-label': ariaLabel,
 }: ClearableNumberInputProps) {
   const [text, setText] = useState(() => formatValue(value, step))
   const [focused, setFocused] = useState(false)
   const valueRef = useRef(value)
+  /** Valeur au moment du focus — blur vide restaure celle-ci (pas la dernière frappe). */
+  const focusValueRef = useRef(value)
 
   useEffect(() => {
     if (!focused) {
@@ -122,6 +127,8 @@ export function ClearableNumberInput({
         (isEmptyValue(prev) || prev === 0)
       ) {
         setText(formatValue(value, step))
+        // « dernière fois » appliqué après focus → nouvelle baseline de restore.
+        focusValueRef.current = value
       }
     }
   }, [value, focused, step, text])
@@ -151,6 +158,7 @@ export function ClearableNumberInput({
         placeholder={focused ? placeholder : undefined}
         onFocus={(e) => {
           setFocused(true)
+          focusValueRef.current = valueRef.current
           onFocus?.()
           if (selectOnFocus) {
             const target = e.currentTarget
@@ -178,20 +186,23 @@ export function ClearableNumberInput({
           }
           const next = parseFloat(raw)
           if (Number.isNaN(next)) return
-          // Train commitOnInput : clamp avant propagate (600→500). Nutrition garde onChange brut
-          // (ex. grammes > max → message parent, clampOnBlur false).
-          onChange(commitOnInput ? clamp(next, min, max, step) : next)
+          // Clamp silencieux seulement si clampOnBlur (nutrition âges/kcal).
+          // Train : clampOnBlur false → propage brut ; parent affiche l’erreur.
+          onChange(commitOnInput && clampOnBlur ? clamp(next, min, max, step) : next)
         }}
         onBlur={() => {
           setFocused(false)
           const parsed = parseFloat(text)
           if (text === '' || text === '.' || Number.isNaN(parsed)) {
             if (required) {
-              // Blur vide : restaurer la valeur parente bornée (6000 kcal → 5000).
-              const restored =
-                clampOnBlur && value != null && Number.isFinite(value)
-                  ? clamp(value, min, max, step)
-                  : value
+              // Blur vide : valeur d’AVANT le focus (20), pas la dernière frappe (2).
+              let restored = focusValueRef.current
+              if (isEmptyValue(restored)) {
+                restored = value
+              }
+              if (clampOnBlur && restored != null && Number.isFinite(restored)) {
+                restored = clamp(restored, min, max, step)
+              }
               setText(formatValue(restored, step))
               if (
                 restored != null &&
@@ -200,20 +211,24 @@ export function ClearableNumberInput({
               ) {
                 onChange(restored)
               }
+              onBlur?.()
               return
             }
             onChange(null)
             setText('')
+            onBlur?.()
             return
           }
           if (!clampOnBlur) {
             onChange(parsed)
             setText(formatValue(parsed, step))
+            onBlur?.()
             return
           }
           const clamped = clamp(parsed, min, max, step)
           onChange(clamped)
           setText(formatValue(clamped, step))
+          onBlur?.()
         }}
         className={`${className ?? ''} ${showPlaceholder ? 'caret-white' : ''}`}
       />
