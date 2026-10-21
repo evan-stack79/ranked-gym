@@ -24,12 +24,19 @@ import {
 const STORAGE_KEY = 'ranked-gym:rest-timer-sound-prefs'
 
 describe('restTimerSound', () => {
-  const schedule = vi.fn(async () => ({ scheduled: true, permission: true }))
+  const schedule = vi.fn(
+    async (_opts: { endAtMs: number; soundEnabled: boolean; token: string }) => ({
+      scheduled: true as boolean,
+      permission: true as boolean,
+    }),
+  )
   const cancel = vi.fn(async () => {})
   const preview = vi.fn(async () => {})
-  const playNow = vi.fn(async () => ({ played: true }))
+  const playNow = vi.fn(async (_token?: string, _opts?: { cancelPending?: boolean }) => ({
+    played: true,
+  }))
   const vibrateNative = vi.fn(async () => {})
-  const playAudio = vi.fn()
+  const playAudio = vi.fn((_url: string, _gain: number) => {})
 
   beforeEach(() => {
     vi.useFakeTimers()
@@ -67,7 +74,7 @@ describe('restTimerSound', () => {
     const endAt = Date.now() + 90_000
     await scheduleRestTimerSound(endAt)
     expect(schedule).toHaveBeenCalledTimes(1)
-    expect(schedule.mock.calls[0]![0].endAtMs).toBe(endAt)
+    expect(schedule.mock.calls[0]?.[0]?.endAtMs).toBe(endAt)
 
     await cancelRestTimerSound()
     expect(cancel).toHaveBeenCalled()
@@ -85,7 +92,7 @@ describe('restTimerSound', () => {
     await rescheduleRestTimerSound(end2)
     expect(cancel).toHaveBeenCalled()
     expect(schedule).toHaveBeenCalledTimes(2)
-    expect(schedule.mock.calls[1]![0].endAtMs).toBe(end2)
+    expect(schedule.mock.calls[1]?.[0]?.endAtMs).toBe(end2)
   })
 
   it('pas de double son à la fin', async () => {
@@ -95,14 +102,14 @@ describe('restTimerSound', () => {
     await onRestTimerSoundComplete()
     // Web path uses playAudio once (token already played).
     expect(playAudio).toHaveBeenCalledTimes(1)
-    expect(playAudio.mock.calls[0]![1]).toBeLessThanOrEqual(1)
+    expect(playAudio.mock.calls[0]?.[1]).toBeLessThanOrEqual(1)
   })
 
   it('son coupé → pas d’audio mais vibration', async () => {
     setRestTimerSoundEnabled(false)
     const endAt = Date.now() + 5_000
     await scheduleRestTimerSound(endAt)
-    expect(schedule.mock.calls[0]![0].soundEnabled).toBe(false)
+    expect(schedule.mock.calls[0]?.[0]?.soundEnabled).toBe(false)
 
     const vibrateSpy = vi.spyOn(
       await import('./haptics'),
@@ -118,7 +125,7 @@ describe('restTimerSound', () => {
     await previewRestTimerSound()
     // Web: playAudio ; native would call preview mock — stub Capacitor absent → audio.
     expect(playAudio).toHaveBeenCalled()
-    expect(playAudio.mock.calls[0]![1]).toBeLessThanOrEqual(1)
+    expect(playAudio.mock.calls[0]?.[1]).toBeLessThanOrEqual(1)
   })
 
   it('prefs persistées (choix gardé)', () => {
