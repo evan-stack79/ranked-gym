@@ -13,7 +13,7 @@ const laEnd = vi.fn(async () => {})
 const soundSchedule = vi.fn(async () => ({ scheduled: true }))
 const soundCancel = vi.fn(async () => {})
 const soundVibrate = vi.fn(async () => {})
-const soundPlayNow = vi.fn(async () => {})
+const soundPlayNow = vi.fn(async () => ({ played: true }))
 
 vi.mock('@capacitor/core', () => ({
   Capacitor: {
