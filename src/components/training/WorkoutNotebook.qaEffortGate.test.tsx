@@ -36,6 +36,18 @@ vi.mock('../../services/restTimerLiveActivity', () => ({
 
 vi.mock('../../utils/restTimerSound', () => ({
   playRestCompleteChime: vi.fn(),
+  scheduleRestTimerSound: vi.fn(async () => {}),
+  cancelRestTimerSound: vi.fn(async () => {}),
+  rescheduleRestTimerSound: vi.fn(async () => {}),
+  onRestTimerSoundComplete: vi.fn(async () => {}),
+  maybePlayCountdownBeep: vi.fn(async () => {}),
+  previewRestTimerSound: vi.fn(async () => {}),
+  getRestTimerSoundPrefs: vi.fn(() => ({
+    soundEnabled: true,
+    countdownBeeps: true,
+    haptics: true,
+  })),
+  setRestTimerSoundEnabled: vi.fn(),
 }))
 
 vi.mock('../../utils/haptics', () => ({
