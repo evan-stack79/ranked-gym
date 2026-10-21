@@ -7,13 +7,33 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const laStart = vi.fn(async () => ({ activityId: 'a1', reused: false }))
-const laUpdate = vi.fn(async () => ({ updated: true }))
-const laEnd = vi.fn(async () => {})
-const soundSchedule = vi.fn(async () => ({ scheduled: true }))
-const soundCancel = vi.fn(async () => {})
+const laStart = vi.fn(async (_opts?: Record<string, unknown>) => ({
+  activityId: 'a1',
+  reused: false,
+}))
+const laUpdate = vi.fn(async (_opts?: Record<string, unknown>) => ({ updated: true }))
+const laEnd = vi.fn(async (_opts?: Record<string, unknown>) => {})
+const soundSchedule = vi.fn(
+  async (_opts: {
+    endAtMs: number
+    soundEnabled: boolean
+    haptics: boolean
+    token: string
+  }) => ({ scheduled: true as boolean }),
+)
+const soundCancel = vi.fn(async (_opts?: { releaseSession?: boolean; cancelPending?: boolean }) => {})
 const soundVibrate = vi.fn(async () => {})
-const soundPlayNow = vi.fn(async () => ({ played: true }))
+const soundPlayNow = vi.fn(
+  async (
+    _token?: string,
+    _opts?: {
+      cancelPending?: boolean
+      volume?: number
+      maxDurationSec?: number
+      holdSession?: boolean
+    },
+  ) => ({ played: true }),
+)
 
 vi.mock('@capacitor/core', () => ({
   Capacitor: {
@@ -23,21 +43,21 @@ vi.mock('@capacitor/core', () => ({
   registerPlugin: (name: string) => {
     if (name === 'LiveActivity') {
       return {
-        start: (...a: unknown[]) => laStart(...a),
-        update: (...a: unknown[]) => laUpdate(...a),
-        end: (...a: unknown[]) => laEnd(...a),
+        start: laStart,
+        update: laUpdate,
+        end: laEnd,
         isAvailable: async () => ({ available: true }),
         alert: vi.fn(async () => ({ alerted: true })),
       }
     }
     if (name === 'RestTimerSound') {
       return {
-        schedule: (...a: unknown[]) => soundSchedule(...a),
-        cancel: (...a: unknown[]) => soundCancel(...a),
+        schedule: soundSchedule,
+        cancel: soundCancel,
         releaseAudioSession: vi.fn(async () => {}),
         preview: vi.fn(async () => {}),
-        playNow: (...a: unknown[]) => soundPlayNow(...a),
-        vibrate: (...a: unknown[]) => soundVibrate(...a),
+        playNow: soundPlayNow,
+        vibrate: soundVibrate,
       }
     }
     return {}
@@ -149,9 +169,7 @@ describe('RestTimerContext — son + Dynamic Island (intégration)', () => {
     )
     // Notif / chime de fin + armement (countdownBeeps ON par défaut produit)
     expect(soundSchedule).toHaveBeenCalled()
-    expect(soundSchedule.mock.calls[0]![0]).toEqual(
-      expect.objectContaining({ soundEnabled: true }),
-    )
+    expect(soundSchedule.mock.calls[0]?.[0]).toMatchObject({ soundEnabled: true })
 
     // Bips 3-2-1 programmés / jouables via le même prefs + maybePlayCountdownBeep
     const beepSpy = vi.spyOn(sound, 'maybePlayCountdownBeep')
