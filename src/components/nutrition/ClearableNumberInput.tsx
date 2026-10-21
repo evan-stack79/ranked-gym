@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface ClearableNumberInputProps {
   value: number | null
@@ -25,6 +25,11 @@ interface ClearableNumberInputProps {
    * l’utilisateur frappe / avant blur — évite l’auto-validate prématuré.
    */
   deferAmbiguousIntegerPrefix?: boolean
+  /**
+   * When true, numeric values are committed only on blur (local string while typing).
+   * Empty still reports null immediately when `required` is false.
+   */
+  commitOnBlur?: boolean
   /** Select all text on focus (handy when default is prefilled). */
   selectOnFocus?: boolean
   /** Called on focus — e.g. apply « dernière fois » placeholders into the value. */
@@ -55,6 +60,10 @@ export function isAmbiguousIntegerPrefix(raw: string, min: number, max: number):
   return false
 }
 
+function isEmptyValue(value: number | null | undefined): boolean {
+  return value == null || !Number.isFinite(value)
+}
+
 /**
  * Number field that can be fully cleared while typing.
  * Clamps to min/max only on blur. Supports Apple-style gray placeholders.
@@ -72,6 +81,7 @@ export function ClearableNumberInput({
   clampOnBlur = true,
   sanitizeUnits = false,
   deferAmbiguousIntegerPrefix = false,
+  commitOnBlur = false,
   selectOnFocus = false,
   onFocus,
   enterKeyHint,
@@ -79,15 +89,27 @@ export function ClearableNumberInput({
 }: ClearableNumberInputProps) {
   const [text, setText] = useState(() => formatValue(value, step))
   const [focused, setFocused] = useState(false)
+  const valueRef = useRef(value)
 
   useEffect(() => {
     if (!focused) {
       setText(formatValue(value, step))
+      valueRef.current = value
       return
     }
-    // External fill while focused on an empty field (ex. « dernière fois »).
-    if (text === '' && value != null && Number.isFinite(value)) {
-      setText(formatValue(value, step))
+    // Remplissage externe pendant le focus (ex. « dernière fois ») :
+    // parent passe de vide → valeur. Ne jamais réécrire un champ vidé par l’utilisateur.
+    const prev = valueRef.current
+    if (value !== prev) {
+      valueRef.current = value
+      if (
+        text === '' &&
+        !isEmptyValue(value) &&
+        value !== 0 &&
+        (isEmptyValue(prev) || prev === 0)
+      ) {
+        setText(formatValue(value, step))
+      }
     }
   }, [value, focused, step, text])
 
@@ -132,6 +154,7 @@ export function ClearableNumberInput({
             if (!required) onChange(null)
             return
           }
+          if (commitOnBlur) return
           if (deferAmbiguousIntegerPrefix && isAmbiguousIntegerPrefix(raw, min, max)) {
             return
           }

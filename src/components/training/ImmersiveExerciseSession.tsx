@@ -338,12 +338,18 @@ export function ImmersiveExerciseSession({
                 </span>
                 <ClearableNumberInput
                   value={showLastHint ? null : set.weightKg}
-                  onChange={(v) => patchSet(idx, { weightKg: v ?? 0 })}
+                  onChange={(v) => {
+                    // Vide → ne jamais écrire 0 silencieux ; blur restaure l’ancienne valeur.
+                    if (v == null) return
+                    patchSet(idx, { weightKg: v })
+                  }}
                   onFocus={showLastHint ? applyLast : undefined}
                   min={0}
                   max={500}
                   step={0.5}
                   required={!showLastHint}
+                  commitOnBlur
+                  selectOnFocus
                   placeholder={
                     showLastHint && last
                       ? formatLastWeightPlaceholder(last.weightKg)
@@ -358,14 +364,17 @@ export function ImmersiveExerciseSession({
                   className={FIELD}
                 />
                 <ClearableNumberInput
-                  value={showLastHint ? null : set.reps}
-                  onChange={(v) =>
-                    patchSet(idx, { reps: v != null ? Math.round(v) : 0 })
-                  }
+                  value={showLastHint ? null : set.reps === 0 ? null : set.reps}
+                  onChange={(v) => {
+                    if (v == null) return
+                    patchSet(idx, { reps: Math.round(v) })
+                  }}
                   onFocus={showLastHint ? applyLast : undefined}
                   min={1}
                   max={50}
                   required={!showLastHint}
+                  commitOnBlur
+                  selectOnFocus
                   placeholder={
                     showLastHint && last
                       ? formatLastRepsPlaceholder(last.reps)
@@ -397,6 +406,7 @@ export function ImmersiveExerciseSession({
                     min={1}
                     max={10}
                     required={false}
+                    selectOnFocus
                     deferAmbiguousIntegerPrefix
                     placeholder="1–10"
                     placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#636366]"
@@ -446,8 +456,17 @@ export function ImmersiveExerciseSession({
           {autoValidate ? null : (
             <button
               type="button"
-              onClick={() => onValidateSet(exercise, validateIdx, restSecResolved)}
-              disabled={Boolean(exercise.sets[validateIdx]?.done) && pendingIdx < 0}
+              onClick={() => {
+                const target = exercise.sets[validateIdx]
+                if (!target || target.done) return
+                // Même gate que l’auto-validate : effort/reps vides → bloque (pas de 0 inventé).
+                if (!isSetReadyForAutoValidate(target)) return
+                onValidateSet(exercise, validateIdx, restSecResolved)
+              }}
+              disabled={
+                (Boolean(exercise.sets[validateIdx]?.done) && pendingIdx < 0) ||
+                !isSetReadyForAutoValidate(exercise.sets[validateIdx] ?? { reps: 0, weightKg: 0 })
+              }
               className="ios-press flex min-h-11 flex-[1.35] items-center justify-center rounded-xl bg-[#FF2B2B] px-3 text-[14px] font-semibold text-white disabled:opacity-40"
             >
               Valider la série

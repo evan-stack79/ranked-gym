@@ -1017,12 +1017,17 @@ export function WorkoutNotebook({
                           <span className="mb-0.5 block text-[10px] text-[#636366]">kg</span>
                           <ClearableNumberInput
                             value={showLastHint ? null : set.weightKg}
-                            onChange={(v) => updateSet(ex.id, idx, { weightKg: v ?? 0 })}
+                            onChange={(v) => {
+                              if (v == null) return
+                              updateSet(ex.id, idx, { weightKg: v })
+                            }}
                             onFocus={showLastHint ? applyLast : undefined}
                             min={0}
                             max={500}
                             step={0.5}
                             required={!showLastHint}
+                            commitOnBlur
+                            selectOnFocus
                             placeholder={
                               showLastHint && lastPerf
                                 ? formatLastWeightPlaceholder(lastPerf.weightKg)
@@ -1040,14 +1045,17 @@ export function WorkoutNotebook({
                         <label className="block">
                           <span className="mb-0.5 block text-[10px] text-[#636366]">Reps</span>
                           <ClearableNumberInput
-                            value={showLastHint ? null : set.reps}
-                            onChange={(v) =>
-                              updateSet(ex.id, idx, { reps: v != null ? Math.round(v) : 0 })
-                            }
+                            value={showLastHint ? null : set.reps === 0 ? null : set.reps}
+                            onChange={(v) => {
+                              if (v == null) return
+                              updateSet(ex.id, idx, { reps: Math.round(v) })
+                            }}
                             onFocus={showLastHint ? applyLast : undefined}
                             min={1}
                             max={50}
                             required={!showLastHint}
+                            commitOnBlur
+                            selectOnFocus
                             placeholder={
                               showLastHint && lastPerf
                                 ? formatLastRepsPlaceholder(lastPerf.reps)
@@ -1077,6 +1085,7 @@ export function WorkoutNotebook({
                             min={1}
                             max={10}
                             required={false}
+                            selectOnFocus
                             deferAmbiguousIntegerPrefix
                             placeholder="1–10"
                             placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2 text-[12px] font-semibold text-[#636366]"
