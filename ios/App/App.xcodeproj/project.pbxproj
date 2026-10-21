@@ -24,6 +24,8 @@
 		C1A100052FEA0401000C02A5 /* RestTimerAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A100002FEA0401000C02A0 /* RestTimerAttributes.swift */; };
 		C1A100072FEA0401000C02A7 /* RestTimerLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A100062FEA0401000C02A6 /* RestTimerLiveActivityWidget.swift */; };
 		C1A1000B2FEA0401000C02AB /* RestTimerLiveActivityWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C1A1000A2FEA0401000C02AA /* RestTimerLiveActivityWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		C1A100162FEA0401000C02B6 /* LiveActivityIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A100152FEA0401000C02B5 /* LiveActivityIntents.swift */; };
+		C1A100172FEA0401000C02B7 /* LiveActivityIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A100152FEA0401000C02B5 /* LiveActivityIntents.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -67,6 +69,7 @@
 		B7E4A1962FEA0301000C01B1 /* SecureStoragePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureStoragePlugin.swift; sourceTree = "<group>"; };
 		C1A100002FEA0401000C02A0 /* RestTimerAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerAttributes.swift; sourceTree = "<group>"; };
 		C1A100022FEA0401000C02A2 /* RestTimerLiveActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerLiveActivityPlugin.swift; sourceTree = "<group>"; };
+		C1A100152FEA0401000C02B5 /* LiveActivityIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityIntents.swift; sourceTree = "<group>"; };
 		C1A100062FEA0401000C02A6 /* RestTimerLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerLiveActivityWidget.swift; sourceTree = "<group>"; };
 		C1A100082FEA0401000C02A8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C1A1000A2FEA0401000C02AA /* RestTimerLiveActivityWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RestTimerLiveActivityWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -152,6 +155,7 @@
 			children = (
 				C1A100002FEA0401000C02A0 /* RestTimerAttributes.swift */,
 				C1A100022FEA0401000C02A2 /* RestTimerLiveActivityPlugin.swift */,
+				C1A100152FEA0401000C02B5 /* LiveActivityIntents.swift */,
 			);
 			path = RestTimerLiveActivity;
 			sourceTree = "<group>";
@@ -274,6 +278,7 @@
 				B7E4A1972FEA0301000C01B2 /* SecureStoragePlugin.swift in Sources */,
 				C1A100012FEA0401000C02A1 /* RestTimerAttributes.swift in Sources */,
 				C1A100032FEA0401000C02A3 /* RestTimerLiveActivityPlugin.swift in Sources */,
+				C1A100162FEA0401000C02B6 /* LiveActivityIntents.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -283,6 +288,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C1A100052FEA0401000C02A5 /* RestTimerAttributes.swift in Sources */,
+				C1A100172FEA0401000C02B7 /* LiveActivityIntents.swift in Sources */,
 				C1A100072FEA0401000C02A7 /* RestTimerLiveActivityWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -296,6 +296,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     void updateRestLiveActivity({
       remainingSec: remaining,
       subtitle: `${targetRef.current.exerciseName} · ${targetRef.current.setLabel}`,
+      paused: true,
     })
   }, [clearTick, persistSnap])
 
@@ -321,6 +322,11 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       endsAt: endsAtRef.current,
       paused: false,
       target: targetRef.current,
+    })
+    void updateRestLiveActivity({
+      remainingSec: remaining,
+      subtitle: `${targetRef.current.exerciseName} · ${targetRef.current.setLabel}`,
+      paused: false,
     })
     armTick()
   }, [armTick, complete, persistSnap])
