@@ -1,6 +1,6 @@
 /**
  * Préférences locales du son de fin de repos (pas de dB, pas de promesse « sûr »).
- * countdownBeeps OFF par défaut (SON-02).
+ * countdownBeeps ON par défaut (bips 3-2-1 + chime de fin) — désactivable.
  */
 
 export type RestTimerSoundPrefs = {
@@ -13,7 +13,7 @@ const STORAGE_KEY = 'ranked-gym:rest-timer-sound-prefs'
 
 export const DEFAULT_REST_TIMER_SOUND_PREFS: RestTimerSoundPrefs = {
   soundEnabled: true,
-  countdownBeeps: false,
+  countdownBeeps: true,
   haptics: true,
 }
 

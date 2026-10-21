@@ -4,18 +4,35 @@ import { safeWarn } from '../utils/safeLog'
 export type RestTimerSoundScheduleOptions = {
   endAtMs: number
   soundEnabled: boolean
+  haptics: boolean
   token: string
+}
+
+export type RestTimerSoundPlayNowOptions = {
+  cancelPending?: boolean
+  /** 0…1 — never raise above media volume; no dB UI. */
+  volume?: number
+  /** Truncate playback (soft countdown beeps). */
+  maxDurationSec?: number
+  /**
+   * Keep AVAudioSession active after this play (countdown 3-2-1).
+   * Final chime omits this so session deactivates with notifyOthersOnDeactivation.
+   */
+  holdSession?: boolean
 }
 
 type RestTimerSoundNative = {
   schedule: (
     options: RestTimerSoundScheduleOptions,
   ) => Promise<{ scheduled?: boolean; permission?: boolean }>
-  cancel: () => Promise<void>
+  cancel: (options?: { releaseSession?: boolean }) => Promise<void>
   preview: () => Promise<void>
   playNow: (options?: {
     token?: string
     cancelPending?: boolean
+    volume?: number
+    maxDurationSec?: number
+    holdSession?: boolean
   }) => Promise<{ played?: boolean; reason?: string }>
   vibrate: () => Promise<void>
 }
@@ -34,7 +51,7 @@ const RestTimerSoundWeb: RestTimerSoundNative = {
     webTimers.set('end', id)
     return { scheduled: true, permission: true }
   },
-  async cancel() {
+  async cancel(_options?: { releaseSession?: boolean }) {
     const id = webTimers.get('end')
     if (id != null) window.clearTimeout(id)
     webTimers.clear()
@@ -69,9 +86,11 @@ export async function nativeSchedule(
   }
 }
 
-export async function nativeCancel(): Promise<void> {
+export async function nativeCancel(options?: {
+  releaseSession?: boolean
+}): Promise<void> {
   try {
-    await RestTimerSound.cancel()
+    await RestTimerSound.cancel(options)
   } catch (error) {
     safeWarn('[restTimerSound] cancel failed', error)
   }
@@ -87,12 +106,15 @@ export async function nativePreview(): Promise<void> {
 
 export async function nativePlayNow(
   token?: string,
-  opts?: { cancelPending?: boolean },
+  opts?: RestTimerSoundPlayNowOptions,
 ): Promise<{ played: boolean }> {
   try {
     const res = await RestTimerSound.playNow({
       token,
       cancelPending: opts?.cancelPending ?? true,
+      volume: opts?.volume,
+      maxDurationSec: opts?.maxDurationSec,
+      holdSession: opts?.holdSession,
     })
     return { played: res.played !== false }
   } catch (error) {

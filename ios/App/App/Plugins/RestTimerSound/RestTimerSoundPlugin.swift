@@ -1,12 +1,21 @@
 import AVFoundation
+import AudioToolbox
 import Capacitor
 import UIKit
 import UserNotifications
 
 /**
  * Rest timer end chime + local notification (lock screen / background).
- * Route-aware AVAudioSession: headphones → .playback + duck; speaker → .ambient.
- * Does not inspect the hardware mute switch.
+ *
+ * Audio session:
+ * - Other app audio playing → .playback + [.mixWithOthers, .duckOthers]
+ *   (works on speaker or headphones; .duckOthers is a no-op on .ambient).
+ * - Else → .ambient (respects silent switch).
+ * - Countdown 3-2-1 + final: activate once at first beep, deactivate with
+ *   .notifyOthersOnDeactivation only after the final chime.
+ *
+ * Vibration: AudioServicesPlaySystemSound(kSystemSoundID_Vibrate) — works on
+ * silent switch. Does not read the mute switch.
  */
 @objc(RestTimerSoundPlugin)
 public class RestTimerSoundPlugin: CAPPlugin, CAPBridgedPlugin, UNUserNotificationCenterDelegate {
@@ -22,9 +31,14 @@ public class RestTimerSoundPlugin: CAPPlugin, CAPBridgedPlugin, UNUserNotificati
 
     private static let notificationId = "ranked-gym.rest-timer.end"
     private static let soundFileName = "rest_timer_chime.caf"
+    /// Near-silent cue so lock-screen notifications still trigger system vibration when muted.
+    private static let silentSoundFileName = "rest_timer_silent.caf"
 
     private var player: AVAudioPlayer?
     private var playedForScheduleToken: String?
+    /// True while countdown beeps hold the session open until the final chime.
+    private var sessionHeld = false
+    private var deactivateWorkItem: DispatchWorkItem?
 
     public override func load() {
         let center = UNUserNotificationCenter.current()
@@ -34,8 +48,11 @@ public class RestTimerSoundPlugin: CAPPlugin, CAPBridgedPlugin, UNUserNotificati
     @objc func schedule(_ call: CAPPluginCall) {
         let endAtMs = call.getDouble("endAtMs") ?? 0
         let soundEnabled = call.getBool("soundEnabled") ?? true
+        let haptics = call.getBool("haptics") ?? true
         let token = call.getString("token") ?? "\(Int(endAtMs))"
         playedForScheduleToken = nil
+        // New schedule → release any held countdown session.
+        releaseHeldSession()
 
         let fireDate = Date(timeIntervalSince1970: endAtMs / 1000.0)
         let delay = fireDate.timeIntervalSinceNow
@@ -52,7 +69,6 @@ public class RestTimerSoundPlugin: CAPPlugin, CAPBridgedPlugin, UNUserNotificati
             self.cancelPending()
 
             guard granted else {
-                // Permission denied — foreground path (JS playNow) still works.
                 call.resolve(["scheduled": false, "permission": false])
                 return
             }
@@ -60,10 +76,19 @@ public class RestTimerSoundPlugin: CAPPlugin, CAPBridgedPlugin, UNUserNotificati
             let content = UNMutableNotificationContent()
             content.title = "Repos terminé"
             content.body = "C’est reparti"
-            content.sound = soundEnabled
-                ? UNNotificationSound(named: UNNotificationSoundName(Self.soundFileName))
-                : nil
-            content.userInfo = ["token": token, "soundEnabled": soundEnabled]
+            if soundEnabled {
+                content.sound = UNNotificationSound(named: UNNotificationSoundName(Self.soundFileName))
+            } else if haptics {
+                // Muted audio preference: near-silent sound keeps system vibrate on lock screen.
+                content.sound = UNNotificationSound(named: UNNotificationSoundName(Self.silentSoundFileName))
+            } else {
+                content.sound = nil
+            }
+            content.userInfo = [
+                "token": token,
+                "soundEnabled": soundEnabled,
+                "haptics": haptics,
+            ]
 
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
             let request = UNNotificationRequest(
@@ -83,17 +108,27 @@ public class RestTimerSoundPlugin: CAPPlugin, CAPBridgedPlugin, UNUserNotificati
 
     @objc func cancel(_ call: CAPPluginCall) {
         cancelPending()
+        // Default true: Reprendre / reschedule. Complete path passes false so the
+        // held countdown session stays up until the final chime deactivates it.
+        let releaseSession = call.getBool("releaseSession") ?? true
+        if releaseSession {
+            releaseHeldSession()
+        }
         call.resolve()
     }
 
     @objc func preview(_ call: CAPPluginCall) {
-        playChime(force: true)
+        playChime(force: true, volume: 1.0, maxDurationSec: nil, holdSession: false)
         call.resolve()
     }
 
     @objc func playNow(_ call: CAPPluginCall) {
         let token = call.getString("token")
         let cancelPendingFlag = call.getBool("cancelPending") ?? true
+        let volume = min(1.0, max(0.0, CGFloat(call.getFloat("volume") ?? 1.0)))
+        let maxDuration = call.getDouble("maxDurationSec")
+        // Countdown beeps: hold session until final chime (JS sets holdSession: true).
+        let holdSession = call.getBool("holdSession") ?? false
         if let token, playedForScheduleToken == token {
             call.resolve(["played": false, "reason": "already"])
             return
@@ -102,8 +137,12 @@ public class RestTimerSoundPlugin: CAPPlugin, CAPBridgedPlugin, UNUserNotificati
             removeDelivered()
             cancelPending()
         }
-        playChime(force: false)
-        // Only mark the end-of-rest token (not countdown beeps).
+        playChime(
+            force: false,
+            volume: Float(volume),
+            maxDurationSec: maxDuration,
+            holdSession: holdSession
+        )
         if cancelPendingFlag, let token {
             playedForScheduleToken = token
         }
@@ -112,9 +151,8 @@ public class RestTimerSoundPlugin: CAPPlugin, CAPBridgedPlugin, UNUserNotificati
 
     @objc func vibrate(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            let gen = UINotificationFeedbackGenerator()
-            gen.prepare()
-            gen.notificationOccurred(.success)
+            // Works on silent switch; UINotificationFeedbackGenerator often does not.
+            AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
         }
         call.resolve()
     }
@@ -130,15 +168,18 @@ public class RestTimerSoundPlugin: CAPPlugin, CAPBridgedPlugin, UNUserNotificati
             completionHandler([])
             return
         }
-        // Foreground at fire time: suppress banner, play via AVAudioPlayer once.
         let token = notification.request.content.userInfo["token"] as? String
         let soundEnabled = (notification.request.content.userInfo["soundEnabled"] as? Bool) ?? true
+        let haptics = (notification.request.content.userInfo["haptics"] as? Bool) ?? true
         if let token, playedForScheduleToken == token {
             completionHandler([])
             return
         }
         if soundEnabled {
-            playChime(force: false)
+            playChime(force: false, volume: 1.0, maxDurationSec: nil, holdSession: false)
+        }
+        if haptics {
+            AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
         }
         if let token {
             playedForScheduleToken = token
@@ -177,20 +218,16 @@ public class RestTimerSoundPlugin: CAPPlugin, CAPBridgedPlugin, UNUserNotificati
             .removeDeliveredNotifications(withIdentifiers: [Self.notificationId])
     }
 
-    private func headphonesConnected() -> Bool {
-        let outputs = AVAudioSession.sharedInstance().currentRoute.outputs
-        let headphoneTypes: Set<AVAudioSession.Port> = [
-            .headphones,
-            .bluetoothA2DP,
-            .bluetoothHFP,
-            .bluetoothLE,
-        ]
-        return outputs.contains { headphoneTypes.contains($0.portType) }
+    private func otherAudioPlaying() -> Bool {
+        let session = AVAudioSession.sharedInstance()
+        return session.isOtherAudioPlaying || session.secondaryAudioShouldBeSilencedHint
     }
 
     private func configureSession() throws {
         let session = AVAudioSession.sharedInstance()
-        if headphonesConnected() {
+        // Architect: .duckOthers only works with .playback. Use it when another
+        // app is already playing (speaker or headphones). Else .ambient respects mute.
+        if otherAudioPlaying() {
             try session.setCategory(.playback, mode: .default, options: [.mixWithOthers, .duckOthers])
         } else {
             try session.setCategory(.ambient, mode: .default, options: [.mixWithOthers])
@@ -199,34 +236,68 @@ public class RestTimerSoundPlugin: CAPPlugin, CAPBridgedPlugin, UNUserNotificati
     }
 
     private func deactivateSession() {
+        sessionHeld = false
         try? AVAudioSession.sharedInstance()
             .setActive(false, options: .notifyOthersOnDeactivation)
     }
 
-    private func playChime(force: Bool) {
+    private func releaseHeldSession() {
+        deactivateWorkItem?.cancel()
+        deactivateWorkItem = nil
+        player?.stop()
+        player = nil
+        if sessionHeld {
+            deactivateSession()
+        }
+    }
+
+    private func playChime(force: Bool, volume: Float, maxDurationSec: Double?, holdSession: Bool) {
         DispatchQueue.main.async {
+            self.deactivateWorkItem?.cancel()
+            self.deactivateWorkItem = nil
             do {
                 try self.configureSession()
+                if holdSession {
+                    self.sessionHeld = true
+                }
                 guard let url = Bundle.main.url(forResource: "rest_timer_chime", withExtension: "caf") else {
-                    self.deactivateSession()
+                    if !holdSession && !self.sessionHeld {
+                        self.deactivateSession()
+                    }
                     return
                 }
                 let player = try AVAudioPlayer(contentsOf: url)
-                player.volume = 1.0
+                player.volume = min(1.0, max(0.0, volume))
                 player.prepareToPlay()
                 self.player = player
                 player.play()
-                let delay = max(0.2, player.duration + 0.05)
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                let natural = max(0.2, player.duration + 0.05)
+                let delay: Double
+                if let maxDurationSec, maxDurationSec > 0 {
+                    delay = min(natural, maxDurationSec)
+                } else {
+                    delay = natural
+                }
+                let work = DispatchWorkItem { [weak self] in
+                    guard let self else { return }
+                    if let maxDurationSec, maxDurationSec > 0, self.player?.isPlaying == true {
+                        self.player?.stop()
+                    }
                     self.player = nil
+                    // Hold through 3-2-1; only release after final (holdSession false).
+                    if holdSession {
+                        return
+                    }
                     self.deactivateSession()
                 }
+                self.deactivateWorkItem = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
             } catch {
-                self.deactivateSession()
+                if !holdSession {
+                    self.deactivateSession()
+                }
                 if force {
-                    // Preview fallback: light haptic so the control still responds.
-                    let gen = UINotificationFeedbackGenerator()
-                    gen.notificationOccurred(.success)
+                    AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
                 }
             }
         }

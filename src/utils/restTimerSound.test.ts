@@ -18,6 +18,7 @@ import {
   previewRestTimerSound,
   rescheduleRestTimerSound,
   scheduleRestTimerSound,
+  setRestTimerCountdownBeeps,
   setRestTimerSoundEnabled,
 } from './restTimerSound'
 
@@ -25,16 +26,31 @@ const STORAGE_KEY = 'ranked-gym:rest-timer-sound-prefs'
 
 describe('restTimerSound', () => {
   const schedule = vi.fn(
-    async (_opts: { endAtMs: number; soundEnabled: boolean; token: string }) => ({
+    async (_opts: {
+      endAtMs: number
+      soundEnabled: boolean
+      haptics: boolean
+      token: string
+    }) => ({
       scheduled: true as boolean,
       permission: true as boolean,
     }),
   )
-  const cancel = vi.fn(async () => {})
+  const cancel = vi.fn(async (_opts?: { releaseSession?: boolean }) => {})
   const preview = vi.fn(async () => {})
-  const playNow = vi.fn(async (_token?: string, _opts?: { cancelPending?: boolean }) => ({
-    played: true,
-  }))
+  const playNow = vi.fn(
+    async (
+      _token?: string,
+      _opts?: {
+        cancelPending?: boolean
+        volume?: number
+        maxDurationSec?: number
+        holdSession?: boolean
+      },
+    ) => ({
+      played: true,
+    }),
+  )
   const vibrateNative = vi.fn(async () => {})
   const playAudio = vi.fn((_url: string, _gain: number) => {})
 
@@ -65,9 +81,20 @@ describe('restTimerSound', () => {
     localStorage.clear()
   })
 
-  it('countdownBeeps off par défaut', () => {
-    expect(getRestTimerSoundPrefs().countdownBeeps).toBe(false)
-    expect(DEFAULT_REST_TIMER_SOUND_PREFS.countdownBeeps).toBe(false)
+  it('countdownBeeps true par défaut', () => {
+    expect(getRestTimerSoundPrefs().countdownBeeps).toBe(true)
+    expect(DEFAULT_REST_TIMER_SOUND_PREFS.countdownBeeps).toBe(true)
+  })
+
+  it('schedule passe haptics + soundEnabled', async () => {
+    const endAt = Date.now() + 90_000
+    await scheduleRestTimerSound(endAt)
+    expect(schedule).toHaveBeenCalledTimes(1)
+    expect(schedule.mock.calls[0]?.[0]).toMatchObject({
+      endAtMs: endAt,
+      soundEnabled: true,
+      haptics: true,
+    })
   })
 
   it('schedule puis cancel sur Reprendre (skip)', async () => {
@@ -105,16 +132,69 @@ describe('restTimerSound', () => {
     expect(playAudio.mock.calls[0]?.[1]).toBeLessThanOrEqual(1)
   })
 
+  it('fin de repos → vibration web même avec son actif', async () => {
+    const vibrateSpy = vi.spyOn(await import('./haptics'), 'vibrate')
+    const endAt = Date.now() + 5_000
+    await scheduleRestTimerSound(endAt)
+    await onRestTimerSoundComplete()
+    expect(playAudio).toHaveBeenCalled()
+    expect(vibrateSpy).toHaveBeenCalled()
+    // Complete path keeps countdown session until final chime.
+    expect(cancel.mock.calls.some((c) => c[0]?.releaseSession === false)).toBe(true)
+    vibrateSpy.mockRestore()
+  })
+
+  it('fin de repos iOS → vibrateNative même avec son actif', async () => {
+    __setRestTimerSoundTestHooks({
+      schedule,
+      cancel,
+      preview,
+      playNow,
+      vibrateNative,
+      playAudio,
+      loadPrefs: loadRestTimerSoundPrefs,
+      isNativeIos: () => true,
+    })
+    const endAt = Date.now() + 5_000
+    await scheduleRestTimerSound(endAt)
+    await onRestTimerSoundComplete()
+    expect(playNow).toHaveBeenCalled()
+    expect(playNow.mock.calls.some((c) => c[1]?.holdSession === false)).toBe(true)
+    expect(vibrateNative).toHaveBeenCalledTimes(1)
+    expect(cancel.mock.calls.some((c) => c[0]?.releaseSession === false)).toBe(true)
+  })
+
+  it('countdown iOS → holdSession true sur bips 3-2-1', async () => {
+    __setRestTimerSoundTestHooks({
+      schedule,
+      cancel,
+      preview,
+      playNow,
+      vibrateNative,
+      playAudio,
+      loadPrefs: loadRestTimerSoundPrefs,
+      isNativeIos: () => true,
+    })
+    const endAt = Date.now() + 10_000
+    await scheduleRestTimerSound(endAt)
+    await maybePlayCountdownBeep(3)
+    await maybePlayCountdownBeep(2)
+    await maybePlayCountdownBeep(1)
+    expect(playNow).toHaveBeenCalledTimes(3)
+    for (const call of playNow.mock.calls) {
+      expect(call[1]?.holdSession).toBe(true)
+      expect(call[1]?.cancelPending).toBe(false)
+      expect(call[1]?.maxDurationSec).toBeLessThanOrEqual(0.2)
+    }
+  })
+
   it('son coupé → pas d’audio mais vibration', async () => {
     setRestTimerSoundEnabled(false)
     const endAt = Date.now() + 5_000
     await scheduleRestTimerSound(endAt)
     expect(schedule.mock.calls[0]?.[0]?.soundEnabled).toBe(false)
 
-    const vibrateSpy = vi.spyOn(
-      await import('./haptics'),
-      'vibrate',
-    )
+    const vibrateSpy = vi.spyOn(await import('./haptics'), 'vibrate')
     await onRestTimerSoundComplete()
     expect(playAudio).not.toHaveBeenCalled()
     expect(vibrateSpy).toHaveBeenCalled()
@@ -140,7 +220,22 @@ describe('restTimerSound', () => {
     expect(loadRestTimerSoundPrefs().soundEnabled).toBe(false)
   })
 
+  it('countdownBeeps on → bips à 3/2/1 puis désactivable', async () => {
+    const endAt = Date.now() + 10_000
+    await scheduleRestTimerSound(endAt)
+    await maybePlayCountdownBeep(3)
+    await maybePlayCountdownBeep(2)
+    await maybePlayCountdownBeep(1)
+    expect(playAudio).toHaveBeenCalledTimes(3)
+
+    setRestTimerCountdownBeeps(false)
+    playAudio.mockClear()
+    await maybePlayCountdownBeep(3)
+    expect(playAudio).not.toHaveBeenCalled()
+  })
+
   it('countdownBeeps off → aucun bip à 3/2/1', async () => {
+    setRestTimerCountdownBeeps(false)
     const endAt = Date.now() + 10_000
     await scheduleRestTimerSound(endAt)
     await maybePlayCountdownBeep(3)

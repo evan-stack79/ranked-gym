@@ -26,6 +26,7 @@
 		C1A1000B2FEA0401000C02AB /* RestTimerLiveActivityWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C1A1000A2FEA0401000C02AA /* RestTimerLiveActivityWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		E2B200022FEB0101000D01A2 /* RestTimerSoundPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2B200012FEB0101000D01A1 /* RestTimerSoundPlugin.swift */; };
 		E2B200042FEB0101000D01A4 /* rest_timer_chime.caf in Resources */ = {isa = PBXBuildFile; fileRef = E2B200032FEB0101000D01A3 /* rest_timer_chime.caf */; };
+		E2B200072FEB0101000D01A7 /* rest_timer_silent.caf in Resources */ = {isa = PBXBuildFile; fileRef = E2B200062FEB0101000D01A6 /* rest_timer_silent.caf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -74,6 +75,7 @@
 		C1A1000A2FEA0401000C02AA /* RestTimerLiveActivityWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RestTimerLiveActivityWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E2B200012FEB0101000D01A1 /* RestTimerSoundPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerSoundPlugin.swift; sourceTree = "<group>"; };
 		E2B200032FEB0101000D01A3 /* rest_timer_chime.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = rest_timer_chime.caf; sourceTree = "<group>"; };
+		E2B200062FEB0101000D01A6 /* rest_timer_silent.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = rest_timer_silent.caf; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -148,6 +150,7 @@
 			children = (
 				E2B200012FEB0101000D01A1 /* RestTimerSoundPlugin.swift */,
 				E2B200032FEB0101000D01A3 /* rest_timer_chime.caf */,
+				E2B200062FEB0101000D01A6 /* rest_timer_silent.caf */,
 			);
 			path = RestTimerSound;
 			sourceTree = "<group>";
@@ -266,6 +269,7 @@
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
 				E2B200042FEB0101000D01A4 /* rest_timer_chime.caf in Resources */,
+				E2B200072FEB0101000D01A7 /* rest_timer_silent.caf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

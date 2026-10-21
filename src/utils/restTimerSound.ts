@@ -14,12 +14,16 @@ import {
   nativePreview,
   nativeSchedule,
   nativeVibrate,
+  type RestTimerSoundPlayNowOptions,
 } from '../services/restTimerSoundNative'
 import { vibrate } from './haptics'
 
 const WEB_CHIME_URL = '/sounds/rest_timer_chime.mp3'
-/** Gain Web Audio ≤ 1.0 (Vérificateur). */
+/** Gain Web Audio ≤ 1.0 (Vérificateur). Même niveau pour chime de fin et bips. */
 const WEB_CHIME_GAIN = 0.2
+/** Bips 3-2-1 : courts (tronqués côté natif / web). */
+const COUNTDOWN_BEEP_MAX_SEC = 0.12
+const COUNTDOWN_BEEP_VOLUME = 1.0
 
 let activeToken: string | null = null
 let playedToken: string | null = null
@@ -32,6 +36,7 @@ let cancelImpl = nativeCancel
 let previewImpl = nativePreview
 let playNowImpl = nativePlayNow
 let vibrateNativeImpl = nativeVibrate
+let isNativeIosImpl = isRestTimerSoundNativeIos
 let prefsLoader = loadRestTimerSoundPrefs
 let audioPlayImpl: ((url: string, gain: number) => void) | null = null
 
@@ -41,6 +46,7 @@ export function __setRestTimerSoundTestHooks(hooks: {
   preview?: typeof nativePreview
   playNow?: typeof nativePlayNow
   vibrateNative?: typeof nativeVibrate
+  isNativeIos?: typeof isRestTimerSoundNativeIos
   loadPrefs?: typeof loadRestTimerSoundPrefs
   playAudio?: (url: string, gain: number) => void
 }): void {
@@ -49,6 +55,7 @@ export function __setRestTimerSoundTestHooks(hooks: {
   if (hooks.preview) previewImpl = hooks.preview
   if (hooks.playNow) playNowImpl = hooks.playNow
   if (hooks.vibrateNative) vibrateNativeImpl = hooks.vibrateNative
+  if (hooks.isNativeIos) isNativeIosImpl = hooks.isNativeIos
   if (hooks.loadPrefs) prefsLoader = hooks.loadPrefs
   if (hooks.playAudio) audioPlayImpl = hooks.playAudio
 }
@@ -59,6 +66,7 @@ export function __resetRestTimerSoundTestHooks(): void {
   previewImpl = nativePreview
   playNowImpl = nativePlayNow
   vibrateNativeImpl = nativeVibrate
+  isNativeIosImpl = isRestTimerSoundNativeIos
   prefsLoader = loadRestTimerSoundPrefs
   audioPlayImpl = null
   activeToken = null
@@ -90,24 +98,34 @@ function makeToken(endAtMs: number): string {
   return `rest-${Math.round(endAtMs)}`
 }
 
-function playWebChime(): void {
+function playWebChime(gain = WEB_CHIME_GAIN, maxDurationSec?: number): void {
   if (audioPlayImpl) {
-    audioPlayImpl(WEB_CHIME_URL, WEB_CHIME_GAIN)
+    audioPlayImpl(WEB_CHIME_URL, gain)
     return
   }
   try {
     const audio = new Audio(WEB_CHIME_URL)
-    audio.volume = Math.min(1, WEB_CHIME_GAIN)
+    audio.volume = Math.min(1, gain)
     void audio.play().catch(() => {
-      playWebAudioFallback()
+      playWebAudioFallback(gain)
     })
+    if (maxDurationSec != null && maxDurationSec > 0) {
+      window.setTimeout(() => {
+        try {
+          audio.pause()
+          audio.currentTime = 0
+        } catch {
+          // ignore
+        }
+      }, maxDurationSec * 1000)
+    }
   } catch {
-    playWebAudioFallback()
+    playWebAudioFallback(gain)
   }
 }
 
 /** Repli Web Audio (ancien chime) — gains ≤ 1.0. */
-function playWebAudioFallback(): void {
+function playWebAudioFallback(gain = WEB_CHIME_GAIN): void {
   try {
     const AudioCtx =
       window.AudioContext ||
@@ -115,13 +133,13 @@ function playWebAudioFallback(): void {
     if (!AudioCtx) return
     const ctx = new AudioCtx()
     const now = ctx.currentTime
-    const playTone = (freq: number, start: number, dur: number, gain = WEB_CHIME_GAIN) => {
+    const playTone = (freq: number, start: number, dur: number, gLevel = gain) => {
       const osc = ctx.createOscillator()
       const g = ctx.createGain()
       osc.type = 'sine'
       osc.frequency.setValueAtTime(freq, start)
       g.gain.setValueAtTime(0.0001, start)
-      g.gain.exponentialRampToValueAtTime(Math.min(1, gain), start + 0.02)
+      g.gain.exponentialRampToValueAtTime(Math.min(1, gLevel), start + 0.02)
       g.gain.exponentialRampToValueAtTime(0.0001, start + dur)
       osc.connect(g)
       g.connect(ctx.destination)
@@ -129,8 +147,8 @@ function playWebAudioFallback(): void {
       osc.stop(start + dur + 0.02)
     }
     void ctx.resume()
-    playTone(784, now, 0.14, 0.16)
-    playTone(1046.5, now + 0.13, 0.22, 0.2)
+    playTone(784, now, 0.14, Math.min(1, gain))
+    playTone(1046.5, now + 0.13, 0.22, Math.min(1, gain))
     window.setTimeout(() => {
       void ctx.close()
     }, 600)
@@ -139,32 +157,69 @@ function playWebAudioFallback(): void {
   }
 }
 
+/** Bip court doux (3-2-1) — même gain que le chime, durée courte. */
+function playWebCountdownBeep(): void {
+  if (audioPlayImpl) {
+    audioPlayImpl(WEB_CHIME_URL, WEB_CHIME_GAIN)
+    return
+  }
+  try {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!AudioCtx) {
+      playWebChime(WEB_CHIME_GAIN, COUNTDOWN_BEEP_MAX_SEC)
+      return
+    }
+    const ctx = new AudioCtx()
+    const now = ctx.currentTime
+    const osc = ctx.createOscillator()
+    const g = ctx.createGain()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(880, now)
+    g.gain.setValueAtTime(0.0001, now)
+    g.gain.exponentialRampToValueAtTime(Math.min(1, WEB_CHIME_GAIN), now + 0.01)
+    g.gain.exponentialRampToValueAtTime(0.0001, now + COUNTDOWN_BEEP_MAX_SEC)
+    osc.connect(g)
+    g.connect(ctx.destination)
+    void ctx.resume()
+    osc.start(now)
+    osc.stop(now + COUNTDOWN_BEEP_MAX_SEC + 0.02)
+    window.setTimeout(() => {
+      void ctx.close()
+    }, 300)
+  } catch {
+    playWebChime(WEB_CHIME_GAIN, COUNTDOWN_BEEP_MAX_SEC)
+  }
+}
+
 async function playEndChimeOnce(token: string): Promise<boolean> {
   if (playedToken === token) return false
   playedToken = token
   const prefs = prefsLoader()
   if (!prefs.soundEnabled) return false
-  if (isRestTimerSoundNativeIos()) {
-    const res = await playNowImpl(token)
+  if (isNativeIosImpl()) {
+    // Final: release held countdown session after this play.
+    const res = await playNowImpl(token, { holdSession: false })
     return res.played
   }
   playWebChime()
   return true
 }
 
-async function fireHapticIfNeeded(soundPlayed: boolean): Promise<void> {
+/**
+ * Vibration de fin : toujours si haptics ON (même avec son actif).
+ * iOS natif → AudioServicesPlaySystemSound(kSystemSoundID_Vibrate).
+ * Bouton silencieux illisible → vibrer en plus du son est OK.
+ */
+async function fireHapticAtEnd(): Promise<void> {
   const prefs = prefsLoader()
   if (!prefs.haptics) return
-  // Son coupé → petite vibration ; silencieux haut-parleur (pas de son) → vibration.
-  if (!prefs.soundEnabled || !soundPlayed) {
-    if (isRestTimerSoundNativeIos()) {
-      await vibrateNativeImpl()
-    } else {
-      vibrate([40, 60, 40])
-    }
-    return
+  if (isNativeIosImpl()) {
+    await vibrateNativeImpl()
+  } else {
+    vibrate([40, 60, 40, 60, 80])
   }
-  vibrate([40, 60, 40, 60, 80])
 }
 
 /**
@@ -187,11 +242,12 @@ export async function scheduleRestTimerSound(endAtMs: number): Promise<void> {
   await scheduleImpl({
     endAtMs,
     soundEnabled: prefs.soundEnabled,
+    haptics: prefs.haptics,
     token,
   })
 
   // Web / secours : si le tick JS est suspendu, pas de double lecture (token).
-  if (!isRestTimerSoundNativeIos()) {
+  if (!isNativeIosImpl()) {
     const delay = Math.max(0, endAtMs - Date.now())
     webEndTimer = window.setTimeout(() => {
       webEndTimer = null
@@ -217,33 +273,34 @@ export async function rescheduleRestTimerSound(endAtMs: number): Promise<void> {
 
 /**
  * Fin naturelle au premier plan : retire la notif, joue une fois (pas de double).
- * Son coupé → vibration seulement si haptics ON.
+ * Vibration systématique si haptics ON (AudioServices côté iOS) — même avec son.
  */
 export async function onRestTimerSoundComplete(): Promise<void> {
   const token = activeToken
-  await cancelImpl()
+  // Keep held countdown session until final chime (releaseSession: false).
+  await cancelImpl({ releaseSession: false })
   if (webEndTimer != null) {
     window.clearTimeout(webEndTimer)
     webEndTimer = null
   }
   if (!token) {
-    const prefs = prefsLoader()
-    if (prefs.haptics) vibrate([40, 60, 40, 60, 80])
+    await fireHapticAtEnd()
     return
   }
-  // Déjà joué (ex. willPresent natif) → pas de second son / haptic.
+  // Déjà joué (ex. willPresent natif) → pas de second son ; haptic déjà côté natif.
   if (playedToken === token) {
     activeToken = null
     return
   }
-  const played = await playEndChimeOnce(token)
-  await fireHapticIfNeeded(played)
+  // Final play (holdSession: false) deactivates with notifyOthersOnDeactivation.
+  await playEndChimeOnce(token)
+  await fireHapticAtEnd()
   activeToken = null
 }
 
 /** Bouton « Écouter » — toujours le chime court, ignore mute pour l’aperçu. */
 export async function previewRestTimerSound(): Promise<void> {
-  if (isRestTimerSoundNativeIos()) {
+  if (isNativeIosImpl()) {
     await previewImpl()
     return
   }
@@ -251,7 +308,9 @@ export async function previewRestTimerSound(): Promise<void> {
 }
 
 /**
- * Option 3 bips (3,2,1) — OFF par défaut. Appelée depuis le tick quand remaining ∈ {3,2,1}.
+ * Option 3 bips (3,2,1) — ON par défaut. Appelée depuis le tick quand remaining ∈ {3,2,1}.
+ * Courts et doux, même volume que le chime de fin.
+ * holdSession: session audio ouverte au bip 3, fermée seulement après le bip final.
  */
 export async function maybePlayCountdownBeep(remainingSec: number): Promise<void> {
   const prefs = prefsLoader()
@@ -260,12 +319,18 @@ export async function maybePlayCountdownBeep(remainingSec: number): Promise<void
   const key = `${activeToken ?? 'x'}:${remainingSec}`
   if (countdownBeepKeys.has(key)) return
   countdownBeepKeys.add(key)
-  if (isRestTimerSoundNativeIos()) {
+  if (isNativeIosImpl()) {
+    const opts: RestTimerSoundPlayNowOptions = {
+      cancelPending: false,
+      volume: COUNTDOWN_BEEP_VOLUME,
+      maxDurationSec: COUNTDOWN_BEEP_MAX_SEC,
+      holdSession: true,
+    }
     // Ne pas annuler la notif de fin pendant les bips 3-2-1.
-    await playNowImpl(`${key}-beep`, { cancelPending: false })
+    await playNowImpl(`${key}-beep`, opts)
     return
   }
-  playWebChime()
+  playWebCountdownBeep()
 }
 
 /** @deprecated Use onRestTimerSoundComplete — kept for older call sites / tests. */
