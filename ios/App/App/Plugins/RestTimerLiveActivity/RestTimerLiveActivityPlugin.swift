@@ -220,7 +220,7 @@ final class LiveActivityActionBridge {
                 guard let observer else { return }
                 let token = Unmanaged<ActionToken>.fromOpaque(observer).takeUnretainedValue()
                 DispatchQueue.main.async {
-                    token.bridge.onAction?(token.action)
+                    token.bridge?.onAction?(token.action)
                 }
             },
             name,
