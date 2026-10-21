@@ -36,9 +36,11 @@ describe('restTimerLiveActivity compat bridge', () => {
     const live = await import('./liveActivity')
     live.__resetLiveActivityBridgeForTests()
     const mod = await import('./restTimerLiveActivity')
+    const endDateMs = Date.now() + 90_000
     await mod.startRestLiveActivity({
       remainingSec: 90.4,
       totalSec: 90,
+      endDateMs,
       subtitle: 'Squat · Série 2',
     })
     expect(start).toHaveBeenCalledWith(
@@ -46,6 +48,7 @@ describe('restTimerLiveActivity compat bridge', () => {
         kind: 'rest',
         remainingSec: 90,
         totalSec: 90,
+        endDateMs,
         subtitle: 'Squat · Série 2',
       }),
     )

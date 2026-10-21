@@ -37,9 +37,11 @@ describe('liveActivity bridge', () => {
   it('start/update/end par kind rest', async () => {
     const mod = await import('./liveActivity')
     mod.__resetLiveActivityBridgeForTests()
+    const endDateMs = Date.now() + 90_000
     await mod.startRestLiveActivity({
       remainingSec: 90.4,
       totalSec: 90,
+      endDateMs,
       subtitle: 'Squat · Série 2',
     })
     expect(start).toHaveBeenCalledWith(
@@ -47,12 +49,18 @@ describe('liveActivity bridge', () => {
         kind: 'rest',
         remainingSec: 90,
         totalSec: 90,
+        endDateMs,
         subtitle: 'Squat · Série 2',
       }),
     )
     await mod.updateRestLiveActivity({ remainingSec: 44.2, paused: true })
     expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'rest', remainingSec: 44, paused: true }),
+      expect.objectContaining({
+        kind: 'rest',
+        remainingSec: 44,
+        paused: true,
+        endDateMs: 0,
+      }),
     )
     await mod.endRestLiveActivity(true)
     expect(end).toHaveBeenCalledWith({ immediate: true })
@@ -99,11 +107,18 @@ describe('liveActivity bridge', () => {
       startedAtMs: 1,
     })
     start.mockClear()
-    await mod.startRestLiveActivity({ remainingSec: 90, totalSec: 90, subtitle: 'Bench' })
+    const restEnd = Date.now() + 90_000
+    await mod.startRestLiveActivity({
+      remainingSec: 90,
+      totalSec: 90,
+      endDateMs: restEnd,
+      subtitle: 'Bench',
+    })
     expect(start).toHaveBeenCalledTimes(1)
     expect(start).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: 'rest',
+        endDateMs: restEnd,
         reuseIfPresent: true,
         activityToken: 'ranked-gym.session',
       }),

@@ -5,6 +5,9 @@ import Foundation
 /**
  * Unified Live Activity plugin (repos / séance / pas / record / rang).
  * JS name: LiveActivity. One Activity at a time for session+rest.
+ *
+ * Rest: JS sends a fixed `endDateMs` (+ pause snapshot). Widget renders
+ * `Text(timerInterval:)` — no per-second updates from the app.
  */
 @objc(LiveActivityPlugin)
 public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -45,10 +48,11 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         let state = Self.contentState(from: call)
         let token = call.getString("activityToken") ?? "ranked-gym.live"
         let reuse = call.getBool("reuseIfPresent") ?? false
+        let stale = Self.staleDate(for: state)
 
         Task {
             if reuse, let activity = self.currentActivityBox as? Activity<RankedGymLiveAttributes> {
-                await activity.update(.init(state: state, staleDate: nil))
+                await activity.update(.init(state: state, staleDate: stale))
                 call.resolve(["activityId": activity.id, "reused": true])
                 return
             }
@@ -59,7 +63,7 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             do {
                 let activity = try Activity.request(
                     attributes: attributes,
-                    content: .init(state: state, staleDate: nil),
+                    content: .init(state: state, staleDate: stale),
                     pushType: nil
                 )
                 self.currentActivityBox = activity
@@ -82,7 +86,7 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
             let merged = Self.merge(existing: activity.content.state, call: call)
-            await activity.update(.init(state: merged, staleDate: nil))
+            await activity.update(.init(state: merged, staleDate: Self.staleDate(for: merged)))
             call.resolve(["updated": true])
         }
     }
@@ -114,7 +118,7 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                 sound: .default
             )
             await activity.update(
-                ActivityContent(state: next, staleDate: nil),
+                ActivityContent(state: next, staleDate: Self.staleDate(for: next)),
                 alertConfiguration: alert
             )
             call.resolve(["alerted": true])
@@ -138,7 +142,7 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         if let activity = currentActivityBox as? Activity<RankedGymLiveAttributes> {
             let finalState = activity.content.state
             await activity.end(
-                .init(state: finalState, staleDate: nil),
+                .init(state: finalState, staleDate: Self.staleDate(for: finalState)),
                 dismissalPolicy: dismissalPolicy
             )
             currentActivityBox = nil
@@ -150,6 +154,13 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         currentActivityBox = nil
     }
 
+    /// `staleDate` = rest `endDate` so the system can retire the activity at zero.
+    @available(iOS 16.1, *)
+    private static func staleDate(for state: RankedGymLiveAttributes.ContentState) -> Date? {
+        guard state.kind == "rest", state.endDateMs > 0 else { return nil }
+        return Date(timeIntervalSince1970: state.endDateMs / 1000.0)
+    }
+
     @available(iOS 16.1, *)
     private static func contentState(from call: CAPPluginCall) -> RankedGymLiveAttributes.ContentState {
         RankedGymLiveAttributes.ContentState(
@@ -157,6 +168,7 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             remainingSec: max(0, call.getInt("remainingSec") ?? 0),
             totalSec: max(1, call.getInt("totalSec") ?? 1),
             paused: call.getBool("paused") ?? false,
+            endDateMs: max(0, call.getDouble("endDateMs") ?? 0),
             exerciseName: call.getString("exerciseName") ?? "",
             setIndex: call.getInt("setIndex") ?? 1,
             setTotal: call.getInt("setTotal") ?? 1,
@@ -181,6 +193,9 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         if let v = call.getInt("remainingSec") { next.remainingSec = max(0, v) }
         if let v = call.getInt("totalSec") { next.totalSec = max(1, v) }
         if let paused = call.getValue("paused") as? Bool { next.paused = paused }
+        if call.getValue("endDateMs") != nil {
+            next.endDateMs = max(0, call.getDouble("endDateMs") ?? 0)
+        }
         if let v = call.getString("exerciseName") { next.exerciseName = v }
         if let v = call.getInt("setIndex") { next.setIndex = v }
         if let v = call.getInt("setTotal") { next.setTotal = v }

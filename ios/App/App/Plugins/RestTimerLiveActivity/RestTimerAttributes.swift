@@ -5,6 +5,10 @@ import Foundation
  * Unified Live Activity attributes (Dynamic Island + lock screen).
  * One activity at a time for session+rest — `kind` switches the drawing.
  * Kinds: rest | session | steps | record | rank
+ *
+ * Rest countdown is driven by `endDateMs` (wall-clock end). The widget uses
+ * `Text(timerInterval:countsDown:)` so the island keeps ticking when the app
+ * is backgrounded — no per-second JS updates required.
  */
 @available(iOS 16.1, *)
 struct RankedGymLiveAttributes: ActivityAttributes {
@@ -13,9 +17,12 @@ struct RankedGymLiveAttributes: ActivityAttributes {
         var kind: String
 
         // Rest
+        /// Fixed display when `paused` (seconds left at pause).
         var remainingSec: Int
         var totalSec: Int
         var paused: Bool
+        /// Wall-clock end of the rest countdown (epoch ms). 0 when paused / N/A.
+        var endDateMs: Double
 
         // Session
         var exerciseName: String

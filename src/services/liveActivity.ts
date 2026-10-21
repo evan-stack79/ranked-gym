@@ -15,9 +15,15 @@ export type LiveActivityPayload = {
   activityToken?: string
   /** When true, update the current activity instead of ending+starting. */
   reuseIfPresent?: boolean
+  /** Snapshot seconds (pause / fallback). Not ticked into the island. */
   remainingSec?: number
   totalSec?: number
   paused?: boolean
+  /**
+   * Wall-clock rest end (epoch ms). Widget uses Text(timerInterval:…endDate).
+   * 0 when paused / N/A — never updated every second.
+   */
+  endDateMs?: number
   exerciseName?: string
   setIndex?: number
   setTotal?: number
@@ -174,16 +180,20 @@ async function nativeAlert(options: {
 export async function startRestLiveActivity(payload: {
   remainingSec: number
   totalSec: number
+  /** Wall-clock end; required when not paused so the island ticks offline. */
+  endDateMs?: number
   subtitle?: string
   paused?: boolean
 }): Promise<void> {
+  const paused = payload.paused ?? false
   const body: LiveActivityPayload = {
     kind: 'rest',
     activityToken: SESSION_TOKEN,
     remainingSec: Math.max(0, Math.round(payload.remainingSec)),
     totalSec: Math.max(1, Math.round(payload.totalSec)),
+    endDateMs: paused ? 0 : Math.max(0, Math.round(payload.endDateMs ?? 0)),
     subtitle: payload.subtitle ?? 'Repos en cours',
-    paused: payload.paused ?? false,
+    paused,
     reuseIfPresent: bridge.sessionActive,
   }
   bridge.restActive = true
@@ -195,17 +205,27 @@ export async function startRestLiveActivity(payload: {
 }
 
 export async function updateRestLiveActivity(payload: {
-  remainingSec: number
+  remainingSec?: number
+  endDateMs?: number
   subtitle?: string
   paused?: boolean
   totalSec?: number
 }): Promise<void> {
   if (!bridge.restActive && !bridge.sessionActive) return
+  const paused = payload.paused
+  const endDateMs =
+    paused === true
+      ? 0
+      : payload.endDateMs != null
+        ? Math.max(0, Math.round(payload.endDateMs))
+        : undefined
   await nativeUpdate({
     kind: 'rest',
-    remainingSec: Math.max(0, Math.round(payload.remainingSec)),
+    remainingSec:
+      payload.remainingSec != null ? Math.max(0, Math.round(payload.remainingSec)) : undefined,
+    endDateMs,
     subtitle: payload.subtitle,
-    paused: payload.paused,
+    paused,
     totalSec: payload.totalSec != null ? Math.max(1, Math.round(payload.totalSec)) : undefined,
   })
 }

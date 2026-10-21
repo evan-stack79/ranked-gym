@@ -69,10 +69,7 @@ private struct CompactTrailing: View {
         case "record", "rank":
             Image(systemName: "sparkles").foregroundStyle(accentRed)
         default:
-            Text(formatClock(state.remainingSec))
-                .font(.caption2.bold())
-                .monospacedDigit()
-                .foregroundStyle(.white)
+            RestCountdownText(state: state, font: .caption2.bold())
         }
     }
 }
@@ -82,10 +79,7 @@ private struct MinimalBadge: View {
     var body: some View {
         ZStack {
             if state.kind == "rest" {
-                Circle()
-                    .trim(from: 0, to: restProgress(state))
-                    .stroke(accentRed, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
+                RestProgress(state: state, line: 2)
                     .frame(width: 18, height: 18)
             }
             Image(systemName: minimalIcon(state.kind))
@@ -99,7 +93,8 @@ private struct ExpandedLeading: View {
     let state: RankedGymLiveAttributes.ContentState
     var body: some View {
         if state.kind == "rest" {
-            RestRing(progress: restProgress(state), size: 44, line: 4)
+            RestProgress(state: state, line: 4)
+                .frame(width: 44, height: 44)
         } else {
             Image(systemName: minimalIcon(state.kind))
                 .font(.title2)
@@ -147,10 +142,7 @@ private struct ExpandedCenter: View {
                 Text(state.paused ? "Pause" : "Repos")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text(formatClock(state.remainingSec))
-                    .font(.title2.bold())
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
+                RestCountdownText(state: state, font: .title2.bold())
             }
         }
     }
@@ -169,9 +161,7 @@ private struct ExpandedTrailing: View {
                     .foregroundStyle(.secondary)
             }
         } else if state.kind == "rest" {
-            Text("\(state.remainingSec)s")
-                .font(.caption.bold())
-                .foregroundStyle(accentRed)
+            RestCountdownText(state: state, font: .caption.bold(), accent: true)
         } else {
             EmptyView()
         }
@@ -257,7 +247,8 @@ private struct RestLockView: View {
     let state: RankedGymLiveAttributes.ContentState
     var body: some View {
         HStack(spacing: 14) {
-            RestRing(progress: restProgress(state), size: 56, line: 5)
+            RestProgress(state: state, line: 5)
+                .frame(width: 56, height: 56)
             VStack(alignment: .leading, spacing: 4) {
                 Text(state.paused ? "Pause" : "Temps de repos")
                     .font(.headline.weight(.bold))
@@ -270,10 +261,10 @@ private struct RestLockView: View {
                 }
             }
             Spacer(minLength: 8)
-            Text(formatClock(state.remainingSec))
-                .font(.system(size: 32, weight: .black, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.white)
+            RestCountdownText(
+                state: state,
+                font: .system(size: 32, weight: .black, design: .rounded)
+            )
             if #available(iOS 17.0, *) {
                 VStack(spacing: 8) {
                     Button(intent: LiveActivityPauseIntent()) {
@@ -379,26 +370,73 @@ private struct AlertLockView: View {
     }
 }
 
-private struct RestRing: View {
-    let progress: CGFloat
-    let size: CGFloat
+// MARK: - Rest countdown (system-driven; survives app background)
+
+/// Compact / expanded / lock-screen countdown.
+/// Running → `Text(timerInterval:countsDown:)` from wall-clock `endDateMs`.
+/// Paused → fixed `remainingSec`.
+private struct RestCountdownText: View {
+    let state: RankedGymLiveAttributes.ContentState
+    let font: Font
+    var accent: Bool = false
+
+    var body: some View {
+        Group {
+            if state.paused || state.endDateMs <= 0 {
+                Text(formatClock(state.remainingSec))
+            } else if let range = restTimerRange(state) {
+                Text(timerInterval: range, countsDown: true)
+            } else {
+                Text(formatClock(state.remainingSec))
+            }
+        }
+        .font(font)
+        .monospacedDigit()
+        .foregroundStyle(accent ? accentRed : Color.white)
+    }
+}
+
+/// Ring / circular progress: system timer when running, snapshot when paused.
+private struct RestProgress: View {
+    let state: RankedGymLiveAttributes.ContentState
     let line: CGFloat
+
     var body: some View {
         ZStack {
             Circle()
                 .stroke(accentRed.opacity(0.25), lineWidth: line)
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(accentRed, style: StrokeStyle(lineWidth: line, lineCap: .round))
-                .rotationEffect(.degrees(-90))
+            if state.paused || state.endDateMs <= 0 {
+                Circle()
+                    .trim(from: 0, to: restProgressPaused(state))
+                    .stroke(accentRed, style: StrokeStyle(lineWidth: line, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            } else if let range = restTimerRange(state) {
+                ProgressView(timerInterval: range, countsDown: true, label: { EmptyView() }, currentValueLabel: { EmptyView() })
+                    .progressViewStyle(.circular)
+                    .tint(accentRed)
+            }
         }
-        .frame(width: size, height: size)
     }
 }
 
 // MARK: - Helpers
 
-private func restProgress(_ state: RankedGymLiveAttributes.ContentState) -> CGFloat {
+private func restEndDate(_ state: RankedGymLiveAttributes.ContentState) -> Date? {
+    guard state.endDateMs > 0 else { return nil }
+    return Date(timeIntervalSince1970: state.endDateMs / 1000.0)
+}
+
+private func restTimerRange(_ state: RankedGymLiveAttributes.ContentState) -> ClosedRange<Date>? {
+    guard !state.paused, let end = restEndDate(state) else { return nil }
+    let now = Date()
+    if end <= now {
+        return now...now.addingTimeInterval(0.001)
+    }
+    // Interval start = now so countsDown reflects remaining wall time from endDate.
+    return now...end
+}
+
+private func restProgressPaused(_ state: RankedGymLiveAttributes.ContentState) -> CGFloat {
     let total = max(1, state.totalSec)
     return CGFloat(max(0, min(1, Double(state.remainingSec) / Double(total))))
 }
