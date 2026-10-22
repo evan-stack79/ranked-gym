@@ -16,6 +16,8 @@ import {
   formatGramsCountLabel,
 } from './lib/foodAddQuantity'
 import {
+  checkStoredMealCalories,
+  MEAL_KCAL_ABOVE_MAX,
   resolveEntrySourceOnUpsert,
   resolveUpsertMealQuantity,
   sanitizeLegacyMealNutrient,
@@ -489,6 +491,13 @@ export const upsertMeal = mutation({
       carbsG = sanitizeLegacyMealNutrient(args.carbsG ?? null)
       fatG = sanitizeLegacyMealNutrient(args.fatG ?? null)
     }
+
+    // V3-11 — jamais stocker > 5000 kcal (client ou scale serveur).
+    const kcalGate = checkStoredMealCalories(calories)
+    if (!kcalGate.ok) {
+      throw new ConvexError({ code: MEAL_KCAL_ABOVE_MAX })
+    }
+    calories = kcalGate.calories
 
     if (existing) {
       await ctx.db.patch(existing._id, {

@@ -10,7 +10,11 @@ import { createRoot, type Root } from 'react-dom/client'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { AddFoodScreenV3, PHOTO_IA_ESTIMATE_LABEL } from './AddFoodScreenV3'
+import {
+  AddFoodScreenV3,
+  MEAL_KCAL_ABOVE_MAX_MSG,
+  PHOTO_IA_ESTIMATE_LABEL,
+} from './AddFoodScreenV3'
 import { canUseMealPhotoEstimate } from '../../services/nutritionSafetyRules'
 import type { OpenFoodFactsSearchHit } from '../../services/alimentsService'
 import type { MealType } from '../../types/nutrition'
@@ -252,7 +256,7 @@ describe('AddFoodScreenV3 — V3-05 Photo IA', () => {
     expect(document.querySelector('[data-photo-ia-estimate]')).toBeNull()
   })
 
-  it('V3-08 : confirm refuse kcal > 5000 (max UI)', async () => {
+  it('V3-12 : saisie >5000 affiche un message (pas de clamp silencieux)', async () => {
     const onPhotoAnalyzed = vi.fn()
     await act(async () => {
       renderScreen(root, { photoEstimateAllowed: true, onPhotoAnalyzed })
@@ -262,16 +266,20 @@ describe('AddFoodScreenV3 — V3-05 Photo IA', () => {
     const kcal = document.querySelector('[data-photo-ia-kcal]') as HTMLInputElement
     expect(kcal.max).toBe('5000')
 
-    // Saisie >5000 → clamp serveur/UI à 5000 (confirm autorisé au plafond).
     await setKcal('6000')
     expect(Number((document.querySelector('[data-photo-ia-kcal]') as HTMLInputElement).value)).toBe(
-      5000,
+      6000,
     )
+    const err = document.querySelector('[data-photo-ia-kcal-error]')
+    expect(err?.textContent).toBe(MEAL_KCAL_ABOVE_MAX_MSG)
+    expect((document.querySelector('[data-photo-ia-confirm]') as HTMLButtonElement).disabled).toBe(
+      true,
+    )
+
     await act(async () => {
       ;(document.querySelector('[data-photo-ia-confirm]') as HTMLButtonElement).click()
     })
-    expect(onPhotoAnalyzed).toHaveBeenCalledTimes(1)
-    expect(onPhotoAnalyzed.mock.calls[0][0].calories).toBe(5000)
+    expect(onPhotoAnalyzed).not.toHaveBeenCalled()
   })
 
   it('mineur / âge inconnu / grossesse / allaitement : recherche seulement, 0 kcal', async () => {

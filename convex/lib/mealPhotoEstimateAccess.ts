@@ -15,6 +15,10 @@ export const MAX_MEAL_PHOTO_KCAL = 5000 as const
 
 export const MEAL_PHOTO_ESTIMATE_BLOCKED = 'PHOTO_ESTIMATE_BLOCKED' as const
 
+/** V3-12 — message visible si saisie > 5000 (pas de clamp silencieux). */
+export const MEAL_KCAL_ABOVE_MAX_MSG =
+  'Maximum 5000 kcal — vérifie ce chiffre.' as const
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   return value as Record<string, unknown>
@@ -62,8 +66,10 @@ export function validateMealPhotoConfirmCalories(
 }
 
 /**
- * V3-09 — macros proportionnelles à l’édition des kcal
+ * V3-09 / V3-12 — macros proportionnelles à l’édition des kcal
  * (ratio = next / base ; base=0 → macros à 0).
+ * Ne clamp pas silencieusement : si next > 5000, conserve la valeur tapée
+ * et les macros de base (le message UI / confirm bloquent l’ajout).
  */
 export function scaleMealPhotoMacrosForEditedKcal(input: {
   baseCalories: number
@@ -77,7 +83,16 @@ export function scaleMealPhotoMacrosForEditedKcal(input: {
   carbsG: number
   fatG: number
 } {
-  const calories = clampMealPhotoCalories(input.nextCalories)
+  const n = typeof input.nextCalories === 'number' ? input.nextCalories : Number(input.nextCalories)
+  const calories = Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0
+  if (calories > MAX_MEAL_PHOTO_KCAL) {
+    return {
+      calories,
+      proteinG: input.baseProteinG,
+      carbsG: input.baseCarbsG,
+      fatG: input.baseFatG,
+    }
+  }
   const base = input.baseCalories
   if (!(base > 0) || !Number.isFinite(base)) {
     return { calories, proteinG: 0, carbsG: 0, fatG: 0 }

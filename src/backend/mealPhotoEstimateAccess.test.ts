@@ -113,7 +113,7 @@ describe('V3-09 — scale macros proportionnel aux kcal éditées', () => {
     })
   })
 
-  it('édition >5000 clampée ; base 0 → macros 0', () => {
+  it('édition >5000 : conserve la valeur (pas de clamp) + macros de base ; base 0 → macros 0', () => {
     expect(
       scaleMealPhotoMacrosForEditedKcal({
         baseCalories: 1000,
@@ -121,8 +121,13 @@ describe('V3-09 — scale macros proportionnel aux kcal éditées', () => {
         baseCarbsG: 100,
         baseFatG: 20,
         nextCalories: 9000,
-      }).calories,
-    ).toBe(5000)
+      }),
+    ).toEqual({
+      calories: 9000,
+      proteinG: 50,
+      carbsG: 100,
+      fatG: 20,
+    })
     expect(
       scaleMealPhotoMacrosForEditedKcal({
         baseCalories: 0,

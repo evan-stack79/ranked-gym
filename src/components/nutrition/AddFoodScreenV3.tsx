@@ -21,9 +21,12 @@ import {
 } from '../../../convex/lib/foodAddQuantity'
 import {
   MAX_MEAL_PHOTO_KCAL,
+  MEAL_KCAL_ABOVE_MAX_MSG,
   scaleMealPhotoMacrosForEditedKcal,
   validateMealPhotoConfirmCalories,
 } from '../../../convex/lib/mealPhotoEstimateAccess'
+
+export { MEAL_KCAL_ABOVE_MAX_MSG }
 import { FoodCategoryWheel } from './FoodCategoryWheel'
 import { FoodProductCard } from './FoodProductCard'
 import { FoodSelectionBar } from './FoodSelectionBar'
@@ -767,8 +770,21 @@ export function AddFoodScreenV3({
                   className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#FF2B2B]/40"
                   data-photo-ia-kcal
                   aria-label="Calories estimées, modifiables"
+                  aria-invalid={
+                    !validateMealPhotoConfirmCalories(photoPending.calories).ok || undefined
+                  }
                 />
               </label>
+              {!validateMealPhotoConfirmCalories(photoPending.calories).ok &&
+              photoPending.calories > MAX_MEAL_PHOTO_KCAL ? (
+                <p
+                  className="mt-1.5 text-[12px] text-[#FF6961]"
+                  role="alert"
+                  data-photo-ia-kcal-error
+                >
+                  {MEAL_KCAL_ABOVE_MAX_MSG}
+                </p>
+              ) : null}
               <button
                 type="button"
                 data-photo-ia-confirm
