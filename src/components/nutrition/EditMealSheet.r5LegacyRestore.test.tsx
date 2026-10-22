@@ -1,8 +1,9 @@
 /** @vitest-environment jsdom */
 /**
- * R5-01 / R5-02 — V3 OFF (= d33b724) :
- * effacer kcal ou macros restaure l’ancienne valeur ; Enregistrer reste actif ;
- * onSave ne renvoie pas null qui effacerait le serveur.
+ * R5 — V3 OFF (= d33b724) :
+ * R5-01 : effacer kcal → restore (required défaut) ; Enregistrer reste actif.
+ * R5-02 : effacer macros → reste vide (required={false}) ; onSave ?? undefined
+ *         (comme d33b724 L200–202) → sync envoie null → serveur effacé.
  */
 import { createRoot, type Root } from 'react-dom/client'
 import { act } from 'react'
@@ -101,7 +102,7 @@ describe('EditMealSheet — R5 V3 OFF restore (d33b724)', () => {
     expect(patch.calories).not.toBeNull()
   })
 
-  it('R5-02 : effacer protéines/glucides/lipides restaure ; onSave garde les valeurs (pas null)', async () => {
+  it('R5-02 : effacer macros reste vide ; onSave envoie undefined (d33b724 → serveur effacé)', async () => {
     const onSave = vi.fn()
     await act(async () => {
       root.render(
@@ -119,9 +120,10 @@ describe('EditMealSheet — R5 V3 OFF restore (d33b724)', () => {
     const protein = await setLabeledInput('Protéines', '')
     const carbs = await setLabeledInput('Glucides', '')
     const fat = await setLabeledInput('Lipides', '')
-    expect(protein.value).toBe('25')
-    expect(carbs.value).toBe('40')
-    expect(fat.value).toBe('8')
+    // d33b724 required={false} : vide au blur, pas de restore.
+    expect(protein.value).toBe('')
+    expect(carbs.value).toBe('')
+    expect(fat.value).toBe('')
 
     const save = document.querySelector('[data-testid="edit-meal-save"]') as HTMLButtonElement
     expect(save.disabled).toBe(false)
@@ -131,11 +133,10 @@ describe('EditMealSheet — R5 V3 OFF restore (d33b724)', () => {
 
     expect(onSave).toHaveBeenCalledTimes(1)
     const patch = onSave.mock.calls[0]![1] as Partial<MealEntry>
-    expect(patch.proteinG).toBe(25)
-    expect(patch.carbsG).toBe(40)
-    expect(patch.fatG).toBe(8)
-    expect(patch.proteinG).not.toBeNull()
-    expect(patch.carbsG).not.toBeNull()
-    expect(patch.fatG).not.toBeNull()
+    // d33b724 : proteinG: proteinG ?? undefined (idem carbsG / fatG)
+    expect(patch.proteinG).toBeUndefined()
+    expect(patch.carbsG).toBeUndefined()
+    expect(patch.fatG).toBeUndefined()
+    expect(patch.calories).toBe(300)
   })
 })

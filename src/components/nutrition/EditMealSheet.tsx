@@ -216,8 +216,8 @@ export function EditMealSheet({
                   min={0}
                   max={400}
                   step={0.1}
-                  // Legacy : restore au blur (R5-02, valeur serveur inchangée). V3 : vide → null.
-                  required={!strictV3Edit}
+                  // d33b724 : required={false} → vider reste vide ; save envoie undefined → serveur effacé.
+                  required={false}
                   placeholder="—"
                   placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#636366]"
                   aria-label="Protéines"
@@ -232,7 +232,7 @@ export function EditMealSheet({
                   min={0}
                   max={400}
                   step={0.1}
-                  required={!strictV3Edit}
+                  required={false}
                   placeholder="—"
                   placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#636366]"
                   aria-label="Glucides"
@@ -247,7 +247,7 @@ export function EditMealSheet({
                   min={0}
                   max={400}
                   step={0.1}
-                  required={!strictV3Edit}
+                  required={false}
                   placeholder="—"
                   placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#636366]"
                   aria-label="Lipides"
@@ -301,7 +301,7 @@ export function EditMealSheet({
               })
               return
             }
-            // Sans marque V3 (= d33b724) : omit macros vides (undefined), jamais null qui efface le serveur.
+            // Sans marque V3 (= d33b724) : macros vides → undefined (push → null serveur).
             if (calories == null) return
             onSave(meal.id, {
               name: name.trim(),
