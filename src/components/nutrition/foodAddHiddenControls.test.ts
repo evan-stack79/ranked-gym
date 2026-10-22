@@ -19,7 +19,7 @@ describe('UI — masquage + / Ajouter / scanner pour comptes cachés', () => {
     const source = readFileSync(new URL('./MealJournal.tsx', import.meta.url), 'utf8')
     expect(source).toContain('foodAddAllowed')
     expect(source).toContain('{foodAddAllowed ? (')
-    expect(source).toContain('!showForm && foodAddAllowed')
+    expect(source).toContain('!showForm && foodAddAllowed && !foodAddV3')
     expect(source).toContain('if (!foodAddAllowed) return')
   })
 })

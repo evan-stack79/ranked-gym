@@ -53,17 +53,17 @@ export function mealCalorieRange(budget: number): { min: number; max: number; ta
 
 export function usedMealCalories(
   mealType: MealType,
-  meals: Array<{ mealType: MealType; calories: number }>,
+  meals: Array<{ mealType: MealType; calories: number | null }>,
 ): number {
   return meals
     .filter((meal) => meal.mealType === mealType)
-    .reduce((sum, meal) => sum + meal.calories, 0)
+    .reduce((sum, meal) => sum + (meal.calories ?? 0), 0)
 }
 
 export function remainingMealBudget(
   dailyTarget: number,
   mealType: MealType,
-  meals: Array<{ mealType: MealType; calories: number }>,
+  meals: Array<{ mealType: MealType; calories: number | null }>,
   morphology: BodyMorphology = 'mesomorph',
 ): number {
   const budget = mealCalorieBudget(dailyTarget, mealType, morphology)
@@ -73,7 +73,7 @@ export function remainingMealBudget(
 export function allMealBudgets(
   dailyTarget: number,
   morphology: BodyMorphology,
-  meals: Array<{ mealType: MealType; calories: number }>,
+  meals: Array<{ mealType: MealType; calories: number | null }>,
 ) {
   const budgets = allocateMealBudgets(dailyTarget, morphology)
   const sumBudgets = MEAL_ORDER.reduce((s, t) => s + budgets[t], 0)

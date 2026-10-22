@@ -36,7 +36,7 @@ describe('ContactUsBlock', () => {
     )
     const address = container.querySelector('[data-testid="age-contact-address"]') as HTMLElement
     expect(address).toBeTruthy()
-    // SUPPORT_EMAIL vide → message bientôt disponible (texte copiable)
+    // SUPPORT_EMAIL renseigné → adresse affichée (texte copiable)
     expect(address.textContent).toBe(SUPPORT_EMAIL)
     expect(address.style.userSelect || getComputedStyle(address).userSelect).toMatch(/text|all|auto/)
   })

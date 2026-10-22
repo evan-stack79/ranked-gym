@@ -46,6 +46,45 @@ export function canAccessFoodAdd(profile: FoodAddProfile): boolean {
 }
 
 /**
+ * V3 only — aligné serveur B16 : `declaredEatingDisorder` true refuse
+ * même si healthAnswer local est none / prefer_not.
+ * Ne pas utiliser quand VITE_ENABLE_FOOD_ADD_V3 est OFF (legacy inchangé).
+ */
+export function hasDeclaredEatingDisorderFlag(profile: FoodAddProfile): boolean {
+  if (!profile) return false
+  if ('declarations' in profile && profile.declarations) {
+    return Boolean(profile.declarations.eatingDisorder)
+  }
+  if ('declaredEatingDisorder' in profile) {
+    return Boolean(profile.declaredEatingDisorder)
+  }
+  return false
+}
+
+export function decideFoodAddAccessV3(
+  profile: FoodAddProfile,
+): { allowed: boolean; reason: FoodAddAccessReason } {
+  if (!profile) {
+    return { allowed: true, reason: 'allowed' }
+  }
+  if (isValidAge(profile.age) && isMinorAge(profile.age)) {
+    return { allowed: false, reason: 'minor' }
+  }
+  if (hasDeclaredEatingDisorderFlag(profile)) {
+    return { allowed: false, reason: 'eating_disorder' }
+  }
+  const declarations = readHealthDeclarations(profile)
+  if (declarations.eatingDisorder) {
+    return { allowed: false, reason: 'eating_disorder' }
+  }
+  return { allowed: true, reason: 'allowed' }
+}
+
+export function canAccessFoodAddV3(profile: FoodAddProfile): boolean {
+  return decideFoodAddAccessV3(profile).allowed
+}
+
+/**
  * Âge manquant → prompt V3 « Ajouter un aliment » uniquement
  * (derrière `VITE_ENABLE_FOOD_ADD_V3`). Ne pas utiliser pour bloquer le legacy.
  */

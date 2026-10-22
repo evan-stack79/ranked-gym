@@ -40,6 +40,20 @@ export type OpenFoodFactsProductCloud = {
   fetchedAt: number
 }
 
+/** Hit recherche V3 (app-facing) — jamais de kcal / macros. */
+export type FoodAddV3SearchHitCloud = {
+  barcode: string
+  nom: string
+  brands: string
+  servingSize: string | null
+  portionLabel: string
+  categoriesTags: string[]
+  imageUrl?: string
+  imageStorageId?: string
+  provenance: 'open_food_facts'
+  fetchedAt: number
+}
+
 type JournalSnapshot = {
   meals: Array<{
     mealId: string
@@ -54,6 +68,8 @@ type JournalSnapshot = {
     grams?: number
     pieces?: number
     portionMode?: 'solo' | 'with_sides'
+    portionLabel?: string
+    entrySource?: 'v3'
     createdAt?: number
     updatedAt: number
     deletedAt?: number
@@ -86,8 +102,16 @@ async function requireToken(): Promise<string> {
   return token
 }
 
-export async function pushConvexMeal(meal: MealEntry, dateKey: string, updatedAt = Date.now()) {
+export async function pushConvexMeal(
+  meal: MealEntry,
+  dateKey: string,
+  updatedAt = Date.now(),
+  opts?: { quantityRules?: 'v3' },
+) {
   const sessionToken = await requireToken()
+  const quantityRules =
+    opts?.quantityRules ??
+    (meal.entrySource === 'v3' ? ('v3' as const) : undefined)
   return getConvex().mutation(api.nutrition.upsertMeal, {
     sessionToken,
     mealId: meal.id,
@@ -100,10 +124,17 @@ export async function pushConvexMeal(meal: MealEntry, dateKey: string, updatedAt
     fatG: meal.fatG ?? null,
     grams: meal.grams,
     pieces: meal.pieces,
+    portionLabel: meal.portionLabel,
     portionMode: meal.portionMode,
+    ...(quantityRules ? { quantityRules } : {}),
     createdAt: meal.createdAt,
     updatedAt,
-  }) as Promise<{ applied: boolean; stale: boolean; updatedAt: number }>
+  }) as Promise<{
+    applied: boolean
+    stale: boolean
+    updatedAt: number
+    portionLabel?: string
+  }>
 }
 
 export async function deleteConvexMeal(mealId: string, dateKey: string, deletedAt = Date.now()) {
@@ -303,7 +334,7 @@ export async function searchFoodsV3ViaConvex(input: {
   categoryTag?: string | null
   limit?: number
 }): Promise<{
-  hits: OpenFoodFactsProductCloud[]
+  hits: FoodAddV3SearchHitCloud[]
   searchCount: number
   dailyLimit: number
 }> {
@@ -314,9 +345,68 @@ export async function searchFoodsV3ViaConvex(input: {
     categoryTag: input.categoryTag ?? null,
     limit: input.limit,
   }) as Promise<{
-    hits: OpenFoodFactsProductCloud[]
+    hits: FoodAddV3SearchHitCloud[]
     searchCount: number
     dailyLimit: number
+  }>
+}
+
+/** Garde serveur V3 — appeler avant d’ouvrir l’écran (pas seulement à l’écriture). */
+export async function checkFoodAddAccessViaConvex(): Promise<{
+  ok: boolean
+  error?: string
+  diabetes?: boolean
+}> {
+  const sessionToken = await requireToken()
+  return getConvex().query(api.nutrition.checkFoodAddAccess, {
+    sessionToken,
+  }) as Promise<{ ok: boolean; error?: string; diabetes?: boolean }>
+}
+
+/** Journal V3 app-facing (sans kcal / macros). */
+export async function fetchConvexJournalSnapshotV3(options?: {
+  startDateKey?: string
+  endDateKey?: string
+  includeDeleted?: boolean
+}): Promise<{
+  meals: Array<{
+    mealId: string
+    dateKey?: string
+    mealType?: string
+    name?: string
+    grams?: number
+    pieces?: number
+    portionLabel?: string
+    imageUrl?: string
+    imageStorageId?: string
+    offCode?: string
+    createdAt?: number
+    updatedAt: number
+    deletedAt?: number
+  }>
+}> {
+  const sessionToken = await requireToken()
+  return getConvex().query(api.foodAdd.listJournalEntriesV3, {
+    sessionToken,
+    startDateKey: options?.startDateKey,
+    endDateKey: options?.endDateKey,
+    includeDeleted: options?.includeDeleted,
+  }) as Promise<{
+    meals: Array<{
+      mealId: string
+      dateKey?: string
+      mealType?: string
+      name?: string
+      grams?: number
+      pieces?: number
+      portionLabel?: string
+      imageUrl?: string
+      imageStorageId?: string
+      offCode?: string
+      createdAt?: number
+      updatedAt: number
+      deletedAt?: number
+    }>
   }>
 }
 
@@ -329,18 +419,33 @@ export async function addFoodSnapshotViaConvex(input: {
   offCode?: string
   imageUrl?: string
   imageStorageId?: string
-  calories: number | null
+  /** V3 : ne plus envoyer — le serveur calcule depuis off_product_nutrients. */
+  calories?: number | null
   proteinG?: number | null
   carbsG?: number | null
   fatG?: number | null
   grams?: number
+  pieces?: number
+  selectionEventId?: string
   createdAt?: number
   updatedAt?: number
 }): Promise<{ applied: boolean; stale: boolean; updatedAt: number }> {
   const sessionToken = await requireToken()
+  // V3 : ne jamais transmettre kcal/macros — le serveur les calcule.
+  const {
+    calories: _c,
+    proteinG: _p,
+    carbsG: _carbs,
+    fatG: _f,
+    ...safe
+  } = input
+  void _c
+  void _p
+  void _carbs
+  void _f
   return getConvex().mutation(api.foodAdd.addFoodSnapshot, {
     sessionToken,
-    ...input,
+    ...safe,
   }) as Promise<{ applied: boolean; stale: boolean; updatedAt: number }>
 }
 

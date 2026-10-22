@@ -48,4 +48,23 @@ describe('foodOfflineCache', () => {
     const cached = listCachedFoods({ term: 'banane' })
     expect(cached[0]?.imageStorageId).toBe('storage:abc')
   })
+
+  it('V3 hit sans kcal n’écrase pas le cache déjà nourri (B111-07)', () => {
+    rememberFoodHits([HIT])
+    expect(listCachedFoods({ term: 'banane' })[0]!.calories).toBe(89)
+
+    const v3Empty: OpenFoodFactsSearchHit = {
+      ...HIT,
+      calories: null,
+      proteines: null,
+      glucides: null,
+      lipides: null,
+    }
+    rememberFoodHits([v3Empty])
+    const cached = listCachedFoods({ term: 'banane' })[0]!
+    expect(cached.calories).toBe(89)
+    expect(cached.proteines).toBe(1)
+    expect(cached.glucides).toBe(23)
+    expect(cached.lipides).toBe(0)
+  })
 })

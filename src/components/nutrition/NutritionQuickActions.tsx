@@ -5,6 +5,8 @@ export type NutritionQuickActionId = 'scanner' | 'scan-ia' | 'search' | 'journal
 
 interface NutritionQuickActionsProps {
   onAction: (id: NutritionQuickActionId) => void
+  /** V3 court — masque Scanner / Scan IA (flag OFF → défaut false). */
+  hideScannerAndPhoto?: boolean
 }
 
 function ScanIaIcon({ className }: { className?: string }) {
@@ -32,10 +34,18 @@ const ACTIONS: Array<{
   { id: 'journal', label: 'Journal', Icon: BookOpen },
 ]
 
-export function NutritionQuickActions({ onAction }: NutritionQuickActionsProps) {
+export function NutritionQuickActions({
+  onAction,
+  hideScannerAndPhoto = false,
+}: NutritionQuickActionsProps) {
+  const actions = hideScannerAndPhoto
+    ? ACTIONS.filter((a) => a.id !== 'scanner' && a.id !== 'scan-ia')
+    : ACTIONS
+  const cols = actions.length === 2 ? 'grid-cols-2' : 'grid-cols-4'
+
   return (
-    <div className="grid grid-cols-4 gap-2 px-1" role="group" aria-label="Raccourcis nutrition">
-      {ACTIONS.map(({ id, label, Icon, customIcon }) => (
+    <div className={`grid ${cols} gap-2 px-1`} role="group" aria-label="Raccourcis nutrition">
+      {actions.map(({ id, label, Icon, customIcon }) => (
         <button
           key={id}
           type="button"

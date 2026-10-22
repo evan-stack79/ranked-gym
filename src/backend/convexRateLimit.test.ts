@@ -250,14 +250,14 @@ describe('Password reset enumeration parity', () => {
       ).resolves.toEqual(known)
     }
 
-    const knownThrottle = requestPasswordResetForEmail(ctx as never, {
-      email: 'known@example.com',
-    })
-    const unknownThrottle = requestPasswordResetForEmail(ctx as never, {
-      email: 'missing@example.com',
-    })
-    await expect(knownThrottle).rejects.toThrow(RATE_LIMITED_ERROR)
-    await expect(unknownThrottle).rejects.toThrow(RATE_LIMITED_ERROR)
+    // Séquentiel : démarrer les 2 promesses en parallèle laisse un reject
+    // sans handler (Vitest « Unhandled Rejection ») sur CI lente.
+    await expect(
+      requestPasswordResetForEmail(ctx as never, { email: 'known@example.com' }),
+    ).rejects.toThrow(RATE_LIMITED_ERROR)
+    await expect(
+      requestPasswordResetForEmail(ctx as never, { email: 'missing@example.com' }),
+    ).rejects.toThrow(RATE_LIMITED_ERROR)
   })
 })
 
