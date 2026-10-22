@@ -4,6 +4,7 @@ import SwiftUI
 import WidgetKit
 
 // MARK: - Palette (gen.py / maquettes 01–06)
+// PR #122 — tip on test/ipa-119-120-121 only (not food-add-v3).
 
 private let colorRed = Color(red: 1, green: 0x2B / 255, blue: 0x2B / 255) // #FF2B2B
 private let colorTrack = Color(red: 0x3A / 255, green: 0x3A / 255, blue: 0x3C / 255) // #3A3A3C
