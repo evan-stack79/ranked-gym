@@ -188,13 +188,25 @@ private struct ExpandedBottom: View {
     }
 }
 
-/// Maquette 01 — texte à gauche, Pause + X à droite ; cadre rouge (gen.py outline).
+/// Maquette 01 — Pause | texte | X (boutons flanquant le chrono) ; cadre rouge.
 private struct ExpandedRestRow: View {
     let state: RankedGymLiveAttributes.ContentState
     private let btn = DICap.restButton
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
+            if #available(iOS 17.0, *) {
+                Button(intent: LiveActivityPauseIntent()) {
+                    ZStack {
+                        Circle().fill(colorPauseBg).frame(width: btn, height: btn)
+                        Image(systemName: state.paused ? "play.fill" : "pause.fill")
+                            .font(.system(size: btn * 0.32, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+
             VStack(spacing: 2) {
                 if !restNextSeriesLabel(state).isEmpty {
                     Text(restNextSeriesLabel(state))
@@ -216,19 +228,9 @@ private struct ExpandedRestRow: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity)
 
             if #available(iOS 17.0, *) {
-                Button(intent: LiveActivityPauseIntent()) {
-                    ZStack {
-                        Circle().fill(colorPauseBg).frame(width: btn, height: btn)
-                        Image(systemName: state.paused ? "play.fill" : "pause.fill")
-                            .font(.system(size: btn * 0.32, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
-                }
-                .buttonStyle(.plain)
-
                 Button(intent: LiveActivityStopIntent()) {
                     ZStack {
                         Circle().fill(colorStopBg).frame(width: btn, height: btn)
@@ -248,9 +250,12 @@ private struct ExpandedRestRow: View {
     }
 }
 
-/// Maquette 02 — densifié dans bottom.
+/// Maquette 02 — Valider ≈ 87×45 pt, barres ≈ 7 pt (gen.py ÷ 2.11).
 private struct ExpandedSessionRow: View {
     let state: RankedGymLiveAttributes.ContentState
+    /// gen.py [640,445]–[824,540] → 184×95 px ÷ 2.11 ≈ 87×45.
+    private let validateW: CGFloat = 87
+    private let validateH: CGFloat = 45
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -282,26 +287,33 @@ private struct ExpandedSessionRow: View {
                         Text("Valider")
                             .font(.system(size: DIScale.pt(30), weight: .bold))
                             .foregroundStyle(.black)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
+                            .frame(width: validateW, height: validateH)
                             .background(colorGreen)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: DIScale.pt(30), style: .continuous))
                     }
                     .buttonStyle(.plain)
                 }
             }
-            SessionSetBars(state: state)
+            SessionSetBars(state: state, barHeight: DIScale.pt(15))
         }
     }
 }
 
-/// Maquette 03 — texte à gauche, anneau à droite (même ligne).
+/// Maquette 03 — anneau à gauche, texte à droite.
 private struct ExpandedStepsRow: View {
     let state: RankedGymLiveAttributes.ContentState
     private let ring = DICap.stepsRing
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
+            StepsRing(
+                state: state,
+                line: max(6, ring * 0.12),
+                showPercent: true,
+                percentFont: DIScale.pt(40)
+            )
+            .frame(width: ring, height: ring)
+
             VStack(alignment: .leading, spacing: 3) {
                 Text("\(formatStepsCount(state.steps)) pas")
                     .font(.system(size: DIScale.pt(64), weight: .bold, design: .rounded))
@@ -323,25 +335,24 @@ private struct ExpandedStepsRow: View {
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-
-            StepsRing(
-                state: state,
-                line: max(6, ring * 0.12),
-                showPercent: true,
-                percentFont: DIScale.pt(40)
-            )
-            .frame(width: ring, height: ring)
         }
     }
 }
 
-/// Maquette 04 — texte à gauche, rond PR à droite ; cadre orange (gen.py outline).
+/// Maquette 04 — rond PR à gauche, texte à droite ; cadre orange.
 private struct ExpandedRecordRow: View {
     let state: RankedGymLiveAttributes.ContentState
     private let badge = DICap.badge
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
+            ZStack {
+                Circle().fill(colorPrCircle).frame(width: badge, height: badge)
+                Text("PR")
+                    .font(.system(size: badge * 0.36, weight: .heavy))
+                    .foregroundStyle(colorOrange)
+            }
+
             VStack(alignment: .leading, spacing: 3) {
                 Text("Nouveau record !")
                     .font(.system(size: DIScale.pt(36), weight: .bold))
@@ -360,13 +371,6 @@ private struct ExpandedRecordRow: View {
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-
-            ZStack {
-                Circle().fill(colorPrCircle).frame(width: badge, height: badge)
-                Text("PR")
-                    .font(.system(size: badge * 0.36, weight: .heavy))
-                    .foregroundStyle(colorOrange)
-            }
         }
         .padding(10)
         .overlay(
@@ -376,13 +380,16 @@ private struct ExpandedRecordRow: View {
     }
 }
 
-/// Maquette 05 — texte à gauche, losange à droite ; cadre or (gen.py outline).
+/// Maquette 05 — losange à gauche, texte à droite ; cadre or.
 private struct ExpandedRankRow: View {
     let state: RankedGymLiveAttributes.ContentState
     private let badge = DICap.badge
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
+            RankDiamond(glyph: rankGlyph(state.alertTitle), glyphSize: badge * 0.32)
+                .frame(width: badge, height: badge)
+
             VStack(alignment: .leading, spacing: 3) {
                 Text("Nouveau rang !")
                     .font(.system(size: DIScale.pt(36), weight: .bold))
@@ -401,9 +408,6 @@ private struct ExpandedRankRow: View {
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-
-            RankDiamond(glyph: rankGlyph(state.alertTitle), glyphSize: badge * 0.32)
-                .frame(width: badge, height: badge)
         }
         .padding(10)
         .overlay(
@@ -529,22 +533,22 @@ private struct SessionLockView: View {
                         Text("Valider")
                             .font(.system(size: DIScale.pt(30), weight: .bold))
                             .foregroundStyle(.black)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
+                            .frame(width: 87, height: 45)
                             .background(colorGreen)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: DIScale.pt(30), style: .continuous))
                     }
                     .buttonStyle(.plain)
                 }
             }
-            SessionSetBars(state: state)
+            SessionSetBars(state: state, barHeight: DIScale.pt(15))
         }
     }
 }
 
 private struct StepsLockView: View {
     let state: RankedGymLiveAttributes.ContentState
-    private let ring = DIScale.pt(210)
+    /// gen.py r105 → Ø210 px ÷ 2.11 ≈ 99 pt (lock a la place).
+    private let ring: CGFloat = DIScale.pt(210)
 
     var body: some View {
         HStack(spacing: 14) {
@@ -554,7 +558,7 @@ private struct StepsLockView: View {
                 showPercent: true,
                 percentFont: DIScale.pt(40)
             )
-            .frame(width: min(ring, 88), height: min(ring, 88))
+            .frame(width: ring, height: ring)
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(formatStepsCount(state.steps)) pas")
                     .font(.system(size: DIScale.pt(64), weight: .bold, design: .rounded))
@@ -702,6 +706,9 @@ private struct StepsRing: View {
 
 private struct SessionSetBars: View {
     let state: RankedGymLiveAttributes.ContentState
+    /// gen.py barres 15 px ÷ 2.11 ≈ 7 pt.
+    var barHeight: CGFloat = DIScale.pt(15)
+
     var body: some View {
         let total = max(1, state.setTotal)
         let filled = sessionFilledSetBars(setIndex: state.setIndex, setTotal: total)
@@ -709,7 +716,7 @@ private struct SessionSetBars: View {
             ForEach(0..<total, id: \.self) { i in
                 Capsule()
                     .fill(i < filled ? colorRed : colorTrack)
-                    .frame(height: 5)
+                    .frame(height: barHeight)
             }
         }
     }
