@@ -24,11 +24,12 @@ vi.mock('../../hooks/useOnlineStatus', () => ({
   useOnlineStatus: () => true,
 }))
 
+/** Faible kcal/100 g : les tests B111 restent indépendants du plafond V3-13 (5000). */
 const hit: OpenFoodFactsSearchHit = {
   barcode: '3017620422003',
   nom: 'Nutella',
   brands: 'Ferrero',
-  calories: 539,
+  calories: 100,
   proteines: 6,
   glucides: 57,
   lipides: 31,
@@ -64,7 +65,7 @@ async function openQuantityStep(root: ReturnType<typeof createRoot>, host: HTMLE
   })
   void host
   const choose = document.querySelector(
-    '[data-food-card] button[aria-pressed="false"]',
+    '[data-food-card][aria-pressed="false"]',
   ) as HTMLButtonElement
   await act(async () => {
     choose.click()
@@ -213,7 +214,7 @@ describe('AddFoodScreenV3 — limites quantité (B111-04/05/06)', () => {
       )
     })
     const choose = document.querySelector(
-      '[data-food-card] button[aria-pressed="false"]',
+      '[data-food-card][aria-pressed="false"]',
     ) as HTMLButtonElement
     await act(async () => {
       choose.click()
@@ -329,7 +330,7 @@ describe('AddFoodScreenV3 — limites quantité (B111-04/05/06)', () => {
       )
     })
     await act(async () => {
-      ;(document.querySelector('[data-food-card] button[aria-pressed="false"]') as HTMLButtonElement).click()
+      ;(document.querySelector('[data-food-card][aria-pressed="false"]') as HTMLButtonElement).click()
     })
     await act(async () => {
       ;(
@@ -527,7 +528,7 @@ describe('AddFoodScreenV3 — limites quantité (B111-04/05/06)', () => {
       )
     })
     await act(async () => {
-      ;(document.querySelector('[data-food-card] button[aria-pressed="false"]') as HTMLButtonElement).click()
+      ;(document.querySelector('[data-food-card][aria-pressed="false"]') as HTMLButtonElement).click()
     })
     await act(async () => {
       ;(

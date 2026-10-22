@@ -8,9 +8,9 @@ import {
 describe('foodCategories', () => {
   it('expose des libellés neutres et filtre par tags OFF', () => {
     expect(FOOD_CATEGORIES.map((c) => c.label)).toEqual([
-      'Tout',
       'Fruits',
       'Boissons',
+      'Tout',
       'Repas',
       'Snacks',
       'Laitages',

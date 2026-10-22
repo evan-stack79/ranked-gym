@@ -30,6 +30,11 @@ interface MealPhotoAnalyzerProps {
   buttonClassName?: string
   /** Icône custom à gauche du libellé (variant=button). */
   iconSlot?: ReactNode
+  /**
+   * V3 confirm-before-add : pas de toast « kcal ajoutées » —
+   * l’appelant affiche l’estimation et attend la confirmation.
+   */
+  deferAddToast?: boolean
 }
 
 export type MealPhotoAnalyzerHandle = {
@@ -55,6 +60,7 @@ export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAn
       forcedErrorMessage = null,
       buttonClassName,
       iconSlot,
+      deferAddToast = false,
     },
     ref,
   ) {
@@ -131,10 +137,12 @@ export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAn
         mealType,
       })
 
-      onToast?.(
-        `+${macros.calories} kcal ajoutées · ${macros.scansRemaining}/${macros.dailyLimit} scans restants`,
-        'success',
-      )
+      if (!deferAddToast) {
+        onToast?.(
+          `+${macros.calories} kcal ajoutées · ${macros.scansRemaining}/${macros.dailyLimit} scans restants`,
+          'success',
+        )
+      }
     } catch (e) {
       safeError('[MealPhotoAnalyzer]', e)
       const msg =

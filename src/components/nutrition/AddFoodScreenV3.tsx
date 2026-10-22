@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Search, WifiOff, X } from 'lucide-react'
+import { Camera, ScanBarcode, Search, WifiOff, X } from 'lucide-react'
 import type { MealType } from '../../types/nutrition'
 import { MEAL_TYPE_LABELS } from '../../utils/calories'
 import type { OpenFoodFactsSearchHit } from '../../services/alimentsService'
@@ -10,6 +10,7 @@ import {
   type FoodCategoryId,
 } from '../../utils/foodCategories'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
+import { PHOTO_IA_ESTIMATE_LABEL } from '../../services/nutritionSafetyRules'
 import {
   foodAddQuantityUserMessage,
   formatGramsCountLabel,
@@ -18,9 +19,45 @@ import {
   validateFoodQuantity,
   type FoodQuantityUnit,
 } from '../../../convex/lib/foodAddQuantity'
+import {
+  MAX_MEAL_PHOTO_KCAL,
+  MEAL_KCAL_ABOVE_MAX_MSG,
+  scaleMealPhotoMacrosForEditedKcal,
+  validateMealPhotoConfirmCalories,
+} from '../../../convex/lib/mealPhotoEstimateAccess'
+import { checkStoredMealCalories } from '../../../convex/lib/foodAddUpsertSanitize'
+import { computeLocalMealNutritionFromOffHit } from '../../utils/foodAddMealNutrition'
+import { isCiqualEnabled } from '../../backend/ciqualFeatureFlag'
+import {
+  CIQUAL_SOURCE_ATTRIBUTION,
+  listCiqualBaseFoods,
+  type CiqualBaseFood,
+} from '../../services/ciqualCatalog'
+import { resolveFoodIconCategory } from '../../utils/foodIconCategory'
+import { FoodCategoryIcon } from './FoodCategoryIcon'
 import { FoodCategoryWheel } from './FoodCategoryWheel'
 import { FoodProductCard } from './FoodProductCard'
 import { FoodSelectionBar } from './FoodSelectionBar'
+import { MealPhotoAnalyzer } from './MealPhotoAnalyzer'
+
+function ciqualToSearchHit(food: CiqualBaseFood): OpenFoodFactsSearchHit {
+  return {
+    barcode: food.barcode,
+    nom: food.nom,
+    brands: '',
+    calories: food.calories,
+    proteines: null,
+    glucides: null,
+    lipides: null,
+    servingSize: null,
+    categoriesTags: food.categoriesTags,
+    foodIconCategory: food.foodIconCategory,
+    provenance: 'ciqual',
+    fetchedAt: food.fetchedAt,
+  }
+}
+
+export { MEAL_KCAL_ABOVE_MAX_MSG, PHOTO_IA_ESTIMATE_LABEL }
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -83,10 +120,14 @@ interface AddFoodScreenProps {
   onCategoryChange: (id: FoodCategoryId) => void
   /** Ajoute les aliments choisis après saisie de quantité. */
   onValidateSelection: (items: FoodAddV3Selection[]) => void
-  /** Conservé pour compat props ; court = recherche seule (non affiché). */
+  /** Scan code-barres (maquette V3 — pastille rouge + icône). */
   onOpenScanner?: () => void
   scannerSlot?: ReactNode
   onToast?: (message: string, variant?: 'success' | 'error') => void
+  /**
+   * V3-05 — appelée seulement après confirmation utilisateur de l’estimation IA
+   * (jamais automatiquement à la fin de l’analyse).
+   */
   onPhotoAnalyzed?: (result: {
     name: string
     mealType: MealType
@@ -95,6 +136,11 @@ interface AddFoodScreenProps {
     carbsG: number
     fatG: number
   }) => void
+  /**
+   * V3-05 — true uniquement pour adultes ≥18 hors grossesse / allaitement
+   * (`canUseMealPhotoEstimate`). Sinon Photo IA ouvre seulement la recherche.
+   */
+  photoEstimateAllowed?: boolean
   name: string
   onNameChange: (value: string) => void
   calories?: number
@@ -116,9 +162,24 @@ interface AddFoodScreenProps {
   onManualGramsChange?: (value: number | '') => void
 }
 
+type PhotoIaPending = {
+  name: string
+  mealType: MealType
+  /** Baseline IA — macros scalées depuis ces valeurs (V3-09). */
+  baseCalories: number
+  baseProteinG: number
+  baseCarbsG: number
+  baseFatG: number
+  calories: number
+  proteinG: number
+  carbsG: number
+  fatG: number
+}
+
 /**
- * Plein écran « Ajouter un aliment » v3 court — recherche seule.
- * Pas de scanner / photo. Pas de kcal / macros à l’écran.
+ * Plein écran « Ajouter un aliment » v3 (maquette) :
+ * recherche + Scan / Photo IA + roue ARC + cartes photo.
+ * Photo IA (adultes) : estimation éditable, confirmée par l’utilisateur.
  */
 export function AddFoodScreenV3({
   searchQuery,
@@ -129,6 +190,11 @@ export function AddFoodScreenV3({
   category,
   onCategoryChange,
   onValidateSelection,
+  onOpenScanner,
+  scannerSlot,
+  onToast,
+  onPhotoAnalyzed,
+  photoEstimateAllowed = false,
   name,
   onNameChange,
   mealType,
@@ -152,6 +218,9 @@ export function AddFoodScreenV3({
   const [submitting, setSubmitting] = useState(false)
   /** B3-05 : verrou synchrone (useState seul laisse passer 2 clics même tick). */
   const submittingRef = useRef(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  /** V3-05 — estimation Photo IA en attente de confirmation (pas d’ajout auto). */
+  const [photoPending, setPhotoPending] = useState<PhotoIaPending | null>(null)
   const online = useOnlineStatus()
   // forceOfflineImages simule aussi le hors-ligne (tests empty / fixture).
   // Les tests quantité / e2e ne passent PAS forceOfflineImages.
@@ -163,11 +232,36 @@ export function AddFoodScreenV3({
     return searchHits.filter((hit) => hitMatchesFoodCategory(category, hit.categoriesTags))
   }, [searchHits, category])
 
+  /** Aliments de base Ciqual — au-dessus des marques OFF ; flag OFF → []. */
+  const ciqualHits = useMemo(() => {
+    if (!isCiqualEnabled()) return [] as OpenFoodFactsSearchHit[]
+    const term = searchQuery.trim()
+    // Browse catégorie sans texte : pas de dump Ciqual complet.
+    if (!term && category === 'all') return []
+    const rows = listCiqualBaseFoods({
+      term: term.length >= 2 ? term : '',
+      limit: 24,
+    })
+    let hits = rows.map(ciqualToSearchHit)
+    if (category !== 'all') {
+      hits = hits.filter((hit) => hitMatchesFoodCategory(category, hit.categoriesTags))
+    }
+    // Sans terme mais catégorie : petit échantillon filtré.
+    if (!term && category !== 'all') {
+      hits = listCiqualBaseFoods({ term: '', limit: 80 })
+        .map(ciqualToSearchHit)
+        .filter((hit) => hitMatchesFoodCategory(category, hit.categoriesTags))
+        .slice(0, 24)
+    }
+    return hits
+  }, [searchQuery, category])
+
   const selectedHits = useMemo(() => {
     const map = new Map(filteredHits.map((h) => [hitKey(h), h] as const))
     for (const h of searchHits) map.set(hitKey(h), h)
+    for (const h of ciqualHits) map.set(hitKey(h), h)
     return selectedKeys.map((k) => map.get(k)).filter((h): h is OpenFoodFactsSearchHit => Boolean(h))
-  }, [selectedKeys, filteredHits, searchHits])
+  }, [selectedKeys, filteredHits, searchHits, ciqualHits])
 
   useEffect(() => {
     if (searchActive) setManualOpen(false)
@@ -184,6 +278,10 @@ export function AddFoodScreenV3({
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        if (photoPending) {
+          setPhotoPending(null)
+          return
+        }
         if (quantityStep) {
           setQuantityStep(false)
           return
@@ -193,7 +291,41 @@ export function AddFoodScreenV3({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, quantityStep])
+  }, [onClose, quantityStep, photoPending])
+
+  const focusSearchField = () => {
+    searchInputRef.current?.focus()
+  }
+
+  const confirmPhotoEstimate = () => {
+    if (!photoPending || !onPhotoAnalyzed) return
+    // V3-08 — même plafond 5000 kcal (UI + serveur).
+    const checked = validateMealPhotoConfirmCalories(photoPending.calories)
+    if (!checked.ok) return
+    onPhotoAnalyzed({
+      name: photoPending.name,
+      mealType: photoPending.mealType,
+      calories: checked.calories,
+      proteinG: photoPending.proteinG,
+      carbsG: photoPending.carbsG,
+      fatG: photoPending.fatG,
+    })
+    setPhotoPending(null)
+  }
+
+  const updatePhotoEstimateCalories = (raw: number) => {
+    setPhotoPending((prev) => {
+      if (!prev) return prev
+      const scaled = scaleMealPhotoMacrosForEditedKcal({
+        baseCalories: prev.baseCalories,
+        baseProteinG: prev.baseProteinG,
+        baseCarbsG: prev.baseCarbsG,
+        baseFatG: prev.baseFatG,
+        nextCalories: raw,
+      })
+      return { ...prev, ...scaled }
+    })
+  }
 
   const toggleHit = (hit: OpenFoodFactsSearchHit) => {
     const key = hitKey(hit)
@@ -237,15 +369,44 @@ export function AddFoodScreenV3({
     return foodAddQuantityUserMessage(checked.reason, checked.unit)
   }
 
+  /** V3-13 — kcal estimées pour une qty (même formule que l’ajout journal). */
+  const estimatedKcalForHitQty = (hit: OpenFoodFactsSearchHit, qty: QtyState): number | null => {
+    if (qty.value === '') return null
+    const checked = validateFoodQuantity({
+      unit: qty.unit,
+      value: qty.value,
+      servingGrams: qty.unit === 'pieces' ? servingGramsFor(hit) : null,
+    })
+    if (!checked.ok) return null
+    const nutrition =
+      checked.unit === 'pieces'
+        ? computeLocalMealNutritionFromOffHit(hit, { pieces: checked.pieces })
+        : computeLocalMealNutritionFromOffHit(hit, { grams: checked.grams })
+    return nutrition.calories
+  }
+
   const allQuantitiesValid = selectedHits.every((hit) => {
     const qty = qtyByKey[hitKey(hit)]
     if (!qty || qty.value === '') return false
-    return validateFoodQuantity({
+    const qtyOk = validateFoodQuantity({
       unit: qty.unit,
       value: qty.value,
       servingGrams: qty.unit === 'pieces' ? servingGramsFor(hit) : null,
     }).ok
+    if (!qtyOk) return false
+    // V3-13 — bloquer si kcal > 5000.
+    const kcal = estimatedKcalForHitQty(hit, qty)
+    return checkStoredMealCalories(kcal).ok
   })
+
+  const quantityKcalCapError = selectedHits.some((hit) => {
+    const qty = qtyByKey[hitKey(hit)]
+    if (!qty || qty.value === '') return false
+    const kcal = estimatedKcalForHitQty(hit, qty)
+    return kcal != null && !checkStoredMealCalories(kcal).ok
+  })
+    ? MEAL_KCAL_ABOVE_MAX_MSG
+    : null
 
   const confirmQuantities = () => {
     if (!networkOk || submitting || submittingRef.current) return
@@ -269,6 +430,13 @@ export function AddFoodScreenV3({
       })
       if (!checked.ok) {
         setQtyError(foodAddQuantityUserMessage(checked.reason, checked.unit))
+        submittingRef.current = false
+        setSubmitting(false)
+        return
+      }
+      const kcal = estimatedKcalForHitQty(hit, qty)
+      if (!checkStoredMealCalories(kcal).ok) {
+        setQtyError(MEAL_KCAL_ABOVE_MAX_MSG)
         submittingRef.current = false
         setSubmitting(false)
         return
@@ -367,19 +535,21 @@ export function AddFoodScreenV3({
       <div className="flex shrink-0 flex-col gap-3 px-4 pb-1 pt-2">
         <label className="relative block">
           <span className="sr-only">Rechercher un aliment</span>
+          {/* V3-06 : loupe au-dessus du champ (z-index), jamais sous le fond. */}
           <Search
-            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8E8E93]"
+            data-food-search-loupe
+            className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-[#8E8E93]"
             strokeWidth={2.25}
             aria-hidden
           />
           <input
+            ref={searchInputRef}
             type="search"
             value={searchQuery}
             onChange={(e) => onSearchQueryChange(e.target.value)}
             placeholder="Rechercher un aliment, une marque…"
-            className="w-full rounded-2xl border border-white/12 py-3.5 pl-10 pr-3.5 text-[15px] text-white placeholder:text-[#636366] outline-none focus:border-[#FF2B2B]/45"
+            className="relative z-0 w-full rounded-2xl border border-white/12 bg-white/[0.06] py-3.5 pl-10 pr-3.5 text-[15px] text-white placeholder:text-[#636366] outline-none focus:border-[#FF2B2B]/45 [-webkit-appearance:none] [appearance:none]"
             style={{
-              background: 'rgb(255 255 255 / 0.06)',
               backdropFilter: 'blur(14px)',
               WebkitBackdropFilter: 'blur(14px)',
             }}
@@ -389,6 +559,79 @@ export function AddFoodScreenV3({
             aria-label="Rechercher un aliment Open Food Facts"
           />
         </label>
+
+        <div className="flex gap-2" data-food-scan-actions>
+          <button
+            type="button"
+            data-food-scan-barcode
+            onClick={() => onOpenScanner?.()}
+            disabled={!onOpenScanner}
+            aria-disabled={!onOpenScanner}
+            className="ios-press flex min-w-0 flex-1 items-center justify-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-[13px] font-semibold text-white disabled:opacity-40"
+          >
+            <span
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white ${
+                onOpenScanner ? 'bg-[#FF2B2B]' : 'bg-[#48484A]'
+              }`}
+            >
+              <ScanBarcode className="h-4 w-4" aria-hidden />
+            </span>
+            Scan Code-Barre
+          </button>
+          {/*
+            V3-05 : adultes → MealPhotoAnalyzer + confirmation ;
+            mineur / âge inconnu / grossesse / allaitement → focus recherche seulement.
+          */}
+          {photoEstimateAllowed ? (
+            <div data-food-scan-photo className="min-w-0 flex-1">
+              <MealPhotoAnalyzer
+                variant="button"
+                deferAddToast
+                buttonClassName="ios-press flex w-full items-center justify-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-[13px] font-semibold text-white disabled:opacity-50"
+                iconSlot={
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white">
+                    <Camera className="h-4 w-4" aria-hidden />
+                  </span>
+                }
+                onToast={onToast}
+                onAnalyzed={(result) => {
+                  // Jamais d’ajout auto : estimation éditable, confirmée ensuite.
+                  const calories = result.calories
+                  const proteinG = result.proteines
+                  const carbsG = result.glucides
+                  const fatG = result.lipides
+                  setPhotoPending({
+                    name: result.name,
+                    mealType: result.mealType,
+                    baseCalories: calories,
+                    baseProteinG: proteinG,
+                    baseCarbsG: carbsG,
+                    baseFatG: fatG,
+                    calories,
+                    proteinG,
+                    carbsG,
+                    fatG,
+                  })
+                }}
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              data-food-scan-photo
+              data-food-photo-search-only
+              onClick={focusSearchField}
+              className="ios-press flex min-w-0 flex-1 items-center justify-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-[13px] font-semibold text-white"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white">
+                <Camera className="h-4 w-4" aria-hidden />
+              </span>
+              Photo IA
+            </button>
+          )}
+        </div>
+
+        {scannerSlot}
 
         {!networkOk ? (
           <p
@@ -421,7 +664,11 @@ export function AddFoodScreenV3({
             </p>
           ) : null}
 
-          {!searchLoading && !searchError && searchActive && filteredHits.length === 0 ? (
+          {!searchLoading &&
+          !searchError &&
+          searchActive &&
+          filteredHits.length === 0 &&
+          ciqualHits.length === 0 ? (
             <p
               className="py-8 text-center text-[13px] text-[#8E8E93]"
               data-food-empty-state
@@ -441,39 +688,80 @@ export function AddFoodScreenV3({
             </p>
           ) : null}
 
+          {ciqualHits.length > 0 ? (
+            <section className="pt-2" data-ciqual-section aria-label="Aliments de base">
+              <h2 className="mb-2 text-[13px] font-semibold uppercase tracking-wider text-[#AEAEB2]">
+                Aliments de base
+              </h2>
+              <ul
+                className="grid grid-cols-2 gap-x-3 gap-y-3.5"
+                role="listbox"
+                aria-label="Aliments de base Ciqual"
+                aria-multiselectable="true"
+              >
+                {ciqualHits.map((hit) => {
+                  const key = hitKey(hit)
+                  return (
+                    <li key={key}>
+                      <FoodProductCard
+                        hit={hit}
+                        selected={selectedKeys.includes(key)}
+                        onToggle={() => toggleHit(hit)}
+                        forceOfflineImages={forceOfflineImages}
+                      />
+                    </li>
+                  )
+                })}
+              </ul>
+              <p
+                className="mt-2 text-center text-[11px] leading-snug text-[#8E8E93]"
+                data-ciqual-attribution
+              >
+                {CIQUAL_SOURCE_ATTRIBUTION}
+              </p>
+            </section>
+          ) : null}
+
           {filteredHits.length > 0 ? (
-            <ul
-              className="grid grid-cols-2 gap-x-3 gap-y-3 pt-2"
-              role="listbox"
-              aria-label="Résultats Open Food Facts"
-              aria-multiselectable="true"
-            >
-              {filteredHits.map((hit) => {
-                const key = hitKey(hit)
-                return (
-                  <li key={key}>
-                    <FoodProductCard
-                      hit={hit}
-                      selected={selectedKeys.includes(key)}
-                      onToggle={() => toggleHit(hit)}
-                      forceOfflineImages={forceOfflineImages}
-                    />
-                  </li>
-                )
-              })}
-            </ul>
+            <section className={ciqualHits.length > 0 ? 'mt-5 pt-1' : 'pt-2'}>
+              {ciqualHits.length > 0 ? (
+                <h2 className="mb-2 text-[13px] font-semibold uppercase tracking-wider text-[#AEAEB2]">
+                  Produits de marque
+                </h2>
+              ) : null}
+              <ul
+                className="grid grid-cols-2 gap-x-3 gap-y-3.5"
+                role="listbox"
+                aria-label="Résultats Open Food Facts"
+                aria-multiselectable="true"
+              >
+                {filteredHits.map((hit) => {
+                  const key = hitKey(hit)
+                  return (
+                    <li key={key}>
+                      <FoodProductCard
+                        hit={hit}
+                        selected={selectedKeys.includes(key)}
+                        onToggle={() => toggleHit(hit)}
+                        forceOfflineImages={forceOfflineImages}
+                      />
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
           ) : null}
 
           <footer
             className="mt-8 space-y-1.5 pb-4 text-center"
             data-off-licence
-            aria-label="Licence Open Food Facts"
+            aria-label="Sources alimentaires"
           >
             <p className="text-[12px] leading-snug text-[#AEAEB2]">
               Données Open Food Facts · licence ODbL
             </p>
             <p className="text-[12px] leading-snug text-[#8E8E93]">
-              Photos : contributeurs Open Food Facts · CC BY-SA 3.0
+              Icônes Ranked Gym (pas de photos contributeurs)
             </p>
           </footer>
 
@@ -569,6 +857,78 @@ export function AddFoodScreenV3({
           ) : null}
         </div>
 
+        {photoPending ? (
+          <div
+            className="absolute inset-0 z-50 flex flex-col justify-end bg-black/70 px-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-3"
+            data-photo-ia-estimate
+            role="dialog"
+            aria-label="Estimation Photo IA"
+          >
+            <div className="rounded-3xl border border-white/12 bg-[#141416] p-4 shadow-2xl">
+              <div className="mb-3 flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[17px] font-semibold text-white">{photoPending.name}</p>
+                  <p
+                    className="mt-1 text-[12px] font-medium text-[#AEAEB2]"
+                    data-photo-ia-estimate-label
+                  >
+                    {PHOTO_IA_ESTIMATE_LABEL}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="ios-press shrink-0 text-[13px] font-semibold text-[#8E8E93]"
+                  onClick={() => setPhotoPending(null)}
+                >
+                  Annuler
+                </button>
+              </div>
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                  Calories (kcal)
+                </span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={MAX_MEAL_PHOTO_KCAL}
+                  step={1}
+                  value={photoPending.calories}
+                  onChange={(e) => {
+                    const next = e.target.value === '' ? 0 : Number(e.target.value)
+                    updatePhotoEstimateCalories(Number.isFinite(next) ? next : 0)
+                  }}
+                  className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#FF2B2B]/40"
+                  data-photo-ia-kcal
+                  aria-label="Calories estimées, modifiables"
+                  aria-invalid={
+                    !validateMealPhotoConfirmCalories(photoPending.calories).ok || undefined
+                  }
+                />
+              </label>
+              {!validateMealPhotoConfirmCalories(photoPending.calories).ok &&
+              photoPending.calories > MAX_MEAL_PHOTO_KCAL ? (
+                <p
+                  className="mt-1.5 text-[12px] text-[#FF6961]"
+                  role="alert"
+                  data-photo-ia-kcal-error
+                >
+                  {MEAL_KCAL_ABOVE_MAX_MSG}
+                </p>
+              ) : null}
+              <button
+                type="button"
+                data-photo-ia-confirm
+                onClick={confirmPhotoEstimate}
+                disabled={!validateMealPhotoConfirmCalories(photoPending.calories).ok}
+                className="btn-brand mt-4 w-full rounded-xl border border-white/15 py-3 text-[15px] font-semibold text-white disabled:opacity-40"
+              >
+                Confirmer l’ajout
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         {quantityStep ? (
           <div
             className="absolute inset-0 z-40 flex flex-col bg-[#0C0C0E]/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-3"
@@ -596,7 +956,18 @@ export function AddFoodScreenV3({
                     className="rounded-2xl border border-white/10 bg-black/30 p-3"
                     data-food-quantity-row
                   >
-                    <p className="truncate text-[14px] font-semibold text-white">{hit.nom}</p>
+                    <div className="flex items-center gap-2.5">
+                      <FoodCategoryIcon
+                        category={
+                          hit.foodIconCategory ?? resolveFoodIconCategory(hit.categoriesTags)
+                        }
+                        size={40}
+                        label={hit.nom}
+                      />
+                      <p className="min-w-0 flex-1 truncate text-[14px] font-semibold text-white">
+                        {hit.nom}
+                      </p>
+                    </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -672,9 +1043,14 @@ export function AddFoodScreenV3({
                 )
               })}
             </ul>
-            {qtyError ? (
-              <p className="mt-2 text-[12px] text-[#FF6961]" role="alert" data-food-qty-error>
-                {qtyError}
+            {qtyError || quantityKcalCapError ? (
+              <p
+                className="mt-2 text-[12px] text-[#FF6961]"
+                role="alert"
+                data-food-qty-error
+                data-food-kcal-cap-error={quantityKcalCapError ? 'true' : undefined}
+              >
+                {qtyError ?? quantityKcalCapError}
               </p>
             ) : null}
             {!networkOk ? (

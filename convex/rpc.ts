@@ -1,5 +1,12 @@
 import { v } from 'convex/values'
-import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from './_generated/server'
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
 import { consumeRateLimit } from './lib/rateLimit'
 import { canViewerSeeSubject } from './lib/socialVisibility'
@@ -693,6 +700,19 @@ export const getUserStats = query({
     }),
   }),
   handler: (ctx, args) => getUserStatsForSession(ctx, args.sessionToken),
+})
+
+/** V3-07 — profil nutrition stocké pour garde Photo IA (jamais confiance client). */
+export const getNutritionProfileJsonInternal = internalQuery({
+  args: { userId: v.string() },
+  returns: v.any(),
+  handler: async (ctx, args) => {
+    const nutrition = await ctx.db
+      .query('nutrition_state')
+      .withIndex('by_userId', (q) => q.eq('userId', args.userId))
+      .first()
+    return nutrition?.profileJson ?? null
+  },
 })
 
 export const reserveAiMealScanInternal = internalMutation({

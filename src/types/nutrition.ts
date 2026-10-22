@@ -112,12 +112,30 @@ export interface MealEntry {
    * Snapshot — un repas passé ne se met pas à jour si OFF change.
    */
   portionLabel?: string
-  /** URL photo (stockage Ranked Gym) figée ; absente / offline → icône neutre. */
+  /** URL photo (stockage Ranked Gym) figée — V3 UI préfère foodIconCategory. */
   imageUrl?: string
   /** Réf. image Convex storage (jamais un hotlink OFF). */
   imageStorageId?: string
   /** Code-barres / code OFF figé au snapshot. */
   offCode?: string
+  /**
+   * Icône catégorie V3 (viennoiserie, pain, …) — déduite des categories_tags OFF
+   * à l’ajout ; pas de photo contributeur.
+   */
+  foodIconCategory?:
+    | 'viennoiserie'
+    | 'pain'
+    | 'produit_laitier'
+    | 'fruit'
+    | 'legume'
+    | 'viande'
+    | 'poisson'
+    | 'boisson'
+    | 'plat'
+    | 'snack'
+    | 'autre'
+  /** categories_tags OFF figés (repli icône si foodIconCategory absent). */
+  categoriesTags?: string[]
   createdAt: number
   /**
    * Horodatage propre à cette entrée (sync newest-wins, comme les verres d’eau).

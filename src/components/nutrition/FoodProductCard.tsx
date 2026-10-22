@@ -1,75 +1,74 @@
-import { Check, Plus } from 'lucide-react'
+import { Check } from 'lucide-react'
 import type { OpenFoodFactsSearchHit } from '../../services/alimentsService'
 import { cleanupFoodName, formatOffServingSize } from '../../utils/foodDisplay'
-import { OffProductImage } from './OffProductImage'
+import { resolveFoodIconCategory } from '../../utils/foodIconCategory'
+import { FoodCategoryIcon } from './FoodCategoryIcon'
 
 interface FoodProductCardProps {
   hit: OpenFoodFactsSearchHit
   selected: boolean
   onToggle: () => void
+  /** Conservé pour compat tests — les photos OFF ne s’affichent plus en V3. */
   forceOfflineImages?: boolean
 }
 
 /**
- * Carte produit 2-colonnes : photo au-dessus du nom (pas de chevauchement),
- * portion lisible (pas de truncate agressif), + / check.
- * Contenu : photo + name + portion UNIQUEMENT (pas de kcal, Nutri-Score, prix…).
+ * Carte produit 2-colonnes (maquette V3) :
+ * icône catégorie (pas de photo contributeur OFF), nom gras, portion grise.
  */
 export function FoodProductCard({
   hit,
   selected,
   onToggle,
-  forceOfflineImages = false,
 }: FoodProductCardProps) {
   const name = cleanupFoodName(hit.nom)
   const portion = formatOffServingSize(hit.servingSize)
+  const iconCategory = hit.foodIconCategory ?? resolveFoodIconCategory(hit.categoriesTags)
 
   return (
-    <article
+    <button
+      type="button"
       data-food-card
       data-selected={selected ? 'true' : 'false'}
-      className={`flex flex-col rounded-[22px] border bg-[#1A1A1C] px-2.5 pb-3 pt-3 transition-[border-color,box-shadow] ${
+      data-food-icon-category={iconCategory}
+      onClick={onToggle}
+      aria-label={selected ? `Retirer ${name}` : `Choisir ${name}`}
+      aria-pressed={selected}
+      className={`relative flex w-full flex-col overflow-hidden rounded-[22px] border bg-[#1A1A1C] text-left transition-[border-color,box-shadow] ${
         selected
           ? 'border-[#FF2B2B] shadow-[0_0_0_1px_rgb(255_43_43_/_0.35)]'
           : 'border-white/[0.08]'
       }`}
     >
-      <div className="mx-auto flex h-[72px] w-[72px] shrink-0 items-center justify-center">
-        <OffProductImage
-          src={hit.imageUrl}
-          alt=""
-          size={72}
-          forceFallback={forceOfflineImages}
-          barcode={hit.barcode}
-          productName={hit.nom}
+      <div className="relative flex h-[132px] w-full items-center justify-center bg-[#1A1A1C] px-3 pt-3">
+        <FoodCategoryIcon
+          category={iconCategory}
+          categoriesTags={hit.categoriesTags}
+          size={96}
+          label={name}
         />
+        {selected ? (
+          <span
+            data-food-card-check
+            className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-white text-[#FF2B2B] shadow-[0_2px_8px_rgb(0_0_0_/_0.35)]"
+            aria-hidden
+          >
+            <Check className="h-4 w-4" strokeWidth={3} />
+          </span>
+        ) : null}
       </div>
 
-      <h3 className="mt-2 line-clamp-2 min-h-[2.5rem] break-words text-center text-[13px] font-semibold leading-snug tracking-tight text-white">
-        {name}
-      </h3>
-
-      <div className="mt-2 flex min-w-0 items-end justify-between gap-1.5">
+      <div className="flex flex-col gap-1 px-3 pb-3.5 pt-2.5">
+        <h3 className="line-clamp-2 min-h-[2.4rem] break-words text-[14px] font-bold leading-snug tracking-tight text-white">
+          {name}
+        </h3>
         <span
-          data-portion-pill
-          className="min-w-0 flex-1 whitespace-normal break-words rounded-full bg-white/[0.08] px-2 py-1 text-left text-[10px] font-medium leading-snug text-[#AEAEB2] sm:text-[11px]"
+          data-portion-label
+          className="min-w-0 whitespace-normal break-words text-[12px] font-medium leading-snug text-[#8E8E93]"
         >
           {portion}
         </span>
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-label={selected ? `Retirer ${name}` : `Choisir ${name}`}
-          aria-pressed={selected}
-          className="ios-press flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white"
-        >
-          {selected ? (
-            <Check className="h-4 w-4" strokeWidth={2.75} aria-hidden />
-          ) : (
-            <Plus className="h-4 w-4" strokeWidth={2.75} aria-hidden />
-          )}
-        </button>
       </div>
-    </article>
+    </button>
   )
 }

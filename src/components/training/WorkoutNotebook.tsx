@@ -35,7 +35,10 @@ import {
   lastPerformanceToSetPatch,
   nextSetFromPrevious,
 } from '../../utils/lastPerformance'
-import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
+import {
+  ClearableNumberInput,
+  flushPendingClearableNumberInputs,
+} from '../nutrition/ClearableNumberInput'
 import { WorkoutHistory } from './WorkoutHistory'
 import { ImmersiveExerciseSession } from './ImmersiveExerciseSession'
 import {
@@ -48,6 +51,13 @@ import {
   AUTO_VALIDATE_UNDO_MS,
   isSetReadyForAutoValidate,
   makeAutoValidateKey,
+  SET_EFFORT_MAX,
+  SET_EFFORT_MIN,
+  SET_REPS_MAX,
+  SET_REPS_MIN,
+  SET_WEIGHT_MAX_KG,
+  SET_WEIGHT_MIN_KG,
+  setFieldRangeError,
   shouldCommitAutoValidate,
 } from '../../utils/autoValidateSet'
 import { CANONICAL_REST_SEC, resolveRestDuration } from '../../utils/restDuration'
@@ -98,6 +108,8 @@ interface WorkoutNotebookProps {
     setIndex: number
     exerciseName: string
     setLabel: string
+    /** Nombre de séries de l’exercice (Dynamic Island « Série X sur Y »). */
+    setTotal?: number
     restSec?: number
   }) => void
   /** Annule le minuteur (validation accidentelle). */
@@ -462,7 +474,12 @@ export function WorkoutNotebook({
     setExercises((prev) => prev.map((e) => (e.id === exerciseId ? { ...e, ...patch } : e)))
   }
 
-  const updateSet = (exerciseId: string, setIndex: number, patch: Partial<WorkoutSet>) => {
+  const updateSet = (
+    exerciseId: string,
+    setIndex: number,
+    patch: Partial<WorkoutSet>,
+    options?: { autoValidate?: boolean },
+  ) => {
     draftDirty.current = true
     const next = exercisesRef.current.map((e) => {
       if (e.id !== exerciseId) return e
@@ -473,8 +490,19 @@ export function WorkoutNotebook({
     })
     exercisesRef.current = next
     setExercises(next)
+    // Frappe : jamais finishSet. Auto-validate seulement au blur / bouton Valider.
+    if (options?.autoValidate === false) return
     if (!autoValidate) return
     const ex = next.find((e) => e.id === exerciseId)
+    const merged = ex?.sets[setIndex]
+    if (ex && merged && isSetReadyForAutoValidate(merged)) {
+      finishSet(ex, setIndex, merged.difficulty, restPrefSec)
+    }
+  }
+
+  const tryAutoValidateSet = (exerciseId: string, setIndex: number) => {
+    if (!autoValidate) return
+    const ex = exercisesRef.current.find((e) => e.id === exerciseId)
     const merged = ex?.sets[setIndex]
     if (ex && merged && isSetReadyForAutoValidate(merged)) {
       finishSet(ex, setIndex, merged.difficulty, restPrefSec)
@@ -491,9 +519,10 @@ export function WorkoutNotebook({
     const current = live?.sets[setIndex]
     if (!current || current.done) return
     const merged = difficulty ? { ...current, difficulty } : current
+    // Même gate immersive : effort/reps vides → bloque (jamais rpe 0 inventé), auto ON ou OFF.
+    if (!isSetReadyForAutoValidate(merged)) return
     const key = makeAutoValidateKey(ex.id, setIndex, merged)
     if (autoValidate) {
-      if (!isSetReadyForAutoValidate(merged)) return
       if (
         !shouldCommitAutoValidate({
           ready: true,
@@ -552,6 +581,7 @@ export function WorkoutNotebook({
         setIndex,
         exerciseName: ex.name.trim() || 'Exercice',
         setLabel: `S${setIndex + 1}`,
+        setTotal: ex.sets.length,
         restSec: duration,
       })
     }
@@ -640,7 +670,10 @@ export function WorkoutNotebook({
   }
 
   const handleSave = async () => {
-    const cleaned = exercises
+    // Architect : commit cases encore focalisées (vide → avant-focus) avant Terminer.
+    flushPendingClearableNumberInputs()
+    const liveExercises = exercisesRef.current
+    const cleaned = liveExercises
       .map((e) => ({
         ...e,
         name: sanitizeExerciseName(e.name.trim() || 'Exercice'),
@@ -998,7 +1031,9 @@ export function WorkoutNotebook({
                     const showLastHint = Boolean(lastPerf && isSetLoadBlank(set))
                     const applyLast = () => {
                       if (!lastPerf || !isSetLoadBlank(set)) return
-                      updateSet(ex.id, idx, lastPerformanceToSetPatch(lastPerf))
+                      updateSet(ex.id, idx, lastPerformanceToSetPatch(lastPerf), {
+                        autoValidate: false,
+                      })
                     }
                     return (
                       <div
@@ -1015,74 +1050,154 @@ export function WorkoutNotebook({
                         </span>
                         <label className="block">
                           <span className="mb-0.5 block text-[10px] text-[#636366]">kg</span>
-                          <ClearableNumberInput
-                            value={showLastHint ? null : set.weightKg}
-                            onChange={(v) => updateSet(ex.id, idx, { weightKg: v ?? 0 })}
-                            onFocus={showLastHint ? applyLast : undefined}
-                            min={0}
-                            max={500}
-                            step={0.5}
-                            required={!showLastHint}
-                            placeholder={
-                              showLastHint && lastPerf
-                                ? formatLastWeightPlaceholder(lastPerf.weightKg)
-                                : undefined
-                            }
-                            placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2.5 text-[15px] font-semibold tabular-nums text-[#636366]"
-                            aria-label={
-                              showLastHint && lastPerf
-                                ? formatLastWeightAriaLabel(lastPerf.weightKg)
-                                : 'Poids'
-                            }
-                            className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
-                          />
+                          {(() => {
+                            const weightErr = showLastHint
+                              ? null
+                              : setFieldRangeError('weight', set.weightKg)
+                            return (
+                              <>
+                                <ClearableNumberInput
+                                  value={showLastHint ? null : set.weightKg}
+                                  onChange={(v) => {
+                                    if (v == null) return
+                                    updateSet(ex.id, idx, { weightKg: v }, { autoValidate: false })
+                                  }}
+                                  onFocus={showLastHint ? applyLast : undefined}
+                                  onBlur={() => tryAutoValidateSet(ex.id, idx)}
+                                  min={SET_WEIGHT_MIN_KG}
+                                  max={SET_WEIGHT_MAX_KG}
+                                  step={0.5}
+                                  required={!showLastHint}
+                                  clampOnBlur={false}
+                                  commitOnBlur
+                                  selectOnFocus
+                                  placeholder={
+                                    showLastHint && lastPerf
+                                      ? formatLastWeightPlaceholder(lastPerf.weightKg)
+                                      : undefined
+                                  }
+                                  placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2.5 text-[15px] font-semibold tabular-nums text-[#636366]"
+                                  aria-label={
+                                    showLastHint && lastPerf
+                                      ? formatLastWeightAriaLabel(lastPerf.weightKg)
+                                      : 'Poids'
+                                  }
+                                  className={`w-full rounded-xl border bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none ${
+                                    weightErr
+                                      ? 'border-[#FF6961]'
+                                      : 'border-white/10'
+                                  }`}
+                                />
+                                {weightErr ? (
+                                  <p className="mt-0.5 text-[10px] font-medium text-[#FF6961]" role="alert">
+                                    {weightErr}
+                                  </p>
+                                ) : null}
+                              </>
+                            )
+                          })()}
                         </label>
                         <label className="block">
                           <span className="mb-0.5 block text-[10px] text-[#636366]">Reps</span>
-                          <ClearableNumberInput
-                            value={showLastHint ? null : set.reps}
-                            onChange={(v) =>
-                              updateSet(ex.id, idx, { reps: v != null ? Math.round(v) : 0 })
-                            }
-                            onFocus={showLastHint ? applyLast : undefined}
-                            min={1}
-                            max={50}
-                            required={!showLastHint}
-                            placeholder={
-                              showLastHint && lastPerf
-                                ? formatLastRepsPlaceholder(lastPerf.reps)
-                                : undefined
-                            }
-                            placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2.5 text-[15px] font-semibold tabular-nums text-[#636366]"
-                            aria-label={
-                              showLastHint && lastPerf
-                                ? formatLastRepsAriaLabel(lastPerf.reps)
-                                : 'Reps'
-                            }
-                            className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
-                          />
+                          {(() => {
+                            const repsDisplay = showLastHint
+                              ? null
+                              : set.reps === 0
+                                ? null
+                                : set.reps
+                            // Série encore vide (0/0) : pas d’alerte. 0 rep sur charge réelle → erreur.
+                            const repsErr =
+                              showLastHint || isSetLoadBlank(set)
+                                ? null
+                                : setFieldRangeError('reps', set.reps)
+                            return (
+                              <>
+                                <ClearableNumberInput
+                                  value={
+                                    repsErr && set.reps === 0 ? 0 : repsDisplay
+                                  }
+                                  onChange={(v) => {
+                                    if (v == null) return
+                                    updateSet(
+                                      ex.id,
+                                      idx,
+                                      { reps: Math.round(v) },
+                                      { autoValidate: false },
+                                    )
+                                  }}
+                                  onFocus={showLastHint ? applyLast : undefined}
+                                  onBlur={() => tryAutoValidateSet(ex.id, idx)}
+                                  min={SET_REPS_MIN}
+                                  max={SET_REPS_MAX}
+                                  required={!showLastHint}
+                                  clampOnBlur={false}
+                                  commitOnBlur
+                                  selectOnFocus
+                                  placeholder={
+                                    showLastHint && lastPerf
+                                      ? formatLastRepsPlaceholder(lastPerf.reps)
+                                      : undefined
+                                  }
+                                  placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2.5 text-[15px] font-semibold tabular-nums text-[#636366]"
+                                  aria-label={
+                                    showLastHint && lastPerf
+                                      ? formatLastRepsAriaLabel(lastPerf.reps)
+                                      : 'Reps'
+                                  }
+                                  className={`w-full rounded-xl border bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none ${
+                                    repsErr ? 'border-[#FF6961]' : 'border-white/10'
+                                  }`}
+                                />
+                                {repsErr ? (
+                                  <p className="mt-0.5 text-[10px] font-medium text-[#FF6961]" role="alert">
+                                    {repsErr}
+                                  </p>
+                                ) : null}
+                              </>
+                            )
+                          })()}
                         </label>
                         <label className="block w-[3.75rem]">
                           <span className="mb-0.5 block text-[10px] text-[#636366]">Effort</span>
-                          <ClearableNumberInput
-                            value={set.rpe ?? null}
-                            onChange={(v) =>
-                              updateSet(ex.id, idx, {
-                                rpe:
-                                  v != null
-                                    ? Math.min(10, Math.max(1, Math.round(v)))
-                                    : undefined,
-                              })
-                            }
-                            min={1}
-                            max={10}
-                            required={false}
-                            deferAmbiguousIntegerPrefix
-                            placeholder="1–10"
-                            placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2 text-[12px] font-semibold text-[#636366]"
-                            aria-label="Effort facultatif, 1 à 10"
-                            className="w-full rounded-xl border border-white/10 bg-black/40 px-2 py-2 text-[13px] font-semibold text-[#AEAEB2] outline-none"
-                          />
+                          {(() => {
+                            const effortErr = setFieldRangeError('effort', set.rpe)
+                            return (
+                              <>
+                                <ClearableNumberInput
+                                  value={set.rpe ?? null}
+                                  onChange={(v) =>
+                                    updateSet(
+                                      ex.id,
+                                      idx,
+                                      {
+                                        rpe: v != null ? Math.round(v) : undefined,
+                                      },
+                                      { autoValidate: false },
+                                    )
+                                  }
+                                  onBlur={() => tryAutoValidateSet(ex.id, idx)}
+                                  min={SET_EFFORT_MIN}
+                                  max={SET_EFFORT_MAX}
+                                  required={false}
+                                  clampOnBlur={false}
+                                  selectOnFocus
+                                  commitOnBlur
+                                  deferAmbiguousIntegerPrefix
+                                  placeholder="1–10"
+                                  placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2 text-[12px] font-semibold text-[#636366]"
+                                  aria-label="Effort facultatif, 1 à 10"
+                                  className={`w-full rounded-xl border bg-black/40 px-2 py-2 text-[13px] font-semibold text-[#AEAEB2] outline-none ${
+                                    effortErr ? 'border-[#FF6961]' : 'border-white/10'
+                                  }`}
+                                />
+                                {effortErr ? (
+                                  <p className="mt-0.5 text-[10px] font-medium text-[#FF6961]" role="alert">
+                                    {effortErr}
+                                  </p>
+                                ) : null}
+                              </>
+                            )
+                          })()}
                         </label>
                         {ex.sets.length > 1 ? (
                           <button
@@ -1115,8 +1230,18 @@ export function WorkoutNotebook({
                   </button>
                   <button
                     type="button"
-                    onClick={() => finishSet(ex, validateIdx)}
-                    className="ios-press inline-flex min-h-11 items-center gap-1 rounded-full border border-[#30D158]/40 bg-[#30D158]/15 px-3.5 text-[12px] font-semibold text-[#30D158]"
+                    onClick={() => {
+                      // Architect : commit local (vide → avant-focus) avant de lire la série.
+                      flushPendingClearableNumberInputs()
+                      finishSet(ex, validateIdx)
+                    }}
+                    disabled={
+                      Boolean(ex.sets[validateIdx]?.done) ||
+                      !isSetReadyForAutoValidate(
+                        ex.sets[validateIdx] ?? { reps: 0, weightKg: 0 },
+                      )
+                    }
+                    className="ios-press inline-flex min-h-11 items-center gap-1 rounded-full border border-[#30D158]/40 bg-[#30D158]/15 px-3.5 text-[12px] font-semibold text-[#30D158] disabled:opacity-40"
                   >
                     <Check className="h-3.5 w-3.5" />
                     Valider
