@@ -714,19 +714,6 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
             ) : null
           }
           onToast={showToast}
-          onPhotoAnalyzed={(result) => {
-            const journal = addMealToToday({
-              name: result.name,
-              mealType: result.mealType,
-              calories: result.calories,
-              proteinG: result.proteinG,
-              carbsG: result.carbsG,
-              fatG: result.fatG,
-            })
-            setMeals(journal.meals)
-            resetForm()
-            showToast('Repas ajouté depuis la photo.')
-          }}
           name={name}
           onNameChange={setName}
           mealType={mealType}

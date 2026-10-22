@@ -115,10 +115,12 @@ describe('AddFoodScreenV3 — maquette (scan, roue, cartes, barre)', () => {
       scan.click()
     })
     expect(onOpenScanner).toHaveBeenCalledTimes(1)
-    expect(document.querySelector('[data-food-scan-photo]')).toBeNull()
+    // Photo IA = bouton simple (focus recherche), pas MealPhotoAnalyzer.
+    expect(document.querySelector('[data-food-scan-photo]')).toBeTruthy()
+    expect(document.querySelector('[data-food-search-loupe]')).toBeTruthy()
   })
 
-  it('Scan / Photo désactivés sans handlers (pas de bouton mort)', async () => {
+  it('Scan désactivé sans onOpenScanner ; Photo IA reste actif (focus recherche)', async () => {
     await act(async () => {
       root.render(
         <AddFoodScreenV3
@@ -144,7 +146,7 @@ describe('AddFoodScreenV3 — maquette (scan, roue, cartes, barre)', () => {
       true,
     )
     expect((document.querySelector('[data-food-scan-photo]') as HTMLButtonElement).disabled).toBe(
-      true,
+      false,
     )
   })
 })

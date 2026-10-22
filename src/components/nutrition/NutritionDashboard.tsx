@@ -1024,20 +1024,6 @@ export function NutritionDashboard({
             ) : null
           }
           onToast={showToast}
-          onPhotoAnalyzed={(result) => {
-            const journal = addMealToDate(selectedDateKey, {
-              name: result.name,
-              mealType: result.mealType,
-              calories: result.calories,
-              proteinG: result.proteinG,
-              carbsG: result.carbsG,
-              fatG: result.fatG,
-            })
-            setMeals(journal.meals)
-            setTick((n) => n + 1)
-            setShowForm(false)
-            showToast('Repas ajouté depuis la photo.')
-          }}
           name={name}
           onNameChange={setName}
           mealType={mealType}

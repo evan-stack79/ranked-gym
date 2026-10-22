@@ -21,7 +21,6 @@ import {
 import { FoodCategoryWheel } from './FoodCategoryWheel'
 import { FoodProductCard } from './FoodProductCard'
 import { FoodSelectionBar } from './FoodSelectionBar'
-import { MealPhotoAnalyzer } from './MealPhotoAnalyzer'
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -88,6 +87,10 @@ interface AddFoodScreenProps {
   onOpenScanner?: () => void
   scannerSlot?: ReactNode
   onToast?: (message: string, variant?: 'success' | 'error') => void
+  /**
+   * @deprecated V3-05 — Photo IA ne lance plus d’analyse ; prop ignorée
+   * (conservée pour compat tests / appelsants).
+   */
   onPhotoAnalyzed?: (result: {
     name: string
     mealType: MealType
@@ -132,8 +135,8 @@ export function AddFoodScreenV3({
   onValidateSelection,
   onOpenScanner,
   scannerSlot,
-  onToast,
-  onPhotoAnalyzed,
+  onToast: _onToast,
+  onPhotoAnalyzed: _onPhotoAnalyzed,
   name,
   onNameChange,
   mealType,
@@ -144,6 +147,8 @@ export function AddFoodScreenV3({
   manualGrams = '',
   onManualGramsChange,
 }: AddFoodScreenProps) {
+  void _onToast
+  void _onPhotoAnalyzed
   const [manualOpen, setManualOpen] = useState(false)
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
   const [quantityStep, setQuantityStep] = useState(false)
@@ -157,6 +162,7 @@ export function AddFoodScreenV3({
   const [submitting, setSubmitting] = useState(false)
   /** B3-05 : verrou synchrone (useState seul laisse passer 2 clics même tick). */
   const submittingRef = useRef(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const online = useOnlineStatus()
   // forceOfflineImages simule aussi le hors-ligne (tests empty / fixture).
   // Les tests quantité / e2e ne passent PAS forceOfflineImages.
@@ -372,19 +378,21 @@ export function AddFoodScreenV3({
       <div className="flex shrink-0 flex-col gap-3 px-4 pb-1 pt-2">
         <label className="relative block">
           <span className="sr-only">Rechercher un aliment</span>
+          {/* V3-06 : loupe au-dessus du champ (z-index), jamais sous le fond. */}
           <Search
-            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8E8E93]"
+            data-food-search-loupe
+            className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-[#8E8E93]"
             strokeWidth={2.25}
             aria-hidden
           />
           <input
+            ref={searchInputRef}
             type="search"
             value={searchQuery}
             onChange={(e) => onSearchQueryChange(e.target.value)}
             placeholder="Rechercher un aliment, une marque…"
-            className="w-full rounded-2xl border border-white/12 py-3.5 pl-10 pr-3.5 text-[15px] text-white placeholder:text-[#636366] outline-none focus:border-[#FF2B2B]/45"
+            className="relative z-0 w-full rounded-2xl border border-white/12 bg-white/[0.06] py-3.5 pl-10 pr-3.5 text-[15px] text-white placeholder:text-[#636366] outline-none focus:border-[#FF2B2B]/45 [-webkit-appearance:none] [appearance:none]"
             style={{
-              background: 'rgb(255 255 255 / 0.06)',
               backdropFilter: 'blur(14px)',
               WebkitBackdropFilter: 'blur(14px)',
             }}
@@ -413,41 +421,20 @@ export function AddFoodScreenV3({
             </span>
             Scan Code-Barre
           </button>
-          {onPhotoAnalyzed ? (
-            <MealPhotoAnalyzer
-              variant="button"
-              buttonClassName="ios-press flex w-full items-center justify-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-[13px] font-semibold text-white disabled:opacity-50"
-              iconSlot={
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white">
-                  <Camera className="h-4 w-4" aria-hidden />
-                </span>
-              }
-              onToast={onToast}
-              onAnalyzed={(result) => {
-                onPhotoAnalyzed({
-                  name: result.name,
-                  mealType: result.mealType,
-                  calories: result.calories,
-                  proteinG: result.proteines,
-                  carbsG: result.glucides,
-                  fatG: result.lipides,
-                })
-              }}
-            />
-          ) : (
-            <button
-              type="button"
-              data-food-scan-photo
-              disabled
-              aria-disabled="true"
-              className="ios-press flex min-w-0 flex-1 items-center justify-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-[13px] font-semibold text-white opacity-40"
-            >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#48484A] text-white">
-                <Camera className="h-4 w-4" aria-hidden />
-              </span>
-              Photo IA
-            </button>
-          )}
+          {/* V3-05 : Photo IA = focus recherche uniquement — jamais MealPhotoAnalyzer / kcal. */}
+          <button
+            type="button"
+            data-food-scan-photo
+            onClick={() => {
+              searchInputRef.current?.focus()
+            }}
+            className="ios-press flex min-w-0 flex-1 items-center justify-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-[13px] font-semibold text-white"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white">
+              <Camera className="h-4 w-4" aria-hidden />
+            </span>
+            Photo IA
+          </button>
         </div>
 
         {scannerSlot}
