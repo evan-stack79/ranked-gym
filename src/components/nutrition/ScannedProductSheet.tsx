@@ -35,7 +35,7 @@ interface ScannedProductSheetProps {
   /** Objectifs repas affichables (drapeau ON + cible > 0 + profil éligible). */
   hasMealTargets?: boolean
   morphology: BodyMorphology
-  meals: Array<{ mealType: MealType; calories: number; name?: string }>
+  meals: Array<{ mealType: MealType; calories: number | null; name?: string }>
   preferredMealType?: MealType | null
   /** Date du journal où l’ajout sera écrit (libellé déjà formaté). */
   dateLabel?: string
@@ -177,7 +177,7 @@ export function ScannedProductSheet({
     [targetCalories, mealType, morphology],
   )
   const used = useMemo(
-    () => foodsAlready.reduce((sum, m) => sum + m.calories, 0),
+    () => foodsAlready.reduce((sum, m) => sum + (m.calories ?? 0), 0),
     [foodsAlready],
   )
   const remaining = useMemo(

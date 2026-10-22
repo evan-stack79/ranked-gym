@@ -114,10 +114,6 @@ export function AddFoodScreenFixture() {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<FoodCategoryId>('all')
   const [name, setName] = useState('')
-  const [calories, setCalories] = useState(350)
-  const [proteinG, setProteinG] = useState<number | ''>('')
-  const [carbsG, setCarbsG] = useState<number | ''>('')
-  const [fatG, setFatG] = useState<number | ''>('')
   const [mealType, setMealType] = useState<MealType>('lunch')
   const [validated, setValidated] = useState<string | null>(null)
 
@@ -163,21 +159,12 @@ export function AddFoodScreenFixture() {
             category={category}
             onCategoryChange={setCategory}
             onValidateSelection={(selected) => {
-              setValidated(selected.map((h) => cleanupDisplayName(h.nom)).join(' · '))
+              setValidated(
+                selected.map((sel) => cleanupDisplayName(sel.hit.nom)).join(' · '),
+              )
             }}
-            onOpenScanner={() => setValidated('scanner')}
-            onToast={() => undefined}
-            onPhotoAnalyzed={() => setValidated('photo-ia')}
             name={name}
             onNameChange={setName}
-            calories={calories}
-            onCaloriesChange={setCalories}
-            proteinG={proteinG}
-            onProteinChange={setProteinG}
-            carbsG={carbsG}
-            onCarbsChange={setCarbsG}
-            fatG={fatG}
-            onFatChange={setFatG}
             mealType={mealType}
             onMealTypeChange={setMealType}
             onSubmitManual={onSubmitManual}

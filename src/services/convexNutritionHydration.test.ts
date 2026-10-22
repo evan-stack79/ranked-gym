@@ -183,6 +183,81 @@ describe('hydrateConvexNutritionJournal', () => {
     expect(saved['2026-09-22'].waterEntries).toBeUndefined()
   })
 
+  it('B3-01 : entrySource / portionLabel / pieces survivent ; kcal null reste null ; 0 reste 0 ; 150 g ok', async () => {
+    fetchConvexJournalSnapshot.mockResolvedValue({
+      meals: [
+        {
+          mealId: 'soup-null',
+          dateKey: '2026-10-15',
+          mealType: 'lunch',
+          name: 'Soupe',
+          calories: null,
+          proteinG: null,
+          carbsG: null,
+          fatG: null,
+          grams: 300,
+          portionLabel: '300 g',
+          entrySource: 'v3',
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          mealId: 'eau-0',
+          dateKey: '2026-10-15',
+          mealType: 'snack',
+          name: 'Eau',
+          calories: 0,
+          proteinG: 0,
+          carbsG: 0,
+          fatG: 0,
+          grams: 250,
+          portionLabel: '250 g',
+          entrySource: 'v3',
+          createdAt: 2,
+          updatedAt: 2,
+        },
+        {
+          mealId: 'yaourt-150',
+          dateKey: '2026-10-15',
+          mealType: 'breakfast',
+          name: 'Yaourt',
+          calories: 81,
+          proteinG: 6,
+          grams: 150,
+          pieces: 1,
+          portionLabel: '150 g',
+          entrySource: 'v3',
+          createdAt: 3,
+          updatedAt: 3,
+        },
+      ],
+      waterEntries: [],
+      dayStates: [],
+    })
+
+    const { hydrateConvexNutritionJournal } = await import('./convexNutritionHydration')
+    await hydrateConvexNutritionJournal()
+
+    const saved = saveMealJournal.mock.calls[0]?.[0]
+    const meals = saved['2026-10-15'].meals as Array<Record<string, unknown>>
+    const soup = meals.find((m) => m.id === 'soup-null')!
+    expect(soup.calories).toBeNull()
+    expect(soup.proteinG).toBeNull()
+    expect(soup.entrySource).toBe('v3')
+    expect(soup.portionLabel).toBe('300 g')
+
+    const eau = meals.find((m) => m.id === 'eau-0')!
+    expect(eau.calories).toBe(0)
+    expect(eau.entrySource).toBe('v3')
+
+    const yaourt = meals.find((m) => m.id === 'yaourt-150')!
+    expect(yaourt.grams).toBe(150)
+    expect(yaourt.pieces).toBe(1)
+    expect(yaourt.calories).toBe(81)
+    expect(yaourt.entrySource).toBe('v3')
+    expect(yaourt.portionLabel).toBe('150 g')
+  })
+
   it('tombstone hard-delete (id+deletedAt, sans dateKey) retire le repas de tous les jours', async () => {
     getMealJournal.mockReturnValue({
       '2026-09-20': {
