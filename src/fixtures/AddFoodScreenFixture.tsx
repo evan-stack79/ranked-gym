@@ -163,6 +163,15 @@ export function AddFoodScreenFixture() {
                 selected.map((sel) => cleanupDisplayName(sel.hit.nom)).join(' · '),
               )
             }}
+            onOpenScanner={() => {
+              // Fixture : ouvre le flux scan (même entrée que prod).
+              window.dispatchEvent(new CustomEvent('ranked-gym:fixture-open-scanner'))
+              setValidated('scanner:open')
+            }}
+            onToast={() => {}}
+            onPhotoAnalyzed={(result) => {
+              setValidated(`photo:${result.name}`)
+            }}
             name={name}
             onNameChange={setName}
             mealType={mealType}

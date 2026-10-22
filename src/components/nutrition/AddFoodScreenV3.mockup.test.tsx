@@ -108,5 +108,43 @@ describe('AddFoodScreenV3 — maquette (scan, roue, cartes, barre)', () => {
     expect(document.querySelector('[data-food-selection-bar]')?.textContent).toMatch(
       /1 aliment choisi/,
     )
+
+    const scan = document.querySelector('[data-food-scan-barcode]') as HTMLButtonElement
+    expect(scan.disabled).toBe(false)
+    await act(async () => {
+      scan.click()
+    })
+    expect(onOpenScanner).toHaveBeenCalledTimes(1)
+    expect(document.querySelector('[data-food-scan-photo]')).toBeNull()
+  })
+
+  it('Scan / Photo désactivés sans handlers (pas de bouton mort)', async () => {
+    await act(async () => {
+      root.render(
+        <AddFoodScreenV3
+          searchQuery="banane"
+          onSearchQueryChange={vi.fn()}
+          searchLoading={false}
+          searchError={null}
+          searchHits={[hit]}
+          category="all"
+          onCategoryChange={vi.fn()}
+          onValidateSelection={vi.fn()}
+          name=""
+          onNameChange={vi.fn()}
+          mealType="snack"
+          onMealTypeChange={vi.fn()}
+          onSubmitManual={(e) => e.preventDefault()}
+          onClose={vi.fn()}
+          forceOfflineImages
+        />,
+      )
+    })
+    expect((document.querySelector('[data-food-scan-barcode]') as HTMLButtonElement).disabled).toBe(
+      true,
+    )
+    expect((document.querySelector('[data-food-scan-photo]') as HTMLButtonElement).disabled).toBe(
+      true,
+    )
   })
 })

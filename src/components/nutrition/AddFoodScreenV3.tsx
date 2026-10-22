@@ -398,35 +398,56 @@ export function AddFoodScreenV3({
         <div className="flex gap-2" data-food-scan-actions>
           <button
             type="button"
+            data-food-scan-barcode
             onClick={() => onOpenScanner?.()}
             disabled={!onOpenScanner}
+            aria-disabled={!onOpenScanner}
             className="ios-press flex min-w-0 flex-1 items-center justify-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-[13px] font-semibold text-white disabled:opacity-40"
           >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white">
+            <span
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white ${
+                onOpenScanner ? 'bg-[#FF2B2B]' : 'bg-[#48484A]'
+              }`}
+            >
               <ScanBarcode className="h-4 w-4" aria-hidden />
             </span>
             Scan Code-Barre
           </button>
-          <MealPhotoAnalyzer
-            variant="button"
-            buttonClassName="ios-press flex w-full items-center justify-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-[13px] font-semibold text-white disabled:opacity-50"
-            iconSlot={
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white">
+          {onPhotoAnalyzed ? (
+            <MealPhotoAnalyzer
+              variant="button"
+              buttonClassName="ios-press flex w-full items-center justify-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-[13px] font-semibold text-white disabled:opacity-50"
+              iconSlot={
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white">
+                  <Camera className="h-4 w-4" aria-hidden />
+                </span>
+              }
+              onToast={onToast}
+              onAnalyzed={(result) => {
+                onPhotoAnalyzed({
+                  name: result.name,
+                  mealType: result.mealType,
+                  calories: result.calories,
+                  proteinG: result.proteines,
+                  carbsG: result.glucides,
+                  fatG: result.lipides,
+                })
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              data-food-scan-photo
+              disabled
+              aria-disabled="true"
+              className="ios-press flex min-w-0 flex-1 items-center justify-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-[13px] font-semibold text-white opacity-40"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#48484A] text-white">
                 <Camera className="h-4 w-4" aria-hidden />
               </span>
-            }
-            onToast={onToast}
-            onAnalyzed={(result) => {
-              onPhotoAnalyzed?.({
-                name: result.name,
-                mealType: result.mealType,
-                calories: result.calories,
-                proteinG: result.proteines,
-                carbsG: result.glucides,
-                fatG: result.lipides,
-              })
-            }}
-          />
+              Photo IA
+            </button>
+          )}
         </div>
 
         {scannerSlot}
