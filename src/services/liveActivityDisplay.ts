@@ -11,14 +11,29 @@ export function sessionFilledSetBars(setIndex: number, setTotal: number): number
 }
 
 /**
- * Rest header under the island / lock screen.
- * setIndex = next series (1-based). Never returns « N+1 sur N ».
+ * Rest header. `setIndex` = next series (1-based).
+ * - Unknown total (≤0) → null (hide line — never fake « … sur 1 » / « Séries terminées »).
+ * - next > total → « Séries terminées » (never « N+1 sur N » / inflated total).
+ * - else → « Série X sur Y ensuite » with X clamped to Y.
  */
-export function restNextSeriesLabel(setIndex: number, setTotal: number): string {
-  const total = Math.max(1, Math.round(setTotal))
+export function restNextSeriesLabel(
+  setIndex: number,
+  setTotal: number | null | undefined,
+): string | null {
+  if (setTotal == null || !Number.isFinite(setTotal) || setTotal <= 0) {
+    return null
+  }
+  const total = Math.round(setTotal)
   const next = Math.max(1, Math.round(setIndex))
   if (next > total) {
     return 'Séries terminées'
   }
-  return `Série ${next} sur ${total} ensuite`
+  const x = Math.min(next, total)
+  return `Série ${x} sur ${total} ensuite`
+}
+
+/** « 6 240 » — espace fine milliers (maquette pas). */
+export function formatStepsCount(steps: number): string {
+  const n = Math.max(0, Math.round(steps))
+  return n.toLocaleString('fr-FR')
 }

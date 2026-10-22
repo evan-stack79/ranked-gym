@@ -196,13 +196,19 @@ private struct ExpandedCenter: View {
                         .frame(maxWidth: 140)
                 }
             case "steps":
-                VStack(spacing: 2) {
-                    Text("Objectif : \(state.stepsGoal)")
-                        .font(.caption2)
-                        .foregroundStyle(colorGray)
-                    Text("Encore \(max(0, state.stepsGoal - state.steps)) pas")
-                        .font(.caption2)
+                VStack(spacing: 4) {
+                    Text("\(formatStepsCount(state.steps)) pas")
+                        .font(.caption.bold())
+                        .monospacedDigit()
                         .foregroundStyle(.white)
+                    Text("Encore \(max(0, state.stepsGoal - state.steps)) pas")
+                        .font(.caption2.bold())
+                        .foregroundStyle(colorGreen)
+                    if state.stepsGoal > 0 {
+                        Text("Objectif : \(formatStepsCount(state.stepsGoal))")
+                            .font(.caption2)
+                            .foregroundStyle(colorGray)
+                    }
                 }
             case "record":
                 VStack(spacing: 4) {
@@ -227,10 +233,12 @@ private struct ExpandedCenter: View {
                 }
             default:
                 VStack(spacing: 4) {
-                    Text(restNextSeriesLabel(state))
-                        .font(.caption2)
-                        .foregroundStyle(colorGray)
-                        .lineLimit(1)
+                    if !restNextSeriesLabel(state).isEmpty {
+                        Text(restNextSeriesLabel(state))
+                            .font(.caption2)
+                            .foregroundStyle(colorGray)
+                            .lineLimit(1)
+                    }
                     RestCountdownText(
                         state: state,
                         font: .system(size: 52, weight: .bold, design: .rounded),
@@ -360,9 +368,11 @@ private struct RestLockView: View {
     let state: RankedGymLiveAttributes.ContentState
     var body: some View {
         VStack(spacing: 10) {
-            Text(restNextSeriesLabel(state))
-                .font(.caption)
-                .foregroundStyle(colorGray)
+            if !restNextSeriesLabel(state).isEmpty {
+                Text(restNextSeriesLabel(state))
+                    .font(.caption)
+                    .foregroundStyle(colorGray)
+            }
             RestCountdownText(
                 state: state,
                 font: .system(size: 48, weight: .bold, design: .rounded),
@@ -458,18 +468,20 @@ private struct StepsLockView: View {
             StepsRing(state: state, line: 5, showPercent: true)
                 .frame(width: 56, height: 56)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Objectif : \(state.stepsGoal)")
-                    .font(.caption)
-                    .foregroundStyle(colorGray)
-                Text("Encore \(max(0, state.stepsGoal - state.steps)) pas")
-                    .font(.caption)
+                Text("\(formatStepsCount(state.steps)) pas")
+                    .font(.headline.bold())
+                    .monospacedDigit()
                     .foregroundStyle(.white)
+                Text("Encore \(max(0, state.stepsGoal - state.steps)) pas")
+                    .font(.caption.bold())
+                    .foregroundStyle(colorGreen)
+                if state.stepsGoal > 0 {
+                    Text("Objectif : \(formatStepsCount(state.stepsGoal))")
+                        .font(.caption)
+                        .foregroundStyle(colorGray)
+                }
             }
             Spacer(minLength: 0)
-            Text("\(state.steps)")
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(colorGreen)
         }
     }
 }
@@ -571,11 +583,12 @@ private struct StepsRing: View {
                 .stroke(colorGreen, style: StrokeStyle(lineWidth: line, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             if showPercent {
-                Text("\(stepsPercent(state))")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                Text("\(stepsPercent(state)) %")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(colorGreen)
-                    .minimumScaleFactor(0.6)
+                    .foregroundStyle(.white)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
             }
         }
     }
@@ -697,20 +710,33 @@ private func sessionFilledSetBars(setIndex: Int, setTotal: Int) -> Int {
 }
 
 private func sessionSeriesLabel(_ state: RankedGymLiveAttributes.ContentState) -> String {
-    let x = max(1, state.setIndex)
-    let y = max(x, state.setTotal)
-    return "Série \(x) sur \(y)"
+    let total = max(1, state.setTotal)
+    // Clamp — never inflate total with max(x, total) (would yield « 5 sur 5 » for total=4).
+    let x = min(max(1, state.setIndex), total)
+    return "Série \(x) sur \(total)"
 }
 
 /// « Série X sur Y ensuite » — setIndex = prochaine série (1-based).
-/// Never « N+1 sur N » after the last set (mirrored in liveActivityDisplay.ts).
+/// Mirrored by `restNextSeriesLabel` in liveActivityDisplay.ts.
+/// Unknown total (≤0) → empty (hide line). next > total → « Séries terminées ».
 private func restNextSeriesLabel(_ state: RankedGymLiveAttributes.ContentState) -> String {
-    let total = max(1, state.setTotal)
+    let total = state.setTotal
+    if total <= 0 { return "" }
     let next = max(1, state.setIndex)
     if next > total {
         return "Séries terminées"
     }
-    return "Série \(next) sur \(total) ensuite"
+    let x = min(next, total)
+    return "Série \(x) sur \(total) ensuite"
+}
+
+private func formatStepsCount(_ steps: Int) -> String {
+    let n = max(0, steps)
+    let f = NumberFormatter()
+    f.locale = Locale(identifier: "fr_FR")
+    f.numberStyle = .decimal
+    f.usesGroupingSeparator = true
+    return f.string(from: NSNumber(value: n)) ?? "\(n)"
 }
 
 /// Inner content stroke for expanded DI. System island chrome cannot be recolored.

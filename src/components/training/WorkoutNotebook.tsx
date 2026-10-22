@@ -108,6 +108,8 @@ interface WorkoutNotebookProps {
     setIndex: number
     exerciseName: string
     setLabel: string
+    /** Nombre de séries de l’exercice (Dynamic Island « Série X sur Y »). */
+    setTotal?: number
     restSec?: number
   }) => void
   /** Annule le minuteur (validation accidentelle). */
@@ -579,6 +581,7 @@ export function WorkoutNotebook({
         setIndex,
         exerciseName: ex.name.trim() || 'Exercice',
         setLabel: `S${setIndex + 1}`,
+        setTotal: ex.sets.length,
         restSec: duration,
       })
     }

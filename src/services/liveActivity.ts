@@ -240,17 +240,20 @@ export async function startRestLiveActivity(payload: {
     startDateMs: payload.startDateMs,
     paused,
   })
-  const setTotalRaw =
-    payload.setTotal != null
-      ? Math.round(payload.setTotal)
-      : (bridge.sessionSnapshot?.setTotal ?? 1)
-  const setTotal = Math.max(1, setTotalRaw)
-  // Next series (1-based). Clamp so widget never receives N+1 on a N-set exercise.
+  // Never invent setTotal=1 — 0 means unknown (widget hides series line).
+  const fromPayload =
+    payload.setTotal != null && payload.setTotal > 0 ? Math.round(payload.setTotal) : 0
+  const fromSession =
+    bridge.sessionSnapshot?.setTotal != null && bridge.sessionSnapshot.setTotal > 0
+      ? Math.round(bridge.sessionSnapshot.setTotal)
+      : 0
+  const setTotal = fromPayload > 0 ? fromPayload : fromSession
+  // Next series (1-based). Keep raw next so widget can show « Séries terminées » when next > total.
   const nextSetRaw =
     payload.setIndex != null
       ? Math.max(1, Math.round(payload.setIndex))
       : Math.max(1, (bridge.sessionSnapshot?.setIndex ?? 0) + 1)
-  const nextSet = Math.min(nextSetRaw, setTotal + 1) // +1 only signals « terminées » in widget
+  const nextSet = nextSetRaw
   const exerciseName =
     payload.exerciseName?.trim() || bridge.sessionSnapshot?.exerciseName || ''
   const body: LiveActivityPayload = {

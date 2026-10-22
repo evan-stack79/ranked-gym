@@ -41,6 +41,8 @@ export type RestTimerTarget = {
   setIndex: number
   exerciseName: string
   setLabel: string
+  /** Nombre de séries de l’exercice (pour « Série X sur Y ensuite »). */
+  setTotal?: number
 }
 
 export type RestTimerState = {
@@ -277,12 +279,17 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       const startAt = endsAt - total * 1000
       // setIndex target is 0-based just-finished → « Série X ensuite » = +2 (1-based next)
       const nextSet = target.setIndex + 2
+      const setTotal =
+        target.setTotal != null && target.setTotal > 0
+          ? Math.round(target.setTotal)
+          : undefined
       void startRestLiveActivity({
         remainingSec: total,
         totalSec: total,
         startDateMs: startAt,
         endDateMs: endsAt,
         setIndex: nextSet,
+        setTotal,
         exerciseName: target.exerciseName,
         subtitle: `${target.exerciseName} · ${target.setLabel}`,
       })
@@ -534,6 +541,10 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       endDateMs: snap.paused ? 0 : endsAtRef.current,
       paused: snap.paused,
       setIndex: snap.target.setIndex + 2,
+      setTotal:
+        snap.target.setTotal != null && snap.target.setTotal > 0
+          ? Math.round(snap.target.setTotal)
+          : undefined,
       exerciseName: snap.target.exerciseName,
       subtitle: `${snap.target.exerciseName} · ${snap.target.setLabel}`,
     })
