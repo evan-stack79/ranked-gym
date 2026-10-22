@@ -36,11 +36,18 @@ import {
   stripMealsFromBackupPayload,
   stripMealsFromJournalJson,
 } from './lib/stripJournalMeals'
+import {
+  buildOffSearchUrl,
+  fetchOffSearchJson,
+  OFF_SEARCH_PAGE_SIZE,
+  OFF_SEARCH_RETURN_LIMIT,
+  OFF_SEARCH_TIMEOUT_MS,
+  pickOffSearchProducts,
+} from './lib/offSearch'
 
 const NUTRITION_SCHEMA_VERSION = 1
-const DEFAULT_OFF_TIMEOUT_MS = 8_000
-const OFF_MAX_RESULTS = 20
-const OFF_USER_AGENT = 'RankedGym/1.0 (support@rankedgym.app)'
+const DEFAULT_OFF_TIMEOUT_MS = OFF_SEARCH_TIMEOUT_MS
+const OFF_MAX_RESULTS = OFF_SEARCH_RETURN_LIMIT
 
 type SessionCtx = QueryCtx | MutationCtx
 
@@ -52,6 +59,8 @@ type OffApiProduct = {
   brands?: string
   serving_size?: string
   categories_tags?: string[]
+  countries_tags?: string[]
+  unique_scans_n?: number
   image_front_small_url?: string
   image_front_url?: string
   nutriments?: {
@@ -146,24 +155,7 @@ async function findFoodRow(ctx: SessionCtx, userId: string, foodKey: string) {
 }
 
 async function fetchOffJson(url: string): Promise<unknown> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), DEFAULT_OFF_TIMEOUT_MS)
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': OFF_USER_AGENT,
-        From: 'support@rankedgym.app',
-      },
-    })
-    if (!response.ok) {
-      throw new Error(`OFF_HTTP_${response.status}`)
-    }
-    return (await response.json()) as unknown
-  } finally {
-    clearTimeout(timer)
-  }
+  return fetchOffSearchJson(url, { timeoutMs: DEFAULT_OFF_TIMEOUT_MS, retries: 1 })
 }
 
 function mapOffProduct(raw: OffApiProduct, fallbackBarcode: string) {
@@ -1247,29 +1239,26 @@ export const searchOpenFoodFacts = action({
     // Legacy : pas de quota 40/jour (contrairement à foodAdd.searchFoods).
     if (term.length < 2 && !categoryTag) return []
     const limit = Math.max(1, Math.min(OFF_MAX_RESULTS, Math.floor(args.limit ?? OFF_MAX_RESULTS)))
-    const params = new URLSearchParams()
-    params.set('action', 'process')
-    params.set('json', '1')
-    params.set('sort_by', 'unique_scans_n')
-    params.set('page_size', String(limit))
-    if (term.length >= 2) {
-      params.set('search_terms', term)
-      params.set('search_simple', '1')
+    const url = buildOffSearchUrl({
+      term,
+      categoryTag: categoryTag || null,
+      pageSize: OFF_SEARCH_PAGE_SIZE,
+    })
+    let data: { products?: OffApiProduct[] }
+    try {
+      data = (await fetchOffJson(url)) as { products?: OffApiProduct[] }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      throw new Error(`FOOD_SEARCH_NETWORK:${message}`)
     }
-    if (categoryTag) {
-      params.set('tagtype_0', 'categories')
-      params.set('tag_contains_0', 'contains')
-      params.set('tag_0', categoryTag)
-    }
-    const data = (await fetchOffJson(
-      `https://world.openfoodfacts.org/cgi/search.pl?${params.toString()}`,
-    )) as { products?: OffApiProduct[] }
     const products = Array.isArray(data.products) ? data.products : []
+    const ranked = pickOffSearchProducts(term, products, limit)
     const hits: ClientOffHit[] = []
-    for (const product of products) {
+    for (const product of ranked) {
       const mapped = mapOffProduct(product, String(product.code || product._id || ''))
       if (!mapped.nom.trim()) continue
-      hits.push(await toClientOffHit(ctx, mapped, hits.length < 6))
+      // Cache image only during search — no sequential mirror (same as V3 searchFoods).
+      hits.push(await toClientOffHit(ctx, mapped, false))
       if (hits.length >= limit) break
     }
     return hits
