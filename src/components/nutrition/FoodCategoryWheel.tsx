@@ -4,13 +4,15 @@ import {
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
 } from 'react'
+import { Apple, Cookie, CupSoda, Grid2X2, Milk, UtensilsCrossed } from 'lucide-react'
 import {
   FOOD_CATEGORIES,
   type FoodCategoryId,
 } from '../../utils/foodCategories'
 
-const ITEM_W = 78
+const ITEM_W = 72
 const FRICTION = 0.94
 const MIN_VELOCITY = 0.08
 const MAX_VELOCITY = 48
@@ -20,6 +22,27 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
+function CategoryIcon({ id, selected }: { id: FoodCategoryId; selected: boolean }): ReactNode {
+  const stroke = selected && id === 'all' ? 2.5 : 2.1
+  const cls = selected && id === 'all' ? 'h-7 w-7 text-white' : 'h-5 w-5'
+  switch (id) {
+    case 'fruits':
+      return <Apple className={cls} strokeWidth={stroke} aria-hidden />
+    case 'drinks':
+      return <CupSoda className={cls} strokeWidth={stroke} aria-hidden />
+    case 'all':
+      return <Grid2X2 className={cls} strokeWidth={stroke} aria-hidden />
+    case 'meals':
+      return <UtensilsCrossed className={cls} strokeWidth={stroke} aria-hidden />
+    case 'snacks':
+      return <Cookie className={cls} strokeWidth={stroke} aria-hidden />
+    case 'dairy':
+      return <Milk className={cls} strokeWidth={stroke} aria-hidden />
+    default:
+      return null
+  }
+}
+
 interface FoodCategoryWheelProps {
   value: FoodCategoryId
   onChange: (id: FoodCategoryId) => void
@@ -27,7 +50,7 @@ interface FoodCategoryWheelProps {
 
 /**
  * Roue catégorie en ARC horizontal (swipe + inertie).
- * Selected = plus grand + soft glow. Reduced motion = pas d’inertie / anim.
+ * Icônes rondes ; « Tout » = gros rond rouge #FF2B2B au centre.
  */
 export function FoodCategoryWheel({ value, onChange }: FoodCategoryWheelProps) {
   const offsetRef = useRef(0)
@@ -43,19 +66,16 @@ export function FoodCategoryWheel({ value, onChange }: FoodCategoryWheelProps) {
 
   const indexOf = useCallback((id: FoodCategoryId) => {
     const i = FOOD_CATEGORIES.findIndex((c) => c.id === id)
-    return i < 0 ? 0 : i
+    return i < 0 ? FOOD_CATEGORIES.findIndex((c) => c.id === 'all') : i
   }, [])
 
   const centerPad = viewportW / 2 - ITEM_W / 2
 
-  const clampOffset = useCallback(
-    (x: number) => {
-      const max = 0
-      const min = -((FOOD_CATEGORIES.length - 1) * ITEM_W)
-      return Math.min(max, Math.max(min, x))
-    },
-    [],
-  )
+  const clampOffset = useCallback((x: number) => {
+    const max = 0
+    const min = -((FOOD_CATEGORIES.length - 1) * ITEM_W)
+    return Math.min(max, Math.max(min, x))
+  }, [])
 
   const offsetForIndex = useCallback((index: number) => -index * ITEM_W, [])
 
@@ -184,7 +204,7 @@ export function FoodCategoryWheel({ value, onChange }: FoodCategoryWheelProps) {
   return (
     <div
       ref={trackRef}
-      className="relative h-[92px] w-full touch-pan-y select-none overflow-hidden"
+      className="relative h-[118px] w-full touch-pan-y select-none overflow-hidden"
       data-food-category-wheel
       role="listbox"
       aria-label="Catégories d’aliments"
@@ -194,11 +214,11 @@ export function FoodCategoryWheel({ value, onChange }: FoodCategoryWheelProps) {
       onPointerCancel={onPointerUp}
     >
       <div
-        className="pointer-events-none absolute inset-x-[-20%] bottom-0 h-[64px] rounded-[100%] border-t border-white/[0.07]"
+        className="pointer-events-none absolute inset-x-[-20%] bottom-0 h-[72px] rounded-[100%] border-t border-white/[0.07]"
         style={{
-          transform: 'translateY(36px)',
+          transform: 'translateY(40px)',
           background:
-            'radial-gradient(ellipse 55% 100% at 50% 0%, rgb(255 43 43 / 0.1) 0%, transparent 72%)',
+            'radial-gradient(ellipse 55% 100% at 50% 0%, rgb(255 43 43 / 0.12) 0%, transparent 72%)',
         }}
         aria-hidden
       />
@@ -212,9 +232,11 @@ export function FoodCategoryWheel({ value, onChange }: FoodCategoryWheelProps) {
         {FOOD_CATEGORIES.map((cat, index) => {
           const dist = Math.abs(index - selectedIndex)
           const selected = dist === 0
-          const scale = selected ? 1.2 : dist === 1 ? 0.9 : 0.76
-          const opacity = selected ? 1 : dist === 1 ? 0.52 : 0.28
-          const y = selected ? 2 : dist === 1 ? 12 : 20
+          const isAll = cat.id === 'all'
+          const scale = selected ? (isAll ? 1.18 : 1.12) : dist === 1 ? 0.88 : 0.72
+          const opacity = selected ? 1 : dist === 1 ? 0.55 : 0.3
+          const y = selected ? 0 : dist === 1 ? 10 : 18
+          const circleSize = selected && isAll ? 58 : selected ? 48 : 40
           return (
             <button
               key={cat.id}
@@ -232,26 +254,33 @@ export function FoodCategoryWheel({ value, onChange }: FoodCategoryWheelProps) {
               }}
             >
               <span
-                className={`text-[14px] font-semibold tracking-tight ${
-                  selected ? 'text-white' : 'text-[#AEAEB2]'
+                className={`flex items-center justify-center rounded-full ${
+                  selected && isAll
+                    ? 'bg-[#FF2B2B] text-white'
+                    : selected
+                      ? 'bg-white/[0.12] text-white'
+                      : 'bg-white/[0.06] text-[#AEAEB2]'
                 }`}
-                style={
-                  selected
-                    ? { textShadow: '0 0 16px rgb(255 43 43 / 0.4)' }
-                    : undefined
-                }
+                style={{
+                  width: circleSize,
+                  height: circleSize,
+                  boxShadow:
+                    selected && isAll
+                      ? '0 0 18px 2px rgb(255 43 43 / 0.45)'
+                      : selected
+                        ? '0 0 12px rgb(255 255 255 / 0.08)'
+                        : undefined,
+                }}
+              >
+                <CategoryIcon id={cat.id} selected={selected} />
+              </span>
+              <span
+                className={`mt-1.5 text-[11px] font-semibold tracking-tight ${
+                  selected ? 'text-white' : 'text-[#8E8E93]'
+                }`}
               >
                 {cat.label}
               </span>
-              {selected ? (
-                <span
-                  className="mt-1.5 h-1 w-1 rounded-full bg-[#FF2B2B]"
-                  style={{ boxShadow: '0 0 10px 2px rgb(255 43 43 / 0.5)' }}
-                  aria-hidden
-                />
-              ) : (
-                <span className="mt-1.5 h-1 w-1" aria-hidden />
-              )}
             </button>
           )
         })}

@@ -1,16 +1,12 @@
-import { FunctionsHttpError } from '@supabase/supabase-js'
-import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 import { compressMealImage } from '../utils/compressMealImage'
-import {
-  AI_UNAVAILABLE_FR,
-  sanitizeMealPhotoAiClientMessage,
-} from '../utils/geminiMealPhotoRetry'
+import { sanitizeMealPhotoAiClientMessage } from '../utils/geminiMealPhotoRetry'
 import { safeError } from '../utils/safeLog'
 import { runWithDomainBackend } from '../backend/domainBackend'
 import { isConvexDomainActive } from '../backend/adapter'
 import { api as generatedApi } from '../../convex/_generated/api'
 import { getConvex } from '../lib/convex'
 import { getConvexSessionToken } from './convexAuthService'
+import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 
 export const AI_MEAL_DAILY_LIMIT = 5
 const CONVEX_MAX_BASE64_CHARS = 900_000
@@ -44,18 +40,6 @@ export type AiUsageToday = {
   scansRemaining: number
 }
 
-type InvokePayload = {
-  error?: string
-  code?: string
-  calories?: number
-  proteines?: number
-  glucides?: number
-  lipides?: number
-  scanCount?: number
-  dailyLimit?: number
-  scansRemaining?: number
-}
-
 type ConvexAnalyzePayload =
   | {
       ok: true
@@ -83,74 +67,6 @@ function parisTodayKey(): string {
     month: '2-digit',
     day: '2-digit',
   }).format(new Date())
-}
-
-function normalizePayload(raw: unknown): InvokePayload | null {
-  if (raw == null) return null
-  if (typeof raw === 'string') {
-    try {
-      return JSON.parse(raw) as InvokePayload
-    } catch {
-      return null
-    }
-  }
-  if (typeof raw === 'object') return raw as InvokePayload
-  return null
-}
-
-async function readFunctionErrorBody(error: unknown): Promise<InvokePayload | null> {
-  if (!(error instanceof FunctionsHttpError)) return null
-  try {
-    return normalizePayload(await error.context.json())
-  } catch {
-    return null
-  }
-}
-
-function friendlyInvokeMessage(error: unknown, payload: InvokePayload | null): string {
-  const httpStatus =
-    error instanceof FunctionsHttpError ? error.context.status : undefined
-
-  if (payload?.error) {
-    return sanitizeMealPhotoAiClientMessage(payload.error, {
-      httpStatus,
-      code: payload.code,
-    })
-  }
-
-  if (error instanceof FunctionsHttpError) {
-    if (error.context.status === 401) {
-      return 'Session expirée — reconnecte-toi pour analyser une photo.'
-    }
-    if (error.context.status === 429) {
-      return `Limite atteinte : ${AI_MEAL_DAILY_LIMIT} analyses photo / jour.`
-    }
-    if (error.context.status === 404) {
-      return 'Fonction analyze-meal-photo introuvable (déploiement Supabase requis).'
-    }
-    if (error.context.status >= 500) {
-      return AI_UNAVAILABLE_FR
-    }
-  }
-
-  if (error instanceof Error && error.message) {
-    if (/failed to send a request to the edge function/i.test(error.message)) {
-      return 'Impossible de joindre l’analyse IA — vérifie ta connexion.'
-    }
-    return sanitizeMealPhotoAiClientMessage(error.message, { httpStatus })
-  }
-
-  return 'Échec analyse photo.'
-}
-
-function invokeFailureSummary(error: unknown, payload: InvokePayload | null) {
-  const status =
-    error instanceof FunctionsHttpError ? error.context.status : undefined
-  return {
-    status,
-    code: payload?.code ?? null,
-    hasPayloadError: Boolean(payload?.error),
-  }
 }
 
 function normalizeConvexPayload(raw: unknown): ConvexAnalyzePayload | null {
@@ -270,114 +186,50 @@ export async function getAiMealUsageToday(userId: string): Promise<AiUsageToday>
 }
 
 /**
- * Compresse la photo puis appelle l’Edge Function `analyze-meal-photo`.
- * Technical exception during migration: AI inference provider remains Supabase Edge.
- * Durable meal data is still stored through the app nutrition journal sync layer.
+ * V3-10 — analyse Photo IA uniquement via Convex `analyzeMealPhoto`
+ * (garde âge / grossesse / allaitement serveur). Plus d’appel à l’ancienne
+ * Edge Function Supabase homonyme.
  */
 export async function analyzeMealPhoto(file: File | Blob): Promise<MealPhotoMacros> {
-  if (isConvexDomainActive()) {
-    const sessionToken = await getConvexSessionToken()
-    if (!sessionToken) {
-      throw new MealPhotoAiError('Session expirée — reconnecte-toi puis réessaie.', {
-        code: 'AUTH_REQUIRED',
-      })
-    }
-
-    const compressed = await compressMealImage(file)
-    if (compressed.base64.length > CONVEX_MAX_BASE64_CHARS) {
-      throw new MealPhotoAiError('Photo trop volumineuse — recadre puis réessaie.', {
-        code: 'IMAGE_TOO_LARGE',
-      })
-    }
-
-    let raw: unknown
-    try {
-      raw = await getConvex().action(api.mealPhotoAi.analyzeMealPhoto, {
-        sessionToken,
-        imageBase64: compressed.base64,
-        mimeType: compressed.mimeType,
-      })
-    } catch (error) {
-      safeError('[mealPhotoAi] convex action failed', error)
-      throw new MealPhotoAiError(convexActionErrorMessage(error), { code: 'ai_error' })
-    }
-
-    const payload = normalizeConvexPayload(raw)
-    if (!payload) {
-      throw new MealPhotoAiError('Réponse vide du serveur d’analyse.')
-    }
-
-    if (!payload.ok) {
-      throw new MealPhotoAiError(
-        sanitizeMealPhotoAiClientMessage(payload.error, { code: payload.code }),
-        {
-          code: payload.code,
-          scansRemaining: payload.scansRemaining,
-        },
-      )
-    }
-
-    const calories = Math.max(0, Math.round(Number(payload.calories) || 0))
-    if (calories <= 0) {
-      throw new MealPhotoAiError(
-        'Gemini n’a pas pu estimer les macros — reprends la photo (repas visible, bon éclairage).',
-        { code: 'EMPTY_MACROS', scansRemaining: payload.scansRemaining },
-      )
-    }
-
-    const scanCount = Number(payload.scanCount ?? 0)
-    const dailyLimit = Number(payload.dailyLimit ?? AI_MEAL_DAILY_LIMIT)
-    return {
-      calories,
-      proteines: Math.max(0, Math.round(Number(payload.proteines) || 0)),
-      glucides: Math.max(0, Math.round(Number(payload.glucides) || 0)),
-      lipides: Math.max(0, Math.round(Number(payload.lipides) || 0)),
-      scanCount,
-      dailyLimit,
-      scansRemaining: Number(payload.scansRemaining ?? Math.max(0, dailyLimit - scanCount)),
-    }
+  if (!isConvexDomainActive()) {
+    throw new MealPhotoAiError(
+      'Analyse photo indisponible — reconnecte-toi ou mets à jour l’app.',
+      { code: 'CONVEX_REQUIRED' },
+    )
   }
 
-  if (!isSupabaseConfigured()) {
-    throw new MealPhotoAiError('Supabase non configuré — connexion requise.')
-  }
-
-  const supabase = getSupabase()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session?.access_token) {
-    throw new MealPhotoAiError('Connecte-toi pour utiliser l’analyse photo.', { code: 'AUTH_REQUIRED' })
-  }
-
-  const compressed = await compressMealImage(file)
-
-  const { data, error } = await supabase.functions.invoke('analyze-meal-photo', {
-    body: {
-      imageBase64: compressed.base64,
-      mimeType: compressed.mimeType,
-    },
-  })
-
-  let payload = normalizePayload(data)
-
-  if (error) {
-    const errorBody = await readFunctionErrorBody(error)
-    if (errorBody) payload = { ...payload, ...errorBody }
-    safeError('[mealPhotoAi] invoke failed', invokeFailureSummary(error, payload))
-
-    throw new MealPhotoAiError(friendlyInvokeMessage(error, payload), {
-      code: payload?.code,
-      scansRemaining: payload?.scansRemaining,
+  const sessionToken = await getConvexSessionToken()
+  if (!sessionToken) {
+    throw new MealPhotoAiError('Session expirée — reconnecte-toi puis réessaie.', {
+      code: 'AUTH_REQUIRED',
     })
   }
 
+  const compressed = await compressMealImage(file)
+  if (compressed.base64.length > CONVEX_MAX_BASE64_CHARS) {
+    throw new MealPhotoAiError('Photo trop volumineuse — recadre puis réessaie.', {
+      code: 'IMAGE_TOO_LARGE',
+    })
+  }
+
+  let raw: unknown
+  try {
+    raw = await getConvex().action(api.mealPhotoAi.analyzeMealPhoto, {
+      sessionToken,
+      imageBase64: compressed.base64,
+      mimeType: compressed.mimeType,
+    })
+  } catch (error) {
+    safeError('[mealPhotoAi] convex action failed', error)
+    throw new MealPhotoAiError(convexActionErrorMessage(error), { code: 'ai_error' })
+  }
+
+  const payload = normalizeConvexPayload(raw)
   if (!payload) {
     throw new MealPhotoAiError('Réponse vide du serveur d’analyse.')
   }
 
-  if (payload.error) {
+  if (!payload.ok) {
     throw new MealPhotoAiError(
       sanitizeMealPhotoAiClientMessage(payload.error, { code: payload.code }),
       {
@@ -397,7 +249,6 @@ export async function analyzeMealPhoto(file: File | Blob): Promise<MealPhotoMacr
 
   const scanCount = Number(payload.scanCount ?? 0)
   const dailyLimit = Number(payload.dailyLimit ?? AI_MEAL_DAILY_LIMIT)
-
   return {
     calories,
     proteines: Math.max(0, Math.round(Number(payload.proteines) || 0)),
@@ -405,8 +256,6 @@ export async function analyzeMealPhoto(file: File | Blob): Promise<MealPhotoMacr
     lipides: Math.max(0, Math.round(Number(payload.lipides) || 0)),
     scanCount,
     dailyLimit,
-    scansRemaining: Number(
-      payload.scansRemaining ?? Math.max(0, dailyLimit - scanCount),
-    ),
+    scansRemaining: Number(payload.scansRemaining ?? Math.max(0, dailyLimit - scanCount)),
   }
 }

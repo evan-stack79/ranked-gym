@@ -2,6 +2,11 @@ name: Build IPA
 
 on:
   workflow_dispatch:
+    inputs:
+      enable_food_add_v3:
+        description: 'VITE_ENABLE_FOOD_ADD_V3=ON for this IPA only (test). Never Cloudflare/prod.'
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -45,6 +50,21 @@ jobs:
             echo "version=$ver" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Resolve Food Add V3 for this IPA only
+        id: food_v3
+        run: |
+          # Default OFF. ON only for: workflow_dispatch input, or PR branch test/ipa-119-120-121.
+          # Never written to Cloudflare; main push IPA stays OFF.
+          ON=false
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.enable_food_add_v3 }}" = "true" ]; then
+            ON=true
+          fi
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ github.head_ref }}" = "test/ipa-119-120-121" ]; then
+            ON=true
+          fi
+          echo "enabled=$ON" >> "$GITHUB_OUTPUT"
+          echo "VITE_ENABLE_FOOD_ADD_V3 for this IPA build: $ON (event=${{ github.event_name }} head_ref=${{ github.head_ref }})"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -55,16 +75,34 @@ jobs:
         run: npm ci
 
       - name: Build web assets
-        run: npm run build
+        run: |
+          set -euo pipefail
+          npm run build
+          WANT="${{ steps.food_v3.outputs.enabled }}"
+          {
+            echo "food_add_v3_ipa=$WANT"
+            echo "VITE_ENABLE_FOOD_ADD_V3_env=${VITE_ENABLE_FOOD_ADD_V3:-<unset>}"
+            echo "event=${{ github.event_name }}"
+            echo "head_ref=${{ github.head_ref }}"
+            echo "sha=${GITHUB_SHA}"
+          } | tee dist/food-add-v3-ipa-proof.txt "$RUNNER_TEMP/food-add-v3-ipa-proof.txt"
+          if [ "$WANT" = "true" ]; then
+            test "${VITE_ENABLE_FOOD_ADD_V3:-}" = "true"
+            echo "PROOF: this IPA web build baked VITE_ENABLE_FOOD_ADD_V3=true" | tee -a dist/food-add-v3-ipa-proof.txt
+          else
+            test -z "${VITE_ENABLE_FOOD_ADD_V3:-}"
+            echo "PROOF: this IPA web build has VITE_ENABLE_FOOD_ADD_V3 unset (OFF)" | tee -a dist/food-add-v3-ipa-proof.txt
+          fi
         env:
           VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL }}
           VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL }}
           VITE_ENABLE_CONVEX_AUTH: "true"
           VITE_ENABLE_CONVEX_PRIMARY: "true"
+          # Empty when OFF so Vite default (absent) remains false — never force "false" string quirks.
+          VITE_ENABLE_FOOD_ADD_V3: ${{ steps.food_v3.outputs.enabled == 'true' && 'true' || '' }}
 
       - name: Sync Capacitor iOS
         run: npx cap sync ios
-
       - name: Show Xcode version
         run: xcodebuild -version
 
@@ -137,5 +175,13 @@ jobs:
         with:
           name: ranked-gym-ios-ipa
           path: ${{ steps.package.outputs.ipa_path }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Food Add V3 IPA proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: food-add-v3-ipa-proof
+          path: ${{ runner.temp }}/food-add-v3-ipa-proof.txt
           if-no-files-found: error
           retention-days: 14

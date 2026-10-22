@@ -129,13 +129,15 @@ describe('AddFoodScreenV3 — règles produit', () => {
     expect(manualText).not.toContain('Lipides')
     expect(manualText).toContain('Quantité (g)')
 
-    // Cartes : image dans le flux (pas absolute overlapping), portion non truncatée.
+    // Cartes maquette : photo haute + portion grise (pas pastille / truncate).
     const card = document.querySelector('[data-food-card]') as HTMLElement
     expect(card).toBeTruthy()
-    expect(card.className).not.toMatch(/\brelative\b/)
-    const portion = card.querySelector('[data-portion-pill]') as HTMLElement
+    expect(card.querySelector('[data-portion-pill]')).toBeNull()
+    const portion = card.querySelector('[data-portion-label]') as HTMLElement
+    expect(portion).toBeTruthy()
     expect(portion.className).toMatch(/whitespace-normal/)
     expect(portion.className).not.toMatch(/\btruncate\b/)
+    expect(portion.className).toMatch(/text-\[#8E8E93\]/)
 
     await act(async () => {
       root.unmount()

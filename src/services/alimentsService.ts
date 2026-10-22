@@ -63,7 +63,11 @@ export interface PersonalFoodItem {
   lastSelectedAt: number
 }
 
-const SEARCH_PAGE_SIZE = 20
+const SEARCH_PAGE_SIZE = 40
+
+/** Message FR — erreur réseau / serveur, jamais « 0 résultat ». */
+export const FOOD_SEARCH_NETWORK_ERROR_MSG =
+  'Connexion difficile. Réessaie dans un instant.' as const
 
 function mapCloudProduct(
   product: OpenFoodFactsProductCloud | {
@@ -145,7 +149,27 @@ export function mapAccessError(error: unknown): Error | null {
   ) {
     return new Error('Ajout d’aliment indisponible pour ce compte.')
   }
+  if (
+    code === 'FOOD_SEARCH_NETWORK' ||
+    code.includes('FOOD_SEARCH_NETWORK') ||
+    messageLooksLikeNetworkFailure(code)
+  ) {
+    return new Error(FOOD_SEARCH_NETWORK_ERROR_MSG)
+  }
   return null
+}
+
+function messageLooksLikeNetworkFailure(text: string): boolean {
+  const lower = text.toLowerCase()
+  return (
+    lower.includes('failed to fetch') ||
+    lower.includes('network') ||
+    lower.includes('timeout') ||
+    lower.includes('aborted') ||
+    lower.includes('off_http_5') ||
+    lower.includes('econnreset') ||
+    lower.includes('etimedout')
+  )
 }
 
 /** Mappe FOOD_ADD_QUANTITY_INVALID → message FR exact (jamais le code brut). */
@@ -258,7 +282,7 @@ export async function searchOpenFoodFacts(
     return listCachedFoods({ term: searchTerm, categoryTag, limit: SEARCH_PAGE_SIZE })
   }
 
-  // v3 : action searchFoods (mirror + quota 40/jour).
+  // v3 : action searchFoods (quota 40/jour) — pas de miroir image bloquant.
   if (isFoodAddV3Enabled()) {
     try {
       const { hits } = await searchFoodsV3ViaConvex({
@@ -268,13 +292,19 @@ export async function searchOpenFoodFacts(
       })
       if (signal?.aborted) return []
       const mapped = hits.map(mapCloudProduct)
-      void rememberFoodHits(mapped)
+      // Jamais cacher une liste vide (erreur ou vrai zéro) — rememberFoodHits ignore déjà [].
+      if (mapped.length > 0) void rememberFoodHits(mapped)
       return mapped
     } catch (error) {
       if (signal?.aborted) return []
       const access = mapAccessError(error)
       if (access) throw access
-      safeWarn('[aliments] Convex search failed, fallback offline cache', error)
+      // En ligne : message réseau clair — jamais « 0 résultat » via cache vide.
+      if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+        safeWarn('[aliments] Convex search failed (online)', error)
+        throw new Error(FOOD_SEARCH_NETWORK_ERROR_MSG)
+      }
+      safeWarn('[aliments] Convex search failed, offline cache', error)
       return listCachedFoods({ term: searchTerm, categoryTag, limit: SEARCH_PAGE_SIZE })
     }
   }
@@ -294,7 +324,7 @@ export async function searchOpenFoodFacts(
       if (!merged.has(key)) merged.set(key, hit)
       if (merged.size >= SEARCH_PAGE_SIZE) {
         const result = Array.from(merged.values())
-        void rememberFoodHits(result)
+        if (result.length > 0) void rememberFoodHits(result)
         return result
       }
     }
@@ -304,13 +334,17 @@ export async function searchOpenFoodFacts(
       if (merged.size >= SEARCH_PAGE_SIZE) break
     }
     const result = Array.from(merged.values())
-    void rememberFoodHits(result)
+    if (result.length > 0) void rememberFoodHits(result)
     return result
   } catch (error) {
     if (signal?.aborted) return []
     const access = mapAccessError(error)
     if (access) throw access
-    safeWarn('[aliments] convex OFF search failed, fallback offline cache', error)
+    if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+      safeWarn('[aliments] convex OFF search failed (online)', error)
+      throw new Error(FOOD_SEARCH_NETWORK_ERROR_MSG)
+    }
+    safeWarn('[aliments] convex OFF search failed, offline cache', error)
     return listCachedFoods({ term: searchTerm, categoryTag, limit: SEARCH_PAGE_SIZE })
   }
 }

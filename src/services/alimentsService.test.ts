@@ -116,18 +116,17 @@ describe('alimentsService Convex primary migration', () => {
     expect(product.proteines).toBe(10)
   })
 
-  it('never calls world.openfoodfacts.org when Convex search fails (cache only)', async () => {
+  it('never calls world.openfoodfacts.org when Convex search fails (online → message, pas 0)', async () => {
     isConvexDomainActive.mockReturnValue(true)
     searchOpenFoodFactsViaConvex.mockRejectedValue(new Error('convex unavailable'))
     listConvexFoodCatalog.mockRejectedValue(new Error('convex unavailable'))
 
     const fetchSpy = vi.fn()
     vi.stubGlobal('fetch', fetchSpy)
+    vi.stubGlobal('navigator', { onLine: true })
 
-    const { searchOpenFoodFacts } = await import('./alimentsService')
-    const hits = await searchOpenFoodFacts('riz')
-
-    expect(hits).toEqual([])
+    const { searchOpenFoodFacts, FOOD_SEARCH_NETWORK_ERROR_MSG } = await import('./alimentsService')
+    await expect(searchOpenFoodFacts('riz')).rejects.toThrow(FOOD_SEARCH_NETWORK_ERROR_MSG)
     expect(fetchSpy).not.toHaveBeenCalled()
     expect(safeWarn).toHaveBeenCalled()
   })
