@@ -64,7 +64,7 @@ async function openQuantityStep(root: ReturnType<typeof createRoot>, host: HTMLE
   })
   void host
   const choose = document.querySelector(
-    '[data-food-card] button[aria-pressed="false"]',
+    '[data-food-card][aria-pressed="false"]',
   ) as HTMLButtonElement
   await act(async () => {
     choose.click()
@@ -213,7 +213,7 @@ describe('AddFoodScreenV3 — limites quantité (B111-04/05/06)', () => {
       )
     })
     const choose = document.querySelector(
-      '[data-food-card] button[aria-pressed="false"]',
+      '[data-food-card][aria-pressed="false"]',
     ) as HTMLButtonElement
     await act(async () => {
       choose.click()
@@ -329,7 +329,7 @@ describe('AddFoodScreenV3 — limites quantité (B111-04/05/06)', () => {
       )
     })
     await act(async () => {
-      ;(document.querySelector('[data-food-card] button[aria-pressed="false"]') as HTMLButtonElement).click()
+      ;(document.querySelector('[data-food-card][aria-pressed="false"]') as HTMLButtonElement).click()
     })
     await act(async () => {
       ;(
@@ -527,7 +527,7 @@ describe('AddFoodScreenV3 — limites quantité (B111-04/05/06)', () => {
       )
     })
     await act(async () => {
-      ;(document.querySelector('[data-food-card] button[aria-pressed="false"]') as HTMLButtonElement).click()
+      ;(document.querySelector('[data-food-card][aria-pressed="false"]') as HTMLButtonElement).click()
     })
     await act(async () => {
       ;(

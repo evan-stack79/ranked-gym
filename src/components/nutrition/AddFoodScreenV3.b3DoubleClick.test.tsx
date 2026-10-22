@@ -66,7 +66,7 @@ describe('AddFoodScreenV3 — B3-05 double clic Valider', () => {
     })
 
     const choose = document.querySelector(
-      '[data-food-card] button[aria-pressed="false"]',
+      '[data-food-card][aria-pressed="false"]',
     ) as HTMLButtonElement
     await act(async () => {
       choose.click()

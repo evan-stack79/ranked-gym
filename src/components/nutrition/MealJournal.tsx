@@ -703,6 +703,30 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
           category={foodCategory}
           onCategoryChange={setFoodCategory}
           onValidateSelection={handleValidateFoodSelection}
+          onOpenScanner={() => openScanner()}
+          scannerSlot={
+            scannerOpen ? (
+              <BarcodeScanner
+                open={scannerOpen}
+                onClose={() => setScannerOpen(false)}
+                onProduct={handleScannedProduct}
+              />
+            ) : null
+          }
+          onToast={showToast}
+          onPhotoAnalyzed={(result) => {
+            const journal = addMealToToday({
+              name: result.name,
+              mealType: result.mealType,
+              calories: result.calories,
+              proteinG: result.proteinG,
+              carbsG: result.carbsG,
+              fatG: result.fatG,
+            })
+            setMeals(journal.meals)
+            resetForm()
+            showToast('Repas ajouté depuis la photo.')
+          }}
           name={name}
           onNameChange={setName}
           mealType={mealType}

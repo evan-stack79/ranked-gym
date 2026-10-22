@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Search, WifiOff, X } from 'lucide-react'
+import { Camera, ScanBarcode, Search, WifiOff, X } from 'lucide-react'
 import type { MealType } from '../../types/nutrition'
 import { MEAL_TYPE_LABELS } from '../../utils/calories'
 import type { OpenFoodFactsSearchHit } from '../../services/alimentsService'
@@ -21,6 +21,7 @@ import {
 import { FoodCategoryWheel } from './FoodCategoryWheel'
 import { FoodProductCard } from './FoodProductCard'
 import { FoodSelectionBar } from './FoodSelectionBar'
+import { MealPhotoAnalyzer } from './MealPhotoAnalyzer'
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -83,7 +84,7 @@ interface AddFoodScreenProps {
   onCategoryChange: (id: FoodCategoryId) => void
   /** Ajoute les aliments choisis après saisie de quantité. */
   onValidateSelection: (items: FoodAddV3Selection[]) => void
-  /** Conservé pour compat props ; court = recherche seule (non affiché). */
+  /** Scan code-barres (maquette V3 — pastille rouge + icône). */
   onOpenScanner?: () => void
   scannerSlot?: ReactNode
   onToast?: (message: string, variant?: 'success' | 'error') => void
@@ -117,8 +118,8 @@ interface AddFoodScreenProps {
 }
 
 /**
- * Plein écran « Ajouter un aliment » v3 court — recherche seule.
- * Pas de scanner / photo. Pas de kcal / macros à l’écran.
+ * Plein écran « Ajouter un aliment » v3 (maquette) :
+ * recherche + Scan / Photo IA + roue ARC + cartes photo. Pas de kcal à l’écran.
  */
 export function AddFoodScreenV3({
   searchQuery,
@@ -129,6 +130,10 @@ export function AddFoodScreenV3({
   category,
   onCategoryChange,
   onValidateSelection,
+  onOpenScanner,
+  scannerSlot,
+  onToast,
+  onPhotoAnalyzed,
   name,
   onNameChange,
   mealType,
@@ -390,6 +395,42 @@ export function AddFoodScreenV3({
           />
         </label>
 
+        <div className="flex gap-2" data-food-scan-actions>
+          <button
+            type="button"
+            onClick={() => onOpenScanner?.()}
+            disabled={!onOpenScanner}
+            className="ios-press flex min-w-0 flex-1 items-center justify-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-[13px] font-semibold text-white disabled:opacity-40"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white">
+              <ScanBarcode className="h-4 w-4" aria-hidden />
+            </span>
+            Scan Code-Barre
+          </button>
+          <MealPhotoAnalyzer
+            variant="button"
+            buttonClassName="ios-press flex w-full items-center justify-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-[13px] font-semibold text-white disabled:opacity-50"
+            iconSlot={
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white">
+                <Camera className="h-4 w-4" aria-hidden />
+              </span>
+            }
+            onToast={onToast}
+            onAnalyzed={(result) => {
+              onPhotoAnalyzed?.({
+                name: result.name,
+                mealType: result.mealType,
+                calories: result.calories,
+                proteinG: result.proteines,
+                carbsG: result.glucides,
+                fatG: result.lipides,
+              })
+            }}
+          />
+        </div>
+
+        {scannerSlot}
+
         {!networkOk ? (
           <p
             data-food-offline-banner
@@ -443,7 +484,7 @@ export function AddFoodScreenV3({
 
           {filteredHits.length > 0 ? (
             <ul
-              className="grid grid-cols-2 gap-x-3 gap-y-3 pt-2"
+              className="grid grid-cols-2 gap-x-3 gap-y-3.5 pt-2"
               role="listbox"
               aria-label="Résultats Open Food Facts"
               aria-multiselectable="true"
