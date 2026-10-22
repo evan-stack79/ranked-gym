@@ -95,6 +95,7 @@ import {
   buildFoodNutritionSnapshot,
   mealEntryFromSnapshot,
 } from '../../utils/foodJournalSnapshot'
+import { computeLocalMealNutritionFromOffHit } from '../../utils/foodAddMealNutrition'
 
 type DashboardToast = {
   message: string
@@ -428,6 +429,13 @@ export function NutritionDashboard({
         // PC-07 : mealId fourni par l’écran (une fois), pas regeneré ici.
         const mealId = sel.mealId || crypto.randomUUID()
         const selectionEventId = sel.selectionEventId || crypto.randomUUID()
+        // V3-01 : même échelle que le serveur (grams/pièces choisis), jamais /100 g brut.
+        const v3Scaled = foodAddV3
+          ? computeLocalMealNutritionFromOffHit(hit, {
+              grams: sel.unit === 'pieces' ? undefined : (sel.grams ?? snapshot.grams),
+              pieces: sel.pieces,
+            })
+          : null
         const entry = {
           ...mealEntryFromSnapshot(snapshot, type),
           id: mealId,
@@ -437,26 +445,10 @@ export function NutritionDashboard({
           entrySource: foodAddV3 ? ('v3' as const) : undefined,
           selectionEventId: foodAddV3 ? selectionEventId : undefined,
           // V3 : null si inconnu (jamais || 0). OFF : legacy inchangé.
-          calories: foodAddV3
-            ? sel.hit.calories == null
-              ? null
-              : snapshot.calories
-            : snapshot.calories,
-          proteinG: foodAddV3
-            ? sel.hit.proteines == null
-              ? null
-              : snapshot.proteinG
-            : snapshot.proteinG,
-          carbsG: foodAddV3
-            ? sel.hit.glucides == null
-              ? null
-              : snapshot.carbsG
-            : snapshot.carbsG,
-          fatG: foodAddV3
-            ? sel.hit.lipides == null
-              ? null
-              : snapshot.fatG
-            : snapshot.fatG,
+          calories: foodAddV3 ? v3Scaled!.calories : snapshot.calories,
+          proteinG: foodAddV3 ? v3Scaled!.proteinG : snapshot.proteinG,
+          carbsG: foodAddV3 ? v3Scaled!.carbsG : snapshot.carbsG,
+          fatG: foodAddV3 ? v3Scaled!.fatG : snapshot.fatG,
         }
 
         // B111-14 / PC-06 : V3 en ligne — serveur d’abord ; refus → rien en local.
