@@ -7,6 +7,8 @@ import {
   formatPiecesCountLabel,
 } from '../../../convex/lib/foodAddQuantity'
 import { BlurInText, StaticKcalNumber } from '../motion'
+import { resolveFoodIconCategory } from '../../utils/foodIconCategory'
+import { FoodCategoryIcon } from './FoodCategoryIcon'
 
 const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -192,6 +194,17 @@ export function NutritionDayMealsCard({
                               className="ios-press flex w-full min-h-11 items-start gap-2 rounded-xl bg-white/[0.03] px-3 py-2.5 text-left"
                               aria-label={`Modifier ${meal.name}`}
                             >
+                              {hideNutritionNumbers ? (
+                                <FoodCategoryIcon
+                                  category={
+                                    meal.foodIconCategory ??
+                                    resolveFoodIconCategory(meal.categoriesTags)
+                                  }
+                                  size={36}
+                                  label={meal.name}
+                                  className="mt-0.5 shrink-0"
+                                />
+                              ) : null}
                               <span className="min-w-0 flex-1">
                                 <span className="block truncate text-[14px] font-semibold text-white">
                                   {meal.name}

@@ -15,6 +15,7 @@ import {
 import { getNutritionTarget, hasMealTargets } from '../../services/nutritionActivity'
 import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
 import { isFoodAddV3Enabled } from '../../backend/foodAddV3FeatureFlag'
+import { resolveFoodIconCategory } from '../../utils/foodIconCategory'
 import {
   canAccessFoodAdd,
   canAccessFoodAddV3,
@@ -463,6 +464,9 @@ export function NutritionDashboard({
           proteinG: foodAddV3 ? v3Scaled!.proteinG : snapshot.proteinG,
           carbsG: foodAddV3 ? v3Scaled!.carbsG : snapshot.carbsG,
           fatG: foodAddV3 ? v3Scaled!.fatG : snapshot.fatG,
+          foodIconCategory:
+            hit.foodIconCategory ?? resolveFoodIconCategory(hit.categoriesTags),
+          categoriesTags: hit.categoriesTags,
         }
 
         // B111-14 / PC-06 : V3 en ligne — serveur d’abord ; refus → rien en local.

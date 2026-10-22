@@ -1,7 +1,8 @@
 import { Check } from 'lucide-react'
 import type { OpenFoodFactsSearchHit } from '../../services/alimentsService'
 import { cleanupFoodName } from '../../utils/foodDisplay'
-import { OffProductImage } from './OffProductImage'
+import { resolveFoodIconCategory } from '../../utils/foodIconCategory'
+import { FoodCategoryIcon } from './FoodCategoryIcon'
 
 interface FoodSelectionBarProps {
   selected: OpenFoodFactsSearchHit[]
@@ -12,13 +13,12 @@ interface FoodSelectionBarProps {
 }
 
 /**
- * Barre flottante verre : « N aliments choisis » + miniatures + valider rouge.
- * Pas de total kcal.
+ * Barre flottante verre : « N aliments choisis » + miniatures icône + valider rouge.
+ * Pas de total kcal. Pas de photo OFF.
  */
 export function FoodSelectionBar({
   selected,
   onValidate,
-  forceOfflineImages = false,
   disabled = false,
 }: FoodSelectionBarProps) {
   if (selected.length === 0) return null
@@ -45,13 +45,15 @@ export function FoodSelectionBar({
             {thumbs.map((hit) => (
               <div
                 key={`${hit.barcode}-${hit.nom}`}
-                className="overflow-hidden rounded-full border border-[#1C1C1E] bg-[#2C2C2E]"
+                className="overflow-hidden rounded-full border border-[#1C1C1E]"
               >
-                <OffProductImage
-                  src={hit.imageUrl}
-                  alt={cleanupFoodName(hit.nom)}
+                <FoodCategoryIcon
+                  category={
+                    hit.foodIconCategory ?? resolveFoodIconCategory(hit.categoriesTags)
+                  }
                   size={28}
-                  forceFallback={forceOfflineImages}
+                  className="!rounded-full"
+                  label={cleanupFoodName(hit.nom)}
                 />
               </div>
             ))}

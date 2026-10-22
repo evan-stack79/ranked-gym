@@ -36,7 +36,7 @@ export interface OpenFoodFactsProduct {
   servingSize?: string | null
   /** categories_tags OFF (filtre roue). */
   categoriesTags?: string[]
-  provenance: 'open_food_facts'
+  provenance: 'open_food_facts' | 'ciqual'
   fetchedAt: number
 }
 
@@ -44,6 +44,8 @@ export interface OpenFoodFactsSearchHit extends OpenFoodFactsProduct {
   brands: string
   foodKey?: string
   isFavorite?: boolean
+  /** Icône V3 (Ciqual / mapping OFF). */
+  foodIconCategory?: import('../utils/foodIconCategory').FoodIconCategoryId
 }
 
 export interface PersonalFoodItem {

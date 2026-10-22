@@ -27,10 +27,35 @@ import {
 } from '../../../convex/lib/mealPhotoEstimateAccess'
 import { checkStoredMealCalories } from '../../../convex/lib/foodAddUpsertSanitize'
 import { computeLocalMealNutritionFromOffHit } from '../../utils/foodAddMealNutrition'
+import { isCiqualEnabled } from '../../backend/ciqualFeatureFlag'
+import {
+  CIQUAL_SOURCE_ATTRIBUTION,
+  listCiqualBaseFoods,
+  type CiqualBaseFood,
+} from '../../services/ciqualCatalog'
+import { resolveFoodIconCategory } from '../../utils/foodIconCategory'
+import { FoodCategoryIcon } from './FoodCategoryIcon'
 import { FoodCategoryWheel } from './FoodCategoryWheel'
 import { FoodProductCard } from './FoodProductCard'
 import { FoodSelectionBar } from './FoodSelectionBar'
 import { MealPhotoAnalyzer } from './MealPhotoAnalyzer'
+
+function ciqualToSearchHit(food: CiqualBaseFood): OpenFoodFactsSearchHit {
+  return {
+    barcode: food.barcode,
+    nom: food.nom,
+    brands: '',
+    calories: food.calories,
+    proteines: null,
+    glucides: null,
+    lipides: null,
+    servingSize: null,
+    categoriesTags: food.categoriesTags,
+    foodIconCategory: food.foodIconCategory,
+    provenance: 'ciqual',
+    fetchedAt: food.fetchedAt,
+  }
+}
 
 export { MEAL_KCAL_ABOVE_MAX_MSG, PHOTO_IA_ESTIMATE_LABEL }
 
@@ -207,11 +232,36 @@ export function AddFoodScreenV3({
     return searchHits.filter((hit) => hitMatchesFoodCategory(category, hit.categoriesTags))
   }, [searchHits, category])
 
+  /** Aliments de base Ciqual — au-dessus des marques OFF ; flag OFF → []. */
+  const ciqualHits = useMemo(() => {
+    if (!isCiqualEnabled()) return [] as OpenFoodFactsSearchHit[]
+    const term = searchQuery.trim()
+    // Browse catégorie sans texte : pas de dump Ciqual complet.
+    if (!term && category === 'all') return []
+    const rows = listCiqualBaseFoods({
+      term: term.length >= 2 ? term : '',
+      limit: 24,
+    })
+    let hits = rows.map(ciqualToSearchHit)
+    if (category !== 'all') {
+      hits = hits.filter((hit) => hitMatchesFoodCategory(category, hit.categoriesTags))
+    }
+    // Sans terme mais catégorie : petit échantillon filtré.
+    if (!term && category !== 'all') {
+      hits = listCiqualBaseFoods({ term: '', limit: 80 })
+        .map(ciqualToSearchHit)
+        .filter((hit) => hitMatchesFoodCategory(category, hit.categoriesTags))
+        .slice(0, 24)
+    }
+    return hits
+  }, [searchQuery, category])
+
   const selectedHits = useMemo(() => {
     const map = new Map(filteredHits.map((h) => [hitKey(h), h] as const))
     for (const h of searchHits) map.set(hitKey(h), h)
+    for (const h of ciqualHits) map.set(hitKey(h), h)
     return selectedKeys.map((k) => map.get(k)).filter((h): h is OpenFoodFactsSearchHit => Boolean(h))
-  }, [selectedKeys, filteredHits, searchHits])
+  }, [selectedKeys, filteredHits, searchHits, ciqualHits])
 
   useEffect(() => {
     if (searchActive) setManualOpen(false)
@@ -614,7 +664,11 @@ export function AddFoodScreenV3({
             </p>
           ) : null}
 
-          {!searchLoading && !searchError && searchActive && filteredHits.length === 0 ? (
+          {!searchLoading &&
+          !searchError &&
+          searchActive &&
+          filteredHits.length === 0 &&
+          ciqualHits.length === 0 ? (
             <p
               className="py-8 text-center text-[13px] text-[#8E8E93]"
               data-food-empty-state
@@ -634,39 +688,80 @@ export function AddFoodScreenV3({
             </p>
           ) : null}
 
+          {ciqualHits.length > 0 ? (
+            <section className="pt-2" data-ciqual-section aria-label="Aliments de base">
+              <h2 className="mb-2 text-[13px] font-semibold uppercase tracking-wider text-[#AEAEB2]">
+                Aliments de base
+              </h2>
+              <ul
+                className="grid grid-cols-2 gap-x-3 gap-y-3.5"
+                role="listbox"
+                aria-label="Aliments de base Ciqual"
+                aria-multiselectable="true"
+              >
+                {ciqualHits.map((hit) => {
+                  const key = hitKey(hit)
+                  return (
+                    <li key={key}>
+                      <FoodProductCard
+                        hit={hit}
+                        selected={selectedKeys.includes(key)}
+                        onToggle={() => toggleHit(hit)}
+                        forceOfflineImages={forceOfflineImages}
+                      />
+                    </li>
+                  )
+                })}
+              </ul>
+              <p
+                className="mt-2 text-center text-[11px] leading-snug text-[#8E8E93]"
+                data-ciqual-attribution
+              >
+                {CIQUAL_SOURCE_ATTRIBUTION}
+              </p>
+            </section>
+          ) : null}
+
           {filteredHits.length > 0 ? (
-            <ul
-              className="grid grid-cols-2 gap-x-3 gap-y-3.5 pt-2"
-              role="listbox"
-              aria-label="Résultats Open Food Facts"
-              aria-multiselectable="true"
-            >
-              {filteredHits.map((hit) => {
-                const key = hitKey(hit)
-                return (
-                  <li key={key}>
-                    <FoodProductCard
-                      hit={hit}
-                      selected={selectedKeys.includes(key)}
-                      onToggle={() => toggleHit(hit)}
-                      forceOfflineImages={forceOfflineImages}
-                    />
-                  </li>
-                )
-              })}
-            </ul>
+            <section className={ciqualHits.length > 0 ? 'mt-5 pt-1' : 'pt-2'}>
+              {ciqualHits.length > 0 ? (
+                <h2 className="mb-2 text-[13px] font-semibold uppercase tracking-wider text-[#AEAEB2]">
+                  Produits de marque
+                </h2>
+              ) : null}
+              <ul
+                className="grid grid-cols-2 gap-x-3 gap-y-3.5"
+                role="listbox"
+                aria-label="Résultats Open Food Facts"
+                aria-multiselectable="true"
+              >
+                {filteredHits.map((hit) => {
+                  const key = hitKey(hit)
+                  return (
+                    <li key={key}>
+                      <FoodProductCard
+                        hit={hit}
+                        selected={selectedKeys.includes(key)}
+                        onToggle={() => toggleHit(hit)}
+                        forceOfflineImages={forceOfflineImages}
+                      />
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
           ) : null}
 
           <footer
             className="mt-8 space-y-1.5 pb-4 text-center"
             data-off-licence
-            aria-label="Licence Open Food Facts"
+            aria-label="Sources alimentaires"
           >
             <p className="text-[12px] leading-snug text-[#AEAEB2]">
               Données Open Food Facts · licence ODbL
             </p>
             <p className="text-[12px] leading-snug text-[#8E8E93]">
-              Photos : contributeurs Open Food Facts · CC BY-SA 3.0
+              Icônes Ranked Gym (pas de photos contributeurs)
             </p>
           </footer>
 
@@ -861,7 +956,18 @@ export function AddFoodScreenV3({
                     className="rounded-2xl border border-white/10 bg-black/30 p-3"
                     data-food-quantity-row
                   >
-                    <p className="truncate text-[14px] font-semibold text-white">{hit.nom}</p>
+                    <div className="flex items-center gap-2.5">
+                      <FoodCategoryIcon
+                        category={
+                          hit.foodIconCategory ?? resolveFoodIconCategory(hit.categoriesTags)
+                        }
+                        size={40}
+                        label={hit.nom}
+                      />
+                      <p className="min-w-0 flex-1 truncate text-[14px] font-semibold text-white">
+                        {hit.nom}
+                      </p>
+                    </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <button
                         type="button"

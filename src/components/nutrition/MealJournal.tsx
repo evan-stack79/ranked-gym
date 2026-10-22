@@ -33,6 +33,7 @@ import {
   type OpenFoodFactsProduct,
   type OpenFoodFactsSearchHit,
 } from '../../services/alimentsService'
+import { resolveFoodIconCategory } from '../../utils/foodIconCategory'
 import {
   foodAddQuantityUserMessage,
   formatGramsCountLabel,
@@ -329,6 +330,9 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
           proteinG: foodAddV3 ? v3Scaled!.proteinG : snapshot.proteinG,
           carbsG: foodAddV3 ? v3Scaled!.carbsG : snapshot.carbsG,
           fatG: foodAddV3 ? v3Scaled!.fatG : snapshot.fatG,
+          foodIconCategory:
+            hit.foodIconCategory ?? resolveFoodIconCategory(hit.categoriesTags),
+          categoriesTags: hit.categoriesTags,
         }
 
         if (foodAddV3 && isConvexDomainActive() && user) {

@@ -1,34 +1,36 @@
 import { Check } from 'lucide-react'
 import type { OpenFoodFactsSearchHit } from '../../services/alimentsService'
 import { cleanupFoodName, formatOffServingSize } from '../../utils/foodDisplay'
-import { OffProductImage } from './OffProductImage'
+import { resolveFoodIconCategory } from '../../utils/foodIconCategory'
+import { FoodCategoryIcon } from './FoodCategoryIcon'
 
 interface FoodProductCardProps {
   hit: OpenFoodFactsSearchHit
   selected: boolean
   onToggle: () => void
+  /** Conservé pour compat tests — les photos OFF ne s’affichent plus en V3. */
   forceOfflineImages?: boolean
 }
 
 /**
  * Carte produit 2-colonnes (maquette V3) :
- * grande photo détourée en haut, nom gras, portion grise.
- * Sélection = contour rouge + coche ronde blanche (pas de pastille / bouton +).
+ * icône catégorie (pas de photo contributeur OFF), nom gras, portion grise.
  */
 export function FoodProductCard({
   hit,
   selected,
   onToggle,
-  forceOfflineImages = false,
 }: FoodProductCardProps) {
   const name = cleanupFoodName(hit.nom)
   const portion = formatOffServingSize(hit.servingSize)
+  const iconCategory = hit.foodIconCategory ?? resolveFoodIconCategory(hit.categoriesTags)
 
   return (
     <button
       type="button"
       data-food-card
       data-selected={selected ? 'true' : 'false'}
+      data-food-icon-category={iconCategory}
       onClick={onToggle}
       aria-label={selected ? `Retirer ${name}` : `Choisir ${name}`}
       aria-pressed={selected}
@@ -38,15 +40,12 @@ export function FoodProductCard({
           : 'border-white/[0.08]'
       }`}
     >
-      <div className="relative flex h-[132px] w-full items-center justify-center bg-gradient-to-b from-[#242426] to-[#1A1A1C] px-3 pt-3">
-        <OffProductImage
-          src={hit.imageUrl}
-          alt=""
-          size={112}
-          forceFallback={forceOfflineImages}
-          barcode={hit.barcode}
-          productName={hit.nom}
-          className="!overflow-visible drop-shadow-[0_8px_16px_rgba(0,0,0,0.4)]"
+      <div className="relative flex h-[132px] w-full items-center justify-center bg-[#1A1A1C] px-3 pt-3">
+        <FoodCategoryIcon
+          category={iconCategory}
+          categoriesTags={hit.categoriesTags}
+          size={96}
+          label={name}
         />
         {selected ? (
           <span

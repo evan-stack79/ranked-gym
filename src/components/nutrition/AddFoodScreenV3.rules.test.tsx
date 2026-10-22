@@ -96,7 +96,8 @@ describe('AddFoodScreenV3 — règles produit', () => {
     expect(text).toContain('0,5 pointe (100 g)')
     expect(text).toContain('Données Open Food Facts')
     expect(text).toContain('ODbL')
-    expect(text).toContain('CC BY-SA 3.0')
+    expect(text).toContain('Icônes Ranked Gym')
+    expect(text).not.toContain('CC BY-SA 3.0')
     expect(text).toContain('Tout')
     expect(text).toContain('Fruits')
     // PC-06 : plus « Hors ligne • l'ajout marche… » — connexion requise.

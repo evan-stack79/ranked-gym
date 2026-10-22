@@ -53,17 +53,31 @@ jobs:
       - name: Resolve Food Add V3 for this IPA only
         id: food_v3
         run: |
-          # Default OFF. ON only for: workflow_dispatch input, or PR branch test/ipa-119-120-121.
+          # Default OFF. ON only for: workflow_dispatch input, or PR test branches.
           # Never written to Cloudflare; main push IPA stays OFF.
           ON=false
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.enable_food_add_v3 }}" = "true" ]; then
             ON=true
           fi
-          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ github.head_ref }}" = "test/ipa-119-120-121" ]; then
+          if [ "${{ github.event_name }}" = "pull_request" ] && {
+            [ "${{ github.head_ref }}" = "test/ipa-119-120-121" ] ||
+            [ "${{ github.head_ref }}" = "feat/food-icons-ciqual" ]
+          }; then
             ON=true
           fi
           echo "enabled=$ON" >> "$GITHUB_OUTPUT"
           echo "VITE_ENABLE_FOOD_ADD_V3 for this IPA build: $ON (event=${{ github.event_name }} head_ref=${{ github.head_ref }})"
+
+      - name: Resolve Ciqual for this IPA only
+        id: ciqual
+        run: |
+          # Default OFF. ON only on feat/food-icons-ciqual PR IPA (test app).
+          ON=false
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ github.head_ref }}" = "feat/food-icons-ciqual" ]; then
+            ON=true
+          fi
+          echo "enabled=$ON" >> "$GITHUB_OUTPUT"
+          echo "VITE_ENABLE_CIQUAL for this IPA build: $ON"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -100,6 +114,7 @@ jobs:
           VITE_ENABLE_CONVEX_PRIMARY: "true"
           # Empty when OFF so Vite default (absent) remains false — never force "false" string quirks.
           VITE_ENABLE_FOOD_ADD_V3: ${{ steps.food_v3.outputs.enabled == 'true' && 'true' || '' }}
+          VITE_ENABLE_CIQUAL: ${{ steps.ciqual.outputs.enabled == 'true' && 'true' || '' }}
 
       - name: Sync Capacitor iOS
         run: npx cap sync ios
