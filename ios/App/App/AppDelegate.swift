@@ -9,7 +9,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Local CAPBridgedPlugin types (CameraHeartRate, SecureStorage,
         // RestTimerLiveActivity) are compiled into the App target under Plugins/
-        // and auto-registered by Capacitor. Do not add a second plugin implementation.
+        // and registered in MainViewController.capacitorDidLoad() — Capacitor does
+        // not auto-register App-target plugins when using CAPBridgeViewController.
         return true
     }
 

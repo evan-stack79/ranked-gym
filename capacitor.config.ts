@@ -21,7 +21,7 @@ const config: CapacitorConfig = {
     },
   },
   ios: {
-    contentInset: 'automatic',
+    contentInset: 'never',
     // Info.plist (Capacitor sync) — Pump Check / VictoryCamera (déjà utilisés côté web)
     // NSCameraUsageDescription: Ranked Gym utilise la caméra pour ton Pump Check post-séance.
     // NSPhotoLibraryAddUsageDescription: Ranked Gym enregistre ta carte Pump Check dans ta galerie.
