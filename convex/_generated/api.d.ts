@@ -9,6 +9,7 @@
  */
 
 import type * as accountLinks from "../accountLinks.js";
+import type * as ai from "../ai.js";
 import type * as auth from "../auth.js";
 import type * as authPrivateData from "../authPrivateData.js";
 import type * as avisBeta from "../avisBeta.js";
@@ -42,6 +43,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   accountLinks: typeof accountLinks;
+  ai: typeof ai;
   auth: typeof auth;
   authPrivateData: typeof authPrivateData;
   avisBeta: typeof avisBeta;
