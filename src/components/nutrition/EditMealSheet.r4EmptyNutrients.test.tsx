@@ -1,7 +1,8 @@
 /** @vitest-environment jsdom */
 /**
- * R4-02 — V3 OFF : kcal/macros vides → null (jamais Number('')→0) ;
- * case touchée puis vidée → règles d33b724.
+ * R4-02 (ajusté R5) — V3 OFF = d33b724 :
+ * kcal obligatoires ; effacer après saisie restaure (pas de bouton gris, jamais 0 silencieux).
+ * Les envois null « repas déjà vide » restent couverts côté file (foodAdd.r4EmptyNutrientsQueue).
  */
 import { createRoot, type Root } from 'react-dom/client'
 import { act } from 'react'
@@ -17,6 +18,18 @@ const emptyMeal: MealEntry = {
   proteinG: null,
   carbsG: null,
   fatG: null,
+  grams: 200,
+  createdAt: 1,
+}
+
+const meal300: MealEntry = {
+  id: 'plat-300',
+  name: 'Plat 300',
+  mealType: 'lunch',
+  calories: 300,
+  proteinG: 10,
+  carbsG: 20,
+  fatG: 5,
   grams: 200,
   createdAt: 1,
 }
@@ -48,7 +61,7 @@ async function setLabeledInput(ariaLabel: string, value: string) {
   return input!
 }
 
-describe('EditMealSheet — R4-02 V3 OFF kcal/macros vides', () => {
+describe('EditMealSheet — R4-02 V3 OFF kcal (d33b724 / R5)', () => {
   let host: HTMLDivElement
   let root: Root
   const prevFlag = import.meta.env.VITE_ENABLE_FOOD_ADD_V3
@@ -70,7 +83,7 @@ describe('EditMealSheet — R4-02 V3 OFF kcal/macros vides', () => {
     else vi.stubEnv('VITE_ENABLE_FOOD_ADD_V3', prevFlag)
   })
 
-  it('kcal + macros vides, seul le type change → onSave envoie null (jamais 0)', async () => {
+  it('repas sans kcal → Enregistrer désactivé (d33b724), jamais envoi 0', async () => {
     const onSave = vi.fn()
     await act(async () => {
       root.render(
@@ -86,36 +99,20 @@ describe('EditMealSheet — R4-02 V3 OFF kcal/macros vides', () => {
     await flushPortal()
 
     const save = document.querySelector('[data-testid="edit-meal-save"]') as HTMLButtonElement
-    expect(save.disabled).toBe(false)
-
-    const dinner = Array.from(document.querySelectorAll('button')).find(
-      (b) => b.textContent === 'Dîner',
-    ) as HTMLButtonElement
-    await act(async () => {
-      dinner.click()
-    })
+    expect(save.disabled).toBe(true)
     await act(async () => {
       save.click()
     })
-
-    expect(onSave).toHaveBeenCalledTimes(1)
-    const patch = onSave.mock.calls[0]![1] as Partial<MealEntry>
-    expect(patch.mealType).toBe('dinner')
-    expect(patch.calories).toBeNull()
-    expect(patch.proteinG).toBeNull()
-    expect(patch.carbsG).toBeNull()
-    expect(patch.fatG).toBeNull()
-    expect(patch.calories).not.toBe(0)
-    expect(patch.proteinG).not.toBe(0)
+    expect(onSave).not.toHaveBeenCalled()
   })
 
-  it('macros vides non touchées → envoyées en null, jamais 0', async () => {
+  it('macros déjà null, kcal renseignées → onSave omet les macros (undefined), jamais 0', async () => {
     const onSave = vi.fn()
     await act(async () => {
       root.render(
         <EditMealSheet
           open
-          meal={emptyMeal}
+          meal={{ ...emptyMeal, calories: 120 }}
           onClose={vi.fn()}
           onSave={onSave}
           onDelete={vi.fn()}
@@ -129,21 +126,22 @@ describe('EditMealSheet — R4-02 V3 OFF kcal/macros vides', () => {
       save.click()
     })
     const patch = onSave.mock.calls[0]![1] as Partial<MealEntry>
-    expect(patch.proteinG).toBeNull()
-    expect(patch.carbsG).toBeNull()
-    expect(patch.fatG).toBeNull()
+    expect(patch.calories).toBe(120)
+    expect(patch.proteinG).toBeUndefined()
+    expect(patch.carbsG).toBeUndefined()
+    expect(patch.fatG).toBeUndefined()
     expect(Object.is(patch.proteinG, 0)).toBe(false)
     expect(Object.is(patch.carbsG, 0)).toBe(false)
     expect(Object.is(patch.fatG, 0)).toBe(false)
   })
 
-  it('case Calories touchée puis vidée → Enregistrer désactivé (d33b724), jamais 0 silencieux', async () => {
+  it('case Calories vidée → restaure (d33b724), Enregistrer actif, jamais 0 silencieux', async () => {
     const onSave = vi.fn()
     await act(async () => {
       root.render(
         <EditMealSheet
           open
-          meal={emptyMeal}
+          meal={meal300}
           onClose={vi.fn()}
           onSave={onSave}
           onDelete={vi.fn()}
@@ -152,17 +150,15 @@ describe('EditMealSheet — R4-02 V3 OFF kcal/macros vides', () => {
     })
     await flushPortal()
 
-    await setLabeledInput('Calories', '120')
-    let save = document.querySelector('[data-testid="edit-meal-save"]') as HTMLButtonElement
+    const input = await setLabeledInput('Calories', '')
+    expect(input.value).toBe('300')
+    const save = document.querySelector('[data-testid="edit-meal-save"]') as HTMLButtonElement
     expect(save.disabled).toBe(false)
-
-    await setLabeledInput('Calories', '')
-    save = document.querySelector('[data-testid="edit-meal-save"]') as HTMLButtonElement
-    expect(save.disabled).toBe(true)
 
     await act(async () => {
       save.click()
     })
-    expect(onSave).not.toHaveBeenCalled()
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(onSave.mock.calls[0]![1].calories).toBe(300)
   })
 })
