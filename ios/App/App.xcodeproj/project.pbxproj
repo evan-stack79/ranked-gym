@@ -16,6 +16,7 @@
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
+		D2B100022FEA0501000C03A2 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2B100012FEA0501000C03A1 /* MainViewController.swift */; };
 		B7E4A1922FEA0101000C01A2 /* CameraHeartRatePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E4A1912FEA0101000C01A1 /* CameraHeartRatePlugin.swift */; };
 		B7E4A1972FEA0301000C01B2 /* SecureStoragePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E4A1962FEA0301000C01B1 /* SecureStoragePlugin.swift */; };
 		C1A100012FEA0401000C02A1 /* RestTimerAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A100002FEA0401000C02A0 /* RestTimerAttributes.swift */; };
@@ -23,6 +24,9 @@
 		C1A100052FEA0401000C02A5 /* RestTimerAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A100002FEA0401000C02A0 /* RestTimerAttributes.swift */; };
 		C1A100072FEA0401000C02A7 /* RestTimerLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A100062FEA0401000C02A6 /* RestTimerLiveActivityWidget.swift */; };
 		C1A1000B2FEA0401000C02AB /* RestTimerLiveActivityWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C1A1000A2FEA0401000C02AA /* RestTimerLiveActivityWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		E2B200022FEB0101000D01A2 /* RestTimerSoundPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2B200012FEB0101000D01A1 /* RestTimerSoundPlugin.swift */; };
+		E2B200042FEB0101000D01A4 /* rest_timer_chime.caf in Resources */ = {isa = PBXBuildFile; fileRef = E2B200032FEB0101000D01A3 /* rest_timer_chime.caf */; };
+		E2B200072FEB0101000D01A7 /* rest_timer_silent.caf in Resources */ = {isa = PBXBuildFile; fileRef = E2B200062FEB0101000D01A6 /* rest_timer_silent.caf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -60,6 +64,7 @@
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		9582B6822FE993A50072D4E8 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		D2B100012FEA0501000C03A1 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		B7E4A1912FEA0101000C01A1 /* CameraHeartRatePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraHeartRatePlugin.swift; sourceTree = "<group>"; };
 		B7E4A1962FEA0301000C01B1 /* SecureStoragePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureStoragePlugin.swift; sourceTree = "<group>"; };
@@ -68,6 +73,9 @@
 		C1A100062FEA0401000C02A6 /* RestTimerLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerLiveActivityWidget.swift; sourceTree = "<group>"; };
 		C1A100082FEA0401000C02A8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C1A1000A2FEA0401000C02AA /* RestTimerLiveActivityWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RestTimerLiveActivityWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E2B200012FEB0101000D01A1 /* RestTimerSoundPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerSoundPlugin.swift; sourceTree = "<group>"; };
+		E2B200032FEB0101000D01A3 /* rest_timer_chime.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = rest_timer_chime.caf; sourceTree = "<group>"; };
+		E2B200062FEB0101000D01A6 /* rest_timer_silent.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = rest_timer_silent.caf; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -112,6 +120,7 @@
 			isa = PBXGroup;
 			children = (
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
+				D2B100012FEA0501000C03A1 /* MainViewController.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				B7E4A1932FEA0101000C01A3 /* Plugins */,
@@ -131,8 +140,19 @@
 				B7E4A1912FEA0101000C01A1 /* CameraHeartRatePlugin.swift */,
 				B7E4A1962FEA0301000C01B1 /* SecureStoragePlugin.swift */,
 				C1A100102FEA0401000C02B0 /* RestTimerLiveActivity */,
+				E2B200052FEB0101000D01A5 /* RestTimerSound */,
 			);
 			path = Plugins;
+			sourceTree = "<group>";
+		};
+		E2B200052FEB0101000D01A5 /* RestTimerSound */ = {
+			isa = PBXGroup;
+			children = (
+				E2B200012FEB0101000D01A1 /* RestTimerSoundPlugin.swift */,
+				E2B200032FEB0101000D01A3 /* rest_timer_chime.caf */,
+				E2B200062FEB0101000D01A6 /* rest_timer_silent.caf */,
+			);
+			path = RestTimerSound;
 			sourceTree = "<group>";
 		};
 		C1A1000F2FEA0401000C02AF /* RestTimerLiveActivityWidget */ = {
@@ -248,6 +268,8 @@
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
+				E2B200042FEB0101000D01A4 /* rest_timer_chime.caf in Resources */,
+				E2B200072FEB0101000D01A7 /* rest_timer_silent.caf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -266,10 +288,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				D2B100022FEA0501000C03A2 /* MainViewController.swift in Sources */,
 				B7E4A1922FEA0101000C01A2 /* CameraHeartRatePlugin.swift in Sources */,
 				B7E4A1972FEA0301000C01B2 /* SecureStoragePlugin.swift in Sources */,
 				C1A100012FEA0401000C02A1 /* RestTimerAttributes.swift in Sources */,
 				C1A100032FEA0401000C02A3 /* RestTimerLiveActivityPlugin.swift in Sources */,
+				E2B200022FEB0101000D01A2 /* RestTimerSoundPlugin.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
