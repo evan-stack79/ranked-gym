@@ -1,6 +1,11 @@
 import { v } from 'convex/values'
 import { api, internal } from './_generated/api'
-import { action, env, type ActionCtx } from './_generated/server'
+import { action, env, internalQuery, type ActionCtx } from './_generated/server'
+import {
+  canUseMealPhotoEstimateFromProfileJson,
+  clampMealPhotoCalories,
+  MEAL_PHOTO_ESTIMATE_BLOCKED,
+} from './lib/mealPhotoEstimateAccess'
 import {
   clientFacingFromGeminiError,
   clientFacingGeminiFailure,
@@ -91,13 +96,28 @@ function parseMacros(raw: unknown): {
   lipides: number
 } {
   const obj = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  // V3-08 — plafond 5000 kcal (même limite UI confirm / saisie manuelle).
+  const calories = clampMealPhotoCalories(obj.calories)
   return {
-    calories: toInt(obj.calories),
+    calories,
     proteines: toInt(obj.proteines ?? obj.protein ?? obj.proteinG),
     glucides: toInt(obj.glucides ?? obj.carbs ?? obj.carbsG),
     lipides: toInt(obj.lipides ?? obj.fat ?? obj.fatG),
   }
 }
+
+/** Profil nutrition stocké — jamais confiance client (V3-07). */
+export const getNutritionProfileJsonInternal = internalQuery({
+  args: { userId: v.string() },
+  returns: v.any(),
+  handler: async (ctx, args) => {
+    const nutrition = await ctx.db
+      .query('nutrition_state')
+      .withIndex('by_userId', (q) => q.eq('userId', args.userId))
+      .first()
+    return nutrition?.profileJson ?? null
+  },
+})
 
 function geminiModelCandidates(): string[] {
   const envMap = env as Record<string, string | undefined>
@@ -251,6 +271,18 @@ export const analyzeMealPhoto = action({
     const session = await ctx.runQuery(api.auth.getSession, { sessionToken: args.sessionToken })
     if (!session) {
       return failure('Session expirée — reconnecte-toi puis réessaie.', 'AUTH_REQUIRED')
+    }
+
+    // V3-07 — même règle que canUseMealPhotoEstimate (âge / grossesse / allaitement).
+    // Avant réserve quota / Gemini : 0 kcal renvoyée.
+    const profileJson = await ctx.runQuery(internal.mealPhotoAi.getNutritionProfileJsonInternal, {
+      userId: session.userId,
+    })
+    if (!canUseMealPhotoEstimateFromProfileJson(profileJson)) {
+      return failure(
+        'Estimation photo indisponible pour ce profil.',
+        MEAL_PHOTO_ESTIMATE_BLOCKED,
+      )
     }
 
     const imageBase64 = args.imageBase64.replace(/^data:[^;]+;base64,/, '').trim()

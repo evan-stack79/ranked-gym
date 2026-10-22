@@ -181,6 +181,22 @@ describe('AddFoodScreenV3 — V3-05 Photo IA', () => {
     document.body.innerHTML = ''
   })
 
+  async function openEstimate() {
+    await act(async () => {
+      ;(document.querySelector('[data-mock-meal-photo-analyzer]') as HTMLButtonElement).click()
+    })
+  }
+
+  async function setKcal(value: string) {
+    const kcal = document.querySelector('[data-photo-ia-kcal]') as HTMLInputElement
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setter?.call(kcal, value)
+      kcal.dispatchEvent(new Event('input', { bubbles: true }))
+      kcal.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+  }
+
   it('adulte : estimation affichée, labellisée, éditable, pas d’ajout avant confirm', async () => {
     const onPhotoAnalyzed = vi.fn()
     const onValidateSelection = vi.fn()
@@ -195,9 +211,7 @@ describe('AddFoodScreenV3 — V3-05 Photo IA', () => {
     expect(document.querySelector('[data-mock-meal-photo-analyzer]')).toBeTruthy()
     expect(document.querySelector('[data-food-photo-search-only]')).toBeNull()
 
-    await act(async () => {
-      ;(document.querySelector('[data-mock-meal-photo-analyzer]') as HTMLButtonElement).click()
-    })
+    await openEstimate()
 
     expect(onPhotoAnalyzed).not.toHaveBeenCalled()
     expect(onValidateSelection).not.toHaveBeenCalled()
@@ -213,17 +227,13 @@ describe('AddFoodScreenV3 — V3-05 Photo IA', () => {
     expect(kcal).toBeTruthy()
     expect(Number(kcal.value)).toBe(450)
     expect(kcal.disabled).toBe(false)
+    expect(kcal.getAttribute('max')).toBe('5000')
 
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      setter?.call(kcal, '380')
-      kcal.dispatchEvent(new Event('input', { bubbles: true }))
-      kcal.dispatchEvent(new Event('change', { bubbles: true }))
-    })
+    await setKcal('225')
 
     expect(onPhotoAnalyzed).not.toHaveBeenCalled()
     expect(Number((document.querySelector('[data-photo-ia-kcal]') as HTMLInputElement).value)).toBe(
-      380,
+      225,
     )
 
     await act(async () => {
@@ -231,9 +241,37 @@ describe('AddFoodScreenV3 — V3-05 Photo IA', () => {
     })
 
     expect(onPhotoAnalyzed).toHaveBeenCalledTimes(1)
-    expect(onPhotoAnalyzed.mock.calls[0][0].calories).toBe(380)
+    // V3-09 — macros scalées 450→225 (×0,5)
+    expect(onPhotoAnalyzed.mock.calls[0][0]).toMatchObject({
+      calories: 225,
+      proteinG: 10,
+      carbsG: 20,
+      fatG: 7.5,
+    })
     expect(onValidateSelection).not.toHaveBeenCalled()
     expect(document.querySelector('[data-photo-ia-estimate]')).toBeNull()
+  })
+
+  it('V3-08 : confirm refuse kcal > 5000 (max UI)', async () => {
+    const onPhotoAnalyzed = vi.fn()
+    await act(async () => {
+      renderScreen(root, { photoEstimateAllowed: true, onPhotoAnalyzed })
+    })
+    await openEstimate()
+
+    const kcal = document.querySelector('[data-photo-ia-kcal]') as HTMLInputElement
+    expect(kcal.max).toBe('5000')
+
+    // Saisie >5000 → clamp serveur/UI à 5000 (confirm autorisé au plafond).
+    await setKcal('6000')
+    expect(Number((document.querySelector('[data-photo-ia-kcal]') as HTMLInputElement).value)).toBe(
+      5000,
+    )
+    await act(async () => {
+      ;(document.querySelector('[data-photo-ia-confirm]') as HTMLButtonElement).click()
+    })
+    expect(onPhotoAnalyzed).toHaveBeenCalledTimes(1)
+    expect(onPhotoAnalyzed.mock.calls[0][0].calories).toBe(5000)
   })
 
   it('mineur / âge inconnu / grossesse / allaitement : recherche seulement, 0 kcal', async () => {

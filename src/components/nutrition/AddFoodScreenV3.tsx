@@ -19,6 +19,11 @@ import {
   validateFoodQuantity,
   type FoodQuantityUnit,
 } from '../../../convex/lib/foodAddQuantity'
+import {
+  MAX_MEAL_PHOTO_KCAL,
+  scaleMealPhotoMacrosForEditedKcal,
+  validateMealPhotoConfirmCalories,
+} from '../../../convex/lib/mealPhotoEstimateAccess'
 import { FoodCategoryWheel } from './FoodCategoryWheel'
 import { FoodProductCard } from './FoodProductCard'
 import { FoodSelectionBar } from './FoodSelectionBar'
@@ -132,6 +137,11 @@ interface AddFoodScreenProps {
 type PhotoIaPending = {
   name: string
   mealType: MealType
+  /** Baseline IA — macros scalées depuis ces valeurs (V3-09). */
+  baseCalories: number
+  baseProteinG: number
+  baseCarbsG: number
+  baseFatG: number
   calories: number
   proteinG: number
   carbsG: number
@@ -236,9 +246,32 @@ export function AddFoodScreenV3({
 
   const confirmPhotoEstimate = () => {
     if (!photoPending || !onPhotoAnalyzed) return
-    const calories = Math.max(0, Math.round(Number(photoPending.calories) || 0))
-    onPhotoAnalyzed({ ...photoPending, calories })
+    // V3-08 — même plafond 5000 kcal (UI + serveur).
+    const checked = validateMealPhotoConfirmCalories(photoPending.calories)
+    if (!checked.ok) return
+    onPhotoAnalyzed({
+      name: photoPending.name,
+      mealType: photoPending.mealType,
+      calories: checked.calories,
+      proteinG: photoPending.proteinG,
+      carbsG: photoPending.carbsG,
+      fatG: photoPending.fatG,
+    })
     setPhotoPending(null)
+  }
+
+  const updatePhotoEstimateCalories = (raw: number) => {
+    setPhotoPending((prev) => {
+      if (!prev) return prev
+      const scaled = scaleMealPhotoMacrosForEditedKcal({
+        baseCalories: prev.baseCalories,
+        baseProteinG: prev.baseProteinG,
+        baseCarbsG: prev.baseCarbsG,
+        baseFatG: prev.baseFatG,
+        nextCalories: raw,
+      })
+      return { ...prev, ...scaled }
+    })
   }
 
   const toggleHit = (hit: OpenFoodFactsSearchHit) => {
@@ -474,13 +507,21 @@ export function AddFoodScreenV3({
                 onToast={onToast}
                 onAnalyzed={(result) => {
                   // Jamais d’ajout auto : estimation éditable, confirmée ensuite.
+                  const calories = result.calories
+                  const proteinG = result.proteines
+                  const carbsG = result.glucides
+                  const fatG = result.lipides
                   setPhotoPending({
                     name: result.name,
                     mealType: result.mealType,
-                    calories: result.calories,
-                    proteinG: result.proteines,
-                    carbsG: result.glucides,
-                    fatG: result.lipides,
+                    baseCalories: calories,
+                    baseProteinG: proteinG,
+                    baseCarbsG: carbsG,
+                    baseFatG: fatG,
+                    calories,
+                    proteinG,
+                    carbsG,
+                    fatG,
                   })
                 }}
               />
@@ -716,13 +757,12 @@ export function AddFoodScreenV3({
                   type="number"
                   inputMode="numeric"
                   min={0}
+                  max={MAX_MEAL_PHOTO_KCAL}
                   step={1}
                   value={photoPending.calories}
                   onChange={(e) => {
                     const next = e.target.value === '' ? 0 : Number(e.target.value)
-                    setPhotoPending((prev) =>
-                      prev ? { ...prev, calories: Number.isFinite(next) ? next : 0 } : prev,
-                    )
+                    updatePhotoEstimateCalories(Number.isFinite(next) ? next : 0)
                   }}
                   className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#FF2B2B]/40"
                   data-photo-ia-kcal
@@ -733,7 +773,8 @@ export function AddFoodScreenV3({
                 type="button"
                 data-photo-ia-confirm
                 onClick={confirmPhotoEstimate}
-                className="btn-brand mt-4 w-full rounded-xl border border-white/15 py-3 text-[15px] font-semibold text-white"
+                disabled={!validateMealPhotoConfirmCalories(photoPending.calories).ok}
+                className="btn-brand mt-4 w-full rounded-xl border border-white/15 py-3 text-[15px] font-semibold text-white disabled:opacity-40"
               >
                 Confirmer l’ajout
               </button>
