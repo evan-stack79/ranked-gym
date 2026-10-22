@@ -198,7 +198,7 @@ describe('ImmersiveExerciseSession', () => {
     })
     expect(onValidate).not.toHaveBeenCalled()
 
-    // Effort 8 → validation
+    // Effort 8 → commit + validation au blur (frappe locale seule)
     await act(async () => {
       const effort = host.querySelector(
         'input[aria-label="Série 1 effort facultatif"]',
@@ -206,7 +206,14 @@ describe('ImmersiveExerciseSession', () => {
       effort.focus()
       typeInto(effort, '8')
     })
-    expect(onUpdate).toHaveBeenCalledWith('ex-1', 0, { rpe: 8 })
+    expect(onValidate).not.toHaveBeenCalled()
+    await act(async () => {
+      const effort = host.querySelector(
+        'input[aria-label="Série 1 effort facultatif"]',
+      ) as HTMLInputElement
+      effort.blur()
+    })
+    expect(onUpdate).toHaveBeenCalledWith('ex-1', 0, { rpe: 8 }, { autoValidate: false })
     expect(onValidate).toHaveBeenCalledTimes(1)
     expect(onValidate.mock.calls[0][1]).toBe(0)
   })
@@ -248,7 +255,7 @@ describe('ImmersiveExerciseSession', () => {
       effortInput.blur()
     })
 
-    expect(onUpdate).toHaveBeenCalledWith('ex-1', 0, { rpe: 7 })
+    expect(onUpdate).toHaveBeenCalledWith('ex-1', 0, { rpe: 7 }, { autoValidate: false })
     expect(host.textContent).toContain('Effort')
     expect(host.textContent).not.toContain('RPE')
     expect(host.textContent).not.toContain('Facile')
@@ -508,6 +515,10 @@ describe('ImmersiveExerciseSession', () => {
       effortInput.dispatchEvent(new Event('input', { bubbles: true }))
       effortInput.dispatchEvent(new Event('change', { bubbles: true }))
     })
+    expect(onValidate).not.toHaveBeenCalled()
+    await act(async () => {
+      effortInput.blur()
+    })
     expect(onValidate).toHaveBeenCalledTimes(1)
     expect(onValidate.mock.calls[0][1]).toBe(0)
     expect(host.querySelector('[data-recovery-timer]')).toBeTruthy()
@@ -628,6 +639,7 @@ describe('ImmersiveExerciseSession', () => {
       ) as HTMLInputElement
       effort.focus()
       typeInto(effort, '8')
+      effort.blur()
     })
     expect(host.querySelector('[data-recovery-timer]')).toBeTruthy()
     expect(persisted.exercises[0].sets[0].rpe).toBe(8)
@@ -723,7 +735,12 @@ describe('ImmersiveExerciseSession', () => {
     await act(async () => {
       typeInto(effort, '10')
     })
-    expect(onUpdate).toHaveBeenCalledWith('ex-1', 0, { rpe: 10 })
+    expect(onUpdate).not.toHaveBeenCalled()
+    expect(onValidate).not.toHaveBeenCalled()
+    await act(async () => {
+      effort.blur()
+    })
+    expect(onUpdate).toHaveBeenCalledWith('ex-1', 0, { rpe: 10 }, { autoValidate: false })
     expect(onValidate).toHaveBeenCalledTimes(1)
     expect(onValidate.mock.calls[0][1]).toBe(0)
     expect(onAddSet).not.toHaveBeenCalled()
@@ -822,6 +839,7 @@ describe('ImmersiveExerciseSession', () => {
       ) as HTMLInputElement
       effort.focus()
       typeInto(effort, '7')
+      effort.blur()
     })
     expect(onValidate).toHaveBeenCalledTimes(1)
     expect(onAddSet).not.toHaveBeenCalled()
@@ -881,6 +899,7 @@ describe('ImmersiveExerciseSession', () => {
       ) as HTMLInputElement
       effort.focus()
       typeInto(effort, '8')
+      effort.blur()
     })
     expect(onValidate).toHaveBeenCalledTimes(1)
     expect(onAddSet).not.toHaveBeenCalled()
@@ -967,6 +986,7 @@ describe('ImmersiveExerciseSession', () => {
       ) as HTMLInputElement
       effort.focus()
       typeInto(effort, '8')
+      effort.blur()
     })
     await act(async () => {
       host
