@@ -58,10 +58,12 @@ describe('V3-07 — canUseMealPhotoEstimateFromProfileJson (serveur)', () => {
 
   it('analyzeMealPhoto appelle la garde avant Gemini (contrat source)', () => {
     const source = readFileSync(new URL('../../convex/mealPhotoAi.ts', import.meta.url), 'utf8')
+    const rpcSource = readFileSync(new URL('../../convex/rpc.ts', import.meta.url), 'utf8')
     expect(source).toContain('canUseMealPhotoEstimateFromProfileJson')
     expect(source).toContain('MEAL_PHOTO_ESTIMATE_BLOCKED')
     expect(source).toContain(MEAL_PHOTO_ESTIMATE_BLOCKED)
-    expect(source).toContain('getNutritionProfileJsonInternal')
+    expect(source).toContain('internal.rpc.getNutritionProfileJsonInternal')
+    expect(rpcSource).toContain('export const getNutritionProfileJsonInternal')
     const gateIdx = source.indexOf('canUseMealPhotoEstimateFromProfileJson')
     const geminiIdx = source.indexOf('runGeminiWithRetryFallback')
     const reserveIdx = source.indexOf('reserveAiMealScanInternal')

@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 import { api, internal } from './_generated/api'
-import { action, env, internalQuery, type ActionCtx } from './_generated/server'
+import { action, env, type ActionCtx } from './_generated/server'
 import {
   canUseMealPhotoEstimateFromProfileJson,
   clampMealPhotoCalories,
@@ -105,19 +105,6 @@ function parseMacros(raw: unknown): {
     lipides: toInt(obj.lipides ?? obj.fat ?? obj.fatG),
   }
 }
-
-/** Profil nutrition stocké — jamais confiance client (V3-07). */
-export const getNutritionProfileJsonInternal = internalQuery({
-  args: { userId: v.string() },
-  returns: v.any(),
-  handler: async (ctx, args) => {
-    const nutrition = await ctx.db
-      .query('nutrition_state')
-      .withIndex('by_userId', (q) => q.eq('userId', args.userId))
-      .first()
-    return nutrition?.profileJson ?? null
-  },
-})
 
 function geminiModelCandidates(): string[] {
   const envMap = env as Record<string, string | undefined>
@@ -275,7 +262,7 @@ export const analyzeMealPhoto = action({
 
     // V3-07 — même règle que canUseMealPhotoEstimate (âge / grossesse / allaitement).
     // Avant réserve quota / Gemini : 0 kcal renvoyée.
-    const profileJson = await ctx.runQuery(internal.mealPhotoAi.getNutritionProfileJsonInternal, {
+    const profileJson = await ctx.runQuery(internal.rpc.getNutritionProfileJsonInternal, {
       userId: session.userId,
     })
     if (!canUseMealPhotoEstimateFromProfileJson(profileJson)) {
