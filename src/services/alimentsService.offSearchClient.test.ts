@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { OpenFoodFactsSearchHit } from './alimentsService'
 
 vi.mock('../backend/foodAddV3FeatureFlag', () => ({
   isFoodAddV3Enabled: () => true,
@@ -10,8 +11,8 @@ vi.mock('../backend/adapter', () => ({
 }))
 
 const searchFoodsV3ViaConvex = vi.fn()
-const rememberFoodHits = vi.fn()
-const listCachedFoods = vi.fn(() => [])
+const rememberFoodHitsSpy = vi.fn()
+const listCachedFoodsSpy = vi.fn<(...args: unknown[]) => OpenFoodFactsSearchHit[]>(() => [])
 
 vi.mock('./convexNutritionService', () => ({
   searchFoodsV3ViaConvex: (...args: unknown[]) => searchFoodsV3ViaConvex(...args),
@@ -23,17 +24,17 @@ vi.mock('./convexNutritionService', () => ({
 }))
 
 vi.mock('./foodOfflineCache', () => ({
-  rememberFoodHits: (...args: unknown[]) => rememberFoodHits(...args),
-  listCachedFoods: (...args: unknown[]) => listCachedFoods(...args),
+  rememberFoodHits: (...args: unknown[]) => rememberFoodHitsSpy(...args),
+  listCachedFoods: (...args: unknown[]) => listCachedFoodsSpy(...args),
 }))
 
 describe('alimentsService V3 — recherche OFF simulée (croissant/pain/yaourt/pomme)', () => {
   beforeEach(() => {
     vi.resetModules()
     searchFoodsV3ViaConvex.mockReset()
-    rememberFoodHits.mockReset()
-    listCachedFoods.mockReset()
-    listCachedFoods.mockReturnValue([])
+    rememberFoodHitsSpy.mockReset()
+    listCachedFoodsSpy.mockReset()
+    listCachedFoodsSpy.mockReturnValue([])
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
   })
 
@@ -41,15 +42,18 @@ describe('alimentsService V3 — recherche OFF simulée (croissant/pain/yaourt/p
     vi.unstubAllGlobals()
   })
 
-  function hit(nom: string, barcode: string) {
+  function hit(nom: string, barcode: string): OpenFoodFactsSearchHit {
     return {
       barcode,
       nom,
       brands: '',
+      calories: null,
+      proteines: null,
+      glucides: null,
+      lipides: null,
       servingSize: null,
-      portionLabel: '',
       categoriesTags: [],
-      provenance: 'open_food_facts' as const,
+      provenance: 'open_food_facts',
       fetchedAt: 1,
     }
   }
@@ -69,18 +73,24 @@ describe('alimentsService V3 — recherche OFF simulée (croissant/pain/yaourt/p
       const fetchSpy = vi.fn()
       vi.stubGlobal('fetch', fetchSpy)
       searchFoodsV3ViaConvex.mockResolvedValue({
-        hits: names.map((nom, i) => hit(nom, `${term}-${i}`)),
+        hits: names.map((nom, i) => ({
+          barcode: `${term}-${i}`,
+          nom,
+          brands: '',
+          servingSize: null,
+          portionLabel: '',
+          categoriesTags: [],
+          provenance: 'open_food_facts' as const,
+          fetchedAt: 1,
+        })),
         searchCount: 1,
         dailyLimit: 40,
       })
       const { searchOpenFoodFacts } = await import('./alimentsService')
       const hits = await searchOpenFoodFacts(term)
       expect(hits.map((h) => h.nom)).toEqual(names)
-      expect(hits[0]!.nom.toLowerCase().startsWith(term.slice(0, 4)) || hits[0]!.nom === names[0]).toBe(
-        true,
-      )
       expect(fetchSpy).not.toHaveBeenCalled()
-      expect(rememberFoodHits).toHaveBeenCalled()
+      expect(rememberFoodHitsSpy).toHaveBeenCalled()
     })
   }
 
@@ -88,13 +98,13 @@ describe('alimentsService V3 — recherche OFF simulée (croissant/pain/yaourt/p
     searchFoodsV3ViaConvex.mockRejectedValue(new Error('FOOD_SEARCH_NETWORK:OFF_HTTP_503'))
     const { searchOpenFoodFacts, FOOD_SEARCH_NETWORK_ERROR_MSG } = await import('./alimentsService')
     await expect(searchOpenFoodFacts('croissant')).rejects.toThrow(FOOD_SEARCH_NETWORK_ERROR_MSG)
-    expect(rememberFoodHits).not.toHaveBeenCalled()
-    expect(listCachedFoods).not.toHaveBeenCalled()
+    expect(rememberFoodHitsSpy).not.toHaveBeenCalled()
+    expect(listCachedFoodsSpy).not.toHaveBeenCalled()
   })
 
   it('hors ligne : repli cache (pas de faux « succès vide » inventé)', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
-    listCachedFoods.mockReturnValue([hit('Croissant cache', 'c-off')])
+    listCachedFoodsSpy.mockReturnValue([hit('Croissant cache', 'c-off')])
     const { searchOpenFoodFacts } = await import('./alimentsService')
     const hits = await searchOpenFoodFacts('croissant')
     expect(hits).toHaveLength(1)
