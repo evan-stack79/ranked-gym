@@ -204,6 +204,31 @@ export function isMinorOrUnknownAge(age: unknown): boolean {
   return age < MINOR_AGE_THRESHOLD
 }
 
+/**
+ * V3-05 — Photo IA (estimation kcal) : adultes ≥18 hors grossesse / allaitement.
+ * Mineur, âge inconnu (`isMinorOrUnknownAge`), grossesse ou allaitement → false
+ * (le bouton ouvre seulement la recherche, 0 kcal devinée).
+ */
+export function canUseMealPhotoEstimate(
+  input:
+    | SafetyProfileInput
+    | Pick<
+        CalorieProfile,
+        'age' | 'sex' | 'declaredPregnancy' | 'declaredBreastfeeding' | 'healthAnswer'
+      >
+    | null
+    | undefined,
+): boolean {
+  if (!input) return false
+  if (isMinorOrUnknownAge(input.age)) return false
+  const pb = effectivePregnancyBreastfeeding(input)
+  if (pb.pregnancy || pb.breastfeeding) return false
+  return true
+}
+
+/** Libellé obligatoire pour toute kcal estimée par Photo IA (à vérifier). */
+export const PHOTO_IA_ESTIMATE_LABEL = 'estimation IA, à vérifier' as const
+
 export function computeBmi(weightKg: number, heightCm: number): number | null {
   if (!Number.isFinite(weightKg) || !Number.isFinite(heightCm) || weightKg <= 0 || heightCm <= 0) {
     return null

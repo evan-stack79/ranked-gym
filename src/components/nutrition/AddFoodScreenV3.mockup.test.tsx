@@ -115,7 +115,7 @@ describe('AddFoodScreenV3 — maquette (scan, roue, cartes, barre)', () => {
       scan.click()
     })
     expect(onOpenScanner).toHaveBeenCalledTimes(1)
-    // Photo IA = bouton simple (focus recherche), pas MealPhotoAnalyzer.
+    // Photo IA visible (adultes → MealPhotoAnalyzer ; sinon focus recherche).
     expect(document.querySelector('[data-food-scan-photo]')).toBeTruthy()
     expect(document.querySelector('[data-food-search-loupe]')).toBeTruthy()
   })

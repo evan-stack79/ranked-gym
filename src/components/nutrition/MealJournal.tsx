@@ -67,6 +67,7 @@ import {
   canAccessFoodAddV3,
   needsAgePrompt,
 } from '../../services/foodAddAccess'
+import { canUseMealPhotoEstimate } from '../../services/nutritionSafetyRules'
 import {
   addFoodSnapshotViaConvex,
 } from '../../services/convexNutritionService'
@@ -714,6 +715,20 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
             ) : null
           }
           onToast={showToast}
+          photoEstimateAllowed={canUseMealPhotoEstimate(calorieProfile)}
+          onPhotoAnalyzed={(result) => {
+            const journal = addMealToToday({
+              name: result.name,
+              mealType: result.mealType,
+              calories: result.calories,
+              proteinG: result.proteinG,
+              carbsG: result.carbsG,
+              fatG: result.fatG,
+            })
+            setMeals(journal.meals)
+            resetForm()
+            showToast('Repas ajouté depuis la photo.')
+          }}
           name={name}
           onNameChange={setName}
           mealType={mealType}

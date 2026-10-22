@@ -10,6 +10,7 @@ import {
   type FoodCategoryId,
 } from '../../utils/foodCategories'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
+import { PHOTO_IA_ESTIMATE_LABEL } from '../../services/nutritionSafetyRules'
 import {
   foodAddQuantityUserMessage,
   formatGramsCountLabel,
@@ -21,6 +22,9 @@ import {
 import { FoodCategoryWheel } from './FoodCategoryWheel'
 import { FoodProductCard } from './FoodProductCard'
 import { FoodSelectionBar } from './FoodSelectionBar'
+import { MealPhotoAnalyzer } from './MealPhotoAnalyzer'
+
+export { PHOTO_IA_ESTIMATE_LABEL }
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -88,8 +92,8 @@ interface AddFoodScreenProps {
   scannerSlot?: ReactNode
   onToast?: (message: string, variant?: 'success' | 'error') => void
   /**
-   * @deprecated V3-05 — Photo IA ne lance plus d’analyse ; prop ignorée
-   * (conservée pour compat tests / appelsants).
+   * V3-05 — appelée seulement après confirmation utilisateur de l’estimation IA
+   * (jamais automatiquement à la fin de l’analyse).
    */
   onPhotoAnalyzed?: (result: {
     name: string
@@ -99,6 +103,11 @@ interface AddFoodScreenProps {
     carbsG: number
     fatG: number
   }) => void
+  /**
+   * V3-05 — true uniquement pour adultes ≥18 hors grossesse / allaitement
+   * (`canUseMealPhotoEstimate`). Sinon Photo IA ouvre seulement la recherche.
+   */
+  photoEstimateAllowed?: boolean
   name: string
   onNameChange: (value: string) => void
   calories?: number
@@ -120,9 +129,19 @@ interface AddFoodScreenProps {
   onManualGramsChange?: (value: number | '') => void
 }
 
+type PhotoIaPending = {
+  name: string
+  mealType: MealType
+  calories: number
+  proteinG: number
+  carbsG: number
+  fatG: number
+}
+
 /**
  * Plein écran « Ajouter un aliment » v3 (maquette) :
- * recherche + Scan / Photo IA + roue ARC + cartes photo. Pas de kcal à l’écran.
+ * recherche + Scan / Photo IA + roue ARC + cartes photo.
+ * Photo IA (adultes) : estimation éditable, confirmée par l’utilisateur.
  */
 export function AddFoodScreenV3({
   searchQuery,
@@ -135,8 +154,9 @@ export function AddFoodScreenV3({
   onValidateSelection,
   onOpenScanner,
   scannerSlot,
-  onToast: _onToast,
-  onPhotoAnalyzed: _onPhotoAnalyzed,
+  onToast,
+  onPhotoAnalyzed,
+  photoEstimateAllowed = false,
   name,
   onNameChange,
   mealType,
@@ -147,8 +167,6 @@ export function AddFoodScreenV3({
   manualGrams = '',
   onManualGramsChange,
 }: AddFoodScreenProps) {
-  void _onToast
-  void _onPhotoAnalyzed
   const [manualOpen, setManualOpen] = useState(false)
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
   const [quantityStep, setQuantityStep] = useState(false)
@@ -163,6 +181,8 @@ export function AddFoodScreenV3({
   /** B3-05 : verrou synchrone (useState seul laisse passer 2 clics même tick). */
   const submittingRef = useRef(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  /** V3-05 — estimation Photo IA en attente de confirmation (pas d’ajout auto). */
+  const [photoPending, setPhotoPending] = useState<PhotoIaPending | null>(null)
   const online = useOnlineStatus()
   // forceOfflineImages simule aussi le hors-ligne (tests empty / fixture).
   // Les tests quantité / e2e ne passent PAS forceOfflineImages.
@@ -195,6 +215,10 @@ export function AddFoodScreenV3({
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        if (photoPending) {
+          setPhotoPending(null)
+          return
+        }
         if (quantityStep) {
           setQuantityStep(false)
           return
@@ -204,7 +228,18 @@ export function AddFoodScreenV3({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, quantityStep])
+  }, [onClose, quantityStep, photoPending])
+
+  const focusSearchField = () => {
+    searchInputRef.current?.focus()
+  }
+
+  const confirmPhotoEstimate = () => {
+    if (!photoPending || !onPhotoAnalyzed) return
+    const calories = Math.max(0, Math.round(Number(photoPending.calories) || 0))
+    onPhotoAnalyzed({ ...photoPending, calories })
+    setPhotoPending(null)
+  }
 
   const toggleHit = (hit: OpenFoodFactsSearchHit) => {
     const key = hitKey(hit)
@@ -421,20 +456,49 @@ export function AddFoodScreenV3({
             </span>
             Scan Code-Barre
           </button>
-          {/* V3-05 : Photo IA = focus recherche uniquement — jamais MealPhotoAnalyzer / kcal. */}
-          <button
-            type="button"
-            data-food-scan-photo
-            onClick={() => {
-              searchInputRef.current?.focus()
-            }}
-            className="ios-press flex min-w-0 flex-1 items-center justify-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-[13px] font-semibold text-white"
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white">
-              <Camera className="h-4 w-4" aria-hidden />
-            </span>
-            Photo IA
-          </button>
+          {/*
+            V3-05 : adultes → MealPhotoAnalyzer + confirmation ;
+            mineur / âge inconnu / grossesse / allaitement → focus recherche seulement.
+          */}
+          {photoEstimateAllowed ? (
+            <div data-food-scan-photo className="min-w-0 flex-1">
+              <MealPhotoAnalyzer
+                variant="button"
+                deferAddToast
+                buttonClassName="ios-press flex w-full items-center justify-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-[13px] font-semibold text-white disabled:opacity-50"
+                iconSlot={
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white">
+                    <Camera className="h-4 w-4" aria-hidden />
+                  </span>
+                }
+                onToast={onToast}
+                onAnalyzed={(result) => {
+                  // Jamais d’ajout auto : estimation éditable, confirmée ensuite.
+                  setPhotoPending({
+                    name: result.name,
+                    mealType: result.mealType,
+                    calories: result.calories,
+                    proteinG: result.proteines,
+                    carbsG: result.glucides,
+                    fatG: result.lipides,
+                  })
+                }}
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              data-food-scan-photo
+              data-food-photo-search-only
+              onClick={focusSearchField}
+              className="ios-press flex min-w-0 flex-1 items-center justify-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-3 py-3 text-[13px] font-semibold text-white"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white">
+                <Camera className="h-4 w-4" aria-hidden />
+              </span>
+              Photo IA
+            </button>
+          )}
         </div>
 
         {scannerSlot}
@@ -617,6 +681,65 @@ export function AddFoodScreenV3({
             </div>
           ) : null}
         </div>
+
+        {photoPending ? (
+          <div
+            className="absolute inset-0 z-50 flex flex-col justify-end bg-black/70 px-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-3"
+            data-photo-ia-estimate
+            role="dialog"
+            aria-label="Estimation Photo IA"
+          >
+            <div className="rounded-3xl border border-white/12 bg-[#141416] p-4 shadow-2xl">
+              <div className="mb-3 flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[17px] font-semibold text-white">{photoPending.name}</p>
+                  <p
+                    className="mt-1 text-[12px] font-medium text-[#AEAEB2]"
+                    data-photo-ia-estimate-label
+                  >
+                    {PHOTO_IA_ESTIMATE_LABEL}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="ios-press shrink-0 text-[13px] font-semibold text-[#8E8E93]"
+                  onClick={() => setPhotoPending(null)}
+                >
+                  Annuler
+                </button>
+              </div>
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                  Calories (kcal)
+                </span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step={1}
+                  value={photoPending.calories}
+                  onChange={(e) => {
+                    const next = e.target.value === '' ? 0 : Number(e.target.value)
+                    setPhotoPending((prev) =>
+                      prev ? { ...prev, calories: Number.isFinite(next) ? next : 0 } : prev,
+                    )
+                  }}
+                  className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#FF2B2B]/40"
+                  data-photo-ia-kcal
+                  aria-label="Calories estimées, modifiables"
+                />
+              </label>
+              <button
+                type="button"
+                data-photo-ia-confirm
+                onClick={confirmPhotoEstimate}
+                className="btn-brand mt-4 w-full rounded-xl border border-white/15 py-3 text-[15px] font-semibold text-white"
+              >
+                Confirmer l’ajout
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {quantityStep ? (
           <div

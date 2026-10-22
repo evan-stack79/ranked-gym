@@ -169,6 +169,10 @@ export function AddFoodScreenFixture() {
               setValidated('scanner:open')
             }}
             onToast={() => {}}
+            photoEstimateAllowed
+            onPhotoAnalyzed={(result) => {
+              setValidated(`photo:${result.name}:${result.calories}`)
+            }}
             name={name}
             onNameChange={setName}
             mealType={mealType}

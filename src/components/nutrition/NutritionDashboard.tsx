@@ -22,7 +22,10 @@ import {
   needsAgePrompt,
 } from '../../services/foodAddAccess'
 import { AgeRequiredPrompt } from './AgeRequiredPrompt'
-import { readHealthDeclarations } from '../../services/nutritionSafetyRules'
+import {
+  canUseMealPhotoEstimate,
+  readHealthDeclarations,
+} from '../../services/nutritionSafetyRules'
 import { isConvexDomainActive } from '../../backend/adapter'
 import {
   addFoodSnapshotViaConvex,
@@ -1024,6 +1027,21 @@ export function NutritionDashboard({
             ) : null
           }
           onToast={showToast}
+          photoEstimateAllowed={canUseMealPhotoEstimate(profile)}
+          onPhotoAnalyzed={(result) => {
+            const journal = addMealToDate(selectedDateKey, {
+              name: result.name,
+              mealType: result.mealType,
+              calories: result.calories,
+              proteinG: result.proteinG,
+              carbsG: result.carbsG,
+              fatG: result.fatG,
+            })
+            setMeals(journal.meals)
+            setTick((n) => n + 1)
+            setShowForm(false)
+            showToast('Repas ajouté depuis la photo.')
+          }}
           name={name}
           onNameChange={setName}
           mealType={mealType}
