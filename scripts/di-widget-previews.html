@@ -80,9 +80,10 @@
       padding: 12px 14px;
       position: relative;
     }
-    .lock.border-red { outline: 2px solid var(--red); outline-offset: -2px; }
-    .lock.border-orange { outline: 2px solid var(--orange); outline-offset: -2px; }
-    .lock.border-gold { outline: 2px solid var(--gold); outline-offset: -2px; }
+    /* Cadres gen.py width=8px ÷ 2.11 ≈ 3.8pt — seulement 01/04/05 */
+    .border-red { outline: 3.8px solid var(--red); outline-offset: -2px; }
+    .border-orange { outline: 3.8px solid var(--orange); outline-offset: -2px; }
+    .border-gold { outline: 3.8px solid var(--gold); outline-offset: -2px; }
 
     .ring {
       width: 20px; height: 20px; border-radius: 50%;
@@ -194,8 +195,8 @@
       <div class="minimal shot-root" data-shot="rest-minimal">
         <div class="ring" style="--p:0.6;--ring-color:var(--red)"></div>
       </div>`);
-    add('rest-expanded', '01 · repos étendu (DI, sans cadre)', `
-      <div class="expanded shot-root" data-shot="rest-expanded">
+    add('rest-expanded', '01 · repos étendu (cadre rouge)', `
+      <div class="expanded border-red shot-root" data-shot="rest-expanded">
         <div class="expanded-rest-grid">
           <div class="btn-circle btn-pause">❚❚</div>
           <div class="col">
@@ -304,8 +305,8 @@
       </div>`);
     add('record-minimal', '04 · record minimal', `
       <div class="minimal shot-root" data-shot="record-minimal"><span class="pr">PR</span></div>`);
-    add('record-expanded', '04 · record étendu', `
-      <div class="expanded shot-root" data-shot="record-expanded">
+    add('record-expanded', '04 · record étendu (cadre orange)', `
+      <div class="expanded border-orange shot-root" data-shot="record-expanded">
         <div class="row" style="gap:14px;width:100%">
           <div class="pr-circle">PR</div>
           <div class="col left" style="gap:2px">
@@ -334,8 +335,8 @@
       </div>`);
     add('rank-minimal', '05 · rang minimal', `
       <div class="minimal shot-root" data-shot="rank-minimal"><div class="diamond"></div></div>`);
-    add('rank-expanded', '05 · rang étendu', `
-      <div class="expanded shot-root" data-shot="rank-expanded">
+    add('rank-expanded', '05 · rang étendu (cadre or)', `
+      <div class="expanded border-gold shot-root" data-shot="rank-expanded">
         <div class="row" style="gap:14px;width:100%">
           <div class="diamond lg"><span>II</span></div>
           <div class="col left" style="gap:2px">
