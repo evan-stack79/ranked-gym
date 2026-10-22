@@ -25,14 +25,14 @@ import {
   scaleMealPhotoMacrosForEditedKcal,
   validateMealPhotoConfirmCalories,
 } from '../../../convex/lib/mealPhotoEstimateAccess'
-
-export { MEAL_KCAL_ABOVE_MAX_MSG }
+import { checkStoredMealCalories } from '../../../convex/lib/foodAddUpsertSanitize'
+import { computeLocalMealNutritionFromOffHit } from '../../utils/foodAddMealNutrition'
 import { FoodCategoryWheel } from './FoodCategoryWheel'
 import { FoodProductCard } from './FoodProductCard'
 import { FoodSelectionBar } from './FoodSelectionBar'
 import { MealPhotoAnalyzer } from './MealPhotoAnalyzer'
 
-export { PHOTO_IA_ESTIMATE_LABEL }
+export { MEAL_KCAL_ABOVE_MAX_MSG, PHOTO_IA_ESTIMATE_LABEL }
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -319,15 +319,44 @@ export function AddFoodScreenV3({
     return foodAddQuantityUserMessage(checked.reason, checked.unit)
   }
 
+  /** V3-13 — kcal estimées pour une qty (même formule que l’ajout journal). */
+  const estimatedKcalForHitQty = (hit: OpenFoodFactsSearchHit, qty: QtyState): number | null => {
+    if (qty.value === '') return null
+    const checked = validateFoodQuantity({
+      unit: qty.unit,
+      value: qty.value,
+      servingGrams: qty.unit === 'pieces' ? servingGramsFor(hit) : null,
+    })
+    if (!checked.ok) return null
+    const nutrition =
+      checked.unit === 'pieces'
+        ? computeLocalMealNutritionFromOffHit(hit, { pieces: checked.pieces })
+        : computeLocalMealNutritionFromOffHit(hit, { grams: checked.grams })
+    return nutrition.calories
+  }
+
   const allQuantitiesValid = selectedHits.every((hit) => {
     const qty = qtyByKey[hitKey(hit)]
     if (!qty || qty.value === '') return false
-    return validateFoodQuantity({
+    const qtyOk = validateFoodQuantity({
       unit: qty.unit,
       value: qty.value,
       servingGrams: qty.unit === 'pieces' ? servingGramsFor(hit) : null,
     }).ok
+    if (!qtyOk) return false
+    // V3-13 — bloquer si kcal > 5000.
+    const kcal = estimatedKcalForHitQty(hit, qty)
+    return checkStoredMealCalories(kcal).ok
   })
+
+  const quantityKcalCapError = selectedHits.some((hit) => {
+    const qty = qtyByKey[hitKey(hit)]
+    if (!qty || qty.value === '') return false
+    const kcal = estimatedKcalForHitQty(hit, qty)
+    return kcal != null && !checkStoredMealCalories(kcal).ok
+  })
+    ? MEAL_KCAL_ABOVE_MAX_MSG
+    : null
 
   const confirmQuantities = () => {
     if (!networkOk || submitting || submittingRef.current) return
@@ -351,6 +380,13 @@ export function AddFoodScreenV3({
       })
       if (!checked.ok) {
         setQtyError(foodAddQuantityUserMessage(checked.reason, checked.unit))
+        submittingRef.current = false
+        setSubmitting(false)
+        return
+      }
+      const kcal = estimatedKcalForHitQty(hit, qty)
+      if (!checkStoredMealCalories(kcal).ok) {
+        setQtyError(MEAL_KCAL_ABOVE_MAX_MSG)
         submittingRef.current = false
         setSubmitting(false)
         return
@@ -901,9 +937,14 @@ export function AddFoodScreenV3({
                 )
               })}
             </ul>
-            {qtyError ? (
-              <p className="mt-2 text-[12px] text-[#FF6961]" role="alert" data-food-qty-error>
-                {qtyError}
+            {qtyError || quantityKcalCapError ? (
+              <p
+                className="mt-2 text-[12px] text-[#FF6961]"
+                role="alert"
+                data-food-qty-error
+                data-food-kcal-cap-error={quantityKcalCapError ? 'true' : undefined}
+              >
+                {qtyError ?? quantityKcalCapError}
               </p>
             ) : null}
             {!networkOk ? (

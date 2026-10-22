@@ -125,6 +125,17 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     window.setTimeout(() => setToast(null), variant === 'error' ? 5200 : 3400)
   }, [])
 
+  // V3-14 — toast file sync (ex. MEAL_KCAL_ABOVE_MAX).
+  useEffect(() => {
+    const onSyncToast = (event: Event) => {
+      const detail = (event as CustomEvent<{ message?: string; variant?: 'success' | 'error' }>)
+        .detail
+      if (detail?.message) showToast(detail.message, detail.variant ?? 'error')
+    }
+    window.addEventListener('ranked-gym:nutrition-sync-toast', onSyncToast)
+    return () => window.removeEventListener('ranked-gym:nutrition-sync-toast', onSyncToast)
+  }, [showToast])
+
   const scrollToScanZone = useCallback(() => {
     scanZoneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [])

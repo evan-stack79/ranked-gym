@@ -24,11 +24,12 @@ vi.mock('../../hooks/useOnlineStatus', () => ({
   useOnlineStatus: () => true,
 }))
 
+/** Faible kcal/100 g : les tests B111 restent indépendants du plafond V3-13 (5000). */
 const hit: OpenFoodFactsSearchHit = {
   barcode: '3017620422003',
   nom: 'Nutella',
   brands: 'Ferrero',
-  calories: 539,
+  calories: 100,
   proteines: 6,
   glucides: 57,
   lipides: 31,

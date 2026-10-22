@@ -173,6 +173,17 @@ export function NutritionDashboard({
     )
   }, [])
 
+  // V3-14 — toast file sync (ex. MEAL_KCAL_ABOVE_MAX).
+  useEffect(() => {
+    const onSyncToast = (event: Event) => {
+      const detail = (event as CustomEvent<{ message?: string; variant?: 'success' | 'error' }>)
+        .detail
+      if (detail?.message) showToast(detail.message, detail.variant ?? 'error')
+    }
+    window.addEventListener('ranked-gym:nutrition-sync-toast', onSyncToast)
+    return () => window.removeEventListener('ranked-gym:nutrition-sync-toast', onSyncToast)
+  }, [showToast])
+
   const showUndoToast = useCallback((message: string, onUndo: () => void) => {
     if (toastTimerRef.current != null) window.clearTimeout(toastTimerRef.current)
     setToast({

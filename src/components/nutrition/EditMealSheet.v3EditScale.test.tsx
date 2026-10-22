@@ -7,6 +7,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EditMealSheet } from './EditMealSheet'
+import { MEAL_KCAL_ABOVE_MAX_MSG } from '../../../convex/lib/mealPhotoEstimateAccess'
 import type { MealEntry } from '../../types/nutrition'
 import {
   clearFoodOfflineCache,
@@ -158,5 +159,33 @@ describe('EditMealSheet — V3-02 rescale hideNutritionNumbers', () => {
         fatG: 77.3,
       }),
     )
+  })
+
+  it('V3-13 : 30→1000 g Nutella (5390 kcal) — message + Enregistrer bloqué', async () => {
+    const onSave = vi.fn()
+    await act(async () => {
+      root.render(
+        <EditMealSheet
+          open
+          meal={nutella30}
+          onClose={vi.fn()}
+          onSave={onSave}
+          onDelete={vi.fn()}
+          hideNutritionNumbers
+        />,
+      )
+    })
+    await flushPortal()
+
+    await setGramsInput('1000')
+    expect(document.querySelector('[data-food-qty-error]')?.textContent).toBe(
+      MEAL_KCAL_ABOVE_MAX_MSG,
+    )
+    const save = document.querySelector('[data-testid="edit-meal-save"]') as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    await act(async () => {
+      save.click()
+    })
+    expect(onSave).not.toHaveBeenCalled()
   })
 })
