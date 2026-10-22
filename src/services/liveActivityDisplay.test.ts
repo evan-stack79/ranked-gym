@@ -39,7 +39,9 @@ describe('restNextSeriesLabel', () => {
 })
 
 describe('formatStepsCount', () => {
-  it('espace milliers fr-FR', () => {
+  it('espace milliers fr-FR (maquette 03)', () => {
     expect(formatStepsCount(6240)).toBe('6 240')
+    expect(formatStepsCount(3760)).toBe('3 760')
+    expect(formatStepsCount(10000)).toBe('10 000')
   })
 })

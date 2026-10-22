@@ -3,7 +3,7 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
-// MARK: - Palette (maquettes DI)
+// MARK: - Palette (gen.py / maquettes 01–06)
 
 private let colorRed = Color(red: 1, green: 0x2B / 255, blue: 0x2B / 255) // #FF2B2B
 private let colorTrack = Color(red: 0x3A / 255, green: 0x3A / 255, blue: 0x3C / 255) // #3A3A3C
@@ -13,6 +13,7 @@ private let colorGold = Color(red: 1, green: 0xD6 / 255, blue: 0x0A / 255) // #F
 private let colorPauseBg = Color(red: 0x2C / 255, green: 0x2C / 255, blue: 0x2E / 255) // #2C2C2E
 private let colorStopBg = Color(red: 0x5A / 255, green: 0x14 / 255, blue: 0x14 / 255) // #5A1414
 private let colorGray = Color(red: 0x8E / 255, green: 0x8E / 255, blue: 0x93 / 255) // #8E8E93
+private let colorPrCircle = Color(red: 0x3D / 255, green: 0x2A / 255, blue: 0x05 / 255) // #3D2A05
 
 struct RankedGymLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
@@ -37,13 +38,14 @@ struct RankedGymLiveActivityWidget: Widget {
             } compactTrailing: {
                 CompactTrailing(state: context.state)
             } minimal: {
+                // Maquette 06 — anneau seul (repos) / « S2 » (séance)
                 MinimalBadge(state: context.state)
             }
         }
     }
 }
 
-// MARK: - Compact / minimal
+// MARK: - Compact (maquettes 01–05 petit)
 
 private struct CompactLeading: View {
     let state: RankedGymLiveAttributes.ContentState
@@ -51,26 +53,27 @@ private struct CompactLeading: View {
         switch state.kind {
         case "session":
             Text("S\(state.setIndex)/\(max(1, state.setTotal))")
-                .font(.caption2.bold())
+                .font(.system(size: 15, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(colorRed)
         case "steps":
-            StepsRing(state: state, line: 2.5)
-                .frame(width: 18, height: 18)
+            StepsRing(state: state, line: 3, showPercent: false)
+                .frame(width: 20, height: 20)
         case "record":
             Text("PR")
-                .font(.system(size: 9, weight: .heavy))
+                .font(.system(size: 11, weight: .heavy))
                 .foregroundStyle(.black)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 2)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
                 .background(colorOrange)
-                .clipShape(Capsule())
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         case "rank":
-            RankDiamond()
+            RankDiamond(glyph: nil)
                 .frame(width: 14, height: 14)
         default:
-            RestRing(state: state, line: 2.5)
-                .frame(width: 18, height: 18)
+            // Anneau seul — pas de chrono au centre (évite le double « 1:17 » d’Evan)
+            RestRing(state: state, line: 3)
+                .frame(width: 20, height: 20)
         }
     }
 }
@@ -80,60 +83,65 @@ private struct CompactTrailing: View {
     var body: some View {
         switch state.kind {
         case "session":
-            SessionElapsedText(state: state, font: .caption2.bold())
+            SessionElapsedText(state: state, font: .system(size: 15, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
         case "steps":
-            Text("\(state.steps)")
-                .font(.caption2.bold())
+            Text(formatStepsCount(state.steps))
+                .font(.system(size: 15, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(colorGreen)
         case "record":
             Text(state.alertTitle.isEmpty ? "+0 kg" : state.alertTitle)
-                .font(.caption2.bold())
+                .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(colorOrange)
                 .lineLimit(1)
         case "rank":
             Text(state.alertTitle.isEmpty ? "Rang" : state.alertTitle)
-                .font(.caption2.bold())
+                .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(colorGold)
                 .lineLimit(1)
         default:
-            RestCountdownText(state: state, font: .caption2.bold(), color: colorRed)
+            RestCountdownText(
+                state: state,
+                font: .system(size: 17, weight: .bold, design: .rounded),
+                color: colorRed
+            )
         }
     }
 }
 
+/// Maquette 06 — minimale uniquement repos (anneau) / séance (S2).
 private struct MinimalBadge: View {
     let state: RankedGymLiveAttributes.ContentState
     var body: some View {
         switch state.kind {
         case "session":
             Text("S\(state.setIndex)")
-                .font(.system(size: 10, weight: .heavy))
+                .font(.system(size: 13, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(colorRed)
         case "steps":
-            StepsRing(state: state, line: 2.5)
-                .frame(width: 18, height: 18)
+            StepsRing(state: state, line: 3, showPercent: false)
+                .frame(width: 20, height: 20)
         case "record":
             Text("PR")
-                .font(.system(size: 8, weight: .heavy))
+                .font(.system(size: 9, weight: .heavy))
                 .foregroundStyle(.black)
-                .padding(.horizontal, 4)
+                .padding(.horizontal, 5)
                 .padding(.vertical, 2)
                 .background(colorOrange)
                 .clipShape(Capsule())
         case "rank":
-            RankDiamond()
+            RankDiamond(glyph: nil)
                 .frame(width: 14, height: 14)
         default:
-            RestRing(state: state, line: 2.5)
-                .frame(width: 18, height: 18)
+            RestRing(state: state, line: 3)
+                .frame(width: 20, height: 20)
         }
     }
 }
 
-// MARK: - Expanded regions
+// MARK: - Expanded (basse — pas de cadre rouge DI, pas de +15)
 
 private struct ExpandedLeading: View {
     let state: RankedGymLiveAttributes.ContentState
@@ -143,30 +151,27 @@ private struct ExpandedLeading: View {
             if #available(iOS 17.0, *) {
                 Button(intent: LiveActivityPauseIntent()) {
                     ZStack {
-                        Circle().fill(colorPauseBg).frame(width: 40, height: 40)
+                        Circle().fill(colorPauseBg).frame(width: 36, height: 36)
                         Image(systemName: state.paused ? "play.fill" : "pause.fill")
+                            .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(.white)
                     }
                 }
                 .buttonStyle(.plain)
             }
-        case "session":
-            // Bars live only in ExpandedCenter (avoid duplicate).
-            EmptyView()
         case "steps":
-            StepsRing(state: state, line: 4, showPercent: true)
-                .frame(width: 52, height: 52)
+            StepsRing(state: state, line: 5, showPercent: true)
+                .frame(width: 48, height: 48)
         case "record":
-            Text("PR")
-                .font(.caption.weight(.heavy))
-                .foregroundStyle(.black)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(colorOrange)
-                .clipShape(Capsule())
+            ZStack {
+                Circle().fill(colorPrCircle).frame(width: 44, height: 44)
+                Text("PR")
+                    .font(.system(size: 16, weight: .heavy))
+                    .foregroundStyle(colorOrange)
+            }
         case "rank":
-            RankDiamond()
-                .frame(width: 28, height: 28)
+            RankDiamond(glyph: rankGlyph(state.alertTitle))
+                .frame(width: 40, height: 40)
         default:
             EmptyView()
         }
@@ -176,85 +181,116 @@ private struct ExpandedLeading: View {
 private struct ExpandedCenter: View {
     let state: RankedGymLiveAttributes.ContentState
     var body: some View {
-        Group {
-            switch state.kind {
-            case "session":
-                VStack(spacing: 4) {
+        switch state.kind {
+        case "session":
+            // Maquette 02 — layout horizontal dense (hauteur basse)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline) {
                     Text(state.exerciseName.isEmpty ? "Séance" : state.exerciseName)
-                        .font(.caption.bold())
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
-                    Text(sessionSeriesLabel(state))
-                        .font(.caption.bold())
-                        .foregroundStyle(colorRed)
+                    Spacer(minLength: 6)
+                    SessionElapsedText(
+                        state: state,
+                        font: .system(size: 13, weight: .semibold, design: .rounded)
+                    )
+                    .foregroundStyle(colorGray)
+                }
+                Text(sessionSeriesLabel(state))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(colorRed)
+                HStack(alignment: .center, spacing: 8) {
                     Text("\(formatKg(state.weightKg)) kg × \(state.reps) reps")
-                        .font(.title2.bold())
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .minimumScaleFactor(0.7)
                         .lineLimit(1)
-                    SessionSetBars(state: state)
-                        .frame(maxWidth: 140)
-                }
-            case "steps":
-                VStack(spacing: 4) {
-                    Text("\(formatStepsCount(state.steps)) pas")
-                        .font(.caption.bold())
-                        .monospacedDigit()
-                        .foregroundStyle(.white)
-                    Text("Encore \(max(0, state.stepsGoal - state.steps)) pas")
-                        .font(.caption2.bold())
-                        .foregroundStyle(colorGreen)
-                    if state.stepsGoal > 0 {
-                        Text("Objectif : \(formatStepsCount(state.stepsGoal))")
-                            .font(.caption2)
-                            .foregroundStyle(colorGray)
+                    Spacer(minLength: 4)
+                    if #available(iOS 17.0, *) {
+                        Button(intent: LiveActivityValidateIntent()) {
+                            Text("Valider")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(.black)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(colorGreen)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-            case "record":
-                VStack(spacing: 4) {
-                    Text("Nouveau record")
-                        .font(.caption.bold())
-                        .foregroundStyle(colorOrange)
-                    Text(state.alertBody.isEmpty ? state.exerciseName : state.alertBody)
-                        .font(.headline.bold())
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.center)
+                SessionSetBars(state: state)
+            }
+        case "steps":
+            // Maquette 03 — « 6 240 pas » / Objectif / Encore (vert)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(formatStepsCount(state.steps)) pas")
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                if state.stepsGoal > 0 {
+                    Text("Objectif : \(formatStepsCount(state.stepsGoal))")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(colorGray)
                 }
-            case "rank":
-                VStack(spacing: 2) {
-                    Text("Nouveau rang !")
-                        .font(.headline.bold())
-                        .foregroundStyle(colorGold)
-                    Text(state.alertTitle)
-                        .font(.caption)
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                }
-            default:
-                VStack(spacing: 4) {
-                    if !restNextSeriesLabel(state).isEmpty {
-                        Text(restNextSeriesLabel(state))
-                            .font(.caption2)
-                            .foregroundStyle(colorGray)
-                            .lineLimit(1)
-                    }
-                    RestCountdownText(
-                        state: state,
-                        font: .system(size: 52, weight: .bold, design: .rounded),
-                        color: .white
-                    )
-                    Text(restExerciseLabel(state))
-                        .font(.caption2)
+                Text("Encore \(formatStepsCount(max(0, state.stepsGoal - state.steps))) pas")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(colorGreen)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        case "record":
+            // Maquette 04
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Nouveau record !")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(colorOrange)
+                Text(state.alertBody.isEmpty ? state.exerciseName : state.alertBody)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Text(recordDeltaCaption(state))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(colorGray)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        case "rank":
+            // Maquette 05
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Nouveau rang !")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(colorGold)
+                Text(state.alertTitle.isEmpty ? "Rang" : state.alertTitle)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Text(state.alertBody.isEmpty ? "Grâce à tes entraînements" : state.alertBody)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(colorGray)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        default:
+            // Maquette 01 — centre bas (pas de cadre rouge autour)
+            VStack(spacing: 2) {
+                if !restNextSeriesLabel(state).isEmpty {
+                    Text(restNextSeriesLabel(state))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(colorGray)
                         .lineLimit(1)
                 }
+                RestCountdownText(
+                    state: state,
+                    font: .system(size: 34, weight: .bold, design: .rounded),
+                    color: .white
+                )
+                Text(restExerciseLabel(state))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(colorGray)
+                    .lineLimit(1)
             }
         }
-        // ActivityKit owns the Dynamic Island outer chrome (system black capsule).
-        // We can only stroke our inner content card — not the system island silhouette.
-        .padding(6)
-        .overlay(expandedKindBorder(state.kind))
     }
 }
 
@@ -266,26 +302,14 @@ private struct ExpandedTrailing: View {
             if #available(iOS 17.0, *) {
                 Button(intent: LiveActivityStopIntent()) {
                     ZStack {
-                        Circle().fill(colorStopBg).frame(width: 40, height: 40)
+                        Circle().fill(colorStopBg).frame(width: 36, height: 36)
                         Image(systemName: "xmark")
-                            .font(.body.bold())
+                            .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(colorRed)
                     }
                 }
                 .buttonStyle(.plain)
             }
-        case "session":
-            SessionElapsedText(state: state, font: .caption.bold())
-                .foregroundStyle(colorGray)
-        case "record":
-            Text(state.alertTitle.isEmpty ? "+0 kg" : state.alertTitle)
-                .font(.caption.bold())
-                .foregroundStyle(colorOrange)
-        case "rank":
-            Text(state.alertTitle)
-                .font(.caption.bold())
-                .foregroundStyle(colorGold)
-                .lineLimit(1)
         default:
             EmptyView()
         }
@@ -294,48 +318,13 @@ private struct ExpandedTrailing: View {
 
 private struct ExpandedBottom: View {
     let state: RankedGymLiveAttributes.ContentState
+    /// Pas de région bottom — réduit la hauteur (maquettes denses).
     var body: some View {
-        if #available(iOS 17.0, *) {
-            switch state.kind {
-            case "rest":
-                HStack {
-                    Spacer(minLength: 0)
-                    Button(intent: LiveActivityAdd15Intent()) {
-                        Text("+15 s")
-                            .font(.caption.bold())
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(colorPauseBg)
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    Spacer(minLength: 0)
-                }
-                .padding(.top, 2)
-            case "session":
-                HStack {
-                    Spacer(minLength: 0)
-                    Button(intent: LiveActivityValidateIntent()) {
-                        Text("Valider")
-                            .font(.caption.bold())
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(colorGreen)
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.top, 2)
-            default:
-                EmptyView()
-            }
-        }
+        EmptyView()
     }
 }
 
-// MARK: - Lock screen
+// MARK: - Lock screen (bordures maquette sur lock uniquement)
 
 private struct LockScreenLiveView: View {
     let state: RankedGymLiveAttributes.ContentState
@@ -358,7 +347,7 @@ private struct LockScreenLiveView: View {
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.vertical, 10)
         }
         .activityBackgroundTint(Color.black)
     }
@@ -367,56 +356,48 @@ private struct LockScreenLiveView: View {
 private struct RestLockView: View {
     let state: RankedGymLiveAttributes.ContentState
     var body: some View {
-        VStack(spacing: 10) {
-            if !restNextSeriesLabel(state).isEmpty {
-                Text(restNextSeriesLabel(state))
-                    .font(.caption)
+        HStack(spacing: 12) {
+            if #available(iOS 17.0, *) {
+                Button(intent: LiveActivityPauseIntent()) {
+                    ZStack {
+                        Circle().fill(colorPauseBg).frame(width: 40, height: 40)
+                        Image(systemName: state.paused ? "play.fill" : "pause.fill")
+                            .foregroundStyle(.white)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            VStack(spacing: 4) {
+                if !restNextSeriesLabel(state).isEmpty {
+                    Text(restNextSeriesLabel(state))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(colorGray)
+                }
+                RestCountdownText(
+                    state: state,
+                    font: .system(size: 36, weight: .bold, design: .rounded),
+                    color: .white
+                )
+                Text(restExerciseLabel(state))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(colorGray)
             }
-            RestCountdownText(
-                state: state,
-                font: .system(size: 48, weight: .bold, design: .rounded),
-                color: .white
-            )
-            Text(restExerciseLabel(state))
-                .font(.caption)
-                .foregroundStyle(colorGray)
+            .frame(maxWidth: .infinity)
             if #available(iOS 17.0, *) {
-                HStack(spacing: 20) {
-                    Button(intent: LiveActivityPauseIntent()) {
-                        ZStack {
-                            Circle().fill(colorPauseBg).frame(width: 40, height: 40)
-                            Image(systemName: state.paused ? "play.fill" : "pause.fill")
-                                .foregroundStyle(.white)
-                        }
+                Button(intent: LiveActivityStopIntent()) {
+                    ZStack {
+                        Circle().fill(colorStopBg).frame(width: 40, height: 40)
+                        Image(systemName: "xmark")
+                            .font(.body.bold())
+                            .foregroundStyle(colorRed)
                     }
-                    .buttonStyle(.plain)
-                    Button(intent: LiveActivityAdd15Intent()) {
-                        Text("+15 s")
-                            .font(.caption.bold())
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(colorPauseBg)
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    Button(intent: LiveActivityStopIntent()) {
-                        ZStack {
-                            Circle().fill(colorStopBg).frame(width: 40, height: 40)
-                            Image(systemName: "xmark")
-                                .font(.body.bold())
-                                .foregroundStyle(colorRed)
-                        }
-                    }
-                    .buttonStyle(.plain)
                 }
+                .buttonStyle(.plain)
             }
         }
-        .frame(maxWidth: .infinity)
         .padding(8)
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(colorRed, lineWidth: 2)
         )
     }
@@ -425,38 +406,38 @@ private struct RestLockView: View {
 private struct SessionLockView: View {
     let state: RankedGymLiveAttributes.ContentState
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(state.exerciseName.isEmpty ? "Séance" : state.exerciseName)
-                    .font(.caption.bold())
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                 Spacer(minLength: 0)
-                SessionElapsedText(state: state, font: .caption.bold())
+                SessionElapsedText(state: state, font: .system(size: 14, weight: .semibold))
                     .foregroundStyle(colorGray)
             }
             Text(sessionSeriesLabel(state))
-                .font(.caption.bold())
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(colorRed)
-            Text("\(formatKg(state.weightKg)) kg × \(state.reps) reps")
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-            SessionSetBars(state: state)
-            if #available(iOS 17.0, *) {
-                HStack {
-                    Spacer(minLength: 0)
+            HStack {
+                Text("\(formatKg(state.weightKg)) kg × \(state.reps) reps")
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                Spacer(minLength: 0)
+                if #available(iOS 17.0, *) {
                     Button(intent: LiveActivityValidateIntent()) {
                         Text("Valider")
-                            .font(.caption.bold())
+                            .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(.black)
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, 14)
                             .padding(.vertical, 8)
                             .background(colorGreen)
-                            .clipShape(Capsule())
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                     .buttonStyle(.plain)
                 }
             }
+            SessionSetBars(state: state)
         }
     }
 }
@@ -465,21 +446,21 @@ private struct StepsLockView: View {
     let state: RankedGymLiveAttributes.ContentState
     var body: some View {
         HStack(spacing: 14) {
-            StepsRing(state: state, line: 5, showPercent: true)
-                .frame(width: 56, height: 56)
+            StepsRing(state: state, line: 6, showPercent: true)
+                .frame(width: 64, height: 64)
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(formatStepsCount(state.steps)) pas")
-                    .font(.headline.bold())
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(.white)
-                Text("Encore \(max(0, state.stepsGoal - state.steps)) pas")
-                    .font(.caption.bold())
-                    .foregroundStyle(colorGreen)
                 if state.stepsGoal > 0 {
                     Text("Objectif : \(formatStepsCount(state.stepsGoal))")
-                        .font(.caption)
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(colorGray)
                 }
+                Text("Encore \(formatStepsCount(max(0, state.stepsGoal - state.steps))) pas")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(colorGreen)
             }
             Spacer(minLength: 0)
         }
@@ -489,32 +470,30 @@ private struct StepsLockView: View {
 private struct RecordLockView: View {
     let state: RankedGymLiveAttributes.ContentState
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Nouveau record")
-                .font(.caption.bold())
-                .foregroundStyle(colorOrange)
-            HStack {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle().fill(colorPrCircle).frame(width: 52, height: 52)
                 Text("PR")
-                    .font(.caption.weight(.heavy))
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(colorOrange)
-                    .clipShape(Capsule())
-                Text(state.alertTitle.isEmpty ? "+0 kg" : state.alertTitle)
-                    .font(.caption.bold())
+                    .font(.system(size: 18, weight: .heavy))
                     .foregroundStyle(colorOrange)
-                Spacer(minLength: 0)
             }
-            Text(state.alertBody.isEmpty ? state.exerciseName : state.alertBody)
-                .font(.title3.bold())
-                .foregroundStyle(.white)
-                .lineLimit(2)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Nouveau record !")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(colorOrange)
+                Text(state.alertBody.isEmpty ? state.exerciseName : state.alertBody)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Text(recordDeltaCaption(state))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(colorGray)
+            }
+            Spacer(minLength: 0)
         }
         .padding(8)
-        .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(colorOrange, lineWidth: 2)
         )
     }
@@ -523,22 +502,25 @@ private struct RecordLockView: View {
 private struct RankLockView: View {
     let state: RankedGymLiveAttributes.ContentState
     var body: some View {
-        HStack(spacing: 12) {
-            RankDiamond()
-                .frame(width: 28, height: 28)
+        HStack(spacing: 14) {
+            RankDiamond(glyph: rankGlyph(state.alertTitle))
+                .frame(width: 48, height: 48)
             VStack(alignment: .leading, spacing: 4) {
                 Text("Nouveau rang !")
-                    .font(.headline.bold())
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(colorGold)
-                Text(state.alertTitle)
-                    .font(.caption)
+                Text(state.alertTitle.isEmpty ? "Rang" : state.alertTitle)
+                    .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(.white)
+                Text(state.alertBody.isEmpty ? "Grâce à tes entraînements" : state.alertBody)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(colorGray)
             }
             Spacer(minLength: 0)
         }
         .padding(8)
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(colorGold, lineWidth: 2)
         )
     }
@@ -546,7 +528,7 @@ private struct RankLockView: View {
 
 // MARK: - Shared pieces
 
-/// Rest ring: ProgressView(timerInterval: start…end) + piste #3A3A3C, départ midi.
+/// Anneau repos : ProgressView(timerInterval:) sans label (évite le chrono dans l’anneau).
 private struct RestRing: View {
     let state: RankedGymLiveAttributes.ContentState
     var line: CGFloat = 3
@@ -561,9 +543,17 @@ private struct RestRing: View {
                     .stroke(colorRed, style: StrokeStyle(lineWidth: line, lineCap: .round))
                     .rotationEffect(.degrees(-90))
             } else if let range = restTimerRange(state) {
-                ProgressView(timerInterval: range, countsDown: true)
-                    .progressViewStyle(.circular)
-                    .tint(colorRed)
+                ProgressView(timerInterval: range, countsDown: true) {
+                    EmptyView()
+                } currentValueLabel: {
+                    EmptyView()
+                }
+                .progressViewStyle(.circular)
+                .tint(colorRed)
+                // Masque tout résidu de texte système au centre
+                .mask(
+                    Circle().stroke(Color.white, lineWidth: line * 2.2)
+                )
             }
         }
     }
@@ -584,7 +574,7 @@ private struct StepsRing: View {
                 .rotationEffect(.degrees(-90))
             if showPercent {
                 Text("\(stepsPercent(state)) %")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(.white)
                     .minimumScaleFactor(0.5)
@@ -598,13 +588,12 @@ private struct SessionSetBars: View {
     let state: RankedGymLiveAttributes.ContentState
     var body: some View {
         let total = max(1, state.setTotal)
-        // Maquette: à la série N, N barres rouges (S2/4 → 2).
         let filled = sessionFilledSetBars(setIndex: state.setIndex, setTotal: total)
         HStack(spacing: 4) {
             ForEach(0..<total, id: \.self) { i in
                 Capsule()
                     .fill(i < filled ? colorRed : colorTrack)
-                    .frame(height: 6)
+                    .frame(height: 5)
             }
         }
     }
@@ -617,7 +606,6 @@ private struct SessionElapsedText: View {
     var body: some View {
         if state.startedAtMs > 0 {
             let start = Date(timeIntervalSince1970: state.startedAtMs / 1000.0)
-            // Compte vers le haut depuis startedAtMs (durée de séance).
             Text(start, style: .timer)
                 .font(font)
                 .monospacedDigit()
@@ -630,14 +618,22 @@ private struct SessionElapsedText: View {
 }
 
 private struct RankDiamond: View {
+    var glyph: String?
     var body: some View {
-        RoundedRectangle(cornerRadius: 3, style: .continuous)
-            .fill(colorGold)
-            .rotationEffect(.degrees(45))
+        ZStack {
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(colorGold)
+                .rotationEffect(.degrees(45))
+            if let glyph, !glyph.isEmpty {
+                Text(glyph)
+                    .font(.system(size: 12, weight: .heavy))
+                    .foregroundStyle(.black)
+                    .rotationEffect(.degrees(0))
+            }
+        }
     }
 }
 
-/// Chrono repos `m:ss` (ex. `1:12`, pas `01:12`).
 private struct RestCountdownText: View {
     let state: RankedGymLiveAttributes.ContentState
     let font: Font
@@ -648,7 +644,6 @@ private struct RestCountdownText: View {
             if state.paused || state.endDateMs <= 0 {
                 Text(formatClockMss(state.remainingSec))
             } else if let range = restTimerRange(state) {
-                // System timer; paused path uses m:ss. Running uses timerInterval.
                 Text(timerInterval: range, countsDown: true, showsHours: false)
             } else {
                 Text(formatClockMss(state.remainingSec))
@@ -702,7 +697,6 @@ private func stepsPercent(_ state: RankedGymLiveAttributes.ContentState) -> Int 
     return Int((Double(state.steps) / Double(goal) * 100).rounded())
 }
 
-/// Red bar count — mirrored by `sessionFilledSetBars` in liveActivityDisplay.ts.
 private func sessionFilledSetBars(setIndex: Int, setTotal: Int) -> Int {
     let total = max(1, setTotal)
     let current = max(0, setIndex)
@@ -711,21 +705,15 @@ private func sessionFilledSetBars(setIndex: Int, setTotal: Int) -> Int {
 
 private func sessionSeriesLabel(_ state: RankedGymLiveAttributes.ContentState) -> String {
     let total = max(1, state.setTotal)
-    // Clamp — never inflate total with max(x, total) (would yield « 5 sur 5 » for total=4).
     let x = min(max(1, state.setIndex), total)
     return "Série \(x) sur \(total)"
 }
 
-/// « Série X sur Y ensuite » — setIndex = prochaine série (1-based).
-/// Mirrored by `restNextSeriesLabel` in liveActivityDisplay.ts.
-/// Unknown total (≤0) → empty (hide line). next > total → « Séries terminées ».
 private func restNextSeriesLabel(_ state: RankedGymLiveAttributes.ContentState) -> String {
     let total = state.setTotal
     if total <= 0 { return "" }
     let next = max(1, state.setIndex)
-    if next > total {
-        return "Séries terminées"
-    }
+    if next > total { return "Séries terminées" }
     let x = min(next, total)
     return "Série \(x) sur \(total) ensuite"
 }
@@ -739,37 +727,34 @@ private func formatStepsCount(_ steps: Int) -> String {
     return f.string(from: NSNumber(value: n)) ?? "\(n)"
 }
 
-/// Inner content stroke for expanded DI. System island chrome cannot be recolored.
-@ViewBuilder
-private func expandedKindBorder(_ kind: String) -> some View {
-    switch kind {
-    case "rest":
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .stroke(colorRed, lineWidth: 2)
-    case "record":
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .stroke(colorOrange, lineWidth: 2)
-    case "rank":
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .stroke(colorGold, lineWidth: 2)
-    default:
-        EmptyView()
-    }
-}
-
 private func restExerciseLabel(_ state: RankedGymLiveAttributes.ContentState) -> String {
-    let name = state.exerciseName.isEmpty
-        ? (state.subtitle.isEmpty ? "Exercice" : state.subtitle)
-        : state.exerciseName
-    // Prefer clean "Repos · Name" even if subtitle was "Name · S1".
     if !state.exerciseName.isEmpty {
         return "Repos · \(state.exerciseName)"
     }
     if state.subtitle.contains("·") {
-        let ex = state.subtitle.split(separator: "·").first.map(String.init)?.trimmingCharacters(in: .whitespaces) ?? name
+        let ex = state.subtitle.split(separator: "·").first.map(String.init)?
+            .trimmingCharacters(in: .whitespaces) ?? "Exercice"
         return "Repos · \(ex)"
     }
-    return "Repos · \(name)"
+    return state.subtitle.isEmpty ? "Repos · Exercice" : "Repos · \(state.subtitle)"
+}
+
+private func recordDeltaCaption(_ state: RankedGymLiveAttributes.ContentState) -> String {
+    let delta = state.alertTitle.isEmpty ? "+0 kg" : state.alertTitle
+    if state.subtitle.localizedCaseInsensitiveContains("rapport") {
+        return state.subtitle
+    }
+    return "\(delta) par rapport à l'ancien"
+}
+
+/// Extrait « II » depuis « Or II » pour le losange (maquette 05).
+private func rankGlyph(_ title: String) -> String? {
+    let parts = title.split(separator: " ")
+    guard let last = parts.last, last != parts.first else { return nil }
+    let s = String(last)
+    // Chiffre romain ou court suffixe
+    if s.count <= 4 { return s }
+    return nil
 }
 
 @main
