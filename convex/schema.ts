@@ -174,6 +174,15 @@ export const convexTables = {
     /** Sports du profil (ids catalogue). Absent = non renseigné. */
     sportIds: v.optional(v.array(v.string())),
     sportsUndecided: v.optional(v.boolean()),
+    /** Mensurations / objectifs — optionnels (moteur IA hybride + nutrition). */
+    heightCm: v.optional(v.number()),
+    weightKg: v.optional(v.number()),
+    bodyfat: v.optional(v.number()),
+    targetCalories: v.optional(v.number()),
+    /** Disjoncteur IA hybride — compteur journalier (reset via lastAiCallDate). */
+    aiCallsToday: v.optional(v.number()),
+    /** Date YYYY-MM-DD du dernier appel IA comptabilisé. */
+    lastAiCallDate: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
