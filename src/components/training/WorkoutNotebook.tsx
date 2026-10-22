@@ -51,7 +51,12 @@ import {
   shouldCommitAutoValidate,
 } from '../../utils/autoValidateSet'
 import { CANONICAL_REST_SEC, resolveRestDuration } from '../../utils/restDuration'
-import { vibrate } from '../../utils/haptics'
+import { animMs } from '../motion/animTiming'
+import {
+  canFinishSession,
+  canValidateSet,
+  SET_VALIDATED_POP_MS,
+} from '../motion/sessionActionGuards'
 
 interface WorkoutNotebookProps {
   id?: string
@@ -272,6 +277,12 @@ export function WorkoutNotebook({
   const [customOpen, setCustomOpen] = useState(false)
   const [customLabel, setCustomLabel] = useState('')
   const [saving, setSaving] = useState(false)
+  const finishCommittedRef = useRef(false)
+  const persistInFlightRef = useRef(false)
+  const [validatedPop, setValidatedPop] = useState<{
+    exerciseId: string
+    setIndex: number
+  } | null>(null)
   const [editingNote, setEditingNote] = useState<WorkoutNote | null>(initialEditNote)
   const [effortHelpOpen, setEffortHelpOpen] = useState(false)
   const [activeExerciseIndex, setActiveExerciseIndex] = useState(() => {
@@ -489,8 +500,13 @@ export function WorkoutNotebook({
   ) => {
     const live = exercisesRef.current.find((item) => item.id === ex.id)
     const current = live?.sets[setIndex]
-    if (!current || current.done) return
-    const merged = difficulty ? { ...current, difficulty } : current
+    // Persist-first + idempotent: ignore double-tap / already-done / in-flight.
+    if (
+      !canValidateSet(current, { persistInFlight: persistInFlightRef.current })
+    ) {
+      return
+    }
+    const merged = difficulty ? { ...current!, difficulty } : current!
     const key = makeAutoValidateKey(ex.id, setIndex, merged)
     if (autoValidate) {
       if (!isSetReadyForAutoValidate(merged)) return
@@ -506,12 +522,13 @@ export function WorkoutNotebook({
       }
     }
     lastAutoKeyRef.current = key
-    const previous = { ...current }
+    const previous = { ...current! }
     const duration = resolveRestDuration({
       exerciseRestSec: live?.targetRestSec ?? ex.targetRestSec,
       preferredRestSec: restSec,
     })
     draftDirty.current = true
+    // Mark done in memory before persist so a second tap cannot re-commit.
     const next = exercisesRef.current.map((e) => {
       if (e.id !== ex.id) return e
       const sets = e.sets.map((s, i) =>
@@ -521,10 +538,12 @@ export function WorkoutNotebook({
     })
     exercisesRef.current = next
     setExercises(next)
+    persistInFlightRef.current = true
     try {
       if (!draftBlocked.current) onDraftSave?.(routineId, next)
     } catch {
       lastAutoKeyRef.current = null
+      persistInFlightRef.current = false
       exercisesRef.current = exercisesRef.current.map((e) =>
         e.id === ex.id
           ? { ...e, sets: e.sets.map((s, i) => (i === setIndex ? previous : s)) }
@@ -533,8 +552,25 @@ export function WorkoutNotebook({
       setExercises(exercisesRef.current)
       return
     }
+    persistInFlightRef.current = false
     draftDirty.current = false
-    vibrate(12)
+    // Rest timer starts immediately — animation never delays it.
+    if (!editingNote) {
+      onRestStart?.({
+        exerciseId: ex.id,
+        setIndex,
+        exerciseName: ex.name.trim() || 'Exercice',
+        setLabel: `S${setIndex + 1}`,
+        restSec: duration,
+      })
+    }
+    // Animate after persist (identical hop every time — no vibration).
+    setValidatedPop({ exerciseId: ex.id, setIndex })
+    window.setTimeout(() => {
+      setValidatedPop((cur) =>
+        cur && cur.exerciseId === ex.id && cur.setIndex === setIndex ? null : cur,
+      )
+    }, animMs(SET_VALIDATED_POP_MS))
     setUndoSnapshot({
       exerciseId: ex.id,
       setIndex,
@@ -546,15 +582,6 @@ export function WorkoutNotebook({
         cur && cur.exerciseId === ex.id && cur.setIndex === setIndex ? null : cur,
       )
     }, AUTO_VALIDATE_UNDO_MS)
-    if (!editingNote) {
-      onRestStart?.({
-        exerciseId: ex.id,
-        setIndex,
-        exerciseName: ex.name.trim() || 'Exercice',
-        setLabel: `S${setIndex + 1}`,
-        restSec: duration,
-      })
-    }
   }
 
   const undoValidation = () => {
@@ -640,6 +667,14 @@ export function WorkoutNotebook({
   }
 
   const handleSave = async () => {
+    if (
+      !canFinishSession({
+        saving,
+        finishCommitted: finishCommittedRef.current,
+      })
+    ) {
+      return
+    }
     const cleaned = exercises
       .map((e) => ({
         ...e,
@@ -648,6 +683,7 @@ export function WorkoutNotebook({
       }))
       .filter((e) => e.sets.length > 0)
     if (!cleaned.length) return
+    finishCommittedRef.current = true
     draftBlocked.current = true
     setSaving(true)
     try {
@@ -683,6 +719,7 @@ export function WorkoutNotebook({
       })
       if (editingNote) {
         cancelEdit()
+        finishCommittedRef.current = false
       } else {
         draftDirty.current = false
         setExercises(
@@ -697,7 +734,11 @@ export function WorkoutNotebook({
             })),
           })),
         )
+        // New session stays finishCommitted so double-tap cannot re-save mid-celebration.
       }
+    } catch (error) {
+      finishCommittedRef.current = false
+      throw error
     } finally {
       setSaving(false)
     }
@@ -742,6 +783,7 @@ export function WorkoutNotebook({
         onValidateSet={(ex, setIndex, restSec) => finishSet(ex, setIndex, undefined, restSec)}
         onFinishSession={() => void handleSave()}
         saving={saving}
+        validatedPop={validatedPop}
         restPrefSec={restPrefSec}
         onRestPrefChange={setRestPrefSec}
         autoValidate={autoValidate}

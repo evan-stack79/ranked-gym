@@ -1618,9 +1618,9 @@ select,
   --sc-bg: #0c0c0e;
   --sc-red: #ff2b2b;
   --sc-red-deep: #b91c1c;
-  --sc-orange: #ff7a1a;
-  --sc-gold: #ffc928;
-  --sc-cream: #fff4c2;
+  --sc-red-soft: #ff6b6b;
+  --sc-white: #ffffff;
+  --sc-white-soft: #ffe8e8;
   position: fixed;
   inset: 0;
   box-sizing: border-box;
@@ -1633,7 +1633,8 @@ select,
   justify-content: center;
   overflow: hidden;
   overscroll-behavior: none;
-  background: var(--sc-bg);
+  /* Transparent shell — scrim fades over the live screen (no hard black cut). */
+  background: transparent;
   padding:
     max(16px, var(--app-safe-area-top))
     max(16px, var(--app-safe-area-right))
@@ -1642,7 +1643,37 @@ select,
   color: #fff;
   outline: none;
   -webkit-tap-highlight-color: transparent;
-  animation: streak-celeb-fade-in 180ms ease-out both;
+}
+
+.streak-celeb::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--sc-bg);
+  opacity: 0;
+  /* Fade over the live screen — keep in sync with slow-mo overrides in animations.css. */
+  animation: streak-celeb-scrim-in 200ms ease-out forwards;
+}
+
+@keyframes streak-celeb-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.92;
+  }
+}
+
+/* Keep celebration layers above the fading scrim (::before). */
+.streak-celeb__halo,
+.streak-celeb__flash,
+.streak-celeb__burst,
+.streak-celeb__panther,
+.streak-celeb__stage,
+.streak-celeb__week {
+  z-index: 1;
 }
 
 @keyframes streak-celeb-fade-in {
@@ -1659,8 +1690,8 @@ select,
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 55% 42% at 50% 38%, rgb(255 43 43 / 0.22) 0%, transparent 70%),
-    radial-gradient(ellipse 40% 30% at 50% 42%, rgb(255 201 40 / 0.1) 0%, transparent 65%);
+    radial-gradient(ellipse 55% 42% at 50% 38%, rgb(255 43 43 / 0.28) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 30% at 50% 42%, rgb(255 255 255 / 0.08) 0%, transparent 65%);
   opacity: 0;
   transition: opacity 420ms ease;
 }
@@ -1681,10 +1712,10 @@ select,
   z-index: 5;
   background: radial-gradient(
     circle at 50% 42%,
-    #fff4c2 0%,
-    #ffc928 18%,
-    #ff7a1a 42%,
-    #ff2b2b 70%,
+    #ffffff 0%,
+    #ff8a8a 22%,
+    #ff2b2b 48%,
+    #b91c1c 72%,
     transparent 100%
   );
   animation: streak-celeb-flash 180ms ease-out both;
@@ -1717,8 +1748,8 @@ select,
   height: 24px;
   margin: -12px 0 0 -12px;
   border-radius: 999px;
-  border: 2px solid rgb(255 201 40 / 0.85);
-  box-shadow: 0 0 24px rgb(255 43 43 / 0.55);
+  border: 2px solid rgb(255 255 255 / 0.9);
+  box-shadow: 0 0 24px rgb(255 43 43 / 0.65);
   animation: streak-celeb-ring 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
@@ -1740,7 +1771,7 @@ select,
   width: 14px;
   height: 14px;
   margin: -7px 0 0 -7px;
-  background: radial-gradient(circle, #fff4c2 0%, #ffc928 45%, #ff2b2b 100%);
+  background: radial-gradient(circle, #ffffff 0%, #ff8a8a 45%, #ff2b2b 100%);
   clip-path: polygon(
     50% 0%,
     61% 35%,
@@ -1779,8 +1810,8 @@ select,
   height: 6px;
   margin: -3px 0 0 -3px;
   border-radius: 999px;
-  background: var(--sc-gold);
-  box-shadow: 0 0 8px rgb(255 122 26 / 0.8);
+  background: var(--sc-white);
+  box-shadow: 0 0 8px rgb(255 43 43 / 0.75);
   animation: streak-celeb-particle 620ms cubic-bezier(0.15, 0.85, 0.25, 1) both;
 }
 
@@ -1792,22 +1823,22 @@ select,
 .streak-celeb__particle--1 {
   --dx: 68px;
   --dy: -52px;
-  background: var(--sc-orange);
+  background: var(--sc-red-soft);
 }
 .streak-celeb__particle--2 {
   --dx: -48px;
   --dy: 54px;
-  background: var(--sc-gold);
+  background: var(--sc-white);
 }
 .streak-celeb__particle--3 {
   --dx: 56px;
   --dy: 48px;
-  background: var(--sc-cream);
+  background: var(--sc-white-soft);
 }
 .streak-celeb__particle--4 {
   --dx: -90px;
   --dy: 8px;
-  background: var(--sc-orange);
+  background: var(--sc-red-soft);
 }
 .streak-celeb__particle--5 {
   --dx: 92px;
@@ -1817,12 +1848,12 @@ select,
 .streak-celeb__particle--6 {
   --dx: -18px;
   --dy: -78px;
-  background: var(--sc-cream);
+  background: var(--sc-white);
 }
 .streak-celeb__particle--7 {
   --dx: 22px;
   --dy: 72px;
-  background: var(--sc-gold);
+  background: var(--sc-red-soft);
 }
 
 @keyframes streak-celeb-particle {
@@ -1970,7 +2001,7 @@ select,
 .streak-celeb--week .streak-celeb__flame,
 .streak-celeb--settled .streak-celeb__flame {
   filter: drop-shadow(0 0 16px rgb(255 43 43 / 0.55))
-    drop-shadow(0 0 28px rgb(255 201 40 / 0.28));
+    drop-shadow(0 0 28px rgb(255 255 255 / 0.22));
 }
 
 .streak-celeb__count {
@@ -2001,7 +2032,7 @@ select,
 .streak-celeb__count--new {
   color: #fff;
   text-shadow: 0 0 28px rgb(255 43 43 / 0.45);
-  animation: streak-celeb-count-in 420ms cubic-bezier(0.2, 0.85, 0.2, 1.15) both;
+  animation: streak-celeb-count-in 220ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 @keyframes streak-celeb-count-out {
@@ -2018,18 +2049,14 @@ select,
 }
 
 @keyframes streak-celeb-count-in {
+  /* No heavy blur / ghost twin — arrive crisp and bright. */
   0% {
-    transform: translateY(-36px) scaleY(1.35);
-    filter: blur(3px);
-    opacity: 0;
-  }
-  70% {
-    transform: translateY(4px) scaleY(0.96);
+    transform: translateY(-12px) scale(1.06);
     filter: blur(0);
-    opacity: 1;
+    opacity: 0.85;
   }
   100% {
-    transform: translateY(0) scaleY(1);
+    transform: translateY(0) scale(1);
     opacity: 1;
   }
 }
@@ -2040,7 +2067,8 @@ select,
   font-weight: 800;
   letter-spacing: -0.01em;
   color: #fff;
-  animation: streak-celeb-text-in 380ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  /* Reach full opacity quickly — no long dim frame. */
+  animation: streak-celeb-text-in 90ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 .streak-celeb__message {
@@ -2050,13 +2078,13 @@ select,
   font-weight: 500;
   line-height: 1.35;
   color: #AEAEB2;
-  animation: streak-celeb-text-in 420ms 60ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: streak-celeb-text-in 110ms 16ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 @keyframes streak-celeb-text-in {
   from {
-    opacity: 0;
-    transform: translateY(10px);
+    opacity: 0.92;
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -2113,7 +2141,7 @@ select,
 }
 
 .streak-celeb__day.is-today .streak-celeb__day-label {
-  color: var(--sc-gold);
+  color: var(--sc-red);
 }
 
 .streak-celeb__day-dot {
@@ -2127,7 +2155,7 @@ select,
 }
 
 .streak-celeb__day.is-covered .streak-celeb__day-dot {
-  background: linear-gradient(135deg, var(--sc-red-deep), var(--sc-orange));
+  background: linear-gradient(135deg, var(--sc-red-deep), var(--sc-red));
   box-shadow: 0 0 10px rgb(255 43 43 / 0.35);
 }
 
@@ -2158,7 +2186,7 @@ select,
   height: 100%;
   width: 0;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--sc-red-deep), var(--sc-red), var(--sc-gold));
+  background: linear-gradient(90deg, var(--sc-red-deep), var(--sc-red), var(--sc-white));
   box-shadow: 0 0 12px rgb(255 43 43 / 0.4);
 }
 
@@ -2194,6 +2222,12 @@ select,
   width: 100%;
   height: auto;
   user-select: none;
+  background: transparent;
+  /* Drop pure-black plate pixels against the dark scrim; keep red/white mark. */
+  mix-blend-mode: lighten;
+  /* Soft falloff hides any residual bitmap fringe around the alpha mark. */
+  -webkit-mask-image: radial-gradient(ellipse 72% 68% at 50% 46%, #000 58%, transparent 78%);
+  mask-image: radial-gradient(ellipse 72% 68% at 50% 46%, #000 58%, transparent 78%);
 }
 
 .streak-celeb__crown {
@@ -2203,9 +2237,9 @@ select,
   width: 28%;
   height: 18%;
   transform: translateX(-50%);
-  background: linear-gradient(180deg, var(--sc-gold), var(--sc-orange));
+  background: linear-gradient(180deg, var(--sc-white), var(--sc-red), var(--sc-red-deep));
   clip-path: polygon(8% 100%, 0 35%, 22% 55%, 35% 0, 50% 45%, 65% 0, 78% 55%, 100% 35%, 92% 100%);
-  filter: drop-shadow(0 0 8px rgb(255 201 40 / 0.7));
+  filter: drop-shadow(0 0 8px rgb(255 43 43 / 0.7));
 }
 
 .streak-celeb__panther--badge {
@@ -2249,7 +2283,12 @@ select,
 }
 
 .streak-celeb--reduced {
-  animation: streak-celeb-fade-in 300ms ease-out both;
+  background: var(--sc-bg);
+}
+
+.streak-celeb--reduced::before {
+  animation: none;
+  opacity: 1;
 }
 
 .streak-celeb--reduced .streak-celeb__flame-wrap,
@@ -2288,7 +2327,12 @@ select,
   }
 
   .streak-celeb {
-    animation: streak-celeb-fade-in 300ms ease-out both !important;
+    background: var(--sc-bg) !important;
+  }
+
+  .streak-celeb::before {
+    opacity: 1 !important;
+    animation: none !important;
   }
 
   .streak-celeb__week-fill {

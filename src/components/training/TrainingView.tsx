@@ -38,6 +38,7 @@ import { SportPicker } from './SportPicker'
 import { StepsCard } from './StepsCard'
 import { TrainingAgenda } from './TrainingAgenda'
 import { WorkoutNotebook } from './WorkoutNotebook'
+import { SessionCompleteBurst } from '../motion/SessionCompleteBurst'
 import { WorkoutHistory } from './WorkoutHistory'
 import { EnduranceSessionCard } from './EnduranceSessionCard'
 import { TrainSheet as IosSheet } from './TrainSheet'
@@ -143,6 +144,9 @@ export function TrainingView({
 
   const [disciplineTick, setDisciplineTick] = useState(0)
   const [pumpCheckSession, setPumpCheckSession] = useState<VictorySessionStats | null>(null)
+  const [sessionBurstNote, setSessionBurstNote] = useState<Parameters<
+    typeof saveWorkoutNote
+  >[0] | null>(null)
   const [panel, setPanel] = useState<TrainPanel>('hub')
   const [notebookLaunchId, setNotebookLaunchId] = useState<string | null>(null)
   const [notebookResume, setNotebookResume] = useState(false)
@@ -533,7 +537,8 @@ export function TrainingView({
         const local = saveWorkoutNote(note)
         setState(local)
         showToast(`${note.title} sauvé en local — connecte-toi pour sauvegarder`)
-        if (isNewSession) openPumpCheck(note)
+        // Save first, then celebrate (identical burst) — Pump Check after.
+        if (isNewSession) setSessionBurstNote(note)
         requireAuth(() => undefined)
         return
       }
@@ -543,18 +548,18 @@ export function TrainingView({
         setState(result.state)
         if (result.ok) {
           if (!isNewSession) showToast('Séance mise à jour ✓')
-          if (isNewSession) openPumpCheck(note)
+          if (isNewSession) setSessionBurstNote(note)
         } else {
           safeError('[Train] session sync failed', result.error)
           showToast(result.error ?? 'Erreur de synchro')
-          if (isNewSession) openPumpCheck(note)
+          if (isNewSession) setSessionBurstNote(note)
         }
       } catch (error) {
         safeError('[Train] session save exception', error)
         showToast('Erreur de synchro')
       }
     },
-    [isAuthenticated, openPumpCheck, requireAuth, showToast],
+    [isAuthenticated, requireAuth, showToast],
   )
 
   useEffect(() => {
@@ -1078,6 +1083,17 @@ export function TrainingView({
           {toast}
         </div>
       )}
+
+      {sessionBurstNote ? (
+        <SessionCompleteBurst
+          open
+          onComplete={() => {
+            const note = sessionBurstNote
+            setSessionBurstNote(null)
+            if (note) openPumpCheck(note)
+          }}
+        />
+      ) : null}
 
       {pumpCheckSession ? (
         <VictoryCamera
