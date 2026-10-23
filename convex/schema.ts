@@ -6,7 +6,8 @@ import { v } from 'convex/values'
  *
  * Maps plan domains:
  * - Profil: profiles, checkins, custom_spots, active_checkins
- * - Train: workouts_state
+ * - Train: workouts_state (colonnes inchangées — contrat v2 additif dans le JSON)
+ * - Progression: day_snapshots, workout_xp_awards, champs Elo sur profiles
  * - Nutrition + Hydratation:
  *   - compatibility snapshot: nutrition_state
  *   - granular sync: nutrition_meals, nutrition_water_entries, nutrition_day_state
@@ -174,11 +175,46 @@ export const convexTables = {
     /** Sports du profil (ids catalogue). Absent = non renseigné. */
     sportIds: v.optional(v.array(v.string())),
     sportsUndecided: v.optional(v.boolean()),
+    /**
+     * Elo interne. Absent sur un profil antérieur au moteur : la lecture vaut 1000.
+     * Écrit à la création et par `awardWorkoutXp` uniquement.
+     */
+    performanceRating: v.optional(v.number()),
+    /** Séances déjà notées (K Elo). Absent = 0. */
+    ratedSessions: v.optional(v.number()),
+    /** Division visible du palier (I / II / III). Absent = dérivée du niveau. */
+    rankDivision: v.optional(v.union(v.literal('I'), v.literal('II'), v.literal('III'))),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index('by_userId', ['userId'])
     .index('by_updatedAt', ['updatedAt']),
+
+  /**
+   * Cache du jour (strain, banque, préparation, fraîcheur).
+   * Une ligne par (userId, dateKey) — invariant de mutation, l’index n’est pas unique.
+   */
+  day_snapshots: defineTable({
+    userId: v.string(),
+    dateKey: v.string(),
+    timezone: v.string(),
+    inputsHash: v.string(),
+    payload: v.any(),
+    computedAt: v.number(),
+  }).index('by_user_date', ['userId', 'dateKey']),
+
+  /**
+   * XP de séance, une fois par note. La mutation refuse un second crédit
+   * pour le même (userId, noteId).
+   */
+  workout_xp_awards: defineTable({
+    userId: v.string(),
+    noteId: v.string(),
+    xp: v.number(),
+    ratingBefore: v.number(),
+    ratingAfter: v.number(),
+    createdAt: v.number(),
+  }).index('by_user_note', ['userId', 'noteId']),
 
   workouts_state: defineTable({
     userId: v.string(),
