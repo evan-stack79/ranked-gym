@@ -40,6 +40,7 @@ import {
 import { getRankFromLevel } from '../../utils/rank'
 import { fetchUserStats, type UserStatsPayload } from '../../services/userStatsService'
 import { ChartSkeleton } from './charts/ChartSkeleton'
+import { RankedCoach } from './RankedCoach'
 
 const XP_PER_LEVEL = 1000
 
@@ -387,6 +388,8 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
             <PowerCurveChart points={arenaStats?.benchCurve} />
           )}
         </div>
+
+        <RankedCoach />
       </section>
 
       {/* Assiduité */}
