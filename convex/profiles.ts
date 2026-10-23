@@ -2,6 +2,7 @@ import { v } from 'convex/values'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
+import { getRankFromLevel } from './lib/progressionRank'
 
 const DEFAULT_DISCIPLINE = 'Musculation'
 const DEFAULT_RANK = 'Bronze'
@@ -18,6 +19,9 @@ export type ConvexProfileView = {
   sportIds?: string[]
   sportsUndecided?: boolean
   avatarFileId?: Id<'user_files'>
+  performanceRating: number
+  ratedSessions: number
+  rankDivision: 'I' | 'II' | 'III'
   currentStreak: number
   lastLoginDate: string | null
   createdAt: number
@@ -36,6 +40,9 @@ const profileViewValidator = v.object({
   sportIds: v.optional(v.array(v.string())),
   sportsUndecided: v.optional(v.boolean()),
   avatarFileId: v.optional(v.id('user_files')),
+  performanceRating: v.number(),
+  ratedSessions: v.number(),
+  rankDivision: v.union(v.literal('I'), v.literal('II'), v.literal('III')),
   currentStreak: v.number(),
   lastLoginDate: v.union(v.string(), v.null()),
   createdAt: v.number(),
@@ -70,6 +77,7 @@ export async function toProfileView(
   assertUserOwnership(profile.userId, userId)
   const streak = await findStreak(ctx, userId)
   if (streak) assertUserOwnership(streak.userId, userId)
+  const derived = getRankFromLevel(profile.level)
   return {
     userId: profile.userId,
     pseudo: profile.pseudo,
@@ -82,6 +90,9 @@ export async function toProfileView(
     sportIds: profile.sportIds,
     sportsUndecided: profile.sportsUndecided,
     avatarFileId: profile.avatarFileId,
+    performanceRating: profile.performanceRating ?? 1000,
+    ratedSessions: profile.ratedSessions ?? 0,
+    rankDivision: profile.rankDivision ?? derived.division,
     currentStreak: streak?.currentStreak ?? 0,
     lastLoginDate: streak?.lastLoginDate ?? null,
     createdAt: profile.createdAt,
@@ -117,6 +128,9 @@ export async function ensureProfileForSession(
     discipline: clip(disciplineLabel, 40, DEFAULT_DISCIPLINE),
     isGhostModeEnabled: false,
     isPrivate: false,
+    performanceRating: 1000,
+    ratedSessions: 0,
+    rankDivision: 'I',
     createdAt: now,
     updatedAt: now,
   })
