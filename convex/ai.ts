@@ -2,7 +2,6 @@ import { v } from 'convex/values'
 import { api, internal } from './_generated/api'
 import {
   action,
-  env,
   internalMutation,
   internalQuery,
   type QueryCtx,
@@ -12,17 +11,7 @@ import {
   computeLeanMassKg,
   effectiveAiCallsToday,
 } from './lib/athleteMetrics'
-
-/** Convex dashboard env (CF_*) — même accès runtime que `process.env` côté actions. */
-function readConvexEnv(name: string): string {
-  const fromTyped = (env as Record<string, string | undefined>)[name]
-  if (typeof fromTyped === 'string' && fromTyped.trim()) return fromTyped.trim()
-  const fromProcess = (
-    globalThis as { process?: { env?: Record<string, string | undefined> } }
-  ).process?.env?.[name]
-  if (typeof fromProcess === 'string' && fromProcess.trim()) return fromProcess.trim()
-  return ''
-}
+import { runWorkersAiChat } from './lib/cloudflareAi'
 
 /** Quota gratuit Cloudflare Workers AI (appels / jour UTC). */
 const AI_DAILY_FREE_LIMIT = 3
@@ -328,71 +317,17 @@ export const askRankedIntelligence = action({
       }
     }
 
-    const accountId = readConvexEnv('CF_ACCOUNT_ID')
-    const apiToken = readConvexEnv('CF_API_TOKEN')
-    if (!accountId || !apiToken) {
-      return {
-        ok: false,
-        error: 'Workers AI non configuré (CF_ACCOUNT_ID / CF_API_TOKEN).',
-        code: 'AI_CONFIG_MISSING',
-      }
-    }
-
     const userQuestion =
       typeof args.question === 'string' && args.question.trim().length > 0
         ? args.question.trim().slice(0, 800)
         : 'Donne-moi un feedback de performance concis basé sur mes stats actuelles.'
 
-    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3.1-8b-instruct`
-    let aiText = ''
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [
-            { role: 'system', content: buildSystemPrompt(context) },
-            { role: 'user', content: userQuestion },
-          ],
-        }),
-      })
-      if (!response.ok) {
-        const detail = await response.text().catch(() => '')
-        console.error(
-          '[askRankedIntelligence] Cloudflare AI HTTP',
-          response.status,
-          detail.slice(0, 300),
-        )
-        return {
-          ok: false,
-          error: 'Le coach IA est temporairement indisponible — réessaie plus tard.',
-          code: 'AI_HTTP_ERROR',
-        }
-      }
-      const payload = (await response.json()) as {
-        success?: boolean
-        result?: { response?: unknown }
-        errors?: unknown
-      }
-      const raw = payload?.result?.response
-      aiText = typeof raw === 'string' ? raw.trim() : ''
-      if (!aiText) {
-        return {
-          ok: false,
-          error: 'Réponse IA vide — réessaie.',
-          code: 'AI_EMPTY',
-        }
-      }
-    } catch (error) {
-      console.error('[askRankedIntelligence] Cloudflare AI fetch failed', error)
-      return {
-        ok: false,
-        error: 'Impossible de joindre Workers AI — réessaie.',
-        code: 'AI_NETWORK',
-      }
+    const ai = await runWorkersAiChat({
+      system: buildSystemPrompt(context),
+      user: userQuestion,
+    })
+    if (!ai.ok) {
+      return { ok: false, error: ai.error, code: ai.code }
     }
 
     const quota = await ctx.runMutation(internal.ai.incrementAiQuota, {
@@ -402,7 +337,7 @@ export const askRankedIntelligence = action({
     return {
       ok: true,
       source: 'ai',
-      message: aiText,
+      message: ai.text,
       aiCallsToday: quota.aiCallsToday,
       dailyLimit: AI_DAILY_FREE_LIMIT,
       remaining: Math.max(0, AI_DAILY_FREE_LIMIT - quota.aiCallsToday),

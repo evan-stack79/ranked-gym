@@ -23,6 +23,7 @@ import type * as lib_athleteMetrics from "../lib/athleteMetrics.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_authConfig from "../lib/authConfig.js";
 import type * as lib_authCrypto from "../lib/authCrypto.js";
+import type * as lib_cloudflareAi from "../lib/cloudflareAi.js";
 import type * as lib_foodAddAccess from "../lib/foodAddAccess.js";
 import type * as lib_foodAddNutrients from "../lib/foodAddNutrients.js";
 import type * as lib_foodAddPublic from "../lib/foodAddPublic.js";
@@ -37,6 +38,7 @@ import type * as lib_rateLimit from "../lib/rateLimit.js";
 import type * as lib_socialVisibility from "../lib/socialVisibility.js";
 import type * as lib_stripJournalMeals from "../lib/stripJournalMeals.js";
 import type * as lib_transactionalMailer from "../lib/transactionalMailer.js";
+import type * as lib_workoutGenerator from "../lib/workoutGenerator.js";
 import type * as mealPhotoAi from "../mealPhotoAi.js";
 import type * as migrations from "../migrations.js";
 import type * as nutrition from "../nutrition.js";
@@ -45,6 +47,7 @@ import type * as purgeSupabaseMeals from "../purgeSupabaseMeals.js";
 import type * as rpc from "../rpc.js";
 import type * as social from "../social.js";
 import type * as sync from "../sync.js";
+import type * as workouts from "../workouts.js";
 
 import type {
   ApiFromModules,
@@ -68,6 +71,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   "lib/authConfig": typeof lib_authConfig;
   "lib/authCrypto": typeof lib_authCrypto;
+  "lib/cloudflareAi": typeof lib_cloudflareAi;
   "lib/foodAddAccess": typeof lib_foodAddAccess;
   "lib/foodAddNutrients": typeof lib_foodAddNutrients;
   "lib/foodAddPublic": typeof lib_foodAddPublic;
@@ -82,6 +86,7 @@ declare const fullApi: ApiFromModules<{
   "lib/socialVisibility": typeof lib_socialVisibility;
   "lib/stripJournalMeals": typeof lib_stripJournalMeals;
   "lib/transactionalMailer": typeof lib_transactionalMailer;
+  "lib/workoutGenerator": typeof lib_workoutGenerator;
   mealPhotoAi: typeof mealPhotoAi;
   migrations: typeof migrations;
   nutrition: typeof nutrition;
@@ -90,6 +95,7 @@ declare const fullApi: ApiFromModules<{
   rpc: typeof rpc;
   social: typeof social;
   sync: typeof sync;
+  workouts: typeof workouts;
 }>;
 
 /**
