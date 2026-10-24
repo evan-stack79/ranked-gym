@@ -163,11 +163,13 @@ export function scaleNutritionOnGramsChange(input: {
   proteinG: number | null | undefined
   carbsG: number | null | undefined
   fatG: number | null | undefined
+  fiberG?: number | null | undefined
 }): {
   calories: number | null
   proteinG: number | null
   carbsG: number | null
   fatG: number | null
+  fiberG: number | null
 } {
   const { oldGrams, newGrams } = input
   if (!(oldGrams > 0) || !(newGrams > 0) || !Number.isFinite(oldGrams) || !Number.isFinite(newGrams)) {
@@ -176,6 +178,7 @@ export function scaleNutritionOnGramsChange(input: {
       proteinG: input.proteinG ?? null,
       carbsG: input.carbsG ?? null,
       fatG: input.fatG ?? null,
+      fiberG: input.fiberG ?? null,
     }
   }
   const ratio = newGrams / oldGrams
@@ -192,6 +195,7 @@ export function scaleNutritionOnGramsChange(input: {
     proteinG: scaleMacro(input.proteinG),
     carbsG: scaleMacro(input.carbsG),
     fatG: scaleMacro(input.fatG),
+    fiberG: scaleMacro(input.fiberG),
   }
 }
 

@@ -28,6 +28,7 @@ import type * as lib_transactionalMailer from "../lib/transactionalMailer.js";
 import type * as migrations from "../migrations.js";
 import type * as lib_stripJournalMeals from "../lib/stripJournalMeals.js";
 import type * as nutrition from "../nutrition.js";
+import type * as nutritionDiary from "../nutritionDiary.js";
 import type * as profiles from "../profiles.js";
 import type * as progression from "../progression.js";
 import type * as purgeSupabaseMeals from "../purgeSupabaseMeals.js";
@@ -62,6 +63,7 @@ declare const fullApi: ApiFromModules<{
   "lib/transactionalMailer": typeof lib_transactionalMailer;
   migrations: typeof migrations;
   nutrition: typeof nutrition;
+  nutritionDiary: typeof nutritionDiary;
   profiles: typeof profiles;
   progression: typeof progression;
   purgeSupabaseMeals: typeof purgeSupabaseMeals;

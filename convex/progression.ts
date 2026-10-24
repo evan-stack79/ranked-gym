@@ -3,6 +3,9 @@ import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/s
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
 import { getRankFromLevel } from './lib/progressionRank'
 import { toProfileView, type ConvexProfileView } from './profiles'
+import type { NutritionDayCache } from '../src/nutrition-engine/diaryRollup'
+import { PROTEIN_GOAL_HALF_LIFE_FACTOR } from '../src/nutrition-engine/proteinGoalFreshness'
+import { muscleFreshness, type FreshnessEvent } from '../src/progression-engine/freshness'
 
 const XP_PER_LEVEL = 1000
 const XP_SESSION_CAP = 250
@@ -17,6 +20,33 @@ const snapshotPayloadValidator = v.object({
   xpAwarded: v.number(),
   strainScale: v.number(),
   muscleFreshness: v.union(v.any(), v.null()),
+  nutrition: v.optional(
+    v.union(
+      v.null(),
+      v.object({
+        logged: v.boolean(),
+        kcal: v.union(v.number(), v.null()),
+        proteinG: v.union(v.number(), v.null()),
+        carbsG: v.union(v.number(), v.null()),
+        fatG: v.union(v.number(), v.null()),
+        fiberG: v.union(v.number(), v.null()),
+        waterMl: v.union(v.number(), v.null()),
+        targetKcal: v.union(v.number(), v.null()),
+        proteinTargetG: v.union(v.number(), v.null()),
+        inputsHash: v.string(),
+      }),
+    ),
+  ),
+  freshnessHalfLifeFactor: v.optional(v.number()),
+  freshnessEvents: v.optional(
+    v.array(
+      v.object({
+        muscles: v.array(v.string()),
+        units: v.number(),
+        hoursAgo: v.number(),
+      }),
+    ),
+  ),
 })
 
 const daySnapshotValidator = v.object({
@@ -36,6 +66,12 @@ const awardValidator = v.object({
   profile: v.any(),
 })
 
+export type FreshnessEventSnapshot = {
+  muscles: string[]
+  units: number
+  hoursAgo: number
+}
+
 export type DaySnapshotPayload = {
   workoutStrain: number | null
   strainZ: number | null
@@ -44,7 +80,13 @@ export type DaySnapshotPayload = {
   xpAwarded: number
   strainScale: number
   muscleFreshness: Record<string, number> | null
+  nutrition?: NutritionDayCache | null
+  freshnessHalfLifeFactor?: number
+  freshnessEvents?: FreshnessEventSnapshot[]
 }
+
+const NUTRITION_ONLY_STRAIN_SCALE = 150
+const PENDING_STRAIN_HASH = 'pending-strain'
 
 export type DaySnapshotView = {
   dateKey: string
@@ -101,7 +143,7 @@ export function parseSnapshotPayload(value: unknown): DaySnapshotPayload {
       muscleFreshness[muscle] = score
     }
   }
-  return {
+  const payload: DaySnapshotPayload = {
     workoutStrain: assertNullableScore(record.workoutStrain, 'SNAPSHOT_PAYLOAD_INVALID'),
     strainZ: assertNullableScore(record.strainZ, 'SNAPSHOT_PAYLOAD_INVALID'),
     sleepBankMinutes: assertNullableScore(record.sleepBankMinutes, 'SNAPSHOT_PAYLOAD_INVALID'),
@@ -110,6 +152,89 @@ export function parseSnapshotPayload(value: unknown): DaySnapshotPayload {
     strainScale,
     muscleFreshness,
   }
+  if ('nutrition' in record) payload.nutrition = parseNutritionCache(record.nutrition)
+  if ('freshnessHalfLifeFactor' in record) {
+    payload.freshnessHalfLifeFactor = parseHalfLifeFactor(record.freshnessHalfLifeFactor)
+  }
+  if ('freshnessEvents' in record) payload.freshnessEvents = parseFreshnessEvents(record.freshnessEvents)
+  return payload
+}
+
+function parseNullableFinite(value: unknown, code: string): number | null {
+  if (value === null) return null
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(code)
+  return value
+}
+
+export function parseNutritionCache(value: unknown): NutritionDayCache | null {
+  if (value === null) return null
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('SNAPSHOT_NUTRITION_INVALID')
+  }
+  const record = value as Record<string, unknown>
+  if (typeof record.logged !== 'boolean') throw new Error('SNAPSHOT_NUTRITION_INVALID')
+  if (typeof record.inputsHash !== 'string' || !record.inputsHash.trim() || record.inputsHash.length > 512) {
+    throw new Error('SNAPSHOT_NUTRITION_INVALID')
+  }
+  return {
+    logged: record.logged,
+    kcal: parseNullableFinite(record.kcal, 'SNAPSHOT_NUTRITION_INVALID'),
+    proteinG: parseNullableFinite(record.proteinG, 'SNAPSHOT_NUTRITION_INVALID'),
+    carbsG: parseNullableFinite(record.carbsG, 'SNAPSHOT_NUTRITION_INVALID'),
+    fatG: parseNullableFinite(record.fatG, 'SNAPSHOT_NUTRITION_INVALID'),
+    fiberG: parseNullableFinite(record.fiberG, 'SNAPSHOT_NUTRITION_INVALID'),
+    waterMl: parseNullableFinite(record.waterMl, 'SNAPSHOT_NUTRITION_INVALID'),
+    targetKcal: parseNullableFinite(record.targetKcal, 'SNAPSHOT_NUTRITION_INVALID'),
+    proteinTargetG: parseNullableFinite(record.proteinTargetG, 'SNAPSHOT_NUTRITION_INVALID'),
+    inputsHash: record.inputsHash.trim(),
+  }
+}
+
+function parseHalfLifeFactor(value: unknown): number {
+  if (value !== 1 && value !== PROTEIN_GOAL_HALF_LIFE_FACTOR) {
+    throw new Error('FRESHNESS_FACTOR_INVALID')
+  }
+  return value
+}
+
+export function parseFreshnessEvents(value: unknown): FreshnessEventSnapshot[] {
+  if (!Array.isArray(value)) throw new Error('FRESHNESS_EVENTS_INVALID')
+  return value.map((event) => {
+    if (!event || typeof event !== 'object' || Array.isArray(event)) {
+      throw new Error('FRESHNESS_EVENTS_INVALID')
+    }
+    const record = event as Record<string, unknown>
+    if (!Array.isArray(record.muscles) || !record.muscles.every((muscle) => typeof muscle === 'string')) {
+      throw new Error('FRESHNESS_EVENTS_INVALID')
+    }
+    if (typeof record.units !== 'number' || !Number.isFinite(record.units) || record.units <= 0) {
+      throw new Error('FRESHNESS_EVENTS_INVALID')
+    }
+    if (typeof record.hoursAgo !== 'number' || !Number.isFinite(record.hoursAgo) || record.hoursAgo < 0) {
+      throw new Error('FRESHNESS_EVENTS_INVALID')
+    }
+    return { muscles: record.muscles, units: record.units, hoursAgo: record.hoursAgo }
+  })
+}
+
+function shellStrainPayload(): DaySnapshotPayload {
+  return {
+    workoutStrain: null,
+    strainZ: null,
+    sleepBankMinutes: null,
+    preparation: null,
+    xpAwarded: 0,
+    strainScale: NUTRITION_ONLY_STRAIN_SCALE,
+    muscleFreshness: null,
+  }
+}
+
+function withProteinGoalFreshness(payload: DaySnapshotPayload): DaySnapshotPayload {
+  const factor = payload.freshnessHalfLifeFactor ?? 1
+  const events = payload.freshnessEvents
+  if (factor === 1 || !events || events.length === 0) return payload
+  const freshness = muscleFreshness(events as FreshnessEvent[], { halfLifeFactor: factor })
+  return { ...payload, muscleFreshness: freshness }
 }
 
 function applyXp(level: number, xp: number, gain: number): { level: number; xp: number } {
@@ -160,7 +285,7 @@ export async function upsertDaySnapshotForSession(
   const dateKey = assertDateKey(input.dateKey)
   const timezone = assertBoundedText(input.timezone, 'SNAPSHOT_TIMEZONE_INVALID', 64)
   const inputsHash = assertBoundedText(input.inputsHash, 'SNAPSHOT_HASH_INVALID', 128)
-  const payload = parseSnapshotPayload(input.payload)
+  const incomingStrain = parseSnapshotPayload(input.payload)
   const existing = await findSnapshots(ctx, user.userId, dateKey)
   for (const row of existing) assertUserOwnership(row.userId, user.userId)
   const current = existing[0]
@@ -176,12 +301,162 @@ export async function upsertDaySnapshotForSession(
       },
     }
   }
+  const previous = current ? parseSnapshotPayload(current.payload) : null
+  const factor =
+    previous?.freshnessHalfLifeFactor === PROTEIN_GOAL_HALF_LIFE_FACTOR
+      ? PROTEIN_GOAL_HALF_LIFE_FACTOR
+      : incomingStrain.freshnessHalfLifeFactor
+  const events = incomingStrain.freshnessEvents ?? previous?.freshnessEvents
+  const nutrition = incomingStrain.nutrition !== undefined ? incomingStrain.nutrition : previous?.nutrition
+  let payload: DaySnapshotPayload = {
+    workoutStrain: incomingStrain.workoutStrain,
+    strainZ: incomingStrain.strainZ,
+    sleepBankMinutes: incomingStrain.sleepBankMinutes,
+    preparation: incomingStrain.preparation,
+    xpAwarded: incomingStrain.xpAwarded,
+    strainScale: incomingStrain.strainScale,
+    muscleFreshness: incomingStrain.muscleFreshness,
+  }
+  if (factor != null) payload.freshnessHalfLifeFactor = factor
+  if (events) payload.freshnessEvents = events
+  if (nutrition !== undefined) payload.nutrition = nutrition
+  payload = withProteinGoalFreshness(payload)
   const computedAt = Date.now()
   if (current) {
     await ctx.db.patch(current._id, { timezone, inputsHash, payload, computedAt })
     for (const extra of existing.slice(1)) {
       await ctx.db.delete(extra._id)
     }
+  } else {
+    await ctx.db.insert('day_snapshots', {
+      userId: user.userId,
+      dateKey,
+      timezone,
+      inputsHash,
+      payload,
+      computedAt,
+    })
+  }
+  return {
+    updated: true,
+    snapshot: { dateKey, timezone, inputsHash, payload, computedAt },
+  }
+}
+
+function viewFromRow(row: {
+  dateKey: string
+  timezone: string
+  inputsHash: string
+  payload: unknown
+  computedAt: number
+}): DaySnapshotView {
+  return {
+    dateKey: row.dateKey,
+    timezone: row.timezone,
+    inputsHash: row.inputsHash,
+    payload: parseSnapshotPayload(row.payload),
+    computedAt: row.computedAt,
+  }
+}
+
+/**
+ * Fusionne payload.nutrition sans effacer le strain.
+ * Même hash nutrition → aucune réécriture.
+ */
+export async function mergeNutritionDaySnapshotForSession(
+  ctx: MutationCtx,
+  sessionToken: string,
+  input: {
+    dateKey: string
+    timezone: string
+    nutrition: NutritionDayCache
+  },
+): Promise<{ updated: boolean; snapshot: DaySnapshotView }> {
+  const user = await requireSessionUser(ctx, sessionToken)
+  const dateKey = assertDateKey(input.dateKey)
+  const timezone = assertBoundedText(input.timezone, 'SNAPSHOT_TIMEZONE_INVALID', 64)
+  const nutrition = parseNutritionCache(input.nutrition)
+  if (!nutrition) throw new Error('SNAPSHOT_NUTRITION_INVALID')
+  const existing = await findSnapshots(ctx, user.userId, dateKey)
+  for (const row of existing) assertUserOwnership(row.userId, user.userId)
+  const current = existing[0]
+  if (current) {
+    const previous = parseSnapshotPayload(current.payload)
+    if (previous.nutrition?.inputsHash === nutrition.inputsHash) {
+      return { updated: false, snapshot: viewFromRow(current) }
+    }
+    const payload: DaySnapshotPayload = { ...previous, nutrition }
+    const computedAt = Date.now()
+    await ctx.db.patch(current._id, { timezone, payload, computedAt })
+    for (const extra of existing.slice(1)) await ctx.db.delete(extra._id)
+    return {
+      updated: true,
+      snapshot: {
+        dateKey,
+        timezone,
+        inputsHash: current.inputsHash,
+        payload,
+        computedAt,
+      },
+    }
+  }
+  const payload: DaySnapshotPayload = { ...shellStrainPayload(), nutrition }
+  const computedAt = Date.now()
+  await ctx.db.insert('day_snapshots', {
+    userId: user.userId,
+    dateKey,
+    timezone,
+    inputsHash: PENDING_STRAIN_HASH,
+    payload,
+    computedAt,
+  })
+  return {
+    updated: true,
+    snapshot: { dateKey, timezone, inputsHash: PENDING_STRAIN_HASH, payload, computedAt },
+  }
+}
+
+/**
+ * protein_goal débloqué : demi-vie × 0,9 sur toutes les séances du dateKey.
+ * Le repas peut arriver après la séance. La préparation et le hash strain restent.
+ */
+export async function applyProteinGoalHalfLifeForSession(
+  ctx: MutationCtx,
+  sessionToken: string,
+  input: {
+    dateKey: string
+    timezone: string
+    freshnessEvents?: FreshnessEventSnapshot[]
+  },
+): Promise<{ updated: boolean; snapshot: DaySnapshotView }> {
+  const user = await requireSessionUser(ctx, sessionToken)
+  const dateKey = assertDateKey(input.dateKey)
+  const timezone = assertBoundedText(input.timezone, 'SNAPSHOT_TIMEZONE_INVALID', 64)
+  const incomingEvents = input.freshnessEvents ? parseFreshnessEvents(input.freshnessEvents) : undefined
+  const existing = await findSnapshots(ctx, user.userId, dateKey)
+  for (const row of existing) assertUserOwnership(row.userId, user.userId)
+  const current = existing[0]
+  const previous = current ? parseSnapshotPayload(current.payload) : shellStrainPayload()
+  const events = incomingEvents ?? previous.freshnessEvents
+  let payload: DaySnapshotPayload = {
+    ...previous,
+    freshnessHalfLifeFactor: PROTEIN_GOAL_HALF_LIFE_FACTOR,
+  }
+  if (events) payload.freshnessEvents = events
+  payload = withProteinGoalFreshness(payload)
+  const same =
+    current &&
+    previous.freshnessHalfLifeFactor === PROTEIN_GOAL_HALF_LIFE_FACTOR &&
+    JSON.stringify(previous.freshnessEvents ?? null) === JSON.stringify(payload.freshnessEvents ?? null) &&
+    JSON.stringify(previous.muscleFreshness) === JSON.stringify(payload.muscleFreshness)
+  if (current && same) {
+    return { updated: false, snapshot: viewFromRow(current) }
+  }
+  const computedAt = Date.now()
+  const inputsHash = current?.inputsHash ?? PENDING_STRAIN_HASH
+  if (current) {
+    await ctx.db.patch(current._id, { timezone, payload, computedAt })
+    for (const extra of existing.slice(1)) await ctx.db.delete(extra._id)
   } else {
     await ctx.db.insert('day_snapshots', {
       userId: user.userId,

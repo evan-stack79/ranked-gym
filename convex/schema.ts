@@ -8,6 +8,7 @@ import { v } from 'convex/values'
  * - Profil: profiles, checkins, custom_spots, active_checkins
  * - Train: workouts_state (colonnes inchangées — contrat v2 additif dans le JSON)
  * - Progression: day_snapshots, workout_xp_awards, champs Elo sur profiles
+ * - Nutrition XP: nutrition_xp_awards (userId + dateKey + kind)
  * - Nutrition + Hydratation:
  *   - compatibility snapshot: nutrition_state
  *   - granular sync: nutrition_meals, nutrition_water_entries, nutrition_day_state
@@ -191,7 +192,8 @@ export const convexTables = {
     .index('by_updatedAt', ['updatedAt']),
 
   /**
-   * Cache du jour (strain, banque, préparation, fraîcheur).
+   * Cache du jour (strain, banque, préparation, fraîcheur, nutrition).
+   * `payload.nutrition` est fusionné : un écrit strain ne l’efface pas.
    * Une ligne par (userId, dateKey) — invariant de mutation, l’index n’est pas unique.
    */
   day_snapshots: defineTable({
@@ -215,6 +217,19 @@ export const convexTables = {
     ratingAfter: v.number(),
     createdAt: v.number(),
   }).index('by_user_note', ['userId', 'noteId']),
+
+  /**
+   * XP nutrition du jour, une fois par kind.
+   * meals_complete = 25, protein_goal = 10, plafond 35.
+   * Jamais retiré si un repas est supprimé ensuite.
+   */
+  nutrition_xp_awards: defineTable({
+    userId: v.string(),
+    dateKey: v.string(),
+    kind: v.union(v.literal('meals_complete'), v.literal('protein_goal')),
+    xp: v.number(),
+    createdAt: v.number(),
+  }).index('by_user_date_kind', ['userId', 'dateKey', 'kind']),
 
   workouts_state: defineTable({
     userId: v.string(),
@@ -277,6 +292,8 @@ export const convexTables = {
     proteinG: v.optional(v.union(v.number(), v.null())),
     carbsG: v.optional(v.union(v.number(), v.null())),
     fatG: v.optional(v.union(v.number(), v.null())),
+    /** Fibres (g) — pas de l’énergie, pas d’XP. */
+    fiberG: v.optional(v.union(v.number(), v.null())),
     grams: v.optional(v.number()),
     pieces: v.optional(v.number()),
     portionMode: v.optional(v.union(v.literal('solo'), v.literal('with_sides'))),
@@ -338,6 +355,10 @@ export const convexTables = {
     proteinPer100g: v.union(v.number(), v.null()),
     carbsPer100g: v.union(v.number(), v.null()),
     fatPer100g: v.union(v.number(), v.null()),
+    /** Fibres pour 100 g. Absentes sur les lignes catalogue déjà écrites. */
+    fiberPer100g: v.optional(v.union(v.number(), v.null())),
+    /** Grammes de la portion de référence (étiquette), si connus. */
+    portionRefGrams: v.optional(v.union(v.number(), v.null())),
     /**
      * Provenance des nutriments catalogue.
      * 'server' = off_product_nutrients / calcul serveur — peut nourrir V3.

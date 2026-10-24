@@ -36,6 +36,30 @@ export {
 } from './sportConstraints.ts'
 export { buildRecommendations } from './recommendations.ts'
 export { validateInput, validateForbiddenActivityFields } from './validation.ts'
+export {
+  diaryRollup,
+  weeklyMeanKcal,
+  displayedKcal,
+  nutritionTargetKcal,
+  nutritionDayCache,
+  nutritionDayInputsHash,
+} from './diaryRollup.ts'
+export type { DiaryMealInput, DiaryRollup, DiaryWaterInput, NutritionDayCache } from './diaryRollup.ts'
+export {
+  MEALS_COMPLETE_XP,
+  PROTEIN_GOAL_XP,
+  NUTRITION_XP_DAY_CAP,
+  evaluateNutritionXp,
+  xpForKind,
+} from './nutritionXp.ts'
+export type { NutritionAwardKind, NutritionXpEvaluation } from './nutritionXp.ts'
+export {
+  PROTEIN_GOAL_HALF_LIFE_FACTOR,
+  applyProteinGoalToDay,
+  halfLifeFactorForProteinGoal,
+} from './proteinGoalFreshness.ts'
+export { readHomeNutritionDay } from './homeRead.ts'
+export type { HomeNutritionRead } from './homeRead.ts'
 export type {
   ActivityLevel,
   EffortIntensity,
