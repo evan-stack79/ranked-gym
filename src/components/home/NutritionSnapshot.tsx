@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { readHomeNutritionDay } from '../../nutrition-engine/homeRead'
+import type { NutritionDayCache } from '../../nutrition-engine/diaryRollup'
 import { getNutritionTarget } from '../../services/nutritionActivity'
 import { getCalorieProfile, getTodayJournal, getTodayWaterMl } from '../../services/nutritionStorage'
 import { formatWaterMl } from '../../utils/waterGoal'
@@ -19,9 +21,11 @@ import { WaterGoalChooser } from '../nutrition/WaterGoalChooser'
 
 interface NutritionSnapshotProps {
   onOpenNutrition?: () => void
+  /** Cache `day_snapshots.payload.nutrition`. Absent → rollup du jour seulement. */
+  nutritionDay?: NutritionDayCache | null
 }
 
-export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
+export function NutritionSnapshot({ onOpenNutrition, nutritionDay }: NutritionSnapshotProps) {
   const [tick, setTick] = useState(0)
   const [waterSaving, setWaterSaving] = useState(false)
   const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' } | null>(
@@ -60,27 +64,35 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
   }, [])
 
   const snapshot = useMemo(() => {
+    void tick
     const nutrition = getNutritionTarget()
     const profile = getCalorieProfile()
-    const meals = getTodayJournal().meals
-    const waterMl = getTodayWaterMl()
     const waterGoalMl = getUserWaterGoalMl()
-    const consumedCalories = meals.reduce((sum, meal) => sum + (meal.calories ?? 0), 0)
-
-    const targetCalories = nutrition.targetCalories
+    const day = readHomeNutritionDay({
+      snapshot: nutritionDay ?? null,
+      todayMeals: nutritionDay ? [] : getTodayJournal().meals,
+      todayWaterMl: nutritionDay ? null : getTodayWaterMl(),
+      waterGoalMl,
+    })
+    const consumedCalories = day.kcal
+    const targetCalories = day.targetKcal ?? nutrition.targetCalories
     const targetAvailable = nutrition.engineOk && targetCalories > 0
-    const remainingCalories = targetAvailable
-      ? Math.max(0, targetCalories - consumedCalories)
-      : 0
+    const remainingCalories =
+      targetAvailable && consumedCalories != null
+        ? Math.max(0, targetCalories - consumedCalories)
+        : targetAvailable
+          ? targetCalories
+          : 0
     const progress =
-      targetAvailable && targetCalories > 0
+      targetAvailable && targetCalories > 0 && consumedCalories != null
         ? Math.min(consumedCalories / targetCalories, 1)
         : 0
-    const hasWaterGoal = waterGoalMl != null && waterGoalMl > 0
+    const waterMl = day.waterMl
+    const hasWaterGoal = day.showWaterRing && waterGoalMl != null
     const waterProgress =
-      hasWaterGoal ? Math.min(Math.max(0, waterMl) / waterGoalMl, 1) : 0
-    const showQuickWater = shouldShowHomeQuickWaterButton(waterMl, waterGoalMl)
-    const waterGoalReached = hasWaterGoal && waterMl >= waterGoalMl
+      hasWaterGoal && waterMl != null ? Math.min(Math.max(0, waterMl) / waterGoalMl, 1) : 0
+    const showQuickWater = shouldShowHomeQuickWaterButton(waterMl ?? 0, waterGoalMl)
+    const waterGoalReached = hasWaterGoal && waterMl != null && waterMl >= waterGoalMl
 
     const calorieGoalEnabled = isCalorieGoalEnabled()
     const minor = isMinorAge(profile.age)
@@ -93,6 +105,7 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
       targetCalories,
       remainingCalories,
       consumedCalories,
+      logged: day.logged,
       progress,
       waterMl,
       waterGoalMl,
@@ -101,7 +114,7 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
       showQuickWater,
       waterGoalReached,
     }
-  }, [tick])
+  }, [tick, nutritionDay])
 
   const handleQuickWater = () => {
     if (!canSubmitHomeQuickWater(waterSaving)) return
@@ -140,8 +153,14 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
               Il te reste <StaticKcalNumber value={snapshot.remainingCalories} /> kcal
             </p>
             <p className="mt-1 text-[13px] text-[#AEAEB2]">
-              <StaticKcalNumber value={snapshot.consumedCalories} /> consommées sur{' '}
-              <StaticKcalNumber value={snapshot.targetCalories} />
+              {snapshot.consumedCalories == null ? (
+                'Aucun repas compté'
+              ) : (
+                <>
+                  <StaticKcalNumber value={snapshot.consumedCalories} /> consommées sur{' '}
+                  <StaticKcalNumber value={snapshot.targetCalories} />
+                </>
+              )}
             </p>
           </>
         ) : snapshot.showUnavailableGoal ? (
@@ -153,7 +172,13 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
           <>
             <p className="mt-1 text-[17px] font-semibold text-white">Suivi du jour</p>
             <p className="mt-1 text-[13px] text-[#AEAEB2]">
-              <StaticKcalNumber value={snapshot.consumedCalories} /> kcal consommées
+              {snapshot.consumedCalories == null ? (
+                'Aucun repas compté'
+              ) : (
+                <>
+                  <StaticKcalNumber value={snapshot.consumedCalories} /> kcal consommées
+                </>
+              )}
             </p>
           </>
         )}
@@ -196,21 +221,25 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
                 <p className="mt-0.5 text-[15px] font-semibold text-[#7DD3FC]">Objectif atteint</p>
               ) : (
                 <p className="mt-0.5 text-[15px] font-semibold text-white">
-                  <CountUpNumber
-                    kind="water"
-                    value={snapshot.waterMl}
-                    format={(n) => formatWaterMl(Math.round(n))}
-                  />{' '}
-                  sur {formatWaterMl(snapshot.waterGoalMl!)}
+                <CountUpNumber
+                  kind="water"
+                  value={snapshot.waterMl ?? 0}
+                  format={(n) => formatWaterMl(Math.round(n))}
+                />{' '}
+                sur {formatWaterMl(snapshot.waterGoalMl!)}
                 </p>
               )
             ) : (
               <p className="mt-0.5 text-[15px] font-semibold text-white">
-                <CountUpNumber
-                  kind="water"
-                  value={snapshot.waterMl}
-                  format={(n) => formatWaterMl(Math.round(n))}
-                />{' '}
+                {snapshot.waterMl == null ? (
+                  '—'
+                ) : (
+                  <CountUpNumber
+                    kind="water"
+                    value={snapshot.waterMl}
+                    format={(n) => formatWaterMl(Math.round(n))}
+                  />
+                )}{' '}
                 bus aujourd&apos;hui
               </p>
             )}

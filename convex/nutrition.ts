@@ -274,6 +274,7 @@ const mealValidator = v.object({
   proteinG: v.optional(v.union(v.number(), v.null())),
   carbsG: v.optional(v.union(v.number(), v.null())),
   fatG: v.optional(v.union(v.number(), v.null())),
+  fiberG: v.optional(v.union(v.number(), v.null())),
   grams: v.optional(v.number()),
   pieces: v.optional(v.number()),
   portionMode: v.optional(v.union(v.literal('solo'), v.literal('with_sides'))),
@@ -322,6 +323,8 @@ const foodValidator = v.object({
   proteinPer100g: v.union(v.number(), v.null()),
   carbsPer100g: v.union(v.number(), v.null()),
   fatPer100g: v.union(v.number(), v.null()),
+  fiberPer100g: v.optional(v.union(v.number(), v.null())),
+  portionRefGrams: v.optional(v.union(v.number(), v.null())),
   imageUrl: v.optional(v.string()),
   source: v.union(
     v.literal('open_food_facts'),
@@ -348,6 +351,7 @@ export const upsertMeal = mutation({
     proteinG: v.optional(v.union(v.number(), v.null())),
     carbsG: v.optional(v.union(v.number(), v.null())),
     fatG: v.optional(v.union(v.number(), v.null())),
+    fiberG: v.optional(v.union(v.number(), v.null())),
     grams: v.optional(v.number()),
     pieces: v.optional(v.number()),
     portionLabel: v.optional(v.string()),
@@ -443,6 +447,7 @@ export const upsertMeal = mutation({
     let proteinG: number | null | undefined
     let carbsG: number | null | undefined
     let fatG: number | null | undefined
+    let fiberG: number | null | undefined
 
     if (ignoreClientMacros) {
       // PC-02 : ignorer kcal/macros client ; proportion si grams changent.
@@ -450,10 +455,12 @@ export const upsertMeal = mutation({
       void args.proteinG
       void args.carbsG
       void args.fatG
+      void args.fiberG
       const prevCal = existing?.calories ?? null
       const prevP = existing?.proteinG ?? null
       const prevC = existing?.carbsG ?? null
       const prevF = existing?.fatG ?? null
+      const prevFiber = existing?.fiberG
       const oldGrams = existing?.grams
       const gramsChanged =
         typeof oldGrams === 'number' &&
@@ -469,11 +476,13 @@ export const upsertMeal = mutation({
           proteinG: prevP,
           carbsG: prevC,
           fatG: prevF,
+          fiberG: prevFiber,
         })
         calories = scaled.calories
         proteinG = scaled.proteinG
         carbsG = scaled.carbsG
         fatG = scaled.fatG
+        fiberG = prevFiber === undefined ? undefined : scaled.fiberG
         // B3-03 : réécrire portionLabel quand grammes changent (y compris ancien chemin).
         portionLabel = formatGramsCountLabel(storeGrams!)
       } else {
@@ -481,13 +490,17 @@ export const upsertMeal = mutation({
         proteinG = prevP
         carbsG = prevC
         fatG = prevF
+        fiberG = prevFiber
       }
     } else {
       // Ligne ancienne (ou création sans V3) : chiffres app ; NaN/inf/négatif → null.
+      // fiberG omis → ne pas effacer une fibre déjà enregistrée.
       calories = sanitizeLegacyMealNutrient(args.calories)
       proteinG = sanitizeLegacyMealNutrient(args.proteinG ?? null)
       carbsG = sanitizeLegacyMealNutrient(args.carbsG ?? null)
       fatG = sanitizeLegacyMealNutrient(args.fatG ?? null)
+      fiberG =
+        args.fiberG === undefined ? existing?.fiberG : sanitizeLegacyMealNutrient(args.fiberG)
     }
 
     if (existing) {
@@ -499,6 +512,7 @@ export const upsertMeal = mutation({
         proteinG,
         carbsG,
         fatG,
+        ...(fiberG !== undefined ? { fiberG } : {}),
         grams: storeGrams,
         pieces: storePieces,
         portionLabel,
@@ -520,6 +534,7 @@ export const upsertMeal = mutation({
       proteinG,
       carbsG,
       fatG,
+      ...(fiberG !== undefined ? { fiberG } : {}),
       grams: storeGrams,
       pieces: storePieces,
       portionLabel,
@@ -884,6 +899,7 @@ export const listJournalEntries = query({
           proteinG: row.proteinG,
           carbsG: row.carbsG,
           fatG: row.fatG,
+          ...(row.fiberG !== undefined ? { fiberG: row.fiberG } : {}),
           grams: row.grams,
           pieces: row.pieces,
           portionMode: row.portionMode,
@@ -941,6 +957,8 @@ export const upsertFoodSelection = mutation({
     proteinPer100g: v.union(v.number(), v.null()),
     carbsPer100g: v.union(v.number(), v.null()),
     fatPer100g: v.union(v.number(), v.null()),
+    fiberPer100g: v.optional(v.union(v.number(), v.null())),
+    portionRefGrams: v.optional(v.union(v.number(), v.null())),
     imageUrl: v.optional(v.string()),
     source: v.union(
       v.literal('open_food_facts'),
@@ -1000,6 +1018,21 @@ export const upsertFoodSelection = mutation({
       fatPer100g = sanitized.fatPer100g
     }
 
+    const fiberPer100g =
+      args.fiberPer100g === undefined
+        ? undefined
+        : args.fiberPer100g == null || !Number.isFinite(args.fiberPer100g) || args.fiberPer100g < 0
+          ? null
+          : args.fiberPer100g
+    const portionRefGrams =
+      args.portionRefGrams === undefined
+        ? undefined
+        : args.portionRefGrams == null ||
+            !Number.isFinite(args.portionRefGrams) ||
+            args.portionRefGrams <= 0
+          ? null
+          : args.portionRefGrams
+
     const existing = await findFoodRow(ctx, userId, foodKey)
     if (existing) {
       assertUserOwnership(existing.userId, userId)
@@ -1019,6 +1052,8 @@ export const upsertFoodSelection = mutation({
         proteinPer100g,
         carbsPer100g,
         fatPer100g,
+        ...(fiberPer100g !== undefined ? { fiberPer100g } : {}),
+        ...(portionRefGrams !== undefined ? { portionRefGrams } : {}),
         nutrientsSource,
         imageUrl: args.imageUrl,
         source: args.source,
@@ -1042,6 +1077,8 @@ export const upsertFoodSelection = mutation({
       proteinPer100g,
       carbsPer100g,
       fatPer100g,
+      ...(fiberPer100g !== undefined ? { fiberPer100g } : {}),
+      ...(portionRefGrams !== undefined ? { portionRefGrams } : {}),
       nutrientsSource,
       imageUrl: args.imageUrl,
       source: args.source,
@@ -1109,6 +1146,8 @@ export const listFoodCatalog = query({
           proteinPer100g: row.proteinPer100g,
           carbsPer100g: row.carbsPer100g,
           fatPer100g: row.fatPer100g,
+          ...(row.fiberPer100g !== undefined ? { fiberPer100g: row.fiberPer100g } : {}),
+          ...(row.portionRefGrams !== undefined ? { portionRefGrams: row.portionRefGrams } : {}),
           imageUrl: row.imageUrl,
           source: row.source,
           lastFetchedAt: row.lastFetchedAt,

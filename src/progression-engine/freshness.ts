@@ -43,8 +43,14 @@ export interface FreshnessEvent {
 /**
  * Sans aucun événement, null — pas 100.
  * Capacité = charge cumulée du muscle. Résidu = charge × exp(−heures / demi-vie).
+ * `halfLifeFactor` 0,9 raccourcit la demi-vie (protein_goal) : le résidu baisse, la fraîcheur monte.
  */
-export function muscleFreshness(events: FreshnessEvent[]): Record<string, number> | null {
+export function muscleFreshness(
+  events: FreshnessEvent[],
+  options?: { halfLifeFactor?: number },
+): Record<string, number> | null {
+  const requested = options?.halfLifeFactor
+  const factor = requested != null && Number.isFinite(requested) && requested > 0 ? requested : 1
   if (events.length === 0) return null
   const residual = new Map<string, number>()
   const capacity = new Map<string, number>()
@@ -53,7 +59,7 @@ export function muscleFreshness(events: FreshnessEvent[]): Record<string, number
     if (!Number.isFinite(event.hoursAgo) || event.hoursAgo < 0) continue
     for (const { muscle, share } of muscleShares(event.muscles)) {
       const load = event.units * share
-      const decay = Math.exp(-event.hoursAgo / halfLifeHours(muscle))
+      const decay = Math.exp(-event.hoursAgo / (halfLifeHours(muscle) * factor))
       residual.set(muscle, (residual.get(muscle) ?? 0) + load * decay)
       capacity.set(muscle, (capacity.get(muscle) ?? 0) + load)
     }
