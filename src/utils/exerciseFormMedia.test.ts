@@ -38,16 +38,27 @@ const WAVE4_IDS = [
   'russian_twist',
 ] as const
 
+const WAVE5_IDS = [
+  't_bar_row',
+  'hack_squat',
+  'shrug',
+  'cable_crunch',
+  'nordic_curl',
+  'landmine_press',
+  'step_up',
+  'dragon_flag',
+] as const
+
 describe('exerciseFormMedia', () => {
   it('n’a pas encore de clips — prêt à recevoir les MP4', () => {
     expect(listFormVideoCanonicalIds()).toEqual([])
-    for (const id of [...WAVE2_IDS, ...WAVE3_IDS, ...WAVE4_IDS]) {
+    for (const id of [...WAVE2_IDS, ...WAVE3_IDS, ...WAVE4_IDS, ...WAVE5_IDS]) {
       expect(resolveFormVideoSrc(id)).toBeNull()
     }
   })
 
-  it('wave2/wave3/wave4 ont déjà l’illustration 3D pour l’aide visuelle', () => {
-    for (const id of [...WAVE2_IDS, ...WAVE3_IDS, ...WAVE4_IDS]) {
+  it('wave2/wave3/wave4/wave5 ont déjà l’illustration 3D pour l’aide visuelle', () => {
+    for (const id of [...WAVE2_IDS, ...WAVE3_IDS, ...WAVE4_IDS, ...WAVE5_IDS]) {
       expect(resolvePickerIllustrationSrc(id), id).toBeTruthy()
       expect(resolvePickerIllustrationSrc(id)).toMatch(/\.png/i)
     }

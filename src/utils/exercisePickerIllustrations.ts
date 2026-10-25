@@ -2,6 +2,7 @@ import wave1ManifestJson from '../../assets/exercises/illustrations/wave1/manife
 import wave2ManifestJson from '../../assets/exercises/illustrations/wave2/manifest.json'
 import wave3ManifestJson from '../../assets/exercises/illustrations/wave3/manifest.json'
 import wave4ManifestJson from '../../assets/exercises/illustrations/wave4/manifest.json'
+import wave5ManifestJson from '../../assets/exercises/illustrations/wave5/manifest.json'
 import developpeCoucheWebp from '../assets/exercises/developpe-couche.webp'
 
 import backSquatPng from '../../assets/exercises/illustrations/wave1/back-squat.png'
@@ -43,6 +44,15 @@ import inclineDumbbellCurlPng from '../../assets/exercises/illustrations/wave4/i
 import pendlayRowPng from '../../assets/exercises/illustrations/wave4/pendlay-row.png'
 import preacherCurlPng from '../../assets/exercises/illustrations/wave4/preacher-curl.png'
 import russianTwistPng from '../../assets/exercises/illustrations/wave4/russian-twist.png'
+
+import cableCrunchPng from '../../assets/exercises/illustrations/wave5/cable-crunch.png'
+import dragonFlagPng from '../../assets/exercises/illustrations/wave5/dragon-flag.png'
+import hackSquatPng from '../../assets/exercises/illustrations/wave5/hack-squat.png'
+import landminePressPng from '../../assets/exercises/illustrations/wave5/landmine-press.png'
+import nordicCurlPng from '../../assets/exercises/illustrations/wave5/nordic-curl.png'
+import shrugPng from '../../assets/exercises/illustrations/wave5/shrug.png'
+import stepUpPng from '../../assets/exercises/illustrations/wave5/step-up.png'
+import tBarRowPng from '../../assets/exercises/illustrations/wave5/t-bar-row.png'
 
 /**
  * Picker / search-result thumbnails only.
@@ -101,6 +111,14 @@ const WAVE_PNG_BY_FILE: Record<string, string> = {
   'pendlay-row.png': pendlayRowPng,
   'preacher-curl.png': preacherCurlPng,
   'russian-twist.png': russianTwistPng,
+  'cable-crunch.png': cableCrunchPng,
+  'dragon-flag.png': dragonFlagPng,
+  'hack-squat.png': hackSquatPng,
+  'landmine-press.png': landminePressPng,
+  'nordic-curl.png': nordicCurlPng,
+  'shrug.png': shrugPng,
+  'step-up.png': stepUpPng,
+  't-bar-row.png': tBarRowPng,
 }
 
 function illustrationSrcFromEntry(entry: WaveManifestEntry): string | null {
@@ -124,6 +142,7 @@ function buildSrcByCanonicalId(): Record<string, string> {
     wave2ManifestJson,
     wave3ManifestJson,
     wave4ManifestJson,
+    wave5ManifestJson,
   ]) {
     const manifest = raw as WaveManifest
     for (const [key, entry] of Object.entries(manifest.entries)) {

@@ -488,6 +488,72 @@ const CATALOG_SEED: Omit<CatalogExercise, 'movement' | 'effortType' | 'level' | 
     aliases: ['russian twist', 'twist russe', 'rotation russe'],
     popularity: 68,
   },
+
+  // —— Wave 5 (nouveaux, illustrations 3D) ——
+  {
+    id: 't_bar_row',
+    name: 'T-bar row',
+    muscles: ['Dos', 'Biceps'],
+    equipment: 'Barre',
+    aliases: ['t bar row', 't-bar', 'rowing t bar', 'landmine row'],
+    popularity: 77,
+  },
+  {
+    id: 'hack_squat',
+    name: 'Hack squat',
+    muscles: ['Quadriceps', 'Fessiers'],
+    equipment: 'Machine',
+    aliases: ['hack squat', 'hack', 'squat machine'],
+    popularity: 81,
+  },
+  {
+    id: 'shrug',
+    name: 'Shrugs',
+    muscles: ['Dos'],
+    equipment: 'Barre',
+    aliases: ['shrug', 'shrugs', 'haussements', 'trapezes'],
+    popularity: 67,
+  },
+  {
+    id: 'cable_crunch',
+    name: 'Crunch poulie',
+    muscles: ['Abdos'],
+    equipment: 'Câble',
+    aliases: ['cable crunch', 'crunch poulie', 'crunch cable'],
+    popularity: 69,
+  },
+  {
+    id: 'nordic_curl',
+    name: 'Nordic curl',
+    muscles: ['Ischios'],
+    equipment: 'Poids du corps',
+    aliases: ['nordic curl', 'nordic hamstring', 'curl nordique'],
+    popularity: 66,
+  },
+  {
+    id: 'landmine_press',
+    name: 'Landmine press',
+    muscles: ['Épaules', 'Pectoraux'],
+    equipment: 'Barre',
+    aliases: ['landmine press', 'landmine', 'presse landmine'],
+    popularity: 72,
+  },
+  {
+    id: 'step_up',
+    name: 'Step-up',
+    muscles: ['Quadriceps', 'Fessiers'],
+    equipment: 'Haltères',
+    aliases: ['step up', 'step-up', 'montee banc', 'stepups'],
+    popularity: 70,
+  },
+  {
+    id: 'dragon_flag',
+    name: 'Dragon flag',
+    muscles: ['Abdos'],
+    equipment: 'Poids du corps',
+    aliases: ['dragon flag', 'drapeau', 'dragonflag'],
+    popularity: 65,
+  },
 ]
 
 const MUSCU = ['musculation', 'bodybuilding', 'functional'] as const
@@ -572,6 +638,14 @@ const CATALOG_META: Record<string, CatalogMeta> = {
   box_squat: { movement: 'legs', effortType: 'strength', level: 'intermediate', sportIds: [...POWER] },
   incline_dumbbell_curl: { movement: 'pull', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
   russian_twist: { movement: 'core', effortType: 'endurance', level: 'beginner', sportIds: [...CALI, ...CROSS] },
+  t_bar_row: { movement: 'pull', effortType: 'strength', level: 'intermediate', sportIds: [...MUSCU, ...POWER] },
+  hack_squat: { movement: 'legs', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  shrug: { movement: 'pull', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  cable_crunch: { movement: 'core', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  nordic_curl: { movement: 'legs', effortType: 'strength', level: 'advanced', sportIds: [...CALI, ...CROSS] },
+  landmine_press: { movement: 'push', effortType: 'hypertrophy', level: 'intermediate', sportIds: [...MUSCU, 'functional'] },
+  step_up: { movement: 'legs', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU, 'functional'] },
+  dragon_flag: { movement: 'core', effortType: 'strength', level: 'advanced', sportIds: [...CALI] },
 }
 
 export const EXERCISE_CATALOG: CatalogExercise[] = CATALOG_SEED.map((ex) => {

@@ -94,6 +94,24 @@ describe('resolvePickerIllustrationSrc', () => {
     }
   })
 
+  it('associe les 8 ids wave5 (nouveaux exercices) au PNG 3D', () => {
+    const wave5 = [
+      't_bar_row',
+      'hack_squat',
+      'shrug',
+      'cable_crunch',
+      'nordic_curl',
+      'landmine_press',
+      'step_up',
+      'dragon_flag',
+    ] as const
+    for (const id of wave5) {
+      const src = resolvePickerIllustrationSrc(id)
+      expect(src, id).toBeTruthy()
+      expect(src).toMatch(/\.png/i)
+    }
+  })
+
   it('bench_press → asset webp validé, jamais une PNG wave1', () => {
     const entry = WAVE1_ENTRIES.bench_press
     expect(entry.file).toBeNull()

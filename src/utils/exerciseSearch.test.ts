@@ -71,6 +71,14 @@ describe('exerciseSearch', () => {
     expect(searchExercises('kickback').some((e) => e.id === 'cable_kickback')).toBe(true)
   })
 
+  it('nouveaux exercices wave5 trouvables (hack squat, nordic, dragon flag)', () => {
+    expect(searchExercises('hack squat').some((e) => e.id === 'hack_squat')).toBe(true)
+    expect(searchExercises('nordic').some((e) => e.id === 'nordic_curl')).toBe(true)
+    expect(searchExercises('dragon').some((e) => e.id === 'dragon_flag')).toBe(true)
+    expect(searchExercises('t-bar').some((e) => e.id === 't_bar_row')).toBe(true)
+    expect(searchExercises('haussements').some((e) => e.id === 'shrug')).toBe(true)
+  })
+
   it('limite l’affichage initial à 8', () => {
     expect(searchExercises('').length).toBe(8)
     expect(countExerciseMatches('')).toBe(EXERCISE_CATALOG.length)
