@@ -78,7 +78,7 @@ function seedHub(kind: 'bench' | 'incline' | 'empty') {
       schedule: [],
       completed: [],
       workoutNotes: notes,
-      routines: [{ id: 'upper', label: 'Upper', subtitle: '', accent: '#FF2B2B', exercises: [], updatedAt: 0 }],
+      routines: [{ id: 'upper', label: 'Upper', subtitle: '', accent: '#FF0702', exercises: [], updatedAt: 0 }],
       lastSelectedRoutineId: null,
       lastSelectedSportId: null,
       lastVoluntaryRoute: 'train-hub',
@@ -229,7 +229,7 @@ describe('accueil Train — maquette unique', () => {
             id: 'upper',
             label: 'Upper',
             subtitle: '',
-            accent: '#FF2B2B',
+            accent: '#FF0702',
             updatedAt: NOW,
             exercises: [
               {

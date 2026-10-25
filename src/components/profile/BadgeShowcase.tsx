@@ -87,7 +87,7 @@ export function BadgeShowcase() {
     <section>
       <div className="mb-3 flex items-center justify-between px-1">
         <h3 className="ios-label">Hauts faits</h3>
-        <span className="text-[13px] tabular-nums text-[#8E8E93]">
+        <span className="text-[13px] tabular-nums text-[#ACB4BA]">
           {unlockedCount} / {TOTAL_BADGES}
         </span>
       </div>
@@ -114,7 +114,7 @@ export function BadgeShowcase() {
             >
               {!isOn ? (
                 <span
-                  className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-black/35 text-[#8E8E93]"
+                  className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-black/35 text-[#ACB4BA]"
                   aria-hidden
                 >
                   <Lock className="h-3 w-3" strokeWidth={2.25} />
@@ -130,13 +130,13 @@ export function BadgeShowcase() {
               </div>
               <p
                 className={`mt-3 font-semibold tracking-tight ${
-                  isOn ? 'text-white' : 'text-[#AEAEB2]'
+                  isOn ? 'text-white' : 'text-[#ACB4BA]'
                 }`}
               >
                 {badge.name}
               </p>
-              <p className="mt-1 text-[13px] leading-snug text-[#8E8E93]">{badge.description}</p>
-              <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#636366]">
+              <p className="mt-1 text-[13px] leading-snug text-[#ACB4BA]">{badge.description}</p>
+              <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#717C83]">
                 {isOn ? 'Débloqué' : 'Verrouillé'}
               </p>
             </article>

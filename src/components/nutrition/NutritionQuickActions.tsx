@@ -50,7 +50,7 @@ export function NutritionQuickActions({
           key={id}
           type="button"
           onClick={() => onAction(id)}
-          className="ios-press flex flex-col items-center gap-2 py-1 text-[#FF2B2B]"
+          className="ios-press flex flex-col items-center gap-2 py-1 text-[#FF0702]"
         >
           <span className="flex h-11 w-11 items-center justify-center">
             {customIcon === 'scan-ia' ? (

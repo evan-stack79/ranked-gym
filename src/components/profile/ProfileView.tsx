@@ -227,7 +227,7 @@ function ProfileViewContent() {
         <button
           type="button"
           onClick={goBack}
-          className="ios-press rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-[13px] font-semibold text-[#AEAEB2]"
+          className="ios-press rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-[13px] font-semibold text-[#ACB4BA]"
         >
           Retour
         </button>
@@ -242,7 +242,7 @@ function ProfileViewContent() {
         <button
           type="button"
           onClick={goBack}
-          className="ios-press rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-[13px] font-semibold text-[#AEAEB2]"
+          className="ios-press rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-[13px] font-semibold text-[#ACB4BA]"
         >
           Retour
         </button>
@@ -266,7 +266,7 @@ function ProfileViewContent() {
           </p>
         ) : null}
         {healthValue.healthAnswer === 'prefer_not' ? (
-          <p className="text-[12px] text-[#8E8E93]">{M_INFO_1}</p>
+          <p className="text-[12px] text-[#ACB4BA]">{M_INFO_1}</p>
         ) : null}
       </section>
     )

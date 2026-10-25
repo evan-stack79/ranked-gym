@@ -512,7 +512,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
         <div className="mb-4 flex items-center gap-2">
           <IconBadge icon={Target} variant="green" size="sm" />
           <div>
-            <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+            <p className="text-[12px] font-semibold uppercase tracking-wider text-[#ACB4BA]">
               {calorieGoalEnabled ? 'Setup nutrition' : 'Inscription'}
             </p>
             <h2 className="text-[22px] font-bold tracking-tight text-white">{stepTitle(step)}</h2>
@@ -545,7 +545,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
 
         {step === 'lite' && (
           <div className="space-y-4" data-testid="onboarding-lite">
-            <p className="text-[15px] text-[#AEAEB2]">{M_INFO_1}</p>
+            <p className="text-[15px] text-[#ACB4BA]">{M_INFO_1}</p>
             <HealthSituationsForm
               value={health}
               onChange={applyHealthChange}
@@ -582,8 +582,8 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
 
         {step === 'goal' && (
           <div className="space-y-4">
-            <p className="text-[15px] text-[#AEAEB2]">{M_CAL_1}</p>
-            <p className="text-[13px] text-[#8E8E93]">{M_INFO_1}</p>
+            <p className="text-[15px] text-[#ACB4BA]">{M_CAL_1}</p>
+            <p className="text-[13px] text-[#ACB4BA]">{M_INFO_1}</p>
 
             <HealthSituationsForm
               value={health}
@@ -620,7 +620,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
 
         {step === 'goalWeight' && (
           <div className="space-y-4">
-            <p className="text-[15px] text-[#AEAEB2]">
+            <p className="text-[15px] text-[#ACB4BA]">
               Quel poids vises-tu avec ton objectif{' '}
               <span className="font-semibold text-white">
                 {goal ? GOAL_LABELS[goal].toLowerCase() : ''}
@@ -629,7 +629,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
             </p>
 
             <label className="glass-card block rounded-2xl p-4">
-              <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
+              <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#ACB4BA]">
                 <Target className="h-3.5 w-3.5 text-[#30D158]" />
                 Poids objectif
               </span>
@@ -645,7 +645,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
                   aria-label="Poids objectif"
                   className="w-full bg-transparent text-[40px] font-black tracking-tight text-white outline-none"
                 />
-                <span className="pb-2 text-[15px] font-medium text-[#8E8E93]">kg</span>
+                <span className="pb-2 text-[15px] font-medium text-[#ACB4BA]">kg</span>
               </div>
             </label>
 
@@ -653,7 +653,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               <button
                 type="button"
                 onClick={goBack}
-                className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#8E8E93]"
+                className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#ACB4BA]"
               >
                 Retour
               </button>
@@ -671,7 +671,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
 
         {step === 'pace' && goal != null && goal !== 'maintain' && (
           <div className="space-y-4">
-            <p className="text-[15px] text-[#AEAEB2]">
+            <p className="text-[15px] text-[#ACB4BA]">
               À quelle vitesse veux-tu progresser chaque semaine ?
             </p>
 
@@ -688,7 +688,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               <button
                 type="button"
                 onClick={goBack}
-                className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#8E8E93]"
+                className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#ACB4BA]"
               >
                 Retour
               </button>
@@ -706,7 +706,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
 
         {step === 'measurements' && (
           <div className="space-y-3">
-            <p className="text-[15px] text-[#AEAEB2]">
+            <p className="text-[15px] text-[#ACB4BA]">
               {showBodyFields
                 ? 'Poids, taille, âge et sexe — base de ton métabolisme.'
                 : 'Indique d’abord ton âge et ton sexe.'}
@@ -737,7 +737,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               <button
                 type="button"
                 onClick={goBack}
-                className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#8E8E93]"
+                className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#ACB4BA]"
               >
                 Retour
               </button>
@@ -757,7 +757,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
 
         {step === 'activity' && (
           <div className="space-y-4">
-            <p className="text-[15px] text-[#AEAEB2]">
+            <p className="text-[15px] text-[#ACB4BA]">
               Ton niveau d’activité hors séance influence ton métabolisme de base.
             </p>
 
@@ -767,7 +767,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               <button
                 type="button"
                 onClick={goBack}
-                className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#8E8E93]"
+                className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#ACB4BA]"
               >
                 Retour
               </button>
@@ -785,7 +785,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
 
         {step === 'morphology' && (
           <div className="space-y-4">
-            <p className="text-[15px] text-[#AEAEB2]">
+            <p className="text-[15px] text-[#ACB4BA]">
               On adapte les portions à ta morphologie — surtout si tu as du mal avec les gros
               repas.
             </p>
@@ -794,7 +794,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               <button
                 type="button"
                 onClick={goBack}
-                className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#8E8E93]"
+                className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#ACB4BA]"
               >
                 Retour
               </button>
@@ -813,28 +813,28 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
         {step === 'result' && draft && nutrition?.engineOk && (
           <div className="space-y-4" data-testid="onboarding-result">
             <div className="rounded-2xl border border-[#30D158]/25 bg-[#30D158]/10 p-4 text-center">
-              <p className="text-[12px] font-semibold uppercase tracking-wide text-[#8E8E93]">
+              <p className="text-[12px] font-semibold uppercase tracking-wide text-[#ACB4BA]">
                 Estimation · {GOAL_LABELS[draft.goal]} · {MORPHOLOGY_LABELS[morphology]}
               </p>
               <p className="mt-1 text-[42px] font-black tracking-tight text-white">
                 {nutrition.targetCalories}
                 <span className="ml-1 text-[16px] font-semibold text-[#30D158]">kcal/j</span>
               </p>
-              <p className="mt-2 text-[13px] text-[#AEAEB2]">
+              <p className="mt-2 text-[13px] text-[#ACB4BA]">
                 {draft.weightKg} kg → {draft.goalWeightKg} kg
                 {draft.goal !== 'maintain' && (
                   <> · {draft.weeklyPaceKg.toFixed(2)} kg/sem.</>
                 )}
                 {estimatedWeeks != null && <> · ~{estimatedWeeks} sem.</>}
               </p>
-              <p className="mt-3 text-[12px] leading-relaxed text-[#AEAEB2]">{M_CAL_2}</p>
+              <p className="mt-3 text-[12px] leading-relaxed text-[#ACB4BA]">{M_CAL_2}</p>
               {(nutrition.safetyNotices.length > 0
                 ? nutrition.safetyNotices
                 : [estimationDisclaimerForAge(draft.age), M_INFO_1]
               ).map((notice) => (
                 <p
                   key={notice}
-                  className="mt-2 text-[12px] leading-relaxed text-[#8E8E93]"
+                  className="mt-2 text-[12px] leading-relaxed text-[#ACB4BA]"
                   data-testid="safety-notice"
                 >
                   {notice}
@@ -852,7 +852,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
                   key={item.label}
                   className="rounded-2xl border border-white/10 bg-black/25 p-3 text-center"
                 >
-                  <p className="text-[10px] text-[#8E8E93]">{item.label}</p>
+                  <p className="text-[10px] text-[#ACB4BA]">{item.label}</p>
                   <p className="mt-1 text-[15px] font-bold text-white">{item.value}</p>
                 </div>
               ))}
@@ -862,7 +862,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               <button
                 type="button"
                 onClick={() => setStep('morphology')}
-                className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#8E8E93]"
+                className="ios-press flex-1 rounded-2xl border border-white/10 bg-ios-inset py-3.5 text-[15px] font-medium text-[#ACB4BA]"
               >
                 Modifier
               </button>
@@ -882,7 +882,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
             {isMinor ? (
               <>
                 <p className="text-[15px] leading-relaxed text-[#EBEBF5]">{Q6A_MINEURS}</p>
-                <p className="text-[15px] leading-relaxed text-[#AEAEB2]">{M_MIN_1}</p>
+                <p className="text-[15px] leading-relaxed text-[#ACB4BA]">{M_MIN_1}</p>
               </>
             ) : null}
             {(declarations.pregnancy || declarations.breastfeeding) && !isMinor ? (
@@ -904,7 +904,7 @@ export function NutritionOnboarding({ initial, onComplete }: NutritionOnboarding
               </div>
             ) : null}
             {!isMinor && !isRestrictedHealth ? (
-              <p className="text-[15px] leading-relaxed text-[#AEAEB2]">{M_INFO_1}</p>
+              <p className="text-[15px] leading-relaxed text-[#ACB4BA]">{M_INFO_1}</p>
             ) : null}
             {(age == null || sex == null) && (
               <MeasurementsFields
@@ -965,7 +965,7 @@ function MeasurementsFields({
   return (
     <>
       <label className="glass-card block rounded-2xl p-3.5">
-        <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
+        <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#ACB4BA]">
           <UserRound className="h-3.5 w-3.5 text-[#FF9F0A]" />
           Âge
         </span>
@@ -993,7 +993,7 @@ function MeasurementsFields({
             type="button"
             onClick={() => setSex(option.value)}
             className={`ios-press flex-1 rounded-lg py-2 text-[13px] font-semibold ${
-              sex === option.value ? 'bg-[#30D158] text-white' : 'text-[#8E8E93]'
+              sex === option.value ? 'bg-[#30D158] text-white' : 'text-[#ACB4BA]'
             }`}
           >
             {option.label}

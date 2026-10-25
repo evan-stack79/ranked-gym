@@ -29,7 +29,7 @@ export function TrainWeeklySummary({
     const timeLabel = timeMetric?.display
     return (
       <p
-        className="text-[13px] text-[#8E8E93]"
+        className="text-[13px] text-[#ACB4BA]"
         aria-label="Résumé de la semaine"
         data-week-summary
       >
@@ -49,7 +49,7 @@ export function TrainWeeklySummary({
   return (
     <section aria-label="Résumé de la semaine">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[13px] font-semibold text-[#8E8E93]">Résumé</p>
+        <p className="text-[13px] font-semibold text-[#ACB4BA]">Résumé</p>
         <div
           className="flex max-w-full flex-wrap gap-1"
           role="tablist"
@@ -66,8 +66,8 @@ export function TrainWeeklySummary({
                 onClick={() => onFilterChange(f.id)}
                 className={`ios-press flex min-h-11 shrink-0 items-center rounded-full border px-2.5 text-[11px] font-semibold ${
                   active
-                    ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/18 text-[#FF6961]'
-                    : 'border-white/10 text-[#8E8E93]'
+                    ? 'border-[#FF0702]/45 bg-[#FF0702]/18 text-[#FF907F]'
+                    : 'border-white/10 text-[#ACB4BA]'
                 }`}
               >
                 {f.label}
@@ -83,7 +83,7 @@ export function TrainWeeklySummary({
             key={m.id}
             className="rounded-2xl border border-white/10 bg-[#141416] px-4 py-3.5"
           >
-            <p className="text-[11px] font-medium text-[#8E8E93]">{m.label}</p>
+            <p className="text-[11px] font-medium text-[#ACB4BA]">{m.label}</p>
             <p className="mt-1 text-[24px] font-bold tabular-nums leading-none tracking-tight text-white">
               {m.id === 'sessions' && m.value != null ? (
                 <CountUpNumber kind="sessions" value={m.value} />

@@ -39,7 +39,7 @@ export function NutritionCalendarSheet({
           <button
             type="button"
             onClick={() => setMonth((value) => new Date(value.getFullYear(), value.getMonth() - 1, 1))}
-            className="ios-press flex h-10 w-10 items-center justify-center rounded-full text-[#AEAEB2]"
+            className="ios-press flex h-10 w-10 items-center justify-center rounded-full text-[#ACB4BA]"
             aria-label="Mois précédent"
           >
             <ChevronLeft className="h-5 w-5" />
@@ -48,14 +48,14 @@ export function NutritionCalendarSheet({
           <button
             type="button"
             onClick={() => setMonth((value) => new Date(value.getFullYear(), value.getMonth() + 1, 1))}
-            className="ios-press flex h-10 w-10 items-center justify-center rounded-full text-[#AEAEB2]"
+            className="ios-press flex h-10 w-10 items-center justify-center rounded-full text-[#ACB4BA]"
             aria-label="Mois suivant"
           >
             <ChevronRight className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="grid grid-cols-7 text-center text-[11px] font-semibold text-[#636366]">
+        <div className="grid grid-cols-7 text-center text-[11px] font-semibold text-[#717C83]">
           {WEEKDAYS.map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}
         </div>
         <div className="grid grid-cols-7 gap-y-1 text-center">
@@ -73,11 +73,11 @@ export function NutritionCalendarSheet({
                 aria-label={`Sélectionner le ${day.getDate()}`}
                 aria-pressed={selected}
                 className={`relative mx-auto flex h-11 w-11 flex-col items-center justify-center rounded-full text-[14px] tabular-nums ${
-                  selected ? 'bg-[#FF2B2B] font-bold text-white' : 'text-[#EBEBF5]'
-                } ${today && !selected ? 'ring-1 ring-[#8E8E93]' : ''}`}
+                  selected ? 'bg-[#FF0702] font-bold text-white' : 'text-[#EBEBF5]'
+                } ${today && !selected ? 'ring-1 ring-[#ACB4BA]' : ''}`}
               >
                 <span>{day.getDate()}</span>
-                {hasData ? <span className={`absolute bottom-1 h-1 w-1 rounded-full ${selected ? 'bg-white' : 'bg-[#FF2B2B]'}`} /> : null}
+                {hasData ? <span className={`absolute bottom-1 h-1 w-1 rounded-full ${selected ? 'bg-white' : 'bg-[#FF0702]'}`} /> : null}
               </button>
             )
           })}

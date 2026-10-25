@@ -116,10 +116,10 @@ export function YourDataMealsErasePanel({
 
   return (
     <div className="space-y-2" data-testid="your-data-meals-section">
-      <p className="px-1 text-[13px] font-semibold uppercase tracking-wide text-[#8E8E93]">
+      <p className="px-1 text-[13px] font-semibold uppercase tracking-wide text-[#ACB4BA]">
         Tes données
       </p>
-      <div className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80">
+      <div className="overflow-hidden rounded-2xl border border-[#25282A] bg-[#141416]/80">
         <button
           type="button"
           data-testid="erase-old-meals-button"
@@ -138,7 +138,7 @@ export function YourDataMealsErasePanel({
           }}
           className="ios-press flex w-full items-center gap-3 px-4 py-3.5 text-left disabled:cursor-not-allowed disabled:opacity-45"
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FF453A]/15 text-[#FF6961]">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FF453A]/15 text-[#FF907F]">
             <Trash2 className="h-4 w-4" aria-hidden />
           </span>
           <span className="min-w-0 flex-1">
@@ -146,14 +146,14 @@ export function YourDataMealsErasePanel({
               Effacer mes anciens repas
             </span>
             <span
-              className="mt-0.5 block text-[13px] text-[#8E8E93]"
+              className="mt-0.5 block text-[13px] text-[#ACB4BA]"
               data-testid="erase-old-meals-count"
             >
               {countLabel(countMode, serverCount)}
             </span>
             {countMode === 'ready' && pendingCount > 0 ? (
               <span
-                className="mt-0.5 block text-[12px] text-[#8E8E93]"
+                className="mt-0.5 block text-[12px] text-[#ACB4BA]"
                 data-testid="erase-old-meals-pending"
               >
                 + {pendingCount} repas pas encore envoyés
@@ -165,7 +165,7 @@ export function YourDataMealsErasePanel({
 
       {signedOut && error ? (
         <p
-          className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]"
+          className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF907F]"
           data-testid="erase-old-meals-signed-out-error"
         >
           {error}
@@ -174,7 +174,7 @@ export function YourDataMealsErasePanel({
 
       {needsReconnect && error ? (
         <p
-          className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]"
+          className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF907F]"
           data-testid="erase-old-meals-reconnect-error"
         >
           {error}
@@ -194,11 +194,11 @@ export function YourDataMealsErasePanel({
         <div className="space-y-3 pb-2">
           {emailCodeStep ? (
             <>
-              <p className="text-[13px] leading-relaxed text-[#AEAEB2]">
+              <p className="text-[13px] leading-relaxed text-[#ACB4BA]">
                 {ERASE_MEALS_EMAIL_CODE_REQUIRED_MESSAGE}
               </p>
               <label className="block space-y-1">
-                <span className="text-[12px] text-[#8E8E93]">Code reçu par e-mail</span>
+                <span className="text-[12px] text-[#ACB4BA]">Code reçu par e-mail</span>
                 <input
                   data-testid="erase-email-verify-code"
                   type="text"
@@ -212,7 +212,7 @@ export function YourDataMealsErasePanel({
               </label>
               {error ? (
                 <p
-                  className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]"
+                  className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF907F]"
                   data-testid="erase-email-verify-error"
                 >
                   {error}
@@ -239,19 +239,19 @@ export function YourDataMealsErasePanel({
                 data-testid="erase-email-verify-resend"
                 disabled={emailCodeBusy}
                 onClick={() => void onRequestEmailCode?.()}
-                className="ios-press w-full rounded-2xl border border-white/10 bg-black/30 py-3 text-[14px] font-medium text-[#AEAEB2] disabled:opacity-50"
+                className="ios-press w-full rounded-2xl border border-white/10 bg-black/30 py-3 text-[14px] font-medium text-[#ACB4BA] disabled:opacity-50"
               >
                 Renvoyer un code
               </button>
             </>
           ) : (
             <>
-              <p className="text-[13px] leading-relaxed text-[#AEAEB2]">
+              <p className="text-[13px] leading-relaxed text-[#ACB4BA]">
                 {ERASE_MEALS_RECONNECT_LEGACY_MESSAGE}. Entre l’e-mail et le mot de passe de ton
                 ancien compte.
               </p>
               <label className="block space-y-1">
-                <span className="text-[12px] text-[#8E8E93]">E-mail</span>
+                <span className="text-[12px] text-[#ACB4BA]">E-mail</span>
                 <input
                   data-testid="erase-legacy-reconnect-email"
                   type="email"
@@ -262,7 +262,7 @@ export function YourDataMealsErasePanel({
                 />
               </label>
               <label className="block space-y-1">
-                <span className="text-[12px] text-[#8E8E93]">Mot de passe</span>
+                <span className="text-[12px] text-[#ACB4BA]">Mot de passe</span>
                 <input
                   data-testid="erase-legacy-reconnect-password"
                   type="password"
@@ -273,7 +273,7 @@ export function YourDataMealsErasePanel({
                 />
               </label>
               {error ? (
-                <p className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]">
+                <p className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF907F]">
                   {error}
                 </p>
               ) : null}
@@ -309,14 +309,14 @@ export function YourDataMealsErasePanel({
         leading={<Trash2 className="mt-0.5 h-5 w-5 text-[#FF453A]" />}
       >
         <div className="space-y-3 pb-2">
-          <p className="text-[13px] leading-relaxed text-[#AEAEB2]">
+          <p className="text-[13px] leading-relaxed text-[#ACB4BA]">
             Tu vas supprimer définitivement {serverCount} repas enregistré
             {serverCount > 1 ? 's' : ''}
             {pendingCount > 0 ? ` (+ ${pendingCount} pas encore envoyés)` : ''}. Aucun détail n’est
             affiché ici. Cette action vide aussi le cache de ton téléphone.
           </p>
           {error ? (
-            <p className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]">
+            <p className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF907F]">
               {error}
             </p>
           ) : null}
@@ -325,7 +325,7 @@ export function YourDataMealsErasePanel({
             data-testid="erase-old-meals-confirm"
             disabled={busy}
             onClick={() => void onRequestErase()}
-            className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-[#FF453A]/40 bg-[#FF453A]/20 py-3.5 text-[15px] font-semibold text-[#FF6961] disabled:opacity-50"
+            className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-[#FF453A]/40 bg-[#FF453A]/20 py-3.5 text-[15px] font-semibold text-[#FF907F] disabled:opacity-50"
           >
             {busy ? (
               <>
@@ -340,7 +340,7 @@ export function YourDataMealsErasePanel({
             type="button"
             disabled={busy}
             onClick={() => onConfirmOpenChange(false)}
-            className="ios-press w-full rounded-2xl border border-white/10 bg-black/30 py-3 text-[14px] font-medium text-[#AEAEB2] disabled:opacity-50"
+            className="ios-press w-full rounded-2xl border border-white/10 bg-black/30 py-3 text-[14px] font-medium text-[#ACB4BA] disabled:opacity-50"
           >
             Annuler
           </button>
@@ -419,10 +419,10 @@ export function YourDataMealsEraseCard() {
   if (loading && isAuthenticated) {
     return (
       <div className="space-y-2" data-testid="your-data-meals-loading">
-        <p className="px-1 text-[13px] font-semibold uppercase tracking-wide text-[#8E8E93]">
+        <p className="px-1 text-[13px] font-semibold uppercase tracking-wide text-[#ACB4BA]">
           Tes données
         </p>
-        <div className="flex items-center gap-2 rounded-2xl border border-[#2C2C2E] bg-[#141416]/80 px-4 py-3.5 text-[13px] text-[#8E8E93]">
+        <div className="flex items-center gap-2 rounded-2xl border border-[#25282A] bg-[#141416]/80 px-4 py-3.5 text-[13px] text-[#ACB4BA]">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Chargement…
         </div>

@@ -53,7 +53,7 @@ export function WorkoutHistory({
     return (
       <section className="history-page" data-history-page="empty">
         {pageTitle}
-        <p className="mt-2 text-left text-[13px] leading-5 text-[#8E8E93]">
+        <p className="mt-2 text-left text-[13px] leading-5 text-[#ACB4BA]">
           Aucune séance enregistrée. Termine une séance pour la retrouver ici, groupée par
           jour.
         </p>
@@ -67,7 +67,7 @@ export function WorkoutHistory({
 
       {groups.map((group) => (
         <div key={group.dateKey} className="mt-5 first:mt-4">
-          <p className="text-left text-[12px] font-semibold text-[#8E8E93]">{group.label}</p>
+          <p className="text-left text-[12px] font-semibold text-[#ACB4BA]">{group.label}</p>
           <ul>
             {group.sessions.map((note) => {
               const metrics = historySessionMetrics(note)
@@ -97,19 +97,19 @@ export function WorkoutHistory({
                           {displayTitle}
                         </span>
                         <time
-                          className="shrink-0 pt-0.5 text-[12px] font-medium tabular-nums text-[#8E8E93]"
+                          className="shrink-0 pt-0.5 text-[12px] font-medium tabular-nums text-[#ACB4BA]"
                           dateTime={new Date(note.createdAt).toISOString()}
                         >
                           {formatClock(note.createdAt)}
                         </time>
                       </span>
                       {metricsLine ? (
-                        <span className="mt-0.5 block truncate text-[12px] leading-4 text-[#AEAEB2]">
+                        <span className="mt-0.5 block truncate text-[12px] leading-4 text-[#ACB4BA]">
                           {metricsLine}
                         </span>
                       ) : null}
                       {exerciseLine ? (
-                        <span className="mt-0.5 block truncate text-[11px] leading-4 text-[#636366]">
+                        <span className="mt-0.5 block truncate text-[11px] leading-4 text-[#717C83]">
                           {exerciseLine}
                         </span>
                       ) : null}

@@ -35,7 +35,7 @@ export function ExercisePickerThumb({
         />
       ) : (
         <span
-          className="block h-full w-full bg-[#2c2c2e]"
+          className="block h-full w-full bg-[#25282a]"
           data-picker-thumb-fallback
         />
       )}

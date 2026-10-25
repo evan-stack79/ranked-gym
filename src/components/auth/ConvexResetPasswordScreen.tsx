@@ -153,19 +153,19 @@ export function ConvexResetPasswordScreen() {
 
       <div className="welcome-screen__body relative z-[1] mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col justify-end">
         <h1 className="welcome-screen__brand text-center font-semibold tracking-tight text-[#F2F2F7]">
-          Ranked <span className="text-[#FF2B2B]">Gym</span>
+          Ranked <span className="text-[#FF0702]">Gym</span>
         </h1>
         <div className="rounded-3xl border border-white/10 bg-[#111113]/90 p-4 backdrop-blur">
           <p className="text-center text-[19px] font-bold tracking-tight text-white">
             Nouveau mot de passe
           </p>
-          <p className="mt-1 text-center text-[13px] leading-relaxed text-[#AEAEB2]">
+          <p className="mt-1 text-center text-[13px] leading-relaxed text-[#ACB4BA]">
             Définis un nouveau mot de passe pour récupérer ton accès.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-4 space-y-3" data-reset-password-form="1">
             <label className="block">
-              <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+              <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">
                 Nouveau mot de passe
               </span>
               <div className="relative">
@@ -178,11 +178,11 @@ export function ConvexResetPasswordScreen() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Au moins 6 caractères"
                   disabled={loading}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#596166] outline-none focus:border-[#FF0702]/45 disabled:opacity-50"
                 />
                 <button
                   type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8E8E93]"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#ACB4BA]"
                   aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                   onClick={() => setShowPassword((v) => !v)}
                 >
@@ -192,7 +192,7 @@ export function ConvexResetPasswordScreen() {
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+              <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">
                 Confirmer le mot de passe
               </span>
               <div className="relative">
@@ -205,11 +205,11 @@ export function ConvexResetPasswordScreen() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Retape le mot de passe"
                   disabled={loading}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#596166] outline-none focus:border-[#FF0702]/45 disabled:opacity-50"
                 />
                 <button
                   type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8E8E93]"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#ACB4BA]"
                   aria-label={showConfirmPassword ? 'Masquer la confirmation' : 'Afficher la confirmation'}
                   onClick={() => setShowConfirmPassword((v) => !v)}
                 >
@@ -224,7 +224,7 @@ export function ConvexResetPasswordScreen() {
 
             <div className="min-h-[3rem] px-0.5">
               {error ? (
-                <p className="text-[13px] leading-snug text-[#FF6961]" role="alert" data-reset-error="1">
+                <p className="text-[13px] leading-snug text-[#FF907F]" role="alert" data-reset-error="1">
                   {error}
                 </p>
               ) : null}
@@ -238,7 +238,7 @@ export function ConvexResetPasswordScreen() {
             {canResend ? (
               <div className="space-y-2">
                 <label className="block">
-                  <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Email</span>
+                  <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">Email</span>
                   <input
                     type="email"
                     autoComplete="email"
@@ -246,7 +246,7 @@ export function ConvexResetPasswordScreen() {
                     onChange={(event) => setResendEmail(event.target.value)}
                     placeholder="toi@email.com"
                     disabled={loading || resendLoading}
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#596166] outline-none focus:border-[#FF0702]/45 disabled:opacity-50"
                   />
                 </label>
                 <button
@@ -278,7 +278,7 @@ export function ConvexResetPasswordScreen() {
 
           <button
             type="button"
-            className="mt-3 w-full text-center text-[13px] font-medium text-[#AEAEB2] underline-offset-2 hover:text-white hover:underline"
+            className="mt-3 w-full text-center text-[13px] font-medium text-[#ACB4BA] underline-offset-2 hover:text-white hover:underline"
             onClick={() => window.location.replace('/')}
             disabled={loading || resendLoading}
           >

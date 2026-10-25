@@ -115,7 +115,7 @@ export function getTodayWorkout(
     routineId,
     title: scheduled.title,
     subtitle: routine?.subtitle ?? 'Programme du jour',
-    accent: routine?.accent ?? '#FF2B2B',
+    accent: routine?.accent ?? '#FF0702',
     source: 'schedule',
     exerciseCount,
     canStart,

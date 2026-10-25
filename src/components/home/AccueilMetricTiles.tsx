@@ -37,7 +37,7 @@ function TileShell({
 }) {
   const className = `accueil-metric-tile ${wide ? 'accueil-metric-tile--wide' : 'accueil-metric-tile--small'} ${
     onClick
-      ? 'ios-press text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/45'
+      ? 'ios-press text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/45'
       : ''
   }`
   const style = { '--tile-accent': accent } as CSSProperties
@@ -255,7 +255,7 @@ export function SeriesJourTile({
               {model.showRing ? `/ ${model.plannedSets}` : 'séries'}
             </span>
           </div>
-          <p className="mt-1 text-[11px] text-[#8E8E93]">
+          <p className="mt-1 text-[11px] text-[#ACB4BA]">
             {model.showRing ? 'Aujourd’hui' : 'Sans séance planifiée'}
           </p>
         </div>
@@ -301,7 +301,7 @@ export function ProchaineSeanceTile({
       <p className="mt-2 truncate text-[22px] font-bold leading-tight tracking-tight text-white">
         {model.title}
       </p>
-      <p className="mt-1 text-[13px] text-[#AEAEB2]">{model.subtitle}</p>
+      <p className="mt-1 text-[13px] text-[#ACB4BA]">{model.subtitle}</p>
       <div className="mt-4">
         {model.canStart && model.routineId ? (
           <button
@@ -350,7 +350,7 @@ export function ProgrammeProgressTile({
   void motion
   return (
     <TileShell
-      accent="#FF2B2B"
+      accent="#FF0702"
       label="Programme"
       ariaLabel={`Programme, ${model.percent} pour cent`}
       wide
@@ -363,7 +363,7 @@ export function ProgrammeProgressTile({
         </span>
         <span className="accueil-metric-tile__unit">%</span>
       </div>
-      <p className="mt-1 text-[12px] text-[#AEAEB2]">{model.label}</p>
+      <p className="mt-1 text-[12px] text-[#ACB4BA]">{model.label}</p>
       <div
         className="accueil-metric-tile__progress mt-4"
         role="progressbar"

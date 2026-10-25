@@ -13,7 +13,7 @@ export function XPProgressBar({ currentXp, xpToNextLevel, level }: XPProgressBar
   return (
     <div className="w-full">
       <div className="mb-2 flex items-center justify-between text-sm">
-        <span className="flex items-center gap-1.5 font-medium text-[#8E8E93]">
+        <span className="flex items-center gap-1.5 font-medium text-[#ACB4BA]">
           <Zap className="h-4 w-4 text-[#FF9F0A]" />
           Progression XP
         </span>
@@ -29,7 +29,7 @@ export function XPProgressBar({ currentXp, xpToNextLevel, level }: XPProgressBar
         />
       </div>
 
-      <p className="mt-2 text-xs text-[#8E8E93]">
+      <p className="mt-2 text-xs text-[#ACB4BA]">
         {remaining.toLocaleString('fr-FR')} XP restants pour le niveau {level + 1}
       </p>
     </div>

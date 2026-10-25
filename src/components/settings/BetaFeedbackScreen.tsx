@@ -361,7 +361,7 @@ export function BetaFeedbackScreen({
         <button
           type="button"
           onClick={onOpenProfile}
-          className="ios-press w-full rounded-2xl bg-[#FF2B2B] px-4 py-3.5 text-[15px] font-semibold text-white"
+          className="ios-press w-full rounded-2xl bg-[#FF0702] px-4 py-3.5 text-[15px] font-semibold text-white"
           data-testid="beta-feedback-open-profile"
         >
           {BETA_FEEDBACK_OPEN_PROFILE}
@@ -395,7 +395,7 @@ export function BetaFeedbackScreen({
           {BETA_FEEDBACK_CONFIRM}
         </p>
         {offlineQueued ? (
-          <p className="text-[13px] text-[#AEAEB2]">{BETA_FEEDBACK_OFFLINE_QUEUED_HELP}</p>
+          <p className="text-[13px] text-[#ACB4BA]">{BETA_FEEDBACK_OFFLINE_QUEUED_HELP}</p>
         ) : null}
         <button
           type="button"
@@ -422,7 +422,7 @@ export function BetaFeedbackScreen({
           {BETA_FEEDBACK_CONFIRM_URGENT_TCA}
         </p>
         {offlineQueued ? (
-          <p className="text-[13px] text-[#AEAEB2]">{BETA_FEEDBACK_OFFLINE_QUEUED_HELP}</p>
+          <p className="text-[13px] text-[#ACB4BA]">{BETA_FEEDBACK_OFFLINE_QUEUED_HELP}</p>
         ) : null}
         <button
           type="button"
@@ -448,16 +448,16 @@ export function BetaFeedbackScreen({
         <p className="text-[15px] leading-relaxed text-[#EBEBF5]" data-testid="beta-feedback-confirm">
           {BETA_FEEDBACK_CONFIRM_URGENT_SUICIDE}
         </p>
-        <p className="text-[13px] leading-relaxed text-[#AEAEB2]" data-testid="beta-feedback-no-realtime">
+        <p className="text-[13px] leading-relaxed text-[#ACB4BA]" data-testid="beta-feedback-no-realtime">
           {BETA_FEEDBACK_NO_REALTIME}
         </p>
         {offlineQueued ? (
-          <p className="text-[13px] text-[#AEAEB2]">{BETA_FEEDBACK_OFFLINE_QUEUED_HELP}</p>
+          <p className="text-[13px] text-[#ACB4BA]">{BETA_FEEDBACK_OFFLINE_QUEUED_HELP}</p>
         ) : null}
         <div className="flex flex-col gap-3">
           <a
             href={BETA_FEEDBACK_TEL_3114}
-            className="ios-press rounded-2xl bg-[#FF2B2B] px-4 py-3.5 text-center text-[15px] font-semibold text-white"
+            className="ios-press rounded-2xl bg-[#FF0702] px-4 py-3.5 text-center text-[15px] font-semibold text-white"
             data-testid="beta-feedback-call-3114"
           >
             {BETA_FEEDBACK_CALL_3114}
@@ -489,7 +489,7 @@ export function BetaFeedbackScreen({
         <p className="text-[15px] leading-relaxed text-[#EBEBF5]">{BETA_FEEDBACK_INSULT_PROMPT}</p>
         {error === BETA_FEEDBACK_OFFLINE_INSULT_MASK ? (
           <p
-            className="text-[13px] leading-relaxed text-[#AEAEB2]"
+            className="text-[13px] leading-relaxed text-[#ACB4BA]"
             data-testid="beta-feedback-offline-insult"
           >
             {BETA_FEEDBACK_OFFLINE_INSULT_MASK}
@@ -509,7 +509,7 @@ export function BetaFeedbackScreen({
           </button>
           <button
             type="button"
-            className="ios-press rounded-2xl bg-[#FF2B2B] px-4 py-3.5 text-[15px] font-semibold text-white disabled:opacity-40"
+            className="ios-press rounded-2xl bg-[#FF0702] px-4 py-3.5 text-[15px] font-semibold text-white disabled:opacity-40"
             disabled={sending}
             onClick={() => {
               setForceInsults(true)
@@ -548,13 +548,13 @@ export function BetaFeedbackScreen({
               onClick={() => setType(option.id)}
               className={`ios-press w-full rounded-2xl border px-4 py-3 text-left transition-colors ${
                 selected
-                  ? 'border-[#FF2B2B]/60 bg-[#FF2B2B]/15'
+                  ? 'border-[#FF0702]/60 bg-[#FF0702]/15'
                   : 'border-white/10 bg-black/25'
               }`}
               data-testid={`beta-feedback-type-${option.id}`}
             >
               <span className="block text-[15px] font-semibold text-white">{option.label}</span>
-              <span className="mt-0.5 block text-[13px] text-[#AEAEB2]">{option.hint}</span>
+              <span className="mt-0.5 block text-[13px] text-[#ACB4BA]">{option.hint}</span>
             </button>
           )
         })}
@@ -570,23 +570,23 @@ export function BetaFeedbackScreen({
           onChange={(e) => handleTexteChange(e.target.value)}
           rows={6}
           placeholder={BETA_FEEDBACK_TEXTE_HELP}
-          className="w-full resize-none rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-[15px] leading-relaxed text-white placeholder:text-[#636366] outline-none focus:border-[#FF2B2B]/50"
+          className="w-full resize-none rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-[15px] leading-relaxed text-white placeholder:text-[#717C83] outline-none focus:border-[#FF0702]/50"
           data-testid="beta-feedback-texte"
         />
-        <p className="text-[13px] text-[#8E8E93]">{BETA_FEEDBACK_TEXTE_HINT}</p>
+        <p className="text-[13px] text-[#ACB4BA]">{BETA_FEEDBACK_TEXTE_HINT}</p>
         {texte.length >= COUNTER_FROM ? (
-          <p className="text-[12px] text-[#AEAEB2]" data-testid="beta-feedback-counter">
+          <p className="text-[12px] text-[#ACB4BA]" data-testid="beta-feedback-counter">
             {texte.length} / {TEXTE_MAX}
           </p>
         ) : null}
         {/* AV-09 / AV-21 : message vide seulement après interaction (pas dès l’ouverture) */}
         {texteTouched && (fieldHint === 'empty' || trimmedLen < TEXTE_MIN) ? (
-          <p className="text-[13px] text-[#FF6961]" data-testid="beta-feedback-empty-hint">
+          <p className="text-[13px] text-[#FF907F]" data-testid="beta-feedback-empty-hint">
             {BETA_FEEDBACK_EMPTY}
           </p>
         ) : null}
         {fieldHint === 'too_long' || error === BETA_FEEDBACK_TOO_LONG ? (
-          <p className="text-[13px] text-[#FF6961]" data-testid="beta-feedback-too-long-hint">
+          <p className="text-[13px] text-[#FF907F]" data-testid="beta-feedback-too-long-hint">
             {BETA_FEEDBACK_TOO_LONG}
           </p>
         ) : null}
@@ -600,7 +600,7 @@ export function BetaFeedbackScreen({
           id="beta-feedback-page"
           value={page}
           onChange={(e) => setPage(e.target.value as BetaFeedbackPage)}
-          className="w-full rounded-xl border border-white/10 bg-[#1C1C1E] px-3 py-2.5 text-[15px] text-white outline-none"
+          className="w-full rounded-xl border border-white/10 bg-[#1D1F20] px-3 py-2.5 text-[15px] text-white outline-none"
           data-testid="beta-feedback-page"
         >
           {BETA_FEEDBACK_PAGES.map((p) => (
@@ -609,7 +609,7 @@ export function BetaFeedbackScreen({
             </option>
           ))}
         </select>
-        <p className="text-[12px] leading-snug text-[#8E8E93]" data-testid="beta-feedback-meta">
+        <p className="text-[12px] leading-snug text-[#ACB4BA]" data-testid="beta-feedback-meta">
           {metaLine}
         </p>
       </div>
@@ -633,13 +633,13 @@ export function BetaFeedbackScreen({
           {BETA_FEEDBACK_CONSENT_MORE}
         </button>
         {consentMoreOpen ? (
-          <p className="text-[13px] leading-relaxed text-[#AEAEB2]">{BETA_FEEDBACK_CONSENT_MORE_BODY}</p>
+          <p className="text-[13px] leading-relaxed text-[#ACB4BA]">{BETA_FEEDBACK_CONSENT_MORE_BODY}</p>
         ) : null}
       </div>
 
       {error && error !== BETA_FEEDBACK_EMPTY && error !== BETA_FEEDBACK_TOO_LONG ? (
         <div className="space-y-2 rounded-2xl border border-[#FF453A]/30 bg-[#FF453A]/10 p-3">
-          <p className="text-[13px] text-[#FF6961]" data-testid="beta-feedback-error">
+          <p className="text-[13px] text-[#FF907F]" data-testid="beta-feedback-error">
             {error}
           </p>
           {error === BETA_FEEDBACK_ERROR_SEND ? (
@@ -653,7 +653,7 @@ export function BetaFeedbackScreen({
             </button>
           ) : null}
           {offlineQueued ? (
-            <p className="text-[12px] text-[#AEAEB2]">{BETA_FEEDBACK_DRAFT_KEPT}</p>
+            <p className="text-[12px] text-[#ACB4BA]">{BETA_FEEDBACK_DRAFT_KEPT}</p>
           ) : null}
         </div>
       ) : null}
@@ -662,7 +662,7 @@ export function BetaFeedbackScreen({
         type="button"
         disabled={!canSubmit}
         onClick={onSubmitClick}
-        className="ios-press w-full rounded-2xl bg-[#FF2B2B] px-4 py-3.5 text-[16px] font-semibold text-white disabled:opacity-40"
+        className="ios-press w-full rounded-2xl bg-[#FF0702] px-4 py-3.5 text-[16px] font-semibold text-white disabled:opacity-40"
         data-testid="beta-feedback-submit"
       >
         {BETA_FEEDBACK_SUBMIT}
@@ -677,7 +677,7 @@ function Header({ onBack }: { onBack: () => void }) {
       <button
         type="button"
         onClick={onBack}
-        className="ios-press rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-[13px] font-semibold text-[#AEAEB2]"
+        className="ios-press rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-[13px] font-semibold text-[#ACB4BA]"
       >
         {BETA_FEEDBACK_BACK}
       </button>

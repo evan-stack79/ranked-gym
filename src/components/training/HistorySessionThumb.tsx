@@ -41,7 +41,7 @@ export function HistorySessionThumb({ note, variant = 'row' }: HistorySessionThu
           />
         ) : (
           <span
-            className="flex h-full w-full items-center justify-center text-[#AEAEB2]"
+            className="flex h-full w-full items-center justify-center text-[#ACB4BA]"
             data-history-thumb-fallback
           >
             <Dumbbell className="h-7 w-7" strokeWidth={1.75} />

@@ -1,0 +1,64 @@
+/*
+  Palette Radix custom Ranked Gym (Dark).
+  https://www.radix-ui.com/colors/custom?accent-light=DD0600&accent-dark=FF0702&gray-dark=99A1A6&bg-dark=000000
+*/
+:root {
+  color-scheme: dark;
+
+  --red-1: #000000;
+  --red-2: #1a0d0b;
+  --red-3: #3b0c07;
+  --red-4: #560000;
+  --red-5: #680301;
+  --red-6: #7a160f;
+  --red-7: #94281e;
+  --red-8: #c03529;
+  --red-9: #ff0702;
+  --red-10: #ef0000;
+  --red-11: #ff907f;
+  --red-12: #ffcfc6;
+  --red-contrast: #ffffff;
+  --red-surface: #341a1680;
+  --red-track: #ff0702;
+
+  --red-a1: #00000000;
+  --red-a2: #ff806c1a;
+  --red-a3: #ff341f3b;
+  --red-a4: #ff000056;
+  --red-a5: #ff080368;
+  --red-a6: #ff2e207a;
+  --red-a7: #ff453494;
+  --red-a8: #ff4737c0;
+  --red-a9: #ff0702;
+  --red-a10: #ff0000ef;
+  --red-a11: #ff907f;
+  --red-a12: #ffcfc6;
+
+  --gray-1: #000000;
+  --gray-2: #101214;
+  --gray-3: #1d1f20;
+  --gray-4: #25282a;
+  --gray-5: #2c3032;
+  --gray-6: #353a3d;
+  --gray-7: #42484c;
+  --gray-8: #596166;
+  --gray-9: #636f76;
+  --gray-10: #717c83;
+  --gray-11: #acb4ba;
+  --gray-12: #eceeef;
+  --gray-contrast: #ffffff;
+  --gray-track: #636f76;
+
+  --gray-a1: #00000000;
+  --gray-a2: #cce6ff14;
+  --gray-a3: #e8f8ff20;
+  --gray-a4: #e1f3ff2a;
+  --gray-a5: #e1f5ff32;
+  --gray-a6: #def3ff3d;
+  --gray-a7: #def2ff4c;
+  --gray-a8: #dff3ff66;
+  --gray-a9: #d6f0ff76;
+  --gray-a10: #dcf2ff83;
+  --gray-a11: #ecf7ffba;
+  --gray-a12: #fcfeffef;
+}

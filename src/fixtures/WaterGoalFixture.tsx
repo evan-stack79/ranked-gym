@@ -84,7 +84,7 @@ function WaterGoalFixtureShell() {
 
   return (
     <div
-      className="relative flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-[#0C0C0E] font-sans"
+      className="relative flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-[#000000] font-sans"
       data-water-goal-fixture="1"
     >
       <header

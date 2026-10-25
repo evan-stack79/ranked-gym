@@ -30,7 +30,7 @@ export function FoodProductCard({
       data-selected={selected ? 'true' : 'false'}
       className={`flex flex-col rounded-[22px] border bg-[#1A1A1C] px-2.5 pb-3 pt-3 transition-[border-color,box-shadow] ${
         selected
-          ? 'border-[#FF2B2B] shadow-[0_0_0_1px_rgb(255_43_43_/_0.35)]'
+          ? 'border-[#FF0702] shadow-[0_0_0_1px_rgb(255_7_2_/_0.35)]'
           : 'border-white/[0.08]'
       }`}
     >
@@ -52,7 +52,7 @@ export function FoodProductCard({
       <div className="mt-2 flex min-w-0 items-end justify-between gap-1.5">
         <span
           data-portion-pill
-          className="min-w-0 flex-1 whitespace-normal break-words rounded-full bg-white/[0.08] px-2 py-1 text-left text-[10px] font-medium leading-snug text-[#AEAEB2] sm:text-[11px]"
+          className="min-w-0 flex-1 whitespace-normal break-words rounded-full bg-white/[0.08] px-2 py-1 text-left text-[10px] font-medium leading-snug text-[#ACB4BA] sm:text-[11px]"
         >
           {portion}
         </span>
@@ -61,7 +61,7 @@ export function FoodProductCard({
           onClick={onToggle}
           aria-label={selected ? `Retirer ${name}` : `Choisir ${name}`}
           aria-pressed={selected}
-          className="ios-press flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white"
+          className="ios-press flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FF0702] text-white"
         >
           {selected ? (
             <Check className="h-4 w-4" strokeWidth={2.75} aria-hidden />

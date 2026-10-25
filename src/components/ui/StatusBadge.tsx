@@ -6,7 +6,7 @@ interface StatusBadgeProps {
 const VARIANTS = {
   fire: {
     label: 'EN FEU 🔥',
-    className: 'bg-[#FF3B30]/20 text-[#FF6961] border-[#FF3B30]/30',
+    className: 'bg-[#FF3B30]/20 text-[#FF907F] border-[#FF3B30]/30',
   },
   elite: {
     label: 'ÉLITE',

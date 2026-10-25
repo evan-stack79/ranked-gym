@@ -48,7 +48,7 @@ export function ColdLaunchAccueilFixture() {
             <div
               aria-hidden="true"
               data-brand-header-bg="1"
-              className="pointer-events-none absolute inset-0 -z-10 bg-[#0C0C0E]"
+              className="pointer-events-none absolute inset-0 -z-10 bg-[#000000]"
             />
             <div className="mx-auto flex max-w-lg items-center justify-center px-4 pb-2 pt-0">
               <div data-cold-launch-target="compact">
@@ -64,7 +64,7 @@ export function ColdLaunchAccueilFixture() {
               <h1 className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white">
                 <TextFlip /><BlurInText as="span" instant={coldEntering} label=", Alex ?">{`, Alex ?`}</BlurInText>
               </h1>
-              <p className="mt-1.5 text-[15px] font-medium text-[#AEAEB2]">
+              <p className="mt-1.5 text-[15px] font-medium text-[#ACB4BA]">
                 <SoftBlurIn instant={coldEntering}>Séance de l’après-midi</SoftBlurIn>
               </p>
             </header>
@@ -76,13 +76,13 @@ export function ColdLaunchAccueilFixture() {
                   data-reveal-card="nutrition"
                   data-testid="accueil-kcal-static"
                 >
-                  <p className="text-[11px] font-medium text-[#8E8E93]">
+                  <p className="text-[11px] font-medium text-[#ACB4BA]">
                     <SoftBlurIn instant={coldEntering}>Aujourd&apos;hui</SoftBlurIn>
                   </p>
                   <p className="mt-1 text-[22px] font-bold tracking-tight text-white">
                     Il te reste <StaticKcalNumber value={842} /> kcal
                   </p>
-                  <p className="mt-3 text-[11px] font-medium text-[#8E8E93]">
+                  <p className="mt-3 text-[11px] font-medium text-[#ACB4BA]">
                     <SoftBlurIn instant={coldEntering}>Eau</SoftBlurIn>
                   </p>
                   <p className="mt-0.5 text-[15px] font-semibold text-white">
@@ -108,7 +108,7 @@ export function ColdLaunchAccueilFixture() {
             <section className="home-cold-enter__group home-cold-enter__group--2">
               <Reveal delayMs={60} instant={coldEntering}>
                 <div className="glass-card rounded-3xl p-5" data-reveal-card="train">
-                  <p className="text-[11px] font-medium text-[#8E8E93]">
+                  <p className="text-[11px] font-medium text-[#ACB4BA]">
                     <SoftBlurIn instant={coldEntering}>Entraînement</SoftBlurIn>
                   </p>
                   <p className="mt-1 text-[15px] font-semibold text-white">Push · 4 exercices</p>

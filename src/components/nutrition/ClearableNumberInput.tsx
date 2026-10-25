@@ -99,7 +99,7 @@ export function ClearableNumberInput({
         <span
           className={
             placeholderClassName ??
-            'pointer-events-none absolute inset-0 flex items-center text-[28px] font-bold tracking-tight text-[#636366]'
+            'pointer-events-none absolute inset-0 flex items-center text-[28px] font-bold tracking-tight text-[#717C83]'
           }
           aria-hidden="true"
         >

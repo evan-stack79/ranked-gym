@@ -24,7 +24,7 @@ export function GoalPicker({ value, onChange, allowCut = true }: GoalPickerProps
   const options = allowCut ? GOAL_OPTIONS : GOAL_OPTIONS.filter((o) => o.value !== 'cut')
   return (
     <div className="space-y-2">
-      <p className="text-[12px] font-semibold text-[#8E8E93]">Objectif</p>
+      <p className="text-[12px] font-semibold text-[#ACB4BA]">Objectif</p>
       <div className={`grid gap-2 ${options.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
         {options.map((option) => {
           const selected = value === option.value
@@ -44,7 +44,7 @@ export function GoalPicker({ value, onChange, allowCut = true }: GoalPickerProps
               >
                 {GOAL_LABELS[option.value]}
               </p>
-              <p className="mt-1 text-[10px] leading-snug text-[#8E8E93]">{option.hint}</p>
+              <p className="mt-1 text-[10px] leading-snug text-[#ACB4BA]">{option.hint}</p>
             </button>
           )
         })}
@@ -72,7 +72,7 @@ export function WeeklyPacePicker({ value, onChange, goal, weightKg }: WeeklyPace
   return (
     <div className="space-y-2">
       <div className="flex items-end justify-between gap-2">
-        <p className="text-[12px] font-semibold text-[#8E8E93]">
+        <p className="text-[12px] font-semibold text-[#ACB4BA]">
           Rythme · {verb} / semaine
         </p>
         <p className="text-[15px] font-bold text-white">{safeValue.toFixed(2)} kg</p>
@@ -87,12 +87,12 @@ export function WeeklyPacePicker({ value, onChange, goal, weightKg }: WeeklyPace
         className="w-full accent-[#30D158]"
         aria-label="Rythme hebdomadaire en kg"
       />
-      <p className="text-[11px] text-[#8E8E93]">
+      <p className="text-[11px] text-[#ACB4BA]">
         Défaut proposé : 0,5 % du poids (~{defaultPctLabel} kg/sem). Plafond : {maxPace.toFixed(2)}{' '}
         kg/sem.
       </p>
-      <p className="text-[11px] leading-relaxed text-[#8E8E93]">{Q3_VITESSE}</p>
-      <p className="text-[11px] leading-relaxed text-[#8E8E93]">{SEC_NUT_05_ORIGINE}</p>
+      <p className="text-[11px] leading-relaxed text-[#ACB4BA]">{Q3_VITESSE}</p>
+      <p className="text-[11px] leading-relaxed text-[#ACB4BA]">{SEC_NUT_05_ORIGINE}</p>
     </div>
   )
 }

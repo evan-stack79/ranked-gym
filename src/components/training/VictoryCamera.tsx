@@ -202,7 +202,7 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
         style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top))' }}
       >
         <p className="text-[10px] font-semibold uppercase tracking-[0.28em]">
-          <span className="text-[#FF2B2B]">Ranked</span>{' '}
+          <span className="text-[#FF0702]">Ranked</span>{' '}
           <span className="text-white">Gym</span>
           <span className="text-[#C7C7CC]"> // UPPER</span>
         </p>
@@ -254,7 +254,7 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
           <div className="relative min-h-0 flex-1 overflow-hidden bg-black">
             {cameraError ? (
               <div className="flex h-full flex-col items-start justify-center gap-4 px-8 text-left">
-                <p className="text-[15px] leading-relaxed text-[#AEAEB2]">{cameraError}</p>
+                <p className="text-[15px] leading-relaxed text-[#ACB4BA]">{cameraError}</p>
                 <button
                   type="button"
                   onClick={() => void startCamera()}
@@ -289,7 +289,7 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
             >
               <div className="pointer-events-none min-w-0">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.28em]">
-                  <span className="text-[#FF2B2B]">Ranked</span>{' '}
+                  <span className="text-[#FF0702]">Ranked</span>{' '}
                   <span className="text-white">Gym</span>
                   <span className="text-[#C7C7CC]"> // UPPER</span>
                 </p>
@@ -319,12 +319,12 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
               className="ios-press relative z-10 flex h-[72px] w-[72px] items-center justify-center rounded-full border-[3px] border-white bg-transparent disabled:opacity-40"
               aria-label="Prendre la photo"
             >
-              <span className="h-[54px] w-[54px] rounded-full bg-[#FF2B2B] shadow-[0_0_28px_rgba(255,43,43,0.55)]" />
+              <span className="h-[54px] w-[54px] rounded-full bg-[#FF0702] shadow-[0_0_28px_rgba(255,43,43,0.55)]" />
             </button>
             <button
               type="button"
               onClick={onComplete}
-              className="ios-press rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-[13px] font-semibold uppercase tracking-[0.16em] text-[#AEAEB2]"
+              className="ios-press rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-[13px] font-semibold uppercase tracking-[0.16em] text-[#ACB4BA]"
             >
               Passer
             </button>
@@ -409,7 +409,7 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
             {canOpenBetaFeedback() ? (
               <button
                 type="button"
-                className="mx-auto mt-3 block text-center text-[12px] font-medium text-[#AEAEB2] underline"
+                className="mx-auto mt-3 block text-center text-[12px] font-medium text-[#ACB4BA] underline"
                 data-testid="beta-feedback-session-link"
                 onClick={() => {
                   onComplete()

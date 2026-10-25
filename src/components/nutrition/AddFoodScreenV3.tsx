@@ -60,8 +60,8 @@ function MealTypeChip({
       onClick={onClick}
       className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors ${
         active
-          ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-white'
-          : 'border-white/10 bg-black/25 text-[#8E8E93]'
+          ? 'border-[#FF0702]/45 bg-[#FF0702]/20 text-white'
+          : 'border-white/10 bg-black/25 text-[#ACB4BA]'
       }`}
     >
       {MEAL_TYPE_LABELS[type]}
@@ -342,7 +342,7 @@ export function AddFoodScreenV3({
         paddingRight: 'env(safe-area-inset-right, 0px)',
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         background:
-          'radial-gradient(ellipse 120% 55% at 50% -8%, rgb(90 18 22 / 0.55) 0%, transparent 58%), #0C0C0E',
+          'radial-gradient(ellipse 120% 55% at 50% -8%, rgb(90 18 22 / 0.55) 0%, transparent 58%), #000000',
       }}
     >
       <header className="flex shrink-0 items-start gap-3 px-4 pb-1 pt-3">
@@ -368,7 +368,7 @@ export function AddFoodScreenV3({
         <label className="relative block">
           <span className="sr-only">Rechercher un aliment</span>
           <Search
-            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8E8E93]"
+            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#ACB4BA]"
             strokeWidth={2.25}
             aria-hidden
           />
@@ -377,7 +377,7 @@ export function AddFoodScreenV3({
             value={searchQuery}
             onChange={(e) => onSearchQueryChange(e.target.value)}
             placeholder="Rechercher un aliment, une marque…"
-            className="w-full rounded-2xl border border-white/12 py-3.5 pl-10 pr-3.5 text-[15px] text-white placeholder:text-[#636366] outline-none focus:border-[#FF2B2B]/45"
+            className="w-full rounded-2xl border border-white/12 py-3.5 pl-10 pr-3.5 text-[15px] text-white placeholder:text-[#717C83] outline-none focus:border-[#FF0702]/45"
             style={{
               background: 'rgb(255 255 255 / 0.06)',
               backdropFilter: 'blur(14px)',
@@ -393,7 +393,7 @@ export function AddFoodScreenV3({
         {!networkOk ? (
           <p
             data-food-offline-banner
-            className="flex items-center justify-center gap-2 rounded-xl bg-white/[0.04] px-3 py-2 text-[12px] text-[#AEAEB2]"
+            className="flex items-center justify-center gap-2 rounded-xl bg-white/[0.04] px-3 py-2 text-[12px] text-[#ACB4BA]"
             role="status"
           >
             <WifiOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -412,18 +412,18 @@ export function AddFoodScreenV3({
           data-food-results
         >
           {searchLoading && filteredHits.length === 0 ? (
-            <p className="py-10 text-center text-[13px] text-[#8E8E93]">Recherche Open Food Facts…</p>
+            <p className="py-10 text-center text-[13px] text-[#ACB4BA]">Recherche Open Food Facts…</p>
           ) : null}
 
           {searchError && !searchLoading ? (
-            <p className="py-8 text-center text-[13px] text-[#FF6961]" role="alert">
+            <p className="py-8 text-center text-[13px] text-[#FF907F]" role="alert">
               {searchError}
             </p>
           ) : null}
 
           {!searchLoading && !searchError && searchActive && filteredHits.length === 0 ? (
             <p
-              className="py-8 text-center text-[13px] text-[#8E8E93]"
+              className="py-8 text-center text-[13px] text-[#ACB4BA]"
               data-food-empty-state
               role="status"
             >
@@ -434,7 +434,7 @@ export function AddFoodScreenV3({
           ) : null}
 
           {idleBrowse ? (
-            <p className="py-8 text-center text-[13px] text-[#8E8E93]">
+            <p className="py-8 text-center text-[13px] text-[#ACB4BA]">
               {category === 'all'
                 ? 'Recherche un aliment ou choisis une catégorie.'
                 : `Charge les produits « ${categoryLabel} »…`}
@@ -469,10 +469,10 @@ export function AddFoodScreenV3({
             data-off-licence
             aria-label="Licence Open Food Facts"
           >
-            <p className="text-[12px] leading-snug text-[#AEAEB2]">
+            <p className="text-[12px] leading-snug text-[#ACB4BA]">
               Données Open Food Facts · licence ODbL
             </p>
-            <p className="text-[12px] leading-snug text-[#8E8E93]">
+            <p className="text-[12px] leading-snug text-[#ACB4BA]">
               Photos : contributeurs Open Food Facts · CC BY-SA 3.0
             </p>
           </footer>
@@ -483,7 +483,7 @@ export function AddFoodScreenV3({
                 type="button"
                 data-manual-toggle
                 onClick={() => setManualOpen((v) => !v)}
-                className="ios-press w-full py-2 text-left text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]"
+                className="ios-press w-full py-2 text-left text-[12px] font-semibold uppercase tracking-wider text-[#ACB4BA]"
                 aria-expanded={manualOpen}
               >
                 {manualOpen ? 'Masquer la saisie manuelle' : 'Ou saisie manuelle'}
@@ -507,20 +507,20 @@ export function AddFoodScreenV3({
                   </div>
 
                   <label className="block">
-                    <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Nom</span>
+                    <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">Nom</span>
                     <input
                       type="text"
                       value={name}
                       onChange={(e) => onNameChange(e.target.value)}
                       placeholder="Poulet riz brocoli…"
-                      className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/40"
+                      className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#596166] outline-none focus:border-[#FF0702]/40"
                       required
                       data-testid="food-add-manual-name"
                     />
                   </label>
 
                   <label className="block">
-                    <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                    <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">
                       Quantité (g)
                     </span>
                     <input
@@ -545,12 +545,12 @@ export function AddFoodScreenV3({
                         )
                       }}
                       placeholder="ex. 120"
-                      className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/40"
+                      className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#596166] outline-none focus:border-[#FF0702]/40"
                       data-testid="food-add-manual-grams"
                     />
                   </label>
                   {manualError ? (
-                    <p className="text-[12px] text-[#FF6961]" role="alert" data-food-qty-error>
+                    <p className="text-[12px] text-[#FF907F]" role="alert" data-food-qty-error>
                       {manualError}
                     </p>
                   ) : null}
@@ -571,7 +571,7 @@ export function AddFoodScreenV3({
 
         {quantityStep ? (
           <div
-            className="absolute inset-0 z-40 flex flex-col bg-[#0C0C0E]/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-3"
+            className="absolute inset-0 z-40 flex flex-col bg-[#000000]/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-3"
             data-food-quantity-step
             role="dialog"
             aria-label="Choisir la quantité"
@@ -580,7 +580,7 @@ export function AddFoodScreenV3({
               <h2 className="text-[17px] font-semibold text-white">Quantité</h2>
               <button
                 type="button"
-                className="ios-press text-[13px] font-semibold text-[#8E8E93]"
+                className="ios-press text-[13px] font-semibold text-[#ACB4BA]"
                 onClick={() => setQuantityStep(false)}
               >
                 Retour
@@ -602,8 +602,8 @@ export function AddFoodScreenV3({
                         type="button"
                         className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
                           qty.unit === 'g'
-                            ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-white'
-                            : 'border-white/10 text-[#8E8E93]'
+                            ? 'border-[#FF0702]/45 bg-[#FF0702]/20 text-white'
+                            : 'border-white/10 text-[#ACB4BA]'
                         }`}
                         onClick={() => {
                           setQtyError(null)
@@ -619,8 +619,8 @@ export function AddFoodScreenV3({
                         type="button"
                         className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
                           qty.unit === 'pieces'
-                            ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-white'
-                            : 'border-white/10 text-[#8E8E93]'
+                            ? 'border-[#FF0702]/45 bg-[#FF0702]/20 text-white'
+                            : 'border-white/10 text-[#ACB4BA]'
                         }`}
                         onClick={() => {
                           setQtyError(null)
@@ -655,13 +655,13 @@ export function AddFoodScreenV3({
                           }))
                           setQtyError(null)
                         }}
-                        className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#FF2B2B]/40"
+                        className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#FF0702]/40"
                         data-testid={`food-qty-input-${key}`}
                       />
                     </label>
                     {qtyMessageFor(hit, qty) ? (
                       <p
-                        className="mt-1.5 text-[12px] text-[#FF6961]"
+                        className="mt-1.5 text-[12px] text-[#FF907F]"
                         role="alert"
                         data-food-qty-error
                       >
@@ -673,13 +673,13 @@ export function AddFoodScreenV3({
               })}
             </ul>
             {qtyError ? (
-              <p className="mt-2 text-[12px] text-[#FF6961]" role="alert" data-food-qty-error>
+              <p className="mt-2 text-[12px] text-[#FF907F]" role="alert" data-food-qty-error>
                 {qtyError}
               </p>
             ) : null}
             {!networkOk ? (
               <p
-                className="mt-2 text-[12px] text-[#FF6961]"
+                className="mt-2 text-[12px] text-[#FF907F]"
                 role="alert"
                 data-food-offline-required
               >

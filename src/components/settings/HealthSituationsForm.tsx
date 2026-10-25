@@ -216,7 +216,7 @@ export function HealthSituationsForm({
 
   return (
     <section className="space-y-3" data-testid="health-situations-form">
-      <p className="text-[13px] leading-relaxed text-[#AEAEB2]">{Q7_INTRO}</p>
+      <p className="text-[13px] leading-relaxed text-[#ACB4BA]">{Q7_INTRO}</p>
       <div className="space-y-2">
         {showPregBreast ? (
           <>
@@ -293,7 +293,7 @@ export function HealthSituationsForm({
             <button
               type="button"
               onClick={confirmClearAnnuler}
-              className="ios-press flex-1 rounded-xl border border-white/15 bg-white/5 py-2.5 text-[14px] font-semibold text-[#AEAEB2]"
+              className="ios-press flex-1 rounded-xl border border-white/15 bg-white/5 py-2.5 text-[14px] font-semibold text-[#ACB4BA]"
               data-testid="health-clear-confirm-cancel"
             >
               {SAFETY_CLEAR_CONFIRM_CANCEL}
@@ -354,7 +354,7 @@ function HealthRow({
         <span className="text-[14px] font-medium text-white">{label}</span>
       </label>
       {hint ? (
-        <p className="px-1 text-[12px] leading-snug text-[#8E8E93]" data-testid={`${testId}-lock-hint`}>
+        <p className="px-1 text-[12px] leading-snug text-[#ACB4BA]" data-testid={`${testId}-lock-hint`}>
           {hint}
         </p>
       ) : null}

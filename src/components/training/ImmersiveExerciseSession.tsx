@@ -61,10 +61,10 @@ function formatEffort(set: WorkoutSet): string | null {
 }
 
 const FIELD =
-  'min-h-11 w-full rounded-lg border border-white/12 bg-[#1c1c1e] px-2 text-center text-[15px] font-semibold tabular-nums text-white outline-none focus-visible:border-[#FF2B2B]/55'
+  'min-h-11 w-full rounded-lg border border-white/12 bg-[#1d1f20] px-2 text-center text-[15px] font-semibold tabular-nums text-white outline-none focus-visible:border-[#FF0702]/55'
 
 const LAST_PLACEHOLDER =
-  'pointer-events-none absolute inset-0 flex items-center justify-center text-[15px] font-semibold tabular-nums text-[#636366]'
+  'pointer-events-none absolute inset-0 flex items-center justify-center text-[15px] font-semibold tabular-nums text-[#717C83]'
 
 const EMPTY_HISTORY: WorkoutNote[] = []
 
@@ -202,7 +202,7 @@ export function ImmersiveExerciseSession({
               data-hero-fallback
               aria-hidden="true"
             >
-              <div className="absolute inset-0 bg-[#1c1c1e]" />
+              <div className="absolute inset-0 bg-[#1d1f20]" />
               <div className="absolute inset-0 bg-[radial-gradient(90%_70%_at_50%_35%,#3a3a3c_0%,transparent_70%)] opacity-70" />
               <div className="absolute inset-0 bg-[linear-gradient(180deg,#252528_0%,#141416_45%,#0c0c0d_100%)] opacity-90" />
             </div>
@@ -251,7 +251,7 @@ export function ImmersiveExerciseSession({
             <button
               type="button"
               onClick={onToggleSessionPause}
-              className="pointer-events-auto ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full bg-black/45 text-[#FF2B2B]"
+              className="pointer-events-auto ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full bg-black/45 text-[#FF0702]"
               aria-label={sessionPaused ? 'Reprendre la séance' : 'Mettre la séance en pause'}
             >
               {sessionPaused ? (
@@ -276,25 +276,25 @@ export function ImmersiveExerciseSession({
             {displayName}
           </h1>
           {muscleLine ? (
-            <p className="mt-0.5 text-[13px] font-medium text-[#8E8E93]">{muscleLine}</p>
+            <p className="mt-0.5 text-[13px] font-medium text-[#ACB4BA]">{muscleLine}</p>
           ) : null}
-          <p className="mt-0.5 text-[12px] text-[#636366]">
+          <p className="mt-0.5 text-[12px] text-[#717C83]">
             Exercice {safeIndex + 1} sur {exercises.length}
           </p>
         </header>
 
         {/* Sets grid — Effort 1–10 (réf. 787e6ed), facultatif, jamais Facile/OK/Dur */}
         <div className="mb-1 grid grid-cols-[2.25rem_1fr_1fr_1fr_2.5rem] items-center gap-x-2 px-0.5">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-[#636366]">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-[#717C83]">
             Série
           </span>
-          <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#636366]">
+          <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#717C83]">
             kg
           </span>
-          <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#636366]">
+          <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#717C83]">
             Reps
           </span>
-          <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#636366]">
+          <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#717C83]">
             Effort
           </span>
           <span className="sr-only">Validation</span>
@@ -325,13 +325,13 @@ export function ImmersiveExerciseSession({
               >
                 {active ? (
                   <span
-                    className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#FF2B2B]"
+                    className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#FF0702]"
                     aria-hidden="true"
                   />
                 ) : null}
                 <span
                   className={`text-center text-[13px] font-bold tabular-nums ${
-                    done ? 'text-white' : active ? 'text-white' : 'text-[#8E8E93]'
+                    done ? 'text-white' : active ? 'text-white' : 'text-[#ACB4BA]'
                   }`}
                 >
                   {idx + 1}
@@ -381,7 +381,7 @@ export function ImmersiveExerciseSession({
                 />
                 {done && effortDone ? (
                   <div
-                    className={`${FIELD} flex items-center justify-center text-[13px] text-[#AEAEB2]`}
+                    className={`${FIELD} flex items-center justify-center text-[13px] text-[#ACB4BA]`}
                     aria-label={`Série ${idx + 1} effort ${effortDone}`}
                   >
                     {effortDone}
@@ -399,9 +399,9 @@ export function ImmersiveExerciseSession({
                     required={false}
                     deferAmbiguousIntegerPrefix
                     placeholder="1–10"
-                    placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#636366]"
+                    placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#717C83]"
                     aria-label={`Série ${idx + 1} effort facultatif`}
-                    className={`${FIELD} text-[13px] text-[#AEAEB2]`}
+                    className={`${FIELD} text-[13px] text-[#ACB4BA]`}
                   />
                 )}
                 <div className="flex items-center justify-center">
@@ -428,7 +428,7 @@ export function ImmersiveExerciseSession({
           <button
             type="button"
             onClick={onUndoValidation}
-            className="ios-press mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-white/12 text-[13px] font-semibold text-[#AEAEB2]"
+            className="ios-press mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-white/12 text-[13px] font-semibold text-[#ACB4BA]"
             data-undo-validation
           >
             Annuler
@@ -439,7 +439,7 @@ export function ImmersiveExerciseSession({
           <button
             type="button"
             onClick={() => onAddSet(exercise.id)}
-            className="ios-press flex min-h-11 flex-1 items-center justify-center rounded-xl border border-white/12 bg-[#1c1c1e] px-3 text-[13px] font-semibold text-[#AEAEB2]"
+            className="ios-press flex min-h-11 flex-1 items-center justify-center rounded-xl border border-white/12 bg-[#1d1f20] px-3 text-[13px] font-semibold text-[#ACB4BA]"
           >
             + Ajouter une série
           </button>
@@ -448,7 +448,7 @@ export function ImmersiveExerciseSession({
               type="button"
               onClick={() => onValidateSet(exercise, validateIdx, restSecResolved)}
               disabled={Boolean(exercise.sets[validateIdx]?.done) && pendingIdx < 0}
-              className="ios-press flex min-h-11 flex-[1.35] items-center justify-center rounded-xl bg-[#FF2B2B] px-3 text-[14px] font-semibold text-white disabled:opacity-40"
+              className="ios-press flex min-h-11 flex-[1.35] items-center justify-center rounded-xl bg-[#FF0702] px-3 text-[14px] font-semibold text-white disabled:opacity-40"
             >
               Valider la série
             </button>
@@ -465,7 +465,7 @@ export function ImmersiveExerciseSession({
               : `Repos prévu ${formatClock(restDisplaySec)}`
           }
         >
-          <Timer className="h-4 w-4 shrink-0 text-[#FF2B2B]" strokeWidth={2.25} />
+          <Timer className="h-4 w-4 shrink-0 text-[#FF0702]" strokeWidth={2.25} />
           <p className="flex-1 text-[14px] font-semibold text-white">
             Repos{' '}
             <span className="tabular-nums tracking-tight">{formatClock(restDisplaySec)}</span>
@@ -505,7 +505,7 @@ export function ImmersiveExerciseSession({
                     cy={ringSize / 2}
                     r={radius}
                     fill="none"
-                    stroke="#2c2c2e"
+                    stroke="#25282a"
                     strokeWidth={stroke}
                   />
                   <circle
@@ -513,7 +513,7 @@ export function ImmersiveExerciseSession({
                     cy={ringSize / 2}
                     r={radius}
                     fill="none"
-                    stroke="#FF2B2B"
+                    stroke="#FF0702"
                     strokeWidth={stroke}
                     strokeLinecap="round"
                     strokeDasharray={circumference}
@@ -542,14 +542,14 @@ export function ImmersiveExerciseSession({
                         type="button"
                         onClick={() => onActiveIndexChange(i)}
                         className={`ios-press relative min-h-9 min-w-5 px-0.5 text-[13px] font-semibold tabular-nums ${
-                          current ? 'text-white' : 'text-[#636366]'
+                          current ? 'text-white' : 'text-[#717C83]'
                         }`}
                         aria-current={current ? 'true' : undefined}
                         aria-label={`Exercice ${i + 1}${ex.name ? ` ${ex.name}` : ''}`}
                       >
                         {i + 1}
                         {current ? (
-                          <span className="absolute inset-x-0 -bottom-0.5 mx-auto h-0.5 w-3 rounded-full bg-[#FF2B2B]" />
+                          <span className="absolute inset-x-0 -bottom-0.5 mx-auto h-0.5 w-3 rounded-full bg-[#FF0702]" />
                         ) : null}
                       </button>
                     )
@@ -558,7 +558,7 @@ export function ImmersiveExerciseSession({
                     <button
                       type="button"
                       onClick={onAddExercise}
-                      className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 text-[#AEAEB2]"
+                      className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 text-[#ACB4BA]"
                       aria-label="Ajouter un exercice"
                       data-add-exercise
                     >
@@ -573,7 +573,7 @@ export function ImmersiveExerciseSession({
               type="button"
               onClick={onFinishSession}
               disabled={saving}
-              className="ios-press mt-3 mb-0.5 min-h-11 w-full text-center text-[13px] font-medium text-[#636366] disabled:opacity-50"
+              className="ios-press mt-3 mb-0.5 min-h-11 w-full text-center text-[13px] font-medium text-[#717C83] disabled:opacity-50"
             >
               {saving ? 'Synchro…' : 'Terminer la séance'}
             </button>

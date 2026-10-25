@@ -22,7 +22,7 @@ export function SportsOnboardingScreen({ onComplete }: SportsOnboardingScreenPro
 
   return (
     <div
-      className="relative flex min-h-[100dvh] flex-col bg-[#0C0C0E] font-sans"
+      className="relative flex min-h-[100dvh] flex-col bg-[#000000] font-sans"
       data-sports-onboarding
       style={{
         paddingTop: 'max(3rem, env(safe-area-inset-top, 0px))',
@@ -31,10 +31,10 @@ export function SportsOnboardingScreen({ onComplete }: SportsOnboardingScreenPro
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
-      <header className="border-b border-white/5 bg-[#0C0C0E]">
+      <header className="border-b border-white/5 bg-[#000000]">
         <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-3">
           <span className="text-[17px] font-semibold tracking-tight text-white">
-            Ranked <span className="text-[#FF2B2B]">Gym</span>
+            Ranked <span className="text-[#FF0702]">Gym</span>
           </span>
         </div>
       </header>
@@ -43,7 +43,7 @@ export function SportsOnboardingScreen({ onComplete }: SportsOnboardingScreenPro
         <h1 className="text-[28px] font-bold leading-tight tracking-tight text-white">
           Quels sports pratiques-tu ou aimerais-tu commencer ?
         </h1>
-        <p className="mt-2 text-[15px] leading-snug text-[#8E8E93]">
+        <p className="mt-2 text-[15px] leading-snug text-[#ACB4BA]">
           Tu pourras modifier ce choix plus tard dans ton profil.
         </p>
 
@@ -63,7 +63,7 @@ export function SportsOnboardingScreen({ onComplete }: SportsOnboardingScreenPro
           <button
             type="button"
             onClick={() => persistAndContinue([], true)}
-            className="ios-press flex min-h-11 w-full items-center justify-center rounded-2xl text-[14px] font-medium text-[#8E8E93]"
+            className="ios-press flex min-h-11 w-full items-center justify-center rounded-2xl text-[14px] font-medium text-[#ACB4BA]"
           >
             Je ne sais pas encore
           </button>

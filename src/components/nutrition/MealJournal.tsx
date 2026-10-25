@@ -84,7 +84,7 @@ const MEAL_META: Record<
   { icon: typeof Coffee; accent: 'orange' | 'crimson' | 'violet' | 'blue'; glow: string }
 > = {
   breakfast: { icon: Coffee, accent: 'orange', glow: '#FF9F0A' },
-  lunch: { icon: Sun, accent: 'crimson', glow: '#FF2B2B' },
+  lunch: { icon: Sun, accent: 'crimson', glow: '#FF0702' },
   dinner: { icon: Moon, accent: 'violet', glow: '#BF5AF2' },
   snack: { icon: Cookie, accent: 'blue', glow: '#00B4FF' },
 }
@@ -514,7 +514,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
         className="relative overflow-hidden rounded-3xl border border-white/10 p-5"
         style={{
           background:
-            'radial-gradient(ellipse 80% 70% at 90% 0%, rgb(255 159 10 / 0.2) 0%, transparent 50%), radial-gradient(ellipse 60% 50% at 0% 100%, rgb(255 43 43 / 0.14) 0%, transparent 55%), rgb(28 28 30 / 0.9)',
+            'radial-gradient(ellipse 80% 70% at 90% 0%, rgb(255 159 10 / 0.2) 0%, transparent 50%), radial-gradient(ellipse 60% 50% at 0% 100%, rgb(255 7 2 / 0.14) 0%, transparent 55%), rgb(28 28 30 / 0.9)',
           boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.08), 0 12px 40px rgb(0 0 0 / 0.3)',
         }}
       >
@@ -522,7 +522,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
           <div className="flex min-w-0 items-center gap-2.5">
             <IconBadge icon={UtensilsCrossed} variant="orange" size="sm" />
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[#ACB4BA]">
                 Journal
               </p>
               <h2 className="whitespace-nowrap text-[20px] font-bold leading-tight tracking-tight text-white">
@@ -559,17 +559,17 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
             progress={progress}
             size={100}
             stroke={9}
-            color={progress > 1 ? '#FF2B2B' : '#FF9F0A'}
+            color={progress > 1 ? '#FF0702' : '#FF9F0A'}
           >
             <p className="text-[20px] font-black text-white">{Math.round(progress * 100)}%</p>
-            <p className="text-[10px] text-[#8E8E93]">objectif</p>
+            <p className="text-[10px] text-[#ACB4BA]">objectif</p>
           </MacroRing>
 
           <div className="min-w-0 flex-1 space-y-2">
             <div className="flex items-baseline justify-between gap-2">
               <p className="text-[28px] font-black tracking-tight text-white">
                 {totals.calories}
-                <span className="ml-1 text-[14px] font-semibold text-[#8E8E93]">
+                <span className="ml-1 text-[14px] font-semibold text-[#ACB4BA]">
                   / {targetCalories} kcal
                 </span>
               </p>
@@ -581,13 +581,13 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
                   transform: `scaleX(${Math.max(0, Math.min(progress, 1))})`,
                   background:
                     progress > 1
-                      ? 'linear-gradient(90deg, #FF2B2B, #FF0055)'
-                      : 'linear-gradient(90deg, #FF9F0A, #FF2B2B)',
+                      ? 'linear-gradient(90deg, #FF0702, #FF0055)'
+                      : 'linear-gradient(90deg, #FF9F0A, #FF0702)',
                   boxShadow: '0 0 12px rgb(255 159 10 / 0.4)',
                 }}
               />
             </div>
-            <p className="text-[13px] text-[#8E8E93]">
+            <p className="text-[13px] text-[#ACB4BA]">
               {remaining > 0 ? (
                 <>
                   Il reste{' '}
@@ -611,7 +611,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
           />
         ) : (
           <div className="mt-4 border-t border-white/8 pt-4">
-            <p className="text-[13px] font-medium tabular-nums text-[#AEAEB2]">
+            <p className="text-[13px] font-medium tabular-nums text-[#ACB4BA]">
               {hydration.consumedMl} ml bus aujourd&apos;hui
             </p>
             <WaterGoalChooser
@@ -663,7 +663,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
           <p className="text-[14px] font-semibold text-white">
             {MEAL_TYPE_LABELS[pendingMealType]} en cours
           </p>
-          <p className="mt-1 text-[12px] leading-relaxed text-[#AEAEB2]">
+          <p className="mt-1 text-[12px] leading-relaxed text-[#ACB4BA]">
             Il manque encore environ{' '}
             <span className="font-semibold text-[#64D2FF]">{pendingRemaining} kcal</span> pour un
             bon repas. Scanne l’accompagnement (ex. frites) — on calcule la portion pour toi.
@@ -680,7 +680,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
             <button
               type="button"
               onClick={() => setPendingMealType(null)}
-              className="ios-press rounded-xl border border-white/10 bg-black/25 px-3 py-2.5 text-[12px] font-medium text-[#8E8E93]"
+              className="ios-press rounded-xl border border-white/10 bg-black/25 px-3 py-2.5 text-[12px] font-medium text-[#ACB4BA]"
             >
               Plus tard
             </button>
@@ -804,7 +804,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
             <UtensilsCrossed className="h-7 w-7 text-[#30D158]" strokeWidth={1.75} />
           </div>
           <p className="text-[16px] font-semibold text-white">Aucun repas pour l&apos;instant</p>
-          <p className="max-w-xs text-[13px] text-[#8E8E93]">
+          <p className="max-w-xs text-[13px] text-[#ACB4BA]">
             {foodAddV3
               ? 'Ajoute un aliment pour suivre ta journée.'
               : 'Scanne un produit ou ajoute un repas pour suivre ta journée.'}
@@ -834,7 +834,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
                         {MEAL_TYPE_LABELS[meal.mealType]}
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[13px] text-[#8E8E93]">
+                    <p className="mt-0.5 text-[13px] text-[#ACB4BA]">
                       {foodAddV3 ? (
                         <>
                           {formatMealPortionLabel(meal) || MEAL_TYPE_LABELS[meal.mealType]}
@@ -852,7 +852,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
                   <button
                     type="button"
                     onClick={() => setEditingMeal(meal)}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/5 bg-white/5 text-[#8E8E93] active:text-white"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/5 bg-white/5 text-[#ACB4BA] active:text-white"
                     aria-label="Modifier l’aliment"
                   >
                     <Pencil className="h-4 w-4" />
@@ -860,7 +860,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
                   <button
                     type="button"
                     onClick={() => handleRemove(meal.id)}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/5 bg-white/5 text-[#8E8E93] active:text-[#FF453A]"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/5 bg-white/5 text-[#ACB4BA] active:text-[#FF453A]"
                     aria-label="Supprimer le repas"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -898,7 +898,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
         <div
           className={`fixed left-1/2 z-[120] max-w-[92%] -translate-x-1/2 rounded-2xl border px-4 py-3 text-center text-[13px] font-medium shadow-lg ${
             toast.variant === 'error'
-              ? 'bottom-[calc(var(--app-bottom-nav)+env(safe-area-inset-bottom,0px)+1rem)] border-[#FF453A]/40 bg-[#2C1014]/95 text-[#FF6961]'
+              ? 'bottom-[calc(var(--app-bottom-nav)+env(safe-area-inset-bottom,0px)+1rem)] border-[#FF453A]/40 bg-[#2C1014]/95 text-[#FF907F]'
               : 'bottom-[calc(var(--app-bottom-nav)+env(safe-area-inset-bottom,0px)+1rem)] border-[#30D158]/35 bg-[#102C18]/95 text-white'
           }`}
           role={toast.variant === 'error' ? 'alert' : 'status'}

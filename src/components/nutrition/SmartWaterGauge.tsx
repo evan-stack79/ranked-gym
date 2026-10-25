@@ -462,14 +462,14 @@ export function SmartWaterGauge() {
     >
       <div className="mb-5 flex items-end justify-between gap-3">
         <div>
-          <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#8E8E93]">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#ACB4BA]">
             Hydratation
           </p>
           <h2 className="mt-1 text-[22px] font-semibold tracking-tight text-white">
             <SoftBlurIn as="span">Eau</SoftBlurIn>
           </h2>
         </div>
-        <p className="text-right text-[15px] font-medium tabular-nums text-[#AEAEB2]">
+        <p className="text-right text-[15px] font-medium tabular-nums text-[#ACB4BA]">
           <span className="text-[22px] font-semibold tracking-tight text-white">
             {awaitingConfirm || dragging ? (
               displayTotal
@@ -478,9 +478,9 @@ export function SmartWaterGauge() {
             )}
           </span>
           {hasGoal ? (
-            <span className="text-[#8E8E93]"> / {formatWaterMl(dailyGoalMl)}</span>
+            <span className="text-[#ACB4BA]"> / {formatWaterMl(dailyGoalMl)}</span>
           ) : (
-            <span className="text-[#8E8E93]"> ml</span>
+            <span className="text-[#ACB4BA]"> ml</span>
           )}
         </p>
       </div>
@@ -676,7 +676,7 @@ export function SmartWaterGauge() {
           <button
             type="button"
             onClick={enterCalibration}
-            className="ios-press min-h-11 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2.5 text-[13px] font-medium text-[#AEAEB2] hover:border-white/20 hover:text-white"
+            className="ios-press min-h-11 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2.5 text-[13px] font-medium text-[#ACB4BA] hover:border-white/20 hover:text-white"
             aria-label="Régler le niveau de ma bouteille"
           >
             Régler ma bouteille
@@ -691,14 +691,14 @@ export function SmartWaterGauge() {
             <p className="rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7DD3FC]">
               Mode calibrage
             </p>
-            <p className="max-w-[280px] text-center text-[13px] font-medium leading-relaxed text-[#AEAEB2]">
+            <p className="max-w-[280px] text-center text-[13px] font-medium leading-relaxed text-[#ACB4BA]">
               Place le niveau de l’eau comme sur ta vraie bouteille
             </p>
             <div className="flex w-full items-center gap-2">
               <button
                 type="button"
                 onClick={cancelCalibration}
-                className="ios-press min-h-11 flex-1 rounded-xl border border-white/12 bg-white/[0.05] px-3 py-2.5 text-[14px] font-medium text-[#AEAEB2]"
+                className="ios-press min-h-11 flex-1 rounded-xl border border-white/12 bg-white/[0.05] px-3 py-2.5 text-[14px] font-medium text-[#ACB4BA]"
               >
                 Annuler
               </button>
@@ -713,7 +713,7 @@ export function SmartWaterGauge() {
             <button
               type="button"
               onClick={resetToAutomatic}
-              className="ios-press px-2 py-1.5 text-[12px] font-medium text-[#8E8E93] underline-offset-2 hover:underline"
+              className="ios-press px-2 py-1.5 text-[12px] font-medium text-[#ACB4BA] underline-offset-2 hover:underline"
             >
               Revenir au suivi automatique
             </button>
@@ -740,7 +740,7 @@ export function SmartWaterGauge() {
         )}
 
         <div className="w-full max-w-[340px]">
-          <p className="mb-2 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8E8E93]">
+          <p className="mb-2 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-[#ACB4BA]">
             Raccourcis
           </p>
           <div className="grid grid-cols-3 gap-2">
@@ -773,7 +773,7 @@ export function SmartWaterGauge() {
                 <span className="text-[12px] font-semibold tracking-tight text-white">
                   {preset.label}
                 </span>
-                <span className="text-[10px] font-medium tabular-nums text-[#8E8E93]">
+                <span className="text-[10px] font-medium tabular-nums text-[#ACB4BA]">
                   {preset.detail}
                 </span>
               </button>
@@ -783,18 +783,18 @@ export function SmartWaterGauge() {
 
         <div className="water-journal w-full max-w-[340px]">
           <div className="mb-2 flex items-baseline justify-between gap-2 px-0.5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8E8E93]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#ACB4BA]">
               Aujourd’hui
             </p>
             {entries.length > 0 ? (
-              <p className="text-[11px] font-medium tabular-nums text-[#636366]">
+              <p className="text-[11px] font-medium tabular-nums text-[#717C83]">
                 {entries.length} prise{entries.length > 1 ? 's' : ''}
               </p>
             ) : null}
           </div>
 
           {entries.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-white/10 px-3 py-4 text-center text-[12px] leading-relaxed text-[#636366]">
+            <p className="rounded-2xl border border-dashed border-white/10 px-3 py-4 text-center text-[12px] leading-relaxed text-[#717C83]">
               Aucune prise pour l’instant — valide un volume ou un raccourci.
             </p>
           ) : (
@@ -813,12 +813,12 @@ export function SmartWaterGauge() {
                     boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.06)',
                   }}
                 >
-                  <span className="shrink-0 text-[12px] font-semibold tabular-nums text-[#8E8E93]">
+                  <span className="shrink-0 text-[12px] font-semibold tabular-nums text-[#ACB4BA]">
                     {formatEntryTime(entry.createdAt)}
                   </span>
                   <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-white">
                     {entry.label}
-                    <span className="text-[#8E8E93]">
+                    <span className="text-[#ACB4BA]">
                       {' '}
                       · <span className="tabular-nums">{entry.amountMl}</span> ml
                     </span>
@@ -826,7 +826,7 @@ export function SmartWaterGauge() {
                   <button
                     type="button"
                     onClick={() => deleteEntry(entry.id)}
-                    className="ios-press flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-[#AEAEB2] hover:border-[#FF453A]/40 hover:bg-[#FF453A]/15 hover:text-[#FF453A]"
+                    className="ios-press flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-[#ACB4BA] hover:border-[#FF453A]/40 hover:bg-[#FF453A]/15 hover:text-[#FF453A]"
                     aria-label={`Supprimer ${entry.label} ${entry.amountMl} ml`}
                   >
                     <X className="h-3.5 w-3.5" strokeWidth={2.5} />
@@ -882,13 +882,13 @@ export function SmartWaterGauge() {
             <button
               type="button"
               onClick={cancelDraft}
-              className="ios-press rounded-xl px-4 py-2 text-[12px] font-medium text-[#8E8E93]"
+              className="ios-press rounded-xl px-4 py-2 text-[12px] font-medium text-[#ACB4BA]"
             >
               Annuler
             </button>
           </div>
         ) : calibrating ? null : (
-          <p className="max-w-[280px] text-center text-[13px] leading-relaxed text-[#8E8E93]">
+          <p className="max-w-[280px] text-center text-[13px] leading-relaxed text-[#ACB4BA]">
             {showActiveBottle
               ? 'Glisse la bouteille ou utilise un raccourci — corrige via la liste.'
               : 'Suivi visuel de ce que tu as enregistré — pas une obligation de boire.'}

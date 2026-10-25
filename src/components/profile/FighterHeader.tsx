@@ -28,7 +28,7 @@ export function FighterHeader({
   email,
   provider,
   disciplineLabel,
-  disciplineAccent = '#FF2B2B',
+  disciplineAccent = '#FF0702',
   avatarUrl,
   userId,
   onAvatarUpdated,
@@ -81,7 +81,7 @@ export function FighterHeader({
             type="button"
             onClick={openPicker}
             disabled={!canEdit || uploading}
-            className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/55 disabled:opacity-100"
+            className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/55 disabled:opacity-100"
             aria-label={canEdit ? 'Changer la photo de profil' : `Avatar de ${username}`}
           >
             <Avatar
@@ -89,11 +89,11 @@ export function FighterHeader({
               imageUrl={displayUrl}
               size="lg"
               loading={uploading}
-              className="ring-2 ring-[#FF2B2B]/40"
+              className="ring-2 ring-[#FF0702]/40"
             />
             {canEdit ? (
               <span
-                className="absolute -bottom-0.5 -right-0.5 flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/20 bg-[#2C2C2E] text-white shadow-[0_4px_12px_rgb(0_0_0_/0.45)]"
+                className="absolute -bottom-0.5 -right-0.5 flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/20 bg-[#25282A] text-white shadow-[0_4px_12px_rgb(0_0_0_/0.45)]"
                 aria-hidden
               >
                 <Pencil className="h-3 w-3" strokeWidth={2.5} />
@@ -115,7 +115,7 @@ export function FighterHeader({
             <h1 className="text-[28px] font-bold tracking-tight text-white">{username}</h1>
             {status && <StatusBadge variant={status} />}
           </div>
-          <p className="mt-0.5 text-[15px] text-[#8E8E93]">{title}</p>
+          <p className="mt-0.5 text-[15px] text-[#ACB4BA]">{title}</p>
           {disciplineLabel && (
             <span
               className="mt-2 inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white"
@@ -129,7 +129,7 @@ export function FighterHeader({
             </span>
           )}
           {email && (
-            <p className="mt-1 text-[12px] text-[#636366]">
+            <p className="mt-1 text-[12px] text-[#717C83]">
               {email}
               {provider ? ` · ${provider}` : ''}
             </p>
@@ -143,7 +143,7 @@ export function FighterHeader({
       <button
         type="button"
         onClick={onOpenSettings}
-        className="glass-card flex h-10 w-10 items-center justify-center rounded-full text-[#8E8E93] transition-colors active:opacity-80"
+        className="glass-card flex h-10 w-10 items-center justify-center rounded-full text-[#ACB4BA] transition-colors active:opacity-80"
         aria-label="Paramètres"
       >
         <Settings className="h-5 w-5" />

@@ -51,7 +51,7 @@ export async function resizeImageForAvatar(file: File): Promise<Blob> {
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas indisponible sur cet appareil.')
 
-  ctx.fillStyle = '#1C1C1E'
+  ctx.fillStyle = '#1D1F20'
   ctx.fillRect(0, 0, width, height)
   ctx.drawImage(img, 0, 0, width, height)
 

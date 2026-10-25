@@ -20,14 +20,14 @@ export function TrainRecentSessions({
   return (
     <section aria-label={single ? 'Dernière séance' : 'Dernières séances'}>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-[13px] font-semibold text-[#8E8E93]">
+        <p className="text-[13px] font-semibold text-[#ACB4BA]">
           <SoftBlurIn>{single ? 'Dernière séance' : 'Dernières séances'}</SoftBlurIn>
         </p>
         {single ? null : (
           <button
             type="button"
             onClick={onSeeAll}
-            className="ios-press min-h-11 rounded-xl px-2 text-[13px] font-semibold text-[#FF6961] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/40"
+            className="ios-press min-h-11 rounded-xl px-2 text-[13px] font-semibold text-[#FF907F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/40"
           >
             Voir tout
           </button>
@@ -35,7 +35,7 @@ export function TrainRecentSessions({
       </div>
 
       {visible.length === 0 ? (
-        <p className="text-[14px] text-[#8E8E93]">Aucune séance enregistrée</p>
+        <p className="text-[14px] text-[#ACB4BA]">Aucune séance enregistrée</p>
       ) : (
         <ul className="space-y-2">
           {visible.map((item) => (
@@ -44,14 +44,14 @@ export function TrainRecentSessions({
                 type="button"
                 onClick={() => onOpen(item.id)}
                 data-last-session={item.id}
-                className="ios-press flex min-h-11 w-full flex-col border-t border-white/10 px-0 py-3.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/40"
+                className="ios-press flex min-h-11 w-full flex-col border-t border-white/10 px-0 py-3.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/40"
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="truncate text-[15px] font-semibold text-white">{item.title}</p>
-                  <span className="shrink-0 text-[12px] text-[#636366]">{item.dateLabel}</span>
+                  <span className="shrink-0 text-[12px] text-[#717C83]">{item.dateLabel}</span>
                 </div>
-                <p className="mt-0.5 text-[12px] text-[#8E8E93]">{item.sportLabel}</p>
-                <p className="mt-1 truncate text-[13px] text-[#AEAEB2]">{item.summary}</p>
+                <p className="mt-0.5 text-[12px] text-[#ACB4BA]">{item.sportLabel}</p>
+                <p className="mt-1 truncate text-[13px] text-[#ACB4BA]">{item.summary}</p>
               </button>
             </li>
           ))}
