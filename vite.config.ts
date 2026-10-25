@@ -45,6 +45,11 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      // IPA : le shell natif a déjà les fichiers. Un SW Workbox qui précache
+      // tout garde la première version installée (même bundle id) et les
+      // IPA suivants semblent « sans mise à jour ». Ce SW s’auto-désinscrit
+      // et vide les caches HTTP / precache, sans toucher au localStorage.
+      selfDestroying: process.env.CAPACITOR_BUILD === '1',
       registerType: 'autoUpdate',
       includeAssets: [
         'favicon.svg',

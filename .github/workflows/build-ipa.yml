@@ -11,6 +11,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'capacitor.config.ts'
+      - 'vite.config.ts'
       - '.github/workflows/build-ipa.yml'
   pull_request:
     paths:
@@ -20,6 +21,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'capacitor.config.ts'
+      - 'vite.config.ts'
       - '.github/workflows/build-ipa.yml'
 
 permissions:
@@ -61,6 +63,9 @@ jobs:
           VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL }}
           VITE_ENABLE_CONVEX_AUTH: "true"
           VITE_ENABLE_CONVEX_PRIMARY: "true"
+          # Pas de precache Workbox dans le shell : chaque IPA charge SES fichiers.
+          CAPACITOR_BUILD: "1"
+          VITE_APP_BUILD_ID: ${{ github.sha }}
 
       - name: Sync Capacitor iOS
         run: npx cap sync ios
@@ -82,6 +87,7 @@ jobs:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
