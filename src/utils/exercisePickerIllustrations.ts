@@ -1,4 +1,5 @@
 import wave1ManifestJson from '../../assets/exercises/illustrations/wave1/manifest.json'
+import wave2ManifestJson from '../../assets/exercises/illustrations/wave2/manifest.json'
 import developpeCoucheWebp from '../assets/exercises/developpe-couche.webp'
 
 import backSquatPng from '../../assets/exercises/illustrations/wave1/back-squat.png'
@@ -14,6 +15,15 @@ import overheadPressPng from '../../assets/exercises/illustrations/wave1/overhea
 import pullUpPng from '../../assets/exercises/illustrations/wave1/pull-up.png'
 import tricepsPushdownPng from '../../assets/exercises/illustrations/wave1/triceps-pushdown.png'
 
+import arnoldPressPng from '../../assets/exercises/illustrations/wave2/arnold-press.png'
+import bulgarianSplitSquatPng from '../../assets/exercises/illustrations/wave2/bulgarian-split-squat.png'
+import chestSupportedRowPng from '../../assets/exercises/illustrations/wave2/chest-supported-row.png'
+import farmerCarryPng from '../../assets/exercises/illustrations/wave2/farmer-carry.png'
+import gobletSquatPng from '../../assets/exercises/illustrations/wave2/goblet-squat.png'
+import hammerCurlPng from '../../assets/exercises/illustrations/wave2/hammer-curl.png'
+import hangingLegRaisePng from '../../assets/exercises/illustrations/wave2/hanging-leg-raise.png'
+import kettlebellSwingPng from '../../assets/exercises/illustrations/wave2/kettlebell-swing.png'
+
 /**
  * Picker / search-result thumbnails only.
  * Do not reuse from immersive session hero — that path stays on `exerciseMedia`.
@@ -22,19 +32,19 @@ export const EXERCISE_PICKER_THUMB_PX = 64
 
 const VALIDATED_BENCH_PRESS_UI_ASSET = 'src/assets/exercises/developpe-couche.webp'
 
-type Wave1ManifestEntry = {
+type WaveManifestEntry = {
   canonical_id: string
   label: string
   file: string | null
   ui_asset?: string
 }
 
-type Wave1Manifest = {
-  entries: Record<string, Wave1ManifestEntry>
+type WaveManifest = {
+  entries: Record<string, WaveManifestEntry>
 }
 
 /** Bundled PNG URLs keyed by the manifest `file` basename — not by display name. */
-const WAVE1_PNG_BY_FILE: Record<string, string> = {
+const WAVE_PNG_BY_FILE: Record<string, string> = {
   'back-squat.png': backSquatPng,
   'barbell-row.png': barbellRowPng,
   'deadlift.png': deadliftPng,
@@ -47,29 +57,39 @@ const WAVE1_PNG_BY_FILE: Record<string, string> = {
   'overhead-press.png': overheadPressPng,
   'pull-up.png': pullUpPng,
   'triceps-pushdown.png': tricepsPushdownPng,
+  'arnold-press.png': arnoldPressPng,
+  'bulgarian-split-squat.png': bulgarianSplitSquatPng,
+  'chest-supported-row.png': chestSupportedRowPng,
+  'farmer-carry.png': farmerCarryPng,
+  'goblet-squat.png': gobletSquatPng,
+  'hammer-curl.png': hammerCurlPng,
+  'hanging-leg-raise.png': hangingLegRaisePng,
+  'kettlebell-swing.png': kettlebellSwingPng,
 }
 
-function illustrationSrcFromEntry(entry: Wave1ManifestEntry): string | null {
+function illustrationSrcFromEntry(entry: WaveManifestEntry): string | null {
   if (entry.file == null) {
     if (entry.ui_asset === VALIDATED_BENCH_PRESS_UI_ASSET) {
       return developpeCoucheWebp
     }
     return null
   }
-  return WAVE1_PNG_BY_FILE[entry.file] ?? null
+  return WAVE_PNG_BY_FILE[entry.file] ?? null
 }
 
 /**
- * Built only from `manifest.json` `entries`.
+ * Built only from wave manifests `entries`.
  * Lookup is an exact canonical id — no slug, no display-name, no hyphen/underscore fold.
  */
 function buildSrcByCanonicalId(): Record<string, string> {
-  const manifest = wave1ManifestJson as Wave1Manifest
   const map: Record<string, string> = {}
-  for (const [key, entry] of Object.entries(manifest.entries)) {
-    if (!entry || key !== entry.canonical_id) continue
-    const src = illustrationSrcFromEntry(entry)
-    if (src) map[entry.canonical_id] = src
+  for (const raw of [wave1ManifestJson, wave2ManifestJson]) {
+    const manifest = raw as WaveManifest
+    for (const [key, entry] of Object.entries(manifest.entries)) {
+      if (!entry || key !== entry.canonical_id) continue
+      const src = illustrationSrcFromEntry(entry)
+      if (src) map[entry.canonical_id] = src
+    }
   }
   return map
 }

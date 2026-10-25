@@ -48,6 +48,15 @@ describe('exerciseSearch', () => {
     expect(results[0]?.id).toBe('leg_press')
   })
 
+  it('nouveaux exercices wave2 trouvables (goblet, fente bulgare, arnold)', () => {
+    expect(searchExercises('goblet').some((e) => e.id === 'goblet_squat')).toBe(true)
+    expect(searchExercises('fente bulgare').some((e) => e.id === 'bulgarian_split_squat')).toBe(
+      true,
+    )
+    expect(searchExercises('arnold').some((e) => e.id === 'arnold_press')).toBe(true)
+    expect(EXERCISE_CATALOG.some((c) => c.id === 'kettlebell_swing')).toBe(true)
+  })
+
   it('limite l’affichage initial à 8', () => {
     expect(searchExercises('').length).toBe(8)
     expect(countExerciseMatches('')).toBe(EXERCISE_CATALOG.length)

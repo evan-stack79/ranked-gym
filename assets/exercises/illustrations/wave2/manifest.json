@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "wave": 2,
+  "status": "wired_new_catalog_exercises",
+  "directory": "assets/exercises/illustrations/wave2/",
+  "format": {
+    "type": "image/png",
+    "width": 1024,
+    "height": 1024,
+    "aspect": "1:1",
+    "mode": "RGBA",
+    "background": "real_alpha"
+  },
+  "style_lock": "Same 3D monochrome graphite model as wave1/back-squat.png. Wave1 assets are untouched.",
+  "entries": {
+    "goblet_squat": {
+      "canonical_id": "goblet_squat",
+      "label": "Goblet squat",
+      "file": "goblet-squat.png"
+    },
+    "bulgarian_split_squat": {
+      "canonical_id": "bulgarian_split_squat",
+      "label": "Fente bulgare",
+      "file": "bulgarian-split-squat.png"
+    },
+    "hammer_curl": {
+      "canonical_id": "hammer_curl",
+      "label": "Curl marteau",
+      "file": "hammer-curl.png"
+    },
+    "arnold_press": {
+      "canonical_id": "arnold_press",
+      "label": "Développé Arnold",
+      "file": "arnold-press.png"
+    },
+    "hanging_leg_raise": {
+      "canonical_id": "hanging_leg_raise",
+      "label": "Relevés de jambes",
+      "file": "hanging-leg-raise.png"
+    },
+    "kettlebell_swing": {
+      "canonical_id": "kettlebell_swing",
+      "label": "Swing kettlebell",
+      "file": "kettlebell-swing.png"
+    },
+    "chest_supported_row": {
+      "canonical_id": "chest_supported_row",
+      "label": "Rowing appuyé",
+      "file": "chest-supported-row.png"
+    },
+    "farmer_carry": {
+      "canonical_id": "farmer_carry",
+      "label": "Farmer walk",
+      "file": "farmer-carry.png"
+    }
+  }
+}

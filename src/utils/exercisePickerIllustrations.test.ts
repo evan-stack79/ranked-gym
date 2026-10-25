@@ -40,6 +40,24 @@ describe('resolvePickerIllustrationSrc', () => {
     }
   })
 
+  it('associe les 8 ids wave2 (nouveaux exercices) au PNG 3D', () => {
+    const wave2 = [
+      'goblet_squat',
+      'bulgarian_split_squat',
+      'hammer_curl',
+      'arnold_press',
+      'hanging_leg_raise',
+      'kettlebell_swing',
+      'chest_supported_row',
+      'farmer_carry',
+    ] as const
+    for (const id of wave2) {
+      const src = resolvePickerIllustrationSrc(id)
+      expect(src, id).toBeTruthy()
+      expect(src).toMatch(/\.png/i)
+    }
+  })
+
   it('bench_press → asset webp validé, jamais une PNG wave1', () => {
     const entry = WAVE1_ENTRIES.bench_press
     expect(entry.file).toBeNull()

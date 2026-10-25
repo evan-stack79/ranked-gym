@@ -290,6 +290,72 @@ const CATALOG_SEED: Omit<CatalogExercise, 'movement' | 'effortType' | 'level' | 
     aliases: ['plank', 'gainage'],
     popularity: 68,
   },
+
+  // —— Wave 2 (nouveaux, illustrations 3D) ——
+  {
+    id: 'goblet_squat',
+    name: 'Goblet squat',
+    muscles: ['Quadriceps', 'Fessiers'],
+    equipment: 'Haltères',
+    aliases: ['goblet', 'goblet squat', 'squat gobelet'],
+    popularity: 82,
+  },
+  {
+    id: 'bulgarian_split_squat',
+    name: 'Fente bulgare',
+    muscles: ['Quadriceps', 'Fessiers'],
+    equipment: 'Haltères',
+    aliases: ['bulgarian split squat', 'split squat', 'fente arrière', 'fente bulgare'],
+    popularity: 81,
+  },
+  {
+    id: 'hammer_curl',
+    name: 'Curl marteau',
+    muscles: ['Biceps'],
+    equipment: 'Haltères',
+    aliases: ['hammer curl', 'curl neutre', 'curl marteau'],
+    popularity: 78,
+  },
+  {
+    id: 'arnold_press',
+    name: 'Développé Arnold',
+    muscles: ['Épaules', 'Triceps'],
+    equipment: 'Haltères',
+    aliases: ['arnold press', 'arnold', 'dev arnold'],
+    popularity: 76,
+  },
+  {
+    id: 'hanging_leg_raise',
+    name: 'Relevés de jambes',
+    muscles: ['Abdos'],
+    equipment: 'Poids du corps',
+    aliases: ['hanging leg raise', 'leg raise', 'relevé de jambes', 'releves de jambes'],
+    popularity: 74,
+  },
+  {
+    id: 'kettlebell_swing',
+    name: 'Swing kettlebell',
+    muscles: ['Fessiers', 'Dos'],
+    equipment: 'Kettlebell',
+    aliases: ['kb swing', 'kettlebell swing', 'swing'],
+    popularity: 80,
+  },
+  {
+    id: 'chest_supported_row',
+    name: 'Rowing appuyé',
+    muscles: ['Dos', 'Biceps'],
+    equipment: 'Haltères',
+    aliases: ['chest supported row', 'incline row', 'rowing banc', 'rowing appuye'],
+    popularity: 77,
+  },
+  {
+    id: 'farmer_carry',
+    name: 'Farmer walk',
+    muscles: ['Dos', 'Mollets'],
+    equipment: 'Haltères',
+    aliases: ['farmer carry', 'farmers walk', 'marche fermier', 'farmer'],
+    popularity: 73,
+  },
 ]
 
 const MUSCU = ['musculation', 'bodybuilding', 'functional'] as const
@@ -330,6 +396,24 @@ const CATALOG_META: Record<string, CatalogMeta> = {
   triceps_pushdown: { movement: 'push', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
   skull_crusher: { movement: 'push', effortType: 'hypertrophy', level: 'intermediate', sportIds: [...MUSCU] },
   plank: { movement: 'core', effortType: 'endurance', level: 'beginner', sportIds: [...CALI, ...CROSS] },
+  goblet_squat: { movement: 'legs', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU, 'functional'] },
+  bulgarian_split_squat: {
+    movement: 'legs',
+    effortType: 'hypertrophy',
+    level: 'intermediate',
+    sportIds: [...MUSCU, 'functional'],
+  },
+  hammer_curl: { movement: 'pull', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  arnold_press: { movement: 'push', effortType: 'hypertrophy', level: 'intermediate', sportIds: [...MUSCU] },
+  hanging_leg_raise: { movement: 'core', effortType: 'endurance', level: 'intermediate', sportIds: [...CALI, ...CROSS] },
+  kettlebell_swing: {
+    movement: 'legs',
+    effortType: 'endurance',
+    level: 'intermediate',
+    sportIds: [...CROSS, 'functional'],
+  },
+  chest_supported_row: { movement: 'pull', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  farmer_carry: { movement: 'pull', effortType: 'endurance', level: 'beginner', sportIds: [...CROSS, 'functional'] },
 }
 
 export const EXERCISE_CATALOG: CatalogExercise[] = CATALOG_SEED.map((ex) => {
