@@ -422,6 +422,72 @@ const CATALOG_SEED: Omit<CatalogExercise, 'movement' | 'effortType' | 'level' | 
     aliases: ['ab wheel', 'ab roller', 'roulette', 'wheel rollout'],
     popularity: 71,
   },
+
+  // —— Wave 4 (nouveaux, illustrations 3D) ——
+  {
+    id: 'good_morning',
+    name: 'Good morning',
+    muscles: ['Ischios', 'Dos'],
+    equipment: 'Barre',
+    aliases: ['good morning', 'goodmorning', 'flexion hanches barre'],
+    popularity: 69,
+  },
+  {
+    id: 'cable_kickback',
+    name: 'Kickback fessier',
+    muscles: ['Fessiers'],
+    equipment: 'Câble',
+    aliases: ['cable kickback', 'glute kickback', 'kickback', 'fessier poulie'],
+    popularity: 74,
+  },
+  {
+    id: 'preacher_curl',
+    name: 'Curl pupitre',
+    muscles: ['Biceps'],
+    equipment: 'Barre',
+    aliases: ['preacher curl', 'curl pupitre', 'curl larry scott', 'scott curl'],
+    popularity: 73,
+  },
+  {
+    id: 'close_grip_bench',
+    name: 'Développé prise serrée',
+    muscles: ['Triceps', 'Pectoraux'],
+    equipment: 'Barre',
+    aliases: ['close grip bench', 'cgbp', 'dev prise serree', 'bench triceps'],
+    popularity: 78,
+  },
+  {
+    id: 'pendlay_row',
+    name: 'Pendlay row',
+    muscles: ['Dos', 'Biceps'],
+    equipment: 'Barre',
+    aliases: ['pendlay row', 'pendlay', 'rowing pendlay', 'dead stop row'],
+    popularity: 72,
+  },
+  {
+    id: 'box_squat',
+    name: 'Squat box',
+    muscles: ['Quadriceps', 'Fessiers'],
+    equipment: 'Barre',
+    aliases: ['box squat', 'squat box', 'squat sur box'],
+    popularity: 70,
+  },
+  {
+    id: 'incline_dumbbell_curl',
+    name: 'Curl incliné',
+    muscles: ['Biceps'],
+    equipment: 'Haltères',
+    aliases: ['incline curl', 'incline dumbbell curl', 'curl incline', 'curl banc incline'],
+    popularity: 71,
+  },
+  {
+    id: 'russian_twist',
+    name: 'Russian twist',
+    muscles: ['Abdos'],
+    equipment: 'Autre',
+    aliases: ['russian twist', 'twist russe', 'rotation russe'],
+    popularity: 68,
+  },
 ]
 
 const MUSCU = ['musculation', 'bodybuilding', 'functional'] as const
@@ -498,6 +564,14 @@ const CATALOG_META: Record<string, CatalogMeta> = {
   chin_up: { movement: 'pull', effortType: 'strength', level: 'intermediate', sportIds: [...CALI, 'crossfit'] },
   concentration_curl: { movement: 'pull', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
   ab_wheel: { movement: 'core', effortType: 'endurance', level: 'intermediate', sportIds: [...CALI, ...CROSS] },
+  good_morning: { movement: 'legs', effortType: 'strength', level: 'intermediate', sportIds: [...POWER] },
+  cable_kickback: { movement: 'legs', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  preacher_curl: { movement: 'pull', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  close_grip_bench: { movement: 'push', effortType: 'strength', level: 'intermediate', sportIds: [...POWER, ...MUSCU] },
+  pendlay_row: { movement: 'pull', effortType: 'strength', level: 'intermediate', sportIds: [...POWER] },
+  box_squat: { movement: 'legs', effortType: 'strength', level: 'intermediate', sportIds: [...POWER] },
+  incline_dumbbell_curl: { movement: 'pull', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  russian_twist: { movement: 'core', effortType: 'endurance', level: 'beginner', sportIds: [...CALI, ...CROSS] },
 }
 
 export const EXERCISE_CATALOG: CatalogExercise[] = CATALOG_SEED.map((ex) => {

@@ -1,6 +1,7 @@
 import wave1ManifestJson from '../../assets/exercises/illustrations/wave1/manifest.json'
 import wave2ManifestJson from '../../assets/exercises/illustrations/wave2/manifest.json'
 import wave3ManifestJson from '../../assets/exercises/illustrations/wave3/manifest.json'
+import wave4ManifestJson from '../../assets/exercises/illustrations/wave4/manifest.json'
 import developpeCoucheWebp from '../assets/exercises/developpe-couche.webp'
 
 import backSquatPng from '../../assets/exercises/illustrations/wave1/back-squat.png'
@@ -33,6 +34,15 @@ import rearDeltFlyPng from '../../assets/exercises/illustrations/wave3/rear-delt
 import reverseLungePng from '../../assets/exercises/illustrations/wave3/reverse-lunge.png'
 import seatedDumbbellPressPng from '../../assets/exercises/illustrations/wave3/seated-dumbbell-press.png'
 import sumoDeadliftPng from '../../assets/exercises/illustrations/wave3/sumo-deadlift.png'
+
+import boxSquatPng from '../../assets/exercises/illustrations/wave4/box-squat.png'
+import cableKickbackPng from '../../assets/exercises/illustrations/wave4/cable-kickback.png'
+import closeGripBenchPng from '../../assets/exercises/illustrations/wave4/close-grip-bench.png'
+import goodMorningPng from '../../assets/exercises/illustrations/wave4/good-morning.png'
+import inclineDumbbellCurlPng from '../../assets/exercises/illustrations/wave4/incline-dumbbell-curl.png'
+import pendlayRowPng from '../../assets/exercises/illustrations/wave4/pendlay-row.png'
+import preacherCurlPng from '../../assets/exercises/illustrations/wave4/preacher-curl.png'
+import russianTwistPng from '../../assets/exercises/illustrations/wave4/russian-twist.png'
 
 /**
  * Picker / search-result thumbnails only.
@@ -83,6 +93,14 @@ const WAVE_PNG_BY_FILE: Record<string, string> = {
   'reverse-lunge.png': reverseLungePng,
   'seated-dumbbell-press.png': seatedDumbbellPressPng,
   'sumo-deadlift.png': sumoDeadliftPng,
+  'box-squat.png': boxSquatPng,
+  'cable-kickback.png': cableKickbackPng,
+  'close-grip-bench.png': closeGripBenchPng,
+  'good-morning.png': goodMorningPng,
+  'incline-dumbbell-curl.png': inclineDumbbellCurlPng,
+  'pendlay-row.png': pendlayRowPng,
+  'preacher-curl.png': preacherCurlPng,
+  'russian-twist.png': russianTwistPng,
 }
 
 function illustrationSrcFromEntry(entry: WaveManifestEntry): string | null {
@@ -101,7 +119,12 @@ function illustrationSrcFromEntry(entry: WaveManifestEntry): string | null {
  */
 function buildSrcByCanonicalId(): Record<string, string> {
   const map: Record<string, string> = {}
-  for (const raw of [wave1ManifestJson, wave2ManifestJson, wave3ManifestJson]) {
+  for (const raw of [
+    wave1ManifestJson,
+    wave2ManifestJson,
+    wave3ManifestJson,
+    wave4ManifestJson,
+  ]) {
     const manifest = raw as WaveManifest
     for (const [key, entry] of Object.entries(manifest.entries)) {
       if (!entry || key !== entry.canonical_id) continue

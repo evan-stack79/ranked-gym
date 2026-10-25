@@ -64,6 +64,13 @@ describe('exerciseSearch', () => {
     expect(searchExercises('fente arrière').some((e) => e.id === 'reverse_lunge')).toBe(true)
   })
 
+  it('nouveaux exercices wave4 trouvables (pupitre, box squat, pendlay)', () => {
+    expect(searchExercises('pupitre').some((e) => e.id === 'preacher_curl')).toBe(true)
+    expect(searchExercises('box squat').some((e) => e.id === 'box_squat')).toBe(true)
+    expect(searchExercises('pendlay').some((e) => e.id === 'pendlay_row')).toBe(true)
+    expect(searchExercises('kickback').some((e) => e.id === 'cable_kickback')).toBe(true)
+  })
+
   it('limite l’affichage initial à 8', () => {
     expect(searchExercises('').length).toBe(8)
     expect(countExerciseMatches('')).toBe(EXERCISE_CATALOG.length)

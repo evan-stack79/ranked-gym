@@ -76,6 +76,24 @@ describe('resolvePickerIllustrationSrc', () => {
     }
   })
 
+  it('associe les 8 ids wave4 (nouveaux exercices) au PNG 3D', () => {
+    const wave4 = [
+      'good_morning',
+      'cable_kickback',
+      'preacher_curl',
+      'close_grip_bench',
+      'pendlay_row',
+      'box_squat',
+      'incline_dumbbell_curl',
+      'russian_twist',
+    ] as const
+    for (const id of wave4) {
+      const src = resolvePickerIllustrationSrc(id)
+      expect(src, id).toBeTruthy()
+      expect(src).toMatch(/\.png/i)
+    }
+  })
+
   it('bench_press → asset webp validé, jamais une PNG wave1', () => {
     const entry = WAVE1_ENTRIES.bench_press
     expect(entry.file).toBeNull()
