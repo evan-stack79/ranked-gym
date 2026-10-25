@@ -16,16 +16,27 @@ const WAVE2_IDS = [
   'farmer_carry',
 ] as const
 
+const WAVE3_IDS = [
+  'sumo_deadlift',
+  'rear_delt_fly',
+  'overhead_triceps_extension',
+  'seated_dumbbell_press',
+  'reverse_lunge',
+  'chin_up',
+  'concentration_curl',
+  'ab_wheel',
+] as const
+
 describe('exerciseFormMedia', () => {
   it('n’a pas encore de clips — prêt à recevoir les MP4', () => {
     expect(listFormVideoCanonicalIds()).toEqual([])
-    for (const id of WAVE2_IDS) {
+    for (const id of [...WAVE2_IDS, ...WAVE3_IDS]) {
       expect(resolveFormVideoSrc(id)).toBeNull()
     }
   })
 
-  it('wave2 a déjà l’illustration 3D pour l’aide visuelle', () => {
-    for (const id of WAVE2_IDS) {
+  it('wave2/wave3 ont déjà l’illustration 3D pour l’aide visuelle', () => {
+    for (const id of [...WAVE2_IDS, ...WAVE3_IDS]) {
       expect(resolvePickerIllustrationSrc(id), id).toBeTruthy()
       expect(resolvePickerIllustrationSrc(id)).toMatch(/\.png/i)
     }

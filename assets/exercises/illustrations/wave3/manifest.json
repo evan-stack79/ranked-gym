@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "wave": 3,
+  "status": "wired_new_catalog_exercises",
+  "directory": "assets/exercises/illustrations/wave3/",
+  "format": {
+    "type": "image/png",
+    "width": 1024,
+    "height": 1024,
+    "aspect": "1:1",
+    "mode": "RGBA",
+    "background": "real_alpha"
+  },
+  "style_lock": "Same 3D monochrome graphite model as wave1/back-squat.png. Wave1 and wave2 assets are untouched.",
+  "entries": {
+    "sumo_deadlift": {
+      "canonical_id": "sumo_deadlift",
+      "label": "Soulevé sumo",
+      "file": "sumo-deadlift.png"
+    },
+    "rear_delt_fly": {
+      "canonical_id": "rear_delt_fly",
+      "label": "Oiseau haltères",
+      "file": "rear-delt-fly.png"
+    },
+    "overhead_triceps_extension": {
+      "canonical_id": "overhead_triceps_extension",
+      "label": "Extension triceps nuque",
+      "file": "overhead-triceps-extension.png"
+    },
+    "seated_dumbbell_press": {
+      "canonical_id": "seated_dumbbell_press",
+      "label": "Développé épaules assis",
+      "file": "seated-dumbbell-press.png"
+    },
+    "reverse_lunge": {
+      "canonical_id": "reverse_lunge",
+      "label": "Fente arrière",
+      "file": "reverse-lunge.png"
+    },
+    "chin_up": {
+      "canonical_id": "chin_up",
+      "label": "Traction supination",
+      "file": "chin-up.png"
+    },
+    "concentration_curl": {
+      "canonical_id": "concentration_curl",
+      "label": "Curl concentration",
+      "file": "concentration-curl.png"
+    },
+    "ab_wheel": {
+      "canonical_id": "ab_wheel",
+      "label": "Roulette abdos",
+      "file": "ab-wheel.png"
+    }
+  }
+}

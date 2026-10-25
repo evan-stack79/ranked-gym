@@ -58,6 +58,24 @@ describe('resolvePickerIllustrationSrc', () => {
     }
   })
 
+  it('associe les 8 ids wave3 (nouveaux exercices) au PNG 3D', () => {
+    const wave3 = [
+      'sumo_deadlift',
+      'rear_delt_fly',
+      'overhead_triceps_extension',
+      'seated_dumbbell_press',
+      'reverse_lunge',
+      'chin_up',
+      'concentration_curl',
+      'ab_wheel',
+    ] as const
+    for (const id of wave3) {
+      const src = resolvePickerIllustrationSrc(id)
+      expect(src, id).toBeTruthy()
+      expect(src).toMatch(/\.png/i)
+    }
+  })
+
   it('bench_press → asset webp validé, jamais une PNG wave1', () => {
     const entry = WAVE1_ENTRIES.bench_press
     expect(entry.file).toBeNull()

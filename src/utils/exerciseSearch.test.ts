@@ -57,6 +57,13 @@ describe('exerciseSearch', () => {
     expect(EXERCISE_CATALOG.some((c) => c.id === 'kettlebell_swing')).toBe(true)
   })
 
+  it('nouveaux exercices wave3 trouvables (sumo, chin-up, roulette)', () => {
+    expect(searchExercises('sumo').some((e) => e.id === 'sumo_deadlift')).toBe(true)
+    expect(searchExercises('supination').some((e) => e.id === 'chin_up')).toBe(true)
+    expect(searchExercises('roulette').some((e) => e.id === 'ab_wheel')).toBe(true)
+    expect(searchExercises('fente arrière').some((e) => e.id === 'reverse_lunge')).toBe(true)
+  })
+
   it('limite l’affichage initial à 8', () => {
     expect(searchExercises('').length).toBe(8)
     expect(countExerciseMatches('')).toBe(EXERCISE_CATALOG.length)

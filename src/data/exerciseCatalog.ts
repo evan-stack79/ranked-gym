@@ -356,6 +356,72 @@ const CATALOG_SEED: Omit<CatalogExercise, 'movement' | 'effortType' | 'level' | 
     aliases: ['farmer carry', 'farmers walk', 'marche fermier', 'farmer'],
     popularity: 73,
   },
+
+  // —— Wave 3 (nouveaux, illustrations 3D) ——
+  {
+    id: 'sumo_deadlift',
+    name: 'Soulevé sumo',
+    muscles: ['Dos', 'Fessiers'],
+    equipment: 'Barre',
+    aliases: ['sumo deadlift', 'deadlift sumo', 'souleve sumo', 'sumo'],
+    popularity: 84,
+  },
+  {
+    id: 'rear_delt_fly',
+    name: 'Oiseau haltères',
+    muscles: ['Épaules', 'Dos'],
+    equipment: 'Haltères',
+    aliases: ['rear delt fly', 'reverse fly', 'oiseau', 'elevations posterieures'],
+    popularity: 72,
+  },
+  {
+    id: 'overhead_triceps_extension',
+    name: 'Extension triceps nuque',
+    muscles: ['Triceps'],
+    equipment: 'Haltères',
+    aliases: ['overhead extension', 'triceps overhead', 'extension nuque', 'french press'],
+    popularity: 75,
+  },
+  {
+    id: 'seated_dumbbell_press',
+    name: 'Développé épaules assis',
+    muscles: ['Épaules', 'Triceps'],
+    equipment: 'Haltères',
+    aliases: ['seated shoulder press', 'seated db press', 'dev epaules assis', 'shoulder press assis'],
+    popularity: 79,
+  },
+  {
+    id: 'reverse_lunge',
+    name: 'Fente arrière',
+    muscles: ['Quadriceps', 'Fessiers'],
+    equipment: 'Haltères',
+    aliases: ['reverse lunge', 'backward lunge', 'fente arriere', 'fentes arriere'],
+    popularity: 76,
+  },
+  {
+    id: 'chin_up',
+    name: 'Traction supination',
+    muscles: ['Dos', 'Biceps'],
+    equipment: 'Poids du corps',
+    aliases: ['chin up', 'chinup', 'traction supination', 'pull up underhand'],
+    popularity: 83,
+  },
+  {
+    id: 'concentration_curl',
+    name: 'Curl concentration',
+    muscles: ['Biceps'],
+    equipment: 'Haltères',
+    aliases: ['concentration curl', 'curl concentre', 'curl assis'],
+    popularity: 70,
+  },
+  {
+    id: 'ab_wheel',
+    name: 'Roulette abdos',
+    muscles: ['Abdos'],
+    equipment: 'Autre',
+    aliases: ['ab wheel', 'ab roller', 'roulette', 'wheel rollout'],
+    popularity: 71,
+  },
 ]
 
 const MUSCU = ['musculation', 'bodybuilding', 'functional'] as const
@@ -414,6 +480,24 @@ const CATALOG_META: Record<string, CatalogMeta> = {
   },
   chest_supported_row: { movement: 'pull', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
   farmer_carry: { movement: 'pull', effortType: 'endurance', level: 'beginner', sportIds: [...CROSS, 'functional'] },
+  sumo_deadlift: { movement: 'pull', effortType: 'strength', level: 'intermediate', sportIds: [...POWER, 'crossfit'] },
+  rear_delt_fly: { movement: 'pull', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  overhead_triceps_extension: {
+    movement: 'push',
+    effortType: 'hypertrophy',
+    level: 'beginner',
+    sportIds: [...MUSCU],
+  },
+  seated_dumbbell_press: {
+    movement: 'push',
+    effortType: 'hypertrophy',
+    level: 'beginner',
+    sportIds: [...MUSCU],
+  },
+  reverse_lunge: { movement: 'legs', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU, 'functional'] },
+  chin_up: { movement: 'pull', effortType: 'strength', level: 'intermediate', sportIds: [...CALI, 'crossfit'] },
+  concentration_curl: { movement: 'pull', effortType: 'hypertrophy', level: 'beginner', sportIds: [...MUSCU] },
+  ab_wheel: { movement: 'core', effortType: 'endurance', level: 'intermediate', sportIds: [...CALI, ...CROSS] },
 }
 
 export const EXERCISE_CATALOG: CatalogExercise[] = CATALOG_SEED.map((ex) => {
