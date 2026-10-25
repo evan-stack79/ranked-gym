@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "@capacitor/core": "^8.5.3",
+    "@capacitor/status-bar": "^8.0.4",
     "@supabase/supabase-js": "^2.112.3",
     "convex": "^1.45.0",
     "html5-qrcode": "^2.3.8",

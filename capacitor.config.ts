@@ -20,6 +20,12 @@ const config: CapacitorConfig = {
     CapacitorHttp: {
       enabled: true,
     },
+    StatusBar: {
+      // Overlay = status bar transparente ; le mesh remonte sous l’heure / batterie.
+      overlaysWebView: true,
+      style: 'DARK',
+      backgroundColor: '#00000000',
+    },
   },
   ios: {
     contentInset: 'never',

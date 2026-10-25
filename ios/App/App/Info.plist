@@ -66,8 +66,10 @@
 	</array>
 	<key>UIStatusBarStyle</key>
 	<string>UIStatusBarStyleLightContent</string>
+	<!-- View controller owns style so MainViewController can keep light content
+	     over a transparent overlay (no opaque system band above the WebView). -->
 	<key>UIViewControllerBasedStatusBarAppearance</key>
-	<false/>
+	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Ranked Gym utilise la caméra pour le Pump Check et le prototype expérimental de mesure BPM (doigt sur le flash). Aucune image n’est envoyée ni enregistrée pour le BPM.</string>
 	<key>NSSupportsLiveActivities</key>
