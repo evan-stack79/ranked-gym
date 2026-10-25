@@ -138,14 +138,14 @@ export function IosSheet({
               <h2 id={titleId} className="text-[17px] font-semibold tracking-tight text-white">
                 {title}
               </h2>
-              {subtitle && <p className="mt-0.5 text-[13px] text-[#AEAEB2]">{subtitle}</p>}
+              {subtitle && <p className="mt-0.5 text-[13px] text-[#ACB4BA]">{subtitle}</p>}
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={!dismissible}
-            className="ios-press flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#AEAEB2] disabled:opacity-40"
+            className="ios-press flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#ACB4BA] disabled:opacity-40"
             aria-label="Fermer"
           >
             <span className="text-[18px] leading-none">×</span>
@@ -158,7 +158,7 @@ export function IosSheet({
 
         {footer ? (
           <div
-            className="shrink-0 border-t border-white/10 bg-[#1C1C1E]/95 px-5 pt-3 backdrop-blur-md"
+            className="shrink-0 border-t border-white/10 bg-[#1D1F20]/95 px-5 pt-3 backdrop-blur-md"
             style={{
               paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
             }}

@@ -64,7 +64,7 @@ export function SectionSkeleton({
 function SkeletonCard({ tall = false }: { tall?: boolean }) {
   return (
     <div
-      className={`overflow-hidden rounded-2xl border border-white/10 bg-[#1C1C1E]/90 p-4 ${
+      className={`overflow-hidden rounded-2xl border border-white/10 bg-[#1D1F20]/90 p-4 ${
         tall ? 'min-h-[160px]' : 'min-h-[96px]'
       }`}
     >

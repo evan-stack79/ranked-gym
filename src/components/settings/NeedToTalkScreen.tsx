@@ -31,7 +31,7 @@ export function NeedToTalkScreen({ onBack }: NeedToTalkScreenProps) {
         <button
           type="button"
           onClick={onBack}
-          className="ios-press rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-[13px] font-semibold text-[#AEAEB2]"
+          className="ios-press rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-[13px] font-semibold text-[#ACB4BA]"
         >
           Retour
         </button>
@@ -101,7 +101,7 @@ export function NeedToTalkScreen({ onBack }: NeedToTalkScreenProps) {
 
       <div className="space-y-2 rounded-2xl border border-white/10 bg-black/25 p-4">
         <p className="text-[13px] font-semibold text-white">Pour aller plus loin</p>
-        <ul className="space-y-2 text-[13px] text-[#AEAEB2]">
+        <ul className="space-y-2 text-[13px] text-[#ACB4BA]">
           {(
             [
               'ffabAnnuaire',
@@ -132,7 +132,7 @@ export function NeedToTalkScreen({ onBack }: NeedToTalkScreenProps) {
             </li>
           ))}
         </ul>
-        <p className="pt-2 text-[11px] text-[#636366]">
+        <p className="pt-2 text-[11px] text-[#717C83]">
           Ressources vérifiées le {TCA_RESOURCES_LAST_VERIFIED}.
         </p>
       </div>

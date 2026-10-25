@@ -47,7 +47,7 @@ export function AccueilAddSheet({ open, prefs, onClose, onSave }: AccueilAddShee
         <button
           type="button"
           onClick={handleReset}
-          className="ios-press min-h-11 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-[14px] font-medium text-[#AEAEB2]"
+          className="ios-press min-h-11 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-[14px] font-medium text-[#ACB4BA]"
           data-accueil-edit-reset
         >
           Revenir à l&apos;accueil de départ
@@ -55,7 +55,7 @@ export function AccueilAddSheet({ open, prefs, onClose, onSave }: AccueilAddShee
       }
     >
       {hidden.length === 0 ? (
-        <p className="px-1 py-4 text-[14px] text-[#8E8E93]" data-accueil-add-empty>
+        <p className="px-1 py-4 text-[14px] text-[#ACB4BA]" data-accueil-add-empty>
           Tous les blocs sont déjà affichés.
         </p>
       ) : (

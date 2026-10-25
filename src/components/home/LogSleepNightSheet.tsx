@@ -113,13 +113,13 @@ export function LogSleepNightSheet({ open, onClose, onSaved, initial }: LogSleep
   return (
     <IosSheet open={open} onClose={onClose} title="Comment s’est passée ta nuit ?">
       <div className="space-y-4 pb-2">
-        <p className="text-[13px] leading-relaxed text-[#AEAEB2]">
+        <p className="text-[13px] leading-relaxed text-[#ACB4BA]">
           Indique seulement quand tu t’es couché et levé — on calcule le reste.
         </p>
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
-            <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Coucher</span>
+            <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">Coucher</span>
             <input
               type="time"
               value={bedtime}
@@ -131,7 +131,7 @@ export function LogSleepNightSheet({ open, onClose, onSaved, initial }: LogSleep
             />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Lever</span>
+            <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">Lever</span>
             <input
               type="time"
               value={waketime}
@@ -149,7 +149,7 @@ export function LogSleepNightSheet({ open, onClose, onSaved, initial }: LogSleep
         </p>
 
         <div>
-          <p className="mb-2 text-[12px] font-semibold text-[#8E8E93]">Combien as-tu dormi ?</p>
+          <p className="mb-2 text-[12px] font-semibold text-[#ACB4BA]">Combien as-tu dormi ?</p>
           <div className="mb-3 flex gap-2">
             <button
               type="button"
@@ -160,7 +160,7 @@ export function LogSleepNightSheet({ open, onClose, onSaved, initial }: LogSleep
               className={`ios-press flex-1 rounded-xl py-2.5 text-[13px] font-semibold transition-colors ${
                 tstKnown
                   ? 'bg-[#5E5CE6] text-white'
-                  : 'border border-white/12 bg-white/5 text-[#AEAEB2]'
+                  : 'border border-white/12 bg-white/5 text-[#ACB4BA]'
               }`}
             >
               Je sais
@@ -174,7 +174,7 @@ export function LogSleepNightSheet({ open, onClose, onSaved, initial }: LogSleep
               className={`ios-press flex-1 rounded-xl py-2.5 text-[13px] font-semibold transition-colors ${
                 !tstKnown
                   ? 'bg-[#5E5CE6] text-white'
-                  : 'border border-white/12 bg-white/5 text-[#AEAEB2]'
+                  : 'border border-white/12 bg-white/5 text-[#ACB4BA]'
               }`}
             >
               Je ne sais pas
@@ -184,7 +184,7 @@ export function LogSleepNightSheet({ open, onClose, onSaved, initial }: LogSleep
           {tstKnown ? (
             <div className="flex items-end gap-2">
               <label className="block flex-1">
-                <span className="mb-1 block text-[11px] text-[#636366]">Heures</span>
+                <span className="mb-1 block text-[11px] text-[#717C83]">Heures</span>
                 <input
                   type="number"
                   min={0}
@@ -198,9 +198,9 @@ export function LogSleepNightSheet({ open, onClose, onSaved, initial }: LogSleep
                   className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#5E5CE6]/40"
                 />
               </label>
-              <span className="pb-3 text-[13px] text-[#8E8E93]">h</span>
+              <span className="pb-3 text-[13px] text-[#ACB4BA]">h</span>
               <label className="block flex-1">
-                <span className="mb-1 block text-[11px] text-[#636366]">Minutes</span>
+                <span className="mb-1 block text-[11px] text-[#717C83]">Minutes</span>
                 <input
                   type="number"
                   min={0}
@@ -214,17 +214,17 @@ export function LogSleepNightSheet({ open, onClose, onSaved, initial }: LogSleep
                   className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#5E5CE6]/40"
                 />
               </label>
-              <span className="pb-3 text-[13px] text-[#8E8E93]">min</span>
+              <span className="pb-3 text-[13px] text-[#ACB4BA]">min</span>
             </div>
           ) : (
-            <p className="rounded-xl border border-white/8 bg-black/25 px-3.5 py-3 text-[13px] leading-relaxed text-[#AEAEB2]">
+            <p className="rounded-xl border border-white/8 bg-black/25 px-3.5 py-3 text-[13px] leading-relaxed text-[#ACB4BA]">
               Pas de souci — on garde le temps passé au lit, sans inventer combien tu as vraiment
               dormi.
             </p>
           )}
         </div>
 
-        {error && <p className="text-[13px] text-[#FF6961]">{error}</p>}
+        {error && <p className="text-[13px] text-[#FF907F]">{error}</p>}
 
         <button
           type="button"

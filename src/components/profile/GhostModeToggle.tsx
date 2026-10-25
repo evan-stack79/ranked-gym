@@ -17,7 +17,7 @@ export function GhostModeToggle({ enabled, onChange, disabled = false }: GhostMo
             Mode Furtif
             <span className="ml-1.5 text-[13px] font-medium text-[#BF5AF2]">Stealth</span>
           </p>
-          <p className="mt-1 text-[13px] leading-snug text-[#8E8E93]">
+          <p className="mt-1 text-[13px] leading-snug text-[#ACB4BA]">
             Masque ta localisation dans le feed social — aucune ville ni zone affichée.
           </p>
         </div>

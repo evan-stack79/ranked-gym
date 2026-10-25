@@ -38,18 +38,18 @@ export function LegalDocumentScreen({ kind }: { kind: LegalDocumentKind }) {
       <div className="mx-auto flex w-full max-w-lg flex-1 flex-col">
         <a
           href="/"
-          className="inline-flex min-h-11 items-center text-[15px] font-medium text-[#AEAEB2] underline-offset-2 hover:text-white hover:underline"
+          className="inline-flex min-h-11 items-center text-[15px] font-medium text-[#ACB4BA] underline-offset-2 hover:text-white hover:underline"
         >
           Retour
         </a>
         <h1 className="mt-6 text-[28px] font-bold tracking-tight">{title}</h1>
-        <p className="mt-2 text-[13px] text-[#8E8E93]">Ranked Gym · Bêta privée</p>
+        <p className="mt-2 text-[13px] text-[#ACB4BA]">Ranked Gym · Bêta privée</p>
         <div className="mt-6 space-y-4 text-[15px] leading-relaxed text-[#EBEBF5]">
           {paragraphs.map((text) => (
             <p key={text}>{text}</p>
           ))}
         </div>
-        <p className="mt-8 text-[13px] text-[#8E8E93]">
+        <p className="mt-8 text-[13px] text-[#ACB4BA]">
           Voir aussi{' '}
           <a className="text-[#EBEBF5] underline underline-offset-2" href={otherHref}>
             {otherLabel}

@@ -94,7 +94,7 @@ export function StatGrid() {
           <p className="text-[18px] font-semibold tracking-tight tabular-nums text-white">
             {formatStreak(streakDays)}
           </p>
-          <p className="mt-1 text-[12px] text-[#8E8E93]">Série</p>
+          <p className="mt-1 text-[12px] text-[#ACB4BA]">Série</p>
         </div>
 
         {/* Séances */}
@@ -107,11 +107,11 @@ export function StatGrid() {
             {sessionCount}
           </p>
           {stats && stats.checkinCount > 0 ? (
-            <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-[#AEAEB2]">
+            <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-[#ACB4BA]">
               {stats.workoutCount} train · {stats.checkinCount} spot
             </p>
           ) : null}
-          <p className="mt-1 text-[12px] text-[#8E8E93]">Séances</p>
+          <p className="mt-1 text-[12px] text-[#ACB4BA]">Séances</p>
         </div>
 
         {/* PR épinglé — vitrine premium */}
@@ -123,7 +123,7 @@ export function StatGrid() {
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
-            className="ios-press absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] text-[#AEAEB2]"
+            className="ios-press absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] text-[#ACB4BA]"
             aria-label="Éditer le PR épinglé"
           >
             <Pencil className="h-3 w-3" strokeWidth={2.25} />
@@ -138,24 +138,24 @@ export function StatGrid() {
               <div className="flex flex-wrap items-baseline gap-1.5">
                 <p className="text-[20px] font-bold tracking-tight tabular-nums text-white">
                   {formatWeight(pinned.weightKg)}
-                  <span className="ml-0.5 text-[13px] font-semibold text-[#AEAEB2]">kg</span>
+                  <span className="ml-0.5 text-[13px] font-semibold text-[#ACB4BA]">kg</span>
                 </p>
               </div>
               <p className="mt-1 line-clamp-2 text-[11px] font-medium leading-snug text-[#D1D1D6]">
                 {pinned.exerciseName}
               </p>
-              <span className="mt-2 inline-flex max-w-full truncate rounded-full border border-[#FF2B2B]/25 bg-[#FF2B2B]/12 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-[#FF8A80]">
+              <span className="mt-2 inline-flex max-w-full truncate rounded-full border border-[#FF0702]/25 bg-[#FF0702]/12 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-[#FF8A80]">
                 {formatPrAgeLabel(pinned.achievedAt)}
               </span>
-              <p className="mt-2 text-[12px] text-[#8E8E93]">PR</p>
+              <p className="mt-2 text-[12px] text-[#ACB4BA]">PR</p>
             </>
           ) : (
             <>
-              <p className="text-[18px] font-semibold tracking-tight text-[#636366]">Aucun PR</p>
-              <p className="mt-1 text-[11px] leading-snug text-[#636366]">
+              <p className="text-[18px] font-semibold tracking-tight text-[#717C83]">Aucun PR</p>
+              <p className="mt-1 text-[11px] leading-snug text-[#717C83]">
                 Épingle un exo via le crayon
               </p>
-              <p className="mt-2 text-[12px] text-[#8E8E93]">PR</p>
+              <p className="mt-2 text-[12px] text-[#ACB4BA]">PR</p>
             </>
           )}
         </div>
@@ -166,24 +166,24 @@ export function StatGrid() {
         onClose={() => setPickerOpen(false)}
         title="PR épinglé"
         subtitle="Choisis l’exercice favori en vitrine"
-        leading={<Trophy className="mt-0.5 h-5 w-5 text-[#FF2B2B]" />}
+        leading={<Trophy className="mt-0.5 h-5 w-5 text-[#FF0702]" />}
       >
         <div className="space-y-3 pb-4">
           {bestPrs.length > 3 ? (
             <label className="relative block">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8E8E93]" />
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#ACB4BA]" />
               <input
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Rechercher un exercice…"
-                className="w-full rounded-2xl border border-white/10 bg-white/[0.05] py-3 pl-10 pr-4 text-[15px] text-white outline-none placeholder:text-[#636366] focus:border-[#FF2B2B]/35"
+                className="w-full rounded-2xl border border-white/10 bg-white/[0.05] py-3 pl-10 pr-4 text-[15px] text-white outline-none placeholder:text-[#717C83] focus:border-[#FF0702]/35"
               />
             </label>
           ) : null}
 
           {filteredPrs.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-[14px] leading-relaxed text-[#8E8E93]">
+            <p className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-[14px] leading-relaxed text-[#ACB4BA]">
               {bestPrs.length === 0
                 ? 'Aucun exercice avec poids dans tes logs. Enregistre une séance dans Train pour débloquer les PR.'
                 : 'Aucun exercice ne correspond à ta recherche.'}
@@ -200,7 +200,7 @@ export function StatGrid() {
                       onClick={() => pickPr(pr)}
                       className={`ios-press flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3.5 text-left ${
                         selected
-                          ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/15'
+                          ? 'border-[#FF0702]/45 bg-[#FF0702]/15'
                           : 'border-white/10 bg-white/[0.04]'
                       }`}
                     >
@@ -208,7 +208,7 @@ export function StatGrid() {
                         <span className="block truncate text-[15px] font-semibold text-white">
                           {pr.exerciseName}
                         </span>
-                        <span className="mt-0.5 block text-[12px] text-[#8E8E93]">
+                        <span className="mt-0.5 block text-[12px] text-[#ACB4BA]">
                           {formatPrAgeLabel(pr.achievedAt)}
                         </span>
                       </span>

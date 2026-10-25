@@ -325,7 +325,7 @@ async function writeTransparentMaster(inputPath, outPath, size = 1024) {
 
 /** Icône opaque sombre : fond noir produit, sujet centré, pas de vert. */
 async function writeOpaqueIcon(inputPath, outPath, size = 1024) {
-  const BRAND_BG = { r: 0x0c, g: 0x0c, b: 0x0e, alpha: 1 }
+  const BRAND_BG = { r: 0x00, g: 0x00, b: 0x00, alpha: 1 }
   const { data, info } = await sharp(inputPath).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i]

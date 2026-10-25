@@ -50,7 +50,7 @@ function drawStats(ctx: CanvasRenderingContext2D, stats: VictorySessionStats) {
   ctx.textAlign = 'left'
 
   ctx.font = '600 28px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'
-  ctx.fillStyle = '#FF2B2B'
+  ctx.fillStyle = '#FF0702'
   ctx.fillText('RANKED', left, 140)
   const rankedW = ctx.measureText('RANKED').width
   ctx.fillStyle = '#FFFFFF'

@@ -16,6 +16,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'capacitor.config.ts'
+      - 'vite.config.ts'
       - '.github/workflows/build-ipa.yml'
   pull_request:
     paths:
@@ -25,6 +26,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'capacitor.config.ts'
+      - 'vite.config.ts'
       - '.github/workflows/build-ipa.yml'
 
 permissions:
@@ -61,7 +63,9 @@ jobs:
           fi
           if [ "${{ github.event_name }}" = "pull_request" ] && {
             [ "${{ github.head_ref }}" = "test/ipa-119-120-121" ] ||
-            [ "${{ github.head_ref }}" = "feat/food-icons-ciqual" ]
+            [ "${{ github.head_ref }}" = "feat/food-icons-ciqual" ] ||
+            [ "${{ github.head_ref }}" = "cursor/radix-on-ciqual-f31a" ] ||
+            [ "${{ github.base_ref }}" = "feat/food-icons-ciqual" ]
           }; then
             ON=true
           fi
@@ -71,9 +75,13 @@ jobs:
       - name: Resolve Ciqual for this IPA only
         id: ciqual
         run: |
-          # Default OFF. ON only on feat/food-icons-ciqual PR IPA (test app).
+          # Default OFF. ON on the Ciqual feature PR and on the palette stacked on it.
           ON=false
-          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ github.head_ref }}" = "feat/food-icons-ciqual" ]; then
+          if [ "${{ github.event_name }}" = "pull_request" ] && {
+            [ "${{ github.head_ref }}" = "feat/food-icons-ciqual" ] ||
+            [ "${{ github.head_ref }}" = "cursor/radix-on-ciqual-f31a" ] ||
+            [ "${{ github.base_ref }}" = "feat/food-icons-ciqual" ]
+          }; then
             ON=true
           fi
           echo "enabled=$ON" >> "$GITHUB_OUTPUT"
@@ -115,6 +123,9 @@ jobs:
           # Empty when OFF so Vite default (absent) remains false — never force "false" string quirks.
           VITE_ENABLE_FOOD_ADD_V3: ${{ steps.food_v3.outputs.enabled == 'true' && 'true' || '' }}
           VITE_ENABLE_CIQUAL: ${{ steps.ciqual.outputs.enabled == 'true' && 'true' || '' }}
+          # Pas de precache Workbox dans le shell : chaque IPA charge SES fichiers.
+          CAPACITOR_BUILD: "1"
+          VITE_APP_BUILD_ID: ${{ github.sha }}
 
       - name: Sync Capacitor iOS
         run: npx cap sync ios
@@ -135,6 +146,7 @@ jobs:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \

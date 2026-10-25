@@ -25,7 +25,7 @@ export function SettingsMenuRow({
       </span>
       <span className="min-w-0 flex-1 text-[16px] font-medium text-white">{label}</span>
       {showChevron && (
-        <ChevronRight className="h-5 w-5 shrink-0 text-[#636366]" strokeWidth={2} />
+        <ChevronRight className="h-5 w-5 shrink-0 text-[#717C83]" strokeWidth={2} />
       )}
     </button>
   )

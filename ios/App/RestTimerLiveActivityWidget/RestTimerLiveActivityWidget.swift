@@ -4,7 +4,7 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
-private let accentRed = Color(red: 1.0, green: 43.0 / 255.0, blue: 43.0 / 255.0) // #FF2B2B
+private let accentRed = Color(red: 1.0, green: 7.0 / 255.0, blue: 2.0 / 255.0) // #FF0702
 
 struct RankedGymLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {

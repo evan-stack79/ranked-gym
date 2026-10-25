@@ -31,7 +31,7 @@ export function RestTimerSoundSettings() {
           type="checkbox"
           checked={prefs.soundEnabled}
           onChange={(e) => setPrefs(setRestTimerSoundEnabled(e.target.checked))}
-          className="h-5 w-5 accent-[#FF2B2B]"
+          className="h-5 w-5 accent-[#FF0702]"
           aria-label="Activer le son de fin de repos"
         />
       </label>
@@ -42,7 +42,7 @@ export function RestTimerSoundSettings() {
           type="checkbox"
           checked={prefs.countdownBeeps}
           onChange={(e) => setPrefs(setRestTimerCountdownBeeps(e.target.checked))}
-          className="h-5 w-5 accent-[#FF2B2B]"
+          className="h-5 w-5 accent-[#FF0702]"
           aria-label="Activer les trois bips avant la fin"
         />
       </label>
@@ -53,7 +53,7 @@ export function RestTimerSoundSettings() {
           type="checkbox"
           checked={prefs.haptics}
           onChange={(e) => setPrefs(setRestTimerHaptics(e.target.checked))}
-          className="h-5 w-5 accent-[#FF2B2B]"
+          className="h-5 w-5 accent-[#FF0702]"
           aria-label="Activer la vibration de fin de repos"
         />
       </label>

@@ -21,21 +21,21 @@ export function TrainWeekStrip({ days }: TrainWeekStripProps) {
             >
               <span
                 className={`text-[10px] font-semibold uppercase ${
-                  day.isToday ? 'text-white' : 'text-[#636366]'
+                  day.isToday ? 'text-white' : 'text-[#717C83]'
                 }`}
               >
                 {day.shortLabel}
               </span>
               <span
                 className={`mt-0.5 text-[14px] font-bold tabular-nums ${
-                  day.isToday ? 'text-white' : 'text-[#AEAEB2]'
+                  day.isToday ? 'text-white' : 'text-[#ACB4BA]'
                 }`}
               >
                 {day.dayNumber}
               </span>
               <span
                 className={`mt-1 h-1 w-1 rounded-full ${
-                  day.hasSession ? 'bg-[#FF2B2B]' : day.isToday ? 'bg-white/40' : 'bg-transparent'
+                  day.hasSession ? 'bg-[#FF0702]' : day.isToday ? 'bg-white/40' : 'bg-transparent'
                 }`}
                 aria-hidden="true"
               />

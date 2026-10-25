@@ -9,6 +9,7 @@ const config: CapacitorConfig = {
   appId: 'com.rankedgym.app',
   appName: 'Ranked Gym',
   webDir: 'dist',
+  backgroundColor: '#000000',
   server: {
     androidScheme: 'https',
     // Do not allow the WebView to navigate to arbitrary third-party origins.
@@ -22,6 +23,7 @@ const config: CapacitorConfig = {
   },
   ios: {
     contentInset: 'never',
+    backgroundColor: '#000000',
     // Info.plist (Capacitor sync) — Pump Check / VictoryCamera (déjà utilisés côté web)
     // NSCameraUsageDescription: Ranked Gym utilise la caméra pour ton Pump Check post-séance.
     // NSPhotoLibraryAddUsageDescription: Ranked Gym enregistre ta carte Pump Check dans ta galerie.

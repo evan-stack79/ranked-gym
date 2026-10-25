@@ -154,7 +154,7 @@ export function BarcodeScanner({ open, onClose, onProduct }: BarcodeScannerProps
           <Camera className="h-5 w-5 text-[#30D158]" />
           <div>
             <p className="text-[16px] font-semibold text-white">Scanner Open Food Facts</p>
-            <p className="text-[12px] text-[#8E8E93]">
+            <p className="text-[12px] text-[#ACB4BA]">
               Tiens le code un peu plus loin — pas besoin de coller l’écran
             </p>
           </div>
@@ -162,7 +162,7 @@ export function BarcodeScanner({ open, onClose, onProduct }: BarcodeScannerProps
         <button
           type="button"
           onClick={onClose}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-[#8E8E93]"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-[#ACB4BA]"
           aria-label="Fermer"
         >
           <X className="h-4 w-4" />
@@ -175,13 +175,13 @@ export function BarcodeScanner({ open, onClose, onProduct }: BarcodeScannerProps
           className="overflow-hidden rounded-2xl border border-white/10 bg-black [&_video]:min-h-[280px] [&_video]:w-full [&_video]:object-cover"
         />
         {lookingUp && (
-          <p className="mt-3 flex items-center justify-center gap-2 text-[13px] text-[#8E8E93]">
+          <p className="mt-3 flex items-center justify-center gap-2 text-[13px] text-[#ACB4BA]">
             <Loader2 className="h-4 w-4 animate-spin text-[#30D158]" />
             Recherche Open Food Facts…
           </p>
         )}
         {error && (
-          <p className="mt-3 rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]">
+          <p className="mt-3 rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF907F]">
             {error}
           </p>
         )}

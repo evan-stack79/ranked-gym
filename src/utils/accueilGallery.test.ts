@@ -14,7 +14,7 @@ import type { TrainingState, WorkoutRoutine } from '../types/training'
 function routine(partial: Partial<WorkoutRoutine> & Pick<WorkoutRoutine, 'id' | 'label'>): WorkoutRoutine {
   return {
     subtitle: '',
-    accent: '#FF2B2B',
+    accent: '#FF0702',
     exercises: [],
     updatedAt: 1,
     ...partial,

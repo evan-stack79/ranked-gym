@@ -49,7 +49,7 @@ interface FullProfileScreenProps {
 
 function TrustBanner() {
   return (
-    <div className="flex gap-3 rounded-2xl border border-[#FF2B2B]/20 bg-[#FF2B2B]/08 px-4 py-3.5">
+    <div className="flex gap-3 rounded-2xl border border-[#FF0702]/20 bg-[#FF0702]/08 px-4 py-3.5">
       <span className="shrink-0 text-[18px]" aria-hidden>
         🔒
       </span>
@@ -74,10 +74,10 @@ function SectionTitle({
   return (
     <div className="px-1">
       <div className="flex items-center gap-2">
-        <Icon className="h-4 w-4 text-[#FF2B2B]" strokeWidth={2.25} />
+        <Icon className="h-4 w-4 text-[#FF0702]" strokeWidth={2.25} />
         <h2 className="text-[13px] font-bold uppercase tracking-[0.14em] text-white">{title}</h2>
       </div>
-      {subtitle ? <p className="mt-1 text-[12px] text-[#636366]">{subtitle}</p> : null}
+      {subtitle ? <p className="mt-1 text-[12px] text-[#717C83]">{subtitle}</p> : null}
     </div>
   )
 }
@@ -287,25 +287,25 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
         </button>
         <div className="min-w-0 flex-1">
           <h1 className="text-[20px] font-bold tracking-tight text-white">Mon profil</h1>
-          <p className="text-[13px] text-[#AEAEB2]">Stats athlète & données corporelles</p>
+          <p className="text-[13px] text-[#ACB4BA]">Stats athlète & données corporelles</p>
         </div>
-        <Shield className="h-5 w-5 shrink-0 text-[#636366]" strokeWidth={2} aria-hidden />
+        <Shield className="h-5 w-5 shrink-0 text-[#717C83]" strokeWidth={2} aria-hidden />
       </div>
 
       <TrustBanner />
 
       {/* En-tête joueur */}
       <section
-        className="relative overflow-hidden rounded-3xl border border-[#FF2B2B]/20 p-5"
+        className="relative overflow-hidden rounded-3xl border border-[#FF0702]/20 p-5"
         style={{
           background:
             'linear-gradient(160deg, rgb(20 20 22) 0%, rgb(28 14 16) 55%, rgb(18 18 20) 100%)',
-          boxShadow: '0 16px 48px rgb(255 43 43 / 0.08), inset 0 1px 0 rgb(255 255 255 / 0.05)',
+          boxShadow: '0 16px 48px rgb(255 7 2 / 0.08), inset 0 1px 0 rgb(255 255 255 / 0.05)',
         }}
       >
         <div
           className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full blur-3xl"
-          style={{ background: 'radial-gradient(circle, rgb(255 43 43 / 0.25) 0%, transparent 70%)' }}
+          style={{ background: 'radial-gradient(circle, rgb(255 7 2 / 0.25) 0%, transparent 70%)' }}
           aria-hidden
         />
 
@@ -315,10 +315,10 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
               type="button"
               onClick={openAvatarPicker}
               disabled={avatarUploading || !user?.id}
-              className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/55"
+              className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/55"
               aria-label="Changer la photo de profil"
             >
-              <div className="rounded-full p-1 ring-2 ring-[#FF2B2B]/50 ring-offset-2 ring-offset-[#141416]">
+              <div className="rounded-full p-1 ring-2 ring-[#FF0702]/50 ring-offset-2 ring-offset-[#141416]">
                 <Avatar
                   username={username}
                   imageUrl={displayAvatarUrl}
@@ -329,7 +329,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
               </div>
               {user?.id ? (
                 <span
-                  className="absolute -bottom-0.5 -right-0.5 flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/20 bg-[#2C2C2E] text-white shadow-[0_4px_12px_rgb(0_0_0_/0.45)]"
+                  className="absolute -bottom-0.5 -right-0.5 flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/20 bg-[#25282A] text-white shadow-[0_4px_12px_rgb(0_0_0_/0.45)]"
                   aria-hidden
                 >
                   <Pencil className="h-3.5 w-3.5" strokeWidth={2.5} />
@@ -348,7 +348,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
 
           <div>
             <h2 className="text-[24px] font-black tracking-tight text-white">{username}</h2>
-            <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#FF2B2B]/35 bg-[#FF2B2B]/15 px-3.5 py-1.5 text-[13px] font-bold text-[#FF6961]">
+            <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#FF0702]/35 bg-[#FF0702]/15 px-3.5 py-1.5 text-[13px] font-bold text-[#FF907F]">
               <Crosshair className="h-3.5 w-3.5" strokeWidth={2.5} />
               Niveau {level} · {rank.title}
             </span>
@@ -378,7 +378,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
 
         <div className="glass-card rounded-2xl p-4">
           <div className="mb-3 flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-[#FF2B2B]" strokeWidth={2.25} />
+            <TrendingUp className="h-4 w-4 text-[#FF0702]" strokeWidth={2.25} />
             <p className="text-[14px] font-semibold text-white">Courbe de Puissance</p>
           </div>
           {statsLoading ? (
@@ -427,8 +427,8 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
 
         {showGoalWeight ? (
           <label className="glass-card block rounded-2xl p-4" data-testid="full-profile-goal-weight">
-            <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
-              <Target className="h-3.5 w-3.5 text-[#FF6961]" />
+            <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#ACB4BA]">
+              <Target className="h-3.5 w-3.5 text-[#FF907F]" />
               Poids cible
             </span>
             <div className="flex items-end gap-1">
@@ -443,13 +443,13 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
                 aria-label="Poids cible"
                 className="w-full bg-transparent text-[26px] font-bold text-white outline-none"
               />
-              <span className="pb-1 text-[13px] text-[#8E8E93]">kg</span>
+              <span className="pb-1 text-[13px] text-[#ACB4BA]">kg</span>
             </div>
           </label>
         ) : null}
 
         <label className="glass-card block rounded-2xl p-4">
-          <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
+          <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#ACB4BA]">
             <UserRound className="h-3.5 w-3.5 text-[#FF9F0A]" />
             Âge
           </span>
@@ -466,7 +466,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
         </label>
 
         {isMinorProfile ? (
-          <p className="flex items-start gap-2 px-1 text-[12px] text-[#8E8E93]">
+          <p className="flex items-start gap-2 px-1 text-[12px] text-[#ACB4BA]">
             <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
             Mensurations masquées pour les comptes de moins de 18 ans.
           </p>

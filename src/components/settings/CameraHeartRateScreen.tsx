@@ -126,7 +126,7 @@ export function CameraHeartRateScreen({ onBack }: CameraHeartRateScreenProps) {
 
       <div className="glass-card rounded-2xl p-4">
         <p className="text-[15px] font-semibold text-white">Comment faire</p>
-        <ol className="mt-2 list-decimal space-y-1.5 pl-4 text-[13px] leading-relaxed text-[#AEAEB2]">
+        <ol className="mt-2 list-decimal space-y-1.5 pl-4 text-[13px] leading-relaxed text-[#ACB4BA]">
           <li>Pose le doigt sur la caméra arrière et le flash.</li>
           <li>Reste immobile 12–20 secondes.</li>
           <li>Si le doigt bouge ou laisse passer la lumière : pas de résultat.</li>
@@ -134,21 +134,21 @@ export function CameraHeartRateScreen({ onBack }: CameraHeartRateScreenProps) {
       </div>
 
       {availabilityMessage ? (
-        <p className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-[13px] text-[#AEAEB2]">
+        <p className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-[13px] text-[#ACB4BA]">
           {availabilityMessage}
         </p>
       ) : null}
 
       <div className="glass-card flex flex-col items-center gap-3 rounded-2xl p-6 text-center">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#8E8E93]">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#ACB4BA]">
           {busy ? 'Mesure en cours' : 'Prêt'}
         </p>
         <p className="text-[48px] font-bold tabular-nums tracking-tight text-white">
           {liveBpm ?? '—'}
         </p>
-        <p className="text-[13px] text-[#8E8E93]">BPM estimé</p>
+        <p className="text-[13px] text-[#ACB4BA]">BPM estimé</p>
         {progress ? (
-          <div className="w-full space-y-1 text-[12px] text-[#AEAEB2]">
+          <div className="w-full space-y-1 text-[12px] text-[#ACB4BA]">
             <p>
               Doigt :{' '}
               <span className="font-semibold text-white">
@@ -191,7 +191,7 @@ export function CameraHeartRateScreen({ onBack }: CameraHeartRateScreenProps) {
             type="button"
             onClick={() => void start()}
             disabled={Boolean(availabilityMessage)}
-            className="ios-press min-h-12 flex-1 rounded-2xl border border-[#FF2B2B]/40 bg-[#FF2B2B]/20 text-[15px] font-semibold text-white disabled:opacity-40"
+            className="ios-press min-h-12 flex-1 rounded-2xl border border-[#FF0702]/40 bg-[#FF0702]/20 text-[15px] font-semibold text-white disabled:opacity-40"
           >
             Démarrer la mesure
           </button>

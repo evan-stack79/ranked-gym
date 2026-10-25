@@ -124,7 +124,7 @@ export function HeightWeightPicker({
           <h2 className="text-[22px] font-bold tracking-tight text-white">
             Ta taille et ton poids
           </h2>
-          <p className="text-[14px] leading-relaxed text-[#AEAEB2]">
+          <p className="text-[14px] leading-relaxed text-[#ACB4BA]">
             On s&apos;en sert seulement pour estimer ce que ton corps dépense au repos. Personne
             d&apos;autre ne les voit. Tu peux les changer ou les effacer quand tu veux dans Profil.
           </p>
@@ -143,7 +143,7 @@ export function HeightWeightPicker({
             type="button"
             onClick={() => setActiveField(tab.id)}
             className={`ios-press flex-1 rounded-lg py-2 text-[13px] font-semibold ${
-              activeField === tab.id ? 'bg-white text-black' : 'text-[#8E8E93]'
+              activeField === tab.id ? 'bg-white text-black' : 'text-[#ACB4BA]'
             }`}
             data-testid={`height-weight-tab-${tab.id}`}
           >
@@ -166,7 +166,7 @@ export function HeightWeightPicker({
                 type="button"
                 onClick={() => setUnit(opt.id)}
                 className={`ios-press flex-1 rounded-lg py-1.5 text-[13px] font-semibold ${
-                  unit === opt.id ? 'bg-brand text-white' : 'text-[#8E8E93]'
+                  unit === opt.id ? 'bg-brand text-white' : 'text-[#ACB4BA]'
                 }`}
                 data-testid={`weight-unit-${opt.id}`}
               >
@@ -188,7 +188,7 @@ export function HeightWeightPicker({
               return sanitizeWeightKg(kg) != null
             }}
           />
-          <p className="text-center text-[12px] text-[#636366]">
+          <p className="text-center text-[12px] text-[#717C83]">
             {weightKg == null
               ? 'Fais glisser ou tape pour choisir'
               : unit === 'lb'
@@ -208,7 +208,7 @@ export function HeightWeightPicker({
             aria-label="Taille en cm"
             validateParsed={(cm) => sanitizeHeightCm(cm) != null}
           />
-          <p className="text-center text-[12px] text-[#636366]">
+          <p className="text-center text-[12px] text-[#717C83]">
             {heightCm == null ? 'Fais glisser ou tape pour choisir' : `${Math.round(heightCm)} cm`}
           </p>
         </div>
@@ -234,7 +234,7 @@ export function HeightWeightPicker({
           <button
             type="button"
             onClick={onSkip}
-            className="ios-press w-full py-2.5 text-[14px] font-medium text-[#8E8E93]"
+            className="ios-press w-full py-2.5 text-[14px] font-medium text-[#ACB4BA]"
             data-testid="height-weight-later"
           >
             Plus tard
@@ -245,7 +245,7 @@ export function HeightWeightPicker({
           <button
             type="button"
             onClick={onErase}
-            className="ios-press w-full py-2.5 text-[14px] font-semibold text-[#FF6961]"
+            className="ios-press w-full py-2.5 text-[14px] font-semibold text-[#FF907F]"
             data-testid="height-weight-erase"
           >
             Effacer

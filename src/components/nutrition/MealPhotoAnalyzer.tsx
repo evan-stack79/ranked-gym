@@ -206,7 +206,7 @@ export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAn
             {busy ? 'Analyse…' : 'Photo IA'}
           </button>
           {visibleErrorMessage ? (
-            <p className="mt-2 text-[11px] leading-snug text-[#FF6961]" role="alert">
+            <p className="mt-2 text-[11px] leading-snug text-[#FF907F]" role="alert">
               {visibleErrorMessage}
             </p>
           ) : null}
@@ -222,7 +222,7 @@ export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAn
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[15px] font-semibold text-white">Photo → macros (Gemini)</p>
-            <p className="mt-0.5 text-[12px] leading-snug text-[#8E8E93]">
+            <p className="mt-0.5 text-[12px] leading-snug text-[#ACB4BA]">
               Compression locale puis analyse sécurisée.
             </p>
             <p
@@ -245,7 +245,7 @@ export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAn
                   className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-all ${
                     mealType === type
                       ? 'border-[#BF5AF2]/45 bg-[#BF5AF2]/20 text-[#E9D5FF]'
-                      : 'border-white/10 bg-black/25 text-[#8E8E93]'
+                      : 'border-white/10 bg-black/25 text-[#ACB4BA]'
                   }`}
                 >
                   {MEAL_TYPE_LABELS[type]}
@@ -278,8 +278,8 @@ export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAn
           className="mt-3 flex items-start gap-2 rounded-xl border border-[#FF453A]/35 bg-[#FF453A]/10 px-3 py-2.5"
           role="alert"
         >
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#FF6961]" />
-          <p className="text-[12px] leading-snug text-[#FF6961]">{visibleErrorMessage}</p>
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#FF907F]" />
+          <p className="text-[12px] leading-snug text-[#FF907F]">{visibleErrorMessage}</p>
         </div>
       ) : null}
 

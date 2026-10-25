@@ -168,7 +168,7 @@ export function EditMealSheet({
     >
       <div className="space-y-4 pb-2">
         <label className="block">
-          <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">Nom</span>
+          <span className="mb-1.5 block text-[13px] font-semibold text-[#ACB4BA]">Nom</span>
           <input
             type="text"
             value={name}
@@ -178,7 +178,7 @@ export function EditMealSheet({
         </label>
 
         <div>
-          <p className="mb-1.5 text-[13px] font-semibold text-[#8E8E93]">Repas</p>
+          <p className="mb-1.5 text-[13px] font-semibold text-[#ACB4BA]">Repas</p>
           <div className="flex flex-wrap gap-1.5">
             {MEAL_TYPES.map((type) => (
               <button
@@ -188,7 +188,7 @@ export function EditMealSheet({
                 className={`min-h-11 rounded-2xl border px-3 py-2 text-[13px] font-semibold ${
                   mealType === type
                     ? 'border-white/35 bg-white/[0.12] text-white'
-                    : 'border-white/10 bg-black/25 text-[#8E8E93]'
+                    : 'border-white/10 bg-black/25 text-[#ACB4BA]'
                 }`}
               >
                 {MEAL_TYPE_LABELS[type]}
@@ -200,7 +200,7 @@ export function EditMealSheet({
         <div className={`grid gap-3 ${hideNutritionNumbers ? 'grid-cols-1' : 'grid-cols-2'}`}>
           {hideNutritionNumbers ? null : (
             <label className="block">
-              <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">Calories</span>
+              <span className="mb-1.5 block text-[13px] font-semibold text-[#ACB4BA]">Calories</span>
               <ClearableNumberInput
                 value={calories}
                 onChange={setCalories}
@@ -213,7 +213,7 @@ export function EditMealSheet({
             </label>
           )}
           <label className="block">
-            <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">
+            <span className="mb-1.5 block text-[13px] font-semibold text-[#ACB4BA]">
               Quantité (g)
             </span>
             <ClearableNumberInput
@@ -226,12 +226,12 @@ export function EditMealSheet({
               clampOnBlur={strictV3Edit ? false : true}
               sanitizeUnits
               placeholder="Optionnel"
-              placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#636366]"
+              placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#717C83]"
               aria-label="Quantité en grammes"
               className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
             />
             {strictV3Edit && (gramsFieldMessage || qtyError) ? (
-              <p className="mt-1.5 text-[12px] text-[#FF6961]" role="alert" data-food-qty-error>
+              <p className="mt-1.5 text-[12px] text-[#FF907F]" role="alert" data-food-qty-error>
                 {gramsFieldMessage ?? qtyError}
               </p>
             ) : null}
@@ -239,7 +239,7 @@ export function EditMealSheet({
           {hideNutritionNumbers ? null : (
             <>
               <label className="block">
-                <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">Protéines</span>
+                <span className="mb-1.5 block text-[13px] font-semibold text-[#ACB4BA]">Protéines</span>
                 <ClearableNumberInput
                   value={proteinG}
                   onChange={setProteinG}
@@ -249,13 +249,13 @@ export function EditMealSheet({
                   // d33b724 : required={false} → vider reste vide ; save envoie undefined → serveur effacé.
                   required={false}
                   placeholder="—"
-                  placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#636366]"
+                  placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#717C83]"
                   aria-label="Protéines"
                   className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
                 />
               </label>
               <label className="block">
-                <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">Glucides</span>
+                <span className="mb-1.5 block text-[13px] font-semibold text-[#ACB4BA]">Glucides</span>
                 <ClearableNumberInput
                   value={carbsG}
                   onChange={setCarbsG}
@@ -264,13 +264,13 @@ export function EditMealSheet({
                   step={0.1}
                   required={false}
                   placeholder="—"
-                  placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#636366]"
+                  placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#717C83]"
                   aria-label="Glucides"
                   className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
                 />
               </label>
               <label className="block">
-                <span className="mb-1.5 block text-[13px] font-semibold text-[#8E8E93]">Lipides</span>
+                <span className="mb-1.5 block text-[13px] font-semibold text-[#ACB4BA]">Lipides</span>
                 <ClearableNumberInput
                   value={fatG}
                   onChange={setFatG}
@@ -279,7 +279,7 @@ export function EditMealSheet({
                   step={0.1}
                   required={false}
                   placeholder="—"
-                  placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#636366]"
+                  placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-3.5 text-[16px] text-[#717C83]"
                   aria-label="Lipides"
                   className="relative z-[1] w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[16px] text-white outline-none"
                 />
@@ -401,7 +401,7 @@ export function EditMealSheet({
           <button
             type="button"
             onClick={() => setConfirmDelete(true)}
-            className="ios-press min-h-11 w-full rounded-2xl border border-[#FF453A]/30 bg-[#FF453A]/10 py-3 text-[14px] font-semibold text-[#FF6961]"
+            className="ios-press min-h-11 w-full rounded-2xl border border-[#FF453A]/30 bg-[#FF453A]/10 py-3 text-[14px] font-semibold text-[#FF907F]"
           >
             Supprimer
           </button>

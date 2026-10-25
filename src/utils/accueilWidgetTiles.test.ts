@@ -22,7 +22,7 @@ function routine(id: string, setCount: number, doneCount = 0): WorkoutRoutine {
     id,
     label: id,
     subtitle: id,
-    accent: '#FF2B2B',
+    accent: '#FF0702',
     updatedAt: FIXED.getTime(),
     exercises: [{ id: `e-${id}`, name: 'Exo', sets }],
   }

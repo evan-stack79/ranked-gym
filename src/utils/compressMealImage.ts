@@ -67,7 +67,7 @@ export async function compressMealImage(file: File | Blob): Promise<CompressedMe
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas indisponible sur cet appareil.')
 
-  ctx.fillStyle = '#0C0C0E'
+  ctx.fillStyle = '#000000'
   ctx.fillRect(0, 0, width, height)
   ctx.drawImage(img, 0, 0, width, height)
 

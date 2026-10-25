@@ -61,7 +61,7 @@ export function PowerCurveChart({
   if (loading) {
     return (
       <div className={`flex min-h-[148px] items-center justify-center ${className}`}>
-        <div className="avatar-spinner h-8 w-8 rounded-full border-2 border-white/20 border-t-[#FF2B2B]" aria-hidden />
+        <div className="avatar-spinner h-8 w-8 rounded-full border-2 border-white/20 border-t-[#FF0702]" aria-hidden />
       </div>
     )
   }
@@ -74,7 +74,7 @@ export function PowerCurveChart({
       <div
         className={`flex min-h-[148px] flex-col items-center justify-center rounded-xl border border-dashed border-white/10 px-4 py-8 text-center ${className}`}
       >
-        <p className="max-w-[260px] text-[13px] leading-relaxed text-[#636366]">
+        <p className="max-w-[260px] text-[13px] leading-relaxed text-[#717C83]">
           Aucune donnée. Valide une séance avec cet exercice pour tracer ta courbe.
         </p>
       </div>
@@ -99,8 +99,8 @@ export function PowerCurveChart({
       >
         <defs>
           <linearGradient id="power-curve-area" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#FF2B2B" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#FF2B2B" stopOpacity="0" />
+            <stop offset="0%" stopColor="#FF0702" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#FF0702" stopOpacity="0" />
           </linearGradient>
           <filter id="power-curve-neon" x="-20%" y="-20%" width="140%" height="140%">
             <feGaussianBlur stdDeviation="1.8" result="blur" />
@@ -129,7 +129,7 @@ export function PowerCurveChart({
                 x={PAD.left - 6}
                 y={y + 3}
                 textAnchor="end"
-                className="fill-[#636366]"
+                className="fill-[#717C83]"
                 style={{ fontSize: 9 }}
               >
                 {Math.round(val)}
@@ -142,7 +142,7 @@ export function PowerCurveChart({
         <path
           d={linePath}
           fill="none"
-          stroke="#FF2B2B"
+          stroke="#FF0702"
           strokeWidth={2.75}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -154,12 +154,12 @@ export function PowerCurveChart({
           const y = PAD.top + INNER_H - ((p.valueKg - minY) / range) * INNER_H
           return (
             <g key={p.label}>
-              <circle cx={x} cy={y} r={4.5} fill="#FF2B2B" stroke="#0C0C0E" strokeWidth={2} />
+              <circle cx={x} cy={y} r={4.5} fill="#FF0702" stroke="#000000" strokeWidth={2} />
               <text
                 x={x}
                 y={H - 8}
                 textAnchor="middle"
-                className="fill-[#8E8E93]"
+                className="fill-[#ACB4BA]"
                 style={{ fontSize: 10, fontWeight: 600 }}
               >
                 {p.label}
@@ -170,8 +170,8 @@ export function PowerCurveChart({
       </svg>
 
       <div className="mt-1 flex items-center justify-between px-1">
-        <p className="text-[12px] text-[#8E8E93]">{exerciseLabel} · 1RM estimé</p>
-        <p className="text-[13px] font-bold tabular-nums text-[#FF6961]">
+        <p className="text-[12px] text-[#ACB4BA]">{exerciseLabel} · 1RM estimé</p>
+        <p className="text-[13px] font-bold tabular-nums text-[#FF907F]">
           {points[points.length - 1]?.valueKg} kg
         </p>
       </div>

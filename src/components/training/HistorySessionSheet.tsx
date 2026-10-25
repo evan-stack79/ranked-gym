@@ -110,7 +110,7 @@ export function HistorySessionSheet({
         <div className="relative">
           <button
             type="button"
-            className="ios-press flex min-h-11 min-w-11 items-center justify-center text-[#AEAEB2]"
+            className="ios-press flex min-h-11 min-w-11 items-center justify-center text-[#ACB4BA]"
             aria-label="Actions de la séance"
             aria-haspopup="menu"
             aria-expanded={menuOpen}
@@ -127,7 +127,7 @@ export function HistorySessionSheet({
             <div
               role="menu"
               data-history-edit-menu
-              className="absolute right-0 top-full z-20 min-w-[11.5rem] rounded-xl border border-[#2C2C2E] bg-[#111113] py-1"
+              className="absolute right-0 top-full z-20 min-w-[11.5rem] rounded-xl border border-[#25282A] bg-[#111113] py-1"
             >
               <button
                 type="button"
@@ -135,7 +135,7 @@ export function HistorySessionSheet({
                 disabled={!canModify}
                 data-history-edit-available={canModify ? 'true' : 'false'}
                 onClick={handleEdit}
-                className="flex min-h-11 w-full items-center px-3 text-left text-[14px] text-white disabled:text-[#636366]"
+                className="flex min-h-11 w-full items-center px-3 text-left text-[14px] text-white disabled:text-[#717C83]"
               >
                 Modifier la séance
               </button>
@@ -158,7 +158,7 @@ export function HistorySessionSheet({
               <p id={confirmTitleId} className="text-[16px] font-semibold text-white">
                 Supprimer cette séance ?
               </p>
-              <p id={confirmDescId} className="mt-1.5 text-[13px] leading-5 text-[#AEAEB2]">
+              <p id={confirmDescId} className="mt-1.5 text-[13px] leading-5 text-[#ACB4BA]">
                 Cette action est définitive et supprimera cette séance de ton historique.
               </p>
               {deleteError ? (
@@ -173,7 +173,7 @@ export function HistorySessionSheet({
                   data-history-confirm-cancel
                   disabled={deleting}
                   onClick={() => setConfirmOpen(false)}
-                  className="ios-press flex min-h-11 flex-1 items-center justify-center text-[14px] font-medium text-[#AEAEB2]"
+                  className="ios-press flex min-h-11 flex-1 items-center justify-center text-[14px] font-medium text-[#ACB4BA]"
                 >
                   Annuler
                 </button>
@@ -195,13 +195,13 @@ export function HistorySessionSheet({
             data-history-detail-summary
           >
             <div>
-              <p className="text-[11px] font-medium text-[#8E8E93]">Durée</p>
+              <p className="text-[11px] font-medium text-[#ACB4BA]">Durée</p>
               <p className="mt-0.5 text-[14px] tabular-nums text-white" data-history-metric="duration">
                 {formatHistoryDetailMetric('duration', metrics.duration)}
               </p>
             </div>
             <div>
-              <p className="text-[11px] font-medium text-[#8E8E93]">Volume</p>
+              <p className="text-[11px] font-medium text-[#ACB4BA]">Volume</p>
               <p className="mt-0.5 text-[14px] tabular-nums text-white" data-history-metric="volume">
                 {formatHistoryDetailMetric('volume', metrics.volume)}
               </p>
@@ -209,7 +209,7 @@ export function HistorySessionSheet({
           </div>
 
           {current.details?.kind === 'team' ? (
-            <p className="mt-3 text-[13px] text-[#AEAEB2]">
+            <p className="mt-3 text-[13px] text-[#ACB4BA]">
               {current.details.sessionType === 'match' ? 'Match' : 'Entraînement'}
               {current.details.minutesPlayed != null
                 ? ` · ${current.details.minutesPlayed} min jouées`
@@ -220,7 +220,7 @@ export function HistorySessionSheet({
           {current.details?.kind === 'endurance' &&
           Number.isFinite(current.details.distanceKm) &&
           current.details.distanceKm > 0 ? (
-            <p className="mt-3 text-[13px] text-[#AEAEB2]">
+            <p className="mt-3 text-[13px] text-[#ACB4BA]">
               Distance : {current.details.distanceKm} km
             </p>
           ) : null}
@@ -228,7 +228,7 @@ export function HistorySessionSheet({
           <section className="mt-4 min-h-0 flex-1" aria-label="Séries">
             <h3 className="text-[13px] font-semibold text-white">Séries</h3>
             {exercises.length === 0 ? (
-              <p className="mt-2 text-[13px] text-[#8E8E93]">—</p>
+              <p className="mt-2 text-[13px] text-[#ACB4BA]">—</p>
             ) : (
               <div className="mt-2 space-y-4">
                 {exercises.map((exercise) => {
@@ -238,14 +238,14 @@ export function HistorySessionSheet({
                   return (
                     <div key={exercise.id} data-history-exercise={exercise.id}>
                       {showHeading ? (
-                        <p className="mb-1.5 text-[13px] font-medium text-[#AEAEB2]">{exerciseName}</p>
+                        <p className="mb-1.5 text-[13px] font-medium text-[#ACB4BA]">{exerciseName}</p>
                       ) : null}
                       {exercise.sets.length === 0 ? (
-                        <p className="text-[13px] text-[#8E8E93]">—</p>
+                        <p className="text-[13px] text-[#ACB4BA]">—</p>
                       ) : (
                         <table className="w-full table-fixed border-collapse text-left">
                           <thead>
-                            <tr className="text-[11px] font-medium text-[#8E8E93]">
+                            <tr className="text-[11px] font-medium text-[#ACB4BA]">
                               <th scope="col" className="w-[18%] py-1 pr-2 font-medium">
                                 Série
                               </th>
@@ -267,7 +267,7 @@ export function HistorySessionSheet({
                                 className="border-t border-[#161618] text-[13px] text-white"
                                 data-history-set-row={`${exercise.id}-${idx}`}
                               >
-                                <td className="py-2 pr-2 tabular-nums text-[#AEAEB2]">{idx + 1}</td>
+                                <td className="py-2 pr-2 tabular-nums text-[#ACB4BA]">{idx + 1}</td>
                                 <td className="py-2 pr-2 tabular-nums" data-history-set="weight">
                                   {formatSetWeightLabel(metrics.kind, set.weightKg)}
                                 </td>

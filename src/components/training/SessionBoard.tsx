@@ -35,7 +35,7 @@ export function SessionBoard({ templates, onStart, onAddCustom }: SessionBoardPr
     <section className="space-y-3">
       <div className="flex items-center justify-between px-1">
         <div>
-          <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+          <p className="text-[12px] font-semibold uppercase tracking-wider text-[#ACB4BA]">
             Séances
           </p>
           <h2 className="text-[20px] font-bold text-white">Tes templates</h2>
@@ -43,7 +43,7 @@ export function SessionBoard({ templates, onStart, onAddCustom }: SessionBoardPr
         <button
           type="button"
           onClick={() => setCustomOpen(true)}
-          className="ios-press inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] font-semibold text-[#AEAEB2]"
+          className="ios-press inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] font-semibold text-[#ACB4BA]"
         >
           <Plus className="h-3.5 w-3.5" />
           Custom
@@ -69,8 +69,8 @@ export function SessionBoard({ templates, onStart, onAddCustom }: SessionBoardPr
               <Zap className="h-4 w-4" />
             </div>
             <p className="text-[18px] font-black tracking-tight text-white">{tpl.title}</p>
-            <p className="mt-0.5 text-[12px] text-[#8E8E93]">{tpl.subtitle}</p>
-            <p className="mt-2 line-clamp-2 text-[10px] leading-relaxed text-[#636366]">
+            <p className="mt-0.5 text-[12px] text-[#ACB4BA]">{tpl.subtitle}</p>
+            <p className="mt-2 line-clamp-2 text-[10px] leading-relaxed text-[#717C83]">
               {tpl.muscles.join(' · ')}
             </p>
             <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-white/80">
@@ -89,17 +89,17 @@ export function SessionBoard({ templates, onStart, onAddCustom }: SessionBoardPr
       >
         <div className="space-y-4 pb-2">
           <label className="block">
-            <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Nom</span>
+            <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">Nom</span>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ex. Pecs & triceps"
-              className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#636366] outline-none"
+              className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#717C83] outline-none"
             />
           </label>
           <div>
-            <p className="mb-2 text-[12px] font-semibold text-[#8E8E93]">Muscles</p>
+            <p className="mb-2 text-[12px] font-semibold text-[#ACB4BA]">Muscles</p>
             <div className="flex flex-wrap gap-1.5">
               {MUSCLE_PRESETS.map((m) => {
                 const on = muscles.includes(m)
@@ -110,8 +110,8 @@ export function SessionBoard({ templates, onStart, onAddCustom }: SessionBoardPr
                     onClick={() => toggleMuscle(m)}
                     className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
                       on
-                        ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-[#FF6961]'
-                        : 'border-white/10 text-[#8E8E93]'
+                        ? 'border-[#FF0702]/45 bg-[#FF0702]/20 text-[#FF907F]'
+                        : 'border-white/10 text-[#ACB4BA]'
                     }`}
                   >
                     {m}

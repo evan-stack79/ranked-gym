@@ -47,7 +47,7 @@ export function TrainingRecommendationCard({
       data-hero-image={imageSrc ? 'ready' : 'fallback'}
       aria-label={recommendation.name}
     >
-      <div className="relative isolate min-h-[200px] bg-[#1c1c1e]">
+      <div className="relative isolate min-h-[200px] bg-[#1d1f20]">
         {imageSrc ? (
           <img
             src={imageSrc}
@@ -57,7 +57,7 @@ export function TrainingRecommendationCard({
             className="absolute inset-0 h-full w-full object-cover object-center"
           />
         ) : (
-          <div className="absolute inset-0 bg-[#1c1c1e]" data-picker-thumb-fallback />
+          <div className="absolute inset-0 bg-[#1d1f20]" data-picker-thumb-fallback />
         )}
         <div
           className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3"
@@ -69,11 +69,11 @@ export function TrainingRecommendationCard({
             {recommendation.name}
           </h2>
           {muscleLine ? (
-            <p className="mt-1 text-[13px] font-medium text-[#AEAEB2]">{muscleLine}</p>
+            <p className="mt-1 text-[13px] font-medium text-[#ACB4BA]">{muscleLine}</p>
           ) : null}
           <p className="mt-2 text-[14px] leading-snug text-[#E5E5EA]">{recommendation.reasonText}</p>
           {metaParts.length > 0 ? (
-            <p className="mt-1 text-[12px] tabular-nums text-[#8E8E93]">{metaParts.join(' · ')}</p>
+            <p className="mt-1 text-[12px] tabular-nums text-[#ACB4BA]">{metaParts.join(' · ')}</p>
           ) : null}
         </div>
       </div>
@@ -82,19 +82,19 @@ export function TrainingRecommendationCard({
         <button
           type="button"
           onClick={onPrimary}
-          className="ios-press flex min-h-11 w-full items-center justify-center rounded-2xl bg-[#FF2B2B] px-4 text-[16px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/60"
+          className="ios-press flex min-h-11 w-full items-center justify-center rounded-2xl bg-[#FF0702] px-4 text-[16px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/60"
         >
           {cta}
         </button>
         {primaryLabel === 'start' ? (
-          <p className="mt-2 text-center text-[12px] leading-snug text-[#8E8E93]">
+          <p className="mt-2 text-center text-[12px] leading-snug text-[#ACB4BA]">
             Tu pourras compléter ta séance ensuite
           </p>
         ) : null}
         <button
           type="button"
           onClick={onDismiss}
-          className="ios-press mt-1 flex min-h-11 w-full items-center justify-center rounded-2xl px-4 text-[13px] font-medium text-[#8E8E93] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+          className="ios-press mt-1 flex min-h-11 w-full items-center justify-center rounded-2xl px-4 text-[13px] font-medium text-[#ACB4BA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
         >
           Pas pour moi
         </button>
