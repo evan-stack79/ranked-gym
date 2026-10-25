@@ -73,7 +73,7 @@ export function AccueilEditSheet({ open, prefs, onClose, onSave }: AccueilEditSh
           <button
             type="button"
             onClick={handleReset}
-            className="ios-press min-h-11 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-[14px] font-medium text-[#AEAEB2]"
+            className="ios-press min-h-11 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-[14px] font-medium text-[#ACB4BA]"
             data-accueil-edit-reset
           >
             Revenir à l&apos;accueil de départ
@@ -116,7 +116,7 @@ export function AccueilEditSheet({ open, prefs, onClose, onSave }: AccueilEditSh
 
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[15px] font-semibold text-white">{label}</p>
-                <p className="mt-0.5 text-[12px] text-[#8E8E93]">
+                <p className="mt-0.5 text-[12px] text-[#ACB4BA]">
                   {visible ? 'Affiché' : 'Masqué'}
                 </p>
               </div>
@@ -128,7 +128,7 @@ export function AccueilEditSheet({ open, prefs, onClose, onSave }: AccueilEditSh
                 aria-label={visible ? `Masquer ${label}` : `Afficher ${label}`}
                 onClick={() => setDraft(toggleAccueilWidgetHidden(draft, id))}
                 className={`relative h-8 w-[52px] shrink-0 overflow-hidden rounded-full ${
-                  visible ? 'bg-[#FF2B2B]' : 'bg-[#3A3A3C]'
+                  visible ? 'bg-[#FF0702]' : 'bg-[#3A3A3C]'
                 }`}
                 data-accueil-edit-toggle={id}
               >
@@ -148,13 +148,13 @@ export function AccueilEditSheet({ open, prefs, onClose, onSave }: AccueilEditSh
         data-accueil-edit-water-goal
       >
         <p className="text-[15px] font-semibold text-white">Objectif d&apos;eau</p>
-        <p className="mt-0.5 mb-3 text-[12px] text-[#8E8E93]">
+        <p className="mt-0.5 mb-3 text-[12px] text-[#ACB4BA]">
           Optionnel — sans objectif, la tuile Eau n&apos;affiche pas d&apos;anneau.
         </p>
         <WaterGoalChooser inputId="accueil-edit-sheet-water-goal" />
       </div>
 
-      <p className="px-1 pb-4 pt-3 text-[12px] leading-snug text-[#8E8E93]">
+      <p className="px-1 pb-4 pt-3 text-[12px] leading-snug text-[#ACB4BA]">
         Pas de calories, poids ou mesures du corps sur l&apos;Accueil.
       </p>
     </IosSheet>

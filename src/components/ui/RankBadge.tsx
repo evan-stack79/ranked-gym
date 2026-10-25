@@ -25,7 +25,7 @@ export function RankBadge({ rank, level, size = 'md' }: RankBadgeProps) {
         <Trophy className="h-3 w-3" />
         {rank}
       </span>
-      <span className="text-sm text-[#8E8E93]">
+      <span className="text-sm text-[#ACB4BA]">
         Niv. <span className="font-semibold text-white">{level}</span>
       </span>
     </div>

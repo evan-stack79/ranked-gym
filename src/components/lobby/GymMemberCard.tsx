@@ -27,7 +27,7 @@ export function GymMemberCard({ member }: GymMemberCardProps) {
           <Avatar
             username={member.username}
             size="md"
-            className="ring-2 ring-[#FF2B2B]/35"
+            className="ring-2 ring-[#FF0702]/35"
           />
         </div>
 
@@ -43,7 +43,7 @@ export function GymMemberCard({ member }: GymMemberCardProps) {
             <span className="min-w-0 truncate font-medium">{member.currentExercise}</span>
           </p>
           {member.disciplineLabel && (
-            <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#8E8E93]">
+            <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#ACB4BA]">
               {member.disciplineLabel}
             </p>
           )}
@@ -67,14 +67,14 @@ export function GymMemberList({ members, gymName }: GymMemberListProps) {
         className="mb-4 overflow-hidden rounded-2xl border border-white/10 px-4 py-3.5"
         style={{
           background:
-            'radial-gradient(ellipse 70% 120% at 100% 0%, rgb(255 43 43 / 0.2) 0%, transparent 55%), rgb(28 28 30 / 0.9)',
+            'radial-gradient(ellipse 70% 120% at 100% 0%, rgb(255 7 2 / 0.2) 0%, transparent 55%), rgb(28 28 30 / 0.9)',
         }}
       >
         <div className="flex items-center gap-3">
           <IconBadge icon={MapPin} variant="crimson" size="sm" />
           <div className="min-w-0 flex-1">
             <h2 className="truncate font-bold tracking-tight text-white">{gymName}</h2>
-            <p className="text-[13px] text-[#8E8E93]">
+            <p className="text-[13px] text-[#ACB4BA]">
               <span className="font-semibold text-white">{members.length}</span> personne
               {members.length > 1 ? 's' : ''} présente{members.length > 1 ? 's' : ''}
             </p>

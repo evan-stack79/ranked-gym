@@ -122,7 +122,7 @@ function HomeDashboardView({
         <h1 className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white">
           <TextFlip /><BlurInText as="span" instant={coldEntering} label={`, ${firstName} ?`}>{`, ${firstName} ?`}</BlurInText>
         </h1>
-        <p className="mt-1.5 text-[15px] font-medium text-[#AEAEB2]">
+        <p className="mt-1.5 text-[15px] font-medium text-[#ACB4BA]">
           <SoftBlurIn instant={coldEntering}>{subtitle}</SoftBlurIn>
         </p>
       </header>

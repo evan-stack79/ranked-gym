@@ -10,6 +10,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Local CAPBridgedPlugin types (CameraHeartRate, SecureStorage,
         // RestTimerLiveActivity) are compiled into the App target under Plugins/
         // and auto-registered by Capacitor. Do not add a second plugin implementation.
+        window?.backgroundColor = RankedPalette.background
+        window?.overrideUserInterfaceStyle = .dark
         return true
     }
 

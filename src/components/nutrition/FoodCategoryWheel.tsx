@@ -198,7 +198,7 @@ export function FoodCategoryWheel({ value, onChange }: FoodCategoryWheelProps) {
         style={{
           transform: 'translateY(36px)',
           background:
-            'radial-gradient(ellipse 55% 100% at 50% 0%, rgb(255 43 43 / 0.1) 0%, transparent 72%)',
+            'radial-gradient(ellipse 55% 100% at 50% 0%, rgb(255 7 2 / 0.1) 0%, transparent 72%)',
         }}
         aria-hidden
       />
@@ -233,11 +233,11 @@ export function FoodCategoryWheel({ value, onChange }: FoodCategoryWheelProps) {
             >
               <span
                 className={`text-[14px] font-semibold tracking-tight ${
-                  selected ? 'text-white' : 'text-[#AEAEB2]'
+                  selected ? 'text-white' : 'text-[#ACB4BA]'
                 }`}
                 style={
                   selected
-                    ? { textShadow: '0 0 16px rgb(255 43 43 / 0.4)' }
+                    ? { textShadow: '0 0 16px rgb(255 7 2 / 0.4)' }
                     : undefined
                 }
               >
@@ -245,8 +245,8 @@ export function FoodCategoryWheel({ value, onChange }: FoodCategoryWheelProps) {
               </span>
               {selected ? (
                 <span
-                  className="mt-1.5 h-1 w-1 rounded-full bg-[#FF2B2B]"
-                  style={{ boxShadow: '0 0 10px 2px rgb(255 43 43 / 0.5)' }}
+                  className="mt-1.5 h-1 w-1 rounded-full bg-[#FF0702]"
+                  style={{ boxShadow: '0 0 10px 2px rgb(255 7 2 / 0.5)' }}
                   aria-hidden
                 />
               ) : (

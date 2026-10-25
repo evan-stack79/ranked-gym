@@ -479,12 +479,12 @@ export function NumberWheel({
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 z-10 h-[72px]"
-          style={{ background: 'linear-gradient(to bottom, #0c0c0e 5%, transparent)' }}
+          style={{ background: 'linear-gradient(to bottom, #000000 5%, transparent)' }}
         />
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[72px]"
-          style={{ background: 'linear-gradient(to top, #0c0c0e 5%, transparent)' }}
+          style={{ background: 'linear-gradient(to top, #000000 5%, transparent)' }}
         />
 
         {editing ? (
@@ -570,7 +570,7 @@ export function NumberWheel({
               const opacity = isCenter ? 1 : Math.max(0.14, 0.58 - dist * 0.2)
               const scale = isCenter ? 1 : Math.max(0.52, 1 - dist * 0.2)
               const fontSize = isCenter ? 64 : Math.max(22, 42 - dist * 10)
-              const color = isCenter ? '#ffffff' : '#636366'
+              const color = isCenter ? '#ffffff' : '#717C83'
               const pulse = isCenter && tickPulse > 0 && !reduced ? 1.04 : 1
               // Center shows the live value (e.g. typed « 70,5 ») even when off-step;
               // a later spin snaps to the nearest wheel step (integers when step=1).
@@ -619,7 +619,7 @@ export function NumberWheel({
       </div>
       {keypadError ? (
         <p
-          className="mt-2 text-center text-[13px] text-[#FF6961]"
+          className="mt-2 text-center text-[13px] text-[#FF907F]"
           role="alert"
           data-testid="number-wheel-error"
         >

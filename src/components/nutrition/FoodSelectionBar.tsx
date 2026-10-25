@@ -45,7 +45,7 @@ export function FoodSelectionBar({
             {thumbs.map((hit) => (
               <div
                 key={`${hit.barcode}-${hit.nom}`}
-                className="overflow-hidden rounded-full border border-[#1C1C1E] bg-[#2C2C2E]"
+                className="overflow-hidden rounded-full border border-[#1D1F20] bg-[#25282A]"
               >
                 <OffProductImage
                   src={hit.imageUrl}
@@ -63,7 +63,7 @@ export function FoodSelectionBar({
           onClick={onValidate}
           disabled={disabled}
           aria-label="Valider la sélection"
-          className="ios-press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#FF2B2B] text-white disabled:opacity-40"
+          className="ios-press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#FF0702] text-white disabled:opacity-40"
         >
           <Check className="h-5 w-5" strokeWidth={2.5} aria-hidden />
         </button>

@@ -33,7 +33,7 @@ export function CreateLobbyPanel({ onCreate, disabled = false }: CreateLobbyPane
           <span className="block text-[15px] font-semibold text-white">
             Mon spot n&apos;y est pas ? Créer un Lobby
           </span>
-          <span className="mt-0.5 block text-[13px] text-[#8E8E93]">
+          <span className="mt-0.5 block text-[13px] text-[#ACB4BA]">
             Lance un lobby perso avec des rivaux simulés
           </span>
         </span>
@@ -52,7 +52,7 @@ export function CreateLobbyPanel({ onCreate, disabled = false }: CreateLobbyPane
         placeholder="Piste municipale, Terrain synthétique…"
         disabled={disabled}
         autoFocus
-        className="w-full rounded-xl border border-white/5 bg-ios-inset px-4 py-3 text-[17px] text-white placeholder:text-[#48484A] focus:outline-none disabled:opacity-50"
+        className="w-full rounded-xl border border-white/5 bg-ios-inset px-4 py-3 text-[17px] text-white placeholder:text-[#596166] focus:outline-none disabled:opacity-50"
       />
 
       <div className="mt-3 flex gap-2">
@@ -62,7 +62,7 @@ export function CreateLobbyPanel({ onCreate, disabled = false }: CreateLobbyPane
             setExpanded(false)
             setGymName('')
           }}
-          className="flex-1 rounded-xl border border-white/5 bg-ios-inset py-3 text-[15px] font-medium text-[#8E8E93]"
+          className="flex-1 rounded-xl border border-white/5 bg-ios-inset py-3 text-[15px] font-medium text-[#ACB4BA]"
         >
           Annuler
         </button>

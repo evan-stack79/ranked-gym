@@ -309,7 +309,7 @@ export function ScannedProductSheet({
   const footer = (
     <div className="space-y-2">
       {disabledReason ? (
-        <p className="text-center text-[13px] text-[#AEAEB2]" role="status">
+        <p className="text-center text-[13px] text-[#ACB4BA]" role="status">
           {disabledReason}
         </p>
       ) : null}
@@ -321,7 +321,7 @@ export function ScannedProductSheet({
       >
         Ajouter au journal
       </button>
-      <p className="text-center text-[11px] text-[#636366]">Source : Open Food Facts</p>
+      <p className="text-center text-[11px] text-[#717C83]">Source : Open Food Facts</p>
     </div>
   )
 
@@ -331,12 +331,12 @@ export function ScannedProductSheet({
       onClose={onClose}
       title={product.nom}
       subtitle={subtitle}
-      leading={<UtensilsCrossed className="mt-0.5 h-5 w-5 text-[#AEAEB2]" />}
+      leading={<UtensilsCrossed className="mt-0.5 h-5 w-5 text-[#ACB4BA]" />}
       footer={footer}
     >
       <div className="space-y-5 pb-2">
         {isFollowUp ? (
-          <p className="text-[13px] text-[#AEAEB2]">
+          <p className="text-[13px] text-[#ACB4BA]">
             Déjà noté sur ce repas :{' '}
             <span className="font-semibold text-white">{formatFrInteger(used)} kcal</span>
             {foodsAlready.some((f) => f.name) ? (
@@ -350,7 +350,7 @@ export function ScannedProductSheet({
 
         {caloriesMissing && product.calories !== 0 ? (
           <div className="space-y-2 rounded-2xl border border-white/10 bg-black/25 px-3.5 py-3">
-            <p className="text-[13px] text-[#AEAEB2]">
+            <p className="text-[13px] text-[#ACB4BA]">
               Les calories de ce produit ne sont pas renseignées.
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -364,7 +364,7 @@ export function ScannedProductSheet({
                 </button>
               ) : null}
               <label className="block min-w-0 flex-1">
-                <span className="mb-1 block text-[12px] font-semibold text-[#8E8E93]">
+                <span className="mb-1 block text-[12px] font-semibold text-[#ACB4BA]">
                   Ou indique les kcal ici
                 </span>
                 <ClearableNumberInput
@@ -398,7 +398,7 @@ export function ScannedProductSheet({
                   className={`ios-press flex min-h-12 items-center gap-2 rounded-2xl border px-3 py-3 text-left ${
                     active
                       ? 'border-white/35 bg-white/[0.12] text-white'
-                      : 'border-white/10 bg-black/25 text-[#8E8E93]'
+                      : 'border-white/10 bg-black/25 text-[#ACB4BA]'
                   }`}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
@@ -426,7 +426,7 @@ export function ScannedProductSheet({
                 >
                   −
                 </button>
-                <div className="flex min-w-0 flex-1 items-end gap-2 rounded-2xl border border-white/10 bg-[#1C1C1E] px-3 py-2">
+                <div className="flex min-w-0 flex-1 items-end gap-2 rounded-2xl border border-white/10 bg-[#1D1F20] px-3 py-2">
                   <ClearableNumberInput
                     value={grams}
                     onChange={setGrams}
@@ -441,7 +441,7 @@ export function ScannedProductSheet({
                     aria-label="Quantité en grammes"
                     className="relative z-[1] w-full bg-transparent text-[28px] font-bold tracking-tight text-white outline-none"
                   />
-                  <span className="pb-1 text-[15px] font-medium text-[#8E8E93]">g</span>
+                  <span className="pb-1 text-[15px] font-medium text-[#ACB4BA]">g</span>
                 </div>
                 <button
                   type="button"
@@ -464,7 +464,7 @@ export function ScannedProductSheet({
                     className={`ios-press min-h-11 min-w-[4.5rem] rounded-2xl border px-3 text-[14px] font-semibold ${
                       grams === qty
                         ? 'border-white/35 bg-white/[0.12] text-white'
-                        : 'border-white/10 bg-black/25 text-[#AEAEB2]'
+                        : 'border-white/10 bg-black/25 text-[#ACB4BA]'
                     }`}
                   >
                     {qty} g
@@ -476,7 +476,7 @@ export function ScannedProductSheet({
                 <button
                   type="button"
                   onClick={() => setShowPieces(true)}
-                  className="ios-press flex min-h-11 items-center gap-2 text-[13px] font-semibold text-[#AEAEB2] underline"
+                  className="ios-press flex min-h-11 items-center gap-2 text-[13px] font-semibold text-[#ACB4BA] underline"
                 >
                   <Hash className="h-4 w-4" />
                   Compter en pièces
@@ -484,9 +484,9 @@ export function ScannedProductSheet({
               ) : null}
             </div>
           ) : (
-            <div className="space-y-3 rounded-2xl border border-white/10 bg-[#1C1C1E] p-4">
+            <div className="space-y-3 rounded-2xl border border-white/10 bg-[#1D1F20] p-4">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-[13px] text-[#AEAEB2]">
+                <p className="text-[13px] text-[#ACB4BA]">
                   {PIECE_KIND_LABELS[pieceKind]} · compte les pièces
                 </p>
                 <button
@@ -508,7 +508,7 @@ export function ScannedProductSheet({
                   className={`ios-press min-h-11 rounded-xl border px-2.5 text-[13px] font-semibold ${
                     pieceMode === 'pack'
                       ? 'border-white/25 bg-white/12 text-white'
-                      : 'border-white/8 bg-transparent text-[#8E8E93]'
+                      : 'border-white/8 bg-transparent text-[#ACB4BA]'
                   }`}
                 >
                   D’après la boîte
@@ -519,7 +519,7 @@ export function ScannedProductSheet({
                   className={`ios-press min-h-11 rounded-xl border px-2.5 text-[13px] font-semibold ${
                     pieceMode === 'typical'
                       ? 'border-white/25 bg-white/12 text-white'
-                      : 'border-white/8 bg-transparent text-[#8E8E93]'
+                      : 'border-white/8 bg-transparent text-[#ACB4BA]'
                   }`}
                 >
                   Estimation typique
@@ -529,7 +529,7 @@ export function ScannedProductSheet({
               {pieceMode === 'pack' ? (
                 <div className="grid grid-cols-2 gap-3">
                   <label className="block">
-                    <span className="text-[12px] font-semibold text-[#8E8E93]">
+                    <span className="text-[12px] font-semibold text-[#ACB4BA]">
                       Poids de la boîte
                     </span>
                     <div className="mt-1 flex items-end gap-1 border-b border-white/10 pb-1">
@@ -544,11 +544,11 @@ export function ScannedProductSheet({
                         aria-label="Poids de la boîte en grammes"
                         className="w-full bg-transparent text-[22px] font-bold text-white outline-none"
                       />
-                      <span className="pb-0.5 text-[12px] text-[#8E8E93]">g</span>
+                      <span className="pb-0.5 text-[12px] text-[#ACB4BA]">g</span>
                     </div>
                   </label>
                   <label className="block">
-                    <span className="text-[12px] font-semibold text-[#8E8E93]">
+                    <span className="text-[12px] font-semibold text-[#ACB4BA]">
                       Pièces dans la boîte
                     </span>
                     <div className="mt-1 border-b border-white/10 pb-1">
@@ -567,13 +567,13 @@ export function ScannedProductSheet({
                   </label>
                 </div>
               ) : (
-                <p className="text-[13px] text-[#AEAEB2]">
+                <p className="text-[13px] text-[#ACB4BA]">
                   ≈ {TYPICAL_GRAMS_PER_PIECE[pieceKind]} g par pièce (moyenne).
                 </p>
               )}
 
               <label className="block">
-                <span className="text-[12px] font-semibold text-[#8E8E93]">
+                <span className="text-[12px] font-semibold text-[#ACB4BA]">
                   Combien tu manges ?
                 </span>
                 <div className="mt-1 flex items-end gap-2 border-b border-white/10 pb-1">
@@ -589,12 +589,12 @@ export function ScannedProductSheet({
                     aria-label="Nombre de pièces mangées"
                     className="w-full bg-transparent text-[28px] font-bold tracking-tight text-white outline-none"
                   />
-                  <span className="pb-1 text-[14px] text-[#8E8E93]">pièces</span>
+                  <span className="pb-1 text-[14px] text-[#ACB4BA]">pièces</span>
                 </div>
               </label>
 
               {computedPieceGrams != null ? (
-                <p className="text-[13px] text-[#AEAEB2]">
+                <p className="text-[13px] text-[#ACB4BA]">
                   ≈{' '}
                   <span className="font-semibold text-white">
                     {formatFrInteger(Math.round(computedPieceGrams))} g
@@ -605,7 +605,7 @@ export function ScannedProductSheet({
           )}
 
           {qtyError && effectiveGrams != null ? (
-            <p className="mt-2 text-[13px] text-[#AEAEB2]" role="status">
+            <p className="mt-2 text-[13px] text-[#ACB4BA]" role="status">
               {qtyError}
             </p>
           ) : null}
@@ -618,19 +618,19 @@ export function ScannedProductSheet({
               <p className="text-[16px] font-semibold text-white">
                 ≈ {formatFrInteger(nutrition.calories)} kcal
               </p>
-              <p className="text-[13px] text-[#AEAEB2]">
+              <p className="text-[13px] text-[#ACB4BA]">
                 Protéines {formatMacroG(nutrition.proteines)} · Glucides{' '}
                 {formatMacroG(nutrition.glucides)} · Lipides {formatMacroG(nutrition.lipides)}
               </p>
             </>
           ) : (
-            <p className="text-[13px] text-[#AEAEB2]">
+            <p className="text-[13px] text-[#ACB4BA]">
               Le résultat s’affiche dès qu’une quantité est saisie.
             </p>
           )}
 
           {hasMealTargets && nutrition ? (
-            <p className="text-[13px] text-[#8E8E93]">
+            <p className="text-[13px] text-[#ACB4BA]">
               Repère indicatif pour ce repas : environ {formatFrInteger(budget)} kcal. Avec cet
               aliment : {formatFrInteger(used + nutrition.calories)} kcal.
             </p>
@@ -640,14 +640,14 @@ export function ScannedProductSheet({
             <button
               type="button"
               onClick={() => setGrams(suggested)}
-              className="ios-press mt-1 min-h-11 rounded-2xl border border-white/15 bg-white/[0.06] px-3 py-2 text-left text-[13px] font-semibold text-[#AEAEB2]"
+              className="ios-press mt-1 min-h-11 rounded-2xl border border-white/15 bg-white/[0.06] px-3 py-2 text-left text-[13px] font-semibold text-[#ACB4BA]"
             >
               Portion repère : {formatFrInteger(suggested)} g
             </button>
           ) : null}
 
           {dateLabel ? (
-            <p className="pt-1 text-[13px] text-[#8E8E93]">Ajouté à : {dateLabel}</p>
+            <p className="pt-1 text-[13px] text-[#ACB4BA]">Ajouté à : {dateLabel}</p>
           ) : null}
         </div>
       </div>

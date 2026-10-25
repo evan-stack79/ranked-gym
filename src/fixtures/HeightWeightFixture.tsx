@@ -28,7 +28,7 @@ export function HeightWeightFixture() {
   // Seed interactive defaults for spin demo / lb / height tabs via DOM hooks
   return (
     <div
-      className="min-h-[100dvh] bg-[#0c0c0e] px-4 pb-10 pt-8 text-white"
+      className="min-h-[100dvh] bg-[#000000] px-4 pb-10 pt-8 text-white"
       data-height-weight-fixture="1"
       data-mode={initialMode}
       data-unit-pref={unitPref}

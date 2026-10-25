@@ -24,7 +24,7 @@ function RatingRow({ rating, total }: { rating: number; total?: number }) {
       <span className="font-semibold text-[#FFD60A]">{rating.toFixed(1)}</span>
       <Star className="h-3.5 w-3.5 fill-[#FFD60A] text-[#FFD60A]" />
       {total != null && (
-        <span className="text-[#8E8E93]">({total.toLocaleString('fr-FR')})</span>
+        <span className="text-[#ACB4BA]">({total.toLocaleString('fr-FR')})</span>
       )}
     </p>
   )
@@ -49,7 +49,7 @@ export function NearbyGymCard({
           <div className="flex items-center gap-2">
             <h3 className="truncate font-semibold tracking-tight text-white">{gym.name}</h3>
             {gym.isCustom && (
-              <span className="shrink-0 rounded-md border border-white/5 bg-ios-inset px-1.5 py-0.5 text-[10px] font-medium text-[#8E8E93]">
+              <span className="shrink-0 rounded-md border border-white/5 bg-ios-inset px-1.5 py-0.5 text-[10px] font-medium text-[#ACB4BA]">
                 Perso
               </span>
             )}
@@ -60,14 +60,14 @@ export function NearbyGymCard({
           )}
 
           {gym.address && (
-            <p className="mt-1.5 flex items-start gap-1.5 text-[13px] leading-snug text-[#8E8E93]">
-              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#FF2B2B]/80" />
+            <p className="mt-1.5 flex items-start gap-1.5 text-[13px] leading-snug text-[#ACB4BA]">
+              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#FF0702]/80" />
               <span className="line-clamp-2">{gym.address}</span>
             </p>
           )}
 
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1 text-[13px] text-[#8E8E93]">
+            <span className="inline-flex items-center gap-1 text-[13px] text-[#ACB4BA]">
               <Navigation className="h-3 w-3" />
               {gym.isCustom
                 ? 'Sur place'
@@ -82,14 +82,14 @@ export function NearbyGymCard({
                   À portée
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 text-[13px] text-[#48484A]">
+                <span className="inline-flex items-center gap-1.5 text-[13px] text-[#596166]">
                   <Lock className="h-3 w-3" />
                   &gt; {CHECK_IN_RADIUS_METERS} m
                   <button
                     type="button"
                     disabled={isCheckingIn}
                     onClick={() => onCheckIn(gym, { force: true })}
-                    className="ml-0.5 text-[11px] font-medium text-[#636366] underline decoration-[#48484A] underline-offset-2 transition-colors active:text-[#AEAEB2] disabled:opacity-40"
+                    className="ml-0.5 text-[11px] font-medium text-[#717C83] underline decoration-[#596166] underline-offset-2 transition-colors active:text-[#ACB4BA] disabled:opacity-40"
                   >
                     Force Check-in
                   </button>
@@ -114,7 +114,7 @@ export function NearbyGymCard({
       )}
 
       {isLocked && isThisCheckingIn && (
-        <p className="mt-3 text-center text-[12px] text-[#8E8E93]">Entrée en lobby…</p>
+        <p className="mt-3 text-center text-[12px] text-[#ACB4BA]">Entrée en lobby…</p>
       )}
     </article>
   )
@@ -143,7 +143,7 @@ export function NearbyGymList({
     <section>
       <div className="mb-3 flex items-center justify-between px-1">
         <h2 className="ios-label">Spots de sport à proximité</h2>
-        <span className="text-[13px] text-[#8E8E93]">{gyms.length}</span>
+        <span className="text-[13px] text-[#ACB4BA]">{gyms.length}</span>
       </div>
 
       <div className="-mx-1 mb-4 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -157,8 +157,8 @@ export function NearbyGymList({
                 onClick={() => setSortMode(id)}
                 className={`shrink-0 rounded-full border px-3.5 py-2 text-[13px] font-semibold transition-all ${
                   active
-                    ? 'border-[#FF2B2B]/50 bg-[#FF2B2B]/20 text-[#FF5C5C] shadow-[0_0_12px_rgb(255_43_43_/_0.2)]'
-                    : 'border-white/10 bg-black/20 text-[#8E8E93] active:bg-white/5'
+                    ? 'border-[#FF0702]/50 bg-[#FF0702]/20 text-[#FF907F] shadow-[0_0_12px_rgb(255_7_2_/_0.2)]'
+                    : 'border-white/10 bg-black/20 text-[#ACB4BA] active:bg-white/5'
                 }`}
                 aria-pressed={active}
               >

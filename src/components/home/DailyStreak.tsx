@@ -64,12 +64,12 @@ export function DailyStreak() {
             boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.04)',
           }}
         >
-          <Flame className="h-7 w-7 shrink-0 text-[#636366]" strokeWidth={2.25} />
+          <Flame className="h-7 w-7 shrink-0 text-[#717C83]" strokeWidth={2.25} />
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#AEAEB2]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#ACB4BA]">
               Série quotidienne
             </p>
-            <p className="mt-0.5 text-[15px] font-semibold text-[#AEAEB2]">
+            <p className="mt-0.5 text-[15px] font-semibold text-[#ACB4BA]">
               Connecte-toi pour allumer ta flamme
             </p>
           </div>
@@ -91,7 +91,7 @@ export function DailyStreak() {
       <div
         className={`streak-card relative overflow-hidden rounded-2xl border px-4 py-3.5 transition-all duration-500 ${
           lit && !calmStreak
-            ? `border-[#FF2B2B]/45 ${weekGlow ? 'streak-card--jackpot' : 'streak-card--lit'}`
+            ? `border-[#FF0702]/45 ${weekGlow ? 'streak-card--jackpot' : 'streak-card--lit'}`
             : 'border-white/10'
         }`}
         style={
@@ -99,7 +99,7 @@ export function DailyStreak() {
             ? {
                 background: 'var(--color-card)',
                 boxShadow: weekGlow
-                  ? 'inset 0 1px 0 rgb(255 255 255 / 0.08), 0 0 0 1px rgb(255 43 43 / 0.28)'
+                  ? 'inset 0 1px 0 rgb(255 255 255 / 0.08), 0 0 0 1px rgb(255 7 2 / 0.28)'
                   : 'inset 0 1px 0 rgb(255 255 255 / 0.04)',
               }
             : {
@@ -112,8 +112,8 @@ export function DailyStreak() {
           <Flame
             className={`h-8 w-8 shrink-0 transition-colors duration-300 ${
               lit && !calmStreak
-                ? `text-[#FF2B2B] ${bump ? 'streak-flame--pop' : ''}`
-                : 'text-[#636366]'
+                ? `text-[#FF0702] ${bump ? 'streak-flame--pop' : ''}`
+                : 'text-[#717C83]'
             }`}
             strokeWidth={2.25}
             fill={lit && !calmStreak ? 'currentColor' : 'none'}
@@ -123,10 +123,10 @@ export function DailyStreak() {
           <div className="min-w-0 flex-1">
             {calmStreak ? (
               <>
-                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#AEAEB2]">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#ACB4BA]">
                   Série
                 </p>
-                <p className="mt-0.5 text-[16px] font-semibold leading-snug text-[#AEAEB2]">
+                <p className="mt-0.5 text-[16px] font-semibold leading-snug text-[#ACB4BA]">
                   {currentStreak > 0 ? `${displayStreak} jour${displayStreak > 1 ? 's' : ''}` : '—'}
                 </p>
               </>
@@ -141,17 +141,17 @@ export function DailyStreak() {
                   }`}
                 >
                   {displayStreak}{' '}
-                  <span className="text-[18px] font-bold text-[#FF2B2B]">
+                  <span className="text-[18px] font-bold text-[#FF0702]">
                     Jour{displayStreak > 1 ? 's' : ''} de feu
                   </span>
                 </p>
               </>
             ) : (
               <>
-                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#AEAEB2]">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#ACB4BA]">
                   Série · {currentStreak} j
                 </p>
-                <p className="mt-0.5 text-[16px] font-semibold leading-snug text-[#AEAEB2]">
+                <p className="mt-0.5 text-[16px] font-semibold leading-snug text-[#ACB4BA]">
                   {currentStreak > 0
                     ? 'Maintiens ta série — reviens demain !'
                     : 'Ouvre l’app demain pour enchaîner'}
@@ -175,7 +175,7 @@ export function DailyStreak() {
           style={{
             background:
               'radial-gradient(ellipse 80% 100% at 50% 0%, rgb(255 214 10 / 0.28) 0%, transparent 60%), rgb(28 28 30 / 0.95)',
-            boxShadow: '0 0 36px rgb(255 43 43 / 0.35), inset 0 1px 0 rgb(255 255 255 / 0.1)',
+            boxShadow: '0 0 36px rgb(255 7 2 / 0.35), inset 0 1px 0 rgb(255 255 255 / 0.1)',
           }}
           role="status"
         >
@@ -186,7 +186,7 @@ export function DailyStreak() {
               <p className="text-[15px] font-black tracking-tight text-white">
                 Semaine parfaite ! +{bonusFlash.bonusXp || STREAK_WEEK_BONUS_XP} XP bonus
               </p>
-              <p className="mt-0.5 text-[12px] text-[#AEAEB2]">
+              <p className="mt-0.5 text-[12px] text-[#ACB4BA]">
                 {bonusFlash.streak} jours de feu — continue comme ça.
               </p>
             </div>

@@ -35,11 +35,11 @@ export function CloudBackupCard() {
       <section className="glass-card rounded-2xl p-4">
         <div className="flex items-start gap-3">
           <div className="rounded-xl bg-white/8 p-2.5">
-            <CloudOff className="h-5 w-5 text-[#8E8E93]" />
+            <CloudOff className="h-5 w-5 text-[#ACB4BA]" />
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[16px] font-semibold text-white">Sauvegarde auto</p>
-            <p className="mt-1 text-[13px] leading-snug text-[#8E8E93]">
+            <p className="mt-1 text-[13px] leading-snug text-[#ACB4BA]">
               Connecte-toi pour sauvegarder nutrition, entraînements et profil.
               Même si le lien de l’app change, ta progression revient au login.
             </p>
@@ -64,14 +64,14 @@ export function CloudBackupCard() {
       <div className="flex items-start gap-3">
         <div className={`rounded-xl p-2.5 ${ok ? 'bg-[#30D158]/15' : 'bg-white/8'}`}>
           {saving ? (
-            <Loader2 className="h-5 w-5 animate-spin text-[#8E8E93]" />
+            <Loader2 className="h-5 w-5 animate-spin text-[#ACB4BA]" />
           ) : (
-            <Cloud className={`h-5 w-5 ${ok ? 'text-[#30D158]' : 'text-[#8E8E93]'}`} />
+            <Cloud className={`h-5 w-5 ${ok ? 'text-[#30D158]' : 'text-[#ACB4BA]'}`} />
           )}
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-[16px] font-semibold text-white">Sauvegarde auto</p>
-          <p className="mt-1 text-[13px] leading-snug text-[#8E8E93]">
+          <p className="mt-1 text-[13px] leading-snug text-[#ACB4BA]">
             {saving
               ? 'Sauvegarde en cours…'
               : `Sauvegarde active. Dernière mise à jour : ${formatWhen(meta.lastPushAt)}.`}

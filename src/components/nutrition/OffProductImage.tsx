@@ -91,7 +91,7 @@ export function OffProductImage({
         />
       ) : (
         <span
-          className="flex h-full w-full items-center justify-center rounded-2xl bg-[#2C2C2E] text-[#8E8E93]"
+          className="flex h-full w-full items-center justify-center rounded-2xl bg-[#25282A] text-[#ACB4BA]"
           aria-hidden
         >
           <Apple className="h-[42%] w-[42%]" strokeWidth={1.75} />

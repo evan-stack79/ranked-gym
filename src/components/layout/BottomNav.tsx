@@ -51,11 +51,11 @@ export function BottomNav({
     <button
       type="button"
       onClick={onStartTraining}
-      className="ios-press flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[#AEAEB2] transition-colors duration-150"
+      className="ios-press flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[#ACB4BA] transition-colors duration-150"
       aria-label={hasActiveWorkout ? 'Reprendre' : 'Nouvelle séance'}
       data-nav-center={hasActiveWorkout ? 'resume' : 'new'}
     >
-      <span className={`flex items-center justify-center rounded-full border-4 border-[#171719] bg-[#FF2B2B] text-white transition-[height,width] duration-180 motion-reduce:transition-none ${compact ? 'h-12 w-12 -mt-1' : 'h-14 w-14 -mt-5'}`}>
+      <span className={`flex items-center justify-center rounded-full border-4 border-[#171719] bg-[#FF0702] text-white transition-[height,width] duration-180 motion-reduce:transition-none ${compact ? 'h-12 w-12 -mt-1' : 'h-14 w-14 -mt-5'}`}>
         <Play className="ml-0.5 h-5 w-5 fill-current" strokeWidth={2.25} aria-hidden="true" />
       </span>
       <span className={labelClass}>{hasActiveWorkout ? 'Reprendre' : 'Nouvelle séance'}</span>
@@ -84,7 +84,7 @@ export function BottomNav({
               key={id}
               type="button"
               onClick={() => onTabChange(id)}
-              className={`ios-press flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 transition-colors duration-150 ${isActive ? 'text-[#FF2B2B]' : 'text-[#AEAEB2]'}`}
+              className={`ios-press flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 transition-colors duration-150 ${isActive ? 'text-[#FF0702]' : 'text-[#ACB4BA]'}`}
               aria-current={isActive ? 'page' : undefined}
               aria-label={label}
             >
@@ -157,7 +157,7 @@ function FloatingPillBottomNav({
       aria-label={hasActiveWorkout ? 'Reprendre' : 'Nouvelle séance'}
       data-nav-center={hasActiveWorkout ? 'resume' : 'new'}
     >
-      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#FF2B2B] text-white shadow-[0_6px_18px_rgb(255_43_43_/_0.45)] ring-4 ring-[#0C0C0E]/55">
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#FF0702] text-white shadow-[0_6px_18px_rgb(255_7_2_/_0.45)] ring-4 ring-[#000000]/55">
         <Play className="ml-0.5 h-5 w-5 fill-current" strokeWidth={2.25} aria-hidden="true" />
       </span>
     </button>
@@ -196,7 +196,7 @@ function FloatingPillBottomNav({
               }}
               onClick={() => onTabChange(id)}
               className={`ios-press bottom-nav-pill__tab relative z-[1] flex h-11 min-h-11 min-w-11 flex-1 items-center justify-center rounded-full px-1 transition-colors duration-150 motion-reduce:transition-none ${
-                isActive ? 'text-[#FF2B2B]' : 'text-[#EBEBF5]'
+                isActive ? 'text-[#FF0702]' : 'text-[#EBEBF5]'
               }`}
               aria-current={isActive ? 'page' : undefined}
               aria-label={label}

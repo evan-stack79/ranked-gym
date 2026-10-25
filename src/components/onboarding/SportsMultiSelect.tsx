@@ -35,14 +35,14 @@ export function SportsMultiSelect({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3" data-sports-multi-select>
       <label className="flex min-h-11 items-center gap-2 rounded-2xl border border-white/10 bg-[#141416] px-3.5">
-        <Search className="h-4 w-4 text-[#8E8E93]" aria-hidden="true" />
+        <Search className="h-4 w-4 text-[#ACB4BA]" aria-hidden="true" />
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Rechercher un sport"
           aria-label="Rechercher un sport"
-          className="min-h-11 w-full bg-transparent text-[15px] text-white placeholder:text-[#636366] outline-none"
+          className="min-h-11 w-full bg-transparent text-[15px] text-white placeholder:text-[#717C83] outline-none"
         />
       </label>
 
@@ -53,11 +53,11 @@ export function SportsMultiSelect({
               <button
                 type="button"
                 onClick={() => toggle(sport)}
-                className="ios-press flex min-h-11 items-center gap-1.5 rounded-full border border-white/12 bg-[#1c1c1e] px-3 text-[13px] font-semibold text-white"
+                className="ios-press flex min-h-11 items-center gap-1.5 rounded-full border border-white/12 bg-[#1d1f20] px-3 text-[13px] font-semibold text-white"
                 aria-label={`Retirer ${sport.name}`}
               >
                 {sport.name}
-                <X className="h-3.5 w-3.5 text-[#8E8E93]" aria-hidden="true" />
+                <X className="h-3.5 w-3.5 text-[#ACB4BA]" aria-hidden="true" />
               </button>
             </li>
           ))}
@@ -83,7 +83,7 @@ export function SportsMultiSelect({
                 onClick={() => toggle(sport)}
                 className={`ios-press flex min-h-11 w-full items-center justify-between gap-3 rounded-2xl border px-3.5 py-3 text-left ${
                   active
-                    ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/12'
+                    ? 'border-[#FF0702]/45 bg-[#FF0702]/12'
                     : 'border-white/10 bg-[#141416]'
                 }`}
               >
@@ -91,13 +91,13 @@ export function SportsMultiSelect({
                   <span className="block truncate text-[15px] font-semibold text-white">
                     {sport.name}
                   </span>
-                  <span className="block text-[11px] text-[#8E8E93]">
+                  <span className="block text-[11px] text-[#ACB4BA]">
                     {SPORT_CATEGORY_LABELS[sport.category]}
                   </span>
                 </span>
                 <span
                   className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${
-                    active ? 'border-[#FF2B2B] bg-[#FF2B2B] text-white' : 'border-white/20'
+                    active ? 'border-[#FF0702] bg-[#FF0702] text-white' : 'border-white/20'
                   }`}
                   aria-hidden="true"
                 >
@@ -109,7 +109,7 @@ export function SportsMultiSelect({
         })}
       </ul>
       {results.length === 0 && query ? (
-        <p className="text-[13px] text-[#8E8E93]">Aucun sport ne correspond à cette recherche.</p>
+        <p className="text-[13px] text-[#ACB4BA]">Aucun sport ne correspond à cette recherche.</p>
       ) : null}
     </div>
   )

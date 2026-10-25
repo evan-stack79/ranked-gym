@@ -29,7 +29,7 @@ export function ProfileXPBar({ level, currentXp, xpToNextLevel }: ProfileXPBarPr
         />
       </div>
 
-      <p className="mt-3 text-[13px] text-[#8E8E93]">
+      <p className="mt-3 text-[13px] text-[#ACB4BA]">
         {remaining} XP avant le niveau {level + 1}
       </p>
     </section>

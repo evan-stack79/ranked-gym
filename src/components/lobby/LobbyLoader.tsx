@@ -31,10 +31,10 @@ export function LobbyLoader({ phase }: LobbyLoaderProps) {
   return (
     <div className="flex flex-col items-center gap-5 py-16">
       <IconBadge icon={Icon} variant="crimson" />
-      <Loader2 className="h-5 w-5 animate-spin text-[#FF2B2B]" />
+      <Loader2 className="h-5 w-5 animate-spin text-[#FF0702]" />
       <div className="text-center">
         <p className="text-[17px] font-semibold tracking-tight text-white">{config.title}</p>
-        <p className="mt-1 text-[15px] text-[#8E8E93]">{config.subtitle}</p>
+        <p className="mt-1 text-[15px] text-[#ACB4BA]">{config.subtitle}</p>
       </div>
     </div>
   )

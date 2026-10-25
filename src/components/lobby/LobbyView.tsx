@@ -268,7 +268,7 @@ export function LobbyView() {
         </header>
         <p className="text-[15px] leading-relaxed text-[#EBEBF5]">{Q12_PROFIL_PRIVE}</p>
         {!isRankingEligible() ? (
-          <p className="text-[13px] text-[#8E8E93]">
+          <p className="text-[13px] text-[#ACB4BA]">
             La découverte de spots reste disponible après 18 ans, sans classement.
           </p>
         ) : null}
@@ -286,7 +286,7 @@ export function LobbyView() {
       <header className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-[34px] font-bold tracking-tight text-white">Lobby</h1>
-          <p className="mt-2 text-[17px] text-[#8E8E93]">
+          <p className="mt-2 text-[17px] text-[#ACB4BA]">
             Spots de sport près de toi — {getDiscipline(getStoredDisciplineId()).spotLabel.toLowerCase()}.
           </p>
         </div>
@@ -297,7 +297,7 @@ export function LobbyView() {
             className="flex h-10 w-10 items-center justify-center glass-card rounded-full active:bg-ios-inset"
             aria-label="Nouvelle recherche"
           >
-            <RefreshCw className="h-5 w-5 text-[#FF2B2B]" />
+            <RefreshCw className="h-5 w-5 text-[#FF0702]" />
           </button>
         )}
       </header>
@@ -317,7 +317,7 @@ export function LobbyView() {
                 <>
                   GPS actif
                   {location.coords.accuracy != null && (
-                    <span className="text-[#8E8E93]"> · ±{Math.round(location.coords.accuracy)} m</span>
+                    <span className="text-[#ACB4BA]"> · ±{Math.round(location.coords.accuracy)} m</span>
                   )}
                 </>
               )}
@@ -330,7 +330,7 @@ export function LobbyView() {
         <div className="flex flex-col gap-6 py-2">
           <div className="flex flex-col items-center gap-4 py-6">
             <IconBadge icon={Navigation} variant="crimson" size="md" />
-            <p className="max-w-xs text-center text-[15px] text-[#8E8E93]">
+            <p className="max-w-xs text-center text-[15px] text-[#ACB4BA]">
               Localise les spots de sport autour de toi pour rejoindre un lobby.
             </p>
           </div>
@@ -352,7 +352,7 @@ export function LobbyView() {
             <IconBadge icon={AlertCircle} variant="orange" size="sm" />
             <div className="flex-1">
               <p className="text-[15px] font-medium text-white">{error}</p>
-              <p className="mt-1 text-[13px] text-[#8E8E93]">
+              <p className="mt-1 text-[13px] text-[#ACB4BA]">
                 Utilise la recherche par ville si le GPS est bloqué.
               </p>
               <NeonButton
@@ -374,7 +374,7 @@ export function LobbyView() {
           <IconBadge icon={MapPin} variant="white" />
           <div>
             <p className="text-[17px] font-semibold text-white">Aucun spot trouvé</p>
-            <p className="mt-1 text-[15px] text-[#8E8E93]">
+            <p className="mt-1 text-[15px] text-[#ACB4BA]">
               Aucun lieu sportif dans un rayon de {formatDistance(SEARCH_RADIUS_METERS)}.
             </p>
           </div>
@@ -398,7 +398,7 @@ export function LobbyView() {
             </div>
           )}
           {location?.source === 'manual' && (
-            <div className="glass-card rounded-2xl p-4 text-[15px] text-[#8E8E93]">
+            <div className="glass-card rounded-2xl p-4 text-[15px] text-[#ACB4BA]">
               Mode ville · check-in disponible sur tous les spots listés.
             </div>
           )}
@@ -415,12 +415,12 @@ export function LobbyView() {
       {phase === 'checked-in' && checkedInGym && (
         <>
           <div
-            className="relative overflow-hidden rounded-3xl border border-[#FF2B2B]/30 p-5"
+            className="relative overflow-hidden rounded-3xl border border-[#FF0702]/30 p-5"
             style={{
               background:
-                'radial-gradient(ellipse 90% 80% at 10% 0%, rgb(255 43 43 / 0.28) 0%, transparent 55%), radial-gradient(ellipse 60% 50% at 100% 100%, rgb(255 159 10 / 0.12) 0%, transparent 50%), rgb(28 28 30 / 0.95)',
+                'radial-gradient(ellipse 90% 80% at 10% 0%, rgb(255 7 2 / 0.28) 0%, transparent 55%), radial-gradient(ellipse 60% 50% at 100% 100%, rgb(255 159 10 / 0.12) 0%, transparent 50%), rgb(28 28 30 / 0.95)',
               boxShadow:
-                'inset 0 1px 0 rgb(255 255 255 / 0.1), 0 0 40px rgb(255 43 43 / 0.15)',
+                'inset 0 1px 0 rgb(255 255 255 / 0.1), 0 0 40px rgb(255 7 2 / 0.15)',
             }}
           >
             <div className="flex items-center gap-2">
@@ -430,7 +430,7 @@ export function LobbyView() {
               </p>
             </div>
             {checkedInAt != null && (
-              <p className="mt-1 text-[13px] text-[#8E8E93]">
+              <p className="mt-1 text-[13px] text-[#ACB4BA]">
                 Session {formatCheckInDuration(checkedInAt)}
               </p>
             )}
@@ -438,10 +438,10 @@ export function LobbyView() {
               {checkedInGym.name}
             </p>
             {checkedInGym.isCustom && (
-              <p className="mt-1 text-[13px] text-[#8E8E93]">Spot perso · sauvegardé</p>
+              <p className="mt-1 text-[13px] text-[#ACB4BA]">Spot perso · sauvegardé</p>
             )}
             {checkedInGym.address && (
-              <p className="mt-1 text-[13px] text-[#AEAEB2]">{checkedInGym.address}</p>
+              <p className="mt-1 text-[13px] text-[#ACB4BA]">{checkedInGym.address}</p>
             )}
             <p className="mt-4 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-[13px] text-[#EBEBF5]">
               Athlètes présents — toutes disciplines. Pas de classement par volume ni par séances.
@@ -450,7 +450,7 @@ export function LobbyView() {
 
           <GymMemberList members={lobbyMembers} gymName={checkedInGym.name} />
 
-          <div className="sticky bottom-0 z-20 -mx-1 space-y-2 bg-gradient-to-t from-[#0C0C0E] via-[#0C0C0E]/95 to-transparent pt-4 pb-1">
+          <div className="sticky bottom-0 z-20 -mx-1 space-y-2 bg-gradient-to-t from-[#000000] via-[#000000]/95 to-transparent pt-4 pb-1">
             <NeonButton onClick={handleLeaveGym} variant="destructive" className="py-4 text-[16px]">
               <span className="flex items-center justify-center gap-2 font-bold">
                 <LogOut className="h-5 w-5" />

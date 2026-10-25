@@ -114,7 +114,7 @@ function NutritionFixtureShell() {
 
   return (
     <div
-      className="relative flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-[#0C0C0E] font-sans"
+      className="relative flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-[#000000] font-sans"
       data-nutrition-fixture="1"
     >
       <header
@@ -128,7 +128,7 @@ function NutritionFixtureShell() {
           <div
             aria-hidden="true"
             data-brand-header-bg="1"
-            className="pointer-events-none absolute inset-0 -z-10 bg-[#0C0C0E]"
+            className="pointer-events-none absolute inset-0 -z-10 bg-[#000000]"
           />
           <div className="mx-auto flex max-w-lg items-center justify-center px-4 pb-2 pt-0">
             <div data-cold-launch-target="compact">

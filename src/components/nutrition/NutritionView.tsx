@@ -31,7 +31,7 @@ function MinorNutritionScreen() {
         <h1 className="text-[34px] font-bold tracking-tight text-white">Nutrition</h1>
       </header>
       <p className="text-[15px] leading-relaxed text-[#EBEBF5]">{Q6A_MINEURS}</p>
-      <p className="text-[15px] leading-relaxed text-[#AEAEB2]">{M_MIN_1}</p>
+      <p className="text-[15px] leading-relaxed text-[#ACB4BA]">{M_MIN_1}</p>
     </div>
   )
 }
@@ -94,7 +94,7 @@ export function NutritionView() {
       <div className="flex flex-col gap-6 pb-2">
         <header>
           <h1 className="text-[34px] font-bold tracking-tight text-white">Nutrition</h1>
-          <p className="mt-2 text-[15px] text-[#AEAEB2]">
+          <p className="mt-2 text-[15px] text-[#ACB4BA]">
             Ajuste ton objectif et ton plan calorique.
           </p>
         </header>

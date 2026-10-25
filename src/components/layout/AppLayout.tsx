@@ -93,7 +93,7 @@ export function AppLayout({
             <div
               aria-hidden="true"
               data-brand-header-bg="1"
-              className="pointer-events-none absolute inset-0 -z-10 bg-[#0C0C0E]"
+              className="pointer-events-none absolute inset-0 -z-10 bg-[#000000]"
             />
             <div className="mx-auto flex max-w-lg items-center justify-center px-4 pb-2 pt-0">
               <div data-cold-launch-target="compact">

@@ -12,7 +12,7 @@ export function NutritionAiErrorFixture() {
 
   return (
     <AuthStateProvider value={authValue}>
-      <div className="min-h-[100dvh] bg-[#0C0C0E] px-5 py-8 text-white">
+      <div className="min-h-[100dvh] bg-[#000000] px-5 py-8 text-white">
         <div className="mx-auto w-full max-w-lg">
           <h1 className="mb-4 text-[22px] font-bold tracking-tight text-white">Nutrition</h1>
           <MealPhotoAnalyzer

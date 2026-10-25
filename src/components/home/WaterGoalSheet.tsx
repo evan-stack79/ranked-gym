@@ -25,7 +25,7 @@ export function WaterGoalSheet({ open, onClose }: WaterGoalSheetProps) {
             clearUserWaterGoal()
             onClose()
           }}
-          className="ios-press min-h-11 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-[14px] font-medium text-[#AEAEB2]"
+          className="ios-press min-h-11 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-[14px] font-medium text-[#ACB4BA]"
           data-accueil-water-goal-clear
         >
           Pas d&apos;objectif

@@ -28,7 +28,7 @@ export function ContactUsBlock({ message, testIdPrefix = 'contact-us' }: Contact
   return (
     <div className="space-y-1.5" data-testid={testIdPrefix}>
       <p
-        className="px-1 text-[12px] leading-snug text-[#8E8E93]"
+        className="px-1 text-[12px] leading-snug text-[#ACB4BA]"
         data-testid={`${testIdPrefix}-message`}
       >
         {message}
@@ -44,7 +44,7 @@ export function ContactUsBlock({ message, testIdPrefix = 'contact-us' }: Contact
           {WRITE_TO_US_LABEL}
         </button>
         <span
-          className="select-text text-[12px] text-[#AEAEB2]"
+          className="select-text text-[12px] text-[#ACB4BA]"
           style={{ userSelect: 'text' }}
           data-testid={`${testIdPrefix}-address`}
         >

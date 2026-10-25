@@ -134,7 +134,7 @@ export function SecurityScreen({
           onChange={onGhostModeChange}
           disabled={ghostSaving}
         />
-        <p className="px-1 text-[13px] leading-relaxed text-[#8E8E93]">
+        <p className="px-1 text-[13px] leading-relaxed text-[#ACB4BA]">
           Le Mode Furtif masque ta localisation et ton identité dans le feed. Tes données
           d&apos;entraînement restent privées.
         </p>
@@ -142,8 +142,8 @@ export function SecurityScreen({
 
       <YourDataMealsEraseCard />
 
-      <div className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80">
-        <div className="border-b border-[#2C2C2E]">
+      <div className="overflow-hidden rounded-2xl border border-[#25282A] bg-[#141416]/80">
+        <div className="border-b border-[#25282A]">
           <SettingsActionRow
             icon={KeyRound}
             label="Changer mon mot de passe"
@@ -185,11 +185,11 @@ export function SecurityScreen({
         dismissible={!passwordBusy}
         title="Changer mon mot de passe"
         subtitle="Sécurise ton compte"
-        leading={<KeyRound className="mt-0.5 h-5 w-5 text-[#8E8E93]" />}
+        leading={<KeyRound className="mt-0.5 h-5 w-5 text-[#ACB4BA]" />}
       >
         <form onSubmit={(e) => void handleChangePassword(e)} className="space-y-3 pb-2">
           <label className="block">
-            <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+            <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">
               Ancien mot de passe
             </span>
             <input
@@ -199,11 +199,11 @@ export function SecurityScreen({
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               disabled={passwordBusy}
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+              className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white outline-none focus:border-[#FF0702]/45 disabled:opacity-50"
             />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+            <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">
               Nouveau mot de passe
             </span>
             <input
@@ -214,11 +214,11 @@ export function SecurityScreen({
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               disabled={passwordBusy}
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+              className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white outline-none focus:border-[#FF0702]/45 disabled:opacity-50"
             />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+            <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">
               Confirmer le nouveau mot de passe
             </span>
             <input
@@ -229,12 +229,12 @@ export function SecurityScreen({
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               disabled={passwordBusy}
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+              className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white outline-none focus:border-[#FF0702]/45 disabled:opacity-50"
             />
           </label>
 
           {passwordError ? (
-            <p className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]">
+            <p className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF907F]">
               {passwordError}
             </p>
           ) : null}
@@ -272,12 +272,12 @@ export function SecurityScreen({
         leading={<Trash2 className="mt-0.5 h-5 w-5 text-[#FF453A]" />}
       >
         <form onSubmit={(e) => void handleDeleteAccount(e)} className="space-y-3 pb-2">
-          <p className="text-[13px] leading-relaxed text-[#AEAEB2]">
+          <p className="text-[13px] leading-relaxed text-[#ACB4BA]">
             Ton profil, tes séances et tes sauvegardes cloud seront définitivement effacés. Cette
             action est irréversible.
           </p>
           <label className="block">
-            <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+            <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">
               Confirme avec ton mot de passe
             </span>
             <input
@@ -291,14 +291,14 @@ export function SecurityScreen({
             />
           </label>
           {deleteError ? (
-            <p className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]">
+            <p className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF907F]">
               {deleteError}
             </p>
           ) : null}
           <button
             type="submit"
             disabled={deleteBusy}
-            className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-[#FF453A]/40 bg-[#FF453A]/15 py-3.5 text-[15px] font-semibold text-[#FF6961] disabled:opacity-50"
+            className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-[#FF453A]/40 bg-[#FF453A]/15 py-3.5 text-[15px] font-semibold text-[#FF907F] disabled:opacity-50"
           >
             {deleteBusy ? (
               <>

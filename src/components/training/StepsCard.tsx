@@ -29,7 +29,7 @@ export function StepsCard({
     >
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+          <p className="text-[12px] font-semibold uppercase tracking-wider text-[#ACB4BA]">
             Aujourd’hui
           </p>
           <h2 className="text-[20px] font-bold text-white">Pas du jour</h2>
@@ -37,7 +37,7 @@ export function StepsCard({
         <button
           type="button"
           onClick={onConnectHealth}
-          className="ios-press inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-[#AEAEB2]"
+          className="ios-press inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-[#ACB4BA]"
         >
           <Link2 className="h-3.5 w-3.5" />
           {healthLinked ? 'Santé OK' : 'Lier Santé'}
@@ -45,7 +45,7 @@ export function StepsCard({
       </div>
 
       <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-        <div className="mb-1 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
+        <div className="mb-1 flex items-center gap-2 text-[12px] font-semibold text-[#ACB4BA]">
           <Footprints className="h-3.5 w-3.5 text-[#64D2FF]" />
           Nombre de pas
         </div>
@@ -60,7 +60,7 @@ export function StepsCard({
             aria-label="Pas du jour"
             className="relative z-[1] w-full bg-transparent text-[34px] font-bold tracking-tight text-white outline-none"
           />
-          <span className="pb-1.5 text-[15px] font-semibold text-[#8E8E93]">pas</span>
+          <span className="pb-1.5 text-[15px] font-semibold text-[#ACB4BA]">pas</span>
         </div>
         <div className="mt-2.5 flex flex-wrap gap-1.5">
           {[5000, 7500, 10000, 12000].map((preset) => (
@@ -71,7 +71,7 @@ export function StepsCard({
               className={`ios-press rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
                 steps === preset
                   ? 'border-[#00B4FF]/45 bg-[#00B4FF]/20 text-[#64D2FF]'
-                  : 'border-white/10 text-[#8E8E93]'
+                  : 'border-white/10 text-[#ACB4BA]'
               }`}
             >
               {preset.toLocaleString('fr-FR')}
@@ -80,7 +80,7 @@ export function StepsCard({
         </div>
       </div>
 
-      <p className="mt-3 text-[12px] leading-relaxed text-[#8E8E93]">
+      <p className="mt-3 text-[12px] leading-relaxed text-[#ACB4BA]">
         Objectif Nutri : <span className="text-white">{goalLabel}</span>. Les pas ne modifient
         pas ta cible alimentaire.
       </p>

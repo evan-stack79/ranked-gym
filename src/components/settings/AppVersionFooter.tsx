@@ -10,7 +10,7 @@ export function AppVersionFooter() {
   return (
     <div className="flex flex-col items-center gap-2 px-2 pt-1" data-testid="app-version-footer">
       <p
-        className="text-center text-[11px] leading-none tracking-wide text-[#636366]"
+        className="text-center text-[11px] leading-none tracking-wide text-[#717C83]"
         data-testid="app-build-version"
       >
         {buildLabel}
@@ -19,7 +19,7 @@ export function AppVersionFooter() {
         <button
           type="button"
           onClick={applyUpdate}
-          className="ios-press rounded-lg px-3 py-2 text-[13px] font-medium text-[#AEAEB2] active:text-white"
+          className="ios-press rounded-lg px-3 py-2 text-[13px] font-medium text-[#ACB4BA] active:text-white"
           data-testid="app-update-button"
         >
           Mettre à jour

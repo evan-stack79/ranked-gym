@@ -56,7 +56,7 @@ export function ArenaRadarChart({
   if (loading) {
     return (
       <div className={`flex min-h-[260px] items-center justify-center ${className}`}>
-        <div className="avatar-spinner h-8 w-8 rounded-full border-2 border-white/20 border-t-[#FF2B2B]" aria-hidden />
+        <div className="avatar-spinner h-8 w-8 rounded-full border-2 border-white/20 border-t-[#FF0702]" aria-hidden />
       </div>
     )
   }
@@ -83,8 +83,8 @@ export function ArenaRadarChart({
       >
         <defs>
           <linearGradient id="arena-radar-fill" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#FF2B2B" stopOpacity="0.45" />
-            <stop offset="100%" stopColor="#FF2B2B" stopOpacity="0.12" />
+            <stop offset="0%" stopColor="#FF0702" stopOpacity="0.45" />
+            <stop offset="100%" stopColor="#FF0702" stopOpacity="0.12" />
           </linearGradient>
           <filter id="arena-radar-glow" x="-30%" y="-30%" width="160%" height="160%">
             <feGaussianBlur stdDeviation="2.5" result="blur" />
@@ -124,7 +124,7 @@ export function ArenaRadarChart({
         <path
           d={dataPath}
           fill="none"
-          stroke="#FF2B2B"
+          stroke="#FF0702"
           strokeWidth={2.25}
           strokeLinejoin="round"
           filter="url(#arena-radar-glow)"
@@ -134,7 +134,7 @@ export function ArenaRadarChart({
           const r = (axis.value / 100) * MAX_R
           const [x, y] = axisPoint(i, count, r)
           return (
-            <circle key={axis.label} cx={x} cy={y} r={3.5} fill="#FF6961" stroke="#0C0C0E" strokeWidth={1.5} />
+            <circle key={axis.label} cx={x} cy={y} r={3.5} fill="#FF907F" stroke="#000000" strokeWidth={1.5} />
           )
         })}
 
@@ -147,7 +147,7 @@ export function ArenaRadarChart({
               y={y}
               textAnchor="middle"
               dominantBaseline="middle"
-              className="fill-[#AEAEB2] text-[10px] font-semibold uppercase tracking-wide"
+              className="fill-[#ACB4BA] text-[10px] font-semibold uppercase tracking-wide"
               style={{ fontSize: 10 }}
             >
               {axis.label}

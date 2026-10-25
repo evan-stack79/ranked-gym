@@ -1,9 +1,9 @@
 const AVATAR_COLORS = [
   'bg-ios-inset',
-  'bg-[#48484A]',
-  'bg-[#636366]',
+  'bg-[#596166]',
+  'bg-[#717C83]',
   'bg-ios-surface',
-  'bg-[#48484A]',
+  'bg-[#596166]',
 ]
 
 function hashString(value: string): number {
@@ -45,7 +45,7 @@ export function Avatar({
   return (
     <div
       className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold text-white ${
-        hasPhoto ? 'bg-[#1C1C1E]' : bg
+        hasPhoto ? 'bg-[#1D1F20]' : bg
       } ${sizeClasses[size]} ${className}`}
       aria-label={`Avatar de ${username}`}
       aria-busy={loading || undefined}

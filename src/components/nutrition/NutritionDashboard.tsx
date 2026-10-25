@@ -756,7 +756,7 @@ export function NutritionDashboard({
   }
 
   return (
-    <div className="-mx-5 min-h-[70vh] overflow-x-hidden bg-[#0C0C0E] pb-2">
+    <div className="-mx-5 min-h-[70vh] overflow-x-hidden bg-[#000000] pb-2">
       <div className="flex flex-col gap-4 px-5 pt-1">
         <header className="flex items-center justify-between gap-3">
           <h1 className="text-[32px] font-bold tracking-tight text-white">
@@ -781,7 +781,7 @@ export function NutritionDashboard({
             <button
               type="button"
               onClick={() => selectDate(shiftDateKey(selectedDateKey, -1))}
-              className="ios-press flex h-10 w-10 items-center justify-center rounded-full text-[#AEAEB2]"
+              className="ios-press flex h-10 w-10 items-center justify-center rounded-full text-[#ACB4BA]"
               aria-label="Jour précédent"
             >
               <ChevronLeft className="h-5 w-5" />
@@ -792,12 +792,12 @@ export function NutritionDashboard({
               className="ios-press min-h-10 flex-1 text-center text-[14px] font-semibold text-white"
               aria-label="Choisir une date"
             >
-              {nutritionDateLabel(selectedDateKey)} <span className="text-[#8E8E93]">⌄</span>
+              {nutritionDateLabel(selectedDateKey)} <span className="text-[#ACB4BA]">⌄</span>
             </button>
             <button
               type="button"
               onClick={() => selectDate(shiftDateKey(selectedDateKey, 1))}
-              className="ios-press flex h-10 w-10 items-center justify-center rounded-full text-[#AEAEB2]"
+              className="ios-press flex h-10 w-10 items-center justify-center rounded-full text-[#ACB4BA]"
               aria-label="Jour suivant"
             >
               <ChevronRight className="h-5 w-5" />
@@ -815,9 +815,9 @@ export function NutritionDashboard({
           </Reveal>
           {nutrition.showCalorieGoal ? (
             <div className="mt-3 space-y-2 px-1" data-testid="dashboard-estimation-notices">
-              <p className="text-[12px] leading-relaxed text-[#AEAEB2]">{M_CAL_2}</p>
+              <p className="text-[12px] leading-relaxed text-[#ACB4BA]">{M_CAL_2}</p>
               {otherSafetyNotices.map((notice) => (
-                <p key={notice} className="text-[12px] leading-relaxed text-[#8E8E93]">
+                <p key={notice} className="text-[12px] leading-relaxed text-[#ACB4BA]">
                   {notice}
                 </p>
               ))}
@@ -825,7 +825,7 @@ export function NutritionDashboard({
           ) : otherSafetyNotices.length > 0 ? (
             <div className="mt-3 space-y-2 px-1" data-testid="dashboard-safety-notices">
               {otherSafetyNotices.map((notice) => (
-                <p key={notice} className="text-[12px] leading-relaxed text-[#8E8E93]">
+                <p key={notice} className="text-[12px] leading-relaxed text-[#ACB4BA]">
                   {notice}
                 </p>
               ))}
@@ -889,13 +889,13 @@ export function NutritionDashboard({
                 <button
                   type="button"
                   onClick={() => setJournalDetailOpen(false)}
-                  className="ios-press text-[12px] font-medium text-[#8E8E93]"
+                  className="ios-press text-[12px] font-medium text-[#ACB4BA]"
                 >
                   Masquer
                 </button>
               </div>
               {meals.length === 0 ? (
-                <p className="rounded-2xl border border-white/[0.08] bg-[#141416]/80 px-4 py-6 text-center text-[13px] text-[#8E8E93]">
+                <p className="rounded-2xl border border-white/[0.08] bg-[#141416]/80 px-4 py-6 text-center text-[13px] text-[#ACB4BA]">
                   {foodAddV3
                     ? 'Aucun aliment pour l’instant — utilise Recherche.'
                     : "Aucun aliment pour l'instant — utilise Scanner, Scan IA ou Recherche."}
@@ -908,7 +908,7 @@ export function NutritionDashboard({
                       <article className="flex items-center gap-2 px-3.5 py-3">
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-[14px] font-semibold text-white">{meal.name}</p>
-                          <p className="mt-0.5 text-[12px] text-[#8E8E93]">
+                          <p className="mt-0.5 text-[12px] text-[#ACB4BA]">
                             {foodAddV3
                               ? [
                                   MEAL_TYPE_LABELS[meal.mealType],
@@ -927,7 +927,7 @@ export function NutritionDashboard({
                         <button
                           type="button"
                           onClick={() => setEditingMeal(meal)}
-                          className="flex h-11 w-11 items-center justify-center rounded-xl text-[#8E8E93]"
+                          className="flex h-11 w-11 items-center justify-center rounded-xl text-[#ACB4BA]"
                           aria-label="Modifier l’aliment"
                         >
                           <Pencil className="h-4 w-4" />
@@ -935,7 +935,7 @@ export function NutritionDashboard({
                         <button
                           type="button"
                           onClick={() => handleRemove(meal.id)}
-                          className="flex h-11 w-11 items-center justify-center rounded-xl text-[#8E8E93]"
+                          className="flex h-11 w-11 items-center justify-center rounded-xl text-[#ACB4BA]"
                           aria-label="Supprimer le repas"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -1169,7 +1169,7 @@ export function NutritionDashboard({
             }}
             className="ios-press flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3.5 text-left"
           >
-            <RotateCcw className="h-4 w-4 text-[#AEAEB2]" />
+            <RotateCcw className="h-4 w-4 text-[#ACB4BA]" />
             <span className="text-[15px] font-medium text-white">Refaire le setup</span>
           </button>
           <button
@@ -1180,7 +1180,7 @@ export function NutritionDashboard({
             }}
             className="ios-press flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3.5 text-left"
           >
-            <Ellipsis className="h-4 w-4 text-[#AEAEB2]" />
+            <Ellipsis className="h-4 w-4 text-[#ACB4BA]" />
             <span className="text-[15px] font-medium text-white">
               {advancedOpen ? 'Masquer plan & jauge' : 'Plan, rythme & jauge eau'}
             </span>
@@ -1201,7 +1201,7 @@ export function NutritionDashboard({
           <button
             type="button"
             onClick={() => setMenuOpen(false)}
-            className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[14px] text-[#8E8E93]"
+            className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[14px] text-[#ACB4BA]"
           >
             <X className="h-4 w-4" />
             Fermer
@@ -1213,8 +1213,8 @@ export function NutritionDashboard({
         <div
           className={`fixed left-1/2 z-[120] flex max-w-[92%] -translate-x-1/2 items-center gap-3 rounded-2xl border px-4 py-3 text-[13px] font-medium shadow-lg ${
             toast.variant === 'error'
-              ? 'bottom-[calc(var(--app-bottom-nav)+env(safe-area-inset-bottom,0px)+1rem)] border-[#FF453A]/40 bg-[#2C1014]/95 text-[#FF6961]'
-              : 'bottom-[calc(var(--app-bottom-nav)+env(safe-area-inset-bottom,0px)+1rem)] border-white/15 bg-[#1C1C1E]/95 text-white'
+              ? 'bottom-[calc(var(--app-bottom-nav)+env(safe-area-inset-bottom,0px)+1rem)] border-[#FF453A]/40 bg-[#2C1014]/95 text-[#FF907F]'
+              : 'bottom-[calc(var(--app-bottom-nav)+env(safe-area-inset-bottom,0px)+1rem)] border-white/15 bg-[#1D1F20]/95 text-white'
           }`}
           role={toast.variant === 'error' ? 'alert' : 'status'}
         >

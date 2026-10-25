@@ -20,7 +20,7 @@ export function DisciplinePicker({ value, onChange, compact }: DisciplinePickerP
             className={`ios-press rounded-2xl border px-3.5 py-3 text-left transition-colors ${
               active
                 ? 'border-white/25 text-white'
-                : 'border-white/10 bg-black/25 text-[#8E8E93]'
+                : 'border-white/10 bg-black/25 text-[#ACB4BA]'
             }`}
             style={
               active
@@ -34,7 +34,7 @@ export function DisciplinePicker({ value, onChange, compact }: DisciplinePickerP
           >
             <p className="text-[14px] font-semibold text-white">{d.label}</p>
             {!compact && (
-              <p className="mt-0.5 text-[11px] text-[#AEAEB2]">{d.spotLabel}</p>
+              <p className="mt-0.5 text-[11px] text-[#ACB4BA]">{d.spotLabel}</p>
             )}
           </button>
         )

@@ -29,7 +29,7 @@ export function WeightPaceCard({ profile }: WeightPaceCardProps) {
       <div className="mb-3 flex items-center gap-2">
         <HeartPulse className="h-4 w-4 text-[#FF9F0A]" />
         <div>
-          <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+          <p className="text-[12px] font-semibold uppercase tracking-wider text-[#ACB4BA]">
             Rythme {GOAL_LABELS[pace.goal]}
           </p>
           <h3 className="text-[17px] font-bold text-white">Objectif poids · ton choix</h3>
@@ -38,7 +38,7 @@ export function WeightPaceCard({ profile }: WeightPaceCardProps) {
 
       <p className="text-[22px] font-black tracking-tight text-white">{pace.headline}</p>
       {pace.estimatedWeeks != null && (
-        <p className="mt-1 text-[13px] text-[#AEAEB2]">
+        <p className="mt-1 text-[13px] text-[#ACB4BA]">
           {profile.weightKg} → {profile.goalWeightKg} kg · ~{pace.estimatedWeeks} semaines à{' '}
           {Math.abs(pace.weeklyKg).toFixed(1)} kg/sem.
         </p>
@@ -47,14 +47,14 @@ export function WeightPaceCard({ profile }: WeightPaceCardProps) {
       <div className="mt-3 space-y-2">
         <div className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2.5">
           <p className="text-[11px] font-semibold text-[#30D158]">Santé</p>
-          <p className="mt-0.5 text-[12px] leading-relaxed text-[#AEAEB2]">{pace.healthTip}</p>
+          <p className="mt-0.5 text-[12px] leading-relaxed text-[#ACB4BA]">{pace.healthTip}</p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2.5">
           <p className="flex items-center gap-1 text-[11px] font-semibold text-[#64D2FF]">
             <Sparkles className="h-3 w-3" />
             Esthétique
           </p>
-          <p className="mt-0.5 text-[12px] leading-relaxed text-[#AEAEB2]">{pace.aestheticTip}</p>
+          <p className="mt-0.5 text-[12px] leading-relaxed text-[#ACB4BA]">{pace.aestheticTip}</p>
         </div>
       </div>
     </section>

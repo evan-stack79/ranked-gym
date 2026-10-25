@@ -137,17 +137,17 @@ export function AddFoodScreenFixture() {
 
   return (
     <AuthProvider>
-      <div className="min-h-[100dvh] bg-[#0C0C0E] text-white">
+      <div className="min-h-[100dvh] bg-[#000000] text-white">
         {validated ? (
           <div
-            className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-[#0C0C0E] px-6"
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-[#000000] px-6"
             data-fixture-validated
             role="status"
           >
             <p className="text-center text-[20px] font-semibold text-[#30D158]">
               Validé : {validated}
             </p>
-            <p className="text-center text-[13px] text-[#8E8E93]">Ajout enregistré dans le journal.</p>
+            <p className="text-center text-[13px] text-[#ACB4BA]">Ajout enregistré dans le journal.</p>
           </div>
         ) : (
           <AddFoodScreen

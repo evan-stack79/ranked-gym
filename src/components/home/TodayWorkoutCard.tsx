@@ -17,10 +17,10 @@ function secondaryLine(workout: TodayWorkoutPlan | null): string {
 }
 
 const secondaryButtonClass =
-  'ios-press min-h-11 shrink-0 rounded-2xl border border-[#FF2B2B]/20 bg-white/5 px-4 py-2.5 text-[14px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E]'
+  'ios-press min-h-11 shrink-0 rounded-2xl border border-[#FF0702]/20 bg-white/5 px-4 py-2.5 text-[14px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[#000000]'
 
 const primaryButtonClass =
-  'btn-brand ios-press min-h-11 shrink-0 rounded-2xl border border-white/15 px-4 py-2.5 text-[14px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E]'
+  'btn-brand ios-press min-h-11 shrink-0 rounded-2xl border border-white/15 px-4 py-2.5 text-[14px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#000000]'
 
 /**
  * Accueil — carte entraînement compacte (alignée Nutrition / Sommeil).
@@ -32,7 +32,7 @@ export function TodayWorkoutCard({ workout, onStart, onOpenNotebook }: TodayWork
     <section className="glass-card rounded-2xl p-4" aria-label="Entraînement">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-medium text-[#8E8E93]">
+          <p className="text-[11px] font-medium text-[#ACB4BA]">
             <SoftBlurIn>Entraînement</SoftBlurIn>
           </p>
           <p className="mt-1 text-[15px] font-semibold leading-snug text-white">

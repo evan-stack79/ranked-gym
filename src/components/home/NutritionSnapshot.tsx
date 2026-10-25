@@ -119,8 +119,8 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
   if (!snapshot.onboardingComplete) {
     return (
       <section className="glass-card rounded-2xl p-4" aria-label="Nutrition">
-        <p className="text-[11px] font-medium text-[#8E8E93]">Nutrition</p>
-        <p className="mt-2 text-[14px] leading-snug text-[#AEAEB2]">
+        <p className="text-[11px] font-medium text-[#ACB4BA]">Nutrition</p>
+        <p className="mt-2 text-[14px] leading-snug text-[#ACB4BA]">
           Configure ton plan dans l&apos;onglet Nutri pour voir ton suivi.
         </p>
       </section>
@@ -130,7 +130,7 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
   return (
     <section className="glass-card rounded-2xl p-4" aria-label="Nutrition du jour">
       <div>
-        <p className="text-[11px] font-medium text-[#8E8E93]">
+        <p className="text-[11px] font-medium text-[#ACB4BA]">
           <SoftBlurIn>Aujourd&apos;hui</SoftBlurIn>
         </p>
         {snapshot.targetAvailable ? (
@@ -139,7 +139,7 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
               {/* SAFETY: kcal must stay static — never CountUpNumber (PM / Vérificateur). */}
               Il te reste <StaticKcalNumber value={snapshot.remainingCalories} /> kcal
             </p>
-            <p className="mt-1 text-[13px] text-[#AEAEB2]">
+            <p className="mt-1 text-[13px] text-[#ACB4BA]">
               <StaticKcalNumber value={snapshot.consumedCalories} /> consommées sur{' '}
               <StaticKcalNumber value={snapshot.targetCalories} />
             </p>
@@ -147,12 +147,12 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
         ) : snapshot.showUnavailableGoal ? (
           <>
             <p className="mt-1 text-[17px] font-semibold text-white">Objectif indisponible</p>
-            <p className="mt-1 text-[13px] text-[#AEAEB2]">Ouvre Nutri pour vérifier ton plan.</p>
+            <p className="mt-1 text-[13px] text-[#ACB4BA]">Ouvre Nutri pour vérifier ton plan.</p>
           </>
         ) : (
           <>
             <p className="mt-1 text-[17px] font-semibold text-white">Suivi du jour</p>
-            <p className="mt-1 text-[13px] text-[#AEAEB2]">
+            <p className="mt-1 text-[13px] text-[#ACB4BA]">
               <StaticKcalNumber value={snapshot.consumedCalories} /> kcal consommées
             </p>
           </>
@@ -168,7 +168,7 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
             aria-label="Progression calorique"
           >
             <div
-              className="motion-progress-fill h-full rounded-full bg-gradient-to-r from-[#B91C1C] to-[#FF2B2B]"
+              className="motion-progress-fill h-full rounded-full bg-gradient-to-r from-[#B91C1C] to-[#FF0702]"
               style={{ transform: `scaleX(${Math.max(0, Math.min(snapshot.progress, 1))})` }}
             />
           </div>
@@ -179,7 +179,7 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
           onClick={onOpenNutrition}
           disabled={!onOpenNutrition}
           aria-label="Ajouter un repas"
-          className="btn-brand ios-press mt-4 min-h-11 w-full rounded-2xl border border-white/15 px-3 py-2.5 text-[14px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E] disabled:opacity-50"
+          className="btn-brand ios-press mt-4 min-h-11 w-full rounded-2xl border border-white/15 px-3 py-2.5 text-[14px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#000000] disabled:opacity-50"
         >
           Ajouter un repas
         </button>
@@ -188,7 +188,7 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
       <div className="mt-4 border-t border-white/8 pt-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-medium text-[#8E8E93]">
+            <p className="text-[11px] font-medium text-[#ACB4BA]">
               <SoftBlurIn>Eau</SoftBlurIn>
             </p>
             {snapshot.hasWaterGoal ? (
@@ -239,7 +239,7 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
               onClick={handleQuickWater}
               disabled={!canSubmitHomeQuickWater(waterSaving)}
               aria-label="J'ai bu 250 ml"
-              className="ios-press min-h-11 shrink-0 rounded-2xl border border-cyan-500/20 bg-cyan-500/8 px-3.5 py-2.5 text-[14px] font-semibold text-[#7DD3FC] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0C0C0E] disabled:opacity-50"
+              className="ios-press min-h-11 shrink-0 rounded-2xl border border-cyan-500/20 bg-cyan-500/8 px-3.5 py-2.5 text-[14px] font-semibold text-[#7DD3FC] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[#000000] disabled:opacity-50"
             >
               +250 ml
             </button>
@@ -250,7 +250,7 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
       {toast ? (
         <p
           className={`mt-3 text-center text-[12px] font-medium ${
-            toast.variant === 'error' ? 'text-[#FF6961]' : 'text-[#30D158]'
+            toast.variant === 'error' ? 'text-[#FF907F]' : 'text-[#30D158]'
           }`}
           role={toast.variant === 'error' ? 'alert' : 'status'}
           aria-live={toast.variant === 'error' ? 'assertive' : 'polite'}
