@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 256" width="920" height="256" role="img" aria-labelledby="t">
+  <title id="t">Ranked Gym lockup — Rank podium</title>
+  <g id="symbol" transform="translate(8,20) scale(0.84)">
+    <path fill="#000" d="
+    M32 220 H224 V236 H32 Z
+    M44 156 H92 V220 H44 Z
+    M106 100 H154 V220 H106 Z
+    M168 220 V56 L194 24 L220 56 V220 Z
+  "/>
+  </g>
+  <g id="wordmark" fill="#000" font-family="Arial Black, Helvetica Neue, Impact, sans-serif" font-weight="900">
+    <text x="240" y="118" font-size="72" letter-spacing="4">RANKED</text>
+    <text x="240" y="188" font-size="56" letter-spacing="10">GYM</text>
+  </g>
+</svg>

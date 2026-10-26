@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="t">
+  <title id="t">Ranked Gym — Panther refined</title>
+  <path fill="#000" fill-rule="evenodd" d="
+    M110 66 L122 42 L128 66 Z
+    M120 66 L128 30 L136 66 Z
+    M128 66 L134 42 L146 66 Z
+    M110 62 H146 V70 H110 Z
+    M56 104
+    L80 56
+    L100 88
+    L118 80
+    L128 74
+    L138 80
+    L156 88
+    L176 56
+    L200 104
+    L212 140
+    L192 188
+    L156 220
+    L128 228
+    L100 220
+    L64 188
+    L44 140
+    Z
+    M82 120
+    L118 104
+    L124 128
+    L88 144
+    Z
+    M174 120
+    L138 104
+    L132 128
+    L168 144
+    Z
+    M128 156
+    L152 188
+    L128 200
+    L104 188
+    Z
+  "/>
+</svg>
