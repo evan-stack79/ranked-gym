@@ -970,28 +970,6 @@ img {
   transition: transform var(--dur-ui) var(--ease-out);
 }
 
-/* MetalButton (10k) — thème Ranked Gym / Radix dark */
-.rg-metal-auth {
-  width: 100%;
-  --tk-metal-bg: var(--gray-1);
-  --tk-metal-fg: var(--gray-12);
-  --tk-metal-height: 52px;
-  --tk-metal-focus: var(--red-9);
-}
-.rg-metal-auth .tk-metal-btn__host,
-.rg-metal-auth .tk-metal-fallback,
-.rg-metal-auth .tk-metal {
-  width: 100%;
-  display: flex;
-  border-radius: 999px;
-}
-.rg-metal-auth .tk-metal-btn {
-  width: 100%;
-  font-weight: 600;
-  font-size: 16px;
-  letter-spacing: -0.01em;
-}
-
 .btn-brand {
   background: var(--red-9);
   box-shadow: inset 0 1px 0 var(--gray-a8);

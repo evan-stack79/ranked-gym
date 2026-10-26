@@ -2,39 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Eye, EyeOff, Loader2, Mail } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { BrandMark } from '../brand/BrandMark'
-import { MetalButton } from '../10k/web-metal-button/MetalButton'
 import { IosSheet } from '../ui/IosSheet'
-
-/** CTA auth plein largeur — anneau métal liquide (thème Radix via --tk-*). */
-function AuthMetalSubmit({
-  loading,
-  idleLabel,
-  loadingLabel,
-}: {
-  loading: boolean
-  idleLabel: string
-  loadingLabel: string
-}) {
-  return (
-    <div className="rg-metal-auth">
-      <MetalButton
-        type="submit"
-        disabled={loading}
-        theme="dark"
-        preset="chromatic"
-        strength={0.92}
-        icon={
-          loading ? (
-            <Loader2 className="tk-metal-btn__icon animate-spin" aria-hidden />
-          ) : null
-        }
-        aria-busy={loading || undefined}
-      >
-        {loading ? loadingLabel : idleLabel}
-      </MetalButton>
-    </div>
-  )
-}
 
 type AuthPanel = 'login' | 'signup' | 'forgot' | 'recovery'
 
@@ -232,11 +200,20 @@ export function AuthBottomSheet() {
                 </p>
               )}
 
-              <AuthMetalSubmit
-                loading={authLoading}
-                idleLabel="Se connecter"
-                loadingLabel="Connexion…"
-              />
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="btn-brand ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 py-3.5 text-[16px] font-semibold text-white disabled:opacity-50"
+              >
+                {authLoading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Connexion…
+                  </>
+                ) : (
+                  'Se connecter'
+                )}
+              </button>
             </form>
 
             <button
@@ -326,11 +303,20 @@ export function AuthBottomSheet() {
                 </p>
               )}
 
-              <AuthMetalSubmit
-                loading={authLoading}
-                idleLabel="Créer le compte"
-                loadingLabel="Création…"
-              />
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="btn-brand ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 py-3.5 text-[16px] font-semibold text-white disabled:opacity-50"
+              >
+                {authLoading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Création…
+                  </>
+                ) : (
+                  'Créer le compte'
+                )}
+              </button>
             </form>
 
             <button
@@ -380,11 +366,20 @@ export function AuthBottomSheet() {
                 </p>
               )}
 
-              <AuthMetalSubmit
-                loading={authLoading}
-                idleLabel="Envoyer le lien"
-                loadingLabel="Envoi…"
-              />
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="btn-brand ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 py-3.5 text-[16px] font-semibold text-white disabled:opacity-50"
+              >
+                {authLoading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Envoi…
+                  </>
+                ) : (
+                  'Envoyer le lien'
+                )}
+              </button>
             </form>
 
             <button
@@ -479,11 +474,20 @@ export function AuthBottomSheet() {
                 </p>
               )}
 
-              <AuthMetalSubmit
-                loading={authLoading}
-                idleLabel="Enregistrer"
-                loadingLabel="Enregistrement…"
-              />
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="btn-brand ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 py-3.5 text-[16px] font-semibold text-white disabled:opacity-50"
+              >
+                {authLoading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Enregistrement…
+                  </>
+                ) : (
+                  'Enregistrer'
+                )}
+              </button>
             </form>
           </>
         )}
