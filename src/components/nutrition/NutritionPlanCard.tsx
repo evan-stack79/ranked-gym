@@ -39,7 +39,7 @@ function Field({
 }) {
   return (
     <label className="glass-card block rounded-2xl p-3.5">
-      <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#8E8E93]">
+      <span className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-[#ACB4BA]">
         {icon}
         {label}
       </span>
@@ -54,7 +54,7 @@ function Field({
           aria-label={label}
           className="w-full bg-transparent text-[26px] font-bold tracking-tight text-white outline-none"
         />
-        <span className="pb-1 text-[13px] font-medium text-[#8E8E93]">{suffix}</span>
+        <span className="pb-1 text-[13px] font-medium text-[#ACB4BA]">{suffix}</span>
       </div>
     </label>
   )
@@ -125,7 +125,7 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
           <div className="flex items-center gap-2">
             <IconBadge icon={Flame} variant="green" size="sm" />
             <div>
-              <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+              <p className="text-[12px] font-semibold uppercase tracking-wider text-[#ACB4BA]">
                 Plan · {GOAL_LABELS[profile.goal]} · {MORPHOLOGY_LABELS[profile.morphology]}
                 {profile.goal !== 'maintain' && (
                   <> · {profile.weeklyPaceKg.toFixed(1)} kg/sem.</>
@@ -137,7 +137,7 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
           <button
             type="button"
             onClick={() => setScaleOpen(true)}
-            className="ios-press inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] font-semibold text-[#AEAEB2]"
+            className="ios-press inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] font-semibold text-[#ACB4BA]"
           >
             <Pencil className="h-3.5 w-3.5" />
             Balance
@@ -146,7 +146,7 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
 
         <div className="mb-5 flex items-center gap-5">
           <MacroRing progress={1} size={120} stroke={9} color="#34C759">
-            <p className="text-[11px] font-semibold text-[#8E8E93]">Cible</p>
+            <p className="text-[11px] font-semibold text-[#ACB4BA]">Cible</p>
             <p className="text-[24px] font-black tracking-tight text-white">
               {nutrition.targetCalories}
             </p>
@@ -155,12 +155,12 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
 
           <div className="min-w-0 flex-1 space-y-3">
             <div>
-              <p className="text-[13px] text-[#8E8E93]">Objectif poids</p>
+              <p className="text-[13px] text-[#ACB4BA]">Objectif poids</p>
               <p className="text-[22px] font-bold tracking-tight text-white">
                 {profile.weightKg}
-                <span className="mx-1 text-[#8E8E93]">→</span>
+                <span className="mx-1 text-[#ACB4BA]">→</span>
                 {profile.goalWeightKg}
-                <span className="ml-1 text-[13px] font-medium text-[#8E8E93]">kg</span>
+                <span className="ml-1 text-[13px] font-medium text-[#ACB4BA]">kg</span>
               </p>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-black/40">
@@ -169,7 +169,7 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
                 style={{ transform: `scaleX(${Math.max(0.08, Math.min(progressToGoal, 1))})` }}
               />
             </div>
-            <p className="text-[12px] text-[#8E8E93]">
+            <p className="text-[12px] text-[#ACB4BA]">
               {deltaKg === 0
                 ? 'Tu es sur ton poids cible'
                 : deltaKg < 0
@@ -182,12 +182,12 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
 
         <div className="grid grid-cols-3 gap-2">
           {[
-            { label: 'Protéines', value: `${nutrition.proteinG} g`, color: '#FF2B2B' },
+            { label: 'Protéines', value: `${nutrition.proteinG} g`, color: '#FF0702' },
             { label: 'Glucides', value: `${nutrition.carbsG} g`, color: '#FF9F0A' },
             { label: 'Lipides', value: `${nutrition.fatG} g`, color: '#00B4FF' },
           ].map((macro) => (
             <div key={macro.label} className="rounded-2xl border border-white/10 bg-black/20 p-2.5">
-              <p className="text-[10px] font-medium text-[#8E8E93]">{macro.label}</p>
+              <p className="text-[10px] font-medium text-[#ACB4BA]">{macro.label}</p>
               <p className="mt-0.5 text-[15px] font-bold text-white">{macro.value}</p>
               <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/10">
                 <div className="h-full w-4/5 rounded-full" style={{ background: macro.color }} />
@@ -198,15 +198,15 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
 
         <div className="mt-4 grid grid-cols-3 gap-2 text-center">
           <div className="rounded-xl border border-white/10 bg-black/20 px-2 py-2">
-            <p className="text-[10px] text-[#8E8E93]">EER</p>
+            <p className="text-[10px] text-[#ACB4BA]">EER</p>
             <p className="text-[14px] font-semibold text-[#00B4FF]">{nutrition.eerKcal}</p>
           </div>
           <div className="rounded-xl border border-white/10 bg-black/20 px-2 py-2">
-            <p className="text-[10px] text-[#8E8E93]">BCMR</p>
+            <p className="text-[10px] text-[#ACB4BA]">BCMR</p>
             <p className="text-[14px] font-semibold text-[#FF9F0A]">{nutrition.bcmrKcal}</p>
           </div>
           <div className="rounded-xl border border-white/10 bg-black/20 px-2 py-2">
-            <p className="text-[10px] text-[#8E8E93]">Taille</p>
+            <p className="text-[10px] text-[#ACB4BA]">Taille</p>
             <p className="text-[14px] font-semibold text-white">{profile.heightCm} cm</p>
           </div>
         </div>
@@ -258,7 +258,7 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
             min={10}
             max={120}
             suffix="ans"
-            icon={<span className="text-[11px] text-[#8E8E93]">ans</span>}
+            icon={<span className="text-[11px] text-[#ACB4BA]">ans</span>}
           />
 
           <GoalPicker
@@ -291,7 +291,7 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
                 type="button"
                 onClick={() => setDraft((p) => ({ ...p, sex: option.value }))}
                 className={`ios-press flex-1 rounded-lg py-2 text-[13px] font-semibold ${
-                  draft.sex === option.value ? 'bg-[#30D158] text-white' : 'text-[#8E8E93]'
+                  draft.sex === option.value ? 'bg-[#30D158] text-white' : 'text-[#ACB4BA]'
                 }`}
               >
                 {option.label}
@@ -305,7 +305,7 @@ export function NutritionPlanCard({ profile, onChange }: NutritionPlanCardProps)
           />
 
           <div className="pt-1">
-            <p className="mb-2 text-[12px] font-semibold text-[#8E8E93]">Morphologie</p>
+            <p className="mb-2 text-[12px] font-semibold text-[#ACB4BA]">Morphologie</p>
             <MorphologyPicker
               value={draft.morphology}
               onChange={(morphology) => setDraft((p) => ({ ...p, morphology }))}

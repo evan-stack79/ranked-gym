@@ -78,7 +78,7 @@ function FlameGlyph({ lit, className = '' }: { lit: boolean; className?: string 
       <defs>
         <linearGradient id="rgStreakFlameOuter" x1="0.5" y1="1" x2="0.5" y2="0">
           <stop offset="0%" stopColor="#B91C1C" />
-          <stop offset="45%" stopColor="#FF2B2B" />
+          <stop offset="45%" stopColor="#FF0702" />
           <stop offset="75%" stopColor="#FF7A1A" />
           <stop offset="100%" stopColor="#FFC928" />
         </linearGradient>

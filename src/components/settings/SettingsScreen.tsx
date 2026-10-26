@@ -216,7 +216,7 @@ export function SettingsScreen({
             type="button"
             onClick={canEditAvatar ? openAvatarPicker : openPersonal}
             disabled={avatarUploading}
-            className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/55 disabled:opacity-100"
+            className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/55 disabled:opacity-100"
             aria-label={canEditAvatar ? 'Changer la photo de profil' : `Avatar de ${username}`}
           >
             <Avatar
@@ -224,11 +224,11 @@ export function SettingsScreen({
               imageUrl={displayAvatarUrl}
               size="xl"
               loading={avatarUploading}
-              className="ring-2 ring-[#FF2B2B]/35"
+              className="ring-2 ring-[#FF0702]/35"
             />
             {canEditAvatar ? (
               <span
-                className="absolute -bottom-0.5 -right-0.5 flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/20 bg-[#2C2C2E] text-white shadow-[0_4px_12px_rgb(0_0_0_/0.45)]"
+                className="absolute -bottom-0.5 -right-0.5 flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/20 bg-[#25282A] text-white shadow-[0_4px_12px_rgb(0_0_0_/0.45)]"
                 aria-hidden
               >
                 <Pencil className="h-3 w-3" strokeWidth={2.5} />
@@ -250,7 +250,7 @@ export function SettingsScreen({
           className="ios-press min-w-0 flex-1 text-left"
         >
           <p className="truncate text-[22px] font-bold tracking-tight text-white">{username}</p>
-          <p className="mt-0.5 flex items-center gap-1 text-[15px] text-[#8E8E93]">
+          <p className="mt-0.5 flex items-center gap-1 text-[15px] text-[#ACB4BA]">
             Voir mon profil
             <ChevronRight className="h-4 w-4" strokeWidth={2.25} />
           </p>
@@ -274,15 +274,15 @@ export function SettingsScreen({
         section.items.length === 0 ? null : (
           <div key={sectionIdx} className="space-y-2">
             {section.title ? (
-              <p className="px-1 text-[13px] font-semibold uppercase tracking-wide text-[#8E8E93]">
+              <p className="px-1 text-[13px] font-semibold uppercase tracking-wide text-[#ACB4BA]">
                 {section.title}
               </p>
             ) : null}
-            <div className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80">
+            <div className="overflow-hidden rounded-2xl border border-[#25282A] bg-[#141416]/80">
               {section.items.map((item, itemIdx) => (
                 <div
                   key={item.id}
-                  className={itemIdx < section.items.length - 1 ? 'border-b border-[#2C2C2E]' : ''}
+                  className={itemIdx < section.items.length - 1 ? 'border-b border-[#25282A]' : ''}
                 >
                   <SettingsMenuRow
                     icon={item.icon}
@@ -338,7 +338,7 @@ export function SettingsScreen({
         <button
           type="button"
           onClick={onSignOut}
-          className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-[#FF453A]/30 bg-[#FF453A]/12 py-3.5 text-[15px] font-semibold text-[#FF6961]"
+          className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-[#FF453A]/30 bg-[#FF453A]/12 py-3.5 text-[15px] font-semibold text-[#FF907F]"
         >
           <LogOut className="h-4 w-4" />
           Se déconnecter
@@ -352,11 +352,11 @@ export function SettingsScreen({
         onClose={() => setSheet(null)}
         title="Méthodes de paiement"
         subtitle="Pass Pro"
-        leading={<CreditCard className="mt-0.5 h-5 w-5 text-[#8E8E93]" />}
+        leading={<CreditCard className="mt-0.5 h-5 w-5 text-[#ACB4BA]" />}
       >
         <div className="space-y-4 pb-2">
           <ProPassCard onTryFree={handleTryPro} onDismiss={() => setSheet(null)} />
-          <p className="text-center text-[12px] text-[#636366]">
+          <p className="text-center text-[12px] text-[#717C83]">
             Paiement sécurisé · Annulation à tout moment
           </p>
         </div>
@@ -367,7 +367,7 @@ export function SettingsScreen({
         onClose={() => setSheet(null)}
         title="Préférences"
         subtitle="Notifications & unités"
-        leading={<Settings2 className="mt-0.5 h-5 w-5 text-[#8E8E93]" />}
+        leading={<Settings2 className="mt-0.5 h-5 w-5 text-[#ACB4BA]" />}
       >
         <div className="space-y-4 pb-2">
           <div>
@@ -383,13 +383,13 @@ export function SettingsScreen({
           </div>
           <div className="glass-card rounded-2xl p-4">
             <p className="text-[15px] font-semibold text-white">Notifications</p>
-            <p className="mt-1 text-[13px] text-[#8E8E93]">
+            <p className="mt-1 text-[13px] text-[#ACB4BA]">
               Gère les rappels de séance dans l&apos;onglet Train → Agenda.
             </p>
           </div>
           <div className="glass-card rounded-2xl p-4">
             <p className="text-[15px] font-semibold text-white">Unités</p>
-            <p className="mt-1 text-[13px] text-[#8E8E93]">Kilogrammes (kg) · Calories (kcal)</p>
+            <p className="mt-1 text-[13px] text-[#ACB4BA]">Kilogrammes (kg) · Calories (kcal)</p>
           </div>
         </div>
       </IosSheet>

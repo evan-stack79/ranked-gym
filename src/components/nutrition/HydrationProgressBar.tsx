@@ -41,7 +41,7 @@ export function HydrationProgressBar({
             />
             <div className="min-w-0">
               <p
-                className={`font-semibold uppercase tracking-wider text-[#8E8E93] ${
+                className={`font-semibold uppercase tracking-wider text-[#ACB4BA] ${
                   compact ? 'text-[10px]' : 'text-[11px]'
                 }`}
               >
@@ -65,7 +65,7 @@ export function HydrationProgressBar({
             </div>
           </div>
           <span
-            className={`shrink-0 tabular-nums text-[#636366] ${
+            className={`shrink-0 tabular-nums text-[#717C83] ${
               compact ? 'text-[11px]' : 'text-[12px]'
             }`}
           >
@@ -100,7 +100,7 @@ export function HydrationProgressBar({
             aria-hidden
           />
           <p
-            className={`leading-snug text-[#8E8E93] ${
+            className={`leading-snug text-[#ACB4BA] ${
               compact ? 'text-[11px]' : 'text-sm'
             }`}
           >
@@ -111,7 +111,7 @@ export function HydrationProgressBar({
       ) : null}
 
       {compact ? (
-        <p className="mt-1 text-[11px] text-[#636366]">
+        <p className="mt-1 text-[11px] text-[#717C83]">
           {overGoal ? (
             <span className="text-[#67E8F9]">{formatWaterMl(consumedMl)} bus</span>
           ) : (

@@ -45,7 +45,7 @@ export const FOOD_ICON_CATEGORY_LABELS: Record<FoodIconCategoryId, string> = {
 }
 
 /** Couleur icône V3 (sobre, pas de glow). */
-export const FOOD_ICON_STROKE = '#FF2B2B'
+export const FOOD_ICON_STROKE = '#FF0702'
 
 type Rule = { id: FoodIconCategoryId; tags: string[] }
 

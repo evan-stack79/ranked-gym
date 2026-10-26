@@ -48,6 +48,37 @@ describe('exerciseSearch', () => {
     expect(results[0]?.id).toBe('leg_press')
   })
 
+  it('nouveaux exercices wave2 trouvables (goblet, fente bulgare, arnold)', () => {
+    expect(searchExercises('goblet').some((e) => e.id === 'goblet_squat')).toBe(true)
+    expect(searchExercises('fente bulgare').some((e) => e.id === 'bulgarian_split_squat')).toBe(
+      true,
+    )
+    expect(searchExercises('arnold').some((e) => e.id === 'arnold_press')).toBe(true)
+    expect(EXERCISE_CATALOG.some((c) => c.id === 'kettlebell_swing')).toBe(true)
+  })
+
+  it('nouveaux exercices wave3 trouvables (sumo, chin-up, roulette)', () => {
+    expect(searchExercises('sumo').some((e) => e.id === 'sumo_deadlift')).toBe(true)
+    expect(searchExercises('supination').some((e) => e.id === 'chin_up')).toBe(true)
+    expect(searchExercises('roulette').some((e) => e.id === 'ab_wheel')).toBe(true)
+    expect(searchExercises('fente arrière').some((e) => e.id === 'reverse_lunge')).toBe(true)
+  })
+
+  it('nouveaux exercices wave4 trouvables (pupitre, box squat, pendlay)', () => {
+    expect(searchExercises('pupitre').some((e) => e.id === 'preacher_curl')).toBe(true)
+    expect(searchExercises('box squat').some((e) => e.id === 'box_squat')).toBe(true)
+    expect(searchExercises('pendlay').some((e) => e.id === 'pendlay_row')).toBe(true)
+    expect(searchExercises('kickback').some((e) => e.id === 'cable_kickback')).toBe(true)
+  })
+
+  it('nouveaux exercices wave5 trouvables (hack squat, nordic, dragon flag)', () => {
+    expect(searchExercises('hack squat').some((e) => e.id === 'hack_squat')).toBe(true)
+    expect(searchExercises('nordic').some((e) => e.id === 'nordic_curl')).toBe(true)
+    expect(searchExercises('dragon').some((e) => e.id === 'dragon_flag')).toBe(true)
+    expect(searchExercises('t-bar').some((e) => e.id === 't_bar_row')).toBe(true)
+    expect(searchExercises('haussements').some((e) => e.id === 'shrug')).toBe(true)
+  })
+
   it('limite l’affichage initial à 8', () => {
     expect(searchExercises('').length).toBe(8)
     expect(countExerciseMatches('')).toBe(EXERCISE_CATALOG.length)

@@ -709,7 +709,7 @@ export function TrainingView({
             <button
               type="button"
               onClick={() => setPanel('agenda')}
-              className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-[#AEAEB2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/35"
+              className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-[#ACB4BA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/35"
               aria-label="Réglages"
             >
               <Settings2 className="h-5 w-5" aria-hidden="true" />
@@ -721,7 +721,7 @@ export function TrainingView({
           <button
             type="button"
             onClick={goHub}
-            className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/35"
+            className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/35"
             aria-label="Retour à Train"
           >
             <ChevronLeft className="h-5 w-5" />
@@ -733,7 +733,7 @@ export function TrainingView({
       )}
 
       {dueBanner && !immersiveLiveSession && panel !== 'hub' ? (
-        <div className="rounded-2xl border border-[#FF2B2B]/40 bg-[#FF2B2B]/15 px-4 py-3 text-[14px] font-semibold text-white">
+        <div className="rounded-2xl border border-[#FF0702]/40 bg-[#FF0702]/15 px-4 py-3 text-[14px] font-semibold text-white">
           {dueBanner}
         </div>
       ) : null}
@@ -751,7 +751,7 @@ export function TrainingView({
               onDismiss={() => refuseRecommendation(heroRec)}
             />
           ) : recsEnabled ? (
-            <p className="text-[14px] text-[#8E8E93]" data-training-reco-empty>
+            <p className="text-[14px] text-[#ACB4BA]" data-training-reco-empty>
               Aucune suggestion pour l’instant. Lance une séance depuis le bouton central.
             </p>
           ) : null}
@@ -824,7 +824,7 @@ export function TrainingView({
           />
         ) : (
           <section className="rounded-3xl border border-white/10 bg-[#141416] p-4">
-            <p className="text-[14px] text-[#AEAEB2]">
+            <p className="text-[14px] text-[#ACB4BA]">
               Passe en musculation pour ouvrir le carnet, ou choisis une autre activité.
             </p>
             <button
@@ -874,7 +874,7 @@ export function TrainingView({
           />
         ) : (
           <section className="rounded-3xl border border-white/10 bg-[#141416] p-4">
-            <p className="text-[14px] text-[#AEAEB2]">Active Course / Endurance pour noter une sortie.</p>
+            <p className="text-[14px] text-[#ACB4BA]">Active Course / Endurance pour noter une sortie.</p>
             <button
               type="button"
               onClick={() => {
@@ -978,8 +978,8 @@ export function TrainingView({
                 onClick={() => setDurationMin(m)}
                 className={`min-h-11 rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
                   durationMin === m
-                    ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-[#FF6961]'
-                    : 'border-white/10 text-[#8E8E93]'
+                    ? 'border-[#FF0702]/45 bg-[#FF0702]/20 text-[#FF907F]'
+                    : 'border-white/10 text-[#ACB4BA]'
                 }`}
               >
                 {m} min
@@ -990,7 +990,7 @@ export function TrainingView({
           {isTeamSheet ? (
             <div className="space-y-3">
               <div>
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#636366]">
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#717C83]">
                   Type de séance
                 </p>
                 <div className="flex flex-wrap gap-1.5">
@@ -1009,8 +1009,8 @@ export function TrainingView({
                       }}
                       className={`min-h-11 rounded-full border px-3 py-1.5 text-[12px] font-semibold ${
                         teamSessionType === opt.id
-                          ? 'border-[#FF2B2B]/45 bg-[#FF2B2B]/20 text-[#FF6961]'
-                          : 'border-white/10 text-[#8E8E93]'
+                          ? 'border-[#FF0702]/45 bg-[#FF0702]/20 text-[#FF907F]'
+                          : 'border-white/10 text-[#ACB4BA]'
                       }`}
                     >
                       {opt.label}
@@ -1021,7 +1021,7 @@ export function TrainingView({
 
               {teamSessionType === 'match' ? (
                 <label className="block">
-                  <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#636366]">
+                  <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#717C83]">
                     Minutes jouées (facultatif)
                   </span>
                   <div className="rounded-2xl border border-white/10 bg-black/35 px-3 py-3">
@@ -1045,7 +1045,7 @@ export function TrainingView({
               ) : null}
 
               <label className="block">
-                <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#636366]">
+                <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#717C83]">
                   Poste (facultatif)
                 </span>
                 <input
@@ -1053,7 +1053,7 @@ export function TrainingView({
                   value={teamPosition}
                   onChange={(e) => setTeamPosition(e.target.value)}
                   placeholder="Ex. milieu, ailier…"
-                  className="min-h-11 w-full rounded-2xl border border-white/10 bg-black/35 px-3 py-3 text-[15px] text-white outline-none placeholder:text-[#636366]"
+                  className="min-h-11 w-full rounded-2xl border border-white/10 bg-black/35 px-3 py-3 text-[15px] text-white outline-none placeholder:text-[#717C83]"
                 />
               </label>
             </div>
@@ -1072,7 +1072,7 @@ export function TrainingView({
 
       {toast && (
         <div
-          className="pointer-events-none fixed left-1/2 z-[70] max-w-[90%] -translate-x-1/2 rounded-full border border-white/10 bg-[#2C2C2E] px-4 py-2 text-center text-[13px] font-medium text-white shadow-lg"
+          className="pointer-events-none fixed left-1/2 z-[70] max-w-[90%] -translate-x-1/2 rounded-full border border-white/10 bg-[#25282A] px-4 py-2 text-center text-[13px] font-medium text-white shadow-lg"
           style={{
             bottom: isBarVisible
               ? 'calc(var(--rest-bar-bottom) + var(--rest-island-h) + 12px)'

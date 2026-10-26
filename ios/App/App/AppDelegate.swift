@@ -11,6 +11,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // LiveActivity, RestTimerSound) are compiled into the App target under Plugins/
         // and registered in MainViewController.capacitorDidLoad() — Capacitor does
         // not auto-register App-target plugins when using CAPBridgeViewController.
+        window?.backgroundColor = RankedPalette.background
+        window?.overrideUserInterfaceStyle = .dark
         return true
     }
 

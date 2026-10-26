@@ -20,7 +20,7 @@ export function MorphologyPicker({ value, onChange, compact = false }: Morpholog
       {!compact && (
         <div className="rounded-2xl border border-white/10 bg-black/25 px-3.5 py-3">
           <p className="text-[12px] font-semibold text-white">Comment savoir ?</p>
-          <p className="mt-1 text-[12px] leading-relaxed text-[#AEAEB2]">{MORPHOLOGY_HOW_TO}</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-[#ACB4BA]">{MORPHOLOGY_HOW_TO}</p>
         </div>
       )}
 
@@ -39,13 +39,13 @@ export function MorphologyPicker({ value, onChange, compact = false }: Morpholog
               }`}
             >
               <div className="flex items-center justify-between gap-2">
-                <p className={`text-[15px] font-semibold ${active ? 'text-white' : 'text-[#AEAEB2]'}`}>
+                <p className={`text-[15px] font-semibold ${active ? 'text-white' : 'text-[#ACB4BA]'}`}>
                   {MORPHOLOGY_LABELS[item]}
                 </p>
-                <span className="text-[11px] font-medium text-[#8E8E93]">{MORPHOLOGY_SHORT[item]}</span>
+                <span className="text-[11px] font-medium text-[#ACB4BA]">{MORPHOLOGY_SHORT[item]}</span>
               </div>
               {active && (
-                <p className="mt-1.5 text-[12px] leading-relaxed text-[#AEAEB2]">
+                <p className="mt-1.5 text-[12px] leading-relaxed text-[#ACB4BA]">
                   {MORPHOLOGY_HINTS[item]}
                 </p>
               )}
@@ -54,7 +54,7 @@ export function MorphologyPicker({ value, onChange, compact = false }: Morpholog
         })}
       </div>
 
-      <p className="text-[12px] leading-relaxed text-[#8E8E93]">{MORPHOLOGY_APP_TIP[value]}</p>
+      <p className="text-[12px] leading-relaxed text-[#ACB4BA]">{MORPHOLOGY_APP_TIP[value]}</p>
     </div>
   )
 }

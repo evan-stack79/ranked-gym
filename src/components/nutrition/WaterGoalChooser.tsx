@@ -56,7 +56,7 @@ export function WaterGoalChooser({
         </button>
       ) : (
         <form onSubmit={submit} className="space-y-2">
-          <label className="block text-[12px] font-medium text-[#AEAEB2]" htmlFor={inputId}>
+          <label className="block text-[12px] font-medium text-[#ACB4BA]" htmlFor={inputId}>
             Objectif (ml ou L)
           </label>
           <div className="flex items-center gap-2">
@@ -72,17 +72,17 @@ export function WaterGoalChooser({
                 setError(null)
               }}
               placeholder="En ml ou en L"
-              className="min-h-11 flex-1 rounded-xl border border-white/12 bg-black/35 px-3 text-[15px] text-white placeholder:text-[#636366] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/40"
+              className="min-h-11 flex-1 rounded-xl border border-white/12 bg-black/35 px-3 text-[15px] text-white placeholder:text-[#717C83] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/40"
             />
             <button
               type="submit"
-              className="ios-press min-h-11 shrink-0 rounded-xl bg-[#FF2B2B] px-3.5 py-2.5 text-[13px] font-semibold text-white"
+              className="ios-press min-h-11 shrink-0 rounded-xl bg-[#FF0702] px-3.5 py-2.5 text-[13px] font-semibold text-white"
             >
               OK
             </button>
           </div>
           {error ? (
-            <p className="text-[12px] font-medium text-[#FF6961]" role="alert">
+            <p className="text-[12px] font-medium text-[#FF907F]" role="alert">
               {error}
             </p>
           ) : null}
@@ -93,13 +93,13 @@ export function WaterGoalChooser({
               setRaw('')
               setError(null)
             }}
-            className="text-[12px] font-medium text-[#8E8E93] underline-offset-2 hover:underline"
+            className="text-[12px] font-medium text-[#ACB4BA] underline-offset-2 hover:underline"
           >
             Annuler
           </button>
         </form>
       )}
-      <p className="mt-2 text-[12px] leading-snug text-[#8E8E93]">{WATER_GOAL_CHOICE_ADVICE}</p>
+      <p className="mt-2 text-[12px] leading-snug text-[#ACB4BA]">{WATER_GOAL_CHOICE_ADVICE}</p>
     </div>
   )
 }

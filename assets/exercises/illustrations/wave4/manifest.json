@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "wave": 4,
+  "status": "wired_new_catalog_exercises",
+  "directory": "assets/exercises/illustrations/wave4/",
+  "format": {
+    "type": "image/png",
+    "width": 1024,
+    "height": 1024,
+    "aspect": "1:1",
+    "mode": "RGBA",
+    "background": "real_alpha"
+  },
+  "style_lock": "Same 3D monochrome graphite model as wave1/back-squat.png. Prior waves untouched.",
+  "entries": {
+    "good_morning": {
+      "canonical_id": "good_morning",
+      "label": "Good morning",
+      "file": "good-morning.png"
+    },
+    "cable_kickback": {
+      "canonical_id": "cable_kickback",
+      "label": "Kickback fessier",
+      "file": "cable-kickback.png"
+    },
+    "preacher_curl": {
+      "canonical_id": "preacher_curl",
+      "label": "Curl pupitre",
+      "file": "preacher-curl.png"
+    },
+    "close_grip_bench": {
+      "canonical_id": "close_grip_bench",
+      "label": "Développé prise serrée",
+      "file": "close-grip-bench.png"
+    },
+    "pendlay_row": {
+      "canonical_id": "pendlay_row",
+      "label": "Pendlay row",
+      "file": "pendlay-row.png"
+    },
+    "box_squat": {
+      "canonical_id": "box_squat",
+      "label": "Squat box",
+      "file": "box-squat.png"
+    },
+    "incline_dumbbell_curl": {
+      "canonical_id": "incline_dumbbell_curl",
+      "label": "Curl incliné",
+      "file": "incline-dumbbell-curl.png"
+    },
+    "russian_twist": {
+      "canonical_id": "russian_twist",
+      "label": "Russian twist",
+      "file": "russian-twist.png"
+    }
+  }
+}

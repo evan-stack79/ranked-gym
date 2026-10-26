@@ -193,7 +193,7 @@ export function PersonalInformationScreen({
           type="button"
           onClick={openAvatarPicker}
           disabled={avatarUploading}
-          className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/55 disabled:opacity-70"
+          className="ios-press relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/55 disabled:opacity-70"
           aria-label="Changer la photo de profil"
         >
           <Avatar
@@ -201,9 +201,9 @@ export function PersonalInformationScreen({
             imageUrl={displayAvatar}
             size="xl"
             loading={avatarUploading}
-            className="ring-2 ring-[#FF2B2B]/35"
+            className="ring-2 ring-[#FF0702]/35"
           />
-          <span className="absolute -bottom-0.5 -right-0.5 flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/20 bg-[#2C2C2E] text-white shadow-[0_4px_12px_rgb(0_0_0_/0.45)]">
+          <span className="absolute -bottom-0.5 -right-0.5 flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/20 bg-[#25282A] text-white shadow-[0_4px_12px_rgb(0_0_0_/0.45)]">
             {avatarUploading ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
             ) : (
@@ -222,7 +222,7 @@ export function PersonalInformationScreen({
         <button
           type="button"
           onClick={openAvatarPicker}
-          className="ios-press text-[13px] font-semibold text-[#FF2B2B]"
+          className="ios-press text-[13px] font-semibold text-[#FF0702]"
         >
           Changer la photo
         </button>
@@ -230,23 +230,23 @@ export function PersonalInformationScreen({
       </div>
 
       <div className="space-y-3">
-        <label className="block overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80 px-4 py-3">
-          <span className="text-[12px] font-semibold text-[#8E8E93]">Pseudo</span>
+        <label className="block overflow-hidden rounded-2xl border border-[#25282A] bg-[#141416]/80 px-4 py-3">
+          <span className="text-[12px] font-semibold text-[#ACB4BA]">Pseudo</span>
           <input
             type="text"
             value={pseudo}
             maxLength={24}
             onChange={(e) => setPseudo(e.target.value)}
-            className="mt-1 w-full bg-transparent text-[17px] font-semibold text-white outline-none placeholder:text-[#48484A]"
+            className="mt-1 w-full bg-transparent text-[17px] font-semibold text-white outline-none placeholder:text-[#596166]"
             placeholder="Ton pseudo"
             autoComplete="nickname"
           />
         </label>
 
-        <div className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80 px-4 py-3">
-          <p className="text-[12px] font-semibold text-[#8E8E93]">Adresse email</p>
+        <div className="overflow-hidden rounded-2xl border border-[#25282A] bg-[#141416]/80 px-4 py-3">
+          <p className="text-[12px] font-semibold text-[#ACB4BA]">Adresse email</p>
           <p className="mt-1 break-all text-[15px] text-[#EBEBF5]">{email || '—'}</p>
-          <p className="mt-1 text-[11px] text-[#636366]">
+          <p className="mt-1 text-[11px] text-[#717C83]">
             L’email est lié à ton compte. Contacte le support pour le modifier.
           </p>
         </div>
@@ -270,11 +270,11 @@ export function PersonalInformationScreen({
         ) : null}
 
         <div
-          className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#141416]/80 px-4 py-3"
+          className="overflow-hidden rounded-2xl border border-[#25282A] bg-[#141416]/80 px-4 py-3"
           data-profile-sports
         >
-          <p className="text-[12px] font-semibold text-[#8E8E93]">Sports</p>
-          <p className="mt-1 text-[12px] text-[#636366]">
+          <p className="text-[12px] font-semibold text-[#ACB4BA]">Sports</p>
+          <p className="mt-1 text-[12px] text-[#717C83]">
             Modifiable à tout moment — alimente les recommandations Training.
           </p>
           <div className="mt-3 max-h-72">
@@ -284,7 +284,7 @@ export function PersonalInformationScreen({
       </div>
 
       {error ? (
-        <p className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF6961]">
+        <p className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF907F]">
           {error}
         </p>
       ) : null}
@@ -314,7 +314,7 @@ export function PersonalInformationScreen({
         <button
           type="button"
           onClick={onOpenFullProfile}
-          className="ios-press text-center text-[13px] font-medium text-[#8E8E93]"
+          className="ios-press text-center text-[13px] font-medium text-[#ACB4BA]"
         >
           Voir mon profil complet (stats athlète)
         </button>

@@ -6,7 +6,9 @@ import {
   countExerciseMatches,
   searchExercises,
 } from '../../utils/exerciseSearch'
+import { resolvePickerIllustrationSrc } from '../../utils/exercisePickerIllustrations'
 import { BRAND_MARK_COMPACT_SRC } from '../brand/BrandMark'
+import { ExerciseFormGuide, ExerciseFormGuideTrigger } from './ExerciseFormGuide'
 import { ExercisePickerThumb } from './ExercisePickerThumb'
 import { getTrainingState } from '../../services/trainingStorage'
 
@@ -34,6 +36,7 @@ export function ExercisePicker({
   const [query, setQuery] = useState('')
   const [customOpen, setCustomOpen] = useState(false)
   const [customName, setCustomName] = useState('')
+  const [formGuide, setFormGuide] = useState<CatalogExercise | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const listId = useId()
 
@@ -87,7 +90,7 @@ export function ExercisePicker({
         <button
           type="button"
           onClick={onBack}
-          className="ios-press absolute left-3 top-1 flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 bg-[#1c1c1e] text-white"
+          className="ios-press absolute left-3 top-1 flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 bg-[#1d1f20] text-white"
           aria-label="Retour"
         >
           <ChevronLeft className="h-5 w-5" strokeWidth={2.25} />
@@ -108,17 +111,17 @@ export function ExercisePicker({
           <h1 className="text-[22px] font-bold leading-tight tracking-tight text-white">
             {title}
           </h1>
-          <p className="mt-1.5 text-[14px] font-medium leading-snug text-[#8E8E93]">
+          <p className="mt-1.5 text-[14px] font-medium leading-snug text-[#ACB4BA]">
             {subtitle}
           </p>
         </header>
 
         {/* Search — graphite, coins modérés */}
         <label
-          className="mb-2 flex min-h-12 shrink-0 items-center gap-2.5 rounded-2xl bg-[#2c2c2e] px-3.5"
+          className="mb-2 flex min-h-12 shrink-0 items-center gap-2.5 rounded-2xl bg-[#25282a] px-3.5"
           htmlFor={`${listId}-search`}
         >
-          <Search className="h-5 w-5 shrink-0 text-[#8E8E93]" aria-hidden="true" />
+          <Search className="h-5 w-5 shrink-0 text-[#ACB4BA]" aria-hidden="true" />
           <input
             ref={searchRef}
             id={`${listId}-search`}
@@ -132,7 +135,7 @@ export function ExercisePicker({
             enterKeyHint="search"
             aria-label="Rechercher un exercice"
             aria-controls={listId}
-            className="min-h-11 w-full bg-transparent text-[16px] text-white placeholder:text-[#636366] outline-none [&::-webkit-search-cancel-button]:hidden"
+            className="min-h-11 w-full bg-transparent text-[16px] text-white placeholder:text-[#717C83] outline-none [&::-webkit-search-cancel-button]:hidden"
           />
           {query ? (
             <button
@@ -141,7 +144,7 @@ export function ExercisePicker({
                 setQuery('')
                 searchRef.current?.focus()
               }}
-              className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full text-[#AEAEB2]"
+              className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full text-[#ACB4BA]"
               aria-label="Effacer la recherche"
             >
               <X className="h-4 w-4" strokeWidth={2.5} />
@@ -162,10 +165,15 @@ export function ExercisePicker({
               exercise={ex}
               active={index === 0}
               onSelect={() => onSelect(ex)}
+              onOpenFormGuide={
+                resolvePickerIllustrationSrc(ex.id)
+                  ? () => setFormGuide(ex)
+                  : undefined
+              }
             />
           ))}
           {results.length === 0 ? (
-            <li className="px-1 py-8 text-center text-[14px] text-[#8E8E93]">
+            <li className="px-1 py-8 text-center text-[14px] text-[#ACB4BA]">
               Aucun exercice trouvé
             </li>
           ) : null}
@@ -183,7 +191,7 @@ export function ExercisePicker({
                   onChange={(e) => setCustomName(e.target.value)}
                   placeholder="Nom de ton exercice"
                   autoFocus
-                  className="min-h-11 w-full rounded-xl border border-white/12 bg-[#1c1c1e] px-3.5 text-[15px] text-white placeholder:text-[#636366] outline-none focus-visible:border-[#FF2B2B]/55"
+                  className="min-h-11 w-full rounded-xl border border-white/12 bg-[#1d1f20] px-3.5 text-[15px] text-white placeholder:text-[#717C83] outline-none focus-visible:border-[#FF0702]/55"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') submitCustom()
                   }}
@@ -193,7 +201,7 @@ export function ExercisePicker({
                 type="button"
                 onClick={submitCustom}
                 disabled={!customName.trim()}
-                className="ios-press flex min-h-11 w-full items-center justify-center rounded-xl bg-[#FF2B2B] text-[14px] font-semibold text-white disabled:opacity-40"
+                className="ios-press flex min-h-11 w-full items-center justify-center rounded-xl bg-[#FF0702] text-[14px] font-semibold text-white disabled:opacity-40"
               >
                 Créer et ajouter
               </button>
@@ -211,7 +219,7 @@ export function ExercisePicker({
             </button>
           )}
           <p
-            className="pb-1 text-center text-[12px] tabular-nums text-[#636366]"
+            className="pb-1 text-center text-[12px] tabular-nums text-[#717C83]"
             aria-live="polite"
             data-result-count
           >
@@ -219,6 +227,12 @@ export function ExercisePicker({
           </p>
         </div>
       </div>
+
+      <ExerciseFormGuide
+        exercise={formGuide}
+        open={Boolean(formGuide)}
+        onClose={() => setFormGuide(null)}
+      />
     </section>
   )
 }
@@ -227,42 +241,53 @@ function ExerciseResultRow({
   exercise,
   active,
   onSelect,
+  onOpenFormGuide,
 }: {
   exercise: CatalogExercise
   active: boolean
   onSelect: () => void
+  onOpenFormGuide?: () => void
 }) {
   const meta = formatCatalogMeta(exercise)
 
   return (
     <li role="option" aria-selected={active}>
-      <button
-        type="button"
-        onClick={onSelect}
-        data-exercise-id={exercise.id}
-        data-result-active={active ? 'true' : 'false'}
-        className="ios-press relative flex min-h-16 w-full items-center gap-3 border-b border-[#2c2c2e] py-2.5 pl-3.5 pr-1 text-left"
-      >
+      <div className="relative flex min-h-16 w-full items-center gap-3 border-b border-[#25282a] py-2.5 pl-3.5 pr-1">
         {active ? (
           <span
-            className="absolute left-0 top-3 bottom-3 w-[2.5px] rounded-full bg-[#FF2B2B]"
+            className="absolute left-0 top-3 bottom-3 w-[2.5px] rounded-full bg-[#FF0702]"
             aria-hidden="true"
           />
         ) : null}
 
-        <ExercisePickerThumb canonicalExerciseId={exercise.id} />
+        <button
+          type="button"
+          onClick={onSelect}
+          data-exercise-id={exercise.id}
+          data-result-active={active ? 'true' : 'false'}
+          className="ios-press flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
+          <ExercisePickerThumb canonicalExerciseId={exercise.id} />
 
-        <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-semibold leading-snug text-white">{exercise.name}</p>
-          <p className="mt-0.5 text-[12px] leading-snug text-[#8E8E93]">{meta}</p>
-        </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-semibold leading-snug text-white">{exercise.name}</p>
+            <p className="mt-0.5 text-[12px] leading-snug text-[#ACB4BA]">{meta}</p>
+          </div>
+        </button>
+
+        {onOpenFormGuide ? (
+          <ExerciseFormGuideTrigger
+            onOpen={onOpenFormGuide}
+            label={`Voir l’exécution de ${exercise.name}`}
+          />
+        ) : null}
 
         <ChevronRight
-          className="h-5 w-5 shrink-0 text-[#636366]"
+          className="h-5 w-5 shrink-0 text-[#717C83]"
           strokeWidth={2}
           aria-hidden="true"
         />
-      </button>
+      </div>
     </li>
   )
 }

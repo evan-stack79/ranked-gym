@@ -105,12 +105,12 @@ export function BrandMark({
             style={{ filter: 'none', transform: 'none' }}
           >
             <span data-brand-wordmark={variant}>
-              Ranked <span className="text-[#FF2B2B]">Gym</span>
+              Ranked <span className="text-[#FF0702]">Gym</span>
             </span>
           </p>
           {tagline ? (
             <p
-              className={`mt-1 max-w-[20rem] truncate font-medium tracking-tight text-[#8E8E93] ${cfg.taglineClass}`}
+              className={`mt-1 max-w-[20rem] truncate font-medium tracking-tight text-[#ACB4BA] ${cfg.taglineClass}`}
             >
               {tagline}
             </p>

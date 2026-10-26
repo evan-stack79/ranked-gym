@@ -36,7 +36,7 @@ export function FoodProductCard({
       aria-pressed={selected}
       className={`relative flex w-full flex-col overflow-hidden rounded-[22px] border bg-[#1A1A1C] text-left transition-[border-color,box-shadow] ${
         selected
-          ? 'border-[#FF2B2B] shadow-[0_0_0_1px_rgb(255_43_43_/_0.35)]'
+          ? 'border-[#FF0702] shadow-[0_0_0_1px_rgb(255_7_2_/_0.35)]'
           : 'border-white/[0.08]'
       }`}
     >
@@ -50,7 +50,7 @@ export function FoodProductCard({
         {selected ? (
           <span
             data-food-card-check
-            className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-white text-[#FF2B2B] shadow-[0_2px_8px_rgb(0_0_0_/_0.35)]"
+            className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-white text-[#FF0702] shadow-[0_2px_8px_rgb(0_0_0_/_0.35)]"
             aria-hidden
           >
             <Check className="h-4 w-4" strokeWidth={3} />

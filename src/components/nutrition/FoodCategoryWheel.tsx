@@ -50,7 +50,7 @@ interface FoodCategoryWheelProps {
 
 /**
  * Roue catégorie en ARC horizontal (swipe + inertie).
- * Icônes rondes ; « Tout » = gros rond rouge #FF2B2B au centre.
+ * Icônes rondes ; « Tout » = gros rond rouge #FF0702 au centre.
  */
 export function FoodCategoryWheel({ value, onChange }: FoodCategoryWheelProps) {
   const offsetRef = useRef(0)
@@ -218,7 +218,7 @@ export function FoodCategoryWheel({ value, onChange }: FoodCategoryWheelProps) {
         style={{
           transform: 'translateY(40px)',
           background:
-            'radial-gradient(ellipse 55% 100% at 50% 0%, rgb(255 43 43 / 0.12) 0%, transparent 72%)',
+            'radial-gradient(ellipse 55% 100% at 50% 0%, rgb(255 7 2 / 0.12) 0%, transparent 72%)',
         }}
         aria-hidden
       />
@@ -256,17 +256,17 @@ export function FoodCategoryWheel({ value, onChange }: FoodCategoryWheelProps) {
               <span
                 className={`flex items-center justify-center rounded-full ${
                   selected && isAll
-                    ? 'bg-[#FF2B2B] text-white'
+                    ? 'bg-[#FF0702] text-white'
                     : selected
                       ? 'bg-white/[0.12] text-white'
-                      : 'bg-white/[0.06] text-[#AEAEB2]'
+                      : 'bg-white/[0.06] text-[#ACB4BA]'
                 }`}
                 style={{
                   width: circleSize,
                   height: circleSize,
                   boxShadow:
                     selected && isAll
-                      ? '0 0 18px 2px rgb(255 43 43 / 0.45)'
+                      ? '0 0 18px 2px rgb(255 7 2 / 0.45)'
                       : selected
                         ? '0 0 12px rgb(255 255 255 / 0.08)'
                         : undefined,

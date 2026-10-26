@@ -10,9 +10,9 @@ export function YourDataMealsEraseFixture() {
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   return (
-    <div className="min-h-[100dvh] bg-[#0C0C0E] px-4 py-8 text-white">
+    <div className="min-h-[100dvh] bg-[#000000] px-4 py-8 text-white">
       <h1 className="text-[28px] font-bold tracking-tight">Sécurité & Confidentialité</h1>
-      <p className="mt-1 text-[14px] text-[#8E8E93]">Compte, Mode Furtif & données</p>
+      <p className="mt-1 text-[14px] text-[#ACB4BA]">Compte, Mode Furtif & données</p>
       <div className="mt-6">
         <YourDataMealsErasePanel
           serverCount={serverCount}

@@ -48,8 +48,8 @@ interface ChartLoadingOverlayProps {
 
 export function ChartLoadingOverlay({ label }: ChartLoadingOverlayProps) {
   return (
-    <p className="flex items-center justify-center gap-2 py-2 text-[12px] text-[#8E8E93]" aria-busy="true">
-      <span className="avatar-spinner h-4 w-4 rounded-full border-2 border-white/20 border-t-[#FF2B2B]" />
+    <p className="flex items-center justify-center gap-2 py-2 text-[12px] text-[#ACB4BA]" aria-busy="true">
+      <span className="avatar-spinner h-4 w-4 rounded-full border-2 border-white/20 border-t-[#FF0702]" />
       {label ?? ''}
     </p>
   )

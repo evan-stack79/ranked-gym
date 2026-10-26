@@ -359,12 +359,12 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
         {activeStep === 'welcome' ? (
           <div className="space-y-4" data-testid="inscription-welcome">
             <p
-              className="text-[15px] leading-relaxed text-[#AEAEB2]"
+              className="text-[15px] leading-relaxed text-[#ACB4BA]"
               data-testid="inscription-reperes"
             >
               {M_INFO_1}
             </p>
-            <p className="text-[14px] leading-relaxed text-[#8E8E93]">
+            <p className="text-[14px] leading-relaxed text-[#ACB4BA]">
               Quelques questions facultatives pour adapter ce que l&apos;app te propose. Tu peux
               répondre Plus tard à tout moment.
             </p>
@@ -383,7 +383,7 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
               aria-label="Âge en années"
               validateParsed={(n) => sanitizeAge(n) != null}
             />
-            <p className="text-center text-[12px] text-[#636366]">
+            <p className="text-center text-[12px] text-[#717C83]">
               {draft.age == null ? 'Fais glisser ou tape pour choisir' : `${draft.age} ans`}
             </p>
           </div>
@@ -419,7 +419,7 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
 
         {activeStep === 'health' ? (
           <div className="space-y-3" data-testid="inscription-health">
-            <p className="text-[13px] leading-relaxed text-[#AEAEB2]">{Q7_INTRO}</p>
+            <p className="text-[13px] leading-relaxed text-[#ACB4BA]">{Q7_INTRO}</p>
             <div className="space-y-2">
               {showPregBreast ? (
                 <>
@@ -492,7 +492,7 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
               aria-label="Taille en cm"
               validateParsed={(cm) => sanitizeHeightCm(cm) != null}
             />
-            <p className="text-center text-[12px] text-[#636366]">
+            <p className="text-center text-[12px] text-[#717C83]">
               {draft.heightCm == null
                 ? 'Fais glisser ou tape pour choisir'
                 : `${Math.round(draft.heightCm)} cm`}
@@ -517,7 +517,7 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
               aria-label="Poids en kg"
               validateParsed={(kg) => sanitizeWeightKg(kg) != null}
             />
-            <p className="text-center text-[12px] text-[#636366]">
+            <p className="text-center text-[12px] text-[#717C83]">
               {draft.weightKg == null ? 'Fais glisser ou tape pour choisir' : `${draft.weightKg} kg`}
             </p>
           </div>
@@ -545,7 +545,7 @@ export function InscriptionFlow({ initial, onComplete }: InscriptionFlowProps) {
         <button
           type="button"
           onClick={onPlusTard}
-          className="ios-press min-h-12 flex-1 rounded-2xl border border-white/15 bg-white/5 py-3 text-[15px] font-semibold text-[#AEAEB2]"
+          className="ios-press min-h-12 flex-1 rounded-2xl border border-white/15 bg-white/5 py-3 text-[15px] font-semibold text-[#ACB4BA]"
           data-testid="inscription-later"
         >
           Plus tard
@@ -624,7 +624,7 @@ function HealthChoice({
       </button>
       {hint ? (
         <p
-          className="px-1 text-[12px] leading-snug text-[#8E8E93]"
+          className="px-1 text-[12px] leading-snug text-[#ACB4BA]"
           data-testid={`${testId}-lock-hint`}
         >
           {hint}

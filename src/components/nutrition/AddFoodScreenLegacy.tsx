@@ -25,7 +25,7 @@ function MealTypeChip({
       className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-all ${
         active
           ? 'border-[#34C759]/45 bg-[#34C759]/20 text-[#30D158]'
-          : 'border-white/10 bg-black/25 text-[#8E8E93]'
+          : 'border-white/10 bg-black/25 text-[#ACB4BA]'
       }`}
     >
       {MEAL_TYPE_LABELS[type]}
@@ -127,7 +127,7 @@ export function AddFoodScreenLegacy({
       role="dialog"
       aria-modal="true"
       aria-labelledby="add-food-title"
-      className="fixed inset-0 z-[90] flex h-[100dvh] w-screen flex-col bg-[#0C0C0E]"
+      className="fixed inset-0 z-[90] flex h-[100dvh] w-screen flex-col bg-[#000000]"
       style={{
         paddingTop: 'env(safe-area-inset-top, 0px)',
         paddingLeft: 'env(safe-area-inset-left, 0px)',
@@ -153,7 +153,7 @@ export function AddFoodScreenLegacy({
         <label className="relative block">
           <span className="sr-only">Rechercher un aliment</span>
           <Search
-            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8E8E93]"
+            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#ACB4BA]"
             strokeWidth={2.25}
             aria-hidden
           />
@@ -162,7 +162,7 @@ export function AddFoodScreenLegacy({
             value={searchQuery}
             onChange={(e) => onSearchQueryChange(e.target.value)}
             placeholder="Rechercher un aliment, une marque..."
-            className="w-full rounded-2xl border border-white/10 bg-[#1C1C1E] py-3.5 pl-10 pr-3.5 text-[15px] text-white placeholder:text-[#636366] outline-none focus:border-[#FF2B2B]/45"
+            className="w-full rounded-2xl border border-white/10 bg-[#1D1F20] py-3.5 pl-10 pr-3.5 text-[15px] text-white placeholder:text-[#717C83] outline-none focus:border-[#FF0702]/45"
             autoComplete="off"
             autoFocus
             role="searchbox"
@@ -218,7 +218,7 @@ export function AddFoodScreenLegacy({
           <button
             type="button"
             onClick={() => setManualOpen((v) => !v)}
-            className="ios-press w-full py-2 text-left text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]"
+            className="ios-press w-full py-2 text-left text-[12px] font-semibold uppercase tracking-wider text-[#ACB4BA]"
             aria-expanded={manualOpen}
           >
             {manualOpen ? 'Masquer la saisie manuelle' : 'Ou saisie manuelle'}
@@ -241,20 +241,20 @@ export function AddFoodScreenLegacy({
               </div>
 
               <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Nom</span>
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">Nom</span>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => onNameChange(e.target.value)}
                   placeholder="Poulet riz brocoli…"
-                  className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#34C759]/40"
+                  className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#596166] outline-none focus:border-[#34C759]/40"
                   required
                 />
               </label>
 
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
-                  <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                  <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">
                     Calories
                   </span>
                   <input
@@ -269,7 +269,7 @@ export function AddFoodScreenLegacy({
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                  <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">
                     Protéines (g)
                   </span>
                   <input
@@ -282,11 +282,11 @@ export function AddFoodScreenLegacy({
                       onProteinChange(e.target.value === '' ? '' : Number(e.target.value))
                     }
                     placeholder="Optionnel"
-                    className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/40"
+                    className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#596166] outline-none focus:border-[#FF0702]/40"
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                  <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">
                     Glucides (g)
                   </span>
                   <input
@@ -299,11 +299,11 @@ export function AddFoodScreenLegacy({
                       onCarbsChange(e.target.value === '' ? '' : Number(e.target.value))
                     }
                     placeholder="Optionnel"
-                    className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF9F0A]/40"
+                    className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#596166] outline-none focus:border-[#FF9F0A]/40"
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                  <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">
                     Lipides (g)
                   </span>
                   <input
@@ -316,7 +316,7 @@ export function AddFoodScreenLegacy({
                       onFatChange(e.target.value === '' ? '' : Number(e.target.value))
                     }
                     placeholder="Optionnel"
-                    className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#48484A] outline-none focus:border-[#00B4FF]/40"
+                    className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white placeholder:text-[#596166] outline-none focus:border-[#00B4FF]/40"
                   />
                 </label>
               </div>

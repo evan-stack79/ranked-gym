@@ -40,6 +40,78 @@ describe('resolvePickerIllustrationSrc', () => {
     }
   })
 
+  it('associe les 8 ids wave2 (nouveaux exercices) au PNG 3D', () => {
+    const wave2 = [
+      'goblet_squat',
+      'bulgarian_split_squat',
+      'hammer_curl',
+      'arnold_press',
+      'hanging_leg_raise',
+      'kettlebell_swing',
+      'chest_supported_row',
+      'farmer_carry',
+    ] as const
+    for (const id of wave2) {
+      const src = resolvePickerIllustrationSrc(id)
+      expect(src, id).toBeTruthy()
+      expect(src).toMatch(/\.png/i)
+    }
+  })
+
+  it('associe les 8 ids wave3 (nouveaux exercices) au PNG 3D', () => {
+    const wave3 = [
+      'sumo_deadlift',
+      'rear_delt_fly',
+      'overhead_triceps_extension',
+      'seated_dumbbell_press',
+      'reverse_lunge',
+      'chin_up',
+      'concentration_curl',
+      'ab_wheel',
+    ] as const
+    for (const id of wave3) {
+      const src = resolvePickerIllustrationSrc(id)
+      expect(src, id).toBeTruthy()
+      expect(src).toMatch(/\.png/i)
+    }
+  })
+
+  it('associe les 8 ids wave4 (nouveaux exercices) au PNG 3D', () => {
+    const wave4 = [
+      'good_morning',
+      'cable_kickback',
+      'preacher_curl',
+      'close_grip_bench',
+      'pendlay_row',
+      'box_squat',
+      'incline_dumbbell_curl',
+      'russian_twist',
+    ] as const
+    for (const id of wave4) {
+      const src = resolvePickerIllustrationSrc(id)
+      expect(src, id).toBeTruthy()
+      expect(src).toMatch(/\.png/i)
+    }
+  })
+
+  it('associe les 8 ids wave5 (nouveaux exercices) au PNG 3D', () => {
+    const wave5 = [
+      't_bar_row',
+      'hack_squat',
+      'shrug',
+      'cable_crunch',
+      'nordic_curl',
+      'landmine_press',
+      'step_up',
+      'dragon_flag',
+    ] as const
+    for (const id of wave5) {
+      const src = resolvePickerIllustrationSrc(id)
+      expect(src, id).toBeTruthy()
+      expect(src).toMatch(/\.png/i)
+    }
+  })
+
   it('bench_press → asset webp validé, jamais une PNG wave1', () => {
     const entry = WAVE1_ENTRIES.bench_press
     expect(entry.file).toBeNull()

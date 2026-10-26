@@ -55,7 +55,7 @@ vi.mock('../../services/trainingStorage', async (importOriginal) => {
           id: 'push',
           label: 'Push',
           subtitle: 'Poussée',
-          accent: '#FF2B2B',
+          accent: '#FF0702',
           updatedAt: Date.now(),
           exercises: [
             {

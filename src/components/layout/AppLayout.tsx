@@ -76,24 +76,24 @@ export function AppLayout({
       */}
       {showHeader ? (
         <header
-          className="sticky top-0 z-30 shrink-0 border-b border-white/5"
+          className="relative sticky top-0 z-30 shrink-0 border-b border-white/5"
           data-app-brand-header="1"
           aria-hidden={streakCelebrationActive ? true : undefined}
-          /* Safe-area seule — pas de padding fixe empilé par-dessus (Dynamic Island). */
+          /* Safe-area seule — le mesh du shell passe sous la status bar (overlay natif). */
           style={{
             paddingTop: 'var(--app-safe-area-top, env(safe-area-inset-top, 0px))',
           }}
         >
           {/*
-            Fond (et éventuel blur) en calque frère ABSOLU sous le contenu —
-            jamais backdrop-filter / opacity / filter sur un ancêtre du logo/texte
-            (WebKit iOS rasterise alors les enfants en basse résolution).
+            Fond opaque uniquement sous la rangée logo — pas sur la zone safe-area,
+            sinon bande noire plate sous l’heure (status bar « non transparente »).
+            Jamais backdrop-filter / opacity / filter sur un ancêtre du logo/texte.
           */}
           <div className="relative">
             <div
               aria-hidden="true"
               data-brand-header-bg="1"
-              className="pointer-events-none absolute inset-0 -z-10 bg-[#0C0C0E]"
+              className="pointer-events-none absolute inset-0 -z-10 bg-[#000000]"
             />
             <div className="mx-auto flex max-w-lg items-center justify-center px-4 pb-2 pt-0">
               <div data-cold-launch-target="compact">

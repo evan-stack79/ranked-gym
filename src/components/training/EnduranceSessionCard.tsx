@@ -78,11 +78,11 @@ export function EnduranceSessionCard({
   return (
     <section className="space-y-3">
       <div className="px-1">
-        <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+        <p className="text-[12px] font-semibold uppercase tracking-wider text-[#ACB4BA]">
           Séance {discipline.shortLabel}
         </p>
         <h2 className="text-[20px] font-bold text-white">Distance & allure</h2>
-        <p className="mt-1 text-[12px] text-[#AEAEB2]">
+        <p className="mt-1 text-[12px] text-[#ACB4BA]">
           Note ta sortie — Nutri recalcule avec ton poids ({bodyWeightKg} kg).
         </p>
       </div>
@@ -90,7 +90,7 @@ export function EnduranceSessionCard({
       <div
         className="rounded-3xl border border-white/10 p-4"
         style={{
-          background: `radial-gradient(ellipse 90% 70% at 100% 0%, ${discipline.accent}33 0%, transparent 55%), #1C1C1E`,
+          background: `radial-gradient(ellipse 90% 70% at 100% 0%, ${discipline.accent}33 0%, transparent 55%), #1D1F20`,
           boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.06)',
         }}
       >
@@ -98,13 +98,13 @@ export function EnduranceSessionCard({
           <IconBadge icon={Route} variant="green" size="md" />
           <div>
             <p className="text-[15px] font-semibold text-white">{discipline.label}</p>
-            <p className="text-[11px] text-[#8E8E93]">Suivi endurance</p>
+            <p className="text-[11px] text-[#ACB4BA]">Suivi endurance</p>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
-            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#636366]">
+            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#717C83]">
               Distance (km)
             </span>
             <div className="rounded-2xl border border-white/10 bg-black/35 px-3 py-3">
@@ -121,7 +121,7 @@ export function EnduranceSessionCard({
             </div>
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#636366]">
+            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#717C83]">
               Durée (min)
             </span>
             <div className="rounded-2xl border border-white/10 bg-black/35 px-3 py-3">
@@ -141,14 +141,14 @@ export function EnduranceSessionCard({
 
         <div className="mt-3 grid grid-cols-2 gap-2">
           <div className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2.5">
-            <p className="flex items-center gap-1.5 text-[11px] text-[#8E8E93]">
+            <p className="flex items-center gap-1.5 text-[11px] text-[#ACB4BA]">
               <Timer className="h-3.5 w-3.5" />
               Allure
             </p>
             <p className="mt-0.5 text-[18px] font-bold text-white">{formatPace(paceSecPerKm)}</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2.5">
-            <p className="flex items-center gap-1.5 text-[11px] text-[#8E8E93]">
+            <p className="flex items-center gap-1.5 text-[11px] text-[#ACB4BA]">
               <Gauge className="h-3.5 w-3.5" />
               Distance
             </p>

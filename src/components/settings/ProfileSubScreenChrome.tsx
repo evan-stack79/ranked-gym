@@ -27,7 +27,7 @@ export function ProfileSubScreenHeader({
       </button>
       <div className="min-w-0 flex-1">
         <h1 className="text-[20px] font-bold tracking-tight text-white">{title}</h1>
-        {subtitle ? <p className="text-[13px] text-[#8E8E93]">{subtitle}</p> : null}
+        {subtitle ? <p className="text-[13px] text-[#ACB4BA]">{subtitle}</p> : null}
       </div>
       {trailing}
     </div>
@@ -54,19 +54,19 @@ export function SettingsActionRow({
       type="button"
       onClick={onClick}
       className={`ios-press flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors active:bg-white/[0.04] ${
-        danger ? 'text-[#FF6961]' : 'text-white'
+        danger ? 'text-[#FF907F]' : 'text-white'
       }`}
     >
       <span
         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-          danger ? 'bg-[#FF453A]/15 text-[#FF6961]' : 'bg-white/[0.06] text-[#EBEBF5]'
+          danger ? 'bg-[#FF453A]/15 text-[#FF907F]' : 'bg-white/[0.06] text-[#EBEBF5]'
         }`}
       >
         <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
       </span>
       <span className="min-w-0 flex-1 text-[16px] font-medium">{label}</span>
       {showChevron ? (
-        <span className={`text-[18px] ${danger ? 'text-[#FF6961]/60' : 'text-[#636366]'}`}>›</span>
+        <span className={`text-[18px] ${danger ? 'text-[#FF907F]/60' : 'text-[#717C83]'}`}>›</span>
       ) : null}
     </button>
   )

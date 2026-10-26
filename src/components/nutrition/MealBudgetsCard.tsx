@@ -27,11 +27,11 @@ export function MealBudgetsCard({ targetCalories, morphology, meals }: MealBudge
   return (
     <section className="glass-card space-y-3 rounded-3xl p-4">
       <div>
-        <p className="text-[12px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+        <p className="text-[12px] font-semibold uppercase tracking-wider text-[#ACB4BA]">
           Repères par repas
         </p>
         <h3 className="text-[17px] font-bold text-white">Répartition indicative</h3>
-        <p className="mt-1 text-[13px] leading-relaxed text-[#AEAEB2]">
+        <p className="mt-1 text-[13px] leading-relaxed text-[#ACB4BA]">
           Repères pour les 4 repas (environ {formatFrInteger(dailyTarget)} kcal au total).
         </p>
       </div>
@@ -47,25 +47,25 @@ export function MealBudgetsCard({ targetCalories, morphology, meals }: MealBudge
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <Icon className="h-4 w-4 text-[#8E8E93]" />
+                  <Icon className="h-4 w-4 text-[#ACB4BA]" />
                   <p className="text-[14px] font-semibold text-white">
                     {MEAL_TYPE_LABELS[row.mealType]}
                   </p>
                 </div>
                 <p className="text-[13px] font-bold text-white">
                   {formatFrInteger(row.budget)}{' '}
-                  <span className="font-medium text-[#636366]">kcal</span>
+                  <span className="font-medium text-[#717C83]">kcal</span>
                 </p>
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
                 <div
-                  className="motion-progress-fill h-full rounded-full bg-[#AEAEB2]"
+                  className="motion-progress-fill h-full rounded-full bg-[#ACB4BA]"
                   style={{
                     transform: `scaleX(${Math.max(progress, row.used > 0 ? 0.06 : 0)})`,
                   }}
                 />
               </div>
-              <p className="mt-1.5 text-[12px] text-[#8E8E93]">
+              <p className="mt-1.5 text-[12px] text-[#ACB4BA]">
                 Noté {formatFrInteger(row.used)} kcal
                 {row.remaining > 0
                   ? ` · reste indicatif ${formatFrInteger(row.remaining)} kcal`
@@ -76,7 +76,7 @@ export function MealBudgetsCard({ targetCalories, morphology, meals }: MealBudge
         })}
       </ul>
 
-      <p className="text-center text-[13px] text-[#AEAEB2]">
+      <p className="text-center text-[13px] text-[#ACB4BA]">
         Total repères{' '}
         <span className="font-semibold text-white">{formatFrInteger(sumBudgets)} kcal</span>
         {' · '}

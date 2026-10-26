@@ -9,7 +9,7 @@ export function OfflineBanner() {
       aria-live="polite"
       data-offline-banner="1"
     >
-      <p className="rounded-full border border-white/15 bg-[#1C1C1E]/92 px-3 py-1 text-[12px] font-semibold text-[#AEAEB2] shadow-lg backdrop-blur-md">
+      <p className="rounded-full border border-white/15 bg-[#1D1F20]/92 px-3 py-1 text-[12px] font-semibold text-[#ACB4BA] shadow-lg backdrop-blur-md">
         {USER_OFFLINE_LABEL}
       </p>
     </div>

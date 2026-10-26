@@ -68,11 +68,11 @@ export const rankVisuals: Record<RankTier, RankVisual> = {
   },
   Légende: {
     background:
-      'radial-gradient(ellipse 130% 110% at 25% 8%, #FFD700 0%, #FF6B00 22%, #FF2B2B 48%, #8B0000 78%, #2A0505 100%)',
+      'radial-gradient(ellipse 130% 110% at 25% 8%, #FFD700 0%, #FF6B00 22%, #FF0702 48%, #8B0000 78%, #2A0505 100%)',
     label: 'text-white',
     sublabel: 'text-[#FFE8A0]',
     border: 'border-[#FFD700]/70',
-    glow: '0 0 52px rgb(255 43 43 / 0.55), 0 0 24px rgb(255 215 0 / 0.35)',
+    glow: '0 0 52px rgb(255 7 2 / 0.55), 0 0 24px rgb(255 215 0 / 0.35)',
     haloRgb: '255, 107, 0',
   },
 }

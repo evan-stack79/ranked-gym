@@ -191,13 +191,13 @@ export function TrainSheet({
               {leading}
               <div className="min-w-0">
                 <h2 id={titleId} className="text-[17px] font-semibold tracking-tight text-white">{title}</h2>
-                {subtitle && <p className="mt-0.5 text-[13px] text-[#AEAEB2]">{subtitle}</p>}
+                {subtitle && <p className="mt-0.5 text-[13px] text-[#ACB4BA]">{subtitle}</p>}
               </div>
             </div>
             <div className="flex shrink-0 items-start">
               {headerActions}
               <button type="button" onClick={onClose} disabled={!dismissible} aria-label="Fermer"
-                className={`ios-press flex min-h-11 min-w-11 shrink-0 items-center justify-center text-[#AEAEB2] disabled:opacity-40 ${
+                className={`ios-press flex min-h-11 min-w-11 shrink-0 items-center justify-center text-[#ACB4BA] disabled:opacity-40 ${
                   graphite
                     ? 'text-[22px] leading-none'
                     : 'rounded-full border border-white/10 bg-white/5 text-[18px] leading-none'

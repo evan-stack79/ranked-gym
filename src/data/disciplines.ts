@@ -34,7 +34,7 @@ export const APP_DISCIPLINES: AppDiscipline[] = [
     shortLabel: 'Muscu',
     family: 'strength',
     primarySportId: 'musculation',
-    accent: '#FF2B2B',
+    accent: '#FF0702',
     placeQueries: [
       { type: 'gym' },
       { type: 'fitness_center' },

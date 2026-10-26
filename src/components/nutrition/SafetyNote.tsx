@@ -17,7 +17,7 @@ export function SafetyNote({
 }: SafetyNoteProps) {
   return (
     <div className="mt-2 space-y-1.5 px-1" data-testid="safety-note">
-      <p className="text-[11px] leading-relaxed text-[#636366]">{M_INFO_1}</p>
+      <p className="text-[11px] leading-relaxed text-[#717C83]">{M_INFO_1}</p>
       {onNeedToTalk ? (
         <button
           type="button"

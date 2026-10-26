@@ -41,14 +41,14 @@ export function AgeRequiredPrompt({ onAgeSubmit }: AgeRequiredPromptProps) {
         <h1 id="age-required-title" className="text-[34px] font-bold tracking-tight text-white">
           Ton âge
         </h1>
-        <p className="mt-2 text-[15px] leading-relaxed text-[#AEAEB2]">
+        <p className="mt-2 text-[15px] leading-relaxed text-[#ACB4BA]">
           Pour adapter Nutrition à ton profil, indique ton âge. Tes repas déjà enregistrés sont
           conservés.
         </p>
       </header>
 
       <label className="block">
-        <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Âge</span>
+        <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">Âge</span>
         <ClearableNumberInput
           value={age}
           onChange={setAge}
@@ -56,12 +56,12 @@ export function AgeRequiredPrompt({ onAgeSubmit }: AgeRequiredPromptProps) {
           max={PLAUSIBLE_AGE_MAX}
           aria-label="Âge"
           placeholder={`${PLAUSIBLE_AGE_MIN}–${PLAUSIBLE_AGE_MAX}`}
-          className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#FF2B2B]/40"
+          className="w-full rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 text-[15px] text-white outline-none focus:border-[#FF0702]/40"
         />
       </label>
 
       {error ? (
-        <p className="text-[13px] text-[#FF6961]" role="alert">
+        <p className="text-[13px] text-[#FF907F]" role="alert">
           {error}
         </p>
       ) : null}

@@ -591,7 +591,7 @@ export function HomeGalleryView({
                 type="button"
                 onClick={() => handleHero(card)}
                 data-accueil-hero={card.id}
-                className="accueil-gallery__hero ios-press relative overflow-hidden rounded-[24px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/50"
+                className="accueil-gallery__hero ios-press relative overflow-hidden rounded-[24px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/50"
                 aria-label={`${card.title}, ${card.progressPercent} pour cent`}
                 disabled={editMode}
               >
@@ -691,7 +691,7 @@ export function HomeGalleryView({
           type="button"
           onClick={onOpenHistory}
           disabled={editMode}
-          className="ios-press flex min-h-11 items-center gap-1 rounded-xl px-1.5 text-[#AEAEB2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/40 disabled:opacity-50"
+          className="ios-press flex min-h-11 items-center gap-1 rounded-xl px-1.5 text-[#ACB4BA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/40 disabled:opacity-50"
           aria-label={`Voir l’historique, ${recent.length} séance${recent.length > 1 ? 's' : ''}`}
         >
           <span className="text-[15px] font-semibold tabular-nums">
@@ -706,7 +706,7 @@ export function HomeGalleryView({
       </div>
 
       {recent.length === 0 ? (
-        <p className="text-[14px] text-[#8E8E93]">
+        <p className="text-[14px] text-[#ACB4BA]">
           <SoftBlurIn instant={coldEntering || prefersReducedMotion}>
             Aucune séance enregistrée
           </SoftBlurIn>
@@ -727,16 +727,16 @@ export function HomeGalleryView({
                 onClick={onOpenHistory}
                 disabled={editMode}
                 data-accueil-recent-tile={item.id}
-                className="accueil-gallery__tile ios-press flex flex-col gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/40 disabled:opacity-70"
+                className="accueil-gallery__tile ios-press flex flex-col gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/40 disabled:opacity-70"
               >
-                <span className="accueil-gallery__tile-media relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-[18px] bg-[#1C1C1E] ring-1 ring-white/8">
+                <span className="accueil-gallery__tile-media relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-[18px] bg-[#1D1F20] ring-1 ring-white/8">
                   <HistorySessionThumb note={item.note} variant="tile" />
                 </span>
                 <span className="min-w-0">
                   <span className="block truncate text-[13px] font-semibold text-white">
                     {item.title}
                   </span>
-                  <span className="mt-0.5 block truncate text-[11px] text-[#8E8E93]">
+                  <span className="mt-0.5 block truncate text-[11px] text-[#ACB4BA]">
                     {formatGalleryRecentMeta(item)}
                   </span>
                 </span>
@@ -931,7 +931,7 @@ export function HomeGalleryView({
                   Accueil
                 </BlurInText>
               </h1>
-              <p className="mt-2 text-[15px] font-medium text-[#AEAEB2]">
+              <p className="mt-2 text-[15px] font-medium text-[#ACB4BA]">
                 <SoftBlurIn instant={coldEntering || prefersReducedMotion}>
                   {subtitle}
                   {firstName ? ` · ${firstName}` : ''}
@@ -942,7 +942,7 @@ export function HomeGalleryView({
               <button
                 type="button"
                 onClick={enterEdit}
-                className="ios-press flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#AEAEB2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/45"
+                className="ios-press flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#ACB4BA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/45"
                 aria-label="Modifier l'accueil"
                 data-accueil-edit-open
               >
@@ -951,7 +951,7 @@ export function HomeGalleryView({
               <button
                 type="button"
                 onClick={onOpenTraining}
-                className="ios-press flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/8 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/45"
+                className="ios-press flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/8 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/45"
                 aria-label="Ouvrir Train"
               >
                 <NotebookPen className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
@@ -991,7 +991,7 @@ export function HomeGalleryView({
           <button
             type="button"
             onClick={enterEdit}
-            className="ios-press min-h-11 rounded-xl px-3 text-[13px] font-medium text-[#8E8E93] underline-offset-2 hover:text-[#AEAEB2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF2B2B]/40"
+            className="ios-press min-h-11 rounded-xl px-3 text-[13px] font-medium text-[#ACB4BA] underline-offset-2 hover:text-[#ACB4BA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/40"
             data-accueil-edit-open-footer
           >
             Modifier l&apos;accueil

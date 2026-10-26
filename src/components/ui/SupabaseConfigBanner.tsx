@@ -34,7 +34,7 @@ export function SupabaseConfigBanner() {
       className="sticky top-0 z-[100] border-b border-[#FF453A]/40 bg-[#2C1014]/95 px-4 py-3 backdrop-blur-md"
       role="alert"
     >
-      <p className="text-[13px] font-semibold text-[#FF6961]">{USER_BACKEND_UNAVAILABLE}</p>
+      <p className="text-[13px] font-semibold text-[#FF907F]">{USER_BACKEND_UNAVAILABLE}</p>
     </div>
   )
 }

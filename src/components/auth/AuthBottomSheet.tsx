@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Eye, EyeOff, Loader2, Mail } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { BrandMark } from '../brand/BrandMark'
 import { IosSheet } from '../ui/IosSheet'
 
 type AuthPanel = 'login' | 'signup' | 'forgot' | 'recovery'
@@ -115,19 +116,25 @@ export function AuthBottomSheet() {
       dismissible={dismissible}
       title={title}
       subtitle={subtitle}
-      leading={<span className="mt-0.5 text-[15px] font-bold text-[#FF2B2B]">RG</span>}
+      leading={
+        <BrandMark
+          variant="compact"
+          showWordmark={false}
+          className="mt-0.5"
+        />
+      }
     >
       <div className="space-y-4 pb-3">
         {panel === 'login' && (
           <>
             <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3.5 py-3">
-              <Mail className="h-4 w-4 shrink-0 text-[#FF2B2B]" />
-              <p className="text-[13px] text-[#AEAEB2]">Connexion par email</p>
+              <Mail className="h-4 w-4 shrink-0 text-[#FF0702]" />
+              <p className="text-[13px] text-[#ACB4BA]">Connexion par email</p>
             </div>
 
             <form onSubmit={handleLogin} className="space-y-3">
               <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Email</span>
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">Email</span>
                 <input
                   type="email"
                   autoComplete="email"
@@ -136,12 +143,12 @@ export function AuthBottomSheet() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="toi@email.com"
                   disabled={authLoading}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#596166] outline-none focus:border-[#FF0702]/45 disabled:opacity-50"
                 />
               </label>
 
               <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">
                   Mot de passe
                 </span>
                 <div className="relative">
@@ -154,11 +161,11 @@ export function AuthBottomSheet() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Ton mot de passe"
                     disabled={authLoading}
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#596166] outline-none focus:border-[#FF0702]/45 disabled:opacity-50"
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8E8E93]"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#ACB4BA]"
                     aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                     onClick={() => setShowPassword((v) => !v)}
                   >
@@ -169,7 +176,7 @@ export function AuthBottomSheet() {
 
               {authError && (
                 <p
-                  className="rounded-xl border-2 border-[#FF2B2B] bg-[#2A0000] px-3 py-3 text-[20px] font-extrabold leading-tight text-[#FF2B2B] [overflow-wrap:anywhere]"
+                  className="rounded-xl border-2 border-[#FF0702] bg-[#2A0000] px-3 py-3 text-[20px] font-extrabold leading-tight text-[#FF0702] [overflow-wrap:anywhere]"
                   role="alert"
                   data-auth-error="1"
                   data-auth-error-raw="1"
@@ -180,7 +187,7 @@ export function AuthBottomSheet() {
               {authErrorCode === 'AUTH_PASSWORD_RESET_REQUIRED' && email.trim().length > 3 ? (
                 <button
                   type="button"
-                  className="w-full text-left text-[13px] font-medium text-[#AEAEB2] underline-offset-2 hover:text-white hover:underline"
+                  className="w-full text-left text-[13px] font-medium text-[#ACB4BA] underline-offset-2 hover:text-white hover:underline"
                   disabled={authLoading}
                   onClick={() => void requestPasswordReset(email)}
                 >
@@ -211,7 +218,7 @@ export function AuthBottomSheet() {
 
             <button
               type="button"
-              className="w-full text-center text-[13px] font-medium text-[#AEAEB2] underline-offset-2 hover:text-white hover:underline"
+              className="w-full text-center text-[13px] font-medium text-[#ACB4BA] underline-offset-2 hover:text-white hover:underline"
               disabled={authLoading}
               onClick={() => {
                 clearAuthMessages()
@@ -224,7 +231,7 @@ export function AuthBottomSheet() {
 
             <button
               type="button"
-              className="w-full text-center text-[13px] font-medium text-[#AEAEB2] underline-offset-2 hover:text-white hover:underline"
+              className="w-full text-center text-[13px] font-medium text-[#ACB4BA] underline-offset-2 hover:text-white hover:underline"
               disabled={authLoading}
               onClick={() => {
                 clearAuthMessages()
@@ -239,13 +246,13 @@ export function AuthBottomSheet() {
 
         {panel === 'signup' && (
           <>
-            <p className="text-[13px] leading-relaxed text-[#AEAEB2]">
+            <p className="text-[13px] leading-relaxed text-[#ACB4BA]">
               Crée un compte test. L’inscription peut être limitée par la configuration backend.
             </p>
 
             <form onSubmit={handleSignup} className="space-y-3">
               <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Email</span>
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">Email</span>
                 <input
                   type="email"
                   autoComplete="email"
@@ -254,12 +261,12 @@ export function AuthBottomSheet() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="toi@email.com"
                   disabled={authLoading}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#596166] outline-none focus:border-[#FF0702]/45 disabled:opacity-50"
                 />
               </label>
 
               <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">
                   Mot de passe
                 </span>
                 <div className="relative">
@@ -272,11 +279,11 @@ export function AuthBottomSheet() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Au moins 6 caractères"
                     disabled={authLoading}
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#596166] outline-none focus:border-[#FF0702]/45 disabled:opacity-50"
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8E8E93]"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#ACB4BA]"
                     aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                     onClick={() => setShowPassword((v) => !v)}
                   >
@@ -286,7 +293,7 @@ export function AuthBottomSheet() {
               </label>
 
               {authError && (
-                <p className="px-0.5 text-[13px] leading-snug text-[#FF6961]" role="alert" data-auth-error="1">
+                <p className="px-0.5 text-[13px] leading-snug text-[#FF907F]" role="alert" data-auth-error="1">
                   {authError}
                 </p>
               )}
@@ -314,7 +321,7 @@ export function AuthBottomSheet() {
 
             <button
               type="button"
-              className="w-full text-center text-[13px] font-medium text-[#AEAEB2] underline-offset-2 hover:text-white hover:underline"
+              className="w-full text-center text-[13px] font-medium text-[#ACB4BA] underline-offset-2 hover:text-white hover:underline"
               disabled={authLoading}
               onClick={() => {
                 clearAuthMessages()
@@ -328,14 +335,14 @@ export function AuthBottomSheet() {
 
         {panel === 'forgot' && (
           <>
-            <p className="text-[13px] leading-relaxed text-[#AEAEB2]">
+            <p className="text-[13px] leading-relaxed text-[#ACB4BA]">
               Indique ton email. Si un compte existe, tu recevras un lien pour choisir un nouveau mot
               de passe.
             </p>
 
             <form onSubmit={handleForgot} className="space-y-3">
               <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">Email</span>
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">Email</span>
                 <input
                   type="email"
                   autoComplete="email"
@@ -344,12 +351,12 @@ export function AuthBottomSheet() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="toi@email.com"
                   disabled={authLoading}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 text-[16px] text-white placeholder:text-[#596166] outline-none focus:border-[#FF0702]/45 disabled:opacity-50"
                 />
               </label>
 
               {authError && (
-                <p className="px-0.5 text-[13px] leading-snug text-[#FF6961]" role="alert" data-auth-error="1">
+                <p className="px-0.5 text-[13px] leading-snug text-[#FF907F]" role="alert" data-auth-error="1">
                   {authError}
                 </p>
               )}
@@ -377,7 +384,7 @@ export function AuthBottomSheet() {
 
             <button
               type="button"
-              className="w-full text-center text-[13px] font-medium text-[#AEAEB2] underline-offset-2 hover:text-white hover:underline"
+              className="w-full text-center text-[13px] font-medium text-[#ACB4BA] underline-offset-2 hover:text-white hover:underline"
               disabled={authLoading}
               onClick={() => {
                 clearAuthMessages()
@@ -391,13 +398,13 @@ export function AuthBottomSheet() {
 
         {panel === 'recovery' && (
           <>
-            <p className="text-[13px] leading-relaxed text-[#AEAEB2]">
+            <p className="text-[13px] leading-relaxed text-[#ACB4BA]">
               Ton lien est valide. Définis un nouveau mot de passe pour retrouver l’accès.
             </p>
 
             <form onSubmit={handleRecovery} className="space-y-3">
               <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">
                   Nouveau mot de passe
                 </span>
                 <div className="relative">
@@ -410,11 +417,11 @@ export function AuthBottomSheet() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Au moins 6 caractères"
                     disabled={authLoading}
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#596166] outline-none focus:border-[#FF0702]/45 disabled:opacity-50"
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8E8E93]"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#ACB4BA]"
                     aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                     onClick={() => setShowPassword((v) => !v)}
                   >
@@ -424,7 +431,7 @@ export function AuthBottomSheet() {
               </label>
 
               <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#8E8E93]">
+                <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">
                   Confirmer le mot de passe
                 </span>
                 <div className="relative">
@@ -437,11 +444,11 @@ export function AuthBottomSheet() {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Retape le mot de passe"
                     disabled={authLoading}
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#48484A] outline-none focus:border-[#FF2B2B]/45 disabled:opacity-50"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3.5 pr-12 text-[16px] text-white placeholder:text-[#596166] outline-none focus:border-[#FF0702]/45 disabled:opacity-50"
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8E8E93]"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#ACB4BA]"
                     aria-label={
                       showConfirmPassword ? 'Masquer la confirmation' : 'Afficher la confirmation'
                     }
@@ -457,7 +464,7 @@ export function AuthBottomSheet() {
               </label>
 
               {authError && (
-                <p className="px-0.5 text-[13px] leading-snug text-[#FF6961]" role="alert" data-auth-error="1">
+                <p className="px-0.5 text-[13px] leading-snug text-[#FF907F]" role="alert" data-auth-error="1">
                   {authError}
                 </p>
               )}

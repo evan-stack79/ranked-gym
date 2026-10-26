@@ -18,7 +18,7 @@ function MacroColumn({ label, consumedG, targetG }: MacroStat) {
 
   return (
     <div className="min-w-0 flex-1 text-center">
-      <p className="text-[12px] font-medium text-[#8E8E93]">{label}</p>
+      <p className="text-[12px] font-medium text-[#ACB4BA]">{label}</p>
       <p className="mt-1 text-[14px] font-bold tabular-nums tracking-tight text-white">
         {hasTarget ? `${consumedLabel} / ${targetLabel} g` : `${consumedLabel} g`}
       </p>
@@ -32,7 +32,7 @@ function MacroColumn({ label, consumedG, targetG }: MacroStat) {
           aria-label={label}
         >
           <div
-            className="motion-progress-fill h-full rounded-full bg-[#FF2B2B]"
+            className="motion-progress-fill h-full rounded-full bg-[#FF0702]"
             style={{ transform: `scaleX(${Math.max(0.02, progress)})` }}
           />
         </div>

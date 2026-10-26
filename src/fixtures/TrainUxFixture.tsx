@@ -20,7 +20,7 @@ export function TrainUxFixture() {
           <div
             aria-hidden="true"
             data-brand-header-bg="1"
-            className="pointer-events-none absolute inset-0 -z-10 bg-[#0C0C0E]"
+            className="pointer-events-none absolute inset-0 -z-10 bg-[#000000]"
           />
           <div className="mx-auto flex max-w-lg items-center justify-center px-4 pb-2 pt-0">
             <div data-cold-launch-target="compact">
@@ -43,7 +43,7 @@ export function TrainUxFixture() {
             <h1 className="text-[34px] font-bold tracking-tight text-white">
               <BlurInText as="span">Train</BlurInText>
             </h1>
-            <p className="mt-1 text-[15px] text-[#AEAEB2]">
+            <p className="mt-1 text-[15px] text-[#ACB4BA]">
               <SoftBlurIn>Hub de la semaine</SoftBlurIn>
             </p>
           </header>
@@ -54,13 +54,13 @@ export function TrainUxFixture() {
               aria-label="Résumé de la semaine"
               data-reveal-card="week"
             >
-              <p className="text-[11px] font-medium text-[#8E8E93]">
+              <p className="text-[11px] font-medium text-[#ACB4BA]">
                 <SoftBlurIn>Cette semaine</SoftBlurIn>
               </p>
               <p className="mt-2 text-[22px] font-bold tabular-nums text-white">
                 <CountUpNumber kind="sessions" value={3} /> séances
               </p>
-              <p className="mt-1 text-[13px] text-[#AEAEB2]">
+              <p className="mt-1 text-[13px] text-[#ACB4BA]">
                 <CountUpNumber kind="successful_sets" value={24} /> séries réussies · Effort suivi
               </p>
             </section>
@@ -72,7 +72,7 @@ export function TrainUxFixture() {
               aria-label="Dernière séance"
               data-reveal-card="recent"
             >
-              <p className="text-[11px] font-medium text-[#8E8E93]">
+              <p className="text-[11px] font-medium text-[#ACB4BA]">
                 <SoftBlurIn>Dernière séance</SoftBlurIn>
               </p>
               <p className="mt-1 text-[15px] font-semibold text-white">Push · Pecs · Épaules</p>
@@ -87,8 +87,8 @@ export function TrainUxFixture() {
           </Reveal>
 
           <section className="glass-card rounded-2xl p-4">
-            <p className="text-[11px] font-medium text-[#8E8E93]">Conseil</p>
-            <p className="mt-1 text-[14px] text-[#AEAEB2]">
+            <p className="text-[11px] font-medium text-[#ACB4BA]">Conseil</p>
+            <p className="mt-1 text-[14px] text-[#ACB4BA]">
               Note ton Effort de 1 à 10 après chaque série — jamais d&apos;échelle RPE dans l&apos;UI.
             </p>
           </section>

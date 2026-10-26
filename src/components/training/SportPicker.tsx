@@ -24,13 +24,13 @@ export function SportPicker({ open, selectedId, onClose, onSelect }: SportPicker
     >
       <div className="space-y-3 pb-2">
         <label className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/35 px-3.5 py-3">
-          <Search className="h-4 w-4 text-[#8E8E93]" />
+          <Search className="h-4 w-4 text-[#ACB4BA]" />
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Ex. tennis, musculation, trail…"
-            className="w-full bg-transparent text-[15px] text-white placeholder:text-[#636366] outline-none"
+            className="w-full bg-transparent text-[15px] text-white placeholder:text-[#717C83] outline-none"
             autoFocus
           />
         </label>
@@ -54,7 +54,7 @@ export function SportPicker({ open, selectedId, onClose, onSelect }: SportPicker
                 >
                   <div className="min-w-0">
                     <p className="truncate text-[15px] font-semibold text-white">{sport.name}</p>
-                    <p className="text-[11px] text-[#8E8E93]">
+                    <p className="text-[11px] text-[#ACB4BA]">
                       {SPORT_CATEGORY_LABELS[sport.category]}
                     </p>
                   </div>

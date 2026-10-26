@@ -127,7 +127,7 @@ export function NutritionDayMealsCard({
                       aria-controls={panelId}
                     >
                       <ChevronDown
-                        className={`h-4 w-4 shrink-0 text-[#8E8E93] transition-transform duration-200 motion-reduce:transition-none ${
+                        className={`h-4 w-4 shrink-0 text-[#ACB4BA] transition-transform duration-200 motion-reduce:transition-none ${
                           expanded ? 'rotate-0' : '-rotate-90'
                         }`}
                         strokeWidth={2.25}
@@ -137,11 +137,11 @@ export function NutritionDayMealsCard({
                         {MEAL_ROW_LABELS[type]}
                       </span>
                       {hideNutritionNumbers ? (
-                        <span className="shrink-0 text-[14px] tabular-nums text-[#8E8E93]">
+                        <span className="shrink-0 text-[14px] tabular-nums text-[#ACB4BA]">
                           {items.length}
                         </span>
                       ) : (
-                        <span className="shrink-0 text-[14px] tabular-nums text-[#8E8E93]">
+                        <span className="shrink-0 text-[14px] tabular-nums text-[#ACB4BA]">
                           {/* SAFETY: meal kcal stays static — never CountUpNumber. */}
                           <StaticKcalNumber value={kcal} /> kcal
                         </span>
@@ -153,7 +153,7 @@ export function NutritionDayMealsCard({
                         {MEAL_ROW_LABELS[type]}
                       </span>
                       {hideNutritionNumbers ? null : (
-                        <span className="shrink-0 text-[14px] tabular-nums text-[#8E8E93]">
+                        <span className="shrink-0 text-[14px] tabular-nums text-[#ACB4BA]">
                           <StaticKcalNumber value={kcal} /> kcal
                         </span>
                       )}
@@ -167,7 +167,7 @@ export function NutritionDayMealsCard({
                         e.stopPropagation()
                         onAddMeal(type)
                       }}
-                      className="ios-press flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#FF2B2B]"
+                      className="ios-press flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#FF0702]"
                       aria-label={`Ajouter un aliment · ${MEAL_ROW_LABELS[type]}`}
                     >
                       <Plus className="h-5 w-5" strokeWidth={2.25} />
@@ -209,7 +209,7 @@ export function NutritionDayMealsCard({
                                 <span className="block truncate text-[14px] font-semibold text-white">
                                   {meal.name}
                                 </span>
-                                <span className="mt-0.5 block text-[12px] text-[#8E8E93]">
+                                <span className="mt-0.5 block text-[12px] text-[#ACB4BA]">
                                   {hideNutritionNumbers
                                     ? portion ?? ''
                                     : meal.calories == null
@@ -219,7 +219,7 @@ export function NutritionDayMealsCard({
                                         }`}
                                   {meal.syncRejected ? (
                                     <span
-                                      className="mt-0.5 block text-[11px] font-semibold text-[#FF6961]"
+                                      className="mt-0.5 block text-[11px] font-semibold text-[#FF907F]"
                                       data-meal-sync-rejected
                                     >
                                       Pas enregistré

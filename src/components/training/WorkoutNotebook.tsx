@@ -800,7 +800,7 @@ export function WorkoutNotebook({
             >
               {sessionClockLabel}
               {sessionPaused ? (
-                <span className="ml-1.5 text-[11px] font-medium text-[#8E8E93]">Pause</span>
+                <span className="ml-1.5 text-[11px] font-medium text-[#ACB4BA]">Pause</span>
               ) : null}
             </p>
             {onToggleSessionPause ? (
@@ -832,7 +832,7 @@ export function WorkoutNotebook({
               className={`ios-press flex min-h-11 shrink-0 items-center rounded-full border px-3.5 text-[12px] font-semibold ${
                 active
                   ? 'border-transparent text-white'
-                  : 'border-white/10 bg-black/25 text-[#8E8E93]'
+                  : 'border-white/10 bg-black/25 text-[#ACB4BA]'
               }`}
               style={
                 active
@@ -848,7 +848,7 @@ export function WorkoutNotebook({
         <button
           type="button"
           onClick={() => setCustomOpen((v) => !v)}
-          className="ios-press flex min-h-11 shrink-0 items-center rounded-full border border-dashed border-white/20 px-3 text-[12px] font-semibold text-[#8E8E93]"
+          className="ios-press flex min-h-11 shrink-0 items-center rounded-full border border-dashed border-white/20 px-3 text-[12px] font-semibold text-[#ACB4BA]"
         >
           + Programme
         </button>
@@ -882,24 +882,24 @@ export function WorkoutNotebook({
         className="rounded-3xl border border-white/10 px-4 py-3.5"
         style={{
           background: editingNote
-            ? `radial-gradient(ellipse 80% 60% at 100% 0%, #FF2B2B33 0%, transparent 55%), rgb(22 22 24 / 0.96)`
-            : `radial-gradient(ellipse 80% 60% at 100% 0%, ${activeRoutine?.accent ?? '#FF2B2B'}28 0%, transparent 55%), rgb(22 22 24 / 0.96)`,
+            ? `radial-gradient(ellipse 80% 60% at 100% 0%, #FF070233 0%, transparent 55%), rgb(22 22 24 / 0.96)`
+            : `radial-gradient(ellipse 80% 60% at 100% 0%, ${activeRoutine?.accent ?? '#FF0702'}28 0%, transparent 55%), rgb(22 22 24 / 0.96)`,
           boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.06)',
         }}
       >
         {editingNote ? (
-          <div className="mb-2.5 flex items-center justify-between gap-2 rounded-2xl border border-[#FF2B2B]/35 bg-[#FF2B2B]/12 px-3 py-2">
+          <div className="mb-2.5 flex items-center justify-between gap-2 rounded-2xl border border-[#FF0702]/35 bg-[#FF0702]/12 px-3 py-2">
             <div className="flex items-center gap-2">
-              <Pencil className="h-4 w-4 shrink-0 text-[#FF6961]" strokeWidth={2.25} />
+              <Pencil className="h-4 w-4 shrink-0 text-[#FF907F]" strokeWidth={2.25} />
               <div>
                 <p className="text-[13px] font-bold text-white">Mode Édition</p>
-                <p className="text-[11px] text-[#AEAEB2]">Séance du {editingNote.dateKey}</p>
+                <p className="text-[11px] text-[#ACB4BA]">Séance du {editingNote.dateKey}</p>
               </div>
             </div>
             <button
               type="button"
               onClick={cancelEdit}
-              className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/10 text-[#8E8E93]"
+              className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/10 text-[#ACB4BA]"
               aria-label="Annuler l’édition"
             >
               <X className="h-4 w-4" />
@@ -918,21 +918,21 @@ export function WorkoutNotebook({
             }}
             placeholder="Nom"
             data-session-title
-            className="w-full bg-transparent text-[17px] font-bold text-white placeholder:text-[#636366] outline-none"
+            className="w-full bg-transparent text-[17px] font-bold text-white placeholder:text-[#717C83] outline-none"
           />
         </div>
         {!hasSaved ? (
-          <p className="mb-2.5 text-[11px] text-[#8E8E93]">
+          <p className="mb-2.5 text-[11px] text-[#ACB4BA]">
             Nouveau focus — ajoute tes exercices ; ils resteront dans ton carnet.
           </p>
         ) : null}
 
         <div className="mb-2 flex items-center justify-end gap-1.5">
-          <span className="text-[11px] text-[#8E8E93]">Effort facultatif</span>
+          <span className="text-[11px] text-[#ACB4BA]">Effort facultatif</span>
           <button
             type="button"
             onClick={() => setEffortHelpOpen((v) => !v)}
-            className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 text-[12px] font-bold text-[#8E8E93]"
+            className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 text-[12px] font-bold text-[#ACB4BA]"
             aria-label="Aide Effort (facultatif)"
             aria-expanded={effortHelpOpen}
           >
@@ -942,7 +942,7 @@ export function WorkoutNotebook({
 
         {effortHelpOpen ? (
           <div
-            className="mb-2.5 rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-[11px] leading-relaxed text-[#AEAEB2]"
+            className="mb-2.5 rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-[11px] leading-relaxed text-[#ACB4BA]"
             role="note"
           >
             <p className="font-semibold text-white">Effort · 1–10</p>
@@ -987,7 +987,7 @@ export function WorkoutNotebook({
                       updateExercise(ex.id, { name: sanitizeExerciseName(e.target.value) })
                     }
                     placeholder="Exercice (ex. Développé couché)"
-                    className="w-full bg-transparent text-[15px] font-semibold uppercase tracking-wide text-white placeholder:normal-case placeholder:tracking-normal placeholder:text-[#636366] outline-none"
+                    className="w-full bg-transparent text-[15px] font-semibold uppercase tracking-wide text-white placeholder:normal-case placeholder:tracking-normal placeholder:text-[#717C83] outline-none"
                   />
                   {exercises.length > 1 && (
                     <button
@@ -996,7 +996,7 @@ export function WorkoutNotebook({
                         draftDirty.current = true
                         setExercises((prev) => prev.filter((x) => x.id !== ex.id))
                       }}
-                      className="ios-press flex min-h-11 min-w-11 items-center justify-center text-[#8E8E93]"
+                      className="ios-press flex min-h-11 min-w-11 items-center justify-center text-[#ACB4BA]"
                       aria-label="Supprimer exercice"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -1006,12 +1006,12 @@ export function WorkoutNotebook({
 
                 {last && (
                   <div className="mb-2 px-0.5 py-1">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-[#ACB4BA]">
                       Dernière séance
                     </p>
                     <ul className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
                       {last.sets.map((s, i) => (
-                        <li key={i} className="text-[12px] tabular-nums text-[#AEAEB2]">
+                        <li key={i} className="text-[12px] tabular-nums text-[#ACB4BA]">
                           {formatSetLoadLabel(s.weightKg, s.reps)}
                         </li>
                       ))}
@@ -1019,7 +1019,7 @@ export function WorkoutNotebook({
                   </div>
                 )}
 
-                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#8E8E93]">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#ACB4BA]">
                   Aujourd&apos;hui
                 </p>
 
@@ -1043,7 +1043,7 @@ export function WorkoutNotebook({
                       >
                         <span
                           className={`pb-2 text-[11px] font-bold ${
-                            set.done ? 'text-[#30D158]' : 'text-[#8E8E93]'
+                            set.done ? 'text-[#30D158]' : 'text-[#ACB4BA]'
                           }`}
                         >
                           {idx + 1}
@@ -1084,12 +1084,12 @@ export function WorkoutNotebook({
                                   }
                                   className={`w-full rounded-xl border bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none ${
                                     weightErr
-                                      ? 'border-[#FF6961]'
+                                      ? 'border-[#FF907F]'
                                       : 'border-white/10'
                                   }`}
                                 />
                                 {weightErr ? (
-                                  <p className="mt-0.5 text-[10px] font-medium text-[#FF6961]" role="alert">
+                                  <p className="mt-0.5 text-[10px] font-medium text-[#FF907F]" role="alert">
                                     {weightErr}
                                   </p>
                                 ) : null}
@@ -1145,11 +1145,11 @@ export function WorkoutNotebook({
                                       : 'Reps'
                                   }
                                   className={`w-full rounded-xl border bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none ${
-                                    repsErr ? 'border-[#FF6961]' : 'border-white/10'
+                                    repsErr ? 'border-[#FF907F]' : 'border-white/10'
                                   }`}
                                 />
                                 {repsErr ? (
-                                  <p className="mt-0.5 text-[10px] font-medium text-[#FF6961]" role="alert">
+                                  <p className="mt-0.5 text-[10px] font-medium text-[#FF907F]" role="alert">
                                     {repsErr}
                                   </p>
                                 ) : null}
@@ -1186,12 +1186,12 @@ export function WorkoutNotebook({
                                   placeholder="1–10"
                                   placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2 text-[12px] font-semibold text-[#636366]"
                                   aria-label="Effort facultatif, 1 à 10"
-                                  className={`w-full rounded-xl border bg-black/40 px-2 py-2 text-[13px] font-semibold text-[#AEAEB2] outline-none ${
-                                    effortErr ? 'border-[#FF6961]' : 'border-white/10'
+                                  className={`w-full rounded-xl border bg-black/40 px-2 py-2 text-[13px] font-semibold text-[#ACB4BA] outline-none ${
+                                    effortErr ? 'border-[#FF907F]' : 'border-white/10'
                                   }`}
                                 />
                                 {effortErr ? (
-                                  <p className="mt-0.5 text-[10px] font-medium text-[#FF6961]" role="alert">
+                                  <p className="mt-0.5 text-[10px] font-medium text-[#FF907F]" role="alert">
                                     {effortErr}
                                   </p>
                                 ) : null}
@@ -1207,7 +1207,7 @@ export function WorkoutNotebook({
                                 sets: ex.sets.filter((_, i) => i !== idx),
                               })
                             }
-                            className="mb-2 flex min-h-11 min-w-11 items-center justify-center text-[#636366]"
+                            className="mb-2 flex min-h-11 min-w-11 items-center justify-center text-[#717C83]"
                             aria-label="Supprimer série"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -1224,7 +1224,7 @@ export function WorkoutNotebook({
                   <button
                     type="button"
                     onClick={() => updateExercise(ex.id, { sets: appendSet(ex.sets) })}
-                    className="ios-press inline-flex min-h-11 items-center rounded-full border border-white/10 px-3 text-[11px] font-semibold text-[#AEAEB2]"
+                    className="ios-press inline-flex min-h-11 items-center rounded-full border border-white/10 px-3 text-[11px] font-semibold text-[#ACB4BA]"
                   >
                     + Ajouter une série
                   </button>
@@ -1258,7 +1258,7 @@ export function WorkoutNotebook({
                         className={`ios-press inline-flex min-h-11 items-center rounded-full border px-3 text-[11px] font-semibold ${
                           on
                             ? 'border-white/25 bg-white/10 text-white'
-                            : 'border-white/10 text-[#636366]'
+                            : 'border-white/10 text-[#717C83]'
                         }`}
                       >
                         {d.label}
@@ -1268,7 +1268,7 @@ export function WorkoutNotebook({
                 </div>
 
                 {ex.sets.some((s) => s.restSec != null && s.restSec > 0) ? (
-                  <p className="mt-1.5 text-[10px] tabular-nums text-[#636366]">
+                  <p className="mt-1.5 text-[10px] tabular-nums text-[#717C83]">
                     Repos loggés :{' '}
                     {ex.sets
                       .map((s, i) =>
@@ -1292,7 +1292,7 @@ export function WorkoutNotebook({
                 prev.length === 0 ? [emptyExercise()] : [...prev, emptyExercise()],
               )
             }}
-            className="ios-press flex flex-1 items-center justify-center gap-1 rounded-2xl border border-white/10 bg-black/30 py-3 text-[13px] font-semibold text-[#AEAEB2]"
+            className="ios-press flex flex-1 items-center justify-center gap-1 rounded-2xl border border-white/10 bg-black/30 py-3 text-[13px] font-semibold text-[#ACB4BA]"
           >
             <Plus className="h-4 w-4" />
             Exercice
@@ -1307,7 +1307,7 @@ export function WorkoutNotebook({
           </button>
         </div>
 
-        <p className="mt-2 text-center text-[11px] text-[#636366]">
+        <p className="mt-2 text-center text-[11px] text-[#717C83]">
           Volume {stats.volume} kg ·{' '}
           {sessionClockLabel && !editingNote
             ? `${sessionClockLabel} chronométré`

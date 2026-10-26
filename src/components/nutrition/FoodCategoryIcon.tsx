@@ -25,7 +25,7 @@ const stroke = {
   strokeLinejoin: 'round' as const,
 }
 
-/** Icônes SVG locales — trait #FF2B2B, pas de fill brillant / glow. */
+/** Icônes SVG locales — trait #FF0702, pas de fill brillant / glow. */
 const ICONS: Record<FoodIconCategoryId, (p: SvgProps) => ReactElement> = {
   viennoiserie: (p) => (
     <svg {...baseProps(p)}>
@@ -114,7 +114,7 @@ interface FoodCategoryIconProps {
 
 /**
  * Icône catégorie V3 (remplace les photos OFF contributeurs).
- * Fond sombre sobre, trait #FF2B2B, pas d’effet brillant.
+ * Fond sombre sobre, trait #FF0702, pas d’effet brillant.
  */
 export function FoodCategoryIcon({
   category,

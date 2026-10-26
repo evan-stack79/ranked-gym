@@ -89,13 +89,13 @@ function SessionChrome({
       <main className="relative z-10 mx-auto min-h-0 w-full max-w-lg flex-1 overflow-y-auto">
         {showBrandHeader ? (
           <header
-            className="border-b border-white/5 bg-[#0C0C0E]"
+            className="border-b border-white/5 bg-[#000000]"
             data-app-brand-header="1"
             style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
           >
             <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-3">
               <span className="text-[17px] font-semibold tracking-tight text-white">
-                Ranked <span className="text-[#FF2B2B]">Gym</span>
+                Ranked <span className="text-[#FF0702]">Gym</span>
               </span>
             </div>
           </header>

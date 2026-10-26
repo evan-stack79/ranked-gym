@@ -28,9 +28,9 @@ export function sleepHomeStatusColorClass(status: SleepQuantityStatus | null): s
     case 'deficit':
       return 'text-[#FF9F0A]'
     case 'excess':
-      return 'text-[#AEAEB2]'
+      return 'text-[#ACB4BA]'
     default:
-      return 'text-[#AEAEB2]'
+      return 'text-[#ACB4BA]'
   }
 }
 

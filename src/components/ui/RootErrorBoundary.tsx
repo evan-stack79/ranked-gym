@@ -27,7 +27,7 @@ export class RootErrorBoundary extends Component<Props, State> {
         <div
           style={{
             minHeight: '100vh',
-            background: '#0C0C0E',
+            background: '#000000',
             color: '#fff',
             fontFamily: 'system-ui, sans-serif',
             padding: '2rem 1.25rem',
@@ -39,7 +39,7 @@ export class RootErrorBoundary extends Component<Props, State> {
           <p
             style={{
               marginTop: '1rem',
-              color: '#FF2B2B',
+              color: '#FF0702',
               fontSize: '1rem',
               fontWeight: 800,
               lineHeight: 1.45,
@@ -50,7 +50,7 @@ export class RootErrorBoundary extends Component<Props, State> {
           >
             {this.state.error.message || String(this.state.error)}
           </p>
-          <p style={{ marginTop: '0.5rem', color: '#AEAEB2', fontSize: '0.9375rem' }}>{USER_CRASH_BODY}</p>
+          <p style={{ marginTop: '0.5rem', color: '#ACB4BA', fontSize: '0.9375rem' }}>{USER_CRASH_BODY}</p>
           <button
             type="button"
             onClick={() => window.location.reload()}
@@ -59,7 +59,7 @@ export class RootErrorBoundary extends Component<Props, State> {
               padding: '0.65rem 1.25rem',
               borderRadius: '999px',
               border: 'none',
-              background: '#FF2B2B',
+              background: '#FF0702',
               color: '#fff',
               fontWeight: 600,
               fontSize: '0.875rem',

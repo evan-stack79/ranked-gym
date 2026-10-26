@@ -41,7 +41,7 @@ function renderBootError(rootEl: HTMLElement, error: unknown) {
   panel.setAttribute('role', 'alert')
   panel.setAttribute('data-boot-error-message', '1')
   panel.style.cssText =
-    'min-height:100vh;background:#0C0C0E;color:#FF2B2B;font:800 18px/1.5 system-ui,sans-serif;padding:32px 20px;overflow-wrap:anywhere;'
+    'min-height:100vh;background:#000000;color:#FF0702;font:800 18px/1.5 system-ui,sans-serif;padding:32px 20px;overflow-wrap:anywhere;'
   panel.textContent = `Erreur au démarrage : ${errorMessage(error)}`
   rootEl.appendChild(panel)
 }
@@ -100,6 +100,13 @@ async function boot() {
   } catch (error) {
     /* least-bad web fallback already used by storage adapters */
     console.error('[boot] secure storage initialization failed', error)
+  }
+
+  try {
+    const { configureNativeStatusBar } = await import('./native/statusBar.ts')
+    await configureNativeStatusBar()
+  } catch (error) {
+    console.warn('[boot] status bar configure skipped', error)
   }
 
   try {
