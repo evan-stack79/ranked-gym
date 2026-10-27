@@ -44,7 +44,7 @@
       inset: 0;
       z-index: 0;
       background:
-        radial-gradient(ellipse 100% 62% at 50% 118%, rgb(255 7 2 / .78) 0%, rgb(139 0 0 / .34) 36%, rgb(0 0 0 / 0) 68%),
+        radial-gradient(ellipse 92% 22% at 50% 112%, rgb(255 7 2 / .9) 0%, rgb(120 0 0 / .35) 42%, rgb(0 0 0 / 0) 72%),
         radial-gradient(ellipse 42% 36% at 86% 0%, rgb(255 7 2 / .28), transparent 70%),
         radial-gradient(ellipse 36% 32% at 0% 12%, rgb(86 0 0 / .5), transparent 72%),
         linear-gradient(180deg, #050505 0%, #000 42%, #140303 100%);
@@ -70,32 +70,32 @@
     .footer__wordmark {
       position: absolute;
       left: 50%;
-      bottom: calc(-2 * var(--u));
       transform: translateX(-50%);
-      z-index: 1;
+      z-index: 2;
       margin: 0;
-      font-size: calc(390 * var(--u));
+      bottom: calc(56 * var(--u));
+      font-size: calc(156 * var(--u));
       font-weight: 600;
-      line-height: .74;
+      line-height: .78;
       letter-spacing: -0.045em;
       white-space: nowrap;
       pointer-events: none;
       user-select: none;
-      color: rgb(255 207 198 / .4);
-      background: linear-gradient(to bottom, rgb(255 207 198 / .78), rgb(255 144 127 / .36) 48%, rgb(255 207 198 / .62));
+      color: rgb(255 255 255 / .92);
+      background: linear-gradient(to bottom, #fff 0%, rgb(255 244 241) 58%, rgb(255 228 222) 100%);
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
-      filter: drop-shadow(0 calc(-1 * var(--u)) 0 rgb(255 207 198 / .55)) drop-shadow(0 0 calc(18 * var(--u)) rgb(255 7 2 / .45));
+      filter: drop-shadow(0 calc(14 * var(--u)) calc(22 * var(--u)) rgb(0 0 0 / .45));
     }
 
     .footer__fog {
       position: absolute;
       inset: auto 0 0;
-      z-index: 2;
-      height: 34%;
+      z-index: 1;
+      height: 9%;
       pointer-events: none;
-      background: linear-gradient(to top, rgb(255 7 2 / .42) 0%, rgb(255 7 2 / .14) 40%, rgb(255 7 2 / 0) 100%);
+      background: linear-gradient(to top, rgb(255 7 2 / .72) 0%, rgb(255 7 2 / .18) 48%, rgb(255 7 2 / 0) 100%);
     }
 
     .footer__content {
@@ -335,8 +335,8 @@
       .brand__text { max-width: calc(350 * var(--u)); }
 
       .footer__wordmark {
-        font-size: calc(286 * var(--u));
-        bottom: calc(10 * var(--u));
+        font-size: calc(108 * var(--u));
+        bottom: calc(58 * var(--u));
       }
     }
 
@@ -384,8 +384,8 @@
         white-space: nowrap;
       }
 
-      .footer__wordmark { bottom: 5vw; font-size: 27vw; }
-      .footer__fog { height: 24%; }
+      .footer__wordmark { bottom: 11vw; font-size: 11.6vw; }
+      .footer__fog { height: 8%; }
     }
 
     @media (max-width: 359px) {
@@ -400,7 +400,7 @@
 <body>
   <footer class="footer">
     <div class="footer__stage" aria-hidden="true"></div>
-    <p class="footer__wordmark" aria-hidden="true">Ranked</p>
+    <p class="footer__wordmark" aria-hidden="true">Ranked Gym</p>
     <div class="footer__fog" aria-hidden="true"></div>
     <div class="footer__content">
       <div class="brand">
@@ -424,24 +424,24 @@
           <li class="chip">Android</li>
         </ul>
       </div>
-      <nav class="col col--menu" aria-label="Produit">
-        <h3 class="col__title">Produit</h3>
+      <nav class="col col--menu" aria-label="Abonnement">
+        <h3 class="col__title">Abonnement</h3>
         <ul class="col__list">
-          <li><a href="#">Accueil</a></li>
-          <li><a href="#">Train</a></li>
-          <li><a href="#">Nutrition</a></li>
-          <li><a href="#">Profil</a></li>
-          <li><a href="#">Lobby</a></li>
+          <li><a href="#">Mensuel</a></li>
+          <li><a href="#">Annuel</a></li>
+          <li><a href="#">Offrir</a></li>
+          <li><a href="#">Restaurer</a></li>
+          <li><a href="#">Gérer</a></li>
         </ul>
       </nav>
-      <nav class="col" aria-label="Suivi">
-        <h3 class="col__title">Suivi</h3>
+      <nav class="col" aria-label="Aide">
+        <h3 class="col__title">Aide</h3>
         <ul class="col__list">
-          <li><a href="#">Séances</a></li>
-          <li><a href="#">Repas</a></li>
-          <li><a href="#">Sommeil</a></li>
-          <li><a href="#">Hydratation</a></li>
-          <li><a href="#">Rang et XP</a></li>
+          <li><a href="#">Support</a></li>
+          <li><a href="#">Contact</a></li>
+          <li><a href="#">À propos</a></li>
+          <li><a href="#">Accessibilité</a></li>
+          <li><a href="#">Presse</a></li>
         </ul>
       </nav>
       <nav class="col" aria-label="Compte">
