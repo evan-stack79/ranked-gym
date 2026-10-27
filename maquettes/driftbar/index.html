@@ -9,12 +9,15 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&amp;display=swap" rel="stylesheet" />
   <style>
     :root {
-      --paper: #f1f1ee;
-      --ink: #0c0c0c;
-      --body: #6f6f6c;
-      --muted: #9c9c98;
-      --wordmark: #efefeb;
-      --mist: #e2e3f1;
+      color-scheme: dark;
+      --paper: #000000;
+      --ink: #eceeef;
+      --body: #acb4ba;
+      --muted: #717c83;
+      --wordmark: #ffcfc6;
+      --mist: #3b0c07;
+      --brand: #ff0702;
+      --brand-hover: #ef0000;
       --font: "Inter", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
     }
 
@@ -55,7 +58,7 @@
       content: "";
       position: absolute;
       inset: 0;
-      background: linear-gradient(to bottom, var(--paper) 0%, rgb(241 241 238 / .96) 26%, rgb(241 241 238 / .72) 44%, rgb(241 241 238 / 0) 70%);
+      background: linear-gradient(to bottom, var(--paper) 0%, rgb(0 0 0 / .96) 26%, rgb(0 0 0 / .72) 44%, rgb(0 0 0 / 0) 70%);
     }
 
     .footer__wordmark {
@@ -72,12 +75,12 @@
       white-space: nowrap;
       pointer-events: none;
       user-select: none;
-      color: rgb(232 234 250 / .4);
-      background: linear-gradient(to bottom, rgb(255 255 255 / .78), rgb(214 218 246 / .36) 48%, rgb(255 255 255 / .62));
+      color: rgb(255 207 198 / .4);
+      background: linear-gradient(to bottom, rgb(255 207 198 / .78), rgb(255 144 127 / .36) 48%, rgb(255 207 198 / .62));
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
-      filter: drop-shadow(0 calc(-1 * var(--u)) 0 rgb(255 255 255 / .55)) drop-shadow(0 0 calc(18 * var(--u)) rgb(190 200 255 / .45));
+      filter: drop-shadow(0 calc(-1 * var(--u)) 0 rgb(255 207 198 / .55)) drop-shadow(0 0 calc(18 * var(--u)) rgb(255 7 2 / .45));
     }
 
     .footer__fog {
@@ -86,7 +89,7 @@
       z-index: 2;
       height: 17%;
       pointer-events: none;
-      background: linear-gradient(to top, var(--mist) 0%, rgb(226 227 241 / .6) 30%, rgb(226 227 241 / 0) 100%);
+      background: linear-gradient(to top, var(--mist) 0%, rgb(59 12 7 / .6) 30%, rgb(59 12 7 / 0) 100%);
     }
 
     .footer__content {
@@ -114,8 +117,8 @@
       width: calc(30 * var(--u));
       height: calc(30 * var(--u));
       border-radius: calc(8 * var(--u));
-      background: linear-gradient(to bottom, #2b2b2b, #0a0a0a 55%);
-      box-shadow: 0 calc(1 * var(--u)) calc(2 * var(--u)) rgb(0 0 0 / .25);
+      background: linear-gradient(to bottom, var(--brand), #560000 55%);
+      box-shadow: 0 calc(1 * var(--u)) calc(2 * var(--u)) rgb(255 7 2 / .45);
     }
 
     .brand__mark::after {
@@ -154,7 +157,7 @@
       margin-top: calc(20 * var(--u));
       padding: 0 calc(16 * var(--u)) 0 calc(15 * var(--u));
       border-radius: calc(7 * var(--u));
-      background: #000;
+      background: var(--brand);
       color: #fff;
       font-size: calc(11.8 * var(--u));
       font-weight: 500;
@@ -169,7 +172,7 @@
     }
 
     .brand__cta:hover {
-      background: #262626;
+      background: var(--brand-hover);
       transform: translateY(-1px);
     }
 
@@ -204,7 +207,7 @@
       height: calc(23 * var(--u));
       border-radius: 50%;
       overflow: hidden;
-      background: #e3e3e0;
+      background: #25282a;
       display: inline-flex;
     }
 
@@ -227,9 +230,9 @@
       gap: calc(6 * var(--u));
       height: calc(25 * var(--u));
       padding: 0 calc(10 * var(--u));
-      border: 1px solid rgb(12 12 12 / .12);
+      border: 1px solid rgb(255 255 255 / .12);
       border-radius: 999px;
-      background: rgb(255 255 255 / .55);
+      background: rgb(255 255 255 / .08);
       font-size: calc(10.8 * var(--u));
       font-weight: 500;
       letter-spacing: -0.01em;
@@ -250,8 +253,8 @@
       width: calc(6 * var(--u));
       height: calc(6 * var(--u));
       border-radius: 50%;
-      background: #2fb36a;
-      box-shadow: 0 0 0 calc(2.5 * var(--u)) rgb(47 179 106 / .18);
+      background: #34c759;
+      box-shadow: 0 0 0 calc(2.5 * var(--u)) rgb(52 199 89 / .18);
     }
 
     .col__title {
@@ -268,7 +271,7 @@
       font-size: calc(13.7 * var(--u));
       line-height: 1.24;
       letter-spacing: .022em;
-      color: #161616;
+      color: var(--ink);
     }
 
     .col--menu .col__list {
@@ -311,7 +314,7 @@
       }
 
       .footer__stage::after {
-        background: linear-gradient(to bottom, var(--paper) 0%, rgb(241 241 238 / .95) 50%, rgb(241 241 238 / .8) 68%, rgb(241 241 238 / 0) 90%);
+        background: linear-gradient(to bottom, var(--paper) 0%, rgb(0 0 0 / .95) 50%, rgb(0 0 0 / .8) 68%, rgb(0 0 0 / 0) 90%);
       }
 
       .footer__content {
@@ -381,7 +384,7 @@
           Get Driftbar today
         </a>
         <p class="brand__copy">© 2026 Driftbar Inc. - Made in Lisbon.</p>
-        <p class="brand__by">Built with <span class="brand__heart" aria-label="love">💙</span> by <span class="brand__author"><span class="brand__avatar" aria-hidden="true"><svg viewBox="0 0 24 24"><rect width="24" height="24" fill="#e6e6e3"/><circle cx="12" cy="9.2" r="4.4" fill="#1b1b1b"/><path d="M3 25c0-6 4-9.4 9-9.4S21 19 21 25Z" fill="#1b1b1b"/></svg></span>Mira Okafor</span></p>
+        <p class="brand__by">Built with <span class="brand__heart" aria-label="love">❤️</span> by <span class="brand__author"><span class="brand__avatar" aria-hidden="true"><svg viewBox="0 0 24 24"><rect width="24" height="24" fill="#25282a"/><circle cx="12" cy="9.2" r="4.4" fill="#eceeef"/><path d="M3 25c0-6 4-9.4 9-9.4S21 19 21 25Z" fill="#eceeef"/></svg></span>Mira Okafor</span></p>
         <ul class="brand__status" aria-label="Driftbar status">
           <li class="chip"><span class="chip__dot" aria-hidden="true"></span>9,400 Macs in sync</li>
           <li class="chip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>v1.8 · Shipped today</li>
