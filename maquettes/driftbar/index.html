@@ -84,7 +84,7 @@
       margin: 0;
       bottom: calc(28 * var(--u));
       padding-bottom: .28em;
-      font-size: calc(156 * var(--u));
+      font-size: calc(220 * var(--u));
       font-weight: 600;
       line-height: 1;
       letter-spacing: -0.045em;
@@ -366,6 +366,10 @@
     .col__list a { transition: opacity .2s; }
     .col__list a:hover { opacity: .55; }
 
+    @media (min-width: 1024px) and (max-height: 780px) {
+      .footer__wordmark { font-size: min(calc(220 * var(--u)), 21svh); }
+    }
+
     @media (min-width: 768px) and (max-width: 1023px) {
       .footer {
         --u: min(100vw / 1040, 100svh / 672);
@@ -380,7 +384,7 @@
       .brand__text { max-width: calc(350 * var(--u)); }
 
       .footer__wordmark {
-        font-size: calc(118 * var(--u));
+        font-size: calc(164 * var(--u));
         bottom: calc(36 * var(--u));
       }
     }
@@ -426,7 +430,7 @@
         white-space: nowrap;
       }
 
-      .footer__wordmark { bottom: 16vw; font-size: 13.2vw; }
+      .footer__wordmark { bottom: 12vw; font-size: 16.4vw; }
     }
 
     @media (max-width: 359px) {
