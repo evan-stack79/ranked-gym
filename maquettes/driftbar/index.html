@@ -99,171 +99,20 @@
     .phone-scene {
       position: absolute;
       z-index: 1;
-      top: calc(250 * var(--u));
-      left: calc(560 * var(--u));
-      width: calc(680 * var(--u));
-      height: calc(820 * var(--u));
-      padding: calc(62 * var(--u)) 0 0 calc(80 * var(--u));
-      box-sizing: border-box;
-      perspective: calc(980 * var(--u));
-      perspective-origin: 40% 30%;
+      top: calc(292 * var(--u));
+      left: calc(540 * var(--u));
+      width: calc(460 * var(--u));
       pointer-events: none;
-      -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent 98%);
-      mask-image: linear-gradient(to bottom, #000 72%, transparent 98%);
+      -webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 88%);
+      mask-image: linear-gradient(to bottom, #000 58%, transparent 88%);
     }
 
-    .phone {
-      position: relative;
-      width: calc(286 * var(--u));
-      height: calc(586 * var(--u));
-      padding: calc(11 * var(--u));
-      border-radius: calc(48 * var(--u));
-      background:
-        linear-gradient(180deg, rgb(255 255 255 / .28), transparent 18%),
-        linear-gradient(165deg, #5a5a60, #1c1c1e 40%, #070708);
-      box-shadow:
-        calc(-22 * var(--u)) calc(40 * var(--u)) calc(54 * var(--u)) rgb(0 0 0 / .48),
-        inset 0 0 0 1px rgb(255 255 255 / .28);
-      transform: rotateX(9deg) rotateY(-26deg) rotateZ(-8deg);
-      transform-style: preserve-3d;
-    }
-
-    .phone::before {
-      content: "";
-      position: absolute;
-      top: calc(18 * var(--u));
-      bottom: calc(18 * var(--u));
-      left: calc(-13 * var(--u));
-      width: calc(14 * var(--u));
-      border-radius: calc(6 * var(--u)) 0 0 calc(6 * var(--u));
-      background: linear-gradient(90deg, #9a9aa0, #3a3a3e 46%, #111);
-      transform: translateZ(calc(-7 * var(--u))) rotateY(-90deg);
-      transform-origin: right center;
-    }
-
-    .phone__screen {
-      height: 100%;
-      border-radius: calc(38 * var(--u));
-      background: #000;
-      overflow: hidden;
-      position: relative;
-      padding: calc(16 * var(--u)) calc(14 * var(--u)) 0;
-      color: #fff;
-      font-size: calc(13 * var(--u));
-      transform: translateZ(calc(1 * var(--u)));
-    }
-
-    .phone__screen::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(118deg, rgb(255 255 255 / .18), transparent 36%);
-      pointer-events: none;
-    }
-
-    .phone__island {
-      width: calc(78 * var(--u));
-      height: calc(22 * var(--u));
-      margin: 0 auto calc(16 * var(--u));
-      border-radius: 999px;
-      background: #0c0c0e;
-      box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08);
-    }
-
-    .phone__title {
-      margin: 0;
-      font-size: calc(28 * var(--u));
-      font-weight: 700;
-      letter-spacing: -0.04em;
-      line-height: 1;
-    }
-
-    .phone__sub {
-      margin: calc(6 * var(--u)) 0 0;
-      color: #acb4ba;
-      font-size: calc(12 * var(--u));
-      font-weight: 500;
-    }
-
-    .phone__tiles {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: calc(8 * var(--u));
-      margin-top: calc(16 * var(--u));
-    }
-
-    .phone__tile,
-    .phone__card {
-      position: relative;
-      overflow: hidden;
-      border-radius: calc(16 * var(--u));
-      background: #141416;
-      box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08);
-    }
-
-    .phone__tile { padding: calc(10 * var(--u)) calc(10 * var(--u)) calc(12 * var(--u)); }
-    .phone__tile span,
-    .phone__card span {
+    .phone-scene img {
       display: block;
-      color: #acb4ba;
-      font-size: calc(10 * var(--u));
-      font-weight: 600;
+      width: 100%;
+      height: auto;
+      filter: drop-shadow(calc(-16 * var(--u)) calc(28 * var(--u)) calc(32 * var(--u)) rgb(0 0 0 / .4));
     }
-    .phone__tile strong {
-      display: block;
-      margin-top: calc(8 * var(--u));
-      font-size: calc(18 * var(--u));
-      letter-spacing: -0.03em;
-    }
-    .phone__tile--water strong { color: #64b5ff; }
-    .phone__tile--sets strong { color: var(--brand); }
-
-    .phone__card {
-      margin-top: calc(8 * var(--u));
-      padding: calc(12 * var(--u)) calc(12 * var(--u)) calc(14 * var(--u));
-    }
-    .phone__card::before {
-      content: "";
-      position: absolute;
-      left: 0;
-      top: calc(10 * var(--u));
-      bottom: calc(10 * var(--u));
-      width: calc(3 * var(--u));
-      border-radius: 999px;
-      background: var(--brand);
-    }
-    .phone__card strong {
-      display: block;
-      margin-top: calc(4 * var(--u));
-      font-size: calc(16 * var(--u));
-      letter-spacing: -0.03em;
-    }
-    .phone__card em {
-      display: block;
-      margin-top: calc(2 * var(--u));
-      color: #acb4ba;
-      font-style: normal;
-      font-size: calc(11 * var(--u));
-    }
-
-    .phone__pill {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      width: calc(168 * var(--u));
-      margin: calc(18 * var(--u)) auto 0;
-      padding: calc(8 * var(--u)) calc(14 * var(--u));
-      border-radius: 999px;
-      background: rgb(28 28 30 / .92);
-      box-shadow: inset 0 0 0 1px rgb(255 255 255 / .1);
-    }
-    .phone__pill i {
-      width: calc(16 * var(--u));
-      height: calc(16 * var(--u));
-      border-radius: calc(4 * var(--u));
-      background: #8e9499;
-    }
-    .phone__pill i.is-on { background: var(--brand); }
 
     .footer__content {
       position: relative;
@@ -617,25 +466,7 @@
     <div class="footer__stage" aria-hidden="true"></div>
     <div class="footer__fade" aria-hidden="true"></div>
     <div class="phone-scene" aria-hidden="true">
-    <div class="phone">
-      <div class="phone__screen">
-        <div class="phone__island"></div>
-        <p class="phone__title">Accueil</p>
-        <p class="phone__sub">Aujourd’hui</p>
-        <div class="phone__tiles">
-          <div class="phone__tile phone__tile--water"><span>Eau</span><strong>1,2 L</strong></div>
-          <div class="phone__tile phone__tile--sets"><span>Séries</span><strong>24</strong></div>
-        </div>
-        <div class="phone__card">
-          <span>Prochaine séance</span>
-          <strong>Push</strong>
-          <em>Poitrine · 45 min</em>
-        </div>
-        <div class="phone__pill">
-          <i class="is-on"></i><i></i><i></i><i></i>
-        </div>
-      </div>
-    </div>
+      <img alt="" src="phone-ajouter.png" />
     </div>
     <p class="footer__wordmark" aria-hidden="true">Ranked <span class="footer__wordmark-accent">Gym</span></p>
     <div class="footer__content">
