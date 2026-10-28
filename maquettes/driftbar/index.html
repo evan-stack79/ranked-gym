@@ -124,8 +124,8 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      gap: calc(40 * var(--u));
-      height: calc(56 * var(--u));
+      gap: calc(28 * var(--u));
+      height: calc(48 * var(--u));
     }
 
     .topnav__btn {
@@ -135,11 +135,11 @@
       background: none;
       color: var(--ink);
       font: inherit;
-      font-size: calc(14 * var(--u));
-      font-weight: 560;
-      letter-spacing: -0.03em;
+      font-size: calc(12 * var(--u));
+      font-weight: 400;
+      letter-spacing: -0.012em;
       cursor: pointer;
-      opacity: .78;
+      opacity: .8;
     }
 
     .topnav__btn:hover,
@@ -154,7 +154,7 @@
     .topnav__sheet {
       display: grid;
       grid-template-rows: 0fr;
-      background: rgb(0 0 0 / .62);
+      background: rgb(10 10 12 / .94);
       transition: grid-template-rows .28s ease;
     }
 
@@ -162,23 +162,62 @@
 
     .topnav__sheet-inner { overflow: hidden; }
 
-    .topnav__list {
+    .topnav__panel {
       display: grid;
-      justify-content: center;
-      gap: calc(14 * var(--u));
-      margin: 0;
-      padding: calc(22 * var(--u)) calc(24 * var(--u)) calc(28 * var(--u));
-      font-size: calc(15 * var(--u));
-      font-weight: 500;
-      letter-spacing: -0.02em;
-      text-align: center;
+      grid-template-columns: minmax(calc(240 * var(--u)), 1.5fr) minmax(calc(170 * var(--u)), 1fr) minmax(calc(190 * var(--u)), 1.05fr);
+      align-items: start;
+      column-gap: calc(56 * var(--u));
+      width: calc(980 * var(--u));
+      margin: 0 0 0 calc(168 * var(--u));
+      padding: calc(26 * var(--u)) 0 calc(40 * var(--u));
+      text-align: left;
     }
 
-    .topnav__list[hidden] { display: none; }
+    .topnav__panel[hidden] { display: none; }
 
-    .topnav__list a { transition: opacity .2s; }
-    .topnav__list a:hover { opacity: .55; }
-    .topnav__list a:focus-visible {
+    .topnav__label {
+      margin: 0 0 calc(12 * var(--u));
+      color: var(--muted);
+      font-size: calc(12 * var(--u));
+      font-weight: 400;
+      letter-spacing: -0.01em;
+    }
+
+    .topnav__lead,
+    .topnav__side {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .topnav__lead { gap: calc(1 * var(--u)); }
+    .topnav__side { gap: calc(10 * var(--u)); padding-top: calc(1 * var(--u)); }
+
+    .topnav__lead a {
+      font-size: calc(24 * var(--u));
+      font-weight: 600;
+      letter-spacing: -0.022em;
+      line-height: 1.16;
+    }
+
+    .topnav__lead a.topnav__compare {
+      margin-top: calc(16 * var(--u));
+      font-size: calc(14 * var(--u));
+      font-weight: 400;
+      letter-spacing: -0.012em;
+      line-height: 1.3;
+    }
+
+    .topnav__side a {
+      font-size: calc(14 * var(--u));
+      font-weight: 400;
+      letter-spacing: -0.012em;
+      line-height: 1.25;
+    }
+
+    .topnav__panel a { transition: opacity .2s; }
+    .topnav__panel a:hover { opacity: .55; }
+    .topnav__panel a:focus-visible {
       outline: 2px solid var(--brand);
       outline-offset: 3px;
     }
@@ -454,6 +493,14 @@
         padding: calc(88 * var(--u)) calc(40 * var(--u)) 0;
       }
 
+      .topnav__panel {
+        width: calc(900 * var(--u));
+        margin-left: calc(48 * var(--u));
+        column-gap: calc(28 * var(--u));
+      }
+
+      .topnav__lead a { font-size: calc(20 * var(--u)); }
+
       .brand__text { max-width: calc(350 * var(--u)); }
 
       .footer__wordmark {
@@ -471,9 +518,20 @@
         min-height: 100svh;
       }
 
-      .topnav__bar { height: 52px; gap: 22px; }
-      .topnav__btn { font-size: 15px; }
-      .topnav__list { gap: 16px; padding: 18px 20px 22px; font-size: 16px; }
+      .topnav__bar { height: 48px; gap: 18px; }
+      .topnav__btn { font-size: 14px; }
+      .topnav__panel {
+        width: auto;
+        margin: 0;
+        padding: 18px 22px 28px;
+        grid-template-columns: 1fr;
+        row-gap: 26px;
+      }
+      .topnav__lead a { font-size: 22px; }
+      .topnav__side a,
+      .topnav__lead a.topnav__compare,
+      .topnav__label { font-size: 15px; }
+      .topnav__side { gap: 12px; }
 
       .footer__content {
         width: 100%;
@@ -499,7 +557,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .store__btn, .topnav__list a, .discord, .topnav__sheet, .topnav__blur { transition: none; }
+      .store__btn, .topnav__panel a, .discord, .topnav__sheet, .topnav__blur { transition: none; }
     }
   </style>
 </head>
@@ -519,27 +577,85 @@
       </nav>
       <div class="topnav__sheet">
         <div class="topnav__sheet-inner">
-          <ul class="topnav__list" id="panel-abonnement" hidden>
-            <li><a href="#">Mensuel</a></li>
-            <li><a href="#">Annuel</a></li>
-            <li><a href="#">Offrir</a></li>
-            <li><a href="#">Restaurer</a></li>
-            <li><a href="#">Gérer</a></li>
-          </ul>
-          <ul class="topnav__list" id="panel-aide" hidden>
-            <li><a href="#">Support</a></li>
-            <li><a href="#">Contact</a></li>
-            <li><a href="#">À propos</a></li>
-            <li><a href="#">Accessibilité</a></li>
-            <li><a href="#">Presse</a></li>
-          </ul>
-          <ul class="topnav__list" id="panel-compte" hidden>
-            <li><a href="#">Connexion</a></li>
-            <li><a href="#">Classement</a></li>
-            <li><a href="#">Conditions</a></li>
-            <li><a href="#">Confidentialité</a></li>
-            <li><a href="#">Tes données</a></li>
-          </ul>
+          <div class="topnav__panel" id="panel-abonnement" hidden>
+            <div class="topnav__lead">
+              <p class="topnav__label">Univers</p>
+              <a href="#">Découvrir Ranked Gym</a>
+              <a href="#">Mensuel</a>
+              <a href="#">Annuel</a>
+              <a href="#">Offrir</a>
+              <a href="#">Classement</a>
+              <a class="topnav__compare" href="#">Comparer les offres</a>
+            </div>
+            <div class="topnav__side">
+              <p class="topnav__label">Acheter</p>
+              <a href="#">S’abonner</a>
+              <a href="#">Restaurer</a>
+              <a href="#">Gérer</a>
+              <a href="#">App Store</a>
+              <a href="#">Google Play</a>
+            </div>
+            <div class="topnav__side">
+              <p class="topnav__label">Autour de Ranked Gym</p>
+              <a href="#">Entraînement</a>
+              <a href="#">Nutrition</a>
+              <a href="#">Récupération</a>
+              <a href="#">Promesse 6 %</a>
+              <a href="#">iOS</a>
+              <a href="#">Android</a>
+              <a href="#">Discord</a>
+              <a href="#">Aide</a>
+            </div>
+          </div>
+          <div class="topnav__panel" id="panel-aide" hidden>
+            <div class="topnav__lead">
+              <p class="topnav__label">Aide</p>
+              <a href="#">Support</a>
+              <a href="#">Contact</a>
+              <a href="#">À propos</a>
+              <a href="#">Accessibilité</a>
+              <a class="topnav__compare" href="#">Presse</a>
+            </div>
+            <div class="topnav__side">
+              <p class="topnav__label">Compte</p>
+              <a href="#">Connexion</a>
+              <a href="#">Tes données</a>
+              <a href="#">Classement</a>
+            </div>
+            <div class="topnav__side">
+              <p class="topnav__label">Autour de l’aide</p>
+              <a href="#">Conditions</a>
+              <a href="#">Confidentialité</a>
+              <a href="#">Restaurer</a>
+              <a href="#">Gérer</a>
+              <a href="#">Discord</a>
+            </div>
+          </div>
+          <div class="topnav__panel" id="panel-compte" hidden>
+            <div class="topnav__lead">
+              <p class="topnav__label">Compte</p>
+              <a href="#">Connexion</a>
+              <a href="#">Classement</a>
+              <a href="#">Tes données</a>
+              <a class="topnav__compare" href="#">Gérer</a>
+            </div>
+            <div class="topnav__side">
+              <p class="topnav__label">Abonnement</p>
+              <a href="#">Mensuel</a>
+              <a href="#">Annuel</a>
+              <a href="#">Offrir</a>
+              <a href="#">Restaurer</a>
+            </div>
+            <div class="topnav__side">
+              <p class="topnav__label">Autour du compte</p>
+              <a href="#">Conditions</a>
+              <a href="#">Confidentialité</a>
+              <a href="#">Accessibilité</a>
+              <a href="#">Presse</a>
+              <a href="#">Support</a>
+              <a href="#">Contact</a>
+            </div>
+          </div>
         </div>
       </div>
     </header>
