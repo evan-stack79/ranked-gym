@@ -10,6 +10,7 @@ import {
   Pencil,
   Settings2,
   Shield,
+  Trophy,
   UserRound,
 } from 'lucide-react'
 import { isCameraHeartRateEnabled } from '../../native/cameraHeartRate'
@@ -42,6 +43,7 @@ export type SettingsMenuId =
   | 'healthSituations'
   | 'energyInfo'
   | 'giveFeedback'
+  | 'ranked'
 
 interface SettingsScreenProps {
   username: string
@@ -57,6 +59,7 @@ interface SettingsScreenProps {
   onOpenHealthSituations?: () => void
   onOpenEnergyInfo?: () => void
   onOpenGiveFeedback?: () => void
+  onOpenRanked?: () => void
   onRequireAuth?: () => void
   onTryPro?: () => void
   onDisciplineChange?: (disciplineLabel: string) => void
@@ -95,6 +98,7 @@ export function SettingsScreen({
   onOpenHealthSituations,
   onOpenEnergyInfo,
   onOpenGiveFeedback,
+  onOpenRanked,
   onRequireAuth,
   onTryPro,
   onDisciplineChange,
@@ -187,6 +191,7 @@ export function SettingsScreen({
     {
       items: [
         { id: 'personal', icon: UserRound, label: 'Informations personnelles' },
+        { id: 'ranked', icon: Trophy, label: 'Ranked Force / Discipline' },
         { id: 'privacy', icon: Shield, label: 'Sécurité & Confidentialité' },
         { id: 'healthSituations', icon: HeartHandshake, label: 'Situations de santé' },
         { id: 'energyInfo', icon: Info, label: 'Informations' },
@@ -310,6 +315,14 @@ export function SettingsScreen({
                           return
                         }
                         onOpenGiveFeedback?.()
+                        return
+                      }
+                      if (item.id === 'ranked') {
+                        if (!isAuthenticated) {
+                          onRequireAuth?.()
+                          return
+                        }
+                        onOpenRanked?.()
                         return
                       }
                       if (item.id === 'healthSituations') {

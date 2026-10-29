@@ -30,9 +30,12 @@ import type * as lib_stripJournalMeals from "../lib/stripJournalMeals.js";
 import type * as nutrition from "../nutrition.js";
 import type * as profiles from "../profiles.js";
 import type * as purgeSupabaseMeals from "../purgeSupabaseMeals.js";
+import type * as ranked from "../ranked.js";
 import type * as rpc from "../rpc.js";
 import type * as social from "../social.js";
 import type * as sync from "../sync.js";
+import type * as lib_rankedAccess from "../lib/rankedAccess.js";
+import type * as lib_rankedScience from "../lib/rankedScience.js";
 
 import type {
   ApiFromModules,
@@ -55,6 +58,8 @@ declare const fullApi: ApiFromModules<{
   "lib/authCrypto": typeof lib_authCrypto;
   "lib/foodAddAccess": typeof lib_foodAddAccess;
   "lib/migrationAdmin": typeof lib_migrationAdmin;
+  "lib/rankedAccess": typeof lib_rankedAccess;
+  "lib/rankedScience": typeof lib_rankedScience;
   "lib/rateLimit": typeof lib_rateLimit;
   "lib/socialVisibility": typeof lib_socialVisibility;
   "lib/stripJournalMeals": typeof lib_stripJournalMeals;
@@ -63,6 +68,7 @@ declare const fullApi: ApiFromModules<{
   nutrition: typeof nutrition;
   profiles: typeof profiles;
   purgeSupabaseMeals: typeof purgeSupabaseMeals;
+  ranked: typeof ranked;
   rpc: typeof rpc;
   social: typeof social;
   sync: typeof sync;

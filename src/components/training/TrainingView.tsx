@@ -28,7 +28,8 @@ import {
   persistActiveExerciseIndex,
 } from '../../services/trainingStorage'
 import { saveAndSyncWorkoutSession } from '../../services/trainingSyncService'
-import { safeError } from '../../utils/safeLog'
+import { notifyRankedSessionCompleted } from '../../services/rankedService'
+import { safeError, safeWarn } from '../../utils/safeLog'
 import { connectHealthIntent } from '../../services/healthSteps'
 import { startReminderWatcher } from '../../services/reminderService'
 import { getCalorieProfile } from '../../services/nutritionStorage'
@@ -543,7 +544,13 @@ export function TrainingView({
         setState(result.state)
         if (result.ok) {
           if (!isNewSession) showToast('Séance mise à jour ✓')
-          if (isNewSession) openPumpCheck(note)
+          if (isNewSession) {
+            openPumpCheck(note)
+            // Ranked Discipline (opt-in) — soft fail si pas opt-in / hors gate
+            void notifyRankedSessionCompleted(note.id).catch((error) => {
+              safeWarn('[Ranked] onSessionCompleted soft-failed', error)
+            })
+          }
         } else {
           safeError('[Train] session sync failed', result.error)
           showToast(result.error ?? 'Erreur de synchro')

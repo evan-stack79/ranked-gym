@@ -16,6 +16,7 @@ import {
   type ServerHealthLocks,
 } from '../settings/HealthSituationsForm'
 import { FullProfileScreen } from './FullProfileScreen'
+import { RankedScreens } from '../ranked/RankedScreens'
 import { useAuth } from '../../context/AuthContext'
 import {
   getCalorieProfile,
@@ -277,6 +278,15 @@ function ProfileViewContent() {
     return <FullProfileScreen onBack={goBack} />
   }
 
+  if (route === 'ranked') {
+    if (!isAuthenticated || !user) {
+      requireAuth(() => navigate('ranked'))
+      goBack()
+      return null
+    }
+    return <RankedScreens onBack={goBack} />
+  }
+
   if (!isAuthenticated || !user) {
     return (
       <div className="flex flex-col gap-6 pb-4 ios-fade-up">
@@ -292,6 +302,7 @@ function ProfileViewContent() {
           onOpenHealthSituations={() => navigate('healthSituations')}
           onOpenEnergyInfo={() => navigate('energyInfo')}
           onOpenGiveFeedback={() => requireAuth(() => navigate('giveFeedback'))}
+          onOpenRanked={() => requireAuth(() => navigate('ranked'))}
         />
         <CloudBackupCard />
       </div>
@@ -318,6 +329,7 @@ function ProfileViewContent() {
         onOpenHealthSituations={() => navigate('healthSituations')}
         onOpenEnergyInfo={() => navigate('energyInfo')}
         onOpenGiveFeedback={() => navigate('giveFeedback')}
+        onOpenRanked={() => navigate('ranked')}
         onRequireAuth={() => requireAuth(() => undefined)}
         onDisciplineChange={(label) => {
           setDisciplineId(disciplineFromLabel(label))
