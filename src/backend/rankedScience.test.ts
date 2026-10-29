@@ -10,6 +10,8 @@ import {
   forceScoreFromBreakdown,
   publicRankedMethod,
   relativeCapCheck,
+  resolveAnomalyBaseline,
+  softResetSeedScore,
 } from '../../convex/lib/rankedScience'
 import {
   assertRankedAdultAge,
@@ -121,6 +123,70 @@ describe('RF-ANOM-01 A/B/novice', () => {
         historySpanMs: 4 * 7 * day,
       }),
     ).toBe('B')
+  })
+})
+
+describe('B2 baseline anomalies — ignore rejected_force', () => {
+  const now = 1_000_000_000_000
+
+  it('repro A : rejected 200 ignoré → baseline 100 → ressaisie 200 = B', () => {
+    const baseline = resolveAnomalyBaseline({
+      verified1RmKg: null,
+      verifiedAtMs: null,
+      recentLifts: [
+        { estimated1RmKg: 100, createdAt: now - 60_000, status: 'pending_verify' },
+        { estimated1RmKg: 200, createdAt: now - 30_000, status: 'rejected_force' },
+      ],
+      nowMs: now,
+    })
+    expect(baseline.baseline1RmKg).toBe(100)
+    const r = evaluateSubmitLift({
+      canonicalExerciseId: 'bench',
+      weightKg: 200,
+      reps: 1,
+      sex: 'M',
+      verifiedRefs: {},
+      baseline1RmKg: baseline.baseline1RmKg,
+      baselineAtMs: baseline.baselineAtMs,
+      historyFirstAtMs: now - 60_000,
+      nowMs: now,
+    })
+    expect(r.status).toBe('rejected_force')
+    expect(r.anomalyFlag).toBe('B')
+  })
+
+  it('repro B : escalier +14% bloqué via floor 7j', () => {
+    const lifts = [
+      { estimated1RmKg: 100, createdAt: now - 5 * 60_000, status: 'pending_verify' as const },
+      { estimated1RmKg: 114, createdAt: now - 4 * 60_000, status: 'pending_verify' as const },
+      { estimated1RmKg: 130, createdAt: now - 3 * 60_000, status: 'pending_verify' as const },
+    ]
+    const baseline = resolveAnomalyBaseline({
+      verified1RmKg: null,
+      verifiedAtMs: null,
+      recentLifts: lifts,
+      nowMs: now,
+    })
+    expect(baseline.baseline1RmKg).toBe(100)
+    const r = evaluateSubmitLift({
+      canonicalExerciseId: 'bench',
+      weightKg: 148,
+      reps: 1,
+      sex: 'M',
+      verifiedRefs: {},
+      baseline1RmKg: baseline.baseline1RmKg,
+      baselineAtMs: baseline.baselineAtMs,
+      historyFirstAtMs: now - 5 * 60_000,
+      nowMs: now,
+    })
+    expect(r.anomalyFlag).toBe('B')
+  })
+})
+
+describe('B4 soft reset seed', () => {
+  it('re-placement partiel 50 %, pas 100 %', () => {
+    expect(softResetSeedScore(420)).toBe(210)
+    expect(softResetSeedScore(0)).toBe(0)
   })
 })
 

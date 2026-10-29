@@ -672,6 +672,8 @@ export const convexTables = {
     userId: v.string(),
     cycleId: v.id('rankedCycle'),
     score: v.number(),
+    /** Soft-reset partial seed (CA6) — not a 100% copy of previous score. */
+    seedScore: v.optional(v.number()),
     breakdown: v.object({
       squat: v.number(),
       bench: v.number(),

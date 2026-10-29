@@ -546,10 +546,13 @@ export function TrainingView({
           if (!isNewSession) showToast('Séance mise à jour ✓')
           if (isNewSession) {
             openPumpCheck(note)
-            // Ranked Discipline (opt-in) — soft fail si pas opt-in / hors gate
-            void notifyRankedSessionCompleted(note.id).catch((error) => {
-              safeWarn('[Ranked] onSessionCompleted soft-failed', error)
-            })
+            // Ranked Discipline (opt-in) — timestamp serveur + id séance réel (B3)
+            const savedId = result.state.workoutNotes[0]?.id
+            if (savedId) {
+              void notifyRankedSessionCompleted(savedId).catch((error) => {
+                safeWarn('[Ranked] onSessionCompleted soft-failed', error)
+              })
+            }
           }
         } else {
           safeError('[Train] session sync failed', result.error)

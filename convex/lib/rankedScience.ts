@@ -164,6 +164,87 @@ export function classifyAnomaly(input: {
   return 'none'
 }
 
+export type AnomalyLiftSample = {
+  estimated1RmKg: number
+  createdAt: number
+  status: LiftForceStatus
+}
+
+/**
+ * Baseline Δ1RM (B2) :
+ * - ignore `rejected_force`
+ * - préfère le meilleur 1RM **vérifié**
+ * - sinon le **plus bas** 1RM non refusé dans la fenêtre 7 j (bloque l’escalier)
+ */
+export function resolveAnomalyBaseline(input: {
+  verified1RmKg: number | null
+  verifiedAtMs: number | null
+  recentLifts: AnomalyLiftSample[]
+  nowMs: number
+}): { baseline1RmKg: number | null; baselineAtMs: number | null } {
+  const windowStart = input.nowMs - ANOMALY_WINDOW_MS
+  const eligible = input.recentLifts.filter(
+    (l) =>
+      l.status !== 'rejected_force' &&
+      Number.isFinite(l.estimated1RmKg) &&
+      l.estimated1RmKg > 0 &&
+      l.createdAt >= windowStart &&
+      l.createdAt <= input.nowMs,
+  )
+
+  if (
+    input.verified1RmKg != null &&
+    input.verified1RmKg > 0 &&
+    input.verifiedAtMs != null &&
+    input.verifiedAtMs >= windowStart
+  ) {
+    // Verified in window: still compare vs the more conservative (lower) eligible floor.
+    const floor = eligible.reduce<number | null>((min, l) => {
+      if (min == null || l.estimated1RmKg < min) return l.estimated1RmKg
+      return min
+    }, input.verified1RmKg)
+    const floorLift = eligible.find((l) => l.estimated1RmKg === floor)
+    return {
+      baseline1RmKg: floor,
+      baselineAtMs:
+        floor === input.verified1RmKg
+          ? input.verifiedAtMs
+          : (floorLift?.createdAt ?? input.verifiedAtMs),
+    }
+  }
+
+  if (input.verified1RmKg != null && input.verified1RmKg > 0) {
+    // Verified outside window still anchors anti-stair when no eligible recent floor.
+    const floor = eligible.reduce<number | null>((min, l) => {
+      if (min == null || l.estimated1RmKg < min) return l.estimated1RmKg
+      return min
+    }, null)
+    if (floor != null && floor < input.verified1RmKg) {
+      const floorLift = eligible.find((l) => l.estimated1RmKg === floor)
+      return { baseline1RmKg: floor, baselineAtMs: floorLift?.createdAt ?? input.nowMs }
+    }
+    // No recent eligible lifts: Δ window uses verifiedAt — if older than 7d, classifyAnomaly → none.
+    return {
+      baseline1RmKg: input.verified1RmKg,
+      baselineAtMs: input.verifiedAtMs,
+    }
+  }
+
+  if (eligible.length === 0) {
+    return { baseline1RmKg: null, baselineAtMs: null }
+  }
+  const floor = eligible.reduce((min, l) => (l.estimated1RmKg < min.estimated1RmKg ? l : min))
+  return { baseline1RmKg: floor.estimated1RmKg, baselineAtMs: floor.createdAt }
+}
+
+/** Soft reset seed ratio — re-placement partiel (CA6), pas 100 % copy. */
+export const SOFT_RESET_SEED_RATIO = 0.5
+
+export function softResetSeedScore(previousScore: number): number {
+  const safe = Number.isFinite(previousScore) ? Math.max(0, previousScore) : 0
+  return Math.floor(safe * SOFT_RESET_SEED_RATIO)
+}
+
 /**
  * Discipline points for sessions in a rolling 7d window.
  * 6th and 7th sessions add 0 Ranked points (RF-DISC-01).
@@ -268,8 +349,11 @@ export function evaluateSubmitLift(input: {
   reps: number
   sex: RankedSex
   verifiedRefs: { deadlift?: number; bench?: number }
-  previous1RmKg: number | null
-  previousAtMs: number | null
+  /** @deprecated Prefer baseline via resolveAnomalyBaseline — kept for tests. */
+  previous1RmKg?: number | null
+  previousAtMs?: number | null
+  baseline1RmKg?: number | null
+  baselineAtMs?: number | null
   historyFirstAtMs: number | null
   nowMs: number
 }): {
@@ -324,13 +408,17 @@ export function evaluateSubmitLift(input: {
     }
   }
 
-  const deltaWithinMs =
-    input.previousAtMs != null ? input.nowMs - input.previousAtMs : null
+  const baseline1RmKg =
+    input.baseline1RmKg !== undefined ? input.baseline1RmKg : (input.previous1RmKg ?? null)
+  const baselineAtMs =
+    input.baselineAtMs !== undefined ? input.baselineAtMs : (input.previousAtMs ?? null)
+
+  const deltaWithinMs = baselineAtMs != null ? input.nowMs - baselineAtMs : null
   const historySpanMs =
     input.historyFirstAtMs != null ? input.nowMs - input.historyFirstAtMs : null
 
   const anomalyFlag = classifyAnomaly({
-    previous1RmKg: input.previous1RmKg,
+    previous1RmKg: baseline1RmKg,
     next1RmKg: estimated1RmKg,
     deltaWithinMs,
     historySpanMs,

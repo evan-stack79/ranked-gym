@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { ChevronLeft, Trophy, BookOpen, Flame, Users, Info, Pause } from 'lucide-react'
 import {
+  confirmRankedVerifyFriend,
   confirmRankedVerifySelf,
   fetchFriendsLeaderboard,
   fetchMyLeague,
   fetchMyRankedStatus,
   fetchPublicRankedMethod,
+  listIncomingRankedVerifyRequests,
+  listMyRankedFriendships,
   listMyRankedLifts,
   listMyVerifiedPrs,
   RANKED_FORCE_LABELS,
+  requestRankedFriendship,
   requestRankedVerify,
+  respondRankedFriendship,
   setRankedInjuryPause,
   setRankedOptIn,
   submitRankedLift,
@@ -28,6 +33,8 @@ export type RankedRoute =
 interface RankedScreensProps {
   onBack: () => void
   initialRoute?: RankedRoute
+  /** Guest mode (CA5) — barème OK ; actions → auth. */
+  requireAuthForActions?: () => void
 }
 
 const FORCE_IDS = Object.keys(RANKED_FORCE_LABELS) as RankedForceExerciseId[]
@@ -242,14 +249,19 @@ function RankedMethodScreen({ onBack }: { onBack: () => void }) {
 
 function RankedCarnetScreen({ onBack }: { onBack: () => void }) {
   const [lifts, setLifts] = useState<any[]>([])
+  const [friends, setFriends] = useState<any[]>([])
   const [exerciseId, setExerciseId] = useState<RankedForceExerciseId>('squat')
   const [weightKg, setWeightKg] = useState('100')
   const [reps, setReps] = useState('5')
+  const [friendForVerify, setFriendForVerify] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   const reload = useCallback(() => {
     void listMyRankedLifts().then((rows) => setLifts(rows as any[]))
+    void listMyRankedFriendships().then((rows) =>
+      setFriends((rows as any[]).filter((f) => f.status === 'accepted')),
+    )
   }, [])
 
   useEffect(() => {
@@ -272,7 +284,7 @@ function RankedCarnetScreen({ onBack }: { onBack: () => void }) {
       setMessage(
         `Statut ${result.status}${
           result.estimated1RmKg != null ? ` · ${result.label ?? '1RM'} ${result.estimated1RmKg.toFixed(1)} kg` : ''
-        }`,
+        }${result.needsReviewQueue ? ' · file relecture / ami 18+' : ''}`,
       )
       reload()
     } catch (e) {
@@ -281,6 +293,8 @@ function RankedCarnetScreen({ onBack }: { onBack: () => void }) {
       setBusy(false)
     }
   }
+
+  const isRowOrOhp = exerciseId === 'barbell_row' || exerciseId === 'ohp'
 
   return (
     <ScreenShell title="Carnet / PR" onBack={onBack}>
@@ -300,6 +314,11 @@ function RankedCarnetScreen({ onBack }: { onBack: () => void }) {
             ))}
           </select>
         </label>
+        {isRowOrOhp ? (
+          <p className="text-[12px] text-[#FF9F0A]" data-testid="ranked-row-ohp-note">
+            1RM estimé — estimation non validée pour row barre / OHP (même formule Epley).
+          </p>
+        ) : null}
         <div className="grid grid-cols-2 gap-3">
           <label className="block text-[12px] font-semibold uppercase tracking-wide text-[#717C83]">
             Charge (kg)
@@ -353,13 +372,21 @@ function RankedCarnetScreen({ onBack }: { onBack: () => void }) {
                     ? ` · 1RM estimé ${Number(lift.estimated1RmKg).toFixed(1)} kg`
                     : ''}
                 </p>
+                {lift.canonicalExerciseId === 'barbell_row' ||
+                lift.canonicalExerciseId === 'ohp' ? (
+                  <p className="text-[11px] text-[#717C83]">
+                    Estimation non validée pour ce mouvement
+                  </p>
+                ) : null}
               </div>
               <StatusPill
                 label={
                   lift.status === 'verified'
                     ? 'Vérifié'
                     : lift.status === 'pending_verify'
-                      ? 'En attente'
+                      ? lift.needsReviewQueue
+                        ? 'Relecture'
+                        : 'En attente'
                       : lift.status === 'rejected_force'
                         ? 'Refus Force'
                         : 'Déclaré'
@@ -376,30 +403,80 @@ function RankedCarnetScreen({ onBack }: { onBack: () => void }) {
               />
             </div>
             {lift.status === 'pending_verify' ? (
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="rounded-xl border border-white/15 px-3 py-1.5 text-[12px] text-white"
-                  onClick={() =>
-                    void requestRankedVerify({ liftLogId: lift.id, method: 'self_24h' }).then(
-                      () => setMessage('Demande self 24h créée — confirme après 24 h.'),
-                    )
-                  }
-                >
-                  Double conf. 24 h
-                </button>
-                <button
-                  type="button"
-                  className="rounded-xl border border-white/15 px-3 py-1.5 text-[12px] text-white"
-                  onClick={() =>
-                    void confirmRankedVerifySelf(lift.id).then((r) => {
-                      setMessage(r.ok ? 'Vérifié' : String((r as any).error))
-                      reload()
-                    })
-                  }
-                >
-                  Confirmer (self)
-                </button>
+              <div className="mt-2 space-y-2">
+                {!lift.needsReviewQueue ? (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="rounded-xl border border-white/15 px-3 py-1.5 text-[12px] text-white"
+                      onClick={() =>
+                        void requestRankedVerify({ liftLogId: lift.id, method: 'self_24h' }).then(
+                          () => setMessage('Demande self 24h créée — confirme après 24 h.'),
+                        )
+                      }
+                    >
+                      Double conf. 24 h
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-xl border border-white/15 px-3 py-1.5 text-[12px] text-white"
+                      onClick={() =>
+                        void confirmRankedVerifySelf(lift.id).then((r) => {
+                          setMessage(r.ok ? 'Vérifié' : String((r as any).error))
+                          reload()
+                        })
+                      }
+                    >
+                      Confirmer (self)
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-[12px] text-[#FF9F0A]">
+                    File relecture / ami 18+ requis (self 24 h bloqué).
+                  </p>
+                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    className="rounded-xl border border-white/10 bg-black px-2 py-1.5 text-[12px] text-white"
+                    value={friendForVerify[lift.id] ?? ''}
+                    onChange={(e) =>
+                      setFriendForVerify((prev) => ({ ...prev, [lift.id]: e.target.value }))
+                    }
+                    data-testid={`ranked-friend-verify-select-${lift.id}`}
+                  >
+                    <option value="">Ami 18+ pour vérifier…</option>
+                    {friends.map((f) => (
+                      <option key={f.friendUserId} value={f.friendUserId}>
+                        {f.pseudo}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="rounded-xl border border-[#FF0702]/40 bg-[#FF0702]/15 px-3 py-1.5 text-[12px] text-white"
+                    data-testid={`ranked-friend-verify-ask-${lift.id}`}
+                    onClick={() => {
+                      const friendId = friendForVerify[lift.id]
+                      if (!friendId) {
+                        setMessage('Choisis un ami accepté.')
+                        return
+                      }
+                      void requestRankedVerify({
+                        liftLogId: lift.id,
+                        method: 'friend_18',
+                        friendId,
+                      }).then((r) => {
+                        setMessage(
+                          r.ok
+                            ? 'Demande envoyée à ton ami.'
+                            : String((r as any).error ?? 'Erreur'),
+                        )
+                      })
+                    }}
+                  >
+                    Demander vérif. ami
+                  </button>
+                </div>
               </div>
             ) : null}
           </li>
@@ -518,13 +595,147 @@ function RankedDisciplineScreen({
 function RankedFriendsScreen({ onBack }: { onBack: () => void }) {
   const [axis, setAxis] = useState<'force' | 'discipline'>('force')
   const [board, setBoard] = useState<any>(null)
+  const [friendships, setFriendships] = useState<any[]>([])
+  const [incomingVerify, setIncomingVerify] = useState<any[]>([])
+  const [friendUserId, setFriendUserId] = useState('')
+  const [message, setMessage] = useState<string | null>(null)
+
+  const reload = useCallback(() => {
+    void fetchFriendsLeaderboard(axis).then(setBoard)
+    void listMyRankedFriendships().then((rows) => setFriendships(rows as any[]))
+    void listIncomingRankedVerifyRequests().then((rows) => setIncomingVerify(rows as any[]))
+  }, [axis])
 
   useEffect(() => {
-    void fetchFriendsLeaderboard(axis).then(setBoard)
-  }, [axis])
+    reload()
+  }, [reload])
+
+  const pendingIncoming = friendships.filter(
+    (f) => f.status === 'pending' && f.direction === 'incoming',
+  )
+  const accepted = friendships.filter((f) => f.status === 'accepted')
 
   return (
     <ScreenShell title="Classement amis" onBack={onBack}>
+      <div className="space-y-3 rounded-2xl border border-white/10 bg-black/30 p-4">
+        <h2 className="text-[13px] font-bold uppercase tracking-wide text-white">Ajouter un ami</h2>
+        <input
+          className="w-full rounded-xl border border-white/10 bg-black px-3 py-2 text-[14px] text-white"
+          placeholder="User id Ranked de ton ami"
+          value={friendUserId}
+          onChange={(e) => setFriendUserId(e.target.value)}
+          data-testid="ranked-friend-add-input"
+        />
+        <button
+          type="button"
+          className="ios-press w-full rounded-2xl bg-[#FF0702] px-4 py-2.5 text-[14px] font-semibold text-white"
+          data-testid="ranked-friend-add-submit"
+          onClick={() => {
+            void requestRankedFriendship(friendUserId.trim()).then((r) => {
+              setMessage(r.ok ? 'Demande envoyée' : String((r as any).error))
+              setFriendUserId('')
+              reload()
+            })
+          }}
+        >
+          Envoyer la demande
+        </button>
+        {message ? <p className="text-[12px] text-[#ACB4BA]">{message}</p> : null}
+      </div>
+
+      {pendingIncoming.length > 0 ? (
+        <div className="space-y-2">
+          <h2 className="text-[13px] font-bold uppercase tracking-wide text-white">
+            Demandes reçues
+          </h2>
+          {pendingIncoming.map((f) => (
+            <div
+              key={f.friendshipId}
+              className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/25 px-3 py-3"
+              data-testid="ranked-friend-pending"
+            >
+              <span className="text-[14px] text-white">{f.pseudo}</span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="rounded-xl bg-emerald-600/80 px-3 py-1.5 text-[12px] text-white"
+                  onClick={() =>
+                    void respondRankedFriendship({
+                      friendshipId: f.friendshipId,
+                      accept: true,
+                    }).then(reload)
+                  }
+                >
+                  Accepter
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl border border-white/15 px-3 py-1.5 text-[12px] text-[#ACB4BA]"
+                  onClick={() =>
+                    void respondRankedFriendship({
+                      friendshipId: f.friendshipId,
+                      accept: false,
+                    }).then(reload)
+                  }
+                >
+                  Refuser
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {incomingVerify.length > 0 ? (
+        <div className="space-y-2">
+          <h2 className="text-[13px] font-bold uppercase tracking-wide text-white">
+            Vérifications à confirmer
+          </h2>
+          {incomingVerify.map((req) => (
+            <div
+              key={req.requestId}
+              className="rounded-2xl border border-white/10 bg-black/25 px-3 py-3"
+              data-testid="ranked-friend-verify-incoming"
+            >
+              <p className="text-[14px] text-white">
+                {req.ownerPseudo} · {req.lift?.canonicalExerciseId}{' '}
+                {req.lift ? `${req.lift.weightKg}×${req.lift.reps}` : ''}
+              </p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  className="rounded-xl bg-emerald-600/80 px-3 py-1.5 text-[12px] text-white"
+                  onClick={() =>
+                    void confirmRankedVerifyFriend({
+                      requestId: req.requestId,
+                      accept: true,
+                    }).then(reload)
+                  }
+                >
+                  Confirmer PR
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl border border-white/15 px-3 py-1.5 text-[12px] text-[#ACB4BA]"
+                  onClick={() =>
+                    void confirmRankedVerifyFriend({
+                      requestId: req.requestId,
+                      accept: false,
+                    }).then(reload)
+                  }
+                >
+                  Refuser
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      <p className="text-[12px] text-[#717C83]">
+        Amis acceptés : {accepted.length}. Pseudo + avatar seulement. Salle = P0-bis.
+      </p>
+
       <div className="flex gap-2">
         <button
           type="button"
@@ -547,54 +758,73 @@ function RankedFriendsScreen({ onBack }: { onBack: () => void }) {
           Discipline
         </button>
       </div>
-      <ul className="space-y-2" data-testid="ranked-friends-board">
-        {(board?.entries ?? []).map((entry: any, index: number) => (
-          <li
-            key={entry.userId}
-            className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/25 px-3 py-3"
-          >
-            <div className="flex items-center gap-3">
-              <span className="w-6 text-[13px] font-bold text-[#717C83]">{index + 1}</span>
-              {entry.avatarUrl ? (
-                <img
-                  src={entry.avatarUrl}
-                  alt=""
-                  className="h-9 w-9 rounded-full object-cover"
-                />
-              ) : (
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-[12px] text-white">
-                  {(entry.pseudo as string).slice(0, 1).toUpperCase()}
-                </div>
-              )}
-              <span className="text-[14px] font-semibold text-white">
-                {entry.pseudo}
-                {entry.isSelf ? ' (toi)' : ''}
-              </span>
-            </div>
-            <span className="text-[14px] font-bold text-white">{entry.score}</span>
-          </li>
-        ))}
-      </ul>
-      <p className="text-[12px] text-[#717C83]">
-        Pseudo + avatar seulement. Classement salle = P0-bis (hors scope).
-      </p>
+
+      {board?.note === 'no_friends' || (board?.entries?.length ?? 0) === 0 ? (
+        <p className="rounded-2xl border border-white/10 bg-white/5 px-3 py-4 text-[13px] text-[#ACB4BA]" data-testid="ranked-friends-empty">
+          Ajoute un ami Ranked (opt-in 18+) pour voir le classement. Sans amis, le board reste vide
+          (pas d’affichage « soi seul »).
+        </p>
+      ) : (
+        <ul className="space-y-2" data-testid="ranked-friends-board">
+          {(board?.entries ?? []).map((entry: any, index: number) => (
+            <li
+              key={`${entry.pseudo}-${index}`}
+              className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/25 px-3 py-3"
+            >
+              <div className="flex items-center gap-3">
+                <span className="w-6 text-[13px] font-bold text-[#717C83]">{index + 1}</span>
+                {entry.avatarUrl ? (
+                  <img
+                    src={entry.avatarUrl}
+                    alt=""
+                    className="h-9 w-9 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-[12px] text-white">
+                    {(entry.pseudo as string).slice(0, 1).toUpperCase()}
+                  </div>
+                )}
+                <span className="text-[14px] font-semibold text-white">
+                  {entry.pseudo}
+                  {entry.isSelf ? ' (toi)' : ''}
+                </span>
+              </div>
+              <span className="text-[14px] font-bold text-white">{entry.score}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </ScreenShell>
   )
 }
 
-export function RankedScreens({ onBack, initialRoute = 'hub' }: RankedScreensProps) {
+export function RankedScreens({
+  onBack,
+  initialRoute = 'hub',
+  requireAuthForActions,
+}: RankedScreensProps) {
   const [route, setRoute] = useState<RankedRoute>(initialRoute)
   const [status, setStatus] = useState<any>(null)
+  const guest = Boolean(requireAuthForActions)
 
   const refresh = useCallback(() => {
+    if (guest) return
     void fetchMyRankedStatus()
       .then(setStatus)
       .catch(() => setStatus(null))
-  }, [])
+  }, [guest])
 
   useEffect(() => {
     refresh()
   }, [refresh])
+
+  const guard = (next: RankedRoute) => {
+    if (guest && next !== 'method') {
+      requireAuthForActions?.()
+      return
+    }
+    setRoute(next)
+  }
 
   if (route === 'optin') {
     return (
@@ -607,7 +837,13 @@ export function RankedScreens({ onBack, initialRoute = 'hub' }: RankedScreensPro
       />
     )
   }
-  if (route === 'method') return <RankedMethodScreen onBack={() => setRoute('hub')} />
+  if (route === 'method') {
+    return (
+      <RankedMethodScreen
+        onBack={() => (guest ? onBack() : setRoute('hub'))}
+      />
+    )
+  }
   if (route === 'carnet') return <RankedCarnetScreen onBack={() => setRoute('hub')} />
   if (route === 'force') return <RankedForceScreen onBack={() => setRoute('hub')} />
   if (route === 'discipline') {
@@ -621,6 +857,31 @@ export function RankedScreens({ onBack, initialRoute = 'hub' }: RankedScreensPro
   }
   if (route === 'friends') return <RankedFriendsScreen onBack={() => setRoute('hub')} />
 
+  if (guest) {
+    return (
+      <ScreenShell title="Ranked" onBack={onBack}>
+        <p className="text-[14px] text-[#C7C7CC]">
+          Barème public accessible sans compte. Connecte-toi pour opt-in, carnet et classement.
+        </p>
+        <button
+          type="button"
+          onClick={() => setRoute('method')}
+          className="ios-press w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-left text-[15px] font-semibold text-white"
+          data-testid="ranked-nav-method"
+        >
+          Comment marche ton rang
+        </button>
+        <button
+          type="button"
+          onClick={() => requireAuthForActions?.()}
+          className="ios-press w-full rounded-2xl bg-[#FF0702] px-4 py-3 text-[15px] font-semibold text-white"
+        >
+          Se connecter pour Ranked
+        </button>
+      </ScreenShell>
+    )
+  }
+
   const opted =
     status?.optIn &&
     (status.optIn.forceEnabled || status.optIn.disciplineEnabled) &&
@@ -629,10 +890,10 @@ export function RankedScreens({ onBack, initialRoute = 'hub' }: RankedScreensPro
   const tiles: { id: RankedRoute; label: string; icon: typeof Trophy; hint: string }[] = [
     { id: 'optin', label: 'Opt-in Ranked', icon: Trophy, hint: '18+ · Force / Discipline' },
     { id: 'method', label: 'Comment marche ton rang', icon: Info, hint: 'Barème public' },
-    { id: 'carnet', label: 'Carnet / PR', icon: BookOpen, hint: 'Déclaré · Vérifié' },
+    { id: 'carnet', label: 'Carnet / PR', icon: BookOpen, hint: 'Déclaré · Vérifié · ami' },
     { id: 'force', label: 'Ranked Force', icon: Flame, hint: 'Score · ligue' },
     { id: 'discipline', label: 'Ranked Discipline', icon: Flame, hint: 'Séances · streak' },
-    { id: 'friends', label: 'Classement amis', icon: Users, hint: 'Pseudo + avatar' },
+    { id: 'friends', label: 'Classement amis', icon: Users, hint: 'Ajouter · accepter · board' },
   ]
 
   return (
@@ -654,7 +915,7 @@ export function RankedScreens({ onBack, initialRoute = 'hub' }: RankedScreensPro
             <button
               key={tile.id}
               type="button"
-              onClick={() => setRoute(tile.id)}
+              onClick={() => guard(tile.id)}
               className="ios-press flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-left"
               data-testid={`ranked-nav-${tile.id}`}
             >

@@ -91,7 +91,22 @@ export async function confirmRankedVerifySelf(liftLogId: string) {
   })
 }
 
-export async function notifyRankedSessionCompleted(sourceSessionId?: string) {
+export async function confirmRankedVerifyFriend(input: {
+  requestId: string
+  accept: boolean
+}) {
+  const sessionToken = await requireToken()
+  return getConvex().mutation(api.ranked.confirmVerifyFriend, {
+    sessionToken,
+    requestId: input.requestId,
+    accept: input.accept,
+  })
+}
+
+export async function notifyRankedSessionCompleted(sourceSessionId: string) {
+  if (!sourceSessionId.trim()) {
+    throw new Error('RANKED_SESSION_ID_REQUIRED')
+  }
   const sessionToken = await requireToken()
   return getConvex().mutation(api.ranked.onSessionCompleted, {
     sessionToken,
@@ -123,4 +138,26 @@ export async function requestRankedFriendship(friendUserId: string) {
     sessionToken,
     friendUserId,
   })
+}
+
+export async function respondRankedFriendship(input: {
+  friendshipId: string
+  accept: boolean
+}) {
+  const sessionToken = await requireToken()
+  return getConvex().mutation(api.ranked.respondFriendship, {
+    sessionToken,
+    friendshipId: input.friendshipId,
+    accept: input.accept,
+  })
+}
+
+export async function listMyRankedFriendships() {
+  const sessionToken = await requireToken()
+  return getConvex().query(api.ranked.listMyFriendships, { sessionToken })
+}
+
+export async function listIncomingRankedVerifyRequests() {
+  const sessionToken = await requireToken()
+  return getConvex().query(api.ranked.listIncomingVerifyRequests, { sessionToken })
 }

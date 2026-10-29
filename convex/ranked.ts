@@ -32,11 +32,13 @@ import {
   publicRankedMethod,
   RANKED_FORCE_EXERCISES,
   RANKED_LEAGUE_TIERS,
+  resolveAnomalyBaseline,
   SELF_VERIFY_DELAY_MS,
+  softResetSeedScore,
   type ForceBreakdown,
   type RankedSex,
 } from './lib/rankedScience'
-import { findProfileByUserId } from './lib/socialVisibility'
+import { findAuthUserByUserId, findProfileByUserId } from './lib/socialVisibility'
 
 type SessionCtx = QueryCtx | MutationCtx
 
@@ -76,17 +78,8 @@ async function requireDisciplineOptIn(ctx: SessionCtx, userId: string) {
   return { ok: true as const, opt }
 }
 
-async function ensureActiveCycle(ctx: MutationCtx, now: number): Promise<Doc<'rankedCycle'>> {
-  const active = await ctx.db
-    .query('rankedCycle')
-    .withIndex('by_status', (q) => q.eq('status', 'active'))
-    .first()
-  if (active && active.endsAt > now) return active
-
-  if (active && active.endsAt <= now) {
-    await ctx.db.patch(active._id, { status: 'closing' })
-  }
-
+/** Create a brand-new active cycle + leagues (does not close anything). */
+async function createFreshCycle(ctx: MutationCtx, now: number): Promise<Doc<'rankedCycle'>> {
   const cycleId = await ctx.db.insert('rankedCycle', {
     startsAt: now,
     endsAt: now + CYCLE_LENGTH_MS,
@@ -106,6 +99,26 @@ async function ensureActiveCycle(ctx: MutationCtx, now: number): Promise<Doc<'ra
   const created = await ctx.db.get(cycleId)
   if (!created) throw new Error('RANKED_CYCLE_CREATE_FAILED')
   return created
+}
+
+/**
+ * B4 — never invent a blank cycle that skips soft reset.
+ * Expired active → closeCycleCore (re-placement partiel) then return new cycle.
+ * Valid active → reuse. No active → create fresh.
+ */
+async function ensureActiveCycle(ctx: MutationCtx, now: number): Promise<Doc<'rankedCycle'>> {
+  const active = await ctx.db
+    .query('rankedCycle')
+    .withIndex('by_status', (q) => q.eq('status', 'active'))
+    .first()
+  if (active && active.endsAt > now) return active
+  if (active && active.endsAt <= now) {
+    const closed = await closeCycleCore(ctx, now)
+    const next = await ctx.db.get(closed.newCycleId)
+    if (!next) throw new Error('RANKED_CYCLE_CREATE_FAILED')
+    return next
+  }
+  return createFreshCycle(ctx, now)
 }
 
 async function getActiveCycle(ctx: SessionCtx): Promise<Doc<'rankedCycle'> | null> {
@@ -154,18 +167,34 @@ async function recalcForceScoreInternal(
 ): Promise<{ score: number; breakdown: ForceBreakdown; leagueId: Id<'rankedLeague'> }> {
   const cycle = await ensureActiveCycle(ctx, now)
   const prs = await getVerifiedPrs(ctx, userId)
-  const breakdown = emptyForceBreakdown()
-  for (const id of RANKED_FORCE_EXERCISES) {
-    const pr = prs.get(id)
-    breakdown[id] = pr?.estimated1RmKg ?? 0
-  }
-  const score = forceScoreFromBreakdown(breakdown)
-  const league = await leagueForScore(ctx, cycle._id, score)
-
   const existing = await ctx.db
     .query('rankedForceScore')
     .withIndex('by_user_cycle', (q) => q.eq('userId', userId).eq('cycleId', cycle._id))
     .first()
+
+  const breakdown = emptyForceBreakdown()
+  const seedScore = existing?.seedScore ?? 0
+
+  if (!existing) {
+    // Bootstrap first score in cycle: all verified PRs (carnet) — not a soft-reset path.
+    for (const id of RANKED_FORCE_EXERCISES) {
+      const pr = prs.get(id)
+      breakdown[id] = pr?.estimated1RmKg ?? 0
+    }
+  } else {
+    // CA6 — cycle score = seed (re-placement) + PRs verified in THIS cycle only.
+    // All-time carnet PRs stay in rankedVerifiedPr but do not freeze the rank forever.
+    for (const id of RANKED_FORCE_EXERCISES) {
+      const pr = prs.get(id)
+      if (pr && pr.cycleId === cycle._id) {
+        breakdown[id] = pr.estimated1RmKg
+      }
+    }
+  }
+
+  const cycleSum = forceScoreFromBreakdown(breakdown)
+  const score = !existing ? cycleSum : seedScore + cycleSum
+  const league = await leagueForScore(ctx, cycle._id, score)
 
   if (existing) {
     await ctx.db.patch(existing._id, {
@@ -179,6 +208,7 @@ async function recalcForceScoreInternal(
       userId,
       cycleId: cycle._id,
       score,
+      seedScore: 0,
       breakdown,
       leagueId: league._id,
       updatedAt: now,
@@ -388,15 +418,11 @@ export const setOptIn = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireSessionUser(ctx, args.sessionToken)
-    const gate = await assertRankedCompetitiveAccess(ctx, user.userId)
-    if (!gate.ok) {
-      return { ok: false as const, error: gate.error }
-    }
-
     const now = Date.now()
     const existing = await getOptIn(ctx, user.userId)
     const enabling = args.forceEnabled || args.disciplineEnabled
 
+    // M2 / RK-04 — opt-out always allowed even if age/pregnancy gate fails.
     if (!enabling) {
       if (existing) {
         await ctx.db.patch(existing._id, {
@@ -411,6 +437,11 @@ export const setOptIn = mutation({
         disciplineEnabled: false,
         optedOut: true,
       }
+    }
+
+    const gate = await assertRankedCompetitiveAccess(ctx, user.userId)
+    if (!gate.ok) {
+      return { ok: false as const, error: gate.error }
     }
 
     await ensureActiveCycle(ctx, now)
@@ -556,11 +587,24 @@ export const submitLift = mutation({
         q.eq('userId', user.userId).eq('canonicalExerciseId', args.canonicalExerciseId),
       )
       .collect()
-    const sorted = history.sort((a, b) => b.createdAt - a.createdAt)
-    const previous = sorted.find((r) => r.estimated1RmKg != null) ?? null
     const first = history.length
       ? history.reduce((min, r) => (r.createdAt < min.createdAt ? r : min))
       : null
+
+    const verifiedPr = prs.get(args.canonicalExerciseId)
+    // B2 — ignore rejected_force; prefer verified / floor of non-rejected in 7d.
+    const baseline = resolveAnomalyBaseline({
+      verified1RmKg: verifiedPr?.estimated1RmKg ?? null,
+      verifiedAtMs: verifiedPr?.verifiedAt ?? null,
+      recentLifts: history
+        .filter((r) => r.estimated1RmKg != null)
+        .map((r) => ({
+          estimated1RmKg: r.estimated1RmKg as number,
+          createdAt: r.createdAt,
+          status: r.status,
+        })),
+      nowMs: now,
+    })
 
     const evaluation = evaluateSubmitLift({
       canonicalExerciseId: args.canonicalExerciseId,
@@ -568,8 +612,8 @@ export const submitLift = mutation({
       reps: args.reps,
       sex,
       verifiedRefs,
-      previous1RmKg: previous?.estimated1RmKg ?? null,
-      previousAtMs: previous?.createdAt ?? null,
+      baseline1RmKg: baseline.baseline1RmKg,
+      baselineAtMs: baseline.baselineAtMs,
       historyFirstAtMs: first?.createdAt ?? null,
       nowMs: now,
     })
@@ -682,6 +726,11 @@ export const requestVerify = mutation({
       return { ok: false as const, error: 'RANKED_LIFT_NOT_PENDING' as const }
     }
 
+    // M1 — self_24h interdit si file relecture ; ami 18+ OK.
+    if (args.method === 'self_24h' && lift.needsReviewQueue) {
+      return { ok: false as const, error: 'RANKED_NEEDS_REVIEW_OR_FRIEND' as const }
+    }
+
     if (args.method === 'friend_18') {
       if (!args.friendId) {
         return { ok: false as const, error: 'RANKED_FRIEND_REQUIRED' as const }
@@ -735,6 +784,10 @@ export const confirmVerifySelf = mutation({
     }
     if (lift.status !== 'pending_verify') {
       return { ok: false as const, error: 'RANKED_LIFT_NOT_PENDING' as const }
+    }
+    // M1 — soft-veto / anomalie A / seuils row·OHP → file relecture : pas de self 24h.
+    if (lift.needsReviewQueue) {
+      return { ok: false as const, error: 'RANKED_NEEDS_REVIEW_OR_FRIEND' as const }
     }
 
     const now = Date.now()
@@ -823,8 +876,8 @@ export const recalcForceScoreInternalMutation = internalMutation({
 export const onSessionCompleted = mutation({
   args: {
     sessionToken: v.string(),
-    sourceSessionId: v.optional(v.string()),
-    completedAt: v.optional(v.number()),
+    /** Required — must refer to a real finished workout session id (B3). */
+    sourceSessionId: v.string(),
   },
   handler: async (ctx, args) => {
     const user = await requireSessionUser(ctx, args.sessionToken)
@@ -833,7 +886,13 @@ export const onSessionCompleted = mutation({
     const discGate = await requireDisciplineOptIn(ctx, user.userId)
     if (!discGate.ok) return { ok: false as const, error: discGate.error }
 
-    const now = args.completedAt ?? Date.now()
+    const sourceSessionId = args.sourceSessionId.trim()
+    if (!sourceSessionId) {
+      return { ok: false as const, error: 'RANKED_SESSION_ID_REQUIRED' as const }
+    }
+
+    // B3 — timestamp serveur uniquement ; jamais de completedAt client / futur.
+    const now = Date.now()
     const opt = discGate.opt
     if (opt.pauseInjuryUntil != null && opt.pauseInjuryUntil > now) {
       return {
@@ -846,21 +905,39 @@ export const onSessionCompleted = mutation({
       }
     }
 
-    const windowStart = now - 7 * MS_DAY
-    const recent = await ctx.db
+    // Dedupe : une séance réelle = un seul crédit Discipline.
+    const priorSame = await ctx.db
       .query('rankedSessionCompletion')
-      .withIndex('by_user_time', (q) => q.eq('userId', user.userId).gte('completedAt', windowStart))
+      .withIndex('by_userId', (q) => q.eq('userId', user.userId))
       .collect()
+    if (priorSame.some((r) => r.sourceSessionId === sourceSessionId)) {
+      const computed = await computeDisciplineFromSessions(
+        ctx,
+        user.userId,
+        now,
+        opt.pauseInjuryUntil,
+      )
+      return {
+        ok: true as const,
+        pointsAdded: 0,
+        paused: false,
+        duplicate: true as const,
+        sessionsLast7d: computed.sessionsLast7d,
+        streakWeeks: computed.streakWeeks,
+        score: computed.score,
+      }
+    }
+
+    const windowStart = now - 7 * MS_DAY
+    const recent = priorSame.filter((r) => r.completedAt >= windowStart)
     const pointsAdded = disciplinePointsForNewSession(recent.length)
 
     await ctx.db.insert('rankedSessionCompletion', {
       userId: user.userId,
       completedAt: now,
-      sourceSessionId: args.sourceSessionId,
+      sourceSessionId,
     })
 
-    // Even if pointsAdded=0 (6th+), still record session for history; score stays capped.
-    void pointsAdded
     const computed = await upsertDisciplineScore(ctx, user.userId, now, opt.pauseInjuryUntil)
     return {
       ok: true as const,
@@ -902,7 +979,8 @@ export const requestFriendship = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireSessionUser(ctx, args.sessionToken)
-    if (user.userId === args.friendUserId) {
+    const friendUserId = args.friendUserId.trim()
+    if (!friendUserId || user.userId === friendUserId) {
       return { ok: false as const, error: 'RANKED_FRIEND_SELF' as const }
     }
     const gate = await assertRankedCompetitiveAccess(ctx, user.userId)
@@ -912,7 +990,28 @@ export const requestFriendship = mutation({
       return { ok: false as const, error: RANKED_NOT_OPTED_IN }
     }
 
-    const { userA, userB } = orderedPair(user.userId, args.friendUserId)
+    // m2 — refuse ids inexistants + rate limit soft.
+    const friendUser = await findAuthUserByUserId(ctx, friendUserId)
+    if (!friendUser || friendUser.deletedAt) {
+      return { ok: false as const, error: 'RANKED_FRIEND_NOT_FOUND' as const }
+    }
+    const recent = await ctx.db
+      .query('rankedFriendship')
+      .withIndex('by_userA_status', (q) => q.eq('userA', user.userId))
+      .collect()
+    const recentB = await ctx.db
+      .query('rankedFriendship')
+      .withIndex('by_userB_status', (q) => q.eq('userB', user.userId))
+      .collect()
+    const hourAgo = Date.now() - 60 * 60 * 1000
+    const recentRequests = [...recent, ...recentB].filter(
+      (r) => r.requestedBy === user.userId && r.createdAt >= hourAgo,
+    )
+    if (recentRequests.length >= 20) {
+      return { ok: false as const, error: 'RANKED_FRIEND_RATE_LIMIT' as const }
+    }
+
+    const { userA, userB } = orderedPair(user.userId, friendUserId)
     const existing = await ctx.db
       .query('rankedFriendship')
       .withIndex('by_pair', (q) => q.eq('userA', userA).eq('userB', userB))
@@ -933,6 +1032,68 @@ export const requestFriendship = mutation({
       updatedAt: now,
     })
     return { ok: true as const, status: 'pending' as const, friendshipId }
+  },
+})
+
+export const listMyFriendships = query({
+  args: { sessionToken: v.string() },
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx, args.sessionToken)
+    const asA = await ctx.db
+      .query('rankedFriendship')
+      .withIndex('by_userA_status', (q) => q.eq('userA', user.userId))
+      .collect()
+    const asB = await ctx.db
+      .query('rankedFriendship')
+      .withIndex('by_userB_status', (q) => q.eq('userB', user.userId))
+      .collect()
+    const rows = [...asA, ...asB]
+    const out = []
+    for (const row of rows) {
+      const otherId = row.userA === user.userId ? row.userB : row.userA
+      const profile = await findProfileByUserId(ctx, otherId)
+      const avatarUrl = await publicAvatarUrl(ctx, profile)
+      out.push({
+        friendshipId: row._id,
+        status: row.status,
+        direction: row.requestedBy === user.userId ? ('outgoing' as const) : ('incoming' as const),
+        // Needed to request friend verify / friendship actions — not shown on public leaderboard.
+        friendUserId: otherId,
+        pseudo: (profile?.pseudo?.trim() || 'Athlete').slice(0, 64),
+        avatarUrl,
+      })
+    }
+    return out
+  },
+})
+
+export const listIncomingVerifyRequests = query({
+  args: { sessionToken: v.string() },
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx, args.sessionToken)
+    const rows = await ctx.db
+      .query('rankedVerifyRequest')
+      .withIndex('by_friendId_status', (q) => q.eq('friendId', user.userId).eq('status', 'open'))
+      .collect()
+    const out = []
+    for (const row of rows) {
+      const lift = await ctx.db.get(row.liftLogId)
+      const ownerProfile = await findProfileByUserId(ctx, row.ownerId)
+      out.push({
+        requestId: row._id,
+        expiresAt: row.expiresAt,
+        ownerPseudo: (ownerProfile?.pseudo?.trim() || 'Athlete').slice(0, 64),
+        lift: lift
+          ? {
+              canonicalExerciseId: lift.canonicalExerciseId,
+              weightKg: lift.weightKg,
+              reps: lift.reps,
+              estimated1RmKg: lift.estimated1RmKg ?? null,
+            }
+          : null,
+      })
+    }
+    return out
   },
 })
 
@@ -970,9 +1131,27 @@ export const leaderboardFriends = query({
   handler: async (ctx, args) => {
     const user = await requireSessionUser(ctx, args.sessionToken)
     const cycle = await getActiveCycle(ctx)
-    if (!cycle) return { cycleId: null, entries: [], note: 'no_active_cycle' as const }
+    if (!cycle) {
+      return {
+        cycleId: null,
+        entries: [],
+        note: 'no_active_cycle' as const,
+        gymLeaderboard: 'P0-bis — hors scope',
+      }
+    }
 
     const friendIds = await listAcceptedFriendIds(ctx, user.userId)
+    // B1 — sans amis acceptés, ne pas afficher un classement « soi seul ».
+    if (friendIds.length === 0) {
+      return {
+        cycleId: cycle._id,
+        axis: args.axis,
+        entries: [],
+        note: 'no_friends' as const,
+        gymLeaderboard: 'P0-bis — hors scope',
+      }
+    }
+
     const candidateIds = [user.userId, ...friendIds]
     const entries = []
 
@@ -1004,8 +1183,8 @@ export const leaderboardFriends = query({
         score = row?.score ?? 0
       }
 
+      // m1 / RK-05 — pseudo + avatar seulement (pas de userId public).
       entries.push({
-        userId: uid,
         pseudo,
         avatarUrl,
         score,
@@ -1018,7 +1197,6 @@ export const leaderboardFriends = query({
       cycleId: cycle._id,
       axis: args.axis,
       entries,
-      // CA8 — salle = P0-bis documenté, hors P0
       gymLeaderboard: 'P0-bis — hors scope',
     }
   },
@@ -1084,7 +1262,7 @@ export const closeCycleCron = internalMutation({
       .withIndex('by_status', (q) => q.eq('status', 'active'))
       .first()
     if (!active) {
-      const created = await ensureActiveCycle(ctx, now)
+      const created = await createFreshCycle(ctx, now)
       return {
         ok: true as const,
         closedCycleId: null,
@@ -1103,7 +1281,50 @@ export const closeCycleCron = internalMutation({
         skipped: true as const,
       }
     }
+    // Expired active → proper soft reset (also used if a client hit ensureActiveCycle first).
     return closeCycleCore(ctx, now)
+  },
+})
+
+/** M1 — relecture humaine (admin) pour file soft-veto / anomalie B. */
+export const confirmVerifyReview = mutation({
+  args: {
+    sessionToken: v.string(),
+    liftLogId: v.id('rankedLiftLog'),
+    approve: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx, args.sessionToken)
+    if (user.role !== 'admin') {
+      return { ok: false as const, error: 'RANKED_ADMIN_REQUIRED' as const }
+    }
+    const lift = await ctx.db.get(args.liftLogId)
+    if (!lift) return { ok: false as const, error: 'RANKED_LIFT_NOT_FOUND' as const }
+    const now = Date.now()
+    if (!args.approve) {
+      if (lift.status === 'pending_verify' || lift.status === 'rejected_force') {
+        await ctx.db.patch(lift._id, {
+          status: 'rejected_force',
+          rejectReason: 'review_denied',
+          needsReviewQueue: false,
+        })
+      }
+      return { ok: true as const, status: 'denied' as const }
+    }
+    if (lift.status !== 'pending_verify' && lift.status !== 'rejected_force') {
+      return { ok: false as const, error: 'RANKED_LIFT_NOT_REVIEWABLE' as const }
+    }
+    // Allow approve from rejected_force (anomalie B) after human review.
+    if (lift.status === 'rejected_force') {
+      await ctx.db.patch(lift._id, { status: 'pending_verify', needsReviewQueue: false })
+      const refreshed = await ctx.db.get(lift._id)
+      if (!refreshed) return { ok: false as const, error: 'RANKED_LIFT_NOT_FOUND' as const }
+      await markVerifiedAndScore(ctx, refreshed, 'review', now)
+    } else {
+      await ctx.db.patch(lift._id, { needsReviewQueue: false })
+      await markVerifiedAndScore(ctx, lift, 'review', now)
+    }
+    return { ok: true as const, status: 'verified' as const }
   },
 })
 
@@ -1113,7 +1334,7 @@ async function closeCycleCore(ctx: MutationCtx, now: number) {
     .withIndex('by_status', (q) => q.eq('status', 'active'))
     .first()
   if (!active) {
-    const created = await ensureActiveCycle(ctx, now)
+    const created = await createFreshCycle(ctx, now)
     return {
       ok: true as const,
       closedCycleId: null,
@@ -1130,35 +1351,46 @@ async function closeCycleCore(ctx: MutationCtx, now: number) {
     .withIndex('by_cycle_score', (q) => q.eq('cycleId', active._id))
     .collect()
 
-  const newCycle = await ensureActiveCycle(ctx, now)
+  // B4 — createFreshCycle only (never ensureActiveCycle here → no recursion / blank skip).
+  const newCycle = await createFreshCycle(ctx, now)
 
   let relocated = 0
   for (const row of oldScores) {
-    // Soft reset = re-placement partiel: carry score into new cycle leagues; PR carnet intact.
-    const league = await leagueForScore(ctx, newCycle._id, row.score)
+    // Soft reset = re-placement partiel (seed 50 %) — rang peut bouger ; PR carnet intact.
+    const seed = softResetSeedScore(row.score)
+    const breakdown = emptyForceBreakdown()
+    const league = await leagueForScore(ctx, newCycle._id, seed)
     await ctx.db.insert('rankedForceScore', {
       userId: row.userId,
       cycleId: newCycle._id,
-      score: row.score,
-      breakdown: row.breakdown,
+      score: seed,
+      seedScore: seed,
+      breakdown,
       leagueId: league._id,
       updatedAt: now,
     })
     relocated += 1
   }
 
-  // Carry discipline scores without wiping session history.
+  // Discipline : reset cycle score display from live window (not frozen forever copy).
   const discScores = await ctx.db
     .query('rankedDisciplineScore')
     .withIndex('by_cycle_score', (q) => q.eq('cycleId', active._id))
     .collect()
   for (const row of discScores) {
+    const opt = await getOptIn(ctx, row.userId)
+    const computed = await computeDisciplineFromSessions(
+      ctx,
+      row.userId,
+      now,
+      opt?.pauseInjuryUntil,
+    )
     await ctx.db.insert('rankedDisciplineScore', {
       userId: row.userId,
       cycleId: newCycle._id,
-      sessionsLast7d: row.sessionsLast7d,
-      streakWeeks: row.streakWeeks,
-      score: row.score,
+      sessionsLast7d: computed.sessionsLast7d,
+      streakWeeks: computed.streakWeeks,
+      score: computed.score,
       updatedAt: now,
     })
   }
@@ -1168,6 +1400,6 @@ async function closeCycleCore(ctx: MutationCtx, now: number) {
     closedCycleId: active._id,
     newCycleId: newCycle._id,
     relocated,
-    verifiedPrWiped: false,
+    verifiedPrWiped: false as const,
   }
 }

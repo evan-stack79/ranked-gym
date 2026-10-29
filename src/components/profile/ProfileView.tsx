@@ -279,10 +279,15 @@ function ProfileViewContent() {
   }
 
   if (route === 'ranked') {
+    // M3 / CA5 — barème public accessible sans auth ; actions compétitives restent gated.
     if (!isAuthenticated || !user) {
-      requireAuth(() => navigate('ranked'))
-      goBack()
-      return null
+      return (
+        <RankedScreens
+          onBack={goBack}
+          initialRoute="method"
+          requireAuthForActions={() => requireAuth(() => navigate('ranked'))}
+        />
+      )
     }
     return <RankedScreens onBack={goBack} />
   }
@@ -302,7 +307,7 @@ function ProfileViewContent() {
           onOpenHealthSituations={() => navigate('healthSituations')}
           onOpenEnergyInfo={() => navigate('energyInfo')}
           onOpenGiveFeedback={() => requireAuth(() => navigate('giveFeedback'))}
-          onOpenRanked={() => requireAuth(() => navigate('ranked'))}
+          onOpenRanked={() => navigate('ranked')}
         />
         <CloudBackupCard />
       </div>

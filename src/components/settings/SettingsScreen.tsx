@@ -318,10 +318,7 @@ export function SettingsScreen({
                         return
                       }
                       if (item.id === 'ranked') {
-                        if (!isAuthenticated) {
-                          onRequireAuth?.()
-                          return
-                        }
+                        // CA5 — ouvrir le hub / barème même hors connexion.
                         onOpenRanked?.()
                         return
                       }
