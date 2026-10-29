@@ -43,6 +43,25 @@ La mesure **BPM** (PPG caméra) n’utilise pas la Dynamic Island. Elle passe pa
 
 Workflow unsigned : `.github/workflows/build-ipa.yml` (`macos-latest`, `CODE_SIGNING_ALLOWED=NO`, artifact `.ipa`).
 
+### Secrets obligatoires (sinon bandeau rouge au lancement)
+
+L’IPA build force **Convex** (`VITE_ENABLE_CONVEX_AUTH=true` + `VITE_ENABLE_CONVEX_PRIMARY=true`).
+Vite fige `VITE_*` au `npm run build`. Sans `VITE_CONVEX_URL`, l’app affiche
+« Connexion au service indisponible » même avec du Wi‑Fi.
+
+Dans **GitHub → Settings → Secrets and variables → Actions** :
+
+| Secret | Valeur |
+|--------|--------|
+| `VITE_CONVEX_URL` | `https://….convex.cloud` (voir `docs/CONVEX_SETUP.md`) |
+
+Optionnel : `VITE_PUBLIC_APP_URL`, `VITE_GOOGLE_MAPS_API_KEY`.
+Puis relance **Build IPA** et réinstalle l’artifact.
+
+> Note code : le runtime web/Cloudflare peut encore avoir Supabase en défaut
+> (`VITE_ENABLE_CONVEX_AUTH` false) tant que le cutover global n’est pas fait.
+> L’IPA n’emprunte plus ce chemin.
+
 ## UI Live Activity (dark)
 
 - Titre : **Temps de repos**
