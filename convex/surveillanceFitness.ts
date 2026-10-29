@@ -517,3 +517,30 @@ export const scanSurveillanceFitnessChurn = internalMutation({
     return { scanned, scheduled }
   },
 })
+
+/**
+ * Ops / Studio Manager : force le schedule d’un event (ex. backfill first_workout).
+ * `force: true` réarme même si déjà envoyé / en cours.
+ */
+export const forceScheduleSurveillanceEventInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    email: v.string(),
+    type: eventTypeValidator,
+    lastActiveDays: v.optional(v.union(v.number(), v.null())),
+    actionCount: v.optional(v.union(v.number(), v.null())),
+  },
+  returns: v.object({ scheduled: v.boolean() }),
+  handler: async (ctx, args) => {
+    const result = await scheduleSurveillanceFitnessEvent(ctx, {
+      userId: args.userId,
+      email: args.email.trim().toLowerCase(),
+      type: args.type,
+      lastActiveDays: args.lastActiveDays ?? 0,
+      actionCount: args.actionCount ?? 1,
+      plan: 'free',
+      force: true,
+    })
+    return { scheduled: result.scheduled }
+  },
+})

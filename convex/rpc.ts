@@ -3,6 +3,7 @@ import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } fr
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
 import { consumeRateLimit } from './lib/rateLimit'
 import { canViewerSeeSubject } from './lib/socialVisibility'
+import { notifySurveillanceFitnessFirstWorkout } from './surveillanceFitness'
 
 const ACTIVITY_TYPES = new Set(['pr', 'workout', 'checkin', 'rank_up', 'streak'])
 const DEFAULT_WEEK_LABELS = ['S-3', 'S-2', 'S-1', 'Act.'] as const
@@ -300,13 +301,13 @@ export async function recordActivityForSession(
   })
   if (input.activityType === 'workout') {
     try {
-      const { notifySurveillanceFitnessFirstWorkout } = await import('./surveillanceFitness')
       await notifySurveillanceFitnessFirstWorkout(ctx, {
         userId,
         email: user.email,
       })
-    } catch {
+    } catch (error) {
       // Soft — jamais bloquer l’activité.
+      console.error('[surveillance-fitness] first_workout hook failed (rpc)', error)
     }
   }
   return String(id)

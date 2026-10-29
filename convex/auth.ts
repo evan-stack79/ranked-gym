@@ -32,6 +32,7 @@ import {
 } from './lib/authConfig'
 import { requireAdminCaller } from './lib/migrationAdmin'
 import { consumeRateLimit } from './lib/rateLimit'
+import { notifySurveillanceFitnessSignup } from './surveillanceFitness'
 import {
   isPasswordResetEmailConfigured,
   sendPasswordResetEmail,
@@ -423,10 +424,10 @@ export async function registerUserWithEmail(
   const session = await createSession(ctx, userId)
   // Surveillance fitness — inscription (free / bêta selon env). Soft si webhook non configuré.
   try {
-    const { notifySurveillanceFitnessSignup } = await import('./surveillanceFitness')
     await notifySurveillanceFitnessSignup(ctx, { userId, email: emailNorm })
-  } catch {
+  } catch (error) {
     // Jamais bloquer l’inscription.
+    console.error('[surveillance-fitness] signup hook failed (email)', error)
   }
   return {
     sessionToken: session.sessionToken,
@@ -819,13 +820,13 @@ export async function completeGoogleSignInFromVerifiedClaims(
   const session = await createSession(ctx, user.userId)
   if (createdNewGoogleUser) {
     try {
-      const { notifySurveillanceFitnessSignup } = await import('./surveillanceFitness')
       await notifySurveillanceFitnessSignup(ctx, {
         userId: user.userId,
         email: user.email,
       })
-    } catch {
+    } catch (error) {
       // Jamais bloquer la connexion Google.
+      console.error('[surveillance-fitness] signup hook failed (google)', error)
     }
   }
   return {

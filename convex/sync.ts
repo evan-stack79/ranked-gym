@@ -2,6 +2,7 @@ import { v } from 'convex/values'
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
 import { writeNutritionProfileJson } from './lib/nutritionProfile'
+import { notifySurveillanceFitnessFirstWorkout } from './surveillanceFitness'
 
 /**
  * Cloud backup/sync for PR-F domains: profile lobby, workouts, nutrition
@@ -597,13 +598,13 @@ export async function pushSyncForSession(
     const completed = arrayLen(training ? training.completed : undefined)
     if (completed > 0) {
       try {
-        const { notifySurveillanceFitnessFirstWorkout } = await import('./surveillanceFitness')
         await notifySurveillanceFitnessFirstWorkout(ctx, {
           userId: user.userId,
           email: user.email,
         })
-      } catch {
+      } catch (error) {
         // Soft — jamais bloquer le sync.
+        console.error('[surveillance-fitness] first_workout hook failed (sync)', error)
       }
     }
   }
