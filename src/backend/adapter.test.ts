@@ -27,6 +27,7 @@ const PHASE_E_TABLES = [
   'rate_limit_buckets',
   'profiles',
   'workouts_state',
+  'active_workouts',
   'nutrition_state',
   'nutrition_age_majority_audit',
   'nutrition_safety_clear_audit',

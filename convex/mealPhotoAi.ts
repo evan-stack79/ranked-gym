@@ -16,7 +16,6 @@ import {
   uniqueModelCandidates,
 } from './lib/geminiMealPhotoRetry'
 
-const AI_MEAL_DAILY_LIMIT = 5
 const CONVEX_MAX_BASE64_CHARS = 900_000
 const GEMINI_TIMEOUT_PER_REQUEST_MS = 12_000
 

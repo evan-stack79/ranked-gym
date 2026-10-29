@@ -174,6 +174,15 @@ export const convexTables = {
     /** Sports du profil (ids catalogue). Absent = non renseigné. */
     sportIds: v.optional(v.array(v.string())),
     sportsUndecided: v.optional(v.boolean()),
+    /** Mensurations / objectifs — optionnels (moteur IA hybride + nutrition). */
+    heightCm: v.optional(v.number()),
+    weightKg: v.optional(v.number()),
+    bodyfat: v.optional(v.number()),
+    targetCalories: v.optional(v.number()),
+    /** Disjoncteur IA hybride — compteur journalier (reset via lastAiCallDate). */
+    aiCallsToday: v.optional(v.number()),
+    /** Date YYYY-MM-DD du dernier appel IA comptabilisé. */
+    lastAiCallDate: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -188,6 +197,40 @@ export const convexTables = {
   })
     .index('by_userId', ['userId'])
     .index('by_updatedAt', ['updatedAt']),
+
+  /**
+   * One-Tap Start — session d’entraînement active (générateur IA / démarrage instantané).
+   * Nom demandé produit : activeWorkouts → table Convex `active_workouts`.
+   */
+  active_workouts: defineTable({
+    userId: v.string(),
+    status: v.union(
+      v.literal('in_progress'),
+      v.literal('completed'),
+      v.literal('abandoned'),
+    ),
+    focus: v.string(),
+    title: v.string(),
+    durationMin: v.number(),
+    source: v.union(v.literal('ai'), v.literal('deterministic')),
+    exercises: v.array(
+      v.object({
+        exerciseId: v.string(),
+        name: v.string(),
+        sets: v.number(),
+        reps: v.number(),
+        restSec: v.number(),
+        order: v.number(),
+      }),
+    ),
+    startedAt: v.number(),
+    endedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_userId_status', ['userId', 'status'])
+    .index('by_userId_startedAt', ['userId', 'startedAt']),
 
   nutrition_state: defineTable({
     userId: v.string(),
