@@ -16,7 +16,6 @@ import {
 } from './_generated/server'
 import { requireSessionUser } from './lib/auth'
 import {
-  buildSurveillanceFitnessWebhookBody,
   daysSince,
   postSurveillanceFitnessWebhook,
   readSurveillanceFitnessWebhookConfig,
