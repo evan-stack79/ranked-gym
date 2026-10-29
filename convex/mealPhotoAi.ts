@@ -1,6 +1,13 @@
 import { v } from 'convex/values'
+import { makeFunctionReference } from 'convex/server'
 import { api, internal } from './_generated/api'
 import { action, env, type ActionCtx } from './_generated/server'
+
+const notifyFirstMealPhotoAiRef = makeFunctionReference<
+  'mutation',
+  { userId: string; email?: string },
+  null
+>('surveillanceFitness:notifyFirstMealPhotoAiInternal')
 import {
   clientFacingFromGeminiError,
   clientFacingGeminiFailure,
@@ -332,6 +339,16 @@ export const analyzeMealPhoto = action({
       }
 
       const scansRemaining = Math.max(0, reserve.daily_limit - reserve.scan_count)
+
+      // Premier scan repas IA réussi → Surveillance fitness (one-shot côté Convex).
+      try {
+        await ctx.runMutation(notifyFirstMealPhotoAiRef, {
+          userId: session.userId,
+          email: session.email,
+        })
+      } catch (error) {
+        console.info('[meal-photo-ai] surveillance fitness hook soft-failed', error)
+      }
 
       return {
         ok: true,

@@ -279,7 +279,8 @@ export async function recordActivityForSession(
     originLng?: number | null
   },
 ): Promise<string> {
-  const userId = await getSessionUserId(ctx, sessionToken)
+  const user = await requireSessionUser(ctx, sessionToken)
+  const userId = user.userId
   await consumeRateLimit(ctx, 'recordActivity', { kind: 'userId', value: userId })
   if (!ACTIVITY_TYPES.has(input.activityType)) {
     throw new Error('ACTIVITY_TYPE_INVALID')
@@ -297,6 +298,17 @@ export async function recordActivityForSession(
     originLng: lng,
     createdAt: Date.now(),
   })
+  if (input.activityType === 'workout') {
+    try {
+      const { notifySurveillanceFitnessFirstWorkout } = await import('./surveillanceFitness')
+      await notifySurveillanceFitnessFirstWorkout(ctx, {
+        userId,
+        email: user.email,
+      })
+    } catch {
+      // Soft — jamais bloquer l’activité.
+    }
+  }
   return String(id)
 }
 

@@ -55,6 +55,7 @@ const PHASE_E_TABLES = [
   'activity_comments',
   'activity_reactions',
   'avis_beta',
+  'surveillance_fitness_events',
 ] as const
 
 describe('Convex Phase A feature flag', () => {

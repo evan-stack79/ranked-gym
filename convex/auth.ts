@@ -421,6 +421,13 @@ export async function registerUserWithEmail(
     updatedAt: now,
   })
   const session = await createSession(ctx, userId)
+  // Surveillance fitness — inscription (free / bêta selon env). Soft si webhook non configuré.
+  try {
+    const { notifySurveillanceFitnessSignup } = await import('./surveillanceFitness')
+    await notifySurveillanceFitnessSignup(ctx, { userId, email: emailNorm })
+  } catch {
+    // Jamais bloquer l’inscription.
+  }
   return {
     sessionToken: session.sessionToken,
     expiresAt: session.expiresAt,
@@ -767,6 +774,7 @@ export async function completeGoogleSignInFromVerifiedClaims(
   await consumeRateLimit(ctx, 'signInEmail', { kind: 'email', value: emailNorm })
 
   let user = await findUserByEmailNorm(ctx, emailNorm)
+  let createdNewGoogleUser = false
   if (!user || user.deletedAt) {
     const userId = crypto.randomUUID()
     await ctx.db.insert('auth_users', {
@@ -778,6 +786,7 @@ export async function completeGoogleSignInFromVerifiedClaims(
       createdAt: now,
       updatedAt: now,
     })
+    createdNewGoogleUser = true
     user = await findUserByEmailNorm(ctx, emailNorm)
   }
   if (!user || user.deletedAt) throw new Error(AUTH_GOOGLE_TOKEN_INVALID)
@@ -808,6 +817,17 @@ export async function completeGoogleSignInFromVerifiedClaims(
   }
 
   const session = await createSession(ctx, user.userId)
+  if (createdNewGoogleUser) {
+    try {
+      const { notifySurveillanceFitnessSignup } = await import('./surveillanceFitness')
+      await notifySurveillanceFitnessSignup(ctx, {
+        userId: user.userId,
+        email: user.email,
+      })
+    } catch {
+      // Jamais bloquer la connexion Google.
+    }
+  }
   return {
     sessionToken: session.sessionToken,
     expiresAt: session.expiresAt,
