@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="t">
+  <title id="t">Ranked Gym — Crown R</title>
+  <path fill="#000" fill-rule="evenodd" d="
+    M40 80
+    V224
+    H84
+    V160
+    H120
+    L176 224
+    H228
+    L148 132
+    H172
+    L196 108
+    V80
+    L172 56
+    L148 80
+    L128 36
+    L108 80
+    L84 56
+    L40 80
+    Z
+    M84 100
+    H148
+    L156 108
+    V124
+    L148 132
+    H84
+    Z
+  "/>
+</svg>
