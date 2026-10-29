@@ -132,6 +132,20 @@ export async function fetchMyLeague() {
   return getConvex().query(api.ranked.myLeague, { sessionToken })
 }
 
+export async function ensureMyRankedFriendCode() {
+  const sessionToken = await requireToken()
+  return getConvex().mutation(api.ranked.ensureMyFriendCode, { sessionToken })
+}
+
+export async function requestRankedFriendshipByCode(friendCode: string) {
+  const sessionToken = await requireToken()
+  return getConvex().mutation(api.ranked.requestFriendship, {
+    sessionToken,
+    friendCode,
+  })
+}
+
+/** @deprecated Prefer requestRankedFriendshipByCode (B1-bis). */
 export async function requestRankedFriendship(friendUserId: string) {
   const sessionToken = await requireToken()
   return getConvex().mutation(api.ranked.requestFriendship, {

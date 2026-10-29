@@ -32,6 +32,9 @@ import {
   publicRankedMethod,
   RANKED_FORCE_EXERCISES,
   RANKED_LEAGUE_TIERS,
+  deriveFriendCodeCandidate,
+  isValidFriendCodeFormat,
+  normalizeFriendCode,
   resolveAnomalyBaseline,
   SELF_VERIFY_DELAY_MS,
   softResetSeedScore,
@@ -47,6 +50,56 @@ const MS_WEEK = 7 * MS_DAY
 
 function orderedPair(a: string, b: string): { userA: string; userB: string } {
   return a < b ? { userA: a, userB: b } : { userA: b, userB: a }
+}
+
+async function allocateUniqueFriendCode(
+  ctx: MutationCtx,
+  userId: string,
+): Promise<string> {
+  for (let attempt = 0; attempt < 64; attempt += 1) {
+    const code = deriveFriendCodeCandidate(userId, attempt)
+    const clash = await ctx.db
+      .query('rankedOptIn')
+      .withIndex('by_friendCode', (q) => q.eq('friendCode', code))
+      .first()
+    if (!clash || clash.userId === userId) return code
+  }
+  throw new Error('RANKED_FRIEND_CODE_EXHAUSTED')
+}
+
+async function ensureFriendCodeOnOptIn(
+  ctx: MutationCtx,
+  opt: Doc<'rankedOptIn'>,
+): Promise<string> {
+  if (opt.friendCode && isValidFriendCodeFormat(opt.friendCode)) {
+    return normalizeFriendCode(opt.friendCode)
+  }
+  const code = await allocateUniqueFriendCode(ctx, opt.userId)
+  await ctx.db.patch(opt._id, { friendCode: code })
+  return code
+}
+
+/** M5 — sourceSessionId must match a workout note owned by the user. */
+async function userOwnsWorkoutSession(
+  ctx: SessionCtx,
+  userId: string,
+  sourceSessionId: string,
+): Promise<boolean> {
+  const workouts = await ctx.db
+    .query('workouts_state')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .first()
+  if (!workouts) return false
+  const state =
+    workouts.stateJson && typeof workouts.stateJson === 'object' && !Array.isArray(workouts.stateJson)
+      ? (workouts.stateJson as Record<string, unknown>)
+      : null
+  const notes = state?.workoutNotes
+  if (!Array.isArray(notes)) return false
+  return notes.some((note) => {
+    if (!note || typeof note !== 'object' || Array.isArray(note)) return false
+    return String((note as Record<string, unknown>).id ?? '') === sourceSessionId
+  })
 }
 
 async function getOptIn(ctx: SessionCtx, userId: string) {
@@ -446,6 +499,7 @@ export const setOptIn = mutation({
 
     await ensureActiveCycle(ctx, now)
 
+    let friendCode: string
     if (existing) {
       await ctx.db.patch(existing._id, {
         forceEnabled: args.forceEnabled,
@@ -455,7 +509,10 @@ export const setOptIn = mutation({
         ageGatePassedAt: now,
         sex: gate.sex,
       })
+      const refreshed = await ctx.db.get(existing._id)
+      friendCode = await ensureFriendCodeOnOptIn(ctx, refreshed!)
     } else {
+      const code = await allocateUniqueFriendCode(ctx, user.userId)
       await ctx.db.insert('rankedOptIn', {
         userId: user.userId,
         forceEnabled: args.forceEnabled,
@@ -463,7 +520,9 @@ export const setOptIn = mutation({
         optedInAt: now,
         ageGatePassedAt: now,
         sex: gate.sex,
+        friendCode: code,
       })
+      friendCode = code
     }
 
     if (args.forceEnabled) {
@@ -479,6 +538,7 @@ export const setOptIn = mutation({
       disciplineEnabled: args.disciplineEnabled,
       optedOut: false,
       sex: gate.sex,
+      friendCode,
     }
   },
 })
@@ -519,6 +579,7 @@ export const getMyStatus = query({
             pauseInjuryUntil: opt.pauseInjuryUntil ?? null,
             optedInAt: opt.optedInAt,
             optedOutAt: opt.optedOutAt ?? null,
+            friendCode: opt.friendCode ?? null,
           }
         : null,
       cycle: cycle
@@ -891,6 +952,11 @@ export const onSessionCompleted = mutation({
       return { ok: false as const, error: 'RANKED_SESSION_ID_REQUIRED' as const }
     }
 
+    // M5 — doit pointer une vraie séance de l’utilisateur (workouts_state).
+    if (!(await userOwnsWorkoutSession(ctx, user.userId, sourceSessionId))) {
+      return { ok: false as const, error: 'RANKED_SESSION_NOT_FOUND' as const }
+    }
+
     // B3 — timestamp serveur uniquement ; jamais de completedAt client / futur.
     const now = Date.now()
     const opt = discGate.opt
@@ -972,22 +1038,53 @@ export const setInjuryPause = mutation({
 
 // ─── Friends + leaderboard (CA8) ─────────────────────────────────────────────
 
+export const ensureMyFriendCode = mutation({
+  args: { sessionToken: v.string() },
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx, args.sessionToken)
+    const opt = await getOptIn(ctx, user.userId)
+    if (!opt || opt.optedOutAt) {
+      return { ok: false as const, error: RANKED_NOT_OPTED_IN }
+    }
+    const friendCode = await ensureFriendCodeOnOptIn(ctx, opt)
+    return { ok: true as const, friendCode }
+  },
+})
+
 export const requestFriendship = mutation({
   args: {
     sessionToken: v.string(),
-    friendUserId: v.string(),
+    /** @deprecated Prefer friendCode (B1-bis). Kept for internal/tests. */
+    friendUserId: v.optional(v.string()),
+    friendCode: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await requireSessionUser(ctx, args.sessionToken)
-    const friendUserId = args.friendUserId.trim()
-    if (!friendUserId || user.userId === friendUserId) {
-      return { ok: false as const, error: 'RANKED_FRIEND_SELF' as const }
-    }
     const gate = await assertRankedCompetitiveAccess(ctx, user.userId)
     if (!gate.ok) return { ok: false as const, error: gate.error }
     const opt = await getOptIn(ctx, user.userId)
     if (!opt || opt.optedOutAt) {
       return { ok: false as const, error: RANKED_NOT_OPTED_IN }
+    }
+
+    let friendUserId = args.friendUserId?.trim() ?? ''
+    if (args.friendCode) {
+      const code = normalizeFriendCode(args.friendCode)
+      if (!isValidFriendCodeFormat(code)) {
+        return { ok: false as const, error: 'RANKED_FRIEND_CODE_INVALID' as const }
+      }
+      const target = await ctx.db
+        .query('rankedOptIn')
+        .withIndex('by_friendCode', (q) => q.eq('friendCode', code))
+        .first()
+      if (!target || target.optedOutAt) {
+        return { ok: false as const, error: 'RANKED_FRIEND_CODE_NOT_FOUND' as const }
+      }
+      friendUserId = target.userId
+    }
+
+    if (!friendUserId || user.userId === friendUserId) {
+      return { ok: false as const, error: 'RANKED_FRIEND_SELF' as const }
     }
 
     // m2 — refuse ids inexistants + rate limit soft.

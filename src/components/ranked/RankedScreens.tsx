@@ -7,12 +7,13 @@ import {
   fetchMyLeague,
   fetchMyRankedStatus,
   fetchPublicRankedMethod,
+  ensureMyRankedFriendCode,
   listIncomingRankedVerifyRequests,
   listMyRankedFriendships,
   listMyRankedLifts,
   listMyVerifiedPrs,
   RANKED_FORCE_LABELS,
-  requestRankedFriendship,
+  requestRankedFriendshipByCode,
   requestRankedVerify,
   respondRankedFriendship,
   setRankedInjuryPause,
@@ -592,19 +593,31 @@ function RankedDisciplineScreen({
   )
 }
 
-function RankedFriendsScreen({ onBack }: { onBack: () => void }) {
+function RankedFriendsScreen({
+  onBack,
+  myFriendCode,
+  onFriendCode,
+}: {
+  onBack: () => void
+  myFriendCode: string | null
+  onFriendCode: (code: string) => void
+}) {
   const [axis, setAxis] = useState<'force' | 'discipline'>('force')
   const [board, setBoard] = useState<any>(null)
   const [friendships, setFriendships] = useState<any[]>([])
   const [incomingVerify, setIncomingVerify] = useState<any[]>([])
-  const [friendUserId, setFriendUserId] = useState('')
+  const [pasteCode, setPasteCode] = useState('')
   const [message, setMessage] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const reload = useCallback(() => {
     void fetchFriendsLeaderboard(axis).then(setBoard)
     void listMyRankedFriendships().then((rows) => setFriendships(rows as any[]))
     void listIncomingRankedVerifyRequests().then((rows) => setIncomingVerify(rows as any[]))
-  }, [axis])
+    void ensureMyRankedFriendCode().then((r) => {
+      if (r.ok) onFriendCode(r.friendCode)
+    })
+  }, [axis, onFriendCode])
 
   useEffect(() => {
     reload()
@@ -615,25 +628,65 @@ function RankedFriendsScreen({ onBack }: { onBack: () => void }) {
   )
   const accepted = friendships.filter((f) => f.status === 'accepted')
 
+  const copyMyCode = async () => {
+    if (!myFriendCode) return
+    try {
+      await navigator.clipboard.writeText(myFriendCode)
+      setCopied(true)
+      setMessage('Code copié')
+      window.setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setMessage(`Ton code : ${myFriendCode}`)
+    }
+  }
+
   return (
     <ScreenShell title="Classement amis" onBack={onBack}>
       <div className="space-y-3 rounded-2xl border border-white/10 bg-black/30 p-4">
-        <h2 className="text-[13px] font-bold uppercase tracking-wide text-white">Ajouter un ami</h2>
+        <h2 className="text-[13px] font-bold uppercase tracking-wide text-white">Ton code ami</h2>
+        <div className="flex items-center gap-2">
+          <p
+            className="flex-1 rounded-xl border border-white/10 bg-black px-3 py-2 font-mono text-[18px] tracking-[0.2em] text-white"
+            data-testid="ranked-friend-code-mine"
+          >
+            {myFriendCode ?? '········'}
+          </p>
+          <button
+            type="button"
+            disabled={!myFriendCode}
+            onClick={() => void copyMyCode()}
+            className="ios-press rounded-xl border border-white/15 px-3 py-2 text-[13px] font-semibold text-white disabled:opacity-40"
+            data-testid="ranked-friend-code-copy"
+          >
+            {copied ? 'Copié' : 'Copier'}
+          </button>
+        </div>
+        <p className="text-[12px] text-[#717C83]">
+          Partage ce code (pas un id technique). Ton ami le colle ci-dessous.
+        </p>
+      </div>
+
+      <div className="space-y-3 rounded-2xl border border-white/10 bg-black/30 p-4">
+        <h2 className="text-[13px] font-bold uppercase tracking-wide text-white">
+          Coller le code d’un ami
+        </h2>
         <input
-          className="w-full rounded-xl border border-white/10 bg-black px-3 py-2 text-[14px] text-white"
-          placeholder="User id Ranked de ton ami"
-          value={friendUserId}
-          onChange={(e) => setFriendUserId(e.target.value)}
+          className="w-full rounded-xl border border-white/10 bg-black px-3 py-2 font-mono text-[14px] uppercase tracking-wider text-white"
+          placeholder="Ex. ABCD2345"
+          value={pasteCode}
+          onChange={(e) => setPasteCode(e.target.value.toUpperCase())}
           data-testid="ranked-friend-add-input"
+          autoCapitalize="characters"
+          spellCheck={false}
         />
         <button
           type="button"
           className="ios-press w-full rounded-2xl bg-[#FF0702] px-4 py-2.5 text-[14px] font-semibold text-white"
           data-testid="ranked-friend-add-submit"
           onClick={() => {
-            void requestRankedFriendship(friendUserId.trim()).then((r) => {
+            void requestRankedFriendshipByCode(pasteCode.trim()).then((r) => {
               setMessage(r.ok ? 'Demande envoyée' : String((r as any).error))
-              setFriendUserId('')
+              setPasteCode('')
               reload()
             })
           }}
@@ -818,6 +871,24 @@ export function RankedScreens({
     refresh()
   }, [refresh])
 
+  const opted = Boolean(
+    status?.optIn &&
+      (status.optIn.forceEnabled || status.optIn.disciplineEnabled) &&
+      !status.optIn.optedOutAt,
+  )
+
+  useEffect(() => {
+    if (guest || !opted) return
+    void ensureMyRankedFriendCode().then((r) => {
+      if (!r.ok) return
+      setStatus((prev: any) =>
+        prev
+          ? { ...prev, optIn: prev.optIn ? { ...prev.optIn, friendCode: r.friendCode } : prev.optIn }
+          : prev,
+      )
+    })
+  }, [guest, opted])
+
   const guard = (next: RankedRoute) => {
     if (guest && next !== 'method') {
       requireAuthForActions?.()
@@ -855,7 +926,24 @@ export function RankedScreens({
       />
     )
   }
-  if (route === 'friends') return <RankedFriendsScreen onBack={() => setRoute('hub')} />
+  if (route === 'friends') {
+    return (
+      <RankedFriendsScreen
+        onBack={() => setRoute('hub')}
+        myFriendCode={status?.optIn?.friendCode ?? null}
+        onFriendCode={(code) =>
+          setStatus((prev: any) =>
+            prev
+              ? {
+                  ...prev,
+                  optIn: prev.optIn ? { ...prev.optIn, friendCode: code } : prev.optIn,
+                }
+              : prev,
+          )
+        }
+      />
+    )
+  }
 
   if (guest) {
     return (
@@ -882,11 +970,6 @@ export function RankedScreens({
     )
   }
 
-  const opted =
-    status?.optIn &&
-    (status.optIn.forceEnabled || status.optIn.disciplineEnabled) &&
-    !status.optIn.optedOutAt
-
   const tiles: { id: RankedRoute; label: string; icon: typeof Trophy; hint: string }[] = [
     { id: 'optin', label: 'Opt-in Ranked', icon: Trophy, hint: '18+ · Force / Discipline' },
     { id: 'method', label: 'Comment marche ton rang', icon: Info, hint: 'Barème public' },
@@ -908,6 +991,20 @@ export function RankedScreens({
           <StatusPill label={String(status.eligibilityError)} tone="bad" />
         ) : null}
       </div>
+      {status?.optIn?.friendCode ? (
+        <p className="text-[13px] text-[#ACB4BA]" data-testid="ranked-hub-friend-code">
+          Code ami :{' '}
+          <span className="font-mono tracking-wider text-white">{status.optIn.friendCode}</span>
+          {' · '}
+          <button
+            type="button"
+            className="text-[#FF0702] underline"
+            onClick={() => setRoute('friends')}
+          >
+            partager / ajouter
+          </button>
+        </p>
+      ) : null}
       <div className="space-y-2">
         {tiles.map((tile) => {
           const Icon = tile.icon

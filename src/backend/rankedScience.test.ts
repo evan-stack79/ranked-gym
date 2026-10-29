@@ -126,10 +126,10 @@ describe('RF-ANOM-01 A/B/novice', () => {
   })
 })
 
-describe('B2 baseline anomalies — ignore rejected_force', () => {
+describe('B2 / M4 baseline anomalies', () => {
   const now = 1_000_000_000_000
 
-  it('repro A : rejected 200 ignoré → baseline 100 → ressaisie 200 = B', () => {
+  it('repro A : rejected 200 ignoré → baseline peak pending 100 → ressaisie 200 = B', () => {
     const baseline = resolveAnomalyBaseline({
       verified1RmKg: null,
       verifiedAtMs: null,
@@ -155,31 +155,42 @@ describe('B2 baseline anomalies — ignore rejected_force', () => {
     expect(r.anomalyFlag).toBe('B')
   })
 
-  it('repro B : escalier +14% bloqué via floor 7j', () => {
-    const lifts = [
-      { estimated1RmKg: 100, createdAt: now - 5 * 60_000, status: 'pending_verify' as const },
-      { estimated1RmKg: 114, createdAt: now - 4 * 60_000, status: 'pending_verify' as const },
-      { estimated1RmKg: 130, createdAt: now - 3 * 60_000, status: 'pending_verify' as const },
-    ]
+  it('M4 : échauffement 50 kg ne doit pas faire refuser un vrai 100 kg vérifié', () => {
     const baseline = resolveAnomalyBaseline({
-      verified1RmKg: null,
-      verifiedAtMs: null,
-      recentLifts: lifts,
+      verified1RmKg: 100,
+      verifiedAtMs: now - 2 * 24 * 60 * 60 * 1000,
+      recentLifts: [
+        { estimated1RmKg: 50, createdAt: now - 60_000, status: 'pending_verify' },
+        { estimated1RmKg: 50, createdAt: now - 30_000, status: 'declared' },
+      ],
       nowMs: now,
     })
     expect(baseline.baseline1RmKg).toBe(100)
     const r = evaluateSubmitLift({
       canonicalExerciseId: 'bench',
-      weightKg: 148,
+      weightKg: 100,
       reps: 1,
       sex: 'M',
       verifiedRefs: {},
       baseline1RmKg: baseline.baseline1RmKg,
       baselineAtMs: baseline.baselineAtMs,
-      historyFirstAtMs: now - 5 * 60_000,
+      historyFirstAtMs: now - 2 * 24 * 60 * 60 * 1000,
       nowMs: now,
     })
-    expect(r.anomalyFlag).toBe('B')
+    expect(r.anomalyFlag).toBe('none')
+    expect(r.status).toBe('pending_verify')
+  })
+})
+
+describe('B1-bis friend code', () => {
+  it('normalise et valide le format', async () => {
+    const { normalizeFriendCode, isValidFriendCodeFormat, deriveFriendCodeCandidate } =
+      await import('../../convex/lib/rankedScience')
+    expect(normalizeFriendCode(' ab-cd_12 ')).toBe('ABCD12')
+    const code = deriveFriendCodeCandidate('user-xyz', 0)
+    expect(code).toHaveLength(8)
+    expect(isValidFriendCodeFormat(code)).toBe(true)
+    expect(isValidFriendCodeFormat('SHORT')).toBe(false)
   })
 })
 

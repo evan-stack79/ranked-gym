@@ -171,10 +171,11 @@ export type AnomalyLiftSample = {
 }
 
 /**
- * Baseline Δ1RM (B2) :
+ * Baseline Δ1RM (B2 + M4) :
  * - ignore `rejected_force`
- * - préfère le meilleur 1RM **vérifié**
- * - sinon le **plus bas** 1RM non refusé dans la fenêtre 7 j (bloque l’escalier)
+ * - **préféré** : meilleur 1RM **vérifié** (jamais un échauffement déclaré)
+ * - sans vérifié : max des lifts `pending_verify`/`verified` sur 7 j
+ *   (pas le min des logs — évite faux positif warmup 50 → vrai 100)
  */
 export function resolveAnomalyBaseline(input: {
   verified1RmKg: number | null
@@ -182,59 +183,66 @@ export function resolveAnomalyBaseline(input: {
   recentLifts: AnomalyLiftSample[]
   nowMs: number
 }): { baseline1RmKg: number | null; baselineAtMs: number | null } {
-  const windowStart = input.nowMs - ANOMALY_WINDOW_MS
-  const eligible = input.recentLifts.filter(
-    (l) =>
-      l.status !== 'rejected_force' &&
-      Number.isFinite(l.estimated1RmKg) &&
-      l.estimated1RmKg > 0 &&
-      l.createdAt >= windowStart &&
-      l.createdAt <= input.nowMs,
-  )
-
-  if (
-    input.verified1RmKg != null &&
-    input.verified1RmKg > 0 &&
-    input.verifiedAtMs != null &&
-    input.verifiedAtMs >= windowStart
-  ) {
-    // Verified in window: still compare vs the more conservative (lower) eligible floor.
-    const floor = eligible.reduce<number | null>((min, l) => {
-      if (min == null || l.estimated1RmKg < min) return l.estimated1RmKg
-      return min
-    }, input.verified1RmKg)
-    const floorLift = eligible.find((l) => l.estimated1RmKg === floor)
-    return {
-      baseline1RmKg: floor,
-      baselineAtMs:
-        floor === input.verified1RmKg
-          ? input.verifiedAtMs
-          : (floorLift?.createdAt ?? input.verifiedAtMs),
-    }
-  }
-
+  // M4 — verified PR is the only healthy competitive baseline when present.
   if (input.verified1RmKg != null && input.verified1RmKg > 0) {
-    // Verified outside window still anchors anti-stair when no eligible recent floor.
-    const floor = eligible.reduce<number | null>((min, l) => {
-      if (min == null || l.estimated1RmKg < min) return l.estimated1RmKg
-      return min
-    }, null)
-    if (floor != null && floor < input.verified1RmKg) {
-      const floorLift = eligible.find((l) => l.estimated1RmKg === floor)
-      return { baseline1RmKg: floor, baselineAtMs: floorLift?.createdAt ?? input.nowMs }
-    }
-    // No recent eligible lifts: Δ window uses verifiedAt — if older than 7d, classifyAnomaly → none.
     return {
       baseline1RmKg: input.verified1RmKg,
       baselineAtMs: input.verifiedAtMs,
     }
   }
 
+  const windowStart = input.nowMs - ANOMALY_WINDOW_MS
+  const eligible = input.recentLifts.filter(
+    (l) =>
+      (l.status === 'pending_verify' || l.status === 'verified') &&
+      Number.isFinite(l.estimated1RmKg) &&
+      l.estimated1RmKg > 0 &&
+      l.createdAt >= windowStart &&
+      l.createdAt <= input.nowMs,
+  )
+
   if (eligible.length === 0) {
     return { baseline1RmKg: null, baselineAtMs: null }
   }
-  const floor = eligible.reduce((min, l) => (l.estimated1RmKg < min.estimated1RmKg ? l : min))
-  return { baseline1RmKg: floor.estimated1RmKg, baselineAtMs: floor.createdAt }
+  // Peak (not min) among competitive candidates — warmups/declared excluded.
+  const peak = eligible.reduce((best, l) =>
+    l.estimated1RmKg > best.estimated1RmKg ? l : best,
+  )
+  return { baseline1RmKg: peak.estimated1RmKg, baselineAtMs: peak.createdAt }
+}
+
+/** Friend-code alphabet (no 0/O/1/I). */
+export const FRIEND_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+export const FRIEND_CODE_LENGTH = 8
+
+export function normalizeFriendCode(raw: string): string {
+  return raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+}
+
+export function isValidFriendCodeFormat(code: string): boolean {
+  const n = normalizeFriendCode(code)
+  if (n.length !== FRIEND_CODE_LENGTH) return false
+  for (const ch of n) {
+    if (!FRIEND_CODE_ALPHABET.includes(ch)) return false
+  }
+  return true
+}
+
+/** Deterministic-ish short code from userId + salt (pure, testable). */
+export function deriveFriendCodeCandidate(userId: string, attempt: number): string {
+  const seed = `${userId}::ranked-friend::${attempt}`
+  let h = 2166136261
+  for (let i = 0; i < seed.length; i += 1) {
+    h ^= seed.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  let out = ''
+  let x = h >>> 0
+  for (let i = 0; i < FRIEND_CODE_LENGTH; i += 1) {
+    out += FRIEND_CODE_ALPHABET[x % FRIEND_CODE_ALPHABET.length]!
+    x = Math.imul(x ^ (x >>> 13), 1274126177) >>> 0
+  }
+  return out
 }
 
 /** Soft reset seed ratio — re-placement partiel (CA6), pas 100 % copy. */

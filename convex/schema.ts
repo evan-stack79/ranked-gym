@@ -630,7 +630,11 @@ export const convexTables = {
     ageGatePassedAt: v.number(),
     sex: v.union(v.literal('M'), v.literal('F'), v.literal('unknown')),
     pauseInjuryUntil: v.optional(v.number()),
-  }).index('by_userId', ['userId']),
+    /** Code ami court partageable (B1-bis) — pas l’id Convex brut. */
+    friendCode: v.optional(v.string()),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_friendCode', ['friendCode']),
 
   rankedLiftLog: defineTable({
     userId: v.string(),
