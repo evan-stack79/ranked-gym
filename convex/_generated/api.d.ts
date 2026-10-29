@@ -29,6 +29,7 @@ import type * as migrations from "../migrations.js";
 import type * as lib_stripJournalMeals from "../lib/stripJournalMeals.js";
 import type * as nutrition from "../nutrition.js";
 import type * as profiles from "../profiles.js";
+import type * as progression from "../progression.js";
 import type * as purgeSupabaseMeals from "../purgeSupabaseMeals.js";
 import type * as rpc from "../rpc.js";
 import type * as social from "../social.js";
@@ -62,6 +63,7 @@ declare const fullApi: ApiFromModules<{
   migrations: typeof migrations;
   nutrition: typeof nutrition;
   profiles: typeof profiles;
+  progression: typeof progression;
   purgeSupabaseMeals: typeof purgeSupabaseMeals;
   rpc: typeof rpc;
   social: typeof social;
