@@ -588,6 +588,33 @@ export const convexTables = {
     .index('by_cleAntiDoublon', ['cleAntiDoublon'])
     .index('by_notif', ['notif'])
     .index('by_statut', ['statut']),
+
+  /**
+   * One-shot + retries webhooks « Surveillance fitness » (Grok Bot).
+   * Un enregistrement par (userId, type) pour signup / first_* / churn / test.
+   */
+  surveillance_fitness_events: defineTable({
+    userId: v.string(),
+    email: v.string(),
+    type: v.union(
+      v.literal('signup_free'),
+      v.literal('beta_signup'),
+      v.literal('first_meal_photo_ai'),
+      v.literal('first_workout'),
+      v.literal('churn'),
+      v.literal('test'),
+    ),
+    plan: v.union(v.literal('free'), v.literal('beta'), v.literal('unknown')),
+    lastActiveDays: v.optional(v.union(v.number(), v.null())),
+    actionCount: v.optional(v.union(v.number(), v.null())),
+    notif: v.union(v.literal('a_envoyer'), v.literal('envoyee'), v.literal('echec')),
+    notifEssais: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_userId_type', ['userId', 'type'])
+    .index('by_notif', ['notif'])
+    .index('by_type', ['type']),
 }
 
 export default defineSchema(convexTables)

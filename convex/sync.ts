@@ -593,6 +593,19 @@ export async function pushSyncForSession(
       input.workouts.progressJson ?? {},
       now,
     )
+    const training = asRecord(input.workouts.stateJson)
+    const completed = arrayLen(training ? training.completed : undefined)
+    if (completed > 0) {
+      try {
+        const { notifySurveillanceFitnessFirstWorkout } = await import('./surveillanceFitness')
+        await notifySurveillanceFitnessFirstWorkout(ctx, {
+          userId: user.userId,
+          email: user.email,
+        })
+      } catch {
+        // Soft — jamais bloquer le sync.
+      }
+    }
   }
   if (input.sleep) {
     await replaceSleepNights(ctx, user.userId, input.sleep, now)
