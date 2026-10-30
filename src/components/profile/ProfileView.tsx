@@ -16,6 +16,7 @@ import {
   type ServerHealthLocks,
 } from '../settings/HealthSituationsForm'
 import { FullProfileScreen } from './FullProfileScreen'
+import { RankedScreens } from '../ranked/RankedScreens'
 import { useAuth } from '../../context/AuthContext'
 import {
   getCalorieProfile,
@@ -277,6 +278,20 @@ function ProfileViewContent() {
     return <FullProfileScreen onBack={goBack} />
   }
 
+  if (route === 'ranked') {
+    // M3 / CA5 — barème public accessible sans auth ; actions compétitives restent gated.
+    if (!isAuthenticated || !user) {
+      return (
+        <RankedScreens
+          onBack={goBack}
+          initialRoute="method"
+          requireAuthForActions={() => requireAuth(() => navigate('ranked'))}
+        />
+      )
+    }
+    return <RankedScreens onBack={goBack} />
+  }
+
   if (!isAuthenticated || !user) {
     return (
       <div className="flex flex-col gap-6 pb-4 ios-fade-up">
@@ -292,6 +307,7 @@ function ProfileViewContent() {
           onOpenHealthSituations={() => navigate('healthSituations')}
           onOpenEnergyInfo={() => navigate('energyInfo')}
           onOpenGiveFeedback={() => requireAuth(() => navigate('giveFeedback'))}
+          onOpenRanked={() => navigate('ranked')}
         />
         <CloudBackupCard />
       </div>
@@ -318,6 +334,7 @@ function ProfileViewContent() {
         onOpenHealthSituations={() => navigate('healthSituations')}
         onOpenEnergyInfo={() => navigate('energyInfo')}
         onOpenGiveFeedback={() => navigate('giveFeedback')}
+        onOpenRanked={() => navigate('ranked')}
         onRequireAuth={() => requireAuth(() => undefined)}
         onDisciplineChange={(label) => {
           setDisciplineId(disciplineFromLabel(label))

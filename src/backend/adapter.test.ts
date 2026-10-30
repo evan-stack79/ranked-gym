@@ -56,6 +56,16 @@ const PHASE_E_TABLES = [
   'activity_reactions',
   'avis_beta',
   'surveillance_fitness_events',
+  'rankedOptIn',
+  'rankedLiftLog',
+  'rankedVerifiedPr',
+  'rankedForceScore',
+  'rankedDisciplineScore',
+  'rankedCycle',
+  'rankedLeague',
+  'rankedFriendship',
+  'rankedVerifyRequest',
+  'rankedSessionCompletion',
 ] as const
 
 describe('Convex Phase A feature flag', () => {

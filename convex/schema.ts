@@ -615,6 +615,153 @@ export const convexTables = {
     .index('by_userId_type', ['userId', 'type'])
     .index('by_notif', ['notif'])
     .index('by_type', ['type']),
+
+  /**
+   * Ranked Force / Ranked Discipline (P0) — ARCHI_RANKED §4.
+   * Cosmétique Bronze→Légende (profiles.rank / rank.ts) reste à côté, inchangé.
+   * Jamais de bodyweight / IAP / look / âge bio dans ces tables.
+   */
+  rankedOptIn: defineTable({
+    userId: v.string(),
+    forceEnabled: v.boolean(),
+    disciplineEnabled: v.boolean(),
+    optedInAt: v.number(),
+    optedOutAt: v.optional(v.number()),
+    ageGatePassedAt: v.number(),
+    sex: v.union(v.literal('M'), v.literal('F'), v.literal('unknown')),
+    pauseInjuryUntil: v.optional(v.number()),
+    /** Code ami court partageable (B1-bis) — pas l’id Convex brut. */
+    friendCode: v.optional(v.string()),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_friendCode', ['friendCode']),
+
+  rankedLiftLog: defineTable({
+    userId: v.string(),
+    canonicalExerciseId: v.string(),
+    weightKg: v.number(),
+    reps: v.number(),
+    estimated1RmKg: v.optional(v.number()),
+    status: v.union(
+      v.literal('declared'),
+      v.literal('pending_verify'),
+      v.literal('verified'),
+      v.literal('rejected_force'),
+    ),
+    anomalyFlag: v.union(v.literal('none'), v.literal('A'), v.literal('B')),
+    sourceSessionId: v.optional(v.string()),
+    createdAt: v.number(),
+    verifiedAt: v.optional(v.number()),
+    verifyMethod: v.optional(
+      v.union(v.literal('self_24h'), v.literal('friend_18'), v.literal('review')),
+    ),
+    needsReviewQueue: v.optional(v.boolean()),
+    rejectReason: v.optional(v.string()),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_user_exercise_time', ['userId', 'canonicalExerciseId', 'createdAt']),
+
+  rankedVerifiedPr: defineTable({
+    userId: v.string(),
+    canonicalExerciseId: v.string(),
+    estimated1RmKg: v.number(),
+    liftLogId: v.id('rankedLiftLog'),
+    verifiedAt: v.number(),
+    cycleId: v.id('rankedCycle'),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_user_exercise', ['userId', 'canonicalExerciseId']),
+
+  rankedForceScore: defineTable({
+    userId: v.string(),
+    cycleId: v.id('rankedCycle'),
+    score: v.number(),
+    /** Soft-reset partial seed (CA6) — not a 100% copy of previous score. */
+    seedScore: v.optional(v.number()),
+    breakdown: v.object({
+      squat: v.number(),
+      bench: v.number(),
+      deadlift: v.number(),
+      barbell_row: v.number(),
+      ohp: v.number(),
+    }),
+    leagueId: v.id('rankedLeague'),
+    updatedAt: v.number(),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_user_cycle', ['userId', 'cycleId'])
+    .index('by_cycle_score', ['cycleId', 'score']),
+
+  rankedDisciplineScore: defineTable({
+    userId: v.string(),
+    cycleId: v.id('rankedCycle'),
+    sessionsLast7d: v.number(),
+    streakWeeks: v.number(),
+    score: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_user_cycle', ['userId', 'cycleId'])
+    .index('by_cycle_score', ['cycleId', 'score']),
+
+  rankedCycle: defineTable({
+    startsAt: v.number(),
+    endsAt: v.number(),
+    status: v.union(v.literal('active'), v.literal('closing'), v.literal('closed')),
+    softResetAt: v.optional(v.number()),
+  })
+    .index('by_status', ['status'])
+    .index('by_endsAt', ['endsAt']),
+
+  rankedLeague: defineTable({
+    cycleId: v.id('rankedCycle'),
+    name: v.string(),
+    tier: v.number(),
+    minScore: v.number(),
+    maxScore: v.number(),
+  })
+    .index('by_cycleId', ['cycleId'])
+    .index('by_cycle_tier', ['cycleId', 'tier']),
+
+  /** Amis Ranked P0 (pas de table friendship legacy dédiée). */
+  rankedFriendship: defineTable({
+    userA: v.string(),
+    userB: v.string(),
+    status: v.union(v.literal('pending'), v.literal('accepted')),
+    requestedBy: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_pair', ['userA', 'userB'])
+    .index('by_userA_status', ['userA', 'status'])
+    .index('by_userB_status', ['userB', 'status']),
+
+  rankedVerifyRequest: defineTable({
+    liftLogId: v.id('rankedLiftLog'),
+    ownerId: v.string(),
+    method: v.union(v.literal('self_24h'), v.literal('friend_18')),
+    friendId: v.optional(v.string()),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    status: v.union(
+      v.literal('open'),
+      v.literal('confirmed'),
+      v.literal('expired'),
+      v.literal('denied'),
+    ),
+  })
+    .index('by_liftLogId', ['liftLogId'])
+    .index('by_ownerId', ['ownerId'])
+    .index('by_friendId_status', ['friendId', 'status']),
+
+  /** Séances terminées comptées pour Ranked Discipline (fenêtre 7j + streak). */
+  rankedSessionCompletion: defineTable({
+    userId: v.string(),
+    completedAt: v.number(),
+    sourceSessionId: v.optional(v.string()),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_user_time', ['userId', 'completedAt']),
 }
 
 export default defineSchema(convexTables)
