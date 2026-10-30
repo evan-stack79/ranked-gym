@@ -25,13 +25,13 @@ export function ProPassCard({ onTryFree, onDismiss, onViewFreeOffer }: ProPassCa
       <button
         type="button"
         onClick={onDismiss}
-        aria-label="Fermer l’offre Passe Pro"
+        aria-label="Fermer l’offre Ranked Pro"
         className="ios-press absolute right-2 top-2 flex min-h-11 min-w-11 items-center justify-center rounded-full text-[#ACB4BA] hover:bg-white/10 hover:text-white"
       >
         <X className="h-4 w-4" strokeWidth={2.25} />
       </button>
 
-      <h2 className="pr-12 text-[22px] font-bold leading-tight text-white">Passe Pro</h2>
+      <h2 className="pr-12 text-[22px] font-bold leading-tight text-white">Ranked Pro</h2>
       <p className="mt-2 max-w-[280px] text-[14px] leading-snug text-[#C7C7CC]">
         7 jours d&apos;essai gratuit, ensuite 9,99 euros par mois, résiliable à tout moment
       </p>

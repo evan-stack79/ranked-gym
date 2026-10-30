@@ -15,7 +15,7 @@ describe('ProPassCard', () => {
     host.remove()
   })
 
-  it('affiche le copy Passe Pro validé (essai 9,99 €, bénéfices, CTAs)', async () => {
+  it('affiche le copy Ranked Pro validé (essai 9,99 €, bénéfices, CTAs)', async () => {
     const onTryFree = vi.fn()
     const onDismiss = vi.fn()
     const onViewFreeOffer = vi.fn()
@@ -32,7 +32,7 @@ describe('ProPassCard', () => {
     })
 
     const text = host.textContent ?? ''
-    expect(text).toContain('Passe Pro')
+    expect(text).toContain('Ranked Pro')
     expect(text).toContain(
       "7 jours d'essai gratuit, ensuite 9,99 euros par mois, résiliable à tout moment",
     )
@@ -42,6 +42,7 @@ describe('ProPassCard', () => {
     expect(text).toContain('Essayer gratuitement')
     expect(text).toContain("Voir l'offre gratuite")
     expect(text).not.toContain('6,99')
+    expect(text).not.toContain('Passe Pro')
     expect(text).not.toContain('Pass Pro')
     expect(text).not.toContain('Débloque')
 

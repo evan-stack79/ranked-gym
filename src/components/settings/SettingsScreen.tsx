@@ -351,7 +351,7 @@ export function SettingsScreen({
         open={sheet === 'payment'}
         onClose={() => setSheet(null)}
         title="Méthodes de paiement"
-        subtitle="Pass Pro"
+        subtitle="Ranked Pro"
         leading={<CreditCard className="mt-0.5 h-5 w-5 text-[#ACB4BA]" />}
       >
         <div className="space-y-4 pb-2">
