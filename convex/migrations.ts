@@ -10,6 +10,7 @@ import {
   type AdminAuthz,
 } from './lib/migrationAdmin'
 import { writeNutritionProfileJson } from './lib/nutritionProfile'
+import { getRankFromLevel } from './lib/progressionRank'
 
 export const MIGRATION_ENTITY_TYPES = [
   'auth_users',
@@ -244,6 +245,9 @@ async function upsertProfile(
       userId,
       createdAt: Number(payload.createdAt ?? now),
       ...patch,
+      performanceRating: 1000,
+      ratedSessions: 0,
+      rankDivision: getRankFromLevel(patch.level).division,
     })
     operation = 'inserted'
     convexId = String(inserted)
