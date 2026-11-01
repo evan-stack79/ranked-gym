@@ -114,6 +114,28 @@ jobs:
             exit 1
           fi
 
+          # Guard: local CAP plugins must be registered via MainViewController.capacitorDidLoad.
+          # Without this, login fails with: "SecureStorage" plugin is not implemented on ios.
+          APP_BINARY="$APP_PATH/App"
+          if [ ! -f "$APP_BINARY" ]; then
+            APP_BINARY="$(find "$APP_PATH" -maxdepth 1 -type f -perm -111 | head -n 1 || true)"
+          fi
+          if [ -z "${APP_BINARY:-}" ] || [ ! -f "$APP_BINARY" ]; then
+            echo "App binary not found inside $APP_PATH"
+            ls -la "$APP_PATH" || true
+            exit 1
+          fi
+          echo "Checking native plugin registration symbols in $APP_BINARY"
+          if ! strings "$APP_BINARY" | grep -q 'MainViewController'; then
+            echo "ERROR: MainViewController missing from App binary — SecureStorage will not register on iOS"
+            exit 1
+          fi
+          if ! strings "$APP_BINARY" | grep -q 'capacitorDidLoad'; then
+            echo "ERROR: capacitorDidLoad missing from App binary — local CAP plugins will not register"
+            exit 1
+          fi
+          echo "Native plugin registration symbols present (MainViewController / capacitorDidLoad)"
+
           STAGE="$RUNNER_TEMP/ipa-stage"
           rm -rf "$STAGE"
           mkdir -p "$STAGE/Payload"

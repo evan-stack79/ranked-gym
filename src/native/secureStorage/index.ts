@@ -7,6 +7,7 @@ export { SecureStorageWeb }
 type CapacitorBridge = {
   isNativePlatform?: () => boolean
   getPlatform?: () => string
+  isPluginAvailable?: (name: string) => boolean
   Plugins?: {
     SecureStorage?: SecureStoragePlugin
   }
@@ -64,9 +65,16 @@ export const SecureStorage: SecureStoragePlugin = {
 export function isNativeSecureStorageAvailable(): boolean {
   const cap = getCapacitor()
   if (!cap) return false
-  if (cap.isNativePlatform?.() === true) return true
   const platform = cap.getPlatform?.()
-  return platform === 'ios' || platform === 'android'
+  const native =
+    cap.isNativePlatform?.() === true || platform === 'ios' || platform === 'android'
+  if (!native) return false
+  // Prefer Keychain only when the native plugin is actually registered.
+  // Otherwise login hard-fails with: "SecureStorage" plugin is not implemented on ios.
+  if (typeof cap.isPluginAvailable === 'function') {
+    return cap.isPluginAvailable('SecureStorage')
+  }
+  return Boolean(cap.Plugins?.SecureStorage)
 }
 
 export function resetSecureStorageBindingForTests(): void {
