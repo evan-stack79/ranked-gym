@@ -128,3 +128,7 @@ ios/DerivedData
 scripts/migrations/artifacts/
 scripts/screenshots/reveal-blur/video-tmp/
 scripts/screenshots/add-food-v3-qa/
+
+# Pub vidéo : ressources capturées et rendus (régénérables)
+marketing/pub-video/assets/
+marketing/pub-video/out/
