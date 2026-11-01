@@ -5,12 +5,14 @@
  *
  * Les masters dans `src/assets/brand/` ne sont jamais modifiés.
  * Les rouges du logo principal (header / splash) sont normalisés à la
- * génération vers la palette produit (#B91C1C → #FF2B2B), fond #0C0C0E.
+ * génération vers la palette Radix dark (#C03529 → #FF0702), fond #000000.
  * Les icônes home-screen / PWA / native copient les pixels exacts de la
  * plaque panthère (bouche fermée, couronne rouge, glow).
  *
  * Usage: npm run brand:assets
  *        node scripts/generate-brand-assets.mjs --icons-only
+ *        node scripts/generate-brand-assets.mjs --header-only
+ *        node scripts/generate-brand-assets.mjs --splash-only
  */
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -23,11 +25,11 @@ sharp.concurrency(1)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
 
-const BRAND_BG = { r: 0x0c, g: 0x0c, b: 0x0e, alpha: 1 }
-/** Rouge profond (`--color-brand-deep`). */
-const BRAND_RED_DEEP = { r: 0xb9, g: 0x1c, b: 0x1c }
-/** Rouge produit principal (`--color-brand`). */
-const BRAND_RED_BRIGHT = { r: 0xff, g: 0x2b, b: 0x2b }
+const BRAND_BG = { r: 0x00, g: 0x00, b: 0x00, alpha: 1 }
+/** Rouge profond — Radix red 8 (`--color-brand-deep`). */
+const BRAND_RED_DEEP = { r: 0xc0, g: 0x35, b: 0x29 }
+/** Rouge produit — Radix red 9 (`--color-brand`, #FF0702). */
+const BRAND_RED_BRIGHT = { r: 0xff, g: 0x07, b: 0x02 }
 
 const MASTER_CALM = path.join(root, 'src/assets/brand/panther-calm-crowned.png')
 /** Icône store/PWA — source propriétaire opaque (A5A15C62…), jamais de fond vert. */
@@ -178,7 +180,7 @@ function isBrandRedCandidate(r, g, b) {
 }
 
 /**
- * Remappe un rouge source vers la rampe #B91C1C → #FF2B2B selon sa valeur,
+ * Remappe un rouge source vers la rampe Radix #C03529 → #FF0702 selon sa valeur,
  * en adoucissant les bords anti-aliasés (mélange avec le pixel d’origine).
  */
 function normalizeRedPixel(r, g, b) {
@@ -198,7 +200,7 @@ function normalizeRedPixel(r, g, b) {
 }
 
 /**
- * Fond #0C0C0E + normalisation des rouges produit.
+ * Fond #000000 + normalisation des rouges produit.
  * Masters sur disque : jamais écrits.
  */
 /**
@@ -246,7 +248,7 @@ function isExteriorBackgroundPixel(r, g, b) {
   const max = Math.max(r, g, b)
   const min = Math.min(r, g, b)
   const delta = max - min
-  // Très sombre, quasi neutre — le fond master + #0C0C0E après remap PWA.
+  // Très sombre, quasi neutre — le fond master + #000000 après remap PWA.
   if (max > 24) return false
   if (delta > 10) return false
   return true
@@ -566,9 +568,9 @@ async function measureHeaderFill(outPath) {
   return Math.round((side / info.width) * 100)
 }
 
-/** Splash natif Capacitor : fond noir + panthère calme (D96BABC8). */
+/** Splash natif Capacitor : fond noir + panthère calme, rouges remappés sur Radix. */
 async function writeNativeSplash() {
-  const { data, info } = await sharp(MASTER_CALM).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  const { data, info } = await loadProcessedMasterPixels({ opaqueProductBackground: false })
   neutralizeTransparentRgb(data)
   const logoSize = Math.round(SPLASH_EXPORT_SIZE * SPLASH_LOGO_SCALE)
   const resized = await sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
@@ -614,7 +616,7 @@ async function writeFaviconFromIcon(iconMasterBuffer) {
   await assertNoVisibleGreen(faviconPath, 'public/favicon.png')
   const faviconSvg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Ranked Gym">
-  <rect width="64" height="64" rx="14" fill="#0C0C0E"/>
+  <rect width="64" height="64" rx="14" fill="#000000"/>
   <image href="/favicon.png" x="0" y="0" width="64" height="64"/>
 </svg>
 `
@@ -650,7 +652,7 @@ async function writeNativeSources(iconMasterBuffer) {
     .png(PNG_OPTS)
     .toFile(iconBackgroundPath)
   console.log(
-    `  ✓ ${path.relative(root, iconBackgroundPath)} (${NATIVE_EXPORT_SIZE}×${NATIVE_EXPORT_SIZE}, #0C0C0E opaque)`,
+    `  ✓ ${path.relative(root, iconBackgroundPath)} (${NATIVE_EXPORT_SIZE}×${NATIVE_EXPORT_SIZE}, #000000 opaque)`,
   )
 
   const subjectSize = Math.round(NATIVE_EXPORT_SIZE * ICON_FOREGROUND_SCALE)
@@ -769,12 +771,17 @@ async function generateAppIconsFromMaster() {
 
 async function main() {
   await mkdir(PUBLIC_DIR, { recursive: true })
+  if (process.argv.includes('--splash-only')) {
+    await writeNativeSplash()
+    console.log('Done.')
+    return
+  }
   const iconsOnly = process.argv.includes('--icons-only')
   const headerOnly = process.argv.includes('--header-only')
 
   if (!iconsOnly) {
     console.log(
-      'Brand assets — masters intactes, rouges → #B91C1C…#FF2B2B, fond #0C0C0E ; icônes PWA via panther-icon-opaque',
+      'Brand assets — masters intactes, rouges → #C03529…#FF0702, fond #000000 ; icônes PWA via panther-icon-opaque',
     )
     const headerMasterPixels = await loadProcessedMasterPixels({ opaqueProductBackground: false })
     await writeHeaderMark(headerMasterPixels)

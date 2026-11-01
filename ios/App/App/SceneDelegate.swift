@@ -3,6 +3,7 @@ import Capacitor
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
+    private var didStartWeb = false
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
@@ -10,10 +11,24 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window = UIWindow(windowScene: windowScene)
         window?.backgroundColor = RankedPalette.background
         window?.overrideUserInterfaceStyle = .dark
-        window?.rootViewController = CAPBridgeViewController()
+        let placeholder = UIViewController()
+        placeholder.view.backgroundColor = RankedPalette.background
+        window?.rootViewController = placeholder
         window?.makeKeyAndVisible()
 
-        SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
+        let startWeb = { [weak self] in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if self.didStartWeb { return }
+                self.didStartWeb = true
+                self.window?.rootViewController = CAPBridgeViewController()
+                SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
+            }
+        }
+        // Le SW de la première install sert encore l’ancien JS tant qu’on ne
+        // l’efface pas avant d’ouvrir la WebView.
+        WebShellCache.purgeIfBuildChanged(completion: startWeb)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: startWeb)
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
