@@ -6,6 +6,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   canCreatePartnerInvite,
+  type PartnerSessionAccount,
 } from '../../convex/lib/partnerAuth'
 import {
   PARTNER_CODE_LOG_REJECTED,
@@ -20,7 +21,6 @@ import {
 import {
   partnerLookupCodeCore,
   partnerMarkConsumedGuarded,
-  type PartnerSessionAccount,
 } from '../../convex/rewards'
 import type { Id } from '../../convex/_generated/dataModel'
 
