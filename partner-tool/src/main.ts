@@ -4,6 +4,12 @@
  */
 import { ConvexHttpClient } from 'convex/browser'
 import { anyApi } from 'convex/server'
+import {
+  escapeAttr,
+  escapeHtml,
+  renderHistoryItemsHtml,
+  sanitizePartnerCode,
+} from './htmlSafety'
 
 type Screen = 'login' | 'invite' | 'caisse' | 'result' | 'history' | 'confirm'
 
@@ -100,8 +106,19 @@ function errorLabel(error: string): string {
     REWARDS_CODE_NOT_REFUSABLE: 'Code non refusables.',
     PARTNER_INVITE_INVALID: 'Invitation invalide ou expirée.',
     PARTNER_PASSWORD_POLICY: 'Mot de passe trop court (8 caractères min.).',
+    PARTNER_INACTIVE: 'Cette marque est désactivée — accès caisse fermé.',
+    PARTNER_ROLE_FORBIDDEN: 'Rôle non autorisé pour cette action.',
+    REWARDS_CODE_INVALID_FORMAT: 'Code invalide (format / caractères non autorisés).',
   }
   return map[error] ?? error
+}
+
+function msgError(): string {
+  return state.error ? `<div class="msg error">${escapeHtml(state.error)}</div>` : ''
+}
+
+function msgOk(): string {
+  return state.message ? `<div class="msg ok">${escapeHtml(state.message)}</div>` : ''
 }
 
 const state: {
@@ -140,7 +157,7 @@ function el(html: string): string {
 }
 
 function banner(): string {
-  return `<div class="banner" role="note">${STOCK_BANNER}</div>`
+  return `<div class="banner" role="note">${escapeHtml(STOCK_BANNER)}</div>`
 }
 
 function renderLogin(): string {
@@ -156,7 +173,7 @@ function renderLogin(): string {
         <label>Mot de passe
           <input name="password" type="password" autocomplete="current-password" required />
         </label>
-        ${state.error ? `<div class="msg error">${state.error}</div>` : ''}
+        ${msgError()}
         <div class="btn-row">
           <button class="btn-primary" type="submit">Se connecter</button>
           <button class="btn-ghost" type="button" data-go="invite">J’ai une invitation</button>
@@ -174,7 +191,7 @@ function renderInvite(): string {
       <p class="sub">Activer mon compte partenaire</p>
       <form id="invite-form" class="card-less">
         <label>Jeton d’invitation
-          <input name="token" type="text" required value="${state.inviteToken}" />
+          <input name="token" type="text" required value="${escapeAttr(state.inviteToken)}" />
         </label>
         <label>E-mail
           <input name="email" type="email" autocomplete="username" required />
@@ -182,7 +199,7 @@ function renderInvite(): string {
         <label>Choisir un mot de passe
           <input name="password" type="password" autocomplete="new-password" minlength="8" required />
         </label>
-        ${state.error ? `<div class="msg error">${state.error}</div>` : ''}
+        ${msgError()}
         <div class="btn-row">
           <button class="btn-primary" type="submit">Activer</button>
           <button class="btn-ghost" type="button" data-go="login">Retour</button>
@@ -200,7 +217,7 @@ function nav(): string {
       <button class="btn-ghost ${state.screen === 'history' ? 'active' : ''}" type="button" data-go="history">Historique</button>
       <button class="btn-ghost" type="button" id="logout-btn">Déconnexion</button>
     </div>
-    <p class="meta">${state.partnerName ?? 'Partenaire'} · ${state.account?.email ?? ''} · ${role}</p>
+    <p class="meta">${escapeHtml(state.partnerName ?? 'Partenaire')} · ${escapeHtml(state.account?.email ?? '')} · ${escapeHtml(role)}</p>
   `
 }
 
@@ -213,10 +230,10 @@ function renderCaisse(): string {
       <p class="sub">Saisis le code cadeau du client, puis vérifie.</p>
       <form id="lookup-form" class="card-less">
         <label>Code cadeau
-          <input class="code-input" name="code" type="text" autocomplete="off" spellcheck="false" required />
+          <input class="code-input" name="code" type="text" autocomplete="off" spellcheck="false" maxlength="64" pattern="[A-Za-z0-9][A-Za-z0-9._-]{3,63}" required />
         </label>
-        ${state.error ? `<div class="msg error">${state.error}</div>` : ''}
-        ${state.message ? `<div class="msg ok">${state.message}</div>` : ''}
+        ${msgError()}
+        ${msgOk()}
         <button class="btn-primary" type="submit">Vérifier</button>
       </form>
     </main>
@@ -230,11 +247,11 @@ function renderResult(): string {
     ${banner()}
     <main class="shell">
       ${nav()}
-      <span class="status-pill">${statusLabel(L.status)}</span>
-      <h1 class="result-title">${L.itemTitle}</h1>
-      <p class="meta">${L.partnerName} · <span class="code-input" style="font-size:0.9rem">${L.code}</span></p>
-      ${state.error ? `<div class="msg error">${state.error}</div>` : ''}
-      ${state.message ? `<div class="msg ok">${state.message}</div>` : ''}
+      <span class="status-pill">${escapeHtml(statusLabel(L.status))}</span>
+      <h1 class="result-title">${escapeHtml(L.itemTitle)}</h1>
+      <p class="meta">${escapeHtml(L.partnerName)} · <span class="code-input" style="font-size:0.9rem">${escapeHtml(L.code)}</span></p>
+      ${msgError()}
+      ${msgOk()}
       ${
         L.actionable
           ? `<div class="btn-row" style="margin-top:1rem">
@@ -242,7 +259,7 @@ function renderResult(): string {
               <button class="btn-danger" type="button" id="btn-refuse">Non, rupture</button>
             </div>
             <label style="margin-top:0.75rem">Motif rupture (optionnel)
-              <input id="refuse-reason" type="text" maxlength="200" value="${state.refuseReason}" />
+              <input id="refuse-reason" type="text" maxlength="200" value="${escapeAttr(state.refuseReason)}" />
             </label>`
           : `<p class="sub">Aucune action possible sur ce code.</p>
              <button class="btn-ghost" type="button" data-go="caisse">Nouveau code</button>`
@@ -259,8 +276,8 @@ function renderConfirm(): string {
       ${nav()}
       <div class="confirm-box card-less">
         <h1 class="result-title" style="font-size:1.2rem">Confirmation admin</h1>
-        <p class="sub">Tu es <strong>rg_admin</strong>. Confirme explicitement l’action « ${action} » sur le code ${state.lookup?.code ?? ''}.</p>
-        ${state.error ? `<div class="msg error">${state.error}</div>` : ''}
+        <p class="sub">Tu es <strong>rg_admin</strong>. Confirme explicitement l’action « ${escapeHtml(action)} » sur le code ${escapeHtml(state.lookup?.code ?? '')}.</p>
+        ${msgError()}
         <div class="btn-row">
           <button class="btn-primary" type="button" id="btn-admin-confirm">Je confirme</button>
           <button class="btn-ghost" type="button" data-go="result">Annuler</button>
@@ -271,23 +288,14 @@ function renderConfirm(): string {
 }
 
 function renderHistory(): string {
-  const items = state.history
-    .map(
-      (h) => `
-      <li>
-        <div><strong>${h.action}</strong> · ${h.result}${h.errorCode ? ` (${h.errorCode})` : ''}</div>
-        <div class="meta"><span class="code-input" style="font-size:0.8rem">${h.code}</span> · ${new Date(h.createdAt).toLocaleString('fr-FR')}${h.reason ? ` · ${h.reason}` : ''}</div>
-      </li>`,
-    )
-    .join('')
   return el(`
     ${banner()}
     <main class="shell">
       ${nav()}
       <h1 class="result-title">Historique</h1>
       <p class="sub">Actions de ce partenaire uniquement.</p>
-      ${state.error ? `<div class="msg error">${state.error}</div>` : ''}
-      <ul class="history-list">${items || '<li class="meta">Aucune action récente.</li>'}</ul>
+      ${msgError()}
+      <ul class="history-list">${renderHistoryItemsHtml(state.history)}</ul>
     </main>
   `)
 }
@@ -491,9 +499,16 @@ function bind() {
     const token = getToken()
     if (!token) return
     const fd = new FormData(lookupForm)
-    const code = String(fd.get('code') ?? '').trim()
+    const rawCode = String(fd.get('code') ?? '')
+    const sanitized = sanitizePartnerCode(rawCode)
     state.error = null
     state.message = null
+    if (!sanitized.ok) {
+      state.error = errorLabel(sanitized.error)
+      render()
+      return
+    }
+    const code = sanitized.code
     try {
       const res = await client().mutation(api.rewards.partnerLookupCodeLogged, {
         partnerSessionToken: token,

@@ -14,6 +14,7 @@ import {
   verifyPassword,
 } from './lib/authCrypto'
 import {
+  canCreatePartnerInvite,
   createPartnerSession,
   PARTNER_INVITE_TTL_MS,
   partnerCanManageStaff,
@@ -49,6 +50,10 @@ export const login = mutation({
     const account = await findAccountByEmail(ctx, email)
     if (!account || !account.active) {
       return { ok: false as const, error: 'PARTNER_INVALID_CREDENTIALS' }
+    }
+    const partner = await ctx.db.get(account.partnerId)
+    if (!partner || !partner.active) {
+      return { ok: false as const, error: 'PARTNER_INACTIVE' }
     }
     const ok = await verifyPassword(args.password, account.passwordHash)
     if (!ok) {
@@ -167,11 +172,8 @@ export const createInvite = mutation({
     if (!partnerCanManageStaff(session.role)) {
       return { ok: false as const, error: 'PARTNER_ADMIN_REQUIRED' }
     }
-    if (args.role === 'partner_admin' && session.role !== 'rg_admin' && session.role !== 'partner_admin') {
-      return { ok: false as const, error: 'PARTNER_ADMIN_REQUIRED' }
-    }
-    // partner_admin may only invite staff for own partner; never rg_admin (validator blocks).
-    if (session.role === 'partner_admin' && args.role !== 'partner_staff' && args.role !== 'partner_admin') {
+    // ARCHI §3.2.5 / QA m1 — partner_admin invites partner_staff only (not peer admins).
+    if (!canCreatePartnerInvite(session.role, args.role)) {
       return { ok: false as const, error: 'PARTNER_ROLE_FORBIDDEN' }
     }
     const now = Date.now()

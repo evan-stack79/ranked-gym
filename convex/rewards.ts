@@ -22,6 +22,11 @@ import {
   type PartnerSessionAccount,
 } from './lib/partnerAuth'
 import {
+  PARTNER_CODE_LOG_REJECTED,
+  sanitizePartnerCode,
+  sanitizePartnerReason,
+} from './lib/partnerCode'
+import {
   assertNoForbiddenProFields,
   catalogItemIsAvailable,
   computeCreditGrant,
@@ -804,15 +809,12 @@ export async function partnerLookupCodeCore(
   },
 ): Promise<PartnerLookupResult> {
   const now = input.now ?? Date.now()
-  const code = input.code.trim()
-  const row = await ctx.db
-    .query('rewardsRedemptionCode')
-    .withIndex('by_code', (q) => q.eq('code', code))
-    .first()
+  const sanitized = sanitizePartnerCode(input.code)
 
   const log = async (
     result: 'ok' | 'denied' | 'error',
     errorCode?: string,
+    logCode?: string,
     redemptionId?: Id<'rewardsRedemptionCode'>,
     partnerId?: Id<'rewardsPartner'>,
   ) => {
@@ -822,7 +824,7 @@ export async function partnerLookupCodeCore(
       partnerId: partnerId ?? input.account.partnerId,
       accountId: input.account.accountId,
       role: input.account.role,
-      code,
+      code: logCode ?? PARTNER_CODE_LOG_REJECTED,
       redemptionId,
       action: 'lookup',
       result,
@@ -831,20 +833,32 @@ export async function partnerLookupCodeCore(
     })
   }
 
+  if (!sanitized.ok) {
+    // QA M1 — never journalize raw HTML / script payloads.
+    await log('denied', sanitized.error, PARTNER_CODE_LOG_REJECTED)
+    return { ok: false, error: sanitized.error }
+  }
+  const code = sanitized.code
+
+  const row = await ctx.db
+    .query('rewardsRedemptionCode')
+    .withIndex('by_code', (q) => q.eq('code', code))
+    .first()
+
   if (!row) {
-    await log('denied', 'REWARDS_CODE_NOT_FOUND')
+    await log('denied', 'REWARDS_CODE_NOT_FOUND', code)
     return { ok: false, error: 'REWARDS_CODE_NOT_FOUND' }
   }
 
   const item = await ctx.db.get(row.itemId)
   if (!item) {
-    await log('error', 'REWARDS_ITEM_MISSING', row._id)
+    await log('error', 'REWARDS_ITEM_MISSING', code, row._id)
     return { ok: false, error: 'REWARDS_ITEM_MISSING' }
   }
 
   const ownership = assertPartnerOwnsItem(input.account, item.partnerId)
   if (!ownership.ok) {
-    await log('denied', ownership.error, row._id, item.partnerId)
+    await log('denied', ownership.error, code, row._id, item.partnerId)
     return { ok: false, error: ownership.error }
   }
 
@@ -858,7 +872,7 @@ export async function partnerLookupCodeCore(
   const actionable =
     (effectiveStatus === 'created' || effectiveStatus === 'shown') && row.expiresAt > now
 
-  await log('ok', undefined, row._id, item.partnerId)
+  await log('ok', undefined, code, row._id, item.partnerId)
   return {
     ok: true,
     status: effectiveStatus,
@@ -886,7 +900,22 @@ export async function partnerMarkConsumedGuarded(
   },
 ): Promise<PartnerMarkConsumedResult> {
   const now = input.now ?? Date.now()
-  const code = input.code.trim()
+  const sanitized = sanitizePartnerCode(input.code)
+  if (!sanitized.ok) {
+    await appendPartnerActionLog(ctx, {
+      partnerId: input.account.partnerId,
+      accountId: input.account.accountId,
+      role: input.account.role,
+      code: PARTNER_CODE_LOG_REJECTED,
+      action: 'consume',
+      result: 'denied',
+      errorCode: sanitized.error,
+      adminConfirmed: input.adminConfirmed === true,
+      createdAt: now,
+    })
+    return { ok: false, error: sanitized.error }
+  }
+  const code = sanitized.code
 
   const confirm = assertAdminConfirmed(input.account, input.adminConfirmed)
   if (!confirm.ok) {
@@ -988,8 +1017,24 @@ export async function partnerRefuseGuarded(
   },
 ): Promise<PartnerRefuseGuardedResult> {
   const now = input.now ?? Date.now()
-  const code = input.code.trim()
-  const reason = (input.reason ?? '').trim()
+  const sanitized = sanitizePartnerCode(input.code)
+  const reason = sanitizePartnerReason(input.reason)
+  if (!sanitized.ok) {
+    await appendPartnerActionLog(ctx, {
+      partnerId: input.account.partnerId,
+      accountId: input.account.accountId,
+      role: input.account.role,
+      code: PARTNER_CODE_LOG_REJECTED,
+      action: 'refuse',
+      result: 'denied',
+      errorCode: sanitized.error,
+      reason,
+      adminConfirmed: input.adminConfirmed === true,
+      createdAt: now,
+    })
+    return { ok: false, error: sanitized.error }
+  }
+  const code = sanitized.code
 
   const confirm = assertAdminConfirmed(input.account, input.adminConfirmed)
   if (!confirm.ok) {
@@ -1001,7 +1046,7 @@ export async function partnerRefuseGuarded(
       action: 'refuse',
       result: 'denied',
       errorCode: confirm.error,
-      reason: reason || undefined,
+      reason,
       adminConfirmed: input.adminConfirmed === true,
       createdAt: now,
     })
@@ -1021,7 +1066,7 @@ export async function partnerRefuseGuarded(
       action: 'refuse',
       result: 'denied',
       errorCode: 'REWARDS_CODE_NOT_FOUND',
-      reason: reason || undefined,
+      reason,
       adminConfirmed: input.adminConfirmed === true,
       createdAt: now,
     })
@@ -1039,7 +1084,7 @@ export async function partnerRefuseGuarded(
       action: 'refuse',
       result: 'error',
       errorCode: 'REWARDS_ITEM_MISSING',
-      reason: reason || undefined,
+      reason,
       adminConfirmed: input.adminConfirmed === true,
       createdAt: now,
     })
@@ -1057,14 +1102,14 @@ export async function partnerRefuseGuarded(
       action: 'refuse',
       result: 'denied',
       errorCode: ownership.error,
-      reason: reason || undefined,
+      reason,
       adminConfirmed: input.adminConfirmed === true,
       createdAt: now,
     })
     return { ok: false, error: ownership.error }
   }
 
-  const result = await partnerRefuseCore(ctx, { code, reason, now })
+  const result = await partnerRefuseCore(ctx, { code, reason: reason ?? '', now })
   await appendPartnerActionLog(ctx, {
     partnerId: item.partnerId,
     accountId: input.account.accountId,
@@ -1074,7 +1119,7 @@ export async function partnerRefuseGuarded(
     action: 'refuse',
     result: result.ok ? 'ok' : 'denied',
     errorCode: result.ok ? undefined : result.error,
-    reason: reason || undefined,
+    reason,
     adminConfirmed: input.adminConfirmed === true,
     createdAt: now,
   })

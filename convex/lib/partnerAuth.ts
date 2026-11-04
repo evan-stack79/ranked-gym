@@ -30,6 +30,16 @@ export function partnerCanManageStaff(role: PartnerRole): boolean {
   return role === 'partner_admin' || role === 'rg_admin'
 }
 
+/** ARCHI §3.2.5 — partner_admin CRUD partner_staff only; rg_admin may invite staff|admin. */
+export function canCreatePartnerInvite(
+  actorRole: PartnerRole,
+  inviteRole: 'partner_staff' | 'partner_admin',
+): boolean {
+  if (actorRole === 'rg_admin') return true
+  if (actorRole === 'partner_admin') return inviteRole === 'partner_staff'
+  return false
+}
+
 /**
  * Resolve a valid partner session. Touches lastActiveAt on mutations (idle sliding).
  * Returns null if missing / revoked / absolute expired / idle expired.
@@ -54,6 +64,10 @@ export async function resolvePartnerSession(
   const account = await ctx.db.get(session.accountId)
   if (!account || !account.active) return null
   if (!isPartnerCaisseRole(account.role)) return null
+
+  // m2 — marque désactivée → session invalide (pas d’accès caisse).
+  const partner = await ctx.db.get(account.partnerId)
+  if (!partner || !partner.active) return null
 
   if (opts?.touch && 'patch' in ctx.db) {
     await ctx.db.patch(session._id, { lastActiveAt: now })
