@@ -14,6 +14,14 @@ import type { Doc, Id } from './_generated/dataModel'
 import { requireSessionUser } from './lib/auth'
 import { createOpaqueToken } from './lib/authCrypto'
 import {
+  appendPartnerActionLog,
+  assertAdminConfirmed,
+  assertPartnerOwnsItem,
+  isPlayerAppSessionToken,
+  requirePartnerSession,
+  type PartnerSessionAccount,
+} from './lib/partnerAuth'
+import {
   assertNoForbiddenProFields,
   catalogItemIsAvailable,
   computeCreditGrant,
@@ -768,37 +776,460 @@ export const listMyCodes = query({
   },
 })
 
-/** Support / partner backoffice — admin session. */
+/**
+ * Partner caisse — lookup only (OP-F03, CA-OP6).
+ * Never consumes; never returns player balance / € / Force / Discipline.
+ */
+export type PartnerLookupResult =
+  | {
+      ok: true
+      status: Doc<'rewardsRedemptionCode'>['status'] | 'expired'
+      code: string
+      itemTitle: string
+      partnerName: string
+      partnerId: Id<'rewardsPartner'>
+      redemptionId: Id<'rewardsRedemptionCode'>
+      expiresAt: number
+      actionable: boolean
+    }
+  | { ok: false; error: string }
+
+export async function partnerLookupCodeCore(
+  ctx: SessionCtx,
+  input: {
+    account: PartnerSessionAccount
+    code: string
+    now?: number
+    log?: boolean
+  },
+): Promise<PartnerLookupResult> {
+  const now = input.now ?? Date.now()
+  const code = input.code.trim()
+  const row = await ctx.db
+    .query('rewardsRedemptionCode')
+    .withIndex('by_code', (q) => q.eq('code', code))
+    .first()
+
+  const log = async (
+    result: 'ok' | 'denied' | 'error',
+    errorCode?: string,
+    redemptionId?: Id<'rewardsRedemptionCode'>,
+    partnerId?: Id<'rewardsPartner'>,
+  ) => {
+    if (input.log === false) return
+    if (!('insert' in ctx.db)) return
+    await appendPartnerActionLog(ctx as MutationCtx, {
+      partnerId: partnerId ?? input.account.partnerId,
+      accountId: input.account.accountId,
+      role: input.account.role,
+      code,
+      redemptionId,
+      action: 'lookup',
+      result,
+      errorCode,
+      createdAt: now,
+    })
+  }
+
+  if (!row) {
+    await log('denied', 'REWARDS_CODE_NOT_FOUND')
+    return { ok: false, error: 'REWARDS_CODE_NOT_FOUND' }
+  }
+
+  const item = await ctx.db.get(row.itemId)
+  if (!item) {
+    await log('error', 'REWARDS_ITEM_MISSING', row._id)
+    return { ok: false, error: 'REWARDS_ITEM_MISSING' }
+  }
+
+  const ownership = assertPartnerOwnsItem(input.account, item.partnerId)
+  if (!ownership.ok) {
+    await log('denied', ownership.error, row._id, item.partnerId)
+    return { ok: false, error: ownership.error }
+  }
+
+  const partner = await ctx.db.get(item.partnerId)
+  const effectiveStatus =
+    row.status === 'expired' || row.expiresAt <= now ? 'expired' : row.status
+  if (row.status !== 'expired' && row.expiresAt <= now && 'patch' in ctx.db) {
+    await ctx.db.patch(row._id, { status: 'expired' })
+  }
+
+  const actionable =
+    (effectiveStatus === 'created' || effectiveStatus === 'shown') && row.expiresAt > now
+
+  await log('ok', undefined, row._id, item.partnerId)
+  return {
+    ok: true,
+    status: effectiveStatus,
+    code: row.code,
+    itemTitle: item.title,
+    partnerName: partner?.name ?? 'Partenaire',
+    partnerId: item.partnerId,
+    redemptionId: row._id,
+    expiresAt: row.expiresAt,
+    actionable,
+  }
+}
+
+export type PartnerMarkConsumedResult =
+  | { ok: true; status: 'consumed' }
+  | { ok: false; error: string }
+
+export async function partnerMarkConsumedGuarded(
+  ctx: MutationCtx,
+  input: {
+    account: PartnerSessionAccount
+    code: string
+    adminConfirmed?: boolean
+    now?: number
+  },
+): Promise<PartnerMarkConsumedResult> {
+  const now = input.now ?? Date.now()
+  const code = input.code.trim()
+
+  const confirm = assertAdminConfirmed(input.account, input.adminConfirmed)
+  if (!confirm.ok) {
+    await appendPartnerActionLog(ctx, {
+      partnerId: input.account.partnerId,
+      accountId: input.account.accountId,
+      role: input.account.role,
+      code,
+      action: 'consume',
+      result: 'denied',
+      errorCode: confirm.error,
+      adminConfirmed: input.adminConfirmed === true,
+      createdAt: now,
+    })
+    return { ok: false, error: confirm.error }
+  }
+
+  const row = await ctx.db
+    .query('rewardsRedemptionCode')
+    .withIndex('by_code', (q) => q.eq('code', code))
+    .first()
+  if (!row) {
+    await appendPartnerActionLog(ctx, {
+      partnerId: input.account.partnerId,
+      accountId: input.account.accountId,
+      role: input.account.role,
+      code,
+      action: 'consume',
+      result: 'denied',
+      errorCode: 'REWARDS_CODE_NOT_FOUND',
+      adminConfirmed: input.adminConfirmed === true,
+      createdAt: now,
+    })
+    return { ok: false, error: 'REWARDS_CODE_NOT_FOUND' }
+  }
+
+  const item = await ctx.db.get(row.itemId)
+  if (!item) {
+    await appendPartnerActionLog(ctx, {
+      partnerId: input.account.partnerId,
+      accountId: input.account.accountId,
+      role: input.account.role,
+      code,
+      redemptionId: row._id,
+      action: 'consume',
+      result: 'error',
+      errorCode: 'REWARDS_ITEM_MISSING',
+      adminConfirmed: input.adminConfirmed === true,
+      createdAt: now,
+    })
+    return { ok: false, error: 'REWARDS_ITEM_MISSING' }
+  }
+
+  const ownership = assertPartnerOwnsItem(input.account, item.partnerId)
+  if (!ownership.ok) {
+    await appendPartnerActionLog(ctx, {
+      partnerId: item.partnerId,
+      accountId: input.account.accountId,
+      role: input.account.role,
+      code,
+      redemptionId: row._id,
+      action: 'consume',
+      result: 'denied',
+      errorCode: ownership.error,
+      adminConfirmed: input.adminConfirmed === true,
+      createdAt: now,
+    })
+    return { ok: false, error: ownership.error }
+  }
+
+  const result = await markConsumedCore(ctx, { code, now })
+  await appendPartnerActionLog(ctx, {
+    partnerId: item.partnerId,
+    accountId: input.account.accountId,
+    role: input.account.role,
+    code,
+    redemptionId: row._id,
+    action: 'consume',
+    result: result.ok ? 'ok' : 'denied',
+    errorCode: result.ok ? undefined : result.error,
+    adminConfirmed: input.adminConfirmed === true,
+    createdAt: now,
+  })
+  return result
+}
+
+export type PartnerRefuseGuardedResult =
+  | PartnerRefuseResult
+  | { ok: false; error: string }
+
+export async function partnerRefuseGuarded(
+  ctx: MutationCtx,
+  input: {
+    account: PartnerSessionAccount
+    code: string
+    reason?: string
+    adminConfirmed?: boolean
+    now?: number
+  },
+): Promise<PartnerRefuseGuardedResult> {
+  const now = input.now ?? Date.now()
+  const code = input.code.trim()
+  const reason = (input.reason ?? '').trim()
+
+  const confirm = assertAdminConfirmed(input.account, input.adminConfirmed)
+  if (!confirm.ok) {
+    await appendPartnerActionLog(ctx, {
+      partnerId: input.account.partnerId,
+      accountId: input.account.accountId,
+      role: input.account.role,
+      code,
+      action: 'refuse',
+      result: 'denied',
+      errorCode: confirm.error,
+      reason: reason || undefined,
+      adminConfirmed: input.adminConfirmed === true,
+      createdAt: now,
+    })
+    return { ok: false, error: confirm.error }
+  }
+
+  const row = await ctx.db
+    .query('rewardsRedemptionCode')
+    .withIndex('by_code', (q) => q.eq('code', code))
+    .first()
+  if (!row) {
+    await appendPartnerActionLog(ctx, {
+      partnerId: input.account.partnerId,
+      accountId: input.account.accountId,
+      role: input.account.role,
+      code,
+      action: 'refuse',
+      result: 'denied',
+      errorCode: 'REWARDS_CODE_NOT_FOUND',
+      reason: reason || undefined,
+      adminConfirmed: input.adminConfirmed === true,
+      createdAt: now,
+    })
+    return { ok: false, error: 'REWARDS_CODE_NOT_FOUND' }
+  }
+
+  const item = await ctx.db.get(row.itemId)
+  if (!item) {
+    await appendPartnerActionLog(ctx, {
+      partnerId: input.account.partnerId,
+      accountId: input.account.accountId,
+      role: input.account.role,
+      code,
+      redemptionId: row._id,
+      action: 'refuse',
+      result: 'error',
+      errorCode: 'REWARDS_ITEM_MISSING',
+      reason: reason || undefined,
+      adminConfirmed: input.adminConfirmed === true,
+      createdAt: now,
+    })
+    return { ok: false, error: 'REWARDS_ITEM_MISSING' }
+  }
+
+  const ownership = assertPartnerOwnsItem(input.account, item.partnerId)
+  if (!ownership.ok) {
+    await appendPartnerActionLog(ctx, {
+      partnerId: item.partnerId,
+      accountId: input.account.accountId,
+      role: input.account.role,
+      code,
+      redemptionId: row._id,
+      action: 'refuse',
+      result: 'denied',
+      errorCode: ownership.error,
+      reason: reason || undefined,
+      adminConfirmed: input.adminConfirmed === true,
+      createdAt: now,
+    })
+    return { ok: false, error: ownership.error }
+  }
+
+  const result = await partnerRefuseCore(ctx, { code, reason, now })
+  await appendPartnerActionLog(ctx, {
+    partnerId: item.partnerId,
+    accountId: input.account.accountId,
+    role: input.account.role,
+    code,
+    redemptionId: row._id,
+    action: 'refuse',
+    result: result.ok ? 'ok' : 'denied',
+    errorCode: result.ok ? undefined : result.error,
+    reason: reason || undefined,
+    adminConfirmed: input.adminConfirmed === true,
+    createdAt: now,
+  })
+  return result
+}
+
+async function rejectIfPlayerToken(
+  ctx: SessionCtx,
+  partnerSessionToken: string,
+): Promise<{ ok: false; error: 'PARTNER_PLAYER_AUTH_REJECTED' } | null> {
+  if (await isPlayerAppSessionToken(ctx, partnerSessionToken)) {
+    return { ok: false, error: 'PARTNER_PLAYER_AUTH_REJECTED' }
+  }
+  return null
+}
+
+export const partnerLookupCode = query({
+  args: {
+    partnerSessionToken: v.string(),
+    code: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const playerReject = await rejectIfPlayerToken(ctx, args.partnerSessionToken)
+    if (playerReject) return playerReject
+    let account: PartnerSessionAccount
+    try {
+      account = await requirePartnerSession(ctx, args.partnerSessionToken, { touch: false })
+    } catch {
+      return { ok: false as const, error: 'PARTNER_AUTH_REQUIRED' }
+    }
+    // Queries cannot append logs — log via mutation companion when needed.
+    // Lookup itself is read-only; action log written from logLookup mutation below
+    // or skipped in pure query path. Spec wants logs: use mutation wrapper.
+    return partnerLookupCodeCore(ctx, { account, code: args.code, log: false })
+  },
+})
+
+/** Mutation wrapper so lookup is logged (append-only table). */
+export const partnerLookupCodeLogged = mutation({
+  args: {
+    partnerSessionToken: v.string(),
+    code: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const playerReject = await rejectIfPlayerToken(ctx, args.partnerSessionToken)
+    if (playerReject) return playerReject
+    let account: PartnerSessionAccount
+    try {
+      account = await requirePartnerSession(ctx, args.partnerSessionToken)
+    } catch {
+      return { ok: false as const, error: 'PARTNER_AUTH_REQUIRED' }
+    }
+    return partnerLookupCodeCore(ctx, { account, code: args.code, log: true })
+  },
+})
+
+/**
+ * Partner / rg_admin caisse — mark code consumed (OP-F04, CA-OP2, CA-OP8).
+ * Rejects player app sessions (CA-OP4). Requires partnerSessionToken — not joueur sessionToken.
+ */
 export const markConsumed = mutation({
   args: {
-    sessionToken: v.string(),
+    partnerSessionToken: v.string(),
     code: v.string(),
+    adminConfirmed: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const user = await requireSessionUser(ctx, args.sessionToken)
-    if (user.role !== 'admin') {
-      return { ok: false as const, error: 'REWARDS_ADMIN_REQUIRED' }
+    const playerReject = await rejectIfPlayerToken(ctx, args.partnerSessionToken)
+    if (playerReject) return playerReject
+    let account: PartnerSessionAccount
+    try {
+      account = await requirePartnerSession(ctx, args.partnerSessionToken)
+    } catch {
+      return { ok: false as const, error: 'PARTNER_AUTH_REQUIRED' }
     }
-    return markConsumedCore(ctx, { code: args.code })
+    return partnerMarkConsumedGuarded(ctx, {
+      account,
+      code: args.code,
+      adminConfirmed: args.adminConfirmed,
+    })
   },
 })
 
+/**
+ * Partner / rg_admin — refuse + recredit (OP-F05, CA-OP3, CA-OP8, §5.4).
+ * Joueur app must never call this (CA-OP4).
+ */
 export const partnerRefuse = mutation({
   args: {
-    sessionToken: v.string(),
+    partnerSessionToken: v.string(),
     code: v.string(),
-    reason: v.string(),
+    reason: v.optional(v.string()),
+    adminConfirmed: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const user = await requireSessionUser(ctx, args.sessionToken)
-    if (user.role !== 'admin') {
-      return { ok: false as const, error: 'REWARDS_ADMIN_REQUIRED' }
+    const playerReject = await rejectIfPlayerToken(ctx, args.partnerSessionToken)
+    if (playerReject) return playerReject
+    let account: PartnerSessionAccount
+    try {
+      account = await requirePartnerSession(ctx, args.partnerSessionToken)
+    } catch {
+      return { ok: false as const, error: 'PARTNER_AUTH_REQUIRED' }
     }
-    return partnerRefuseCore(ctx, { code: args.code, reason: args.reason })
+    return partnerRefuseGuarded(ctx, {
+      account,
+      code: args.code,
+      reason: args.reason,
+      adminConfirmed: args.adminConfirmed,
+    })
   },
 })
 
-/** Internal helpers for tests / support tooling without admin UI. */
+/** Historique caisse — actions de ce partnerId seulement (OP-F10). */
+export const listPartnerActionLog = query({
+  args: {
+    partnerSessionToken: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const playerReject = await rejectIfPlayerToken(ctx, args.partnerSessionToken)
+    if (playerReject) return playerReject
+    let account: PartnerSessionAccount
+    try {
+      account = await requirePartnerSession(ctx, args.partnerSessionToken, { touch: false })
+    } catch {
+      return { ok: false as const, error: 'PARTNER_AUTH_REQUIRED' }
+    }
+    const lim = Math.min(Math.max(args.limit ?? 50, 1), 200)
+    const rows = await ctx.db
+      .query('rewardsPartnerActionLog')
+      .withIndex('by_partner_time', (q) => q.eq('partnerId', account.partnerId))
+      .collect()
+    rows.sort((a, b) => b.createdAt - a.createdAt)
+    const mine =
+      account.role === 'rg_admin'
+        ? rows.slice(0, lim)
+        : rows.filter((r) => String(r.partnerId) === String(account.partnerId)).slice(0, lim)
+    return {
+      ok: true as const,
+      actions: mine.map((r) => ({
+        id: r._id,
+        code: r.code,
+        action: r.action,
+        result: r.result,
+        errorCode: r.errorCode ?? null,
+        reason: r.reason ?? null,
+        role: r.role,
+        adminConfirmed: r.adminConfirmed ?? false,
+        createdAt: r.createdAt,
+      })),
+    }
+  },
+})
+
+/** Internal helpers for tests / support tooling without partner UI. */
 export const markConsumedInternal = internalMutation({
   args: { code: v.string(), now: v.optional(v.number()) },
   handler: async (ctx, args) => markConsumedCore(ctx, args),
