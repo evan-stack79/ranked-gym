@@ -42,6 +42,7 @@ import {
   type RankedSex,
 } from './lib/rankedScience'
 import { findAuthUserByUserId, findProfileByUserId } from './lib/socialVisibility'
+import { creditFromDisciplineCore, onCycleCloseCore } from './rewards'
 
 type SessionCtx = QueryCtx | MutationCtx
 
@@ -1005,6 +1006,23 @@ export const onSessionCompleted = mutation({
     })
 
     const computed = await upsertDisciplineScore(ctx, user.userId, now, opt.pauseInjuryUntil)
+
+    // Partner rewards — post-validation Discipline only (RP-F02). Never touches Force/Discipline scores.
+    // Idempotent on (userId, discipline_session, sourceSessionId). Caps from rewardsEconomyConfig.
+    let rewardsGranted = 0
+    try {
+      const rewards = await creditFromDisciplineCore(ctx, {
+        userId: user.userId,
+        reason: 'discipline_session',
+        refId: sourceSessionId,
+        now,
+      })
+      if (rewards.ok) rewardsGranted = rewards.granted
+    } catch {
+      // Soft-fail: Discipline score already committed; rewards can catch up via idempotent retry later.
+      rewardsGranted = 0
+    }
+
     return {
       ok: true as const,
       pointsAdded,
@@ -1012,6 +1030,7 @@ export const onSessionCompleted = mutation({
       sessionsLast7d: computed.sessionsLast7d,
       streakWeeks: computed.streakWeeks,
       score: computed.score,
+      rewardsGranted,
     }
   },
 })
@@ -1492,11 +1511,22 @@ async function closeCycleCore(ctx: MutationCtx, now: number) {
     })
   }
 
+  // Partner rewards season reset (RP-05 / RP-13): zero wallet; leave issued codes alone.
+  // Never mutates Force/Discipline scores (already handled above).
+  let rewardsWalletsReset = 0
+  try {
+    const rewardsClose = await onCycleCloseCore(ctx, { cycleId: active._id, now })
+    rewardsWalletsReset = rewardsClose.walletsReset
+  } catch {
+    rewardsWalletsReset = 0
+  }
+
   return {
     ok: true as const,
     closedCycleId: active._id,
     newCycleId: newCycle._id,
     relocated,
     verifiedPrWiped: false as const,
+    rewardsWalletsReset,
   }
 }

@@ -31,11 +31,13 @@ import type * as nutrition from "../nutrition.js";
 import type * as profiles from "../profiles.js";
 import type * as purgeSupabaseMeals from "../purgeSupabaseMeals.js";
 import type * as ranked from "../ranked.js";
+import type * as rewards from "../rewards.js";
 import type * as rpc from "../rpc.js";
 import type * as social from "../social.js";
 import type * as sync from "../sync.js";
 import type * as lib_rankedAccess from "../lib/rankedAccess.js";
 import type * as lib_rankedScience from "../lib/rankedScience.js";
+import type * as lib_rewardsEconomy from "../lib/rewardsEconomy.js";
 
 import type {
   ApiFromModules,
@@ -60,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   "lib/migrationAdmin": typeof lib_migrationAdmin;
   "lib/rankedAccess": typeof lib_rankedAccess;
   "lib/rankedScience": typeof lib_rankedScience;
+  "lib/rewardsEconomy": typeof lib_rewardsEconomy;
   "lib/rateLimit": typeof lib_rateLimit;
   "lib/socialVisibility": typeof lib_socialVisibility;
   "lib/stripJournalMeals": typeof lib_stripJournalMeals;
@@ -69,6 +72,7 @@ declare const fullApi: ApiFromModules<{
   profiles: typeof profiles;
   purgeSupabaseMeals: typeof purgeSupabaseMeals;
   ranked: typeof ranked;
+  rewards: typeof rewards;
   rpc: typeof rpc;
   social: typeof social;
   sync: typeof sync;
