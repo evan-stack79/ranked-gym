@@ -115,3 +115,19 @@ Barèmes = **ordres de grandeur Product** pour caler « une semaine régulière 
 - Fiche MI : [Ranked Gym — récompenses partenaires](https://cursor.com/canvas/store-aa9032a9-934c-4804-8de3-398def72b0d6/81a03291-cfaf-4211-b290-309041c56a47)
 - `SPEC_RANKED.md` (RK-03, Discipline, soft reset)
 - Alerte Juriste 4/11/2026 : catalogue identique ; Pro cosmétique only
+
+---
+
+## OP — Outil partenaire (caisse marques)
+
+**Statut :** GO Evan 4/11/2026 via Studio Manager — lots OP-a/b/c (+ prep OP-d) en code.  
+**Source de vérité :** `docs/ARCHI_OUTIL_PARTENAIRE.md` · `docs/ARCHI_REWARDS_PARTENAIRES.md` §5.4 · `docs/PARTNER_TOOL_DEPLOY.md`.
+
+### OP.0
+Page web privée hors app joueur : code cadeau → **Oui, donné** (`rewards.markConsumed`) / **Non, rupture** (`rewards.partnerRefuse` + recrédit). Joueur ne se recrédit pas.
+
+### OP.1 Décisions
+OP-01…09 : web privée · VPS 2ᵉ vhost · auth partenaire · flow caisse · markConsumed / partnerRefuse · anti-triche · stock = partenaire · RK-03 inchangé.
+
+### Critères CA-OP1…9
+Voir `docs/ARCHI_OUTIL_PARTENAIRE.md` §7. App : `partner-tool/` (hors bundle Capacitor).
