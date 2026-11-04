@@ -23,7 +23,7 @@ Sources : MI canvas `98062d04…` ; GO Marketing P0 ; décisions Evan ; `/worksp
 |----------|--------|
 | Force + Discipline en P0 | Oui |
 | Barème public | Oui |
-| Jamais pay-to-win | Oui |
+| Zéro P2W (Force/Discipline/saisons progression ; Pass/coins = cosmétique) | Oui (RK-03) |
 | Plafonds + anomalies + badge Vérifié | Oui (§4.3) |
 | Ligues + soft reset P0 | Oui (§4.4) |
 | Saisons formelles / clans / B2B | P1 |
@@ -42,7 +42,7 @@ Classement musculation fiable — **Ranked Force** + **Ranked Discipline**, mét
 ## 3. Charte
 - RK-01 : Performance only — jamais apparence.
 - RK-02 : Ranked compétitif = **18+** (serveur).
-- RK-03 : Jamais pay-to-win sur le rang.
+- RK-03 : **Zéro P2W (règle absolue Evan, 29/10/2026)** — Ranked Force, Ranked Discipline, ligues/soft reset et **saisons de progression** = jamais payants, jamais boostés (Pass, gym coins, promo). Gym coins + Pass = **cosmétique only**. Toute feature perf/classement = **validation anti-P2W** (PM + Studio) avant implémentation.
 - RK-04 : Opt-in / opt-out.
 - RK-05 : Pseudo + avatar seulement dans les classements.
 - RK-06 : Formules → Vérificateur avant code.
@@ -79,7 +79,8 @@ Hors Force P0 : isolations, machines, curls, et tout autre mouvement non listé 
 - Ligues / divisions Ranked Force (noms distincts du cosmétique Bronze→Légende).
 - Soft reset fin de cycle (~6–8 sem) + promo/relégation conceptuelle.
 - Rang figé forever **interdit**.
-- Saison formelle (branding, event, passe) = **P1**.
+- Saison formelle (branding, event, passe cosmétique) = **P1** — ne modifie pas Force/Discipline.
+- Progression compétitive (ligues / soft reset) = **toujours free** (RK-03).
 
 ### 4.5 Amis + salle — découpage réaliste (Q3)
 Evan veut **amis + salle si possible**. Google Places + présence = lourd (ARCHI_CLASSEMENT_SALLE : quotas, privacy, point salle).
@@ -108,7 +109,7 @@ Cœur gratuit. Écarts : offline partiel ; import Hevy/Strong absent ; export à
 5. Plafonds + anomalies + badge Vérifié (§4.3).
 6. Ligues + soft reset.
 7. Classement **amis** (P0) ; salle = P0-bis.
-8. Jamais pay-to-win ; 18+ ; perf only.
+8. Zéro P2W (RK-03) ; 18+ ; perf only.
 
 ## 6. P1
 Saisons formelles, salle/inter-salles (si pas P0-bis), clans, vidéo PR.
@@ -136,3 +137,9 @@ Prochaine étape : GO Studio Manager → Architecte / Dev. PM n’écrit pas de 
 - CA6 : Soft reset fin de cycle.
 - CA7 : Discipline visible (séances/sem ou streak).
 - CA8 : Classement amis fonctionne ; salle absente du P0 = documentée si P0-bis reporté.
+
+## 8. Delta UX P0bis (brouillon partiel)
+Voir `/workspace/ranked_gym/docs/SPEC_UX_RANKED_P0bis.md` — Hub = **route de rangs** (logique) · **entrée = carte Accueil** (Q1bis figée) · Q2 auto figé · Q3 Alim en attente description. Mock UI plus tard. SPEC UX non figée tant que Alim non tranché.
+
+## 9. Récompenses partenaires (hors scores compétitifs)
+Voir `/workspace/ranked_gym/docs/PRD.md` **RP v0.1 FIGÉ** (Evan 4/11 : GO Archi — pas de code) — catalogue identique free/Pro ; Pro cosmétique hors lots ; points sans valeur monétaire ; codes uniques + recrédit ; reset annoncé ; boutique ≠ Force/Discipline (RK-03). Brief Archi = Studio.

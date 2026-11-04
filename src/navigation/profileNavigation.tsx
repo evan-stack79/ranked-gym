@@ -18,6 +18,7 @@ export type ProfileRoute =
   | 'energyInfo'
   | 'giveFeedback'
   | 'ranked'
+  | 'boutiquePartenaires'
 
 interface ProfileNavigationContextValue {
   route: ProfileRoute

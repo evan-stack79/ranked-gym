@@ -762,6 +762,108 @@ export const convexTables = {
   })
     .index('by_userId', ['userId'])
     .index('by_user_time', ['userId', 'completedAt']),
+
+  /**
+   * Points partenaires / boutique cadeaux (ARCHI_REWARDS_PARTENAIRES).
+   * Wallet séparé de Force/Discipline. Interdit : proOnly, earlyAccessPro, minPlan,
+   * pointMultiplier, capBonus. userId = auth string (comme ranked*).
+   */
+  rewardsWallet: defineTable({
+    userId: v.string(),
+    cycleId: v.id('rankedCycle'),
+    balance: v.number(),
+    earnedToday: v.number(),
+    earnedTodayDate: v.string(),
+    earnedThisCycle: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_user_cycle', ['userId', 'cycleId'])
+    .index('by_cycleId', ['cycleId']),
+
+  rewardsLedger: defineTable({
+    userId: v.string(),
+    cycleId: v.id('rankedCycle'),
+    delta: v.number(),
+    reason: v.union(
+      v.literal('discipline_session'),
+      v.literal('week_objective'),
+      v.literal('redeem'),
+      v.literal('season_reset'),
+      v.literal('partner_refuse_recredit'),
+      v.literal('admin_adjust'),
+    ),
+    refId: v.optional(v.string()),
+    createdAt: v.number(),
+    balanceAfter: v.number(),
+  })
+    .index('by_user_time', ['userId', 'createdAt'])
+    .index('by_user_reason_ref', ['userId', 'reason', 'refId'])
+    .index('by_cycleId', ['cycleId']),
+
+  rewardsPartner: defineTable({
+    slug: v.string(),
+    name: v.string(),
+    active: v.boolean(),
+  }).index('by_slug', ['slug']),
+
+  rewardsCatalogItem: defineTable({
+    partnerId: v.id('rewardsPartner'),
+    categoryId: v.union(
+      v.literal('RP-CAT-01'),
+      v.literal('RP-CAT-02'),
+      v.literal('RP-CAT-03'),
+      v.literal('RP-CAT-04'),
+      v.literal('RP-CAT-05'),
+    ),
+    title: v.string(),
+    costPoints: v.number(),
+    stockLogical: v.number(),
+    active: v.boolean(),
+    availableFrom: v.number(),
+    availableTo: v.optional(v.number()),
+    sortOrder: v.number(),
+  })
+    .index('by_partnerId', ['partnerId'])
+    .index('by_active_sort', ['active', 'sortOrder'])
+    .index('by_categoryId', ['categoryId']),
+
+  rewardsRedemptionCode: defineTable({
+    code: v.string(),
+    userId: v.string(),
+    itemId: v.id('rewardsCatalogItem'),
+    costPoints: v.number(),
+    status: v.union(
+      v.literal('created'),
+      v.literal('shown'),
+      v.literal('consumed'),
+      v.literal('expired'),
+      v.literal('partner_refused'),
+      v.literal('invalidated'),
+    ),
+    cycleId: v.id('rankedCycle'),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    shownAt: v.optional(v.number()),
+    consumedAt: v.optional(v.number()),
+    partnerRefuseAt: v.optional(v.number()),
+    partnerRefuseReason: v.optional(v.string()),
+    recreditLedgerId: v.optional(v.id('rewardsLedger')),
+  })
+    .index('by_code', ['code'])
+    .index('by_userId', ['userId'])
+    .index('by_user_created', ['userId', 'createdAt'])
+    .index('by_itemId', ['itemId'])
+    .index('by_status', ['status']),
+
+  rewardsEconomyConfig: defineTable({
+    ptsPerValidatedSession: v.number(),
+    ptsPerWeekObjective: v.number(),
+    dailyCap: v.number(),
+    seasonCap: v.number(),
+    codeTtlMs: v.number(),
+    activeFrom: v.number(),
+  }).index('by_activeFrom', ['activeFrom']),
 }
 
 export default defineSchema(convexTables)

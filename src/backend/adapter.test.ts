@@ -66,6 +66,12 @@ const PHASE_E_TABLES = [
   'rankedFriendship',
   'rankedVerifyRequest',
   'rankedSessionCompletion',
+  'rewardsWallet',
+  'rewardsLedger',
+  'rewardsPartner',
+  'rewardsCatalogItem',
+  'rewardsRedemptionCode',
+  'rewardsEconomyConfig',
 ] as const
 
 describe('Convex Phase A feature flag', () => {
