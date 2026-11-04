@@ -10,6 +10,7 @@ import {
   Pencil,
   Settings2,
   Shield,
+  Gift,
   Trophy,
   UserRound,
 } from 'lucide-react'
@@ -44,6 +45,7 @@ export type SettingsMenuId =
   | 'energyInfo'
   | 'giveFeedback'
   | 'ranked'
+  | 'boutiquePartenaires'
 
 interface SettingsScreenProps {
   username: string
@@ -60,6 +62,7 @@ interface SettingsScreenProps {
   onOpenEnergyInfo?: () => void
   onOpenGiveFeedback?: () => void
   onOpenRanked?: () => void
+  onOpenBoutiquePartenaires?: () => void
   onRequireAuth?: () => void
   onTryPro?: () => void
   onDisciplineChange?: (disciplineLabel: string) => void
@@ -99,6 +102,7 @@ export function SettingsScreen({
   onOpenEnergyInfo,
   onOpenGiveFeedback,
   onOpenRanked,
+  onOpenBoutiquePartenaires,
   onRequireAuth,
   onTryPro,
   onDisciplineChange,
@@ -192,6 +196,7 @@ export function SettingsScreen({
       items: [
         { id: 'personal', icon: UserRound, label: 'Informations personnelles' },
         { id: 'ranked', icon: Trophy, label: 'Ranked Force / Discipline' },
+        { id: 'boutiquePartenaires', icon: Gift, label: 'Boutique partenaires' },
         { id: 'privacy', icon: Shield, label: 'Sécurité & Confidentialité' },
         { id: 'healthSituations', icon: HeartHandshake, label: 'Situations de santé' },
         { id: 'energyInfo', icon: Info, label: 'Informations' },
@@ -320,6 +325,15 @@ export function SettingsScreen({
                       if (item.id === 'ranked') {
                         // CA5 — ouvrir le hub / barème même hors connexion.
                         onOpenRanked?.()
+                        return
+                      }
+                      if (item.id === 'boutiquePartenaires') {
+                        // RP-F09 / RK-03 — entrée hors hub scores Force/Discipline.
+                        if (!isAuthenticated) {
+                          onRequireAuth?.()
+                          return
+                        }
+                        onOpenBoutiquePartenaires?.()
                         return
                       }
                       if (item.id === 'healthSituations') {

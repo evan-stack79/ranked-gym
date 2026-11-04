@@ -17,6 +17,7 @@ import {
 } from '../settings/HealthSituationsForm'
 import { FullProfileScreen } from './FullProfileScreen'
 import { RankedScreens } from '../ranked/RankedScreens'
+import { BoutiquePartenairesScreen } from '../rewards/BoutiquePartenairesScreen'
 import { useAuth } from '../../context/AuthContext'
 import {
   getCalorieProfile,
@@ -292,6 +293,26 @@ function ProfileViewContent() {
     return <RankedScreens onBack={goBack} />
   }
 
+  if (route === 'boutiquePartenaires') {
+    // RP-F09 — boutique hors hub Ranked ; auth required (entry gated in Settings).
+    if (!isAuthenticated || !user) {
+      return (
+        <div className="flex flex-col gap-4 pb-4 ios-fade-up">
+          <SettingsScreen
+            username="Invité"
+            isAuthenticated={false}
+            onRequireAuth={() => requireAuth(() => navigate('boutiquePartenaires'))}
+            onOpenRanked={() => navigate('ranked')}
+            onOpenBoutiquePartenaires={() =>
+              requireAuth(() => navigate('boutiquePartenaires'))
+            }
+          />
+        </div>
+      )
+    }
+    return <BoutiquePartenairesScreen onBack={goBack} />
+  }
+
   if (!isAuthenticated || !user) {
     return (
       <div className="flex flex-col gap-6 pb-4 ios-fade-up">
@@ -308,6 +329,9 @@ function ProfileViewContent() {
           onOpenEnergyInfo={() => navigate('energyInfo')}
           onOpenGiveFeedback={() => requireAuth(() => navigate('giveFeedback'))}
           onOpenRanked={() => navigate('ranked')}
+          onOpenBoutiquePartenaires={() =>
+            requireAuth(() => navigate('boutiquePartenaires'))
+          }
         />
         <CloudBackupCard />
       </div>
@@ -335,6 +359,7 @@ function ProfileViewContent() {
         onOpenEnergyInfo={() => navigate('energyInfo')}
         onOpenGiveFeedback={() => navigate('giveFeedback')}
         onOpenRanked={() => navigate('ranked')}
+        onOpenBoutiquePartenaires={() => navigate('boutiquePartenaires')}
         onRequireAuth={() => requireAuth(() => undefined)}
         onDisciplineChange={(label) => {
           setDisciplineId(disciplineFromLabel(label))
