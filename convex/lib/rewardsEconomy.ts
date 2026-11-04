@@ -111,3 +111,12 @@ export function catalogItemIsAvailable(
   if (item.availableTo != null && item.availableTo <= now) return false
   return true
 }
+
+/**
+ * Studio QA M2 — only grant partner points when Discipline actually scored the session
+ * (`pointsAdded > 0`). 6th+ session in the 7d window (Discipline weekly cap) → no rewards credit.
+ * Rewards dailyCap 50 remains independent.
+ */
+export function shouldGrantRewardsForDisciplinePoints(pointsAdded: number): boolean {
+  return pointsAdded > 0
+}

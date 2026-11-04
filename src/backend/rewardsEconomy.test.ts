@@ -7,6 +7,7 @@ import {
   rateForCreditReason,
   REWARDS_ECONOMY_SEED,
   REWARDS_FORBIDDEN_PRO_FIELDS,
+  shouldGrantRewardsForDisciplinePoints,
   utcDateString,
 } from '../../convex/lib/rewardsEconomy'
 
@@ -154,5 +155,13 @@ describe('catalog availability', () => {
 describe('utcDateString', () => {
   it('formats YYYY-MM-DD UTC', () => {
     expect(utcDateString(Date.parse('2026-11-04T23:30:00.000Z'))).toBe('2026-11-04')
+  })
+})
+
+describe('M2 shouldGrantRewardsForDisciplinePoints', () => {
+  it('credits only when Discipline pointsAdded > 0 (not 6th+ capped session)', () => {
+    expect(shouldGrantRewardsForDisciplinePoints(1)).toBe(true)
+    expect(shouldGrantRewardsForDisciplinePoints(0)).toBe(false)
+    expect(shouldGrantRewardsForDisciplinePoints(-1)).toBe(false)
   })
 })

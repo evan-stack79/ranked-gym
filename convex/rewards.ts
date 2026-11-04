@@ -355,11 +355,19 @@ export async function markConsumedCore(
 }
 
 export type PartnerRefuseResult =
-  | { ok: true; recredited: number; balance: number }
+  | {
+      ok: true
+      recredited: number
+      balance: number
+      recreditCycleId: Id<'rankedCycle'>
+      priorCycleCode: boolean
+    }
   | { ok: false; error: string }
 
 /**
  * RP-14 — recredit even if seasonCap; do NOT bump earnedThisCycle.
+ * Studio QA M1: always credit the **active** cycle wallet (not the code's emission cycle),
+ * so a prior-season refuse still tops up the current season balance.
  */
 export async function partnerRefuseCore(
   ctx: MutationCtx,
@@ -379,7 +387,17 @@ export async function partnerRefuseCore(
     return { ok: false, error: 'REWARDS_CODE_EXPIRED' }
   }
 
-  const wallet = await ensureWalletForCycle(ctx, row.userId, row.cycleId, now)
+  const activeCycle = await getActiveCycle(ctx)
+  if (!activeCycle) return { ok: false, error: 'REWARDS_NO_ACTIVE_CYCLE' }
+
+  const priorCycleCode = String(row.cycleId) !== String(activeCycle._id)
+  const baseReason = input.reason.trim().slice(0, 400) || 'partner_refuse'
+  const refuseReason = priorCycleCode
+    ? `${baseReason} | prior_cycle:${String(row.cycleId)}`
+    : baseReason
+
+  // Active-season wallet only (M1) — never leave the recredit stuck on a closed cycle.
+  const wallet = await ensureWalletForCycle(ctx, row.userId, activeCycle._id, now)
   const balanceAfter = wallet.balance + row.costPoints
   await ctx.db.patch(wallet._id, {
     balance: balanceAfter,
@@ -388,7 +406,7 @@ export async function partnerRefuseCore(
 
   const ledgerId = await ctx.db.insert('rewardsLedger', {
     userId: row.userId,
-    cycleId: row.cycleId,
+    cycleId: activeCycle._id,
     delta: row.costPoints,
     reason: 'partner_refuse_recredit',
     refId: String(row._id),
@@ -399,13 +417,19 @@ export async function partnerRefuseCore(
   await ctx.db.patch(row._id, {
     status: 'partner_refused',
     partnerRefuseAt: now,
-    partnerRefuseReason: input.reason.trim().slice(0, 500) || 'partner_refuse',
+    partnerRefuseReason: refuseReason.slice(0, 500),
     recreditLedgerId: ledgerId,
   })
   // Then invalidate (terminal).
   await ctx.db.patch(row._id, { status: 'invalidated' })
 
-  return { ok: true, recredited: row.costPoints, balance: balanceAfter }
+  return {
+    ok: true,
+    recredited: row.costPoints,
+    balance: balanceAfter,
+    recreditCycleId: activeCycle._id,
+    priorCycleCode,
+  }
 }
 
 export type OnCycleCloseResult = {

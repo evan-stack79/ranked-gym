@@ -275,6 +275,8 @@ describe('rewards module cores (CA-RP*)', () => {
     expect(refused.ok).toBe(true)
     if (!refused.ok) return
     expect(refused.recredited).toBe(100)
+    expect(refused.ok && refused.priorCycleCode).toBe(false)
+    expect(refused.ok && refused.recreditCycleId).toBe(cycleId)
     const wallet = db.table('rewardsWallet')[0]
     expect(wallet?.balance).toBe(100)
     expect(wallet?.earnedThisCycle).toBe(1200)
@@ -284,6 +286,87 @@ describe('rewards module cores (CA-RP*)', () => {
     expect(
       db.table('rewardsLedger').some((r) => r.reason === 'partner_refuse_recredit'),
     ).toBe(true)
+  })
+
+  it('M1: partnerRefuse on prior-cycle code recredits active wallet', async () => {
+    const now = Date.parse('2026-11-04T10:00:00.000Z')
+    const db = new FakeDb()
+    const oldCycleId = (await db.insert('rankedCycle', {
+      startsAt: now - 60 * 86_400_000,
+      endsAt: now - 1000,
+      status: 'closed',
+    })) as Id<'rankedCycle'>
+    const activeCycleId = (await db.insert('rankedCycle', {
+      startsAt: now - 500,
+      endsAt: now + 40 * 86_400_000,
+      status: 'active',
+    })) as Id<'rankedCycle'>
+
+    await seedDevCatalogCore(ctxOf(db), { now })
+    const item = db.table('rewardsCatalogItem').find((r) => r.costPoints === 100)!
+
+    // Old-season wallet emptied by redeem; active wallet starts at 0.
+    await db.insert('rewardsWallet', {
+      userId: 'u1',
+      cycleId: oldCycleId,
+      balance: 0,
+      earnedToday: 0,
+      earnedTodayDate: '2026-10-01',
+      earnedThisCycle: 0,
+      updatedAt: now - 2000,
+    })
+    await db.insert('rewardsWallet', {
+      userId: 'u1',
+      cycleId: activeCycleId,
+      balance: 0,
+      earnedToday: 0,
+      earnedTodayDate: '2026-11-04',
+      earnedThisCycle: 0,
+      updatedAt: now,
+    })
+
+    const code = 'RG-PRIORCYCLECODE01'
+    await db.insert('rewardsRedemptionCode', {
+      code,
+      userId: 'u1',
+      itemId: item._id,
+      costPoints: 100,
+      status: 'shown',
+      cycleId: oldCycleId,
+      createdAt: now - 10_000,
+      expiresAt: now + 20 * 86_400_000,
+      shownAt: now - 9000,
+    })
+
+    const refused = await partnerRefuseCore(ctxOf(db), {
+      code,
+      reason: 'caisse_bug',
+      now: now + 50,
+    })
+    expect(refused.ok).toBe(true)
+    if (!refused.ok) return
+    expect(refused.recredited).toBe(100)
+    expect(refused.priorCycleCode).toBe(true)
+    expect(refused.recreditCycleId).toBe(activeCycleId)
+    expect(refused.balance).toBe(100)
+
+    const oldWallet = db.table('rewardsWallet').find((w) => w.cycleId === oldCycleId)
+    const activeWallet = db.table('rewardsWallet').find((w) => w.cycleId === activeCycleId)
+    expect(oldWallet?.balance).toBe(0)
+    expect(activeWallet?.balance).toBe(100)
+    expect(activeWallet?.earnedThisCycle).toBe(0)
+
+    const ledger = db
+      .table('rewardsLedger')
+      .find((r) => r.reason === 'partner_refuse_recredit')
+    expect(ledger?.cycleId).toBe(activeCycleId)
+    expect(ledger?.delta).toBe(100)
+
+    const codeRow = db.table('rewardsRedemptionCode')[0]
+    expect(codeRow?.status).toBe('invalidated')
+    expect(String(codeRow?.partnerRefuseReason)).toContain('prior_cycle:')
+    expect(String(codeRow?.partnerRefuseReason)).toContain(String(oldCycleId))
+    expect(String(codeRow?.partnerRefuseReason)).toContain('caisse_bug')
   })
 
   it('CA-RP4: season reset zeros balance; codes remain', async () => {
@@ -370,5 +453,7 @@ describe('rewards anti-P2W source scan', () => {
     expect(ranked).toContain('creditFromDisciplineCore')
     expect(ranked).toContain('onCycleCloseCore')
     expect(ranked).toContain('rewardsGranted')
+    expect(ranked).toContain('shouldGrantRewardsForDisciplinePoints')
+    expect(ranked).toContain('console.error')
   })
 })
