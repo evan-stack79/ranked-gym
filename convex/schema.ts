@@ -864,6 +864,78 @@ export const convexTables = {
     codeTtlMs: v.number(),
     activeFrom: v.number(),
   }).index('by_activeFrom', ['activeFrom']),
+
+  /**
+   * Partner tool auth (ARCHI_OUTIL_PARTENAIRE §3.1) — separate from player auth_users.
+   * No SSO joueur → outil.
+   */
+  rewardsPartnerAccount: defineTable({
+    email: v.string(),
+    passwordHash: v.string(),
+    partnerId: v.id('rewardsPartner'),
+    role: v.union(
+      v.literal('partner_staff'),
+      v.literal('partner_admin'),
+      v.literal('rg_admin'),
+    ),
+    active: v.boolean(),
+    createdAt: v.number(),
+    lastLoginAt: v.optional(v.number()),
+  })
+    .index('by_email', ['email'])
+    .index('by_partnerId', ['partnerId'])
+    .index('by_partner_role', ['partnerId', 'role']),
+
+  rewardsPartnerInvite: defineTable({
+    tokenHash: v.string(),
+    partnerId: v.id('rewardsPartner'),
+    role: v.union(v.literal('partner_staff'), v.literal('partner_admin')),
+    email: v.optional(v.string()),
+    expiresAt: v.number(),
+    usedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    createdByAccountId: v.optional(v.id('rewardsPartnerAccount')),
+  })
+    .index('by_tokenHash', ['tokenHash'])
+    .index('by_partnerId', ['partnerId']),
+
+  rewardsPartnerSession: defineTable({
+    accountId: v.id('rewardsPartnerAccount'),
+    tokenHash: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    lastActiveAt: v.number(),
+    revokedAt: v.optional(v.number()),
+  })
+    .index('by_tokenHash', ['tokenHash'])
+    .index('by_accountId', ['accountId']),
+
+  /** Append-only caisse action log (ARCHI_OUTIL_PARTENAIRE §5). */
+  rewardsPartnerActionLog: defineTable({
+    partnerId: v.id('rewardsPartner'),
+    accountId: v.id('rewardsPartnerAccount'),
+    role: v.string(),
+    code: v.string(),
+    redemptionId: v.optional(v.id('rewardsRedemptionCode')),
+    action: v.union(
+      v.literal('lookup'),
+      v.literal('consume'),
+      v.literal('refuse'),
+    ),
+    result: v.union(
+      v.literal('ok'),
+      v.literal('denied'),
+      v.literal('error'),
+    ),
+    errorCode: v.optional(v.string()),
+    reason: v.optional(v.string()),
+    adminConfirmed: v.optional(v.boolean()),
+    createdAt: v.number(),
+    ipHash: v.optional(v.string()),
+  })
+    .index('by_partner_time', ['partnerId', 'createdAt'])
+    .index('by_account_time', ['accountId', 'createdAt'])
+    .index('by_code', ['code']),
 }
 
 export default defineSchema(convexTables)
