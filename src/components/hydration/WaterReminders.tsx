@@ -1,5 +1,10 @@
 import { useState } from 'react'
-import { DEFAULT_REMINDER_TIMES, REMINDERS_MAX_PER_DAY } from '../../shared/hydration'
+import {
+  DEFAULT_REMINDER_TIMES,
+  MSG_REMINDER_PAUSE_GOAL,
+  MSG_REMINDER_PAUSE_NEUTRAL,
+  REMINDERS_MAX_PER_DAY,
+} from '../../shared/hydration'
 import {
   defaultReminderTimes,
   sanitizeReminderTimes,
@@ -10,6 +15,8 @@ interface WaterRemindersProps {
   enabled: boolean
   times: string[]
   goalReachedToday: boolean
+  /** M7 — mineurs / âge inconnu : pause neutre, jamais « objectif » / réussite. */
+  useRepereCopy?: boolean
   onChange: (next: { enabled: boolean; times: string[] }) => void
 }
 
@@ -17,6 +24,7 @@ export function WaterReminders({
   enabled,
   times,
   goalReachedToday,
+  useRepereCopy = false,
   onChange,
 }: WaterRemindersProps) {
   const [error, setError] = useState<string | null>(null)
@@ -82,8 +90,11 @@ export function WaterReminders({
         Créneaux : {(displayTimes.length ? displayTimes : DEFAULT_REMINDER_TIMES).join(' · ')}
       </p>
       {goalReachedToday && enabled ? (
-        <p className="text-[12px] text-[#C7C7CC]">
-          Objectif du jour atteint — les rappels restants sont en pause jusqu’à demain.
+        <p
+          className="text-[12px] text-[#C7C7CC]"
+          data-hydration-reminder-pause={useRepereCopy ? 'repere' : 'goal'}
+        >
+          {useRepereCopy ? MSG_REMINDER_PAUSE_NEUTRAL : MSG_REMINDER_PAUSE_GOAL}
         </p>
       ) : null}
       {error ? <p className="text-[12px] text-[#C7C7CC]">{error}</p> : null}

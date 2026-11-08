@@ -19,7 +19,14 @@ import {
 } from '../../services/hydration/faceRefuse'
 import { getCalorieProfile } from '../../services/nutritionStorage'
 import { isMinorOrUnknownAge } from '../../services/nutritionSafetyRules'
-import { GOAL_DEFAULT_ML, localDayKey, type HydrationMode } from '../../shared/hydration'
+import {
+  GOAL_DEFAULT_ML,
+  LABEL_REPERE_JOUR,
+  MSG_MINOR_PERMANENT,
+  MSG_REPERE_LOCKED,
+  localDayKey,
+  type HydrationMode,
+} from '../../shared/hydration'
 
 interface WaterSettingsSheetProps {
   open: boolean
@@ -136,9 +143,12 @@ export function WaterSettingsSheet({ open, onClose }: WaterSettingsSheetProps) {
             />
             {minorLocked ? (
               <div data-hydration-goal-locked className="space-y-1">
-                <p className="text-[15px] font-semibold text-white">Objectif du jour</p>
-                <p className="text-[13px] text-[#ACB4BA]">
-                  Objectif par défaut — non modifiable ici.
+                <p className="text-[15px] font-semibold text-white">{LABEL_REPERE_JOUR}</p>
+                <p className="text-[13px] text-[#ACB4BA]" data-hydration-repere-locked>
+                  {MSG_REPERE_LOCKED}
+                </p>
+                <p className="text-[12px] leading-snug text-[#8E8E93]" data-hydration-minor-permanent>
+                  {MSG_MINOR_PERMANENT}
                 </p>
               </div>
             ) : (
@@ -151,6 +161,7 @@ export function WaterSettingsSheet({ open, onClose }: WaterSettingsSheetProps) {
               enabled={today?.remindersEnabled ?? false}
               times={today?.reminderTimes ?? []}
               goalReachedToday={Boolean(today && today.drunkMl >= today.goalMl)}
+              useRepereCopy={minorLocked}
               onChange={(next) => {
                 void (async () => {
                   await updateHydrationSettings({

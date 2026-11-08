@@ -2,11 +2,15 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   fillRatio,
   formatDrunkLabel,
+  formatLitersFr,
   formatRemainingLabel,
   GOAL_DEFAULT_ML,
   LABEL_EAU_BUE_SEULE,
+  LABEL_REPERE_JOUR,
   MSG_HIGH_INFO,
+  MSG_MINOR_PERMANENT,
   MSG_PERMANENT,
+  MSG_REPERE_LOCKED,
   MSG_SPORT_HEAT,
   quickAddAmountMl,
   localDayKey,
@@ -113,6 +117,7 @@ export function WaterCard({ compact = false, onOpenSettings, className = '' }: W
 
   const goalMl = minorLocked ? GOAL_DEFAULT_ML : today.goalMl
   const ratio = fillRatio(goalMl, today.drunkMl)
+  const repereLabel = `${LABEL_REPERE_JOUR} · ${formatLitersFr(goalMl)}`
 
   return (
     <div
@@ -134,8 +139,13 @@ export function WaterCard({ compact = false, onOpenSettings, className = '' }: W
             <p className="text-[11px] font-medium text-[#8E8E93]">{LABEL_EAU_BUE_SEULE}</p>
           </div>
           {minorLocked ? (
-            <p className="mt-0.5 text-[15px] font-semibold text-white" data-hydration-minor-copy>
-              Suivi simple de l&apos;eau du jour
+            <p
+              className="mt-0.5 text-[15px] font-semibold tabular-nums text-white"
+              data-hydration-minor-copy
+              data-hydration-repere
+              aria-label={repereLabel}
+            >
+              {repereLabel}
             </p>
           ) : (
             <p className="mt-0.5 text-[15px] font-semibold tabular-nums text-white" data-hydration-remaining>
@@ -145,7 +155,14 @@ export function WaterCard({ compact = false, onOpenSettings, className = '' }: W
           <p className="text-[13px] tabular-nums text-[#ACB4BA]" data-hydration-drunk>
             {formatDrunkLabel(today.drunkMl)}
           </p>
-          {!compact && !minorLocked ? (
+          {minorLocked ? (
+            <p
+              className="mt-2 text-[12px] leading-snug text-[#8E8E93]"
+              data-hydration-minor-permanent
+            >
+              {MSG_MINOR_PERMANENT}
+            </p>
+          ) : !compact ? (
             <p className="mt-2 text-[12px] leading-snug text-[#8E8E93]">{MSG_PERMANENT}</p>
           ) : null}
           {today.showHighInfo && !minorLocked ? (
@@ -158,7 +175,7 @@ export function WaterCard({ compact = false, onOpenSettings, className = '' }: W
           ) : null}
           {minorLocked ? (
             <p className="mt-2 text-[12px] leading-snug text-[#8E8E93]" data-hydration-minor-note>
-              L&apos;objectif n&apos;est pas réglable ici.
+              {MSG_REPERE_LOCKED}
             </p>
           ) : null}
         </div>
