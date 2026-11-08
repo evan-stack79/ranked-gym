@@ -7,7 +7,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { WorkoutNotebook } from './WorkoutNotebook'
-import type { ExerciseEntry, WorkoutNote, WorkoutRoutine } from '../../types/training'
+import type { ExerciseEntry, WorkoutRoutine } from '../../types/training'
 
 vi.mock('../../backend/trainingFeatureFlags', () => ({
   isAutoSetValidationEnabled: () => false,
@@ -72,6 +72,8 @@ function makeRoutine(exercises: ExerciseEntry[]): WorkoutRoutine {
   }
 }
 
+type SavePayload = { exercises: Array<{ sets: Array<{ weightKg: number; reps: number }> }> }
+
 describe('WorkoutNotebook Terminer / blur bounds (M1)', () => {
   let host: HTMLDivElement
   let root: Root
@@ -87,7 +89,7 @@ describe('WorkoutNotebook Terminer / blur bounds (M1)', () => {
     host.remove()
   })
 
-  async function renderNotebook(onSave: (note: WorkoutNote) => void | Promise<void>) {
+  async function renderNotebook(onSave: (payload: SavePayload) => void | Promise<void>) {
     const exercises: ExerciseEntry[] = [
       {
         id: 'ex-1',
@@ -114,7 +116,10 @@ describe('WorkoutNotebook Terminer / blur bounds (M1)', () => {
   }
 
   it('blur 501 kg → message + parent inchangé (Terminer ne sauve pas 501)', async () => {
-    const onSave = vi.fn(async () => undefined)
+    const savedWeights: number[] = []
+    const onSave = vi.fn(async (payload: SavePayload) => {
+      savedWeights.push(payload.exercises[0]!.sets[0]!.weightKg)
+    })
     await renderNotebook(onSave)
     const kg = host.querySelector('input[aria-label="Poids"]') as HTMLInputElement
     expect(kg).toBeTruthy()
@@ -131,8 +136,7 @@ describe('WorkoutNotebook Terminer / blur bounds (M1)', () => {
       terminer.click()
     })
     expect(onSave).toHaveBeenCalled()
-    const note = onSave.mock.calls[0][0] as WorkoutNote
-    expect(note.exercises[0].sets[0].weightKg).toBe(20)
+    expect(savedWeights).toEqual([20])
   })
 
   it('Terminer avec 501 kg encore focalisé → aucun onSave + message', async () => {
@@ -172,7 +176,10 @@ describe('WorkoutNotebook Terminer / blur bounds (M1)', () => {
   })
 
   it('valeur valide 100 kg → Terminer sauvegarde 100', async () => {
-    const onSave = vi.fn(async () => undefined)
+    const savedWeights: number[] = []
+    const onSave = vi.fn(async (payload: SavePayload) => {
+      savedWeights.push(payload.exercises[0]!.sets[0]!.weightKg)
+    })
     await renderNotebook(onSave)
     const kg = host.querySelector('input[aria-label="Poids"]') as HTMLInputElement
     await act(async () => {
@@ -187,7 +194,6 @@ describe('WorkoutNotebook Terminer / blur bounds (M1)', () => {
       terminer.click()
     })
     expect(onSave).toHaveBeenCalled()
-    const note = onSave.mock.calls[0][0] as WorkoutNote
-    expect(note.exercises[0].sets[0].weightKg).toBe(100)
+    expect(savedWeights).toEqual([100])
   })
 })
