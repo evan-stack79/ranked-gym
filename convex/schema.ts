@@ -936,6 +936,49 @@ export const convexTables = {
     .index('by_partner_time', ['partnerId', 'createdAt'])
     .index('by_account_time', ['accountId', 'createdAt'])
     .index('by_code', ['code']),
+
+  /**
+   * Hydratation v0 (ARCHI_HYDRATATION) — isolé de ranked* / rewards*.
+   * Entitlement Pass Pro cosmétique (Ma bouteille). Hors catalogue RP.
+   */
+  proEntitlements: defineTable({
+    userId: v.string(),
+    activeUntil: v.number(),
+    updatedAt: v.number(),
+  }).index('by_user', ['userId']),
+
+  hydrationSettings: defineTable({
+    userId: v.string(),
+    mode: v.union(
+      v.literal('classic_2l'),
+      v.literal('glasses_250'),
+      v.literal('my_bottle'),
+    ),
+    goalMl: v.number(),
+    myBottleVolumeMl: v.optional(v.number()),
+    myBottleHasShape: v.boolean(),
+    remindersEnabled: v.boolean(),
+    reminderTimes: v.array(v.string()),
+    onboardedAt: v.optional(v.number()),
+    updatedAt: v.number(),
+  }).index('by_user', ['userId']),
+
+  hydrationEntries: defineTable({
+    userId: v.string(),
+    dayKey: v.string(),
+    amountMl: v.number(),
+    source: v.union(
+      v.literal('glass'),
+      v.literal('half_bottle'),
+      v.literal('full_bottle'),
+      v.literal('slider'),
+    ),
+    clientId: v.string(),
+    createdAt: v.number(),
+    undoneAt: v.optional(v.number()),
+  })
+    .index('by_user_day', ['userId', 'dayKey'])
+    .index('by_user_client', ['userId', 'clientId']),
 }
 
 export default defineSchema(convexTables)

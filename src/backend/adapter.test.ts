@@ -76,6 +76,9 @@ const PHASE_E_TABLES = [
   'rewardsPartnerInvite',
   'rewardsPartnerSession',
   'rewardsPartnerActionLog',
+  'proEntitlements',
+  'hydrationSettings',
+  'hydrationEntries',
 ] as const
 
 describe('Convex Phase A feature flag', () => {

@@ -20,6 +20,8 @@ export default defineConfig({
       ['src/components/profile/**/*.test.tsx', 'jsdom'],
       ['src/components/onboarding/**/*.test.tsx', 'jsdom'],
       ['src/components/home/**/*.test.tsx', 'jsdom'],
+      ['src/components/hydration/**/*.test.tsx', 'jsdom'],
+      ['src/services/hydration/**/*.test.ts', 'jsdom'],
       ['src/components/motion/**/*.test.tsx', 'jsdom'],
       ['src/components/ui/AppBootScreen.test.tsx', 'jsdom'],
       ['src/components/ui/BootIssueScreen.test.tsx', 'jsdom'],

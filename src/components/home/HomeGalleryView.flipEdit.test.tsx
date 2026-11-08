@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 /**
- * Accueil edit FLIP: reduced motion stays instant; reorder prefs unchanged by animation;
- * Eau remains read-only during edit (no water writes).
+ * Accueil edit FLIP: reduced motion stays instant; reorder prefs unchanged by animation.
+ * M1: legacy widget « eau » is filtered out of Accueil (hydration* only).
  */
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -32,20 +32,6 @@ vi.mock('../../context/AuthContext', () => ({
     isLoading: false,
   }),
 }))
-
-vi.mock('../../services/nutritionStorage', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../services/nutritionStorage')>()
-  return {
-    ...actual,
-    getTodayWaterMl: () => 900,
-    addWaterEntry: vi.fn(() => {
-      throw new Error('Accueil must not call addWaterEntry')
-    }),
-    setTodayWaterMl: vi.fn(() => {
-      throw new Error('Accueil must not call setTodayWaterMl')
-    }),
-  }
-})
 
 vi.mock('../../services/trainingStorage', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../services/trainingStorage')>()
@@ -116,7 +102,7 @@ describe('Accueil edit FLIP / reduced motion', () => {
     expect(host.querySelector('[data-accueil-entering="1"]')).toBeNull()
   })
 
-  it('edit reorder via prefs keeps Eau visible with stable water text (no 0 ml)', async () => {
+  it('M1: legacy Accueil widget eau is not rendered even if prefs still list it', async () => {
     const prefs = loadAccueilWidgetPrefs()
     saveAccueilWidgetPrefs(
       reorderVisibleAccueilWidget(prefs, 'eau', 'seances_semaine', Date.now()),
@@ -136,10 +122,7 @@ describe('Accueil edit FLIP / reduced motion', () => {
       ;(host.querySelector('[data-accueil-edit-open-footer]') as HTMLButtonElement).click()
     })
 
-    const eau = host.querySelector('[data-accueil-edit-slot="eau"]')
-    expect(eau).toBeTruthy()
-    const text = eau?.textContent ?? ''
-    expect(text).not.toMatch(/\b0\s*ml\b/i)
-    expect(text).toMatch(/900/)
+    expect(host.querySelector('[data-accueil-edit-slot="eau"]')).toBeNull()
+    expect(host.querySelector('[data-accueil-slot="eau"]')).toBeNull()
   })
 })
