@@ -5,6 +5,7 @@
 import type { Doc, Id } from '../_generated/dataModel'
 import type { MutationCtx, QueryCtx } from '../_generated/server'
 import type { SubscriptionAccessState, SubscriptionChainStatus } from '../../shared/subscriptions/constants'
+import { readSubscriptionEnv } from './subscriptionEnv'
 import { PRO_FAMILY_SHARING_ENABLED } from '../../shared/subscriptions/constants'
 
 type DbCtx = MutationCtx | QueryCtx
@@ -105,7 +106,7 @@ export async function loadProStatusForUser(
       url:
         c.source === 'apple'
           ? 'https://apps.apple.com/account/subscriptions'
-          : `https://play.google.com/store/account/subscriptions?sku=${encodeURIComponent(c.productId)}&package=${encodeURIComponent(process.env.GOOGLE_PLAY_PACKAGE_NAME ?? 'com.rankedgym.app')}`,
+          : `https://play.google.com/store/account/subscriptions?sku=${encodeURIComponent(c.productId)}&package=${encodeURIComponent(readSubscriptionEnv('GOOGLE_PLAY_PACKAGE_NAME') ?? 'com.rankedgym.app')}`,
     }))
 
   if (!winner) {

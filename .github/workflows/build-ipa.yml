@@ -233,7 +233,7 @@ jobs:
           # pipefail: grep -q exits early → SIGPIPE on strings → false failure (QA M2).
           echo "Checking native plugin registration symbols in $APP_BINARY"
           STRINGS_DUMP="$RUNNER_TEMP/app-binary-strings.txt"
-          strings "$APP_BINARY" > "$STRINGS_DUMP"
+          strings "$APP_BINARY" >"$STRINGS_DUMP" 2>/dev/null || true
           if ! grep -q 'MainViewController' "$STRINGS_DUMP"; then
             echo "ERROR: MainViewController missing from App binary — SecureStorage will not register on iOS"
             exit 1

@@ -42,6 +42,7 @@ import {
   fetchGoogleSubscriptionsv2,
   normalizeGoogleSubscriptionsv2,
 } from './lib/googlePlayVerify'
+import { readSubscriptionEnv } from './lib/subscriptionEnv'
 
 const AGE_POLICY_VERSION = 'pro-min-15-civil-2026-11-08'
 
@@ -279,7 +280,7 @@ export const verifyApplePurchase = mutation({
     const normalized = normalizeAppleTransaction({
       claims,
       renewal,
-      expectedBundleId: process.env.APPLE_BUNDLE_ID,
+      expectedBundleId: readSubscriptionEnv('APPLE_BUNDLE_ID'),
     })
     if (local) {
       ;(normalized as { environment: string }).environment = 'local_test'
@@ -408,7 +409,7 @@ export const verifyGooglePurchase = mutation({
     const user = await requireSessionUser(ctx, args.sessionToken)
 
     if (args.purchaseToken.startsWith('localtest.')) {
-      const deployEnv = (process.env.SUBSCRIPTION_DEPLOY_ENV ?? 'production').toLowerCase()
+      const deployEnv = (readSubscriptionEnv('SUBSCRIPTION_DEPLOY_ENV') ?? 'production').toLowerCase()
       if (deployEnv === 'production') {
         throw new Error('LOCAL_TEST_REJECTED_IN_PRODUCTION')
       }
@@ -478,7 +479,7 @@ export const verifyGooglePurchase = mutation({
       body: apiBody,
     })
     if (normalized.environment === 'sandbox') {
-      const deployEnv = (process.env.SUBSCRIPTION_DEPLOY_ENV ?? 'production').toLowerCase()
+      const deployEnv = (readSubscriptionEnv('SUBSCRIPTION_DEPLOY_ENV') ?? 'production').toLowerCase()
       if (deployEnv === 'production') throw new Error('SANDBOX_REJECTED_IN_PRODUCTION')
     }
     if (normalized.obfuscatedExternalAccountId) {
@@ -598,7 +599,7 @@ export const adminAdjust = internalMutation({
     adminSecret: v.string(),
   },
   handler: async (ctx, args) => {
-    const expected = process.env.MIGRATION_ADMIN_SECRET
+    const expected = readSubscriptionEnv('MIGRATION_ADMIN_SECRET')
     if (!expected || args.adminSecret !== expected) {
       throw new Error('ADMIN_FORBIDDEN')
     }
@@ -634,7 +635,7 @@ export const grantLocalTestPro = internalMutation({
     activeUntil: v.number(),
   },
   handler: async (ctx, args) => {
-    const deployEnv = (process.env.SUBSCRIPTION_DEPLOY_ENV ?? 'production').toLowerCase()
+    const deployEnv = (readSubscriptionEnv('SUBSCRIPTION_DEPLOY_ENV') ?? 'production').toLowerCase()
     if (deployEnv === 'production') {
       throw new Error('LOCAL_TEST_GRANT_FORBIDDEN_IN_PRODUCTION')
     }

@@ -12,6 +12,7 @@ import {
   type SubscriptionEnvironment,
   type SubscriptionSource,
 } from '../../shared/subscriptions/constants'
+import { readSubscriptionEnv } from './subscriptionEnv'
 import { projectSubscriptionAccess } from './subscriptionAccess'
 import { assertSoloProductId } from './subscriptionProducts'
 
@@ -63,7 +64,7 @@ export async function applyVerifiedStateCore(
   }
 
   if (input.environment === 'sandbox' || input.environment === 'local_test') {
-    const deployEnv = (process.env.SUBSCRIPTION_DEPLOY_ENV ?? 'production').toLowerCase()
+    const deployEnv = (readSubscriptionEnv('SUBSCRIPTION_DEPLOY_ENV') ?? 'production').toLowerCase()
     if (deployEnv === 'production' && input.environment !== 'local_test') {
       // Production deployment must refuse sandbox proofs.
       // local_test only allowed when SUBSCRIPTION_DEPLOY_ENV=test|local

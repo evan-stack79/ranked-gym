@@ -7,6 +7,7 @@ import {
   isAllowedGoogleProductId,
 } from './subscriptionProducts'
 import type { SubscriptionChainStatus, SubscriptionEnvironment } from '../../shared/subscriptions/constants'
+import { readSubscriptionEnv } from './subscriptionEnv'
 
 export type GoogleSubscriptionV2Normalized = {
   source: 'google'
@@ -116,13 +117,13 @@ export function normalizeGoogleSubscriptionsv2(args: {
 export async function fetchGoogleSubscriptionsv2(
   purchaseToken: string,
 ): Promise<Subscriptionsv2Response | null> {
-  const packageName = process.env.GOOGLE_PLAY_PACKAGE_NAME
-  const saJson = process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON
+  const packageName = readSubscriptionEnv('GOOGLE_PLAY_PACKAGE_NAME')
+  const saJson = readSubscriptionEnv('GOOGLE_PLAY_SERVICE_ACCOUNT_JSON')
   if (!packageName || !saJson) return null
 
   // OAuth token acquisition from service account is deferred to configured runtime;
   // without a live token helper we fail closed rather than invent credentials.
-  const accessToken = process.env.GOOGLE_PLAY_ACCESS_TOKEN
+  const accessToken = readSubscriptionEnv('GOOGLE_PLAY_ACCESS_TOKEN')
   if (!accessToken) {
     throw new Error('GOOGLE_PLAY_ACCESS_TOKEN_REQUIRED')
   }
@@ -142,8 +143,8 @@ export async function acknowledgeGoogleSubscription(args: {
   purchaseToken: string
   subscriptionId: string
 }): Promise<boolean> {
-  const packageName = process.env.GOOGLE_PLAY_PACKAGE_NAME
-  const accessToken = process.env.GOOGLE_PLAY_ACCESS_TOKEN
+  const packageName = readSubscriptionEnv('GOOGLE_PLAY_PACKAGE_NAME')
+  const accessToken = readSubscriptionEnv('GOOGLE_PLAY_ACCESS_TOKEN')
   if (!packageName || !accessToken) return false
 
   const url =

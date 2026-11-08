@@ -11,6 +11,7 @@ import {
   type SubscriptionChainStatus,
   type SubscriptionEnvironment,
 } from '../../shared/subscriptions/constants'
+import { readSubscriptionEnv } from './subscriptionEnv'
 import { billingPeriodForAppleProduct, isAllowedAppleProductId } from './subscriptionProducts'
 
 export type AppleTransactionClaims = {
@@ -43,12 +44,16 @@ export type AppleRenewalClaims = {
 function b64urlToUtf8(part: string): string {
   const pad = part.length % 4 === 0 ? '' : '='.repeat(4 - (part.length % 4))
   const b64 = (part + pad).replace(/-/g, '+').replace(/_/g, '/')
-  if (typeof atob === 'function') {
-    return decodeURIComponent(
-      Array.from(atob(b64), (c) => `%${c.charCodeAt(0).toString(16).padStart(2, '0')}`).join(''),
-    )
-  }
-  return Buffer.from(b64, 'base64').toString('utf8')
+  // Prefer atob (Convex isolate / browser); avoid Node Buffer for convex typecheck.
+  const binary =
+    typeof atob === 'function'
+      ? atob(b64)
+      : (() => {
+          throw new Error('B64_DECODE_UNAVAILABLE')
+        })()
+  return decodeURIComponent(
+    Array.from(binary, (c) => `%${c.charCodeAt(0).toString(16).padStart(2, '0')}`).join(''),
+  )
 }
 
 export function decodeJwsPayloadUnsafe(jws: string): Record<string, unknown> {
@@ -81,8 +86,8 @@ export async function verifyAppleJwsSignature(jws: string): Promise<{
   const leafPem = derToPem(x5c[0]!)
   const key = await importX509(leafPem, 'ES256')
 
-  const deployEnv = (process.env.SUBSCRIPTION_DEPLOY_ENV ?? 'production').toLowerCase()
-  const roots = (process.env.APPLE_ROOT_CA_PEMS ?? '').trim()
+  const deployEnv = (readSubscriptionEnv('SUBSCRIPTION_DEPLOY_ENV') ?? 'production').toLowerCase()
+  const roots = (readSubscriptionEnv('APPLE_ROOT_CA_PEMS') ?? '').trim()
   if (deployEnv === 'production' && !roots) {
     throw new Error('APPLE_ROOT_CA_NOT_CONFIGURED')
   }
@@ -180,7 +185,7 @@ export function normalizeAppleTransaction(args: {
   const billingPeriod = billingPeriodForAppleProduct(claims.productId)
   if (!billingPeriod) throw new Error('APPLE_PRODUCT_NOT_ALLOWED')
 
-  const expectedBundle = args.expectedBundleId ?? process.env.APPLE_BUNDLE_ID
+  const expectedBundle = args.expectedBundleId ?? readSubscriptionEnv('APPLE_BUNDLE_ID')
   if (expectedBundle && claims.bundleId && claims.bundleId !== expectedBundle) {
     throw new Error('APPLE_BUNDLE_MISMATCH')
   }
@@ -225,7 +230,7 @@ export function normalizeAppleTransaction(args: {
  * Jamais en production.
  */
 export function parseLocalTestApplePayload(signedTransaction: string): AppleTransactionClaims | null {
-  const deployEnv = (process.env.SUBSCRIPTION_DEPLOY_ENV ?? 'production').toLowerCase()
+  const deployEnv = (readSubscriptionEnv('SUBSCRIPTION_DEPLOY_ENV') ?? 'production').toLowerCase()
   if (deployEnv === 'production') return null
   if (!signedTransaction.startsWith('localtest.')) return null
   const json = signedTransaction.slice('localtest.'.length)

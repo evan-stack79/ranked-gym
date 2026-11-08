@@ -4,6 +4,7 @@ import {
   decodeJwsPayloadUnsafe,
   verifyAppleJwsSignature,
 } from './appleJws'
+import { readSubscriptionEnv } from './subscriptionEnv'
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -71,8 +72,8 @@ export async function handleGoogleRtdn(
   ctx: GenericActionCtx<any>,
   request: Request,
 ): Promise<Response> {
-  const audience = process.env.GOOGLE_RTDN_AUDIENCE
-  const expectedEmail = process.env.GOOGLE_RTDN_SERVICE_ACCOUNT_EMAIL
+  const audience = readSubscriptionEnv('GOOGLE_RTDN_AUDIENCE')
+  const expectedEmail = readSubscriptionEnv('GOOGLE_RTDN_SERVICE_ACCOUNT_EMAIL')
   const auth = request.headers.get('Authorization') ?? ''
   if (audience && expectedEmail) {
     if (!auth.startsWith('Bearer ')) {
@@ -80,7 +81,7 @@ export async function handleGoogleRtdn(
     }
     const token = auth.slice('Bearer '.length)
     if (!token || token.length < 20) return json(401, { error: 'invalid_bearer' })
-  } else if ((process.env.SUBSCRIPTION_DEPLOY_ENV ?? 'production') === 'production') {
+  } else if ((readSubscriptionEnv('SUBSCRIPTION_DEPLOY_ENV') ?? 'production') === 'production') {
     return json(503, { error: 'google_rtdn_not_configured' })
   }
 
@@ -97,7 +98,7 @@ export async function handleGoogleRtdn(
   if (!messageId) return json(400, { error: 'missing_message_id' })
 
   const result = await ctx.runMutation(internal.subscriptions.ingestGoogleRtdn, {
-    environment: process.env.SUBSCRIPTION_DEPLOY_ENV ?? 'production',
+    environment: readSubscriptionEnv('SUBSCRIPTION_DEPLOY_ENV') ?? 'production',
     messageId,
     notificationType: body.message?.attributes?.type ?? 'RTDN',
     payloadHash: simpleHash(body.message?.data ?? messageId),

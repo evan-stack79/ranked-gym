@@ -4,6 +4,7 @@
  * Sans credentials : retourne null (la vérif JWS locale reste obligatoire en amont).
  */
 import { SignJWT, importPKCS8 } from 'jose'
+import { readSubscriptionEnv } from './subscriptionEnv'
 
 export type AppleSubscriptionApiSnapshot = {
   originalTransactionId: string
@@ -19,10 +20,10 @@ function appleApiBase(environment: 'production' | 'sandbox'): string {
 }
 
 export async function createAppleServerApiToken(): Promise<string | null> {
-  const keyId = process.env.APPLE_IAP_KEY_ID
-  const issuerId = process.env.APPLE_IAP_ISSUER_ID
-  const privateKeyPem = process.env.APPLE_IAP_PRIVATE_KEY
-  const bundleId = process.env.APPLE_BUNDLE_ID
+  const keyId = readSubscriptionEnv('APPLE_IAP_KEY_ID')
+  const issuerId = readSubscriptionEnv('APPLE_IAP_ISSUER_ID')
+  const privateKeyPem = readSubscriptionEnv('APPLE_IAP_PRIVATE_KEY')
+  const bundleId = readSubscriptionEnv('APPLE_BUNDLE_ID')
   if (!keyId || !issuerId || !privateKeyPem || !bundleId) return null
 
   const key = await importPKCS8(privateKeyPem.replace(/\\n/g, '\n'), 'ES256')
