@@ -1,12 +1,12 @@
-# RestTimerLiveActivity (iOS)
+# Live Activity (iOS) — Dynamic Island / lock screen
 
-Source of truth for the Capacitor plugin + attributes:
+Source of truth (App + Widget targets):
 
-- `ios/App/App/Plugins/RestTimerLiveActivity/RestTimerLiveActivityPlugin.swift`
-- `ios/App/App/Plugins/RestTimerLiveActivity/RestTimerAttributes.swift`
+- `ios/App/App/Plugins/RestTimerLiveActivity/RestTimerAttributes.swift` — `RankedGymLiveAttributes` (`kind`)
+- `ios/App/App/Plugins/RestTimerLiveActivity/RestTimerLiveActivityPlugin.swift` — `LiveActivityPlugin`
+- `ios/App/App/Plugins/RestTimerLiveActivity/LiveActivityIntents.swift` — Pause / Stop / Valider
+- `ios/App/RestTimerLiveActivityWidget/RestTimerLiveActivityWidget.swift` — UI by kind
 
-Those files are members of the **App** Xcode target (Compile Sources).
-Do not keep a second Swift copy here — it would not be compiled.
+Registered in `MainViewController.swift` via `LiveActivityPlugin()`.
 
-React bridge: `src/services/restTimerLiveActivity.ts`
-Docs: `docs/IOS_LIVE_ACTIVITIES.md`
+React bridge: `src/services/liveActivity.ts` (+ compat `restTimerLiveActivity.ts`).

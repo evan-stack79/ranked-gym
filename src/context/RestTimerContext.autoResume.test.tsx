@@ -8,7 +8,7 @@ import {
   subscribeRestLogged,
   useRestTimerContext,
 } from './RestTimerContext'
-import { playRestCompleteChime } from '../utils/restTimerSound'
+import { onRestTimerSoundComplete } from '../utils/restTimerSound'
 
 const persistSpy = vi.fn()
 let persistedRest: unknown = null
@@ -32,6 +32,14 @@ vi.mock('../services/restTimerLiveActivity', () => ({
 
 vi.mock('../utils/restTimerSound', () => ({
   playRestCompleteChime: vi.fn(),
+  scheduleRestTimerSound: vi.fn(async () => {}),
+  cancelRestTimerSound: vi.fn(async () => {}),
+  rescheduleRestTimerSound: vi.fn(async () => {}),
+  onRestTimerSoundComplete: vi.fn(async () => {}),
+  maybePlayCountdownBeep: vi.fn(async () => {}),
+  previewRestTimerSound: vi.fn(async () => {}),
+  getRestTimerSoundPrefs: vi.fn(() => ({ soundEnabled: true, countdownBeeps: false, haptics: true })),
+  setRestTimerSoundEnabled: vi.fn((v) => ({ soundEnabled: v, countdownBeeps: false, haptics: true })),
 }))
 
 vi.mock('../utils/haptics', () => ({
@@ -78,7 +86,7 @@ beforeEach(() => {
   vi.useFakeTimers()
   persistedRest = null
   persistSpy.mockClear()
-  vi.mocked(playRestCompleteChime).mockClear()
+  vi.mocked(onRestTimerSoundComplete).mockClear()
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -118,7 +126,7 @@ describe('RestTimer auto-fermeture à 0:00', () => {
 
     expect(host.querySelector('[data-recovery-timer]')).toBeNull()
     expect(logs).toEqual([{ skipped: false }])
-    expect(playRestCompleteChime).toHaveBeenCalledTimes(1)
+    expect(onRestTimerSoundComplete).toHaveBeenCalledTimes(1)
     unsub()
   })
 
@@ -151,7 +159,7 @@ describe('RestTimer auto-fermeture à 0:00', () => {
 
     expect(host.querySelector('[data-recovery-timer]')).toBeNull()
     expect(logs).toEqual([{ skipped: true }])
-    expect(playRestCompleteChime).not.toHaveBeenCalled()
+    expect(onRestTimerSoundComplete).not.toHaveBeenCalled()
     unsub()
   })
 
@@ -183,7 +191,7 @@ describe('RestTimer auto-fermeture à 0:00', () => {
 
     expect(host.querySelector('[data-recovery-timer]')).toBeNull()
     expect(logs).toEqual([{ skipped: false }])
-    expect(playRestCompleteChime).not.toHaveBeenCalled()
+    expect(onRestTimerSoundComplete).not.toHaveBeenCalled()
 
     // Remount / re-hydrate même expireKey → pas de double log
     await act(async () => {
