@@ -79,6 +79,14 @@ const PHASE_E_TABLES = [
   'proEntitlements',
   'hydrationSettings',
   'hydrationEntries',
+  'subscriptionUserProfiles',
+  'subscriptionAccounts',
+  'subscriptions',
+  'subscriptionAccess',
+  'subscriptionEvents',
+  'subscriptionPurchaseAttempts',
+  'subscriptionReceipts',
+  'subscriptionReminderOutbox',
 ] as const
 
 describe('Convex Phase A feature flag', () => {
