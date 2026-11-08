@@ -33,6 +33,7 @@ import {
   type OpenFoodFactsProduct,
   type OpenFoodFactsSearchHit,
 } from '../../services/alimentsService'
+import { resolveFoodIconCategory } from '../../utils/foodIconCategory'
 import {
   foodAddQuantityUserMessage,
   formatGramsCountLabel,
@@ -59,6 +60,7 @@ import {
   buildFoodNutritionSnapshot,
   mealEntryFromSnapshot,
 } from '../../utils/foodJournalSnapshot'
+import { computeLocalMealNutritionFromOffHit } from '../../utils/foodAddMealNutrition'
 import { isConvexDomainActive } from '../../backend/adapter'
 import { isFoodAddV3Enabled } from '../../backend/foodAddV3FeatureFlag'
 import {
@@ -66,6 +68,7 @@ import {
   canAccessFoodAddV3,
   needsAgePrompt,
 } from '../../services/foodAddAccess'
+import { canUseMealPhotoEstimate } from '../../services/nutritionSafetyRules'
 import {
   addFoodSnapshotViaConvex,
 } from '../../services/convexNutritionService'
@@ -122,6 +125,17 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
     setToast({ message, variant })
     window.setTimeout(() => setToast(null), variant === 'error' ? 5200 : 3400)
   }, [])
+
+  // V3-14 — toast file sync (ex. MEAL_KCAL_ABOVE_MAX).
+  useEffect(() => {
+    const onSyncToast = (event: Event) => {
+      const detail = (event as CustomEvent<{ message?: string; variant?: 'success' | 'error' }>)
+        .detail
+      if (detail?.message) showToast(detail.message, detail.variant ?? 'error')
+    }
+    window.addEventListener('ranked-gym:nutrition-sync-toast', onSyncToast)
+    return () => window.removeEventListener('ranked-gym:nutrition-sync-toast', onSyncToast)
+  }, [showToast])
 
   const scrollToScanZone = useCallback(() => {
     scanZoneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -297,6 +311,13 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
         }
         const mealId = sel.mealId || crypto.randomUUID()
         const selectionEventId = sel.selectionEventId || crypto.randomUUID()
+        // V3-01 : même échelle que le serveur (grams/pièces choisis), jamais /100 g brut.
+        const v3Scaled = foodAddV3
+          ? computeLocalMealNutritionFromOffHit(hit, {
+              grams: sel.unit === 'pieces' ? undefined : (sel.grams ?? snapshot.grams),
+              pieces: sel.pieces,
+            })
+          : null
         const entry = {
           ...mealEntryFromSnapshot(snapshot, type),
           id: mealId,
@@ -305,26 +326,13 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
           portionLabel: snapshot.portionLabel,
           entrySource: foodAddV3 ? ('v3' as const) : undefined,
           selectionEventId: foodAddV3 ? selectionEventId : undefined,
-          calories: foodAddV3
-            ? hit.calories == null
-              ? null
-              : snapshot.calories
-            : snapshot.calories,
-          proteinG: foodAddV3
-            ? hit.proteines == null
-              ? null
-              : snapshot.proteinG
-            : snapshot.proteinG,
-          carbsG: foodAddV3
-            ? hit.glucides == null
-              ? null
-              : snapshot.carbsG
-            : snapshot.carbsG,
-          fatG: foodAddV3
-            ? hit.lipides == null
-              ? null
-              : snapshot.fatG
-            : snapshot.fatG,
+          calories: foodAddV3 ? v3Scaled!.calories : snapshot.calories,
+          proteinG: foodAddV3 ? v3Scaled!.proteinG : snapshot.proteinG,
+          carbsG: foodAddV3 ? v3Scaled!.carbsG : snapshot.carbsG,
+          fatG: foodAddV3 ? v3Scaled!.fatG : snapshot.fatG,
+          foodIconCategory:
+            hit.foodIconCategory ?? resolveFoodIconCategory(hit.categoriesTags),
+          categoriesTags: hit.categoriesTags,
         }
 
         if (foodAddV3 && isConvexDomainActive() && user) {
@@ -711,6 +719,31 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
           category={foodCategory}
           onCategoryChange={setFoodCategory}
           onValidateSelection={handleValidateFoodSelection}
+          onOpenScanner={() => openScanner()}
+          scannerSlot={
+            scannerOpen ? (
+              <BarcodeScanner
+                open={scannerOpen}
+                onClose={() => setScannerOpen(false)}
+                onProduct={handleScannedProduct}
+              />
+            ) : null
+          }
+          onToast={showToast}
+          photoEstimateAllowed={canUseMealPhotoEstimate(calorieProfile)}
+          onPhotoAnalyzed={(result) => {
+            const journal = addMealToToday({
+              name: result.name,
+              mealType: result.mealType,
+              calories: result.calories,
+              proteinG: result.proteinG,
+              carbsG: result.carbsG,
+              fatG: result.fatG,
+            })
+            setMeals(journal.meals)
+            resetForm()
+            showToast('Repas ajouté depuis la photo.')
+          }}
           name={name}
           onNameChange={setName}
           mealType={mealType}

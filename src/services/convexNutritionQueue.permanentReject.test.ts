@@ -35,12 +35,15 @@ vi.mock('./nutritionStorage', () => ({
   saveJournalForDate: vi.fn(),
 }))
 
+import { MEAL_KCAL_ABOVE_MAX } from '../../convex/lib/foodAddUpsertSanitize'
+import { MEAL_KCAL_ABOVE_MAX_MSG } from '../../convex/lib/mealPhotoEstimateAccess'
 import {
   __testReadNutritionQueue,
   __testReadRejectedQueue,
   __testWriteNutritionQueue,
   flushConvexNutritionQueue,
   isPermanentConvexQueueError,
+  NUTRITION_SYNC_TOAST_EVENT,
 } from './convexNutritionQueue'
 import { saveJournalForDate } from './nutritionStorage'
 
@@ -255,5 +258,99 @@ describe('convexNutritionQueue — refus définitif vs passager', () => {
       meals: Array<{ syncRejected?: boolean }>
     }
     expect(saved.meals.some((m) => m.syncRejected === true)).toBe(true)
+  })
+
+  it('V3-14 MEAL_KCAL_ABOVE_MAX : Pas enregistré, toast, suite eau/repas/delete', async () => {
+    expect(
+      isPermanentConvexQueueError(new ConvexError({ code: MEAL_KCAL_ABOVE_MAX })),
+    ).toBe(true)
+
+    const toasts: string[] = []
+    const onToast = (event: Event) => {
+      const detail = (event as CustomEvent<{ message?: string }>).detail
+      if (detail?.message) toasts.push(detail.message)
+    }
+    window.addEventListener(NUTRITION_SYNC_TOAST_EVENT, onToast)
+
+    pushConvexMeal
+      .mockRejectedValueOnce(new ConvexError({ code: MEAL_KCAL_ABOVE_MAX }))
+      .mockResolvedValueOnce({ applied: true })
+    pushConvexWaterEntry.mockResolvedValueOnce({ applied: true })
+    deleteConvexMeal.mockResolvedValueOnce({ applied: true })
+
+    __testWriteNutritionQueue(USER, [
+      {
+        id: 'op-kcal-bad',
+        kind: 'meal-upsert',
+        dateKey: '2026-10-15',
+        meal: {
+          id: 'meal-bad',
+          name: 'Nutella 1000g',
+          mealType: 'snack',
+          calories: 5390,
+          grams: 1000,
+          createdAt: 1,
+        },
+        updatedAt: 1,
+        enqueuedAt: 1,
+      },
+      {
+        id: 'op-water',
+        kind: 'water-upsert',
+        dateKey: '2026-10-15',
+        entry: {
+          id: 'w1',
+          amountMl: 250,
+          type: 'glass',
+          label: 'Verre',
+          createdAt: 1,
+        },
+        updatedAt: 2,
+        enqueuedAt: 2,
+      },
+      {
+        id: 'op-meal-ok',
+        kind: 'meal-upsert',
+        dateKey: '2026-10-15',
+        meal: {
+          id: 'meal-ok',
+          name: 'Banane',
+          mealType: 'lunch',
+          calories: 89,
+          grams: 100,
+          createdAt: 1,
+        },
+        updatedAt: 3,
+        enqueuedAt: 3,
+      },
+      {
+        id: 'op-del',
+        kind: 'meal-delete',
+        dateKey: '2026-10-15',
+        mealId: 'meal-gone',
+        deletedAt: 4,
+        enqueuedAt: 4,
+      },
+    ])
+
+    await flushConvexNutritionQueue()
+
+    window.removeEventListener(NUTRITION_SYNC_TOAST_EVENT, onToast)
+
+    expect(pushConvexMeal).toHaveBeenCalledTimes(2)
+    expect(pushConvexWaterEntry).toHaveBeenCalledTimes(1)
+    expect(deleteConvexMeal).toHaveBeenCalledTimes(1)
+    expect(__testReadNutritionQueue(USER)).toHaveLength(0)
+    const rejected = __testReadRejectedQueue(USER)
+    expect(rejected).toHaveLength(1)
+    expect(rejected[0]!.code).toBe(MEAL_KCAL_ABOVE_MAX)
+    expect(rejected[0]!.mealId).toBe('meal-bad')
+    expect(toasts).toContain(MEAL_KCAL_ABOVE_MAX_MSG)
+    const saved = vi.mocked(saveJournalForDate).mock.calls[0]![0] as {
+      meals: Array<{ id: string; syncRejected?: boolean; syncRejectCode?: string }>
+    }
+    const bad = saved.meals.find((m) => m.id === 'meal-bad')
+    expect(bad?.syncRejected).toBe(true)
+    expect(bad?.syncRejectCode).toBe(MEAL_KCAL_ABOVE_MAX)
   })
 })

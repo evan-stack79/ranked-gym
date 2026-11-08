@@ -34,6 +34,11 @@ interface ImportMetaEnv {
    * Unset/empty/false = OFF (écran legacy).
    */
   readonly VITE_ENABLE_FOOD_ADD_V3?: string
+  /**
+   * Section « Aliments de base » Ciqual (ANSES).
+   * Unset/empty/false = OFF (défaut). Activer seulement en app de test.
+   */
+  readonly VITE_ENABLE_CIQUAL?: string
 }
 
 interface ImportMeta {

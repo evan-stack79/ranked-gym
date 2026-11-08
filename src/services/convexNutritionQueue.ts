@@ -10,6 +10,16 @@ import {
 import { readFoodAddErrorData } from './alimentsService'
 import { getJournalForDate, saveJournalForDate } from './nutritionStorage'
 import { safeError, safeWarn } from '../utils/safeLog'
+import { MEAL_KCAL_ABOVE_MAX } from '../../convex/lib/foodAddUpsertSanitize'
+import { MEAL_KCAL_ABOVE_MAX_MSG } from '../../convex/lib/mealPhotoEstimateAccess'
+
+/** Toast UI (Dashboard / Journal) pour refus définitifs visibles. */
+export const NUTRITION_SYNC_TOAST_EVENT = 'ranked-gym:nutrition-sync-toast' as const
+
+export type NutritionSyncToastDetail = {
+  message: string
+  variant: 'success' | 'error'
+}
 
 type MealUpsertOp = {
   kind: 'meal-upsert'
@@ -133,6 +143,7 @@ function removeQueueOpById(entries: StoredQueueOp[], opId: string): StoredQueueO
  * Codes Convex connus = refus définitif (sortie file → refusés).
  * FOOD_ADD_ACCESS_AGE_REQUIRED / age_required = passager (l’âge peut être
  * complété) — reste en file, backoff, pas « Pas enregistré ».
+ * V3-14 — MEAL_KCAL_ABOVE_MAX = définitif (ne pas renvoyer).
  */
 export function isPermanentConvexQueueError(error: unknown): boolean {
   const data = readFoodAddErrorData(error)
@@ -141,9 +152,19 @@ export function isPermanentConvexQueueError(error: unknown): boolean {
   if (code === 'age_required' || code === 'FOOD_ADD_ACCESS_AGE_REQUIRED') {
     return false
   }
+  if (code === MEAL_KCAL_ABOVE_MAX) return true
   if (code.startsWith('FOOD_ADD_')) return true
   if (code === 'FOOD_SEARCH_DAILY_LIMIT') return true
   return false
+}
+
+function notifyNutritionSyncToast(message: string, variant: 'success' | 'error' = 'error'): void {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(
+    new CustomEvent<NutritionSyncToastDetail>(NUTRITION_SYNC_TOAST_EVENT, {
+      detail: { message, variant },
+    }),
+  )
 }
 
 export function permanentConvexErrorCode(error: unknown): string | null {
@@ -297,6 +318,10 @@ export async function flushConvexNutritionQueue(): Promise<void> {
           writeRejected(userId, rejected.slice(-REJECTED_QUEUE_MAX))
           if (current.kind === 'meal-upsert') {
             markMealSyncRejected(current.dateKey, current.meal.id, code)
+            // V3-14 — message visible sur refus kcal > 5000.
+            if (code === MEAL_KCAL_ABOVE_MAX) {
+              notifyNutritionSyncToast(MEAL_KCAL_ABOVE_MAX_MSG, 'error')
+            }
           }
           const latestQueue = readQueue(userId)
           writeQueue(userId, removeQueueOpById(latestQueue, current.id))

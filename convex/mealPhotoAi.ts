@@ -1,13 +1,11 @@
 import { v } from 'convex/values'
-import { makeFunctionReference } from 'convex/server'
 import { api, internal } from './_generated/api'
 import { action, env, type ActionCtx } from './_generated/server'
-
-const notifyFirstMealPhotoAiRef = makeFunctionReference<
-  'mutation',
-  { userId: string; email?: string },
-  null
->('surveillanceFitness:notifyFirstMealPhotoAiInternal')
+import {
+  canUseMealPhotoEstimateFromProfileJson,
+  clampMealPhotoCalories,
+  MEAL_PHOTO_ESTIMATE_BLOCKED,
+} from './lib/mealPhotoEstimateAccess'
 import {
   clientFacingFromGeminiError,
   clientFacingGeminiFailure,
@@ -98,8 +96,10 @@ function parseMacros(raw: unknown): {
   lipides: number
 } {
   const obj = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  // V3-08 — plafond 5000 kcal (même limite UI confirm / saisie manuelle).
+  const calories = clampMealPhotoCalories(obj.calories)
   return {
-    calories: toInt(obj.calories),
+    calories,
     proteines: toInt(obj.proteines ?? obj.protein ?? obj.proteinG),
     glucides: toInt(obj.glucides ?? obj.carbs ?? obj.carbsG),
     lipides: toInt(obj.lipides ?? obj.fat ?? obj.fatG),
@@ -260,6 +260,18 @@ export const analyzeMealPhoto = action({
       return failure('Session expirée — reconnecte-toi puis réessaie.', 'AUTH_REQUIRED')
     }
 
+    // V3-07 — même règle que canUseMealPhotoEstimate (âge / grossesse / allaitement).
+    // Avant réserve quota / Gemini : 0 kcal renvoyée.
+    const profileJson = await ctx.runQuery(internal.rpc.getNutritionProfileJsonInternal, {
+      userId: session.userId,
+    })
+    if (!canUseMealPhotoEstimateFromProfileJson(profileJson)) {
+      return failure(
+        'Estimation photo indisponible pour ce profil.',
+        MEAL_PHOTO_ESTIMATE_BLOCKED,
+      )
+    }
+
     const imageBase64 = args.imageBase64.replace(/^data:[^;]+;base64,/, '').trim()
     const mimeType =
       typeof args.mimeType === 'string' && args.mimeType.startsWith('image/')
@@ -339,16 +351,6 @@ export const analyzeMealPhoto = action({
       }
 
       const scansRemaining = Math.max(0, reserve.daily_limit - reserve.scan_count)
-
-      // Premier scan repas IA réussi → Surveillance fitness (one-shot côté Convex).
-      try {
-        await ctx.runMutation(notifyFirstMealPhotoAiRef, {
-          userId: session.userId,
-          email: session.email,
-        })
-      } catch (error) {
-        console.info('[meal-photo-ai] surveillance fitness hook soft-failed', error)
-      }
 
       return {
         ok: true,

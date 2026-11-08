@@ -15,8 +15,10 @@ export interface FoodCategory {
   offTags: string[]
 }
 
+/**
+ * Ordre maquette V3 : Fruits → Boissons → Tout (centre) → Repas → Snacks → Laitages.
+ */
 export const FOOD_CATEGORIES: readonly FoodCategory[] = [
-  { id: 'all', label: 'Tout', offTags: [] },
   {
     id: 'fruits',
     label: 'Fruits',
@@ -27,6 +29,7 @@ export const FOOD_CATEGORIES: readonly FoodCategory[] = [
     label: 'Boissons',
     offTags: ['en:beverages', 'en:drinks', 'en:waters', 'en:sodas', 'fr:boissons'],
   },
+  { id: 'all', label: 'Tout', offTags: [] },
   {
     id: 'meals',
     label: 'Repas',
@@ -52,7 +55,7 @@ export const FOOD_CATEGORIES: readonly FoodCategory[] = [
 ] as const
 
 export function foodCategoryById(id: FoodCategoryId): FoodCategory {
-  return FOOD_CATEGORIES.find((c) => c.id === id) ?? FOOD_CATEGORIES[0]!
+  return FOOD_CATEGORIES.find((c) => c.id === id) ?? FOOD_CATEGORIES.find((c) => c.id === 'all')!
 }
 
 /** True si le produit appartient à la catégorie (Tout = toujours). */

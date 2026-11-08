@@ -73,7 +73,7 @@ describe('AddFoodScreenV3 — hors ligne requis (PC-06)', () => {
     await act(async () => {
       ;(
         document.querySelector(
-          '[data-food-card] button[aria-pressed="false"]',
+          '[data-food-card][aria-pressed="false"]',
         ) as HTMLButtonElement
       ).click()
     })

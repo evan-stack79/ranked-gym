@@ -1,9 +1,15 @@
 import { v } from 'convex/values'
-import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from './_generated/server'
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
 import { consumeRateLimit } from './lib/rateLimit'
 import { canViewerSeeSubject } from './lib/socialVisibility'
-import { notifySurveillanceFitnessFirstWorkout } from './surveillanceFitness'
 
 const ACTIVITY_TYPES = new Set(['pr', 'workout', 'checkin', 'rank_up', 'streak'])
 const DEFAULT_WEEK_LABELS = ['S-3', 'S-2', 'S-1', 'Act.'] as const
@@ -280,8 +286,7 @@ export async function recordActivityForSession(
     originLng?: number | null
   },
 ): Promise<string> {
-  const user = await requireSessionUser(ctx, sessionToken)
-  const userId = user.userId
+  const userId = await getSessionUserId(ctx, sessionToken)
   await consumeRateLimit(ctx, 'recordActivity', { kind: 'userId', value: userId })
   if (!ACTIVITY_TYPES.has(input.activityType)) {
     throw new Error('ACTIVITY_TYPE_INVALID')
@@ -299,17 +304,6 @@ export async function recordActivityForSession(
     originLng: lng,
     createdAt: Date.now(),
   })
-  if (input.activityType === 'workout') {
-    try {
-      await notifySurveillanceFitnessFirstWorkout(ctx, {
-        userId,
-        email: user.email,
-      })
-    } catch (error) {
-      // Soft — jamais bloquer l’activité.
-      console.error('[surveillance-fitness] first_workout hook failed (rpc)', error)
-    }
-  }
   return String(id)
 }
 
@@ -706,6 +700,19 @@ export const getUserStats = query({
     }),
   }),
   handler: (ctx, args) => getUserStatsForSession(ctx, args.sessionToken),
+})
+
+/** V3-07 — profil nutrition stocké pour garde Photo IA (jamais confiance client). */
+export const getNutritionProfileJsonInternal = internalQuery({
+  args: { userId: v.string() },
+  returns: v.any(),
+  handler: async (ctx, args) => {
+    const nutrition = await ctx.db
+      .query('nutrition_state')
+      .withIndex('by_userId', (q) => q.eq('userId', args.userId))
+      .first()
+    return nutrition?.profileJson ?? null
+  },
 })
 
 export const reserveAiMealScanInternal = internalMutation({

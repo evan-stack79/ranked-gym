@@ -67,7 +67,7 @@ describe('AddFoodScreenV3 — parcours court (recherche → quantité → valide
     expect(screen.textContent).not.toContain('Scan IA')
 
     const choose = document.querySelector(
-      '[data-food-card] button[aria-pressed="false"]',
+      '[data-food-card][aria-pressed="false"]',
     ) as HTMLButtonElement
     expect(choose).toBeTruthy()
     await act(async () => {

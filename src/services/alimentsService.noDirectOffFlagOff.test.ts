@@ -82,7 +82,7 @@ describe('alimentsService — flag OFF : jamais de contact OFF direct', () => {
     const hits = await searchOpenFoodFacts('', undefined, { categoryTag: 'en:fruits' })
 
     expect(hits).toHaveLength(1)
-    expect(searchOpenFoodFactsViaConvex).toHaveBeenCalledWith('', 20, { categoryTag: 'en:fruits' })
+    expect(searchOpenFoodFactsViaConvex).toHaveBeenCalledWith('', 40, { categoryTag: 'en:fruits' })
     expect(searchFoodsV3ViaConvex).not.toHaveBeenCalled()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
