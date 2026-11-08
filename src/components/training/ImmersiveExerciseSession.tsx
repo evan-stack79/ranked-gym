@@ -1,14 +1,26 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Check, ChevronLeft, Minus, Pause, Play, Plus, Timer } from 'lucide-react'
 import type { ExerciseEntry, WorkoutNote, WorkoutSet } from '../../types/training'
-import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
+import {
+  ClearableNumberInput,
+  flushPendingClearableNumberInputs,
+} from '../nutrition/ClearableNumberInput'
 import { BRAND_MARK_COMPACT_SRC } from '../brand/BrandMark'
 import {
   formatExerciseMuscles,
   resolveExerciseMedia,
 } from '../../utils/exerciseMedia'
 import { useRestTimerContext } from '../../context/RestTimerContext'
-import { isSetReadyForAutoValidate } from '../../utils/autoValidateSet'
+import {
+  isSetReadyForAutoValidate,
+  SET_EFFORT_MAX,
+  SET_EFFORT_MIN,
+  SET_REPS_MAX,
+  SET_REPS_MIN,
+  SET_WEIGHT_MAX_KG,
+  SET_WEIGHT_MIN_KG,
+  setFieldRangeError,
+} from '../../utils/autoValidateSet'
 import {
   findLastPerformance,
   formatLastRepsAriaLabel,
@@ -29,7 +41,12 @@ export interface ImmersiveExerciseSessionProps {
   sessionPaused: boolean
   onToggleSessionPause?: () => void
   onBack: () => void
-  onUpdateSet: (exerciseId: string, setIndex: number, patch: Partial<WorkoutSet>) => void
+  onUpdateSet: (
+    exerciseId: string,
+    setIndex: number,
+    patch: Partial<WorkoutSet>,
+    options?: { autoValidate?: boolean },
+  ) => void
   onAddSet: (exerciseId: string) => void
   /** Ouvre le sélecteur pour ajouter un exercice à la suite. */
   onAddExercise?: () => void
@@ -61,10 +78,13 @@ function formatEffort(set: WorkoutSet): string | null {
 }
 
 const FIELD =
-  'min-h-11 w-full rounded-lg border border-white/12 bg-[#1d1f20] px-2 text-center text-[15px] font-semibold tabular-nums text-white outline-none focus-visible:border-[#FF0702]/55'
+  'min-h-11 w-full rounded-lg border border-white/12 bg-[#1c1c1e] px-2 text-center text-[15px] font-semibold tabular-nums text-white outline-none focus-visible:border-[#FF2B2B]/55'
+
+const FIELD_ERROR =
+  'min-h-11 w-full rounded-lg border border-[#FF6961] bg-[#1c1c1e] px-2 text-center text-[15px] font-semibold tabular-nums text-white outline-none'
 
 const LAST_PLACEHOLDER =
-  'pointer-events-none absolute inset-0 flex items-center justify-center text-[15px] font-semibold tabular-nums text-[#717C83]'
+  'pointer-events-none absolute inset-0 flex items-center justify-center text-[15px] font-semibold tabular-nums text-[#636366]'
 
 const EMPTY_HISTORY: WorkoutNote[] = []
 
@@ -108,6 +128,10 @@ export function ImmersiveExerciseSession({
   const muscleLine = formatExerciseMuscles(media.muscles)
   const [imgFailedFor, setImgFailedFor] = useState<string | null>(null)
   const showImage = Boolean(media.imageSrc) && imgFailedFor !== media.imageSrc
+  const setsRef = useRef<WorkoutSet[]>(exercise?.sets ?? [])
+  if (exercise) {
+    setsRef.current = exercise.sets
+  }
 
   const lastHints = useMemo(() => {
     if (!exercise || history.length === 0) return [] as Array<ReturnType<typeof findLastPerformance>>
@@ -138,15 +162,30 @@ export function ImmersiveExerciseSession({
       : restSecResolved
   const showRecovery = autoValidate && restActive
 
-  const patchSet = (idx: number, patch: Partial<WorkoutSet>) => {
-    const current = exercise.sets[idx]
-    if (!current) return
-    onUpdateSet(exercise.id, idx, patch)
+  const tryAutoValidateSet = (idx: number) => {
     if (!autoValidate) return
+    const merged = setsRef.current[idx]
+    if (!merged || !isSetReadyForAutoValidate(merged)) return
+    onValidateSet(
+      { ...exercise, sets: setsRef.current.map((s) => ({ ...s })) },
+      idx,
+      restSecResolved,
+    )
+  }
+
+  const patchSet = (
+    idx: number,
+    patch: Partial<WorkoutSet>,
+    options?: { autoValidate?: boolean },
+  ) => {
+    const current = setsRef.current[idx]
+    if (!current) return
     const merged = { ...current, ...patch }
-    if (isSetReadyForAutoValidate(merged)) {
-      onValidateSet(exercise, idx, restSecResolved)
-    }
+    setsRef.current = setsRef.current.map((s, i) => (i === idx ? merged : s))
+    // Frappe : maj seule. Auto-validate au blur / bouton Valider.
+    onUpdateSet(exercise.id, idx, patch, { autoValidate: false })
+    if (options?.autoValidate === false) return
+    tryAutoValidateSet(idx)
   }
 
   const nudgeRest = (delta: number) => {
@@ -202,7 +241,7 @@ export function ImmersiveExerciseSession({
               data-hero-fallback
               aria-hidden="true"
             >
-              <div className="absolute inset-0 bg-[#1d1f20]" />
+              <div className="absolute inset-0 bg-[#1c1c1e]" />
               <div className="absolute inset-0 bg-[radial-gradient(90%_70%_at_50%_35%,#3a3a3c_0%,transparent_70%)] opacity-70" />
               <div className="absolute inset-0 bg-[linear-gradient(180deg,#252528_0%,#141416_45%,#0c0c0d_100%)] opacity-90" />
             </div>
@@ -251,7 +290,7 @@ export function ImmersiveExerciseSession({
             <button
               type="button"
               onClick={onToggleSessionPause}
-              className="pointer-events-auto ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full bg-black/45 text-[#FF0702]"
+              className="pointer-events-auto ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full bg-black/45 text-[#FF2B2B]"
               aria-label={sessionPaused ? 'Reprendre la séance' : 'Mettre la séance en pause'}
             >
               {sessionPaused ? (
@@ -276,25 +315,25 @@ export function ImmersiveExerciseSession({
             {displayName}
           </h1>
           {muscleLine ? (
-            <p className="mt-0.5 text-[13px] font-medium text-[#ACB4BA]">{muscleLine}</p>
+            <p className="mt-0.5 text-[13px] font-medium text-[#8E8E93]">{muscleLine}</p>
           ) : null}
-          <p className="mt-0.5 text-[12px] text-[#717C83]">
+          <p className="mt-0.5 text-[12px] text-[#636366]">
             Exercice {safeIndex + 1} sur {exercises.length}
           </p>
         </header>
 
         {/* Sets grid — Effort 1–10 (réf. 787e6ed), facultatif, jamais Facile/OK/Dur */}
         <div className="mb-1 grid grid-cols-[2.25rem_1fr_1fr_1fr_2.5rem] items-center gap-x-2 px-0.5">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-[#717C83]">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-[#636366]">
             Série
           </span>
-          <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#717C83]">
+          <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#636366]">
             kg
           </span>
-          <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#717C83]">
+          <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#636366]">
             Reps
           </span>
-          <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#717C83]">
+          <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#636366]">
             Effort
           </span>
           <span className="sr-only">Validation</span>
@@ -310,7 +349,7 @@ export function ImmersiveExerciseSession({
             const showLastHint = Boolean(last && isSetLoadBlank(set))
             const applyLast = () => {
               if (!last || !isSetLoadBlank(set)) return
-              patchSet(idx, lastPerformanceToSetPatch(last))
+              patchSet(idx, lastPerformanceToSetPatch(last), { autoValidate: false })
             }
 
             return (
@@ -325,85 +364,158 @@ export function ImmersiveExerciseSession({
               >
                 {active ? (
                   <span
-                    className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#FF0702]"
+                    className="absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#FF2B2B]"
                     aria-hidden="true"
                   />
                 ) : null}
                 <span
                   className={`text-center text-[13px] font-bold tabular-nums ${
-                    done ? 'text-white' : active ? 'text-white' : 'text-[#ACB4BA]'
+                    done ? 'text-white' : active ? 'text-white' : 'text-[#8E8E93]'
                   }`}
                 >
                   {idx + 1}
                 </span>
-                <ClearableNumberInput
-                  value={showLastHint ? null : set.weightKg}
-                  onChange={(v) => patchSet(idx, { weightKg: v ?? 0 })}
-                  onFocus={showLastHint ? applyLast : undefined}
-                  min={0}
-                  max={500}
-                  step={0.5}
-                  required={!showLastHint}
-                  placeholder={
-                    showLastHint && last
-                      ? formatLastWeightPlaceholder(last.weightKg)
-                      : undefined
-                  }
-                  placeholderClassName={LAST_PLACEHOLDER}
-                  aria-label={
-                    showLastHint && last
-                      ? formatLastWeightAriaLabel(last.weightKg)
-                      : `Série ${idx + 1} poids`
-                  }
-                  className={FIELD}
-                />
-                <ClearableNumberInput
-                  value={showLastHint ? null : set.reps}
-                  onChange={(v) =>
-                    patchSet(idx, { reps: v != null ? Math.round(v) : 0 })
-                  }
-                  onFocus={showLastHint ? applyLast : undefined}
-                  min={1}
-                  max={50}
-                  required={!showLastHint}
-                  placeholder={
-                    showLastHint && last
-                      ? formatLastRepsPlaceholder(last.reps)
-                      : undefined
-                  }
-                  placeholderClassName={LAST_PLACEHOLDER}
-                  aria-label={
-                    showLastHint && last
-                      ? formatLastRepsAriaLabel(last.reps)
-                      : `Série ${idx + 1} reps`
-                  }
-                  className={FIELD}
-                />
-                {done && effortDone ? (
-                  <div
-                    className={`${FIELD} flex items-center justify-center text-[13px] text-[#ACB4BA]`}
-                    aria-label={`Série ${idx + 1} effort ${effortDone}`}
-                  >
-                    {effortDone}
-                  </div>
-                ) : (
-                  <ClearableNumberInput
-                    value={set.rpe ?? null}
-                    onChange={(v) =>
-                      patchSet(idx, {
-                        rpe: v != null ? Math.min(10, Math.max(1, Math.round(v))) : undefined,
-                      })
-                    }
-                    min={1}
-                    max={10}
-                    required={false}
-                    deferAmbiguousIntegerPrefix
-                    placeholder="1–10"
-                    placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#717C83]"
-                    aria-label={`Série ${idx + 1} effort facultatif`}
-                    className={`${FIELD} text-[13px] text-[#ACB4BA]`}
-                  />
-                )}
+                {(() => {
+                  const weightErr = showLastHint
+                    ? null
+                    : setFieldRangeError('weight', set.weightKg)
+                  const repsErr =
+                    showLastHint || isSetLoadBlank(set)
+                      ? null
+                      : setFieldRangeError('reps', set.reps)
+                  const effortErr = setFieldRangeError('effort', set.rpe)
+                  return (
+                    <>
+                      <div>
+                        <ClearableNumberInput
+                          value={showLastHint ? null : set.weightKg}
+                          onChange={(v) => {
+                            // Vide → ne jamais écrire 0 silencieux ; blur restaure l’avant-focus.
+                            if (v == null) return
+                            patchSet(idx, { weightKg: v }, { autoValidate: false })
+                          }}
+                          onFocus={showLastHint ? applyLast : undefined}
+                          onBlur={() => tryAutoValidateSet(idx)}
+                          min={SET_WEIGHT_MIN_KG}
+                          max={SET_WEIGHT_MAX_KG}
+                          step={0.5}
+                          required={!showLastHint}
+                          clampOnBlur={false}
+                          commitOnBlur
+                          selectOnFocus
+                          placeholder={
+                            showLastHint && last
+                              ? formatLastWeightPlaceholder(last.weightKg)
+                              : undefined
+                          }
+                          placeholderClassName={LAST_PLACEHOLDER}
+                          aria-label={
+                            showLastHint && last
+                              ? formatLastWeightAriaLabel(last.weightKg)
+                              : `Série ${idx + 1} poids`
+                          }
+                          className={weightErr ? FIELD_ERROR : FIELD}
+                        />
+                        {weightErr ? (
+                          <p
+                            className="mt-0.5 text-center text-[10px] font-medium text-[#FF6961]"
+                            role="alert"
+                          >
+                            {weightErr}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div>
+                        <ClearableNumberInput
+                          value={
+                            showLastHint
+                              ? null
+                              : repsErr && set.reps === 0
+                                ? 0
+                                : set.reps === 0
+                                  ? null
+                                  : set.reps
+                          }
+                          onChange={(v) => {
+                            if (v == null) return
+                            patchSet(idx, { reps: Math.round(v) }, { autoValidate: false })
+                          }}
+                          onFocus={showLastHint ? applyLast : undefined}
+                          onBlur={() => tryAutoValidateSet(idx)}
+                          min={SET_REPS_MIN}
+                          max={SET_REPS_MAX}
+                          required={!showLastHint}
+                          clampOnBlur={false}
+                          commitOnBlur
+                          selectOnFocus
+                          placeholder={
+                            showLastHint && last
+                              ? formatLastRepsPlaceholder(last.reps)
+                              : undefined
+                          }
+                          placeholderClassName={LAST_PLACEHOLDER}
+                          aria-label={
+                            showLastHint && last
+                              ? formatLastRepsAriaLabel(last.reps)
+                              : `Série ${idx + 1} reps`
+                          }
+                          className={repsErr ? FIELD_ERROR : FIELD}
+                        />
+                        {repsErr ? (
+                          <p
+                            className="mt-0.5 text-center text-[10px] font-medium text-[#FF6961]"
+                            role="alert"
+                          >
+                            {repsErr}
+                          </p>
+                        ) : null}
+                      </div>
+                      {done && effortDone ? (
+                        <div
+                          className={`${FIELD} flex items-center justify-center text-[13px] text-[#AEAEB2]`}
+                          aria-label={`Série ${idx + 1} effort ${effortDone}`}
+                        >
+                          {effortDone}
+                        </div>
+                      ) : (
+                        <div>
+                          <ClearableNumberInput
+                            value={set.rpe ?? null}
+                            onChange={(v) =>
+                              patchSet(
+                                idx,
+                                {
+                                  rpe: v != null ? Math.round(v) : undefined,
+                                },
+                                { autoValidate: false },
+                              )
+                            }
+                            onBlur={() => tryAutoValidateSet(idx)}
+                            min={SET_EFFORT_MIN}
+                            max={SET_EFFORT_MAX}
+                            required={false}
+                            clampOnBlur={false}
+                            selectOnFocus
+                            commitOnBlur
+                            deferAmbiguousIntegerPrefix
+                            placeholder="1–10"
+                            placeholderClassName="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-[#636366]"
+                            aria-label={`Série ${idx + 1} effort facultatif`}
+                            className={`${effortErr ? FIELD_ERROR : FIELD} text-[13px] text-[#AEAEB2]`}
+                          />
+                          {effortErr ? (
+                            <p
+                              className="mt-0.5 text-center text-[10px] font-medium text-[#FF6961]"
+                              role="alert"
+                            >
+                              {effortErr}
+                            </p>
+                          ) : null}
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
                 <div className="flex items-center justify-center">
                   {done ? (
                     <span
@@ -428,7 +540,7 @@ export function ImmersiveExerciseSession({
           <button
             type="button"
             onClick={onUndoValidation}
-            className="ios-press mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-white/12 text-[13px] font-semibold text-[#ACB4BA]"
+            className="ios-press mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-white/12 text-[13px] font-semibold text-[#AEAEB2]"
             data-undo-validation
           >
             Annuler
@@ -439,16 +551,31 @@ export function ImmersiveExerciseSession({
           <button
             type="button"
             onClick={() => onAddSet(exercise.id)}
-            className="ios-press flex min-h-11 flex-1 items-center justify-center rounded-xl border border-white/12 bg-[#1d1f20] px-3 text-[13px] font-semibold text-[#ACB4BA]"
+            className="ios-press flex min-h-11 flex-1 items-center justify-center rounded-xl border border-white/12 bg-[#1c1c1e] px-3 text-[13px] font-semibold text-[#AEAEB2]"
           >
             + Ajouter une série
           </button>
           {autoValidate ? null : (
             <button
               type="button"
-              onClick={() => onValidateSet(exercise, validateIdx, restSecResolved)}
-              disabled={Boolean(exercise.sets[validateIdx]?.done) && pendingIdx < 0}
-              className="ios-press flex min-h-11 flex-[1.35] items-center justify-center rounded-xl bg-[#FF0702] px-3 text-[14px] font-semibold text-white disabled:opacity-40"
+              onClick={() => {
+                // Architect : commit local (vide → avant-focus) avant Valider.
+                flushPendingClearableNumberInputs()
+                const target = setsRef.current[validateIdx]
+                if (!target || target.done) return
+                // Même gate que l’auto-validate : effort/reps vides → bloque (pas de 0 inventé).
+                if (!isSetReadyForAutoValidate(target)) return
+                onValidateSet(
+                  { ...exercise, sets: setsRef.current.map((s) => ({ ...s })) },
+                  validateIdx,
+                  restSecResolved,
+                )
+              }}
+              disabled={
+                (Boolean(exercise.sets[validateIdx]?.done) && pendingIdx < 0) ||
+                !isSetReadyForAutoValidate(exercise.sets[validateIdx] ?? { reps: 0, weightKg: 0 })
+              }
+              className="ios-press flex min-h-11 flex-[1.35] items-center justify-center rounded-xl bg-[#FF2B2B] px-3 text-[14px] font-semibold text-white disabled:opacity-40"
             >
               Valider la série
             </button>
@@ -465,7 +592,7 @@ export function ImmersiveExerciseSession({
               : `Repos prévu ${formatClock(restDisplaySec)}`
           }
         >
-          <Timer className="h-4 w-4 shrink-0 text-[#FF0702]" strokeWidth={2.25} />
+          <Timer className="h-4 w-4 shrink-0 text-[#FF2B2B]" strokeWidth={2.25} />
           <p className="flex-1 text-[14px] font-semibold text-white">
             Repos{' '}
             <span className="tabular-nums tracking-tight">{formatClock(restDisplaySec)}</span>
@@ -505,7 +632,7 @@ export function ImmersiveExerciseSession({
                     cy={ringSize / 2}
                     r={radius}
                     fill="none"
-                    stroke="#25282a"
+                    stroke="#2c2c2e"
                     strokeWidth={stroke}
                   />
                   <circle
@@ -513,7 +640,7 @@ export function ImmersiveExerciseSession({
                     cy={ringSize / 2}
                     r={radius}
                     fill="none"
-                    stroke="#FF0702"
+                    stroke="#FF2B2B"
                     strokeWidth={stroke}
                     strokeLinecap="round"
                     strokeDasharray={circumference}
@@ -542,14 +669,14 @@ export function ImmersiveExerciseSession({
                         type="button"
                         onClick={() => onActiveIndexChange(i)}
                         className={`ios-press relative min-h-9 min-w-5 px-0.5 text-[13px] font-semibold tabular-nums ${
-                          current ? 'text-white' : 'text-[#717C83]'
+                          current ? 'text-white' : 'text-[#636366]'
                         }`}
                         aria-current={current ? 'true' : undefined}
                         aria-label={`Exercice ${i + 1}${ex.name ? ` ${ex.name}` : ''}`}
                       >
                         {i + 1}
                         {current ? (
-                          <span className="absolute inset-x-0 -bottom-0.5 mx-auto h-0.5 w-3 rounded-full bg-[#FF0702]" />
+                          <span className="absolute inset-x-0 -bottom-0.5 mx-auto h-0.5 w-3 rounded-full bg-[#FF2B2B]" />
                         ) : null}
                       </button>
                     )
@@ -558,7 +685,7 @@ export function ImmersiveExerciseSession({
                     <button
                       type="button"
                       onClick={onAddExercise}
-                      className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 text-[#ACB4BA]"
+                      className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 text-[#AEAEB2]"
                       aria-label="Ajouter un exercice"
                       data-add-exercise
                     >
@@ -571,9 +698,12 @@ export function ImmersiveExerciseSession({
 
             <button
               type="button"
-              onClick={onFinishSession}
+              onClick={() => {
+                flushPendingClearableNumberInputs()
+                onFinishSession()
+              }}
               disabled={saving}
-              className="ios-press mt-3 mb-0.5 min-h-11 w-full text-center text-[13px] font-medium text-[#717C83] disabled:opacity-50"
+              className="ios-press mt-3 mb-0.5 min-h-11 w-full text-center text-[13px] font-medium text-[#636366] disabled:opacity-50"
             >
               {saving ? 'Synchro…' : 'Terminer la séance'}
             </button>

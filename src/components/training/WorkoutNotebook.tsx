@@ -35,7 +35,10 @@ import {
   lastPerformanceToSetPatch,
   nextSetFromPrevious,
 } from '../../utils/lastPerformance'
-import { ClearableNumberInput } from '../nutrition/ClearableNumberInput'
+import {
+  ClearableNumberInput,
+  flushPendingClearableNumberInputs,
+} from '../nutrition/ClearableNumberInput'
 import { WorkoutHistory } from './WorkoutHistory'
 import { ImmersiveExerciseSession } from './ImmersiveExerciseSession'
 import {
@@ -48,6 +51,13 @@ import {
   AUTO_VALIDATE_UNDO_MS,
   isSetReadyForAutoValidate,
   makeAutoValidateKey,
+  SET_EFFORT_MAX,
+  SET_EFFORT_MIN,
+  SET_REPS_MAX,
+  SET_REPS_MIN,
+  SET_WEIGHT_MAX_KG,
+  SET_WEIGHT_MIN_KG,
+  setFieldRangeError,
   shouldCommitAutoValidate,
 } from '../../utils/autoValidateSet'
 import { CANONICAL_REST_SEC, resolveRestDuration } from '../../utils/restDuration'
@@ -462,7 +472,12 @@ export function WorkoutNotebook({
     setExercises((prev) => prev.map((e) => (e.id === exerciseId ? { ...e, ...patch } : e)))
   }
 
-  const updateSet = (exerciseId: string, setIndex: number, patch: Partial<WorkoutSet>) => {
+  const updateSet = (
+    exerciseId: string,
+    setIndex: number,
+    patch: Partial<WorkoutSet>,
+    options?: { autoValidate?: boolean },
+  ) => {
     draftDirty.current = true
     const next = exercisesRef.current.map((e) => {
       if (e.id !== exerciseId) return e
@@ -473,8 +488,19 @@ export function WorkoutNotebook({
     })
     exercisesRef.current = next
     setExercises(next)
+    // Frappe : jamais finishSet. Auto-validate seulement au blur / bouton Valider.
+    if (options?.autoValidate === false) return
     if (!autoValidate) return
     const ex = next.find((e) => e.id === exerciseId)
+    const merged = ex?.sets[setIndex]
+    if (ex && merged && isSetReadyForAutoValidate(merged)) {
+      finishSet(ex, setIndex, merged.difficulty, restPrefSec)
+    }
+  }
+
+  const tryAutoValidateSet = (exerciseId: string, setIndex: number) => {
+    if (!autoValidate) return
+    const ex = exercisesRef.current.find((e) => e.id === exerciseId)
     const merged = ex?.sets[setIndex]
     if (ex && merged && isSetReadyForAutoValidate(merged)) {
       finishSet(ex, setIndex, merged.difficulty, restPrefSec)
@@ -491,9 +517,10 @@ export function WorkoutNotebook({
     const current = live?.sets[setIndex]
     if (!current || current.done) return
     const merged = difficulty ? { ...current, difficulty } : current
+    // Même gate immersive : effort/reps vides → bloque (jamais rpe 0 inventé), auto ON ou OFF.
+    if (!isSetReadyForAutoValidate(merged)) return
     const key = makeAutoValidateKey(ex.id, setIndex, merged)
     if (autoValidate) {
-      if (!isSetReadyForAutoValidate(merged)) return
       if (
         !shouldCommitAutoValidate({
           ready: true,
@@ -640,7 +667,10 @@ export function WorkoutNotebook({
   }
 
   const handleSave = async () => {
-    const cleaned = exercises
+    // Architect : commit cases encore focalisées (vide → avant-focus) avant Terminer.
+    flushPendingClearableNumberInputs()
+    const liveExercises = exercisesRef.current
+    const cleaned = liveExercises
       .map((e) => ({
         ...e,
         name: sanitizeExerciseName(e.name.trim() || 'Exercice'),
@@ -767,7 +797,7 @@ export function WorkoutNotebook({
             >
               {sessionClockLabel}
               {sessionPaused ? (
-                <span className="ml-1.5 text-[11px] font-medium text-[#ACB4BA]">Pause</span>
+                <span className="ml-1.5 text-[11px] font-medium text-[#8E8E93]">Pause</span>
               ) : null}
             </p>
             {onToggleSessionPause ? (
@@ -799,7 +829,7 @@ export function WorkoutNotebook({
               className={`ios-press flex min-h-11 shrink-0 items-center rounded-full border px-3.5 text-[12px] font-semibold ${
                 active
                   ? 'border-transparent text-white'
-                  : 'border-white/10 bg-black/25 text-[#ACB4BA]'
+                  : 'border-white/10 bg-black/25 text-[#8E8E93]'
               }`}
               style={
                 active
@@ -815,7 +845,7 @@ export function WorkoutNotebook({
         <button
           type="button"
           onClick={() => setCustomOpen((v) => !v)}
-          className="ios-press flex min-h-11 shrink-0 items-center rounded-full border border-dashed border-white/20 px-3 text-[12px] font-semibold text-[#ACB4BA]"
+          className="ios-press flex min-h-11 shrink-0 items-center rounded-full border border-dashed border-white/20 px-3 text-[12px] font-semibold text-[#8E8E93]"
         >
           + Programme
         </button>
@@ -849,24 +879,24 @@ export function WorkoutNotebook({
         className="rounded-3xl border border-white/10 px-4 py-3.5"
         style={{
           background: editingNote
-            ? `radial-gradient(ellipse 80% 60% at 100% 0%, #FF070233 0%, transparent 55%), rgb(22 22 24 / 0.96)`
-            : `radial-gradient(ellipse 80% 60% at 100% 0%, ${activeRoutine?.accent ?? '#FF0702'}28 0%, transparent 55%), rgb(22 22 24 / 0.96)`,
+            ? `radial-gradient(ellipse 80% 60% at 100% 0%, #FF2B2B33 0%, transparent 55%), rgb(22 22 24 / 0.96)`
+            : `radial-gradient(ellipse 80% 60% at 100% 0%, ${activeRoutine?.accent ?? '#FF2B2B'}28 0%, transparent 55%), rgb(22 22 24 / 0.96)`,
           boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.06)',
         }}
       >
         {editingNote ? (
-          <div className="mb-2.5 flex items-center justify-between gap-2 rounded-2xl border border-[#FF0702]/35 bg-[#FF0702]/12 px-3 py-2">
+          <div className="mb-2.5 flex items-center justify-between gap-2 rounded-2xl border border-[#FF2B2B]/35 bg-[#FF2B2B]/12 px-3 py-2">
             <div className="flex items-center gap-2">
-              <Pencil className="h-4 w-4 shrink-0 text-[#FF907F]" strokeWidth={2.25} />
+              <Pencil className="h-4 w-4 shrink-0 text-[#FF6961]" strokeWidth={2.25} />
               <div>
                 <p className="text-[13px] font-bold text-white">Mode Édition</p>
-                <p className="text-[11px] text-[#ACB4BA]">Séance du {editingNote.dateKey}</p>
+                <p className="text-[11px] text-[#AEAEB2]">Séance du {editingNote.dateKey}</p>
               </div>
             </div>
             <button
               type="button"
               onClick={cancelEdit}
-              className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/10 text-[#ACB4BA]"
+              className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/10 text-[#8E8E93]"
               aria-label="Annuler l’édition"
             >
               <X className="h-4 w-4" />
@@ -885,21 +915,21 @@ export function WorkoutNotebook({
             }}
             placeholder="Nom"
             data-session-title
-            className="w-full bg-transparent text-[17px] font-bold text-white placeholder:text-[#717C83] outline-none"
+            className="w-full bg-transparent text-[17px] font-bold text-white placeholder:text-[#636366] outline-none"
           />
         </div>
         {!hasSaved ? (
-          <p className="mb-2.5 text-[11px] text-[#ACB4BA]">
+          <p className="mb-2.5 text-[11px] text-[#8E8E93]">
             Nouveau focus — ajoute tes exercices ; ils resteront dans ton carnet.
           </p>
         ) : null}
 
         <div className="mb-2 flex items-center justify-end gap-1.5">
-          <span className="text-[11px] text-[#ACB4BA]">Effort facultatif</span>
+          <span className="text-[11px] text-[#8E8E93]">Effort facultatif</span>
           <button
             type="button"
             onClick={() => setEffortHelpOpen((v) => !v)}
-            className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 text-[12px] font-bold text-[#ACB4BA]"
+            className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 text-[12px] font-bold text-[#8E8E93]"
             aria-label="Aide Effort (facultatif)"
             aria-expanded={effortHelpOpen}
           >
@@ -909,7 +939,7 @@ export function WorkoutNotebook({
 
         {effortHelpOpen ? (
           <div
-            className="mb-2.5 rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-[11px] leading-relaxed text-[#ACB4BA]"
+            className="mb-2.5 rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-[11px] leading-relaxed text-[#AEAEB2]"
             role="note"
           >
             <p className="font-semibold text-white">Effort · 1–10</p>
@@ -954,7 +984,7 @@ export function WorkoutNotebook({
                       updateExercise(ex.id, { name: sanitizeExerciseName(e.target.value) })
                     }
                     placeholder="Exercice (ex. Développé couché)"
-                    className="w-full bg-transparent text-[15px] font-semibold uppercase tracking-wide text-white placeholder:normal-case placeholder:tracking-normal placeholder:text-[#717C83] outline-none"
+                    className="w-full bg-transparent text-[15px] font-semibold uppercase tracking-wide text-white placeholder:normal-case placeholder:tracking-normal placeholder:text-[#636366] outline-none"
                   />
                   {exercises.length > 1 && (
                     <button
@@ -963,7 +993,7 @@ export function WorkoutNotebook({
                         draftDirty.current = true
                         setExercises((prev) => prev.filter((x) => x.id !== ex.id))
                       }}
-                      className="ios-press flex min-h-11 min-w-11 items-center justify-center text-[#ACB4BA]"
+                      className="ios-press flex min-h-11 min-w-11 items-center justify-center text-[#8E8E93]"
                       aria-label="Supprimer exercice"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -973,12 +1003,12 @@ export function WorkoutNotebook({
 
                 {last && (
                   <div className="mb-2 px-0.5 py-1">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-[#ACB4BA]">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-[#8E8E93]">
                       Dernière séance
                     </p>
                     <ul className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
                       {last.sets.map((s, i) => (
-                        <li key={i} className="text-[12px] tabular-nums text-[#ACB4BA]">
+                        <li key={i} className="text-[12px] tabular-nums text-[#AEAEB2]">
                           {formatSetLoadLabel(s.weightKg, s.reps)}
                         </li>
                       ))}
@@ -986,7 +1016,7 @@ export function WorkoutNotebook({
                   </div>
                 )}
 
-                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#ACB4BA]">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#8E8E93]">
                   Aujourd&apos;hui
                 </p>
 
@@ -998,7 +1028,9 @@ export function WorkoutNotebook({
                     const showLastHint = Boolean(lastPerf && isSetLoadBlank(set))
                     const applyLast = () => {
                       if (!lastPerf || !isSetLoadBlank(set)) return
-                      updateSet(ex.id, idx, lastPerformanceToSetPatch(lastPerf))
+                      updateSet(ex.id, idx, lastPerformanceToSetPatch(lastPerf), {
+                        autoValidate: false,
+                      })
                     }
                     return (
                       <div
@@ -1008,81 +1040,161 @@ export function WorkoutNotebook({
                       >
                         <span
                           className={`pb-2 text-[11px] font-bold ${
-                            set.done ? 'text-[#30D158]' : 'text-[#ACB4BA]'
+                            set.done ? 'text-[#30D158]' : 'text-[#8E8E93]'
                           }`}
                         >
                           {idx + 1}
                         </span>
                         <label className="block">
-                          <span className="mb-0.5 block text-[10px] text-[#717C83]">kg</span>
-                          <ClearableNumberInput
-                            value={showLastHint ? null : set.weightKg}
-                            onChange={(v) => updateSet(ex.id, idx, { weightKg: v ?? 0 })}
-                            onFocus={showLastHint ? applyLast : undefined}
-                            min={0}
-                            max={500}
-                            step={0.5}
-                            required={!showLastHint}
-                            placeholder={
-                              showLastHint && lastPerf
-                                ? formatLastWeightPlaceholder(lastPerf.weightKg)
-                                : undefined
-                            }
-                            placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2.5 text-[15px] font-semibold tabular-nums text-[#717C83]"
-                            aria-label={
-                              showLastHint && lastPerf
-                                ? formatLastWeightAriaLabel(lastPerf.weightKg)
-                                : 'Poids'
-                            }
-                            className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
-                          />
+                          <span className="mb-0.5 block text-[10px] text-[#636366]">kg</span>
+                          {(() => {
+                            const weightErr = showLastHint
+                              ? null
+                              : setFieldRangeError('weight', set.weightKg)
+                            return (
+                              <>
+                                <ClearableNumberInput
+                                  value={showLastHint ? null : set.weightKg}
+                                  onChange={(v) => {
+                                    if (v == null) return
+                                    updateSet(ex.id, idx, { weightKg: v }, { autoValidate: false })
+                                  }}
+                                  onFocus={showLastHint ? applyLast : undefined}
+                                  onBlur={() => tryAutoValidateSet(ex.id, idx)}
+                                  min={SET_WEIGHT_MIN_KG}
+                                  max={SET_WEIGHT_MAX_KG}
+                                  step={0.5}
+                                  required={!showLastHint}
+                                  clampOnBlur={false}
+                                  commitOnBlur
+                                  selectOnFocus
+                                  placeholder={
+                                    showLastHint && lastPerf
+                                      ? formatLastWeightPlaceholder(lastPerf.weightKg)
+                                      : undefined
+                                  }
+                                  placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2.5 text-[15px] font-semibold tabular-nums text-[#636366]"
+                                  aria-label={
+                                    showLastHint && lastPerf
+                                      ? formatLastWeightAriaLabel(lastPerf.weightKg)
+                                      : 'Poids'
+                                  }
+                                  className={`w-full rounded-xl border bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none ${
+                                    weightErr
+                                      ? 'border-[#FF6961]'
+                                      : 'border-white/10'
+                                  }`}
+                                />
+                                {weightErr ? (
+                                  <p className="mt-0.5 text-[10px] font-medium text-[#FF6961]" role="alert">
+                                    {weightErr}
+                                  </p>
+                                ) : null}
+                              </>
+                            )
+                          })()}
                         </label>
                         <label className="block">
-                          <span className="mb-0.5 block text-[10px] text-[#717C83]">Reps</span>
-                          <ClearableNumberInput
-                            value={showLastHint ? null : set.reps}
-                            onChange={(v) =>
-                              updateSet(ex.id, idx, { reps: v != null ? Math.round(v) : 0 })
-                            }
-                            onFocus={showLastHint ? applyLast : undefined}
-                            min={1}
-                            max={50}
-                            required={!showLastHint}
-                            placeholder={
-                              showLastHint && lastPerf
-                                ? formatLastRepsPlaceholder(lastPerf.reps)
-                                : undefined
-                            }
-                            placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2.5 text-[15px] font-semibold tabular-nums text-[#717C83]"
-                            aria-label={
-                              showLastHint && lastPerf
-                                ? formatLastRepsAriaLabel(lastPerf.reps)
-                                : 'Reps'
-                            }
-                            className="w-full rounded-xl border border-white/10 bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none"
-                          />
+                          <span className="mb-0.5 block text-[10px] text-[#636366]">Reps</span>
+                          {(() => {
+                            const repsDisplay = showLastHint
+                              ? null
+                              : set.reps === 0
+                                ? null
+                                : set.reps
+                            // Série encore vide (0/0) : pas d’alerte. 0 rep sur charge réelle → erreur.
+                            const repsErr =
+                              showLastHint || isSetLoadBlank(set)
+                                ? null
+                                : setFieldRangeError('reps', set.reps)
+                            return (
+                              <>
+                                <ClearableNumberInput
+                                  value={
+                                    repsErr && set.reps === 0 ? 0 : repsDisplay
+                                  }
+                                  onChange={(v) => {
+                                    if (v == null) return
+                                    updateSet(
+                                      ex.id,
+                                      idx,
+                                      { reps: Math.round(v) },
+                                      { autoValidate: false },
+                                    )
+                                  }}
+                                  onFocus={showLastHint ? applyLast : undefined}
+                                  onBlur={() => tryAutoValidateSet(ex.id, idx)}
+                                  min={SET_REPS_MIN}
+                                  max={SET_REPS_MAX}
+                                  required={!showLastHint}
+                                  clampOnBlur={false}
+                                  commitOnBlur
+                                  selectOnFocus
+                                  placeholder={
+                                    showLastHint && lastPerf
+                                      ? formatLastRepsPlaceholder(lastPerf.reps)
+                                      : undefined
+                                  }
+                                  placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2.5 text-[15px] font-semibold tabular-nums text-[#636366]"
+                                  aria-label={
+                                    showLastHint && lastPerf
+                                      ? formatLastRepsAriaLabel(lastPerf.reps)
+                                      : 'Reps'
+                                  }
+                                  className={`w-full rounded-xl border bg-black/40 px-2.5 py-2 text-[15px] font-semibold text-white outline-none ${
+                                    repsErr ? 'border-[#FF6961]' : 'border-white/10'
+                                  }`}
+                                />
+                                {repsErr ? (
+                                  <p className="mt-0.5 text-[10px] font-medium text-[#FF6961]" role="alert">
+                                    {repsErr}
+                                  </p>
+                                ) : null}
+                              </>
+                            )
+                          })()}
                         </label>
                         <label className="block w-[3.75rem]">
-                          <span className="mb-0.5 block text-[10px] text-[#717C83]">Effort</span>
-                          <ClearableNumberInput
-                            value={set.rpe ?? null}
-                            onChange={(v) =>
-                              updateSet(ex.id, idx, {
-                                rpe:
-                                  v != null
-                                    ? Math.min(10, Math.max(1, Math.round(v)))
-                                    : undefined,
-                              })
-                            }
-                            min={1}
-                            max={10}
-                            required={false}
-                            deferAmbiguousIntegerPrefix
-                            placeholder="1–10"
-                            placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2 text-[12px] font-semibold text-[#717C83]"
-                            aria-label="Effort facultatif, 1 à 10"
-                            className="w-full rounded-xl border border-white/10 bg-black/40 px-2 py-2 text-[13px] font-semibold text-[#ACB4BA] outline-none"
-                          />
+                          <span className="mb-0.5 block text-[10px] text-[#636366]">Effort</span>
+                          {(() => {
+                            const effortErr = setFieldRangeError('effort', set.rpe)
+                            return (
+                              <>
+                                <ClearableNumberInput
+                                  value={set.rpe ?? null}
+                                  onChange={(v) =>
+                                    updateSet(
+                                      ex.id,
+                                      idx,
+                                      {
+                                        rpe: v != null ? Math.round(v) : undefined,
+                                      },
+                                      { autoValidate: false },
+                                    )
+                                  }
+                                  onBlur={() => tryAutoValidateSet(ex.id, idx)}
+                                  min={SET_EFFORT_MIN}
+                                  max={SET_EFFORT_MAX}
+                                  required={false}
+                                  clampOnBlur={false}
+                                  selectOnFocus
+                                  commitOnBlur
+                                  deferAmbiguousIntegerPrefix
+                                  placeholder="1–10"
+                                  placeholderClassName="pointer-events-none absolute inset-0 flex items-center px-2 text-[12px] font-semibold text-[#636366]"
+                                  aria-label="Effort facultatif, 1 à 10"
+                                  className={`w-full rounded-xl border bg-black/40 px-2 py-2 text-[13px] font-semibold text-[#AEAEB2] outline-none ${
+                                    effortErr ? 'border-[#FF6961]' : 'border-white/10'
+                                  }`}
+                                />
+                                {effortErr ? (
+                                  <p className="mt-0.5 text-[10px] font-medium text-[#FF6961]" role="alert">
+                                    {effortErr}
+                                  </p>
+                                ) : null}
+                              </>
+                            )
+                          })()}
                         </label>
                         {ex.sets.length > 1 ? (
                           <button
@@ -1092,7 +1204,7 @@ export function WorkoutNotebook({
                                 sets: ex.sets.filter((_, i) => i !== idx),
                               })
                             }
-                            className="mb-2 flex min-h-11 min-w-11 items-center justify-center text-[#717C83]"
+                            className="mb-2 flex min-h-11 min-w-11 items-center justify-center text-[#636366]"
                             aria-label="Supprimer série"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -1109,14 +1221,24 @@ export function WorkoutNotebook({
                   <button
                     type="button"
                     onClick={() => updateExercise(ex.id, { sets: appendSet(ex.sets) })}
-                    className="ios-press inline-flex min-h-11 items-center rounded-full border border-white/10 px-3 text-[11px] font-semibold text-[#ACB4BA]"
+                    className="ios-press inline-flex min-h-11 items-center rounded-full border border-white/10 px-3 text-[11px] font-semibold text-[#AEAEB2]"
                   >
                     + Ajouter une série
                   </button>
                   <button
                     type="button"
-                    onClick={() => finishSet(ex, validateIdx)}
-                    className="ios-press inline-flex min-h-11 items-center gap-1 rounded-full border border-[#30D158]/40 bg-[#30D158]/15 px-3.5 text-[12px] font-semibold text-[#30D158]"
+                    onClick={() => {
+                      // Architect : commit local (vide → avant-focus) avant de lire la série.
+                      flushPendingClearableNumberInputs()
+                      finishSet(ex, validateIdx)
+                    }}
+                    disabled={
+                      Boolean(ex.sets[validateIdx]?.done) ||
+                      !isSetReadyForAutoValidate(
+                        ex.sets[validateIdx] ?? { reps: 0, weightKg: 0 },
+                      )
+                    }
+                    className="ios-press inline-flex min-h-11 items-center gap-1 rounded-full border border-[#30D158]/40 bg-[#30D158]/15 px-3.5 text-[12px] font-semibold text-[#30D158] disabled:opacity-40"
                   >
                     <Check className="h-3.5 w-3.5" />
                     Valider
@@ -1133,7 +1255,7 @@ export function WorkoutNotebook({
                         className={`ios-press inline-flex min-h-11 items-center rounded-full border px-3 text-[11px] font-semibold ${
                           on
                             ? 'border-white/25 bg-white/10 text-white'
-                            : 'border-white/10 text-[#717C83]'
+                            : 'border-white/10 text-[#636366]'
                         }`}
                       >
                         {d.label}
@@ -1143,7 +1265,7 @@ export function WorkoutNotebook({
                 </div>
 
                 {ex.sets.some((s) => s.restSec != null && s.restSec > 0) ? (
-                  <p className="mt-1.5 text-[10px] tabular-nums text-[#717C83]">
+                  <p className="mt-1.5 text-[10px] tabular-nums text-[#636366]">
                     Repos loggés :{' '}
                     {ex.sets
                       .map((s, i) =>
@@ -1167,7 +1289,7 @@ export function WorkoutNotebook({
                 prev.length === 0 ? [emptyExercise()] : [...prev, emptyExercise()],
               )
             }}
-            className="ios-press flex flex-1 items-center justify-center gap-1 rounded-2xl border border-white/10 bg-black/30 py-3 text-[13px] font-semibold text-[#ACB4BA]"
+            className="ios-press flex flex-1 items-center justify-center gap-1 rounded-2xl border border-white/10 bg-black/30 py-3 text-[13px] font-semibold text-[#AEAEB2]"
           >
             <Plus className="h-4 w-4" />
             Exercice
@@ -1182,7 +1304,7 @@ export function WorkoutNotebook({
           </button>
         </div>
 
-        <p className="mt-2 text-center text-[11px] text-[#717C83]">
+        <p className="mt-2 text-center text-[11px] text-[#636366]">
           Volume {stats.volume} kg ·{' '}
           {sessionClockLabel && !editingNote
             ? `${sessionClockLabel} chronométré`
