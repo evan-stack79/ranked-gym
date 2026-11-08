@@ -64,6 +64,9 @@ jobs:
           VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL }}
           VITE_ENABLE_CONVEX_AUTH: "true"
           VITE_ENABLE_CONVEX_PRIMARY: "true"
+          # Pas de precache Workbox dans le shell IPA : chaque build charge SES fichiers.
+          CAPACITOR_BUILD: "1"
+          VITE_APP_BUILD_ID: ${{ github.sha }}
 
       - name: Sync Capacitor iOS
         run: npx cap sync ios
@@ -85,6 +88,15 @@ jobs:
           grep -q 'contentInsetAdjustmentBehavior = .never' "$MVC"
           grep -q 'SecureStoragePlugin' "$MVC"
           grep -q 'preferredStatusBarStyle' "$MVC"
+          grep -q 'RestTimerLiveActivityPlugin' "$MVC"
+          grep -q 'RestTimerSoundPlugin' "$MVC"
+
+          echo "== RestTimerSound + Live Activity + WebShellCache sources =="
+          test -f ios/App/App/Plugins/RestTimerSound/RestTimerSoundPlugin.swift
+          test -f ios/App/App/Plugins/RestTimerSound/rest_timer_chime.caf
+          test -f ios/App/App/Plugins/RestTimerLiveActivity/RestTimerLiveActivityPlugin.swift
+          test -f ios/App/App/WebShellCache.swift
+          grep -q 'purgeIfBuildChanged' ios/App/App/SceneDelegate.swift
 
           echo "== Info.plist status bar ownership =="
           PLIST="ios/App/App/Info.plist"
@@ -149,6 +161,7 @@ jobs:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -217,7 +230,22 @@ jobs:
             echo "ERROR: StatusBar symbols missing from App binary — overlaysWebView will not apply"
             exit 1
           fi
-          echo "Native plugin registration symbols present (MainViewController / SecureStoragePlugin / StatusBar)"
+          # Rest timer native end sound (port radix).
+          if ! grep -q 'RestTimerSound' "$STRINGS_DUMP"; then
+            echo "ERROR: RestTimerSound missing from App binary — end-of-rest chime will not play"
+            exit 1
+          fi
+          # Live Activity / Dynamic Island host plugin.
+          if ! grep -q 'RestTimerLiveActivity' "$STRINGS_DUMP"; then
+            echo "ERROR: RestTimerLiveActivity missing from App binary — Live Activity will not start"
+            exit 1
+          fi
+          # IPA shell purge (stale Capacitor web assets after OTA/build bump).
+          if ! grep -q 'WebShellCache' "$STRINGS_DUMP"; then
+            echo "ERROR: WebShellCache missing from App binary — IPA shell purge will not run"
+            exit 1
+          fi
+          echo "Native plugin registration symbols present (MainViewController / SecureStoragePlugin / StatusBar / RestTimerSound / RestTimerLiveActivity / WebShellCache)"
 
           STAGE="$RUNNER_TEMP/ipa-stage"
           rm -rf "$STAGE"

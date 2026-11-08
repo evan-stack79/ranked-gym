@@ -379,6 +379,10 @@ describe('WorkoutNotebook — carnet kg clear (liste séries)', () => {
     })
 
     expect(onRestStart).toHaveBeenCalledTimes(1)
+    expect(onRestStart.mock.calls[0]?.[0]).toMatchObject({
+      setIndex: 0,
+      setTotal: 1,
+    })
     expect(
       (host.querySelector('input[aria-label="Poids"]') as HTMLInputElement | null)?.value ?? '20',
     ).toBe('20')
