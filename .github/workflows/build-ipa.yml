@@ -88,13 +88,14 @@ jobs:
           grep -q 'contentInsetAdjustmentBehavior = .never' "$MVC"
           grep -q 'SecureStoragePlugin' "$MVC"
           grep -q 'preferredStatusBarStyle' "$MVC"
-          grep -q 'RestTimerLiveActivityPlugin' "$MVC"
+          grep -q 'LiveActivityPlugin()' "$MVC"
           grep -q 'RestTimerSoundPlugin' "$MVC"
 
           echo "== RestTimerSound + Live Activity + WebShellCache sources =="
           test -f ios/App/App/Plugins/RestTimerSound/RestTimerSoundPlugin.swift
           test -f ios/App/App/Plugins/RestTimerSound/rest_timer_chime.caf
           test -f ios/App/App/Plugins/RestTimerLiveActivity/RestTimerLiveActivityPlugin.swift
+          grep -q 'class LiveActivityPlugin' ios/App/App/Plugins/RestTimerLiveActivity/RestTimerLiveActivityPlugin.swift
           test -f ios/App/App/WebShellCache.swift
           grep -q 'purgeIfBuildChanged' ios/App/App/SceneDelegate.swift
 
@@ -235,9 +236,9 @@ jobs:
             echo "ERROR: RestTimerSound missing from App binary — end-of-rest chime will not play"
             exit 1
           fi
-          # Live Activity / Dynamic Island host plugin.
-          if ! grep -q 'RestTimerLiveActivity' "$STRINGS_DUMP"; then
-            echo "ERROR: RestTimerLiveActivity missing from App binary — Live Activity will not start"
+          # Unified Live Activity / Dynamic Island host plugin (JS name LiveActivity).
+          if ! grep -q 'LiveActivityPlugin' "$STRINGS_DUMP"; then
+            echo "ERROR: LiveActivityPlugin missing from App binary — Live Activity will not start"
             exit 1
           fi
           # IPA shell purge (stale Capacitor web assets after OTA/build bump).
@@ -245,7 +246,7 @@ jobs:
             echo "ERROR: WebShellCache missing from App binary — IPA shell purge will not run"
             exit 1
           fi
-          echo "Native plugin registration symbols present (MainViewController / SecureStoragePlugin / StatusBar / RestTimerSound / RestTimerLiveActivity / WebShellCache)"
+          echo "Native plugin registration symbols present (MainViewController / SecureStoragePlugin / StatusBar / RestTimerSound / LiveActivityPlugin / WebShellCache)"
 
           STAGE="$RUNNER_TEMP/ipa-stage"
           rm -rf "$STAGE"

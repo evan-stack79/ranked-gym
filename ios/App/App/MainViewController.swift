@@ -33,7 +33,8 @@ class MainViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(SecureStoragePlugin())
         bridge?.registerPluginInstance(CameraHeartRatePlugin())
-        bridge?.registerPluginInstance(RestTimerLiveActivityPlugin())
+        // Unified Live Activity (rest/session/steps/record/rank) — JS name `LiveActivity`.
+        bridge?.registerPluginInstance(LiveActivityPlugin())
         bridge?.registerPluginInstance(RestTimerSoundPlugin())
     }
 }
