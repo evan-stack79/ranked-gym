@@ -938,8 +938,10 @@ export const convexTables = {
     .index('by_code', ['code']),
 
   /**
-   * Hydratation v0 (ARCHI_HYDRATATION) — isolé de ranked* / rewards*.
-   * Entitlement Pass Pro cosmétique (Ma bouteille). Hors catalogue RP.
+   * Hydratation v2 (ARCHI_HYDRATATION) — isolé de ranked* / rewards*.
+   * `proEntitlements` = legacy / inventaire post-merge uniquement.
+   * Source de vérité Pro cosmétique = `subscriptionAccess` / `requirePro` (Ranked Pro Solo).
+   * Ne jamais promouvoir `activeUntil` en droit payant sans reçu validé.
    */
   proEntitlements: defineTable({
     userId: v.string(),
@@ -979,6 +981,188 @@ export const convexTables = {
   })
     .index('by_user_day', ['userId', 'dayKey'])
     .index('by_user_client', ['userId', 'clientId']),
+
+  /**
+   * Ranked Pro Solo v0 (ARCHI_ABONNEMENT_PRO §3).
+   * Source de vérité Pro = chaînes vérifiées + projection `subscriptionAccess`.
+   */
+
+  /** DOB privée pour garde d’achat 15+ (ARCHI §7) — hors `subscriptions`. */
+  subscriptionUserProfiles: defineTable({
+    userId: v.string(),
+    dateOfBirth: v.optional(v.string()), // YYYY-MM-DD
+    dateOfBirthUpdatedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index('by_user', ['userId']),
+
+  subscriptionAccounts: defineTable({
+    userId: v.string(),
+    storeAccountToken: v.string(),
+    createdAt: v.number(),
+  })
+    .index('by_user', ['userId'])
+    .index('by_store_token', ['storeAccountToken']),
+
+  subscriptions: defineTable({
+    userId: v.string(),
+    source: v.union(v.literal('apple'), v.literal('google'), v.literal('admin')),
+    environment: v.union(
+      v.literal('production'),
+      v.literal('sandbox'),
+      v.literal('local_test'),
+    ),
+    storeChainKey: v.string(),
+    purchaseTokenEncrypted: v.optional(v.string()),
+    linkedChainKey: v.optional(v.string()),
+    latestTransactionId: v.optional(v.string()),
+    productId: v.string(),
+    basePlanId: v.optional(v.string()),
+    offerId: v.optional(v.string()),
+    plan: v.literal('solo'),
+    seatLimit: v.number(),
+    billingPeriod: v.union(v.literal('month'), v.literal('year')),
+    status: v.union(
+      v.literal('pending'),
+      v.literal('trial'),
+      v.literal('active'),
+      v.literal('canceled_active_until'),
+      v.literal('grace'),
+      v.literal('suspended'),
+      v.literal('expired'),
+      v.literal('refunded'),
+      v.literal('revoked'),
+    ),
+    periodEndsAt: v.optional(v.number()),
+    trialEndsAt: v.optional(v.number()),
+    graceEndsAt: v.optional(v.number()),
+    autoRenew: v.boolean(),
+    isTrial: v.boolean(),
+    billingRetry: v.boolean(),
+    familyShared: v.optional(v.boolean()),
+    revokedAt: v.optional(v.number()),
+    refundedAt: v.optional(v.number()),
+    verifiedAt: v.number(),
+    updatedAt: v.number(),
+    revision: v.number(),
+    adminActorId: v.optional(v.string()),
+    adminReason: v.optional(v.string()),
+  })
+    .index('by_user', ['userId'])
+    .index('by_source_env_chain', ['source', 'environment', 'storeChainKey']),
+
+  subscriptionAccess: defineTable({
+    userId: v.string(),
+    active: v.boolean(),
+    state: v.string(),
+    subscriptionId: v.optional(v.id('subscriptions')),
+    plan: v.optional(v.literal('solo')),
+    origin: v.optional(
+      v.union(v.literal('apple'), v.literal('google'), v.literal('admin')),
+    ),
+    accessUntil: v.optional(v.number()),
+    trialEndsAt: v.optional(v.number()),
+    autoRenew: v.optional(v.boolean()),
+    nextTransitionAt: v.optional(v.number()),
+    revision: v.number(),
+    updatedAt: v.number(),
+  }).index('by_user', ['userId']),
+
+  subscriptionEvents: defineTable({
+    source: v.string(),
+    environment: v.string(),
+    eventKey: v.string(),
+    subscriptionId: v.optional(v.id('subscriptions')),
+    userId: v.optional(v.string()),
+    type: v.string(),
+    sourceOccurredAt: v.optional(v.number()),
+    receivedAt: v.number(),
+    payloadHash: v.string(),
+    payloadEncrypted: v.optional(v.string()),
+    processingState: v.union(
+      v.literal('queued'),
+      v.literal('processing'),
+      v.literal('applied'),
+      v.literal('quarantined'),
+      v.literal('failed'),
+    ),
+    attempts: v.number(),
+    lastError: v.optional(v.string()),
+    actor: v.optional(v.string()),
+    before: v.optional(v.string()),
+    after: v.optional(v.string()),
+    appliedAt: v.optional(v.number()),
+  }).index('by_source_env_event', ['source', 'environment', 'eventKey']),
+
+  subscriptionPurchaseAttempts: defineTable({
+    userId: v.string(),
+    offerKey: v.string(),
+    productId: v.string(),
+    billingPeriod: v.union(v.literal('month'), v.literal('year')),
+    storeAccountToken: v.string(),
+    legalVersionL05: v.string(),
+    legalVersionL05b: v.string(),
+    cgvVersion: v.string(),
+    withdrawalConsentAt: v.number(),
+    ageGateYears: v.number(),
+    agePolicyVersion: v.string(),
+    status: v.union(
+      v.literal('prepared'),
+      v.literal('submitted'),
+      v.literal('verified'),
+      v.literal('abandoned'),
+      v.literal('rejected'),
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_user', ['userId'])
+    .index('by_user_created', ['userId', 'createdAt']),
+
+  /** Confirmation durable post-achat (PRO-L05d / CA-PRO25) — page sauvegardable. */
+  subscriptionReceipts: defineTable({
+    userId: v.string(),
+    subscriptionId: v.optional(v.id('subscriptions')),
+    purchaseAttemptId: v.optional(v.id('subscriptionPurchaseAttempts')),
+    offerKey: v.string(),
+    productId: v.string(),
+    priceDisplay: v.string(),
+    firstChargeAt: v.optional(v.number()),
+    firstChargeAmountDisplay: v.string(),
+    withdrawalConsentAt: v.number(),
+    legalVersionL05: v.string(),
+    cancelUrl: v.string(),
+    createdAt: v.number(),
+  })
+    .index('by_user', ['userId'])
+    .index('by_user_created', ['userId', 'createdAt']),
+
+  /**
+   * Outbox rappels (essai J−2, annuel ~J−30 PRO-P05).
+   * Dédupliqués par (userId, kind, periodKey).
+   */
+  subscriptionReminderOutbox: defineTable({
+    userId: v.string(),
+    kind: v.union(
+      v.literal('trial_end_j2'),
+      v.literal('annual_renewal_j30'),
+    ),
+    periodKey: v.string(),
+    fireAt: v.number(),
+    status: v.union(
+      v.literal('scheduled'),
+      v.literal('sent'),
+      v.literal('cancelled'),
+      v.literal('failed'),
+    ),
+    channel: v.union(v.literal('local_push'), v.literal('email'), v.literal('in_app')),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    sentAt: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+  })
+    .index('by_user_kind_period', ['userId', 'kind', 'periodKey'])
+    .index('by_status_fireAt', ['status', 'fireAt']),
 }
 
 export default defineSchema(convexTables)

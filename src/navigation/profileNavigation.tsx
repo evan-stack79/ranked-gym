@@ -19,6 +19,8 @@ export type ProfileRoute =
   | 'giveFeedback'
   | 'ranked'
   | 'boutiquePartenaires'
+  | 'pro'
+  | 'proEngagement'
 
 interface ProfileNavigationContextValue {
   route: ProfileRoute

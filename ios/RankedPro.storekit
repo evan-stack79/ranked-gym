@@ -1,0 +1,98 @@
+{
+  "identifier" : "RankedProSolo",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "fr_FR",
+    "_storefront" : "FRA",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21420001",
+      "localizations" : [
+
+      ],
+      "name" : "Ranked Pro Solo",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "9.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "21421001",
+          "introductoryOffer" : {
+            "internalID" : "21421011",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P2W"
+          },
+          "localizations" : [
+            {
+              "description" : "Ranked Pro Solo mensuel — cosmétique et confort uniquement.",
+              "displayName" : "Pro Solo mensuel",
+              "locale" : "fr_FR"
+            }
+          ],
+          "productID" : "ranked.pro.solo.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Pro Solo Monthly",
+          "subscriptionGroupID" : "21420001",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "89.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "21421002",
+          "introductoryOffer" : {
+            "internalID" : "21421012",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P2W"
+          },
+          "localizations" : [
+            {
+              "description" : "Ranked Pro Solo annuel — cosmétique et confort uniquement.",
+              "displayName" : "Pro Solo annuel",
+              "locale" : "fr_FR"
+            }
+          ],
+          "productID" : "ranked.pro.solo.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Pro Solo Yearly",
+          "subscriptionGroupID" : "21420001",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

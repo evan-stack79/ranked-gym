@@ -39,6 +39,14 @@ import type * as sync from "../sync.js";
 import type * as lib_rankedAccess from "../lib/rankedAccess.js";
 import type * as lib_rankedScience from "../lib/rankedScience.js";
 import type * as lib_rewardsEconomy from "../lib/rewardsEconomy.js";
+import type * as lib_subscriptionAccess from "../lib/subscriptionAccess.js";
+import type * as lib_subscriptionApply from "../lib/subscriptionApply.js";
+import type * as lib_subscriptionProducts from "../lib/subscriptionProducts.js";
+import type * as lib_appleJws from "../lib/appleJws.js";
+import type * as lib_appleServerApi from "../lib/appleServerApi.js";
+import type * as lib_iapHttp from "../lib/iapHttp.js";
+import type * as lib_subscriptionReminders from "../lib/subscriptionReminders.js";
+import type * as subscriptions from "../subscriptions.js";
 
 import type {
   ApiFromModules,
@@ -65,6 +73,13 @@ declare const fullApi: ApiFromModules<{
   "lib/rankedAccess": typeof lib_rankedAccess;
   "lib/rankedScience": typeof lib_rankedScience;
   "lib/rewardsEconomy": typeof lib_rewardsEconomy;
+  "lib/subscriptionAccess": typeof lib_subscriptionAccess;
+  "lib/subscriptionApply": typeof lib_subscriptionApply;
+  "lib/subscriptionProducts": typeof lib_subscriptionProducts;
+  "lib/appleJws": typeof lib_appleJws;
+  "lib/appleServerApi": typeof lib_appleServerApi;
+  "lib/iapHttp": typeof lib_iapHttp;
+  "lib/subscriptionReminders": typeof lib_subscriptionReminders;
   "lib/rateLimit": typeof lib_rateLimit;
   "lib/socialVisibility": typeof lib_socialVisibility;
   "lib/stripJournalMeals": typeof lib_stripJournalMeals;
@@ -77,6 +92,7 @@ declare const fullApi: ApiFromModules<{
   rewards: typeof rewards;
   rpc: typeof rpc;
   social: typeof social;
+  subscriptions: typeof subscriptions;
   sync: typeof sync;
 }>;
 

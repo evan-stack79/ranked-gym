@@ -40,4 +40,18 @@ crons.daily(
   {},
 )
 
+const processProRemindersRef = makeFunctionReference<
+  'mutation',
+  { now?: number; limit?: number },
+  { scanned: number; sent: number }
+>('subscriptions:processReminderOutbox')
+
+/** Ranked Pro — outbox rappels essai J−2 + annuel ~J−30 (PRO-P05). */
+crons.hourly(
+  'ranked pro subscription reminder outbox',
+  { minuteUTC: 20 },
+  processProRemindersRef,
+  {},
+)
+
 export default crons
