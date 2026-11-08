@@ -176,6 +176,37 @@ describe('ExercisePicker', () => {
     await cleanup()
   })
 
+  it('wave5 : miniatures 3D pour hack squat, nordic, dragon flag, t-bar', async () => {
+    const { host, cleanup } = await renderPicker()
+
+    await typeSearch(host, 'hack squat')
+    expect(
+      host
+        .querySelector('[data-exercise-id="hack_squat"] [data-picker-thumb]')
+        ?.getAttribute('data-picker-thumb-state'),
+    ).toBe('illustration')
+    expect(
+      host.querySelector('[data-exercise-id="hack_squat"] img')?.getAttribute('src'),
+    ).toMatch(/hack-squat/i)
+
+    await typeSearch(host, 'nordic')
+    expect(
+      host.querySelector('[data-exercise-id="nordic_curl"] img')?.getAttribute('src'),
+    ).toMatch(/nordic-curl/i)
+
+    await typeSearch(host, 'dragon')
+    expect(
+      host.querySelector('[data-exercise-id="dragon_flag"] img')?.getAttribute('src'),
+    ).toMatch(/dragon-flag/i)
+
+    await typeSearch(host, 't-bar')
+    expect(
+      host.querySelector('[data-exercise-id="t_bar_row"] img')?.getAttribute('src'),
+    ).toMatch(/t-bar-row/i)
+
+    await cleanup()
+  })
+
   it('id sans illustration + exo custom : fallback neutre uniquement', async () => {
     const onCreateCustom = vi.fn()
     const { host, cleanup } = await renderPicker({ onCreateCustom })

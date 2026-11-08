@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Eye, EyeOff, Loader2, Mail } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { BrandMark } from '../brand/BrandMark'
 import { IosSheet } from '../ui/IosSheet'
 
 type AuthPanel = 'login' | 'signup' | 'forgot' | 'recovery'
@@ -115,7 +116,13 @@ export function AuthBottomSheet() {
       dismissible={dismissible}
       title={title}
       subtitle={subtitle}
-      leading={<span className="mt-0.5 text-[15px] font-bold text-[#FF0702]">RG</span>}
+      leading={
+        <BrandMark
+          variant="compact"
+          showWordmark={false}
+          className="mt-0.5"
+        />
+      }
     >
       <div className="space-y-4 pb-3">
         {panel === 'login' && (

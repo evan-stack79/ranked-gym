@@ -47,6 +47,11 @@ describe('AuthBottomSheet', () => {
     expect(document.body.textContent).toContain('Mot de passe oublié ?')
     expect(document.body.textContent).toMatch(/créer un compte/i)
     expect(document.body.textContent).not.toMatch(/inscription publique désactivée/i)
+    // Header : panthère à gauche, nom Ranked Gym (plus de « RG » texte).
+    expect(dialog?.querySelector('[data-brand-mark-image="compact"]')).toBeTruthy()
+    expect(dialog?.textContent).toMatch(/Ranked\s*Gym/)
+    expect(dialog?.textContent).toContain('Bon retour à la salle')
+    expect(dialog?.textContent).not.toMatch(/(^|[^A-Za-z])RG([^A-Za-z]|$)/)
     const close = document.querySelector(
       '[role="dialog"] button[aria-label="Fermer"]',
     ) as HTMLButtonElement
