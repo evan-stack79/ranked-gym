@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 /**
  * Accueil edit FLIP: reduced motion stays instant; reorder prefs unchanged by animation.
- * M1: legacy widget « eau » is filtered out of Accueil (hydration* only).
+ * Hydratation v2 : tuile Eau de nouveau dans la grille (édition OK).
  */
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -31,6 +31,33 @@ vi.mock('../../context/AuthContext', () => ({
     profile: { pseudo: 'Alex' },
     isLoading: false,
   }),
+}))
+
+vi.mock('../../services/hydration/hydrationService', () => ({
+  fetchHydrationToday: vi.fn(async () => ({
+    dayKey: '2026-11-08',
+    mode: 'classic_2l',
+    goalMl: 1500,
+    drunkMl: 500,
+    remainingMl: 1000,
+    showHighInfo: false,
+    myBottleVolumeMl: null,
+    myBottleHasShape: false,
+    proActive: false,
+    effectiveVisualMode: 'classic_2l',
+    remindersEnabled: false,
+    reminderTimes: [],
+    canUndo: false,
+    lastEntryId: null,
+    glassMl: 250,
+    classicBottleMl: 2000,
+    labelEauBueSeule: true,
+    pendingMl: 0,
+    confirmedMl: 500,
+  })),
+  HYDRATION_CHANGED_EVENT: 'ranked-gym:hydration-changed',
+  onHydrationAccountChanged: vi.fn(),
+  flushHydrationPendingQueue: vi.fn(async () => undefined),
 }))
 
 vi.mock('../../services/trainingStorage', async (importOriginal) => {
@@ -102,7 +129,7 @@ describe('Accueil edit FLIP / reduced motion', () => {
     expect(host.querySelector('[data-accueil-entering="1"]')).toBeNull()
   })
 
-  it('M1: legacy Accueil widget eau is not rendered even if prefs still list it', async () => {
+  it('v2: tuile Eau reste éditable dans la grille Accueil', async () => {
     const prefs = loadAccueilWidgetPrefs()
     saveAccueilWidgetPrefs(
       reorderVisibleAccueilWidget(prefs, 'eau', 'seances_semaine', Date.now()),
@@ -122,7 +149,9 @@ describe('Accueil edit FLIP / reduced motion', () => {
       ;(host.querySelector('[data-accueil-edit-open-footer]') as HTMLButtonElement).click()
     })
 
-    expect(host.querySelector('[data-accueil-edit-slot="eau"]')).toBeNull()
-    expect(host.querySelector('[data-accueil-slot="eau"]')).toBeNull()
+    expect(host.querySelector('[data-accueil-edit-slot="eau"]')).toBeTruthy()
+    expect(
+      host.querySelector('[data-accueil-slot="eau"], [data-accueil-metric-tile="eau"]'),
+    ).toBeTruthy()
   })
 })

@@ -141,6 +141,32 @@ export function WaterSettingsSheet({ open, onClose }: WaterSettingsSheetProps) {
               onSelect={(m) => void saveMode(m)}
               onRequestPro={() => setShowProGate(true)}
             />
+            {today?.mode === 'my_bottle' && today.proActive ? (
+              <div className="space-y-2 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                <p className="text-[13px] leading-snug text-[#ACB4BA]">
+                  Look cosmétique Pass Pro. Aucun avantage de jeu.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isFaceDetectorAvailable()) {
+                      setFaceGateMsg(FACE_UNAVAILABLE_MESSAGE)
+                      return
+                    }
+                    setShowCapture(true)
+                  }}
+                  className="ios-press min-h-11 w-full rounded-2xl border border-white/15 text-[14px] font-semibold text-white"
+                  data-hydration-change-photo
+                >
+                  {today.myBottleHasShape ? 'Changer la photo' : 'Prendre en photo'}
+                </button>
+                {typeof today.myBottleVolumeMl === 'number' ? (
+                  <p className="text-center text-[12px] text-[#8E8E93]">
+                    Capacité : {today.myBottleVolumeMl}&nbsp;ml
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             {minorLocked ? (
               <div data-hydration-goal-locked className="space-y-1">
                 <p className="text-[15px] font-semibold text-white">{LABEL_REPERE_JOUR}</p>

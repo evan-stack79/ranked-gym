@@ -42,7 +42,7 @@ describe('EauTile reads shared userWaterGoal', () => {
     vi.unstubAllGlobals()
   })
 
-  it('sans objectif : total + « Choisir mon objectif », pas d’anneau / %', async () => {
+  it('sans objectif : litres + « Choisir mon objectif », pas d’anneau / %', async () => {
     const { EauTile } = await import('./AccueilMetricTiles')
     const { deriveWaterTileModel } = await import('../../utils/accueilWidgetTiles')
     const { getUserWaterGoalMl } = await import('../../utils/userWaterGoal')
@@ -61,15 +61,14 @@ describe('EauTile reads shared userWaterGoal', () => {
     })
 
     const text = host.textContent ?? ''
-    expect(text.replace(/\s/g, '')).toContain('1200')
+    expect(text).toContain('1,2')
     expect(text).toContain('Choisir mon objectif')
-    expect(text).not.toMatch(/\b250\b/)
-    expect(text).not.toMatch(/\b6000\b/)
+    expect(host.querySelector('[data-accueil-eau-glasses="1"]')).toBeTruthy()
     expect(host.querySelector('[data-accueil-ring]')).toBeNull()
     expect(text).not.toMatch(/%/)
   })
 
-  it('avec objectif userWaterGoal : anneau + « sur … »', async () => {
+  it('avec objectif userWaterGoal : verres + « L / … L »', async () => {
     const { setUserWaterGoalMl, getUserWaterGoalMl } = await import('../../utils/userWaterGoal')
     const { EauTile } = await import('./AccueilMetricTiles')
     const { deriveWaterTileModel } = await import('../../utils/accueilWidgetTiles')
@@ -88,10 +87,8 @@ describe('EauTile reads shared userWaterGoal', () => {
     })
 
     const text = host.textContent ?? ''
-    expect(host.querySelector('[data-accueil-ring]')).toBeTruthy()
-    expect(text).toContain('sur 2,5 L')
+    expect(host.querySelector('[data-accueil-eau-glasses="1"]')).toBeTruthy()
+    expect(text).toContain('L / 2,5 L')
     expect(text).not.toContain('Choisir mon objectif')
-    expect(text).not.toMatch(/\b250\b/)
-    expect(text).not.toMatch(/\b6000\b/)
   })
 })

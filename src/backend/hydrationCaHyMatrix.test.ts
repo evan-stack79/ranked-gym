@@ -17,7 +17,8 @@ import {
 } from '../../shared/hydration/constants'
 
 export const CA_HY_STATUS = {
-  'CA-HY1': HYDRATION_CUTOUT_ENABLED ? 'OK' : 'PARTIEL', // cutout auto derrière garde ; crop manuel OK
+  // Flood-fill on-device toujours dispo ; modèle BiRefNet optionnel (VITE_HYDRATION_CUTOUT).
+  'CA-HY1': 'OK',
   'CA-HY2': 'OK',
   'CA-HY3': 'OK',
   'CA-HY4': 'OK',
@@ -61,16 +62,19 @@ describe('CA-HY matrix', () => {
     expect(cut).not.toMatch(/fetch\([^)]*photo/)
   })
 
-  it('CA-HY9 WaterCard monté Accueil + Alimentation', () => {
+  it('CA-HY9 Eau Accueil + Alimentation (même source hydration*)', () => {
     const home = readFileSync(resolve('src/components/home/HomeGalleryView.tsx'), 'utf8')
     const dash = readFileSync(resolve('src/components/home/HomeView.tsx'), 'utf8')
     const nutri = readFileSync(resolve('src/components/nutrition/NutritionDashboard.tsx'), 'utf8')
-    expect(home).toContain('WaterCard')
+    expect(home).toContain('EauTile')
+    expect(home).toContain('fetchHydrationToday')
     expect(dash).toContain('WaterCard')
-    expect(nutri).toContain('WaterCard')
+    expect(nutri).toContain('HydrationPanel')
   })
 
-  it('CA-HY1 cutout auto documenté comme partiel si garde off', () => {
-    expect(CA_HY_STATUS['CA-HY1']).toBe(HYDRATION_CUTOUT_ENABLED ? 'OK' : 'PARTIEL')
+  it('CA-HY1 cutout on-device (flood, modèle optionnel)', () => {
+    expect(CA_HY_STATUS['CA-HY1']).toBe('OK')
+    // Garde modèle : flag toujours exporté (peut rester false sans BiRefNet).
+    expect(typeof HYDRATION_CUTOUT_ENABLED).toBe('boolean')
   })
 })

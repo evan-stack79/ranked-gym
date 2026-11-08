@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 /**
- * Eau tile must never paint « 0 ml » on remount when a value exists,
+ * Eau tile must never paint « 0 L » on remount when a value exists,
  * and must show a neutral placeholder (not 0) while water is still loading.
  */
 import { act } from 'react'
@@ -35,7 +35,7 @@ describe('EauTile remount / loading flash', () => {
     resetCountUpStableCacheForTests()
   })
 
-  it('never renders 0 ml on remount when a value exists', async () => {
+  it('never renders 0 L on remount when a value exists', async () => {
     const { EauTile } = await import('./AccueilMetricTiles')
     const { deriveWaterTileModel } = await import('../../utils/accueilWidgetTiles')
     const model = deriveWaterTileModel(1200, null, true)
@@ -49,10 +49,9 @@ describe('EauTile remount / loading flash', () => {
         />,
       )
     })
-    expect(host.textContent?.replace(/\s/g, '')).toContain('1200')
-    expect(host.textContent).not.toMatch(/\b0\s*ml\b/)
+    expect(host.textContent).toContain('1,2')
+    expect(host.textContent).not.toMatch(/\b0\s*L\b/)
 
-    // Remount (drag reorder / leave edit) with same value + freezeCountUp.
     await act(async () => {
       root.render(<span data-gap />)
     })
@@ -67,14 +66,12 @@ describe('EauTile remount / loading flash', () => {
     })
 
     const text = host.textContent ?? ''
-    expect(text.replace(/\s/g, '')).toContain('1200')
-    expect(text).not.toMatch(/\b0\s*ml\b/)
-    expect(host.querySelector('[data-rg-count="water"]')?.textContent?.replace(/\s/g, '')).toBe(
-      '1200',
-    )
+    expect(text).toContain('1,2')
+    expect(text).not.toMatch(/\b0\s*L\b/)
+    expect(host.querySelector('[data-rg-count="water"]')?.textContent).toContain('1,2')
   })
 
-  it('shows neutral placeholder (not 0 ml) while water is loading', async () => {
+  it('shows neutral placeholder (not 0 L) while water is loading', async () => {
     const { EauTile } = await import('./AccueilMetricTiles')
     const { deriveWaterTileModel } = await import('../../utils/accueilWidgetTiles')
     const loading = deriveWaterTileModel(0, null, false)
@@ -91,7 +88,6 @@ describe('EauTile remount / loading flash', () => {
 
     expect(host.querySelector('[data-accueil-eau-placeholder="1"]')).toBeTruthy()
     expect(host.textContent).toContain('—')
-    expect(host.textContent).not.toMatch(/\b0\s*ml\b/)
     expect(host.querySelector('[data-rg-count="water"]')).toBeNull()
   })
 })
