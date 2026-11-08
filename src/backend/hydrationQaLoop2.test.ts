@@ -160,6 +160,7 @@ describe('QA M1 client helpers', () => {
 
   it('migrateLocalLegacyWaterToHydration est idempotente (2e passe skipped)', async () => {
     vi.resetModules()
+    localStorage.clear()
     vi.doMock('../services/nutritionStorage', () => ({
       getWaterEntriesForDate: (dayKey: string) =>
         dayKey === '2026-11-08'
@@ -167,28 +168,38 @@ describe('QA M1 client helpers', () => {
           : [],
       getWaterMlForDate: () => 0,
     }))
-    const addCalls: unknown[] = []
-    vi.doMock('../services/hydration/hydrationService', () => ({
-      addHydrationEntry: async (input: unknown) => {
-        addCalls.push(input)
-        return { drunkMl: 1200 }
-      },
+    vi.doMock('../services/convexAuthService', () => ({
+      getConvexSessionToken: async () => 'tok',
+    }))
+    const mutationCalls: unknown[] = []
+    vi.doMock('../lib/convex', () => ({
+      getConvex: () => ({
+        mutation: async (_ref: unknown, args: unknown) => {
+          mutationCalls.push(args)
+          return { inserted: 1, skipped: 0, rejected: [], ok: true }
+        },
+      }),
     }))
     const { migrateLocalLegacyWaterToHydration } = await import(
       '../services/hydration/hydrationLegacyMigrate'
     )
     const first = await migrateLocalLegacyWaterToHydration('user-a', '2026-11-08')
     expect(first.skipped).toBe(false)
+    expect(first.complete).toBe(true)
     expect(first.attempted).toBeGreaterThanOrEqual(1)
-    expect(addCalls[0]).toMatchObject({
-      clientId: 'legacy:w1',
-      amountMl: 1200,
+    expect(mutationCalls[0]).toMatchObject({
+      endDayKey: '2026-11-08',
+      entries: expect.arrayContaining([
+        expect.objectContaining({ clientId: 'legacy:w1', amountMl: 1200 }),
+      ]),
     })
     const second = await migrateLocalLegacyWaterToHydration('user-a', '2026-11-08')
     expect(second.skipped).toBe(true)
     expect(second.attempted).toBe(0)
-    expect(addCalls).toHaveLength(first.ok)
+    expect(mutationCalls).toHaveLength(1)
     vi.doUnmock('../services/nutritionStorage')
-    vi.doUnmock('../services/hydration/hydrationService')
+    vi.doUnmock('../services/convexAuthService')
+    vi.doUnmock('../lib/convex')
+    localStorage.clear()
   })
 })

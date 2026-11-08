@@ -24,7 +24,10 @@ import {
   removePendingHydrationEntry,
   type PendingHydrationEntry,
 } from './hydrationOfflineQueue'
-import { pauseHydrationRemindersIfGoalReached } from './hydrationReminders'
+import {
+  pauseHydrationRemindersIfGoalReached,
+  syncHydrationReminders,
+} from './hydrationReminders'
 
 const api = generatedApi as any
 
@@ -261,7 +264,21 @@ export async function fetchHydrationToday(dayKey = localDayKey()): Promise<Hydra
       dayKey,
     })) as Omit<HydrationToday, 'pendingMl' | 'confirmedMl'>
     writeLocalSettings(cacheFromToday(today, userId, dayKey))
-    return mergePending(today, dayKey, userId)
+    const merged = mergePending(today, dayKey, userId)
+    // M2 — réarmement lendemain : pause objectif = jour J seulement.
+    // Au refresh (focus / nouveau jour), sync avec goalReachedToday du jour courant.
+    if (merged.remindersEnabled) {
+      try {
+        await syncHydrationReminders({
+          enabled: true,
+          times: merged.reminderTimes,
+          goalReachedToday: merged.drunkMl >= merged.goalMl,
+        })
+      } catch {
+        /* web / plugin : ignore */
+      }
+    }
+    return merged
   } catch {
     return fallbackToday(dayKey, userId)
   }

@@ -40,6 +40,8 @@ import {
   lastNDayKeys,
   legacyWaterEntryClientId,
   effectiveHydrationGoalMl,
+  isDayKeyWithinLegacyMigrationWindow,
+  isLegacyHydrationClientId,
   remainingMl,
   showHighInfo,
 } from './lib/hydrationConstants'
@@ -152,6 +154,53 @@ async function sumDrunkMl(
 }
 
 /**
+ * M1-a — insert hydrationEntries si clientId absent ; sinon skip (idempotent / retry-safe).
+ */
+async function insertHydrationIfAbsent(
+  ctx: MutationCtx,
+  input: {
+    userId: string
+    dayKey: string
+    amountMl: number
+    source: HydrationEntrySource
+    clientId: string
+    createdAt: number
+  },
+): Promise<{ inserted: boolean; entryId: string }> {
+  const existing = await findHydrationByClientId(ctx, input.userId, input.clientId)
+  if (existing) {
+    return { inserted: false, entryId: existing._id }
+  }
+  const entryId = await ctx.db.insert('hydrationEntries', {
+    userId: input.userId,
+    dayKey: input.dayKey,
+    amountMl: input.amountMl,
+    source: input.source,
+    clientId: input.clientId,
+    createdAt: input.createdAt,
+  })
+  // Re-check après insert (course migrate + addEntry même clientId).
+  const again = await ctx.db
+    .query('hydrationEntries')
+    .withIndex('by_user_client', (q) =>
+      q.eq('userId', input.userId).eq('clientId', input.clientId),
+    )
+    .collect()
+  if (again.length > 1) {
+    // Garde-fou : conserver la plus ancienne, soft-undo les doublons.
+    again.sort((a, b) => a.createdAt - b.createdAt)
+    for (let i = 1; i < again.length; i += 1) {
+      const dup = again[i]
+      if (dup && dup.undoneAt == null) {
+        await ctx.db.patch(dup._id, { undoneAt: input.createdAt })
+      }
+    }
+    return { inserted: false, entryId: again[0]!._id }
+  }
+  return { inserted: true, entryId }
+}
+
+/**
  * M1 — copie idempotente nutrition_water_entries → hydrationEntries (clientId stable).
  * Rejouable sans effet / sans doublon.
  */
@@ -167,9 +216,7 @@ async function migrateLegacyWaterDay(
     const amountMl = Math.max(0, Math.round(leg.amountMl))
     if (amountMl < ENTRY_MIN_ML || amountMl > ENTRY_MAX_ML) continue
     const clientId = legacyWaterEntryClientId(leg.entryId)
-    const existing = await findHydrationByClientId(ctx, userId, clientId)
-    if (existing) continue
-    await ctx.db.insert('hydrationEntries', {
+    const result = await insertHydrationIfAbsent(ctx, {
       userId,
       dayKey,
       amountMl,
@@ -177,7 +224,7 @@ async function migrateLegacyWaterDay(
       clientId,
       createdAt: typeof leg.createdAt === 'number' ? leg.createdAt : now,
     })
-    inserted += 1
+    if (result.inserted) inserted += 1
   }
   return inserted
 }
@@ -442,36 +489,43 @@ export const addEntry = mutation({
   handler: async (ctx, args) => {
     const user = await requireSessionUser(ctx, args.sessionToken)
     const now = Date.now()
-    if (!isValidDayKey(args.dayKey) || !isDayKeyWithinTolerance(args.dayKey, now)) {
-      throw new Error('HYDRATION_INVALID_DAY_KEY')
-    }
+    if (!isValidDayKey(args.dayKey)) throw new Error('HYDRATION_INVALID_DAY_KEY')
+    // M1-b — legacy:* sur fenêtre 7 j ; ajouts courants ±1 jour.
+    const serverDayKey = (() => {
+      const d = new Date(now)
+      const y = d.getUTCFullYear()
+      const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+      const day = String(d.getUTCDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
+    })()
+    const dayAllowed = isLegacyHydrationClientId(args.clientId)
+      ? isDayKeyWithinLegacyMigrationWindow(args.dayKey, serverDayKey)
+      : isDayKeyWithinTolerance(args.dayKey, now)
+    if (!dayAllowed) throw new Error('HYDRATION_INVALID_DAY_KEY')
     if (typeof args.clientId !== 'string' || args.clientId.length < 8 || args.clientId.length > 128) {
       throw new Error('HYDRATION_INVALID_CLIENT_ID')
     }
     assertSource(args.source)
     assertAmountMl(args.amountMl)
 
-    const dup = await ctx.db
-      .query('hydrationEntries')
-      .withIndex('by_user_client', (q) =>
-        q.eq('userId', user.userId).eq('clientId', args.clientId),
-      )
-      .first()
-    if (dup) {
-      let settings = await ensureSettings(ctx, user.userId, now)
-      settings = await normalizeStoredGoalIfLocked(ctx, user.userId, settings, now)
+    let settings = await ensureSettings(ctx, user.userId, now)
+    settings = await normalizeStoredGoalIfLocked(ctx, user.userId, settings, now)
+
+    // M1-a — upsert/skip : si clientId déjà présent, pas de 2e insert.
+    const existing = await findHydrationByClientId(ctx, user.userId, args.clientId)
+    if (existing) {
       return {
         duplicate: true as const,
-        entryId: dup._id,
+        entryId: existing._id,
         today: await buildTodayView(ctx, user.userId, settings, args.dayKey, now),
       }
     }
 
-    let settings = await ensureSettings(ctx, user.userId, now)
-    settings = await normalizeStoredGoalIfLocked(ctx, user.userId, settings, now)
-    // Reprise legacy avant nouvel ajout (évite total 0 puis +X sans historique).
+    // Reprise legacy table avant nouvel ajout (évite total 0).
     await migrateLegacyWaterDay(ctx, user.userId, args.dayKey, now)
-    const entryId = await ctx.db.insert('hydrationEntries', {
+
+    // M1-a — re-check après migrate (même clientId legacy: peut venir d’être créé).
+    const afterMigrate = await insertHydrationIfAbsent(ctx, {
       userId: user.userId,
       dayKey: args.dayKey,
       amountMl: args.amountMl,
@@ -480,9 +534,91 @@ export const addEntry = mutation({
       createdAt: now,
     })
     return {
-      duplicate: false as const,
-      entryId,
+      duplicate: !afterMigrate.inserted,
+      entryId: afterMigrate.entryId,
       today: await buildTodayView(ctx, user.userId, settings, args.dayKey, now),
+    }
+  },
+})
+
+/**
+ * M1-b — import batch journal local (fenêtre 7 j), upsert par clientId.
+ * Ne passe pas par la tolérance ±1 des ajouts courants.
+ */
+export const importLegacyLocalEntries = mutation({
+  args: {
+    sessionToken: v.string(),
+    endDayKey: v.string(),
+    entries: v.array(
+      v.object({
+        clientId: v.string(),
+        dayKey: v.string(),
+        amountMl: v.number(),
+        createdAt: v.optional(v.number()),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx, args.sessionToken)
+    const now = Date.now()
+    if (!isValidDayKey(args.endDayKey)) throw new Error('HYDRATION_INVALID_DAY_KEY')
+    await ensureSettings(ctx, user.userId, now)
+
+    let inserted = 0
+    let skipped = 0
+    const rejected: Array<{ clientId: string; dayKey: string; reason: string }> = []
+
+    for (const entry of args.entries) {
+      if (!isLegacyHydrationClientId(entry.clientId)) {
+        rejected.push({
+          clientId: entry.clientId,
+          dayKey: entry.dayKey,
+          reason: 'HYDRATION_NOT_LEGACY_CLIENT_ID',
+        })
+        continue
+      }
+      if (
+        !isValidDayKey(entry.dayKey)
+        || !isDayKeyWithinLegacyMigrationWindow(entry.dayKey, args.endDayKey)
+      ) {
+        rejected.push({
+          clientId: entry.clientId,
+          dayKey: entry.dayKey,
+          reason: 'HYDRATION_INVALID_DAY_KEY',
+        })
+        continue
+      }
+      const amountMl = Math.round(entry.amountMl)
+      if (
+        !Number.isFinite(amountMl)
+        || !Number.isInteger(amountMl)
+        || amountMl < ENTRY_MIN_ML
+        || amountMl > ENTRY_MAX_ML
+      ) {
+        rejected.push({
+          clientId: entry.clientId,
+          dayKey: entry.dayKey,
+          reason: 'HYDRATION_AMOUNT_OUT_OF_RANGE',
+        })
+        continue
+      }
+      const result = await insertHydrationIfAbsent(ctx, {
+        userId: user.userId,
+        dayKey: entry.dayKey,
+        amountMl,
+        source: 'slider',
+        clientId: entry.clientId,
+        createdAt: entry.createdAt ?? now,
+      })
+      if (result.inserted) inserted += 1
+      else skipped += 1
+    }
+
+    return {
+      inserted,
+      skipped,
+      rejected,
+      ok: rejected.length === 0,
     }
   },
 })

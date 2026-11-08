@@ -161,3 +161,15 @@ export function lastNDayKeys(endDayKey: string, n: number): string[] {
   }
   return keys
 }
+
+/** M1-b — fenêtre migration historique (7 j), distincte de la tolérance ±1 des ajouts courants. */
+export const LEGACY_MIGRATION_WINDOW_DAYS = 7
+
+export function isDayKeyWithinLegacyMigrationWindow(
+  dayKey: string,
+  endDayKey: string,
+  windowDays = LEGACY_MIGRATION_WINDOW_DAYS,
+): boolean {
+  if (!isValidDayKey(dayKey) || !isValidDayKey(endDayKey)) return false
+  return lastNDayKeys(endDayKey, windowDays).includes(dayKey)
+}
