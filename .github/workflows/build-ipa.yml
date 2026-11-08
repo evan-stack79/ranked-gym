@@ -1,5 +1,8 @@
 name: Build IPA
 
+# Unsigned IPA only — no App Store / TestFlight deploy.
+# workflow_dispatch: launch manually on ANY branch (Actions → Build IPA → Run workflow).
+# push/PR: also builds when iOS/web sources change (including PR branches).
 on:
   workflow_dispatch:
   push:
@@ -64,6 +67,67 @@ jobs:
 
       - name: Sync Capacitor iOS
         run: npx cap sync ios
+
+      # Durable guards — these fixes vanished from main IPAs when they lived only on
+      # unmerged test branches (#117/#118/#119). Fail the build if sync/config regresses.
+      - name: Guard iOS safe-area + native plugin contracts (source)
+        run: |
+          set -euo pipefail
+
+          echo "== capacitor.config.ts =="
+          grep -q "contentInset: 'never'" capacitor.config.ts
+          ! grep -q "contentInset: 'automatic'" capacitor.config.ts
+          grep -q "overlaysWebView: true" capacitor.config.ts
+
+          echo "== MainViewController.swift =="
+          MVC="ios/App/App/MainViewController.swift"
+          test -f "$MVC"
+          grep -q 'contentInsetAdjustmentBehavior = .never' "$MVC"
+          grep -q 'SecureStoragePlugin' "$MVC"
+          grep -q 'preferredStatusBarStyle' "$MVC"
+
+          echo "== Info.plist status bar ownership =="
+          PLIST="ios/App/App/Info.plist"
+          grep -A1 'UIViewControllerBasedStatusBarAppearance' "$PLIST" | grep -q '<true/>'
+
+          echo "== Synced capacitor.config.json (cap sync output) =="
+          # cap sync writes JSON next to the App target; accept either path Cap uses.
+          CFG=""
+          for candidate in \
+            ios/App/App/capacitor.config.json \
+            ios/App/capacitor.config.json \
+            ios/App/App/capacitor.config.js
+          do
+            if [ -f "$candidate" ]; then CFG="$candidate"; break; fi
+          done
+          if [ -z "$CFG" ]; then
+            echo "Looking for synced capacitor config…"
+            find ios -name 'capacitor.config.*' -print || true
+            echo "ERROR: capacitor.config.json missing after cap sync"
+            exit 1
+          fi
+          echo "Using $CFG"
+          # JSON may pretty-print; require never + overlaysWebView true
+          python3 - "$CFG" <<'PY'
+          import json, sys
+          path = sys.argv[1]
+          with open(path) as f:
+              data = json.load(f)
+          inset = (data.get("ios") or {}).get("contentInset")
+          if inset != "never":
+              raise SystemExit(f"ios.contentInset must be 'never', got {inset!r} in {path}")
+          status = (data.get("plugins") or {}).get("StatusBar") or {}
+          if status.get("overlaysWebView") is not True:
+              raise SystemExit(f"StatusBar.overlaysWebView must be true, got {status!r} in {path}")
+          print("synced capacitor config OK (contentInset=never, overlaysWebView=true)")
+          PY
+
+          echo "== CapApp-SPM includes StatusBar after sync =="
+          PKG="ios/App/CapApp-SPM/Package.swift"
+          test -f "$PKG"
+          grep -q 'CapacitorStatusBar\|status-bar' "$PKG"
+
+          echo "Source + sync guards OK"
 
       - name: Show Xcode version
         run: xcodebuild -version
@@ -141,7 +205,12 @@ jobs:
             echo "ERROR: SecureStoragePlugin missing from App binary — Keychain plugin not linked"
             exit 1
           fi
-          echo "Native plugin registration symbols present (MainViewController / SecureStoragePlugin)"
+          # StatusBar overlay plugin (safe-area / Dynamic Island full-bleed).
+          if ! strings "$APP_BINARY" | grep -qi 'StatusBar'; then
+            echo "ERROR: StatusBar symbols missing from App binary — overlaysWebView will not apply"
+            exit 1
+          fi
+          echo "Native plugin registration symbols present (MainViewController / SecureStoragePlugin / StatusBar)"
 
           STAGE="$RUNNER_TEMP/ipa-stage"
           rm -rf "$STAGE"
