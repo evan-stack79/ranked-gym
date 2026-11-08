@@ -1,21 +1,21 @@
-import { PlasticBottle15, SmallBottle50, GlassPickerIcon, type BottleKind } from './FlatBottleSvg'
+import { PhotoThumb, type PhotoKind } from './PhotoContainer'
 
 const OPTIONS: Array<{
-  id: Exclude<BottleKind, 'gourd'>
+  id: Exclude<PhotoKind, 'gourd'>
   label: string
-  detail: string
+  fill: number
 }> = [
-  { id: 'plastic_15', label: 'Bouteille 1,5 L', detail: 'Plastique' },
-  { id: 'small_50', label: 'Petite bouteille 50 cl', detail: 'Plastique' },
-  { id: 'glass_25', label: 'Verre 25 cl', detail: 'Verre' },
+  { id: 'plastic_15', label: 'Bouteille 1,5 L', fill: 620 / 1500 },
+  { id: 'small_50', label: 'Petite bouteille 50 cl', fill: 0.35 },
+  { id: 'glass_25', label: 'Verre 25 cl', fill: 0.55 },
 ]
 
 export function ContainerPicker({
   selected,
   onSelect,
 }: {
-  selected: Exclude<BottleKind, 'gourd'>
-  onSelect: (id: Exclude<BottleKind, 'gourd'>) => void
+  selected: Exclude<PhotoKind, 'gourd'>
+  onSelect: (id: Exclude<PhotoKind, 'gourd'>) => void
 }) {
   return (
     <div className="space-y-2" data-mockup-container-picker>
@@ -36,11 +36,7 @@ export function ContainerPicker({
               data-mockup-container={opt.id}
               aria-pressed={isSelected}
             >
-              {opt.id === 'plastic_15' ? (
-                <PlasticBottle15 fillRatio={0.4} selected={isSelected} />
-              ) : null}
-              {opt.id === 'small_50' ? <SmallBottle50 selected={isSelected} /> : null}
-              {opt.id === 'glass_25' ? <GlassPickerIcon selected={isSelected} /> : null}
+              <PhotoThumb kind={opt.id} fillRatio={opt.fill} />
               <span className="block text-[11px] font-semibold leading-tight text-white">
                 {opt.label}
               </span>

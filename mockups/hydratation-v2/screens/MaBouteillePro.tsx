@@ -3,10 +3,14 @@ import { BlurInText } from '../../../src/components/motion'
 import { BottleDragPanel } from '../components/BottleDragPanel'
 
 /**
- * Ma bouteille (Pass Pro, cosmétique) — pastille Pro discrète, silhouette
- * gourde plate « Exemple », même geste glisser, sans avantage de jeu.
+ * Ma bouteille (Pass Pro, cosmétique) — vraie photo détourée de gourde,
+ * eau + glisser au niveau, sans étiquette « Exemple ».
  */
 export function MaBouteillePro() {
+  // ~480 ml sur une gourde ~750 ml typique → niveau crédible
+  const estimateMl = 480
+  const fillRatio = 480 / 750
+
   return (
     <div
       className="-mx-5 min-h-[70vh] overflow-x-hidden bg-[#000000] pb-2"
@@ -53,7 +57,7 @@ export function MaBouteillePro() {
         </div>
 
         <section
-          className="rounded-[28px] border border-white/12 bg-white/[0.04] px-4 py-4"
+          className="rounded-[28px] border border-white/12 bg-white/[0.04] px-3 py-2.5"
           data-mockup-eau-section
           aria-label="Ma bouteille"
         >
@@ -79,35 +83,34 @@ export function MaBouteillePro() {
           </p>
 
           <BottleDragPanel
-            variant="gourd"
-            fillRatio={480 / 750}
-            estimateMl={480}
-            showProChip={false}
+            kind="gourd"
+            fillRatio={fillRatio}
+            estimateMl={estimateMl}
+            capacityMl={750}
           />
 
           <button
             type="button"
-            className="ios-press mt-4 min-h-11 w-full rounded-2xl bg-[#FF0702] text-[15px] font-semibold text-white"
+            className="ios-press mt-2 min-h-11 w-full rounded-2xl bg-[#FF0702] text-[15px] font-semibold text-white"
             data-mockup-add-water
           >
             Ajouter
           </button>
 
-          <button
-            type="button"
-            className="ios-press mt-2 min-h-10 w-full text-center text-[14px] font-medium text-[#ACB4BA] underline-offset-2 hover:underline"
-            data-mockup-retake-photo
-          >
-            Reprendre la photo
-          </button>
-
           <p
-            className="mt-1 text-center text-[12px] leading-snug text-[#8E8E93]"
+            className="mt-1.5 text-center text-[12px] leading-snug text-[#8E8E93]"
             data-mockup-no-face
           >
             Pas de visage sur la photo
           </p>
         </section>
+
+        <p
+          className="px-1 text-center text-[12px] text-[#8E8E93]"
+          data-mockup-photo-meta
+        >
+          Photo prise le 12 oct. · Changer la photo
+        </p>
       </div>
     </div>
   )

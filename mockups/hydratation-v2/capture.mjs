@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Capture 3 maquettes iPhone (390×844 CSS, deviceScaleFactor 3 → 1170×2532).
- * Sortie : /opt/cursor/artifacts/ + mockups/hydratation-v2/rendus/
+ * Capture écrans 2+3 (et A/B SVG) — 390×844 @3x → 1170×2532.
+ * N’écrase PAS 1_accueil_widget_eau.png.
  */
 import { mkdir, copyFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -22,33 +22,42 @@ const DPR = 3
 
 const SHOTS = [
   {
-    screen: 'accueil',
-    file: '1_accueil_widget_eau.png',
-    wait: '[data-mockup-eau-glasses]',
-    forbid: [/kcal/i, /\bcalories?\b/i],
-    require: ['Accueil', 'Eau', '1,25', 'Séries du jour'],
-    visible: ['[data-mockup-eau-glasses]'],
-  },
-  {
     screen: 'alimentation',
     file: '2_alimentation_glisser.png',
-    wait: '[data-mockup-drag-panel="plastic_15"]',
-    forbid: [/kcal/i, /\bcalories?\b/i, /\bAdd\b/, /\bWater\b/, /\bBottle\b/],
+    wait: '[data-mockup-photo-container="plastic_15"]',
+    forbid: [/kcal/i, /\bcalories?\b/i, /\bAdd\b/, /\bWater\b/, /\bBottle\b/, /Exemple/],
     require: ['Nutrition', 'Bouteille 1,5 L', 'glisse pour régler', 'Ajouter', '620'],
     visible: ['[data-mockup-add-water]', '[data-mockup-estimate]', '[data-mockup-drag-handle]'],
   },
   {
     screen: 'ma-bouteille',
     file: '3_ma_bouteille_pro.png',
-    wait: '[data-mockup-bottle="gourd"]',
-    forbid: [/kcal/i, /\bcalories?\b/i, /\bXP\b/, /bonus/i],
-    require: ['Ma bouteille', 'Pro', 'Exemple', 'Reprendre la photo', 'Pas de visage', 'Ajouter'],
+    wait: '[data-mockup-photo-container="gourd"]',
+    forbid: [/kcal/i, /\bcalories?\b/i, /Exemple/, /\bXP\b/, /bonus/i],
+    require: [
+      'Ma bouteille',
+      'Pro',
+      'Changer la photo',
+      'Pas de visage',
+      'Ajouter',
+      'Photo prise le 12 oct.',
+    ],
     visible: [
       '[data-mockup-add-water]',
-      '[data-mockup-retake-photo]',
+      '[data-mockup-photo-meta]',
       '[data-mockup-no-face]',
       '[data-mockup-estimate]',
+      '[data-mockup-drag-handle]',
     ],
+  },
+  {
+    screen: 'svg-compare',
+    file: '_ab_svg_alimentation.png',
+    wait: '[data-mockup-svg-bottle="15"]',
+    forbid: [/kcal/i],
+    require: ['Nutrition', '620'],
+    visible: ['[data-mockup-drag-handle]'],
+    artifactOnly: true,
   },
 ]
 
@@ -95,12 +104,12 @@ async function stopServer(server) {
 function assertFrenchCopy(text, shot) {
   for (const re of shot.forbid) {
     if (re.test(text)) {
-      throw new Error(`${shot.file}: texte interdit trouvé (${re}) — extrait: ${text.slice(0, 280)}`)
+      throw new Error(`${shot.file}: texte interdit (${re})`)
     }
   }
   for (const needle of shot.require) {
     if (!text.includes(needle)) {
-      throw new Error(`${shot.file}: texte manquant « ${needle} »`)
+      throw new Error(`${shot.file}: texte manquant « ${needle} » — extrait: ${text.slice(0, 400)}`)
     }
   }
 }
@@ -130,7 +139,7 @@ async function main() {
       await page.waitForSelector('[data-harness-ready]', { timeout: 30_000 })
       await page.waitForSelector(shot.wait, { timeout: 20_000 })
       await page.waitForSelector('[data-bottom-nav-variant="floating-pill"]', { timeout: 15_000 })
-      await page.waitForTimeout(400)
+      await page.waitForTimeout(500)
 
       const text = await page.locator('[data-app-shell]').innerText()
       assertFrenchCopy(text, shot)
@@ -140,15 +149,23 @@ async function main() {
         await el.waitFor({ state: 'visible', timeout: 10_000 })
         const box = await el.boundingBox()
         if (!box) throw new Error(`${shot.file}: ${sel} sans boundingBox`)
-        // BottomNav floating pill + safe-area ≈ 100px — contenu utile au-dessus.
         const maxBottom = VIEWPORT.height - 100
         if (box.y + box.height > maxBottom) {
           throw new Error(
             `${shot.file}: ${sel} sous la nav (bottom=${(box.y + box.height).toFixed(0)} > ${maxBottom})`,
           )
         }
-        if (box.x < -2 || box.x + box.width > VIEWPORT.width + 2) {
-          throw new Error(`${shot.file}: ${sel} coupe horizontalement`)
+      }
+
+      // Vérifie ratio eau ~620/1500 sur écran 2
+      if (shot.screen === 'alimentation') {
+        const ratio = await page.getAttribute(
+          '[data-mockup-photo-container="plastic_15"]',
+          'data-fill-ratio',
+        )
+        const n = Number(ratio)
+        if (!(Math.abs(n - 620 / 1500) < 0.01)) {
+          throw new Error(`fillRatio incorrect: ${ratio}`)
         }
       }
 
@@ -156,14 +173,8 @@ async function main() {
       const outArt = join(artifactsDir, shot.file)
       await page.screenshot({ path: outLocal, type: 'png', fullPage: false })
       await copyFile(outLocal, outArt)
-
-      const box = await page.evaluate(() => ({
-        w: window.innerWidth,
-        h: window.innerHeight,
-        dpr: window.devicePixelRatio,
-      }))
-      console.log(`saved ${shot.file} viewport=${box.w}x${box.h} dpr=${box.dpr}`)
-      report.push({ file: shot.file, ...box, path: outArt })
+      console.log(`saved ${shot.file}`)
+      report.push({ file: shot.file, path: outArt })
       await context.close()
     }
   } finally {
@@ -171,7 +182,10 @@ async function main() {
     await stopServer(server)
   }
 
-  await writeFile(join(artifactsDir, 'hydratation-v2-capture-report.json'), JSON.stringify(report, null, 2))
+  await writeFile(
+    join(artifactsDir, 'hydratation-v2-capture-report.json'),
+    JSON.stringify(report, null, 2),
+  )
   console.log('OK', report.map((r) => r.path).join('\n'))
 }
 

@@ -1,16 +1,29 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Ellipsis } from 'lucide-react'
 import { BlurInText } from '../../../src/components/motion'
 import { ContainerPicker } from '../components/ContainerPicker'
 import { BottleDragPanel } from '../components/BottleDragPanel'
-import type { BottleKind } from '../components/FlatBottleSvg'
+import type { PhotoKind } from '../components/PhotoContainer'
+
+const CAPACITY: Record<Exclude<PhotoKind, 'gourd'>, number> = {
+  plastic_15: 1500,
+  small_50: 500,
+  glass_25: 250,
+}
 
 /**
- * Onglet Nutrition réel (en-tête + jour + actions) — section Eau proposée
- * avec sélecteur de contenant + bouteille plate glissable. Aucun kcal.
+ * Nutrition — contenants photo détourés, glisser au niveau de l'eau.
+ * Aucun kcal.
  */
 export function AlimentationGlisser() {
-  const [container, setContainer] = useState<Exclude<BottleKind, 'gourd'>>('plastic_15')
+  const [container, setContainer] = useState<Exclude<PhotoKind, 'gourd'>>('plastic_15')
+  // Niveau figé pour la maquette : 620 ml sur 1,5 L (ratio exact).
+  const estimateMl = 620
+  const fillRatio = useMemo(() => {
+    if (container === 'plastic_15') return 620 / 1500
+    if (container === 'small_50') return Math.min(1, 620 / 500)
+    return Math.min(1, 620 / 250)
+  }, [container])
 
   return (
     <div
@@ -57,13 +70,12 @@ export function AlimentationGlisser() {
           </button>
         </div>
 
-        {/* Section Eau — proposition maquette (pas de ring kcal) */}
         <section
-          className="rounded-[28px] border border-white/12 bg-white/[0.04] px-4 py-3"
+          className="rounded-[28px] border border-white/12 bg-white/[0.04] px-3 py-2.5"
           data-mockup-eau-section
           aria-label="Eau"
         >
-          <div className="mb-2">
+          <div className="mb-1.5">
             <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#ACB4BA]">
               Hydratation
             </p>
@@ -72,13 +84,18 @@ export function AlimentationGlisser() {
 
           <ContainerPicker selected={container} onSelect={setContainer} />
 
-          <div className="mt-3">
-            <BottleDragPanel variant="plastic_15" fillRatio={620 / 1500} estimateMl={620} />
+          <div className="mt-2">
+            <BottleDragPanel
+              kind={container}
+              fillRatio={fillRatio}
+              estimateMl={estimateMl}
+              capacityMl={CAPACITY[container]}
+            />
           </div>
 
           <button
             type="button"
-            className="ios-press mt-3 min-h-11 w-full rounded-2xl bg-[#FF0702] text-[15px] font-semibold text-white"
+            className="ios-press mt-2 min-h-11 w-full rounded-2xl bg-[#FF0702] text-[15px] font-semibold text-white"
             data-mockup-add-water
           >
             Ajouter

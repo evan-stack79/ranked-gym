@@ -9,6 +9,7 @@ import type { TabId } from '../../src/types'
 import { AccueilEauWidget } from './screens/AccueilEauWidget'
 import { AlimentationGlisser } from './screens/AlimentationGlisser'
 import { MaBouteillePro } from './screens/MaBouteillePro'
+import { SvgCompareGlisser } from './screens/SvgCompareGlisser'
 
 const FIXED_ISO = '2026-10-07T18:30:00.000'
 const FIXED_MS = new Date(FIXED_ISO).getTime()
@@ -19,12 +20,19 @@ document.documentElement.style.setProperty('--app-safe-area-bottom', '34px')
 document.documentElement.dataset.bottomNavPreview = 'floating-pill'
 document.documentElement.dataset.mockupHydratation = 'v2'
 
-type ScreenId = 'accueil' | 'alimentation' | 'ma-bouteille'
+type ScreenId = 'accueil' | 'alimentation' | 'ma-bouteille' | 'svg-compare'
 
 function resolveScreen(): ScreenId {
   const params = new URLSearchParams(window.location.search)
   const raw = params.get('screen') ?? 'accueil'
-  if (raw === 'alimentation' || raw === 'ma-bouteille' || raw === 'accueil') return raw
+  if (
+    raw === 'alimentation' ||
+    raw === 'ma-bouteille' ||
+    raw === 'accueil' ||
+    raw === 'svg-compare'
+  ) {
+    return raw
+  }
   return 'accueil'
 }
 
@@ -76,6 +84,7 @@ function MockupShell() {
             {screen === 'accueil' ? <AccueilEauWidget /> : null}
             {screen === 'alimentation' ? <AlimentationGlisser /> : null}
             {screen === 'ma-bouteille' ? <MaBouteillePro /> : null}
+            {screen === 'svg-compare' ? <SvgCompareGlisser /> : null}
           </AppLayout>
         </div>
       </RestTimerProvider>
