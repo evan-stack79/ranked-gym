@@ -1279,7 +1279,12 @@ export function WorkoutNotebook({
                       setSaveGateError(null)
                       finishSet(ex, validateIdx)
                     }}
-                    disabled={Boolean(ex.sets[validateIdx]?.done)}
+                    disabled={
+                      Boolean(ex.sets[validateIdx]?.done) ||
+                      !isSetReadyForAutoValidate(
+                        ex.sets[validateIdx] ?? { reps: 0, weightKg: 0 },
+                      )
+                    }
                     className="ios-press inline-flex min-h-11 items-center gap-1 rounded-full border border-[#30D158]/40 bg-[#30D158]/15 px-3.5 text-[12px] font-semibold text-[#30D158] disabled:opacity-40"
                   >
                     <Check className="h-3.5 w-3.5" />

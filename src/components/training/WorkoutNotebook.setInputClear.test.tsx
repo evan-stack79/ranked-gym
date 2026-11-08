@@ -338,7 +338,7 @@ describe('WorkoutNotebook — carnet kg clear (liste séries)', () => {
     expect(onRestStart).not.toHaveBeenCalled()
   })
 
-  it('kg 20 → vider → Valider clavier ouvert → refus + message (reste vide)', async () => {
+  it('kg 20 → vider → Valider désactivé (effort/ready gate) ; champ reste vide', async () => {
     autoValidateFlag.on = false
     const onRestStart = vi.fn()
     const exercises: ExerciseEntry[] = [
@@ -381,8 +381,10 @@ describe('WorkoutNotebook — carnet kg clear (liste séries)', () => {
 
     const validateBtn = [...host.querySelectorAll('button')].find((b) =>
       (b.textContent ?? '').trim().includes('Valider'),
-    )
+    ) as HTMLButtonElement | undefined
     expect(validateBtn).toBeTruthy()
+    // NaN kg → !isSetReadyForAutoValidate → bouton disabled (pas de validation).
+    expect(validateBtn!.disabled).toBe(true)
     await act(async () => {
       validateBtn!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
@@ -391,7 +393,6 @@ describe('WorkoutNotebook — carnet kg clear (liste séries)', () => {
     expect(
       (host.querySelector('input[aria-label="Poids"]') as HTMLInputElement | null)?.value,
     ).toBe('')
-    expect(host.textContent).toMatch(/poids et des reps valides/i)
   })
 
   it('kg 20 → vider → Terminer clavier ouvert → refus (pas de save)', async () => {
