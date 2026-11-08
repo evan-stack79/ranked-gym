@@ -17,6 +17,7 @@ import type * as emailVerification from "../emailVerification.js";
 import type * as files from "../files.js";
 import type * as foodAdd from "../foodAdd.js";
 import type * as health from "../health.js";
+import type * as hydration from "../hydration.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_authConfig from "../lib/authConfig.js";
 import type * as lib_authCrypto from "../lib/authCrypto.js";
@@ -55,6 +56,7 @@ declare const fullApi: ApiFromModules<{
   files: typeof files;
   foodAdd: typeof foodAdd;
   health: typeof health;
+  hydration: typeof hydration;
   "lib/auth": typeof lib_auth;
   "lib/authConfig": typeof lib_authConfig;
   "lib/authCrypto": typeof lib_authCrypto;

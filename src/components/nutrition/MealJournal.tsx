@@ -17,13 +17,9 @@ import { remainingMealBudget } from '../../utils/portionGuide'
 import {
   addMealToToday,
   getTodayJournal,
-  getTodayWaterMl,
   removeMealFromToday,
   updateMealInToday,
 } from '../../services/nutritionStorage'
-import { getUserWaterGoalMl, WATER_GOAL_CHANGED_EVENT } from '../../utils/userWaterGoal'
-import { HydrationProgressBar } from './HydrationProgressBar'
-import { WaterGoalChooser } from './WaterGoalChooser'
 import {
   listPersonalFoods,
   mapAccessError,
@@ -93,7 +89,6 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   const { user, requireAuth } = useAuth()
   const [meals, setMeals] = useState<MealEntry[]>([])
   const [hydrated, setHydrated] = useState(false)
-  const [waterTick, setWaterTick] = useState(0)
   const [showForm, setShowForm] = useState(false)
   /** V3 only — age prompt before Ajouter un aliment (never when flag OFF). */
   const [showV3AgeGate, setShowV3AgeGate] = useState(false)
@@ -134,16 +129,9 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
 
   useEffect(() => {
     const onRestored = () => setMeals(getTodayJournal().meals)
-    const onWater = () => setWaterTick((n) => n + 1)
     window.addEventListener('ranked-gym:backup-restored', onRestored)
-    window.addEventListener('ranked-gym:water-changed', onWater)
-    window.addEventListener(WATER_GOAL_CHANGED_EVENT, onWater)
-    window.addEventListener('ranked-gym:profile-changed', onWater)
     return () => {
       window.removeEventListener('ranked-gym:backup-restored', onRestored)
-      window.removeEventListener('ranked-gym:water-changed', onWater)
-      window.removeEventListener(WATER_GOAL_CHANGED_EVENT, onWater)
-      window.removeEventListener('ranked-gym:profile-changed', onWater)
     }
   }, [])
 
@@ -430,14 +418,6 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
   const progress = targetCalories > 0 ? totals.calories / targetCalories : 0
   const remaining = Math.max(0, targetCalories - totals.calories)
 
-  const hydration = useMemo(() => {
-    void waterTick
-    return {
-      consumedMl: getTodayWaterMl(),
-      goalMl: getUserWaterGoalMl(),
-    }
-  }, [waterTick])
-
   const handleAdd = (event: FormEvent) => {
     event.preventDefault()
     const trimmed = name.trim()
@@ -603,23 +583,6 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
           </div>
         </div>
 
-        {hydration.goalMl != null && hydration.goalMl > 0 ? (
-          <HydrationProgressBar
-            className="mt-4 border-t border-white/8 pt-4"
-            consumedMl={hydration.consumedMl}
-            goalMl={hydration.goalMl}
-          />
-        ) : (
-          <div className="mt-4 border-t border-white/8 pt-4">
-            <p className="text-[13px] font-medium tabular-nums text-[#ACB4BA]">
-              {hydration.consumedMl} ml bus aujourd&apos;hui
-            </p>
-            <WaterGoalChooser
-              className="mt-2"
-              onSaved={() => setWaterTick((n) => n + 1)}
-            />
-          </div>
-        )}
       </div>
 
       <div

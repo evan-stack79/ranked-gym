@@ -37,11 +37,11 @@ describe('kcal / body weight never use CountUpNumber', () => {
     expect(code).not.toMatch(/from ['"].*CountUp/)
   })
 
-  it('NutritionSnapshot kcal stays on StaticKcalNumber; only water uses CountUp', () => {
+  it('NutritionSnapshot kcal stays on StaticKcalNumber (eau retirée → WaterCard)', () => {
     const src = read('src/components/home/NutritionSnapshot.tsx')
     expect(src).toMatch(/StaticKcalNumber/)
-    expect(src).toMatch(/kcal must stay static/)
-    expect(src).toMatch(/kind="water"/)
+    expect(src).not.toMatch(/CountUpNumber/)
+    expect(src).not.toMatch(/kind="water"/)
     expect(src).not.toMatch(/kind="sessions"/)
     expect(src).not.toMatch(/kind="successful_sets"/)
     expect(src).not.toMatch(/kind="kcal"/)

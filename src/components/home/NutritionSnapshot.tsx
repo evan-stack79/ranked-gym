@@ -1,70 +1,37 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { getNutritionTarget } from '../../services/nutritionActivity'
-import { getCalorieProfile, getTodayJournal, getTodayWaterMl } from '../../services/nutritionStorage'
-import { formatWaterMl } from '../../utils/waterGoal'
-import {
-  canSubmitHomeQuickWater,
-  HOME_QUICK_WATER_ML,
-  shouldShowHomeQuickWaterButton,
-  tryAddHomeQuickWater,
-} from '../../utils/homeNutritionQuickActions'
-import {
-  getUserWaterGoalMl,
-  WATER_GOAL_CHANGED_EVENT,
-} from '../../utils/userWaterGoal'
+import { getCalorieProfile, getTodayJournal } from '../../services/nutritionStorage'
 import { isCalorieGoalEnabled } from '../../backend/calorieGoalFeatureFlag'
 import { isMinorAge } from '../../services/nutritionSafetyRules'
-import { CountUpNumber, SoftBlurIn, StaticKcalNumber } from '../motion'
-import { WaterGoalChooser } from '../nutrition/WaterGoalChooser'
+import { SoftBlurIn, StaticKcalNumber } from '../motion'
 
 interface NutritionSnapshotProps {
   onOpenNutrition?: () => void
 }
 
+/**
+ * Accueil — calories only (M1). L’eau est uniquement via WaterCard (hydration*).
+ */
 export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
   const [tick, setTick] = useState(0)
-  const [waterSaving, setWaterSaving] = useState(false)
-  const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' } | null>(
-    null,
-  )
-  const toastTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     const sync = () => setTick((n) => n + 1)
     window.addEventListener('ranked-gym:profile-changed', sync)
     window.addEventListener('ranked-gym:backup-restored', sync)
-    window.addEventListener('ranked-gym:water-changed', sync)
-    window.addEventListener(WATER_GOAL_CHANGED_EVENT, sync)
     window.addEventListener('focus', sync)
     return () => {
       window.removeEventListener('ranked-gym:profile-changed', sync)
       window.removeEventListener('ranked-gym:backup-restored', sync)
-      window.removeEventListener('ranked-gym:water-changed', sync)
-      window.removeEventListener(WATER_GOAL_CHANGED_EVENT, sync)
       window.removeEventListener('focus', sync)
-      if (toastTimerRef.current != null) {
-        window.clearTimeout(toastTimerRef.current)
-      }
     }
-  }, [])
-
-  const showToast = useCallback((message: string, variant: 'success' | 'error' = 'success') => {
-    setToast({ message, variant })
-    if (toastTimerRef.current != null) {
-      window.clearTimeout(toastTimerRef.current)
-    }
-    toastTimerRef.current = window.setTimeout(() => {
-      setToast(null)
-      toastTimerRef.current = null
-    }, 2600)
   }, [])
 
   const snapshot = useMemo(() => {
+    void tick
     const nutrition = getNutritionTarget()
     const profile = getCalorieProfile()
     const meals = getTodayJournal().meals
-    const waterMl = getTodayWaterMl()
-    const waterGoalMl = getUserWaterGoalMl()
     const consumedCalories = meals.reduce((sum, meal) => sum + (meal.calories ?? 0), 0)
 
     const targetCalories = nutrition.targetCalories
@@ -76,11 +43,6 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
       targetAvailable && targetCalories > 0
         ? Math.min(consumedCalories / targetCalories, 1)
         : 0
-    const hasWaterGoal = waterGoalMl != null && waterGoalMl > 0
-    const waterProgress =
-      hasWaterGoal ? Math.min(Math.max(0, waterMl) / waterGoalMl, 1) : 0
-    const showQuickWater = shouldShowHomeQuickWaterButton(waterMl, waterGoalMl)
-    const waterGoalReached = hasWaterGoal && waterMl >= waterGoalMl
 
     const calorieGoalEnabled = isCalorieGoalEnabled()
     const minor = isMinorAge(profile.age)
@@ -88,33 +50,13 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
     return {
       onboardingComplete: nutrition.profile.onboardingComplete,
       targetAvailable,
-      // BUG-16 : drapeau OFF / mineur → carte neutre, jamais « Objectif indisponible »
       showUnavailableGoal: !targetAvailable && calorieGoalEnabled && !minor,
       targetCalories,
       remainingCalories,
       consumedCalories,
       progress,
-      waterMl,
-      waterGoalMl,
-      hasWaterGoal,
-      waterProgress,
-      showQuickWater,
-      waterGoalReached,
     }
   }, [tick])
-
-  const handleQuickWater = () => {
-    if (!canSubmitHomeQuickWater(waterSaving)) return
-    setWaterSaving(true)
-    const result = tryAddHomeQuickWater()
-    setWaterSaving(false)
-    if (result.ok) {
-      setTick((n) => n + 1)
-      showToast(`${HOME_QUICK_WATER_ML} ml ajoutés`)
-      return
-    }
-    showToast(result.message, 'error')
-  }
 
   if (!snapshot.onboardingComplete) {
     return (
@@ -128,26 +70,25 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
   }
 
   return (
-    <section className="glass-card rounded-2xl p-4" aria-label="Nutrition du jour">
+    <section className="glass-card rounded-2xl p-4" aria-label="Nutrition">
       <div>
         <p className="text-[11px] font-medium text-[#ACB4BA]">
-          <SoftBlurIn>Aujourd&apos;hui</SoftBlurIn>
+          <SoftBlurIn>Nutrition</SoftBlurIn>
         </p>
-        {snapshot.targetAvailable ? (
-          <>
-            <p className="mt-1 text-[22px] font-bold leading-tight tracking-tight text-white">
-              {/* SAFETY: kcal must stay static — never CountUpNumber (PM / Vérificateur). */}
-              Il te reste <StaticKcalNumber value={snapshot.remainingCalories} /> kcal
-            </p>
-            <p className="mt-1 text-[13px] text-[#ACB4BA]">
-              <StaticKcalNumber value={snapshot.consumedCalories} /> consommées sur{' '}
-              <StaticKcalNumber value={snapshot.targetCalories} />
-            </p>
-          </>
-        ) : snapshot.showUnavailableGoal ? (
+        {snapshot.showUnavailableGoal ? (
           <>
             <p className="mt-1 text-[17px] font-semibold text-white">Objectif indisponible</p>
             <p className="mt-1 text-[13px] text-[#ACB4BA]">Ouvre Nutri pour vérifier ton plan.</p>
+          </>
+        ) : snapshot.targetAvailable ? (
+          <>
+            <p className="mt-1 text-[17px] font-semibold text-white">
+              <StaticKcalNumber value={snapshot.remainingCalories} /> kcal restantes
+            </p>
+            <p className="mt-1 text-[13px] text-[#ACB4BA]">
+              <StaticKcalNumber value={snapshot.consumedCalories} /> /{' '}
+              <StaticKcalNumber value={snapshot.targetCalories} /> kcal
+            </p>
           </>
         ) : (
           <>
@@ -184,80 +125,6 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
           Ajouter un repas
         </button>
       </div>
-
-      <div className="mt-4 border-t border-white/8 pt-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-medium text-[#ACB4BA]">
-              <SoftBlurIn>Eau</SoftBlurIn>
-            </p>
-            {snapshot.hasWaterGoal ? (
-              snapshot.waterGoalReached ? (
-                <p className="mt-0.5 text-[15px] font-semibold text-[#7DD3FC]">Objectif atteint</p>
-              ) : (
-                <p className="mt-0.5 text-[15px] font-semibold text-white">
-                  <CountUpNumber
-                    kind="water"
-                    value={snapshot.waterMl}
-                    format={(n) => formatWaterMl(Math.round(n))}
-                  />{' '}
-                  sur {formatWaterMl(snapshot.waterGoalMl!)}
-                </p>
-              )
-            ) : (
-              <p className="mt-0.5 text-[15px] font-semibold text-white">
-                <CountUpNumber
-                  kind="water"
-                  value={snapshot.waterMl}
-                  format={(n) => formatWaterMl(Math.round(n))}
-                />{' '}
-                bus aujourd&apos;hui
-              </p>
-            )}
-            {snapshot.hasWaterGoal ? (
-              <div
-                className="mt-2 h-1 overflow-hidden rounded-full bg-white/10"
-                role="progressbar"
-                aria-valuenow={Math.round(snapshot.waterProgress * 100)}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-label="Progression hydrique"
-              >
-                <div
-                  className="motion-progress-fill h-full rounded-full bg-gradient-to-r from-[#0891B2] to-[#38BDF8]"
-                  style={{ transform: `scaleX(${Math.max(0, Math.min(snapshot.waterProgress, 1))})` }}
-                />
-              </div>
-            ) : (
-              <WaterGoalChooser className="mt-2" onSaved={() => setTick((n) => n + 1)} />
-            )}
-          </div>
-
-          {snapshot.showQuickWater ? (
-            <button
-              type="button"
-              onClick={handleQuickWater}
-              disabled={!canSubmitHomeQuickWater(waterSaving)}
-              aria-label="J'ai bu 250 ml"
-              className="ios-press min-h-11 shrink-0 rounded-2xl border border-cyan-500/20 bg-cyan-500/8 px-3.5 py-2.5 text-[14px] font-semibold text-[#7DD3FC] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[#000000] disabled:opacity-50"
-            >
-              +250 ml
-            </button>
-          ) : null}
-        </div>
-      </div>
-
-      {toast ? (
-        <p
-          className={`mt-3 text-center text-[12px] font-medium ${
-            toast.variant === 'error' ? 'text-[#FF907F]' : 'text-[#30D158]'
-          }`}
-          role={toast.variant === 'error' ? 'alert' : 'status'}
-          aria-live={toast.variant === 'error' ? 'assertive' : 'polite'}
-        >
-          {toast.message}
-        </p>
-      ) : null}
     </section>
   )
 }

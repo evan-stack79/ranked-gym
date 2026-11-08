@@ -133,11 +133,15 @@ jobs:
             exit 1
           fi
           echo "Checking native plugin registration symbols in $APP_BINARY"
-          if ! strings "$APP_BINARY" | grep -q 'MainViewController'; then
+          # Dump strings to a file first: `strings | grep -q` under `pipefail` is a
+          # false-fail when grep -q exits early (SIGPIPE / "failed to flush output").
+          STRINGS_DUMP="$RUNNER_TEMP/app-strings.txt"
+          strings "$APP_BINARY" > "$STRINGS_DUMP"
+          if ! grep -q 'MainViewController' "$STRINGS_DUMP"; then
             echo "ERROR: MainViewController missing from App binary — SecureStorage will not register on iOS"
             exit 1
           fi
-          if ! strings "$APP_BINARY" | grep -q 'SecureStoragePlugin'; then
+          if ! grep -q 'SecureStoragePlugin' "$STRINGS_DUMP"; then
             echo "ERROR: SecureStoragePlugin missing from App binary — Keychain plugin not linked"
             exit 1
           fi

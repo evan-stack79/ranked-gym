@@ -104,6 +104,9 @@ export async function signInWithEmail(email: string, password: string) {
 export async function signOut() {
   const localUserId = getActiveCloudUserId()
   clearAvisBetaLocalData({ userId: localUserId })
+  // M5 — ne jamais rejouer la file hydratation d’un compte sur un autre.
+  const { clearHydrationLocalState } = await import('./hydration/hydrationService')
+  clearHydrationLocalState()
   if (isConvexAuthActive()) {
     await convexAuth.signOut()
     await clearSecureAuthStorage()
