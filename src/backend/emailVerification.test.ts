@@ -131,24 +131,27 @@ class FakeQuery {
   }
 }
 
+/** Stub `process.env` without dropping `nextTick` (sinon Vitest worker flake en CI). */
+function stubProcessEnv(env: Record<string, string | undefined>) {
+  vi.stubGlobal('process', { ...process, env: { ...env } })
+}
+
 describe('transactionalMailer — abstract env', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
   })
 
   it('missing server key / provider → not configured', () => {
-    vi.stubGlobal('process', { env: {} })
+    stubProcessEnv({})
     expect(isTransactionalEmailConfigured()).toBe(false)
   })
 
   it('configured env → send posts opaque payload (no hardcoded provider)', async () => {
-    vi.stubGlobal('process', {
-      env: {
-        EMAIL_PROVIDER: 'evan-chosen-provider',
-        EMAIL_API_KEY: 'secret-key',
-        EMAIL_API_URL: 'https://mail.example.test/send',
-        AUTH_EMAIL_FROM: 'noreply@ranked.gym',
-      },
+    stubProcessEnv({
+      EMAIL_PROVIDER: 'evan-chosen-provider',
+      EMAIL_API_KEY: 'secret-key',
+      EMAIL_API_URL: 'https://mail.example.test/send',
+      AUTH_EMAIL_FROM: 'noreply@ranked.gym',
     })
     expect(isTransactionalEmailConfigured()).toBe(true)
     const fetchMock = vi.fn().mockResolvedValue({
@@ -347,7 +350,7 @@ describe('email verification codes — B9-01', () => {
 
   // B11-02 : replaced source-reading test with real FakeDb signup/import execution.
   it('signup/import ne posent pas emailConfirmedAt (exécution réelle)', async () => {
-    vi.stubGlobal('process', { env: { CONVEX_ALLOW_PUBLIC_SIGNUP: 'true' } })
+    stubProcessEnv({ CONVEX_ALLOW_PUBLIC_SIGNUP: 'true' })
     const db = new FakeDb()
     const ctx = { db }
     const signedUp = await registerUserWithEmail(ctx as never, {
@@ -368,7 +371,7 @@ describe('email verification codes — B9-01', () => {
   })
 
   it('mailer absent → linking impossible (code EMAIL_PROVIDER_NOT_CONFIGURED)', () => {
-    vi.stubGlobal('process', { env: { EMAIL_PROVIDER: 'x' } })
+    stubProcessEnv({ EMAIL_PROVIDER: 'x' })
     expect(isTransactionalEmailConfigured()).toBe(false)
   })
 
