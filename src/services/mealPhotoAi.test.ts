@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
 
 const isConvexDomainActive = vi.fn()
 const getConvexSessionToken = vi.fn()
@@ -38,12 +39,18 @@ describe('mealPhotoAi service', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
-    isConvexDomainActive.mockReturnValue(false)
+    isConvexDomainActive.mockReturnValue(true)
     isSupabaseConfigured.mockReturnValue(true)
   })
 
+  it('V3-10 : source client n’appelle plus l’Edge Supabase analyze-meal-photo', () => {
+    const source = readFileSync(new URL('./mealPhotoAi.ts', import.meta.url), 'utf8')
+    expect(source).not.toMatch(/functions\.invoke\(\s*['"]analyze-meal-photo['"]/)
+    expect(source).not.toContain('FunctionsHttpError')
+    expect(source).toContain('api.mealPhotoAi.analyzeMealPhoto')
+  })
+
   it('uses Convex action path when convex-primary is active', async () => {
-    isConvexDomainActive.mockReturnValue(true)
     getConvexSessionToken.mockResolvedValue('convex-session-token')
     compressMealImage.mockResolvedValue({
       base64: 'a'.repeat(1200),
@@ -65,6 +72,7 @@ describe('mealPhotoAi service', () => {
 
     expect(getConvexSessionToken).toHaveBeenCalledTimes(1)
     expect(convexAction).toHaveBeenCalledTimes(1)
+    expect(getSupabase).not.toHaveBeenCalled()
     expect(result).toEqual({
       calories: 530,
       proteines: 31,
@@ -77,7 +85,6 @@ describe('mealPhotoAi service', () => {
   })
 
   it('blocks convex path when the compressed payload is too large', async () => {
-    isConvexDomainActive.mockReturnValue(true)
     getConvexSessionToken.mockResolvedValue('convex-session-token')
     compressMealImage.mockResolvedValue({
       base64: 'x'.repeat(900_001),
@@ -92,7 +99,6 @@ describe('mealPhotoAi service', () => {
   })
 
   it('surfaces Convex action business errors with french messages', async () => {
-    isConvexDomainActive.mockReturnValue(true)
     getConvexSessionToken.mockResolvedValue('convex-session-token')
     compressMealImage.mockResolvedValue({
       base64: 'a'.repeat(1200),
@@ -121,7 +127,6 @@ describe('mealPhotoAi service', () => {
   })
 
   it('uses dedicated overload FR message for convex ai_unavailable errors', async () => {
-    isConvexDomainActive.mockReturnValue(true)
     getConvexSessionToken.mockResolvedValue('convex-session-token')
     compressMealImage.mockResolvedValue({
       base64: 'a'.repeat(1200),
@@ -149,45 +154,16 @@ describe('mealPhotoAi service', () => {
     )
   })
 
-  it('keeps the Supabase edge-function path when convex-primary is disabled', async () => {
+  it('V3-10 : refuse le chemin Supabase — Convex requis', async () => {
     isConvexDomainActive.mockReturnValue(false)
-    compressMealImage.mockResolvedValue({
-      base64: 'a'.repeat(1200),
-      mimeType: 'image/jpeg',
-    })
-    const invoke = vi.fn().mockResolvedValue({
-      data: {
-        calories: 480,
-        proteines: 26,
-        glucides: 52,
-        lipides: 14,
-        scanCount: 1,
-        dailyLimit: 5,
-        scansRemaining: 4,
-      },
-      error: null,
-    })
-    getSupabase.mockReturnValue({
-      auth: {
-        getSession: vi.fn().mockResolvedValue({
-          data: { session: { access_token: 'supabase-token' } },
-        }),
-      },
-      functions: {
-        invoke,
-      },
-    })
-
-    const { analyzeMealPhoto } = await import('./mealPhotoAi')
-    const result = await analyzeMealPhoto(new Blob(['fake'], { type: 'image/jpeg' }))
-
-    expect(invoke).toHaveBeenCalledWith('analyze-meal-photo', {
-      body: {
-        imageBase64: 'a'.repeat(1200),
-        mimeType: 'image/jpeg',
-      },
-    })
+    const { analyzeMealPhoto, MealPhotoAiError } = await import('./mealPhotoAi')
+    await expect(analyzeMealPhoto(new Blob(['fake'], { type: 'image/jpeg' }))).rejects.toBeInstanceOf(
+      MealPhotoAiError,
+    )
+    await expect(analyzeMealPhoto(new Blob(['fake'], { type: 'image/jpeg' }))).rejects.toThrow(
+      /Analyse photo indisponible/,
+    )
+    expect(getSupabase).not.toHaveBeenCalled()
     expect(convexAction).not.toHaveBeenCalled()
-    expect(result.scansRemaining).toBe(4)
   })
 })

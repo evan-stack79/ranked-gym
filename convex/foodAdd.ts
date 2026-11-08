@@ -15,7 +15,6 @@ import {
   internalQuery,
   mutation,
   query,
-  type ActionCtx,
   type MutationCtx,
 } from './_generated/server'
 import { assertUserOwnership, requireSessionUser } from './lib/auth'
@@ -46,6 +45,15 @@ import {
   catalogNutrientForV3Meal,
   pickCatalogNutrient,
 } from './lib/foodAddUpsertSanitize'
+import {
+  buildOffSearchUrl,
+  fetchOffSearchJson,
+  OFF_SEARCH_PAGE_SIZE,
+  OFF_SEARCH_RETURN_LIMIT,
+  OFF_SEARCH_TIMEOUT_MS,
+  OFF_SEARCH_USER_AGENT,
+  pickOffSearchProducts,
+} from './lib/offSearch'
 
 /** Toutes les erreurs FOOD_ADD_* passent par ConvexError (data.code visible en prod). */
 function throwFoodAddError(data: {
@@ -56,9 +64,10 @@ function throwFoodAddError(data: {
   throw new ConvexError(data)
 }
 
-const OFF_USER_AGENT = 'RankedGym/1.0 (support@rankedgym.app)'
-const OFF_TIMEOUT_MS = 8_000
-const OFF_MAX_RESULTS = 20
+const OFF_USER_AGENT = OFF_SEARCH_USER_AGENT
+/** Miroir image (hors recherche) — inchangé. */
+const OFF_TIMEOUT_MS = OFF_SEARCH_TIMEOUT_MS
+const OFF_MAX_RESULTS = OFF_SEARCH_RETURN_LIMIT
 const FOOD_SEARCH_DAILY_LIMIT = 40
 const IMAGE_MAX_BYTES = 1_500_000
 const NUTRITION_SCHEMA_VERSION = 1
@@ -71,6 +80,8 @@ type OffApiProduct = {
   brands?: string
   serving_size?: string
   categories_tags?: string[]
+  countries_tags?: string[]
+  unique_scans_n?: number
   image_front_small_url?: string
   image_front_url?: string
   nutriments?: {
@@ -215,22 +226,7 @@ export function resolveAddFoodSnapshotQuantity(input: {
 }
 
 async function fetchOffJson(url: string): Promise<unknown> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), OFF_TIMEOUT_MS)
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': OFF_USER_AGENT,
-        From: 'support@rankedgym.app',
-      },
-    })
-    if (!response.ok) throw new Error(`OFF_HTTP_${response.status}`)
-    return (await response.json()) as unknown
-  } finally {
-    clearTimeout(timer)
-  }
+  return fetchOffSearchJson(url, { timeoutMs: OFF_SEARCH_TIMEOUT_MS, retries: 1 })
 }
 
 function mapOffProduct(raw: OffApiProduct, fallbackBarcode: string) {
@@ -526,25 +522,6 @@ export const mirrorOffImage = internalAction({
   },
 })
 
-async function resolveOwnedImage(
-  ctx: ActionCtx,
-  offCode: string,
-  offImageUrl: string | undefined,
-): Promise<{ imageUrl?: string; imageStorageId?: string }> {
-  if (!offCode) return {}
-  const mirrored: OwnedImageRef | null = offImageUrl
-    ? await ctx.runAction(internal.foodAdd.mirrorOffImage, {
-        offCode,
-        sourceUrl: offImageUrl,
-      })
-    : await ctx.runQuery(internal.foodAdd.getOffImageCache, { offCode })
-  if (!mirrored) return {}
-  return {
-    imageUrl: mirrored.url ?? undefined,
-    imageStorageId: mirrored.storageId,
-  }
-}
-
 export const searchFoods = action({
   args: {
     sessionToken: v.string(),
@@ -573,37 +550,33 @@ export const searchFoods = action({
     }
 
     const limit = Math.max(1, Math.min(OFF_MAX_RESULTS, Math.floor(args.limit ?? OFF_MAX_RESULTS)))
-    const params = new URLSearchParams()
-    params.set('action', 'process')
-    params.set('json', '1')
-    params.set('sort_by', 'unique_scans_n')
-    params.set('page_size', String(limit))
-    if (term.length >= 2) {
-      params.set('search_terms', term)
-      params.set('search_simple', '1')
-    }
-    if (categoryTag) {
-      params.set('tagtype_0', 'categories')
-      params.set('tag_contains_0', 'contains')
-      params.set('tag_0', categoryTag)
-    }
+    // Demande large à OFF, re-tri pertinence, renvoie `limit`.
+    const url = buildOffSearchUrl({
+      term,
+      categoryTag: categoryTag || null,
+      pageSize: OFF_SEARCH_PAGE_SIZE,
+    })
 
-    const data = (await fetchOffJson(
-      `https://world.openfoodfacts.org/cgi/search.pl?${params.toString()}`,
-    )) as { products?: OffApiProduct[] }
+    let data: { products?: OffApiProduct[] }
+    try {
+      data = (await fetchOffJson(url)) as { products?: OffApiProduct[] }
+    } catch (error) {
+      // Jamais de liste vide sur erreur réseau — le client affiche un message clair.
+      const message = error instanceof Error ? error.message : String(error)
+      throw new Error(`FOOD_SEARCH_NETWORK:${message}`)
+    }
     const products = Array.isArray(data.products) ? data.products : []
+    const ranked = pickOffSearchProducts(term, products, limit)
     const hits: FoodAddV3PublicHit[] = []
 
-    for (const product of products) {
+    for (const product of ranked) {
       const mapped = mapOffProduct(product, String(product.code || product._id || ''))
       if (!mapped.nom.trim()) continue
+      // Recherche : cache image seulement — pas de mirror séquentiel (cause timeouts → 0 résultat).
+      // Le miroir OFF → storage reste disponible ailleurs (barcode / mirrorOffImage).
       let imageUrl: string | undefined
       let imageStorageId: string | undefined
-      if (hits.length < 8) {
-        const owned = await resolveOwnedImage(ctx, mapped.barcode, mapped.offImageUrl)
-        imageUrl = owned.imageUrl
-        imageStorageId = owned.imageStorageId
-      } else if (mapped.barcode) {
+      if (mapped.barcode) {
         const cached: OwnedImageRef | null = await ctx.runQuery(internal.foodAdd.getOffImageCache, {
           offCode: mapped.barcode,
         })

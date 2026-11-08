@@ -47,12 +47,15 @@ describe('isSetReadyForAutoValidate', () => {
     expect(isSetReadyForAutoValidate({ reps: 0, weightKg: 20, rpe: 8 })).toBe(false)
     expect(isSetReadyForAutoValidate({ reps: 8, weightKg: Number.NaN, rpe: 8 })).toBe(false)
     expect(isSetReadyForAutoValidate({ reps: 8, weightKg: 20, rpe: 8, done: true })).toBe(false)
+    expect(isSetReadyForAutoValidate({ reps: 8, weightKg: 600, rpe: 8 })).toBe(false)
+    expect(isSetReadyForAutoValidate({ reps: 51, weightKg: 20, rpe: 8 })).toBe(false)
   })
 
   it('accepte charge+reps+Effort 1–10 (0 kg autorisé)', () => {
     expect(isSetReadyForAutoValidate({ reps: 8, weightKg: 20, rpe: 7 })).toBe(true)
     expect(isSetReadyForAutoValidate({ reps: 10, weightKg: 0, rpe: 1 })).toBe(true)
     expect(isSetReadyForAutoValidate({ reps: 6, weightKg: 80, rpe: 10 })).toBe(true)
+    expect(isSetReadyForAutoValidate({ reps: 50, weightKg: 500, rpe: 10 })).toBe(true)
   })
 })
 

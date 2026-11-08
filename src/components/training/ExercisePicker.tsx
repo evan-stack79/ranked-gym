@@ -6,7 +6,9 @@ import {
   countExerciseMatches,
   searchExercises,
 } from '../../utils/exerciseSearch'
+import { resolvePickerIllustrationSrc } from '../../utils/exercisePickerIllustrations'
 import { BRAND_MARK_COMPACT_SRC } from '../brand/BrandMark'
+import { ExerciseFormGuide, ExerciseFormGuideTrigger } from './ExerciseFormGuide'
 import { ExercisePickerThumb } from './ExercisePickerThumb'
 import { getTrainingState } from '../../services/trainingStorage'
 
@@ -34,6 +36,7 @@ export function ExercisePicker({
   const [query, setQuery] = useState('')
   const [customOpen, setCustomOpen] = useState(false)
   const [customName, setCustomName] = useState('')
+  const [formGuide, setFormGuide] = useState<CatalogExercise | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const listId = useId()
 
@@ -162,6 +165,11 @@ export function ExercisePicker({
               exercise={ex}
               active={index === 0}
               onSelect={() => onSelect(ex)}
+              onOpenFormGuide={
+                resolvePickerIllustrationSrc(ex.id)
+                  ? () => setFormGuide(ex)
+                  : undefined
+              }
             />
           ))}
           {results.length === 0 ? (
@@ -219,6 +227,12 @@ export function ExercisePicker({
           </p>
         </div>
       </div>
+
+      <ExerciseFormGuide
+        exercise={formGuide}
+        open={Boolean(formGuide)}
+        onClose={() => setFormGuide(null)}
+      />
     </section>
   )
 }
@@ -227,22 +241,18 @@ function ExerciseResultRow({
   exercise,
   active,
   onSelect,
+  onOpenFormGuide,
 }: {
   exercise: CatalogExercise
   active: boolean
   onSelect: () => void
+  onOpenFormGuide?: () => void
 }) {
   const meta = formatCatalogMeta(exercise)
 
   return (
     <li role="option" aria-selected={active}>
-      <button
-        type="button"
-        onClick={onSelect}
-        data-exercise-id={exercise.id}
-        data-result-active={active ? 'true' : 'false'}
-        className="ios-press relative flex min-h-16 w-full items-center gap-3 border-b border-[#25282a] py-2.5 pl-3.5 pr-1 text-left"
-      >
+      <div className="relative flex min-h-16 w-full items-center gap-3 border-b border-[#25282a] py-2.5 pl-3.5 pr-1">
         {active ? (
           <span
             className="absolute left-0 top-3 bottom-3 w-[2.5px] rounded-full bg-[#FF0702]"
@@ -250,19 +260,34 @@ function ExerciseResultRow({
           />
         ) : null}
 
-        <ExercisePickerThumb canonicalExerciseId={exercise.id} />
+        <button
+          type="button"
+          onClick={onSelect}
+          data-exercise-id={exercise.id}
+          data-result-active={active ? 'true' : 'false'}
+          className="ios-press flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
+          <ExercisePickerThumb canonicalExerciseId={exercise.id} />
 
-        <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-semibold leading-snug text-white">{exercise.name}</p>
-          <p className="mt-0.5 text-[12px] leading-snug text-[#ACB4BA]">{meta}</p>
-        </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-semibold leading-snug text-white">{exercise.name}</p>
+            <p className="mt-0.5 text-[12px] leading-snug text-[#ACB4BA]">{meta}</p>
+          </div>
+        </button>
+
+        {onOpenFormGuide ? (
+          <ExerciseFormGuideTrigger
+            onOpen={onOpenFormGuide}
+            label={`Voir l’exécution de ${exercise.name}`}
+          />
+        ) : null}
 
         <ChevronRight
           className="h-5 w-5 shrink-0 text-[#717C83]"
           strokeWidth={2}
           aria-hidden="true"
         />
-      </button>
+      </div>
     </li>
   )
 }

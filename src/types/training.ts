@@ -220,6 +220,7 @@ export interface ActiveWorkoutDraft {
       setIndex: number
       exerciseName: string
       setLabel: string
+      setTotal?: number
     }
   } | null
   /**

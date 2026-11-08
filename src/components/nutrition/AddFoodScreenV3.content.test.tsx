@@ -93,7 +93,8 @@ describe('AddFoodScreen content rules', () => {
     expect(screen?.textContent).toContain('pour 100 g')
     expect(screen?.textContent).toContain('Données Open Food Facts')
     expect(screen?.textContent).toContain('ODbL')
-    expect(screen?.textContent).toContain('CC BY-SA 3.0')
+    expect(screen?.textContent).toContain('Icônes Ranked Gym')
+    expect(screen?.textContent).not.toContain('CC BY-SA 3.0')
     expect(screen?.textContent).toContain('Ou saisie manuelle')
 
     const text = screen?.textContent ?? ''
@@ -103,8 +104,9 @@ describe('AddFoodScreen content rules', () => {
     expect(text).not.toMatch(/€|promo|bon marché|mauvais|excellent/i)
     expect(text).not.toContain('Touchez pour revoir')
 
-    // Offline → icônes neutres
-    expect(document.querySelectorAll('[data-off-image="fallback"]').length).toBeGreaterThan(0)
+    // V3 : icônes catégorie (pas de photos OFF)
+    expect(document.querySelectorAll('[data-food-category-icon]').length).toBeGreaterThan(0)
+    expect(document.querySelector('img')).toBeNull()
 
     await act(async () => {
       root.unmount()

@@ -165,6 +165,13 @@ export function resolveCachedImageUrl(
   return undefined
 }
 
+/** Lookup per-100 g par code OFF / code-barres (édition V3). */
+export function findCachedFoodByOffCode(offCode: string | null | undefined): CachedFoodItem | undefined {
+  const code = offCode?.trim().toLowerCase()
+  if (!code) return undefined
+  return readAll().find((item) => item.barcode.trim().toLowerCase() === code)
+}
+
 export function clearFoodOfflineCache(): void {
   if (typeof localStorage === 'undefined') return
   localStorage.removeItem(STORAGE_KEY)

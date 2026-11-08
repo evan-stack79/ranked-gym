@@ -17,6 +17,10 @@ export const PER100G_KCAL_HARD_MAX = 900
 /** Une macro > 100 g/100 g → null. */
 export const PER100G_MACRO_HARD_MAX = 100
 
+/** V3-11 — plafond kcal stockées (upsertMeal / Photo IA / saisie). */
+export const MAX_STORED_MEAL_KCAL = 5000 as const
+export const MEAL_KCAL_ABOVE_MAX = 'MEAL_KCAL_ABOVE_MAX' as const
+
 export type NutrientsSource = 'server' | 'client'
 
 export function isFiniteNumber(n: unknown): n is number {
@@ -25,7 +29,7 @@ export function isFiniteNumber(n: unknown): n is number {
 
 /**
  * Nutriment repas legacy : NaN / infini / négatif → null ; 0 et positifs gardés.
- * Ne jette jamais.
+ * Ne jette jamais. Le plafond 5000 est vérifié à part (`checkStoredMealCalories`).
  */
 export function sanitizeLegacyMealNutrient(
   value: number | null | undefined,
@@ -33,6 +37,23 @@ export function sanitizeLegacyMealNutrient(
   if (value == null) return null
   if (!isFiniteNumber(value) || value < 0) return null
   return value
+}
+
+/**
+ * V3-11 — refuse toute kcal > 5000 avant écriture repas (pure, testable sans réseau).
+ * `null` / omis autorisé (lignes V3 sans chiffre client).
+ */
+export function checkStoredMealCalories(
+  calories: number | null | undefined,
+):
+  | { ok: true; calories: number | null }
+  | { ok: false; code: typeof MEAL_KCAL_ABOVE_MAX } {
+  if (calories == null) return { ok: true, calories: null }
+  if (!isFiniteNumber(calories) || calories < 0) return { ok: true, calories: null }
+  if (calories > MAX_STORED_MEAL_KCAL) {
+    return { ok: false, code: MEAL_KCAL_ABOVE_MAX }
+  }
+  return { ok: true, calories }
 }
 
 /**

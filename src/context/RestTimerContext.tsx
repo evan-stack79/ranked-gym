@@ -8,7 +8,13 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { playRestCompleteChime } from '../utils/restTimerSound'
+import {
+  cancelRestTimerSound,
+  maybePlayCountdownBeep,
+  onRestTimerSoundComplete,
+  rescheduleRestTimerSound,
+  scheduleRestTimerSound,
+} from '../utils/restTimerSound'
 import { vibrate } from '../utils/haptics'
 import { CANONICAL_REST_SEC, clampRestSec } from '../utils/restDuration'
 import {
@@ -16,6 +22,7 @@ import {
   startRestLiveActivity,
   updateRestLiveActivity,
 } from '../services/restTimerLiveActivity'
+import { subscribeLiveActivityActions } from '../services/liveActivity'
 import {
   getTrainingState,
   getTrainingStorageScope,
@@ -34,6 +41,8 @@ export type RestTimerTarget = {
   setIndex: number
   exerciseName: string
   setLabel: string
+  /** Nombre de séries de l’exercice (pour « Série X sur Y ensuite »). */
+  setTotal?: number
 }
 
 export type RestTimerState = {
@@ -203,8 +212,8 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     persistSnap(null)
     logRest(false)
     void endRestLiveActivity(true)
-    vibrate([40, 60, 40, 60, 80])
-    playRestCompleteChime()
+    // Son + haptic (mute → vibration seule) — une seule fois, pas de boucle.
+    void onRestTimerSoundComplete()
     // Auto-fermeture : pas d’état « finished » bloquant ni second log via skip.
     goIdle()
   }, [clearTick, goIdle, logRest, persistSnap])
@@ -225,12 +234,11 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       finished: false,
       paused: false,
     }))
+    // Live Activity is endDate-driven (widget Text(timerInterval:)) — never push
+    // remainingSec each tick; background freezes JS and would freeze the island.
     if (target) {
-      void updateRestLiveActivity({
-        remainingSec: next,
-        subtitle: `${target.exerciseName} · ${target.setLabel}`,
-      })
       if (next === 10 || next === 5 || next === 3 || next === 1) vibrate(10)
+      void maybePlayCountdownBeep(next)
     }
   }, [complete])
 
@@ -268,11 +276,24 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
         paused: false,
         target,
       })
+      const startAt = endsAt - total * 1000
+      // setIndex target is 0-based just-finished → « Série X ensuite » = +2 (1-based next)
+      const nextSet = target.setIndex + 2
+      const setTotal =
+        target.setTotal != null && target.setTotal > 0
+          ? Math.round(target.setTotal)
+          : undefined
       void startRestLiveActivity({
         remainingSec: total,
         totalSec: total,
+        startDateMs: startAt,
+        endDateMs: endsAt,
+        setIndex: nextSet,
+        setTotal,
+        exerciseName: target.exerciseName,
         subtitle: `${target.exerciseName} · ${target.setLabel}`,
       })
+      void scheduleRestTimerSound(endsAt)
       vibrate(10)
       armTick()
     },
@@ -293,9 +314,13 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       paused: true,
       target: targetRef.current,
     })
+    void cancelRestTimerSound()
     void updateRestLiveActivity({
       remainingSec: remaining,
+      startDateMs: 0,
+      endDateMs: 0,
       subtitle: `${targetRef.current.exerciseName} · ${targetRef.current.setLabel}`,
+      paused: true,
     })
   }, [clearTick, persistSnap])
 
@@ -307,7 +332,8 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       complete()
       return
     }
-    endsAtRef.current = Date.now() + remaining * 1000
+    const startAt = Date.now()
+    endsAtRef.current = startAt + remaining * 1000
     setState((s) => ({
       ...s,
       remainingSec: remaining,
@@ -322,29 +348,41 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       paused: false,
       target: targetRef.current,
     })
+    void rescheduleRestTimerSound(endsAtRef.current)
+    void updateRestLiveActivity({
+      remainingSec: remaining,
+      startDateMs: startAt,
+      endDateMs: endsAtRef.current,
+      subtitle: `${targetRef.current.exerciseName} · ${targetRef.current.setLabel}`,
+      paused: false,
+    })
     armTick()
   }, [armTick, complete, persistSnap])
 
   const skip = useCallback(() => {
     // Déjà terminé (course avec auto-fermeture) : fermer sans 2ᵉ rest-logged / append.
     if (finishedRef.current) {
+      void cancelRestTimerSound()
       void endRestLiveActivity(true)
       goIdle()
       return
     }
     if (!targetRef.current) {
+      void cancelRestTimerSound()
       void endRestLiveActivity(true)
       goIdle()
       return
     }
     clearTick()
     logRest(true)
+    void cancelRestTimerSound()
     void endRestLiveActivity(true)
     vibrate(16)
     goIdle()
   }, [clearTick, goIdle, logRest])
 
   const dismiss = useCallback(() => {
+    void cancelRestTimerSound()
     void endRestLiveActivity(true)
     goIdle()
   }, [goIdle])
@@ -361,6 +399,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       if (!pausedRef.current) {
         endsAtRef.current = Date.now() + nextRemaining * 1000
         if (tickIdRef.current == null) armTick()
+        void rescheduleRestTimerSound(endsAtRef.current)
       }
       setState((s) => ({
         ...s,
@@ -376,6 +415,18 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
         endsAt: pausedRef.current ? Date.now() + nextRemaining * 1000 : endsAtRef.current,
         paused: pausedRef.current,
         target: targetRef.current,
+      })
+      // One-shot LA update with new start/endDate (or fixed remaining while paused).
+      const startAt = pausedRef.current
+        ? 0
+        : endsAtRef.current - nextRemaining * 1000
+      void updateRestLiveActivity({
+        remainingSec: nextRemaining,
+        totalSec: totalRef.current,
+        startDateMs: startAt,
+        endDateMs: pausedRef.current ? 0 : endsAtRef.current,
+        paused: pausedRef.current,
+        subtitle: `${targetRef.current.exerciseName} · ${targetRef.current.setLabel}`,
       })
     },
     [armTick, persistSnap],
@@ -457,6 +508,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
           restSec: Math.max(1, Math.round(snap.totalSec)),
           skipped: false,
         })
+        void cancelRestTimerSound()
         void endRestLiveActivity(true)
         targetRef.current = null
         setState(IDLE)
@@ -485,9 +537,23 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     void startRestLiveActivity({
       remainingSec: remaining,
       totalSec: snap.totalSec,
+      startDateMs: snap.paused ? 0 : endsAtRef.current - remaining * 1000,
+      endDateMs: snap.paused ? 0 : endsAtRef.current,
+      paused: snap.paused,
+      setIndex: snap.target.setIndex + 2,
+      setTotal:
+        snap.target.setTotal != null && snap.target.setTotal > 0
+          ? Math.round(snap.target.setTotal)
+          : undefined,
+      exerciseName: snap.target.exerciseName,
       subtitle: `${snap.target.exerciseName} · ${snap.target.setLabel}`,
     })
-    if (!snap.paused) armTickRef.current()
+    if (!snap.paused) {
+      void scheduleRestTimerSound(endsAtRef.current)
+      armTickRef.current()
+    } else {
+      void cancelRestTimerSound()
+    }
 
     return () => {
       cancelled = true
@@ -495,9 +561,30 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     }
   }, [hydrateEpoch])
 
+  // Widget App Intents → pause / stop / +15 s / validate (DI-12)
+  useEffect(() => {
+    let remove: (() => void) | undefined
+    void subscribeLiveActivityActions((action) => {
+      if (action === 'pause') {
+        if (pausedRef.current) resume()
+        else pause()
+      } else if (action === 'stop') {
+        skip()
+      } else if (action === 'add15') {
+        addSeconds(15)
+      } else if (action === 'validate') {
+        window.dispatchEvent(new CustomEvent('ranked-gym:live-validate'))
+      }
+    }).then((h) => {
+      remove = () => h.remove()
+    })
+    return () => remove?.()
+  }, [pause, resume, skip, addSeconds])
+
   useEffect(() => {
     return () => {
       clearTick()
+      void cancelRestTimerSound()
       void endRestLiveActivity(true)
     }
   }, [clearTick])

@@ -1,5 +1,8 @@
 name: Build IPA
 
+# Unsigned IPA only — no App Store / TestFlight deploy.
+# workflow_dispatch: launch manually on ANY branch (Actions → Build IPA → Run workflow).
+# push/PR: also builds when iOS/web sources change (including PR branches).
 on:
   workflow_dispatch:
   push:
@@ -61,9 +64,86 @@ jobs:
           VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL }}
           VITE_ENABLE_CONVEX_AUTH: "true"
           VITE_ENABLE_CONVEX_PRIMARY: "true"
+          # Pas de precache Workbox dans le shell IPA : chaque build charge SES fichiers.
+          CAPACITOR_BUILD: "1"
+          VITE_APP_BUILD_ID: ${{ github.sha }}
 
       - name: Sync Capacitor iOS
         run: npx cap sync ios
+
+      # Durable guards — these fixes vanished from main IPAs when they lived only on
+      # unmerged test branches (#117/#118/#119). Fail the build if sync/config regresses.
+      - name: Guard iOS safe-area + native plugin contracts (source)
+        run: |
+          set -euo pipefail
+
+          echo "== capacitor.config.ts =="
+          grep -q "contentInset: 'never'" capacitor.config.ts
+          ! grep -q "contentInset: 'automatic'" capacitor.config.ts
+          grep -q "overlaysWebView: true" capacitor.config.ts
+
+          echo "== MainViewController.swift =="
+          MVC="ios/App/App/MainViewController.swift"
+          test -f "$MVC"
+          grep -q 'contentInsetAdjustmentBehavior = .never' "$MVC"
+          grep -q 'SecureStoragePlugin' "$MVC"
+          grep -q 'preferredStatusBarStyle' "$MVC"
+          grep -q 'LiveActivityPlugin()' "$MVC"
+          grep -q 'RestTimerSoundPlugin' "$MVC"
+
+          echo "== RestTimerSound + Live Activity + WebShellCache sources =="
+          test -f ios/App/App/Plugins/RestTimerSound/RestTimerSoundPlugin.swift
+          test -f ios/App/App/Plugins/RestTimerSound/rest_timer_chime.caf
+          test -f ios/App/App/Plugins/RestTimerLiveActivity/RestTimerLiveActivityPlugin.swift
+          grep -q 'class LiveActivityPlugin' ios/App/App/Plugins/RestTimerLiveActivity/RestTimerLiveActivityPlugin.swift
+          test -f ios/App/App/WebShellCache.swift
+          grep -q 'purgeIfBuildChanged' ios/App/App/SceneDelegate.swift
+
+          echo "== Info.plist status bar ownership =="
+          PLIST="ios/App/App/Info.plist"
+          # Avoid `grep | grep -q` under pipefail (SIGPIPE) — dump then grep the file.
+          PLIST_STATUS_DUMP="$RUNNER_TEMP/plist-status-bar.txt"
+          grep -A1 'UIViewControllerBasedStatusBarAppearance' "$PLIST" > "$PLIST_STATUS_DUMP"
+          grep -q '<true/>' "$PLIST_STATUS_DUMP"
+
+          echo "== Synced capacitor.config.json (cap sync output) =="
+          # cap sync writes JSON next to the App target; accept either path Cap uses.
+          CFG=""
+          for candidate in \
+            ios/App/App/capacitor.config.json \
+            ios/App/capacitor.config.json \
+            ios/App/App/capacitor.config.js
+          do
+            if [ -f "$candidate" ]; then CFG="$candidate"; break; fi
+          done
+          if [ -z "$CFG" ]; then
+            echo "Looking for synced capacitor config…"
+            find ios -name 'capacitor.config.*' -print || true
+            echo "ERROR: capacitor.config.json missing after cap sync"
+            exit 1
+          fi
+          echo "Using $CFG"
+          # JSON may pretty-print; require never + overlaysWebView true
+          python3 - "$CFG" <<'PY'
+          import json, sys
+          path = sys.argv[1]
+          with open(path) as f:
+              data = json.load(f)
+          inset = (data.get("ios") or {}).get("contentInset")
+          if inset != "never":
+              raise SystemExit(f"ios.contentInset must be 'never', got {inset!r} in {path}")
+          status = (data.get("plugins") or {}).get("StatusBar") or {}
+          if status.get("overlaysWebView") is not True:
+              raise SystemExit(f"StatusBar.overlaysWebView must be true, got {status!r} in {path}")
+          print("synced capacitor config OK (contentInset=never, overlaysWebView=true)")
+          PY
+
+          echo "== CapApp-SPM includes StatusBar after sync =="
+          PKG="ios/App/CapApp-SPM/Package.swift"
+          test -f "$PKG"
+          grep -q 'CapacitorStatusBar\|status-bar' "$PKG"
+
+          echo "Source + sync guards OK"
 
       - name: Show Xcode version
         run: xcodebuild -version
@@ -82,6 +162,7 @@ jobs:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -132,16 +213,40 @@ jobs:
             ls -la "$APP_PATH" || true
             exit 1
           fi
+          # Dump strings once, then grep the file. Never `strings | grep -q` under
+          # pipefail: grep -q exits early → SIGPIPE on strings → false failure (QA M2).
           echo "Checking native plugin registration symbols in $APP_BINARY"
-          if ! strings "$APP_BINARY" | grep -q 'MainViewController'; then
+          STRINGS_DUMP="$RUNNER_TEMP/app-binary-strings.txt"
+          strings "$APP_BINARY" > "$STRINGS_DUMP"
+          if ! grep -q 'MainViewController' "$STRINGS_DUMP"; then
             echo "ERROR: MainViewController missing from App binary — SecureStorage will not register on iOS"
             exit 1
           fi
-          if ! strings "$APP_BINARY" | grep -q 'SecureStoragePlugin'; then
+          if ! grep -q 'SecureStoragePlugin' "$STRINGS_DUMP"; then
             echo "ERROR: SecureStoragePlugin missing from App binary — Keychain plugin not linked"
             exit 1
           fi
-          echo "Native plugin registration symbols present (MainViewController / SecureStoragePlugin)"
+          # StatusBar overlay plugin (safe-area / Dynamic Island full-bleed).
+          if ! grep -qi 'StatusBar' "$STRINGS_DUMP"; then
+            echo "ERROR: StatusBar symbols missing from App binary — overlaysWebView will not apply"
+            exit 1
+          fi
+          # Rest timer native end sound (port radix).
+          if ! grep -q 'RestTimerSound' "$STRINGS_DUMP"; then
+            echo "ERROR: RestTimerSound missing from App binary — end-of-rest chime will not play"
+            exit 1
+          fi
+          # Unified Live Activity / Dynamic Island host plugin (JS name LiveActivity).
+          if ! grep -q 'LiveActivityPlugin' "$STRINGS_DUMP"; then
+            echo "ERROR: LiveActivityPlugin missing from App binary — Live Activity will not start"
+            exit 1
+          fi
+          # Do NOT require "WebShellCache" via strings(1): it is a pure Swift enum
+          # (no @objc name) and is often absent from Release-stripped binaries even
+          # when linked — same false-negative class as capacitorDidLoad (#137/#138).
+          # Source guards above already require WebShellCache.swift + SceneDelegate
+          # purgeIfBuildChanged.
+          echo "Native plugin registration symbols present (MainViewController / SecureStoragePlugin / StatusBar / RestTimerSound / LiveActivityPlugin)"
 
           STAGE="$RUNNER_TEMP/ipa-stage"
           rm -rf "$STAGE"

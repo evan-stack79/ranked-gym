@@ -1,4 +1,10 @@
+import { Volume2, VolumeX } from 'lucide-react'
+import { useState } from 'react'
 import { useRestTimerContext } from '../../context/RestTimerContext'
+import {
+  getRestTimerSoundPrefs,
+  setRestTimerSoundEnabled,
+} from '../../utils/restTimerSound'
 
 /** Compte à rebours MM:SS — 01:30, 00:47, 00:30, 00:05. */
 export function formatRecoveryClock(totalSec: number): string {
@@ -25,12 +31,18 @@ export function formatRecoveryDurationLabel(totalSec: number): string {
  */
 export function RecoveryTimerPanel() {
   const rest = useRestTimerContext()
+  const [soundOn, setSoundOn] = useState(() => getRestTimerSoundPrefs().soundEnabled)
 
   if (!rest.state.active && !rest.state.finished) return null
 
   const totalSec = Math.max(1, rest.state.totalSec)
   const remaining = rest.state.finished ? 0 : rest.state.remainingSec
   const durationLabel = formatRecoveryDurationLabel(totalSec)
+
+  const toggleSound = () => {
+    const next = setRestTimerSoundEnabled(!soundOn)
+    setSoundOn(next.soundEnabled)
+  }
 
   return (
     <div
@@ -114,6 +126,21 @@ export function RecoveryTimerPanel() {
           aria-label="Ajouter 15 secondes de récupération"
         >
           +15 s
+        </button>
+
+        <button
+          type="button"
+          onClick={toggleSound}
+          className="ios-press mt-4 flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] text-white"
+          data-recovery-sound-toggle
+          aria-label={soundOn ? 'Couper le son du repos' : 'Activer le son du repos'}
+          aria-pressed={!soundOn}
+        >
+          {soundOn ? (
+            <Volume2 className="h-4 w-4" strokeWidth={2.25} />
+          ) : (
+            <VolumeX className="h-4 w-4" strokeWidth={2.25} />
+          )}
         </button>
       </div>
     </div>

@@ -74,7 +74,7 @@ export function OffProductImage({
 
   return (
     <div
-      className={`relative flex items-center justify-center overflow-hidden rounded-2xl ${className}`}
+      className={`relative flex items-center justify-center overflow-visible ${className}`}
       style={{ width: size, height: size }}
       data-off-image={showImage ? 'ready' : 'fallback'}
     >
@@ -86,7 +86,7 @@ export function OffProductImage({
           loading="lazy"
           decoding="async"
           referrerPolicy="no-referrer"
-          className="pointer-events-none h-full w-full object-contain"
+          className="pointer-events-none h-full w-full object-contain drop-shadow-[0_6px_14px_rgba(0,0,0,0.4)]"
           onError={() => setFailed(true)}
         />
       ) : (

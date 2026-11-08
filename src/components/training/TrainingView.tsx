@@ -28,8 +28,7 @@ import {
   persistActiveExerciseIndex,
 } from '../../services/trainingStorage'
 import { saveAndSyncWorkoutSession } from '../../services/trainingSyncService'
-import { notifyRankedSessionCompleted } from '../../services/rankedService'
-import { safeError, safeWarn } from '../../utils/safeLog'
+import { safeError } from '../../utils/safeLog'
 import { connectHealthIntent } from '../../services/healthSteps'
 import { startReminderWatcher } from '../../services/reminderService'
 import { getCalorieProfile } from '../../services/nutritionStorage'
@@ -38,6 +37,7 @@ import { getNutritionTarget } from '../../services/nutritionActivity'
 import { SportPicker } from './SportPicker'
 import { StepsCard } from './StepsCard'
 import { TrainingAgenda } from './TrainingAgenda'
+import { RestTimerSoundSettings } from './RestTimerSoundSettings'
 import { WorkoutNotebook } from './WorkoutNotebook'
 import { WorkoutHistory } from './WorkoutHistory'
 import { EnduranceSessionCard } from './EnduranceSessionCard'
@@ -544,16 +544,7 @@ export function TrainingView({
         setState(result.state)
         if (result.ok) {
           if (!isNewSession) showToast('Séance mise à jour ✓')
-          if (isNewSession) {
-            openPumpCheck(note)
-            // Ranked Discipline (opt-in) — timestamp serveur + id séance réel (B3)
-            const savedId = result.state.workoutNotes[0]?.id
-            if (savedId) {
-              void notifyRankedSessionCompleted(savedId).catch((error) => {
-                safeWarn('[Ranked] onSessionCompleted soft-failed', error)
-              })
-            }
-          }
+          if (isNewSession) openPumpCheck(note)
         } else {
           safeError('[Train] session sync failed', result.error)
           showToast(result.error ?? 'Erreur de synchro')
@@ -898,16 +889,19 @@ export function TrainingView({
       ) : null}
 
       {panel === 'agenda' ? (
-        <TrainingAgenda
-          schedule={state.schedule}
-          routines={state.routines}
-          primarySportId={activeSportId}
-          notificationsEnabled={state.notificationsEnabled}
-          onSave={(entry) => persist(upsertSchedule(entry))}
-          onRemove={(id) => persist(removeSchedule(id))}
-          onNotificationsChange={(enabled) => persist(setNotificationsEnabled(enabled))}
-          onToast={showToast}
-        />
+        <div className="flex flex-col gap-4">
+          <RestTimerSoundSettings />
+          <TrainingAgenda
+            schedule={state.schedule}
+            routines={state.routines}
+            primarySportId={activeSportId}
+            notificationsEnabled={state.notificationsEnabled}
+            onSave={(entry) => persist(upsertSchedule(entry))}
+            onRemove={(id) => persist(removeSchedule(id))}
+            onNotificationsChange={(enabled) => persist(setNotificationsEnabled(enabled))}
+            onToast={showToast}
+          />
+        </div>
       ) : null}
 
       {panel === 'history' ? (

@@ -1,7 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { Check, ChevronUp, Pause, Play, SkipForward, Timer } from 'lucide-react'
+import { Check, ChevronUp, Pause, Play, SkipForward, Timer, Volume2, VolumeX } from 'lucide-react'
 import type { RestPresetSec, RestTimerState } from '../../context/RestTimerContext'
 import { REST_PRESETS_SEC } from '../../context/RestTimerContext'
+import {
+  getRestTimerSoundPrefs,
+  setRestTimerSoundEnabled,
+} from '../../utils/restTimerSound'
 
 /** Clearance scroll quand l’îlot repos est visible (CSS var). */
 export const REST_BAR_CONTENT_PAD = 'var(--rest-content-clearance)'
@@ -88,6 +92,7 @@ export function RestTimerOverlay({
   showReadyBar = false,
 }: RestTimerOverlayProps) {
   const [expanded, setExpanded] = useState(false)
+  const [soundOn, setSoundOn] = useState(() => getRestTimerSoundPrefs().soundEnabled)
   const [reduceMotion, setReduceMotion] = useState(() => {
     try {
       return window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -95,6 +100,11 @@ export function RestTimerOverlay({
       return false
     }
   })
+
+  const toggleSound = () => {
+    const next = setRestTimerSoundEnabled(!soundOn)
+    setSoundOn(next.soundEnabled)
+  }
 
   useEffect(() => {
     try {
@@ -302,6 +312,23 @@ export function RestTimerOverlay({
               aria-label="Reprendre le repos"
             >
               <Play className="h-3.5 w-3.5" strokeWidth={2.5} />
+            </button>
+          ) : null}
+
+          {state.active ? (
+            <button
+              type="button"
+              onClick={toggleSound}
+              className="ios-press flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/[0.07] text-white"
+              aria-label={soundOn ? 'Couper le son du repos' : 'Activer le son du repos'}
+              aria-pressed={!soundOn}
+              data-rest-sound-toggle
+            >
+              {soundOn ? (
+                <Volume2 className="h-3.5 w-3.5" strokeWidth={2.5} />
+              ) : (
+                <VolumeX className="h-3.5 w-3.5" strokeWidth={2.5} />
+              )}
             </button>
           ) : null}
 

@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "wave": 5,
+  "status": "wired_new_catalog_exercises",
+  "directory": "assets/exercises/illustrations/wave5/",
+  "format": {
+    "type": "image/png",
+    "width": 1024,
+    "height": 1024,
+    "aspect": "1:1",
+    "mode": "RGBA",
+    "background": "real_alpha"
+  },
+  "style_lock": "Same 3D monochrome graphite model as wave1/back-squat.png. Prior waves untouched.",
+  "entries": {
+    "t_bar_row": {
+      "canonical_id": "t_bar_row",
+      "label": "T-bar row",
+      "file": "t-bar-row.png"
+    },
+    "hack_squat": {
+      "canonical_id": "hack_squat",
+      "label": "Hack squat",
+      "file": "hack-squat.png"
+    },
+    "shrug": {
+      "canonical_id": "shrug",
+      "label": "Shrugs",
+      "file": "shrug.png"
+    },
+    "cable_crunch": {
+      "canonical_id": "cable_crunch",
+      "label": "Crunch poulie",
+      "file": "cable-crunch.png"
+    },
+    "nordic_curl": {
+      "canonical_id": "nordic_curl",
+      "label": "Nordic curl",
+      "file": "nordic-curl.png"
+    },
+    "landmine_press": {
+      "canonical_id": "landmine_press",
+      "label": "Landmine press",
+      "file": "landmine-press.png"
+    },
+    "step_up": {
+      "canonical_id": "step_up",
+      "label": "Step-up",
+      "file": "step-up.png"
+    },
+    "dragon_flag": {
+      "canonical_id": "dragon_flag",
+      "label": "Dragon flag",
+      "file": "dragon-flag.png"
+    }
+  }
+}

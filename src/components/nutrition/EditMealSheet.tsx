@@ -6,6 +6,12 @@ import {
   formatGramsCountLabel,
   validateFoodQuantity,
 } from '../../../convex/lib/foodAddQuantity'
+import {
+  checkStoredMealCalories,
+  MAX_STORED_MEAL_KCAL,
+} from '../../../convex/lib/foodAddUpsertSanitize'
+import { MEAL_KCAL_ABOVE_MAX_MSG } from '../../../convex/lib/mealPhotoEstimateAccess'
+import { computeLocalMealNutritionForEdit } from '../../utils/foodAddMealNutrition'
 import { IosSheet } from '../ui/IosSheet'
 import { ClearableNumberInput } from './ClearableNumberInput'
 
@@ -89,29 +95,53 @@ export function EditMealSheet({
         ? foodAddQuantityUserMessage(gramsValidation.reason, gramsValidation.unit)
         : null
 
+  // V3-13 — plafond 5000 kcal (même message que Photo IA / serveur).
+  const kcalAboveMax =
+    strictV3Edit && calories != null && !checkStoredMealCalories(calories).ok
+
   // Legacy (= d33b724) : calories obligatoires. V3 : hide → qty seule ; sinon kcal requises.
   const canSave = strictV3Edit
     ? hideNutritionNumbers
-      ? name.trim().length > 0 && (grams == null || Boolean(gramsValidation?.ok))
+      ? name.trim().length > 0 &&
+        (grams == null || Boolean(gramsValidation?.ok)) &&
+        !kcalAboveMax
       : name.trim().length > 0 &&
         calories != null &&
         calories >= 0 &&
+        calories <= MAX_STORED_MEAL_KCAL &&
         (grams == null || Boolean(gramsValidation?.ok))
     : name.trim().length > 0 && calories != null && calories >= 0
   const applyGrams = (nextGrams: number | null) => {
     setGrams(nextGrams)
     if (strictV3Edit) {
       if (nextGrams == null) {
+        // Vide reste vide — ne jamais coller 0 inventé.
         setQtyError(null)
-      } else {
-        const checked = validateFoodQuantity({ unit: 'g', value: nextGrams })
-        setQtyError(
-          checked.ok ? null : foodAddQuantityUserMessage(checked.reason, checked.unit),
-        )
+        return
       }
+      const checked = validateFoodQuantity({ unit: 'g', value: nextGrams })
+      if (!checked.ok) {
+        setQtyError(foodAddQuantityUserMessage(checked.reason, checked.unit))
+        return
+      }
+      // V3-02 : même calcul que le serveur (computeMealNutritionFromOffCache).
+      const scaled = computeLocalMealNutritionForEdit({
+        offCode: meal.offCode,
+        grams: nextGrams,
+        baseline: baselineRef.current,
+      })
+      setCalories(scaled.calories)
+      setProteinG(scaled.proteinG)
+      setCarbsG(scaled.carbsG)
+      setFatG(scaled.fatG)
+      // V3-13 — bloquer confirm + message si > 5000 kcal.
+      if (!checkStoredMealCalories(scaled.calories).ok) {
+        setQtyError(MEAL_KCAL_ABOVE_MAX_MSG)
+        return
+      }
+      setQtyError(null)
+      return
     }
-    // Ligne V3 + hideNutritionNumbers : rescale serveur, pas client.
-    if (strictV3Edit && hideNutritionNumbers) return
     const base = baselineRef.current
     if (base == null || nextGrams == null || !(nextGrams > 0)) return
     const ratio = nextGrams / base.grams
@@ -275,6 +305,20 @@ export function EditMealSheet({
               const portionLabel =
                 grams != null ? formatGramsCountLabel(grams) : meal.portionLabel
               if (hideNutritionNumbers) {
+                // V3-02 : renvoyer kcal/macros recalculés (état local / journal).
+                // Serveur ignore toujours les macros client sur ligne V3.
+                const nutrition =
+                  grams != null
+                    ? computeLocalMealNutritionForEdit({
+                        offCode: meal.offCode,
+                        grams,
+                        baseline: baselineRef.current,
+                      })
+                    : null
+                if (nutrition && !checkStoredMealCalories(nutrition.calories).ok) {
+                  setQtyError(MEAL_KCAL_ABOVE_MAX_MSG)
+                  return
+                }
                 onSave(meal.id, {
                   name: name.trim(),
                   mealType,
@@ -283,10 +327,22 @@ export function EditMealSheet({
                   // Ne jamais inventer de pièces : 1 ou undefined (gardées).
                   pieces: grams != null ? undefined : meal.pieces,
                   entrySource: meal.entrySource,
+                  ...(nutrition
+                    ? {
+                        calories: nutrition.calories,
+                        proteinG: nutrition.proteinG,
+                        carbsG: nutrition.carbsG,
+                        fatG: nutrition.fatG,
+                      }
+                    : {}),
                 })
                 return
               }
               if (calories == null) return
+              if (!checkStoredMealCalories(calories).ok) {
+                setQtyError(MEAL_KCAL_ABOVE_MAX_MSG)
+                return
+              }
               onSave(meal.id, {
                 name: name.trim(),
                 mealType,

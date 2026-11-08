@@ -103,6 +103,13 @@ async function boot() {
   }
 
   try {
+    const { configureNativeStatusBar } = await import('./native/statusBar.ts')
+    await configureNativeStatusBar()
+  } catch (error) {
+    console.warn('[boot] status bar configure skipped', error)
+  }
+
+  try {
     const tree = resolveBootTree()
     createRoot(rootEl).render(
       <StrictMode>
