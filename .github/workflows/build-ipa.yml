@@ -241,12 +241,12 @@ jobs:
             echo "ERROR: LiveActivityPlugin missing from App binary — Live Activity will not start"
             exit 1
           fi
-          # IPA shell purge (stale Capacitor web assets after OTA/build bump).
-          if ! grep -q 'WebShellCache' "$STRINGS_DUMP"; then
-            echo "ERROR: WebShellCache missing from App binary — IPA shell purge will not run"
-            exit 1
-          fi
-          echo "Native plugin registration symbols present (MainViewController / SecureStoragePlugin / StatusBar / RestTimerSound / LiveActivityPlugin / WebShellCache)"
+          # Do NOT require "WebShellCache" via strings(1): it is a pure Swift enum
+          # (no @objc name) and is often absent from Release-stripped binaries even
+          # when linked — same false-negative class as capacitorDidLoad (#137/#138).
+          # Source guards above already require WebShellCache.swift + SceneDelegate
+          # purgeIfBuildChanged.
+          echo "Native plugin registration symbols present (MainViewController / SecureStoragePlugin / StatusBar / RestTimerSound / LiveActivityPlugin)"
 
           STAGE="$RUNNER_TEMP/ipa-stage"
           rm -rf "$STAGE"
