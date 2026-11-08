@@ -6,8 +6,6 @@ import {
   addMealToDate,
   getJournalForDate,
   getMealJournal,
-  getWaterMlForDate,
-  addWaterEntryForDate,
   removeMealFromDate,
   saveJournalForDate,
   updateMealOnDate,
@@ -33,10 +31,6 @@ import { M_CAL_2, M_INFO_1 } from '../../content/safetyCopy'
 import { NeedToTalkScreen } from '../settings/NeedToTalkScreen'
 import { SafetyNote } from './SafetyNote'
 import {
-  canSubmitHomeQuickWater,
-} from '../../utils/homeNutritionQuickActions'
-import {
-  getUserWaterGoalMl,
   WATER_GOAL_CHANGED_EVENT,
 } from '../../utils/userWaterGoal'
 import {
@@ -58,7 +52,8 @@ import { useAuth } from '../../context/AuthContext'
 import { NutritionCalorieRing } from './NutritionCalorieRing'
 import { NutritionCalendarSheet } from './NutritionCalendarSheet'
 import { NutritionMacrosRow } from './NutritionMacrosRow'
-import { NutritionHydrationCard } from './NutritionHydrationCard'
+import { WaterCard } from '../hydration/WaterCard'
+import { WaterSettingsSheet } from '../hydration/WaterSettingsSheet'
 import {
   NutritionQuickActions,
   type NutritionQuickActionId,
@@ -126,7 +121,7 @@ export function NutritionDashboard({
   const [meals, setMeals] = useState<MealEntry[]>([])
   const [hydrated, setHydrated] = useState(false)
   const [showNeedToTalk, setShowNeedToTalk] = useState(false)
-  const [waterSaving, setWaterSaving] = useState(false)
+  const [waterSettingsOpen, setWaterSettingsOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [journalDetailOpen, setJournalDetailOpen] = useState(false)
@@ -320,14 +315,6 @@ export function NutritionDashboard({
   const remainingCalories = targetCalories > 0 ? targetCalories - totals.calories : 0
   const calorieProgress =
     targetCalories > 0 ? totals.calories / targetCalories : 0
-
-  const hydration = useMemo(() => {
-    void tick
-    return {
-      consumedMl: getWaterMlForDate(selectedDateKey),
-      goalMl: getUserWaterGoalMl(),
-    }
-  }, [tick, selectedDateKey])
 
   const dataDateKeys = useMemo(() => Object.keys(getMealJournal()), [tick])
 
@@ -688,31 +675,6 @@ export function NutritionDashboard({
     setEditingMeal(null)
   }
 
-  const handleQuickWater = () => {
-    if (!canSubmitHomeQuickWater(waterSaving)) return
-    setWaterSaving(true)
-    let added = false
-    try {
-      const before = getWaterMlForDate(selectedDateKey)
-      const result = addWaterEntryForDate(selectedDateKey, {
-        amountMl: 250,
-        type: 'glass',
-        label: 'Verre',
-      })
-      if (result.waterMl >= before) {
-        added = true
-        setTick((n) => n + 1)
-        showToast('+250 ml ajoutés')
-        return
-      }
-    } catch {
-    } finally {
-      setWaterSaving(false)
-    }
-    if (added) return
-    showToast("Impossible d'ajouter l'eau", 'error')
-  }
-
   const handleQuickAction = (id: NutritionQuickActionId) => {
     switch (id) {
       case 'scanner':
@@ -853,14 +815,14 @@ export function NutritionDashboard({
         />
 
         <Reveal delayMs={60}>
-          <NutritionHydrationCard
-            consumedMl={hydration.consumedMl}
-            goalMl={hydration.goalMl}
-            onAdd250={handleQuickWater}
-            onGoalSaved={() => setTick((n) => n + 1)}
-            saving={waterSaving}
+          <WaterCard
+            onOpenSettings={() => setWaterSettingsOpen(true)}
           />
         </Reveal>
+        <WaterSettingsSheet
+          open={waterSettingsOpen}
+          onClose={() => setWaterSettingsOpen(false)}
+        />
 
         {foodAddAllowed ? (
           <NutritionQuickActions

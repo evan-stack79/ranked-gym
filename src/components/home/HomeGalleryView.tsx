@@ -68,6 +68,8 @@ import {
   type DragPoint,
 } from './EditableAccueilSlot'
 import { WaterGoalSheet } from './WaterGoalSheet'
+import { WaterCard } from '../hydration/WaterCard'
+import { WaterSettingsSheet } from '../hydration/WaterSettingsSheet'
 
 interface HomeGalleryViewProps {
   onStartTraining: (routineId: string) => void
@@ -140,6 +142,7 @@ export function HomeGalleryView({
   const [freezeReveals, setFreezeReveals] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [waterGoalOpen, setWaterGoalOpen] = useState(false)
+  const [waterSettingsOpen, setWaterSettingsOpen] = useState(false)
   const [draggingId, setDraggingId] = useState<AccueilWidgetId | null>(null)
   /** Absolute viewport rect of the lifted tile (finger − grab offset). */
   const [dragFloat, setDragFloat] = useState<DragFloatRect | null>(null)
@@ -961,6 +964,12 @@ export function HomeGalleryView({
         )}
       </header>
 
+      {!editMode ? (
+        <div className="home-cold-enter__group">
+          <WaterCard compact onOpenSettings={() => setWaterSettingsOpen(true)} />
+        </div>
+      ) : null}
+
       <div ref={widgetsRootRef} className="accueil-widgets flex flex-col gap-3">
         {packs.map((pack) => {
           if (pack.kind === 'wide') {
@@ -1025,6 +1034,10 @@ export function HomeGalleryView({
       <WaterGoalSheet
         open={waterGoalOpen && !editMode}
         onClose={() => setWaterGoalOpen(false)}
+      />
+      <WaterSettingsSheet
+        open={waterSettingsOpen && !editMode}
+        onClose={() => setWaterSettingsOpen(false)}
       />
     </div>
   )

@@ -13,6 +13,8 @@ import { HomeGalleryView } from './HomeGalleryView'
 import { TodayWorkoutCard } from './TodayWorkoutCard'
 import { NutritionSnapshot } from './NutritionSnapshot'
 import { SleepSnapshot } from './SleepSnapshot'
+import { WaterCard } from '../hydration/WaterCard'
+import { WaterSettingsSheet } from '../hydration/WaterSettingsSheet'
 
 interface HomeViewProps {
   onStartTraining: (routineId: string) => void
@@ -66,6 +68,7 @@ function HomeDashboardView({
 }) {
   const { user, profile } = useAuth()
   const [trainingTick, setTrainingTick] = useState(0)
+  const [waterSettingsOpen, setWaterSettingsOpen] = useState(false)
   const [coldEntering, setColdEntering] = useState(() => {
     if (typeof document === 'undefined') return false
     return document.documentElement.dataset.coldLaunchLanding === '1'
@@ -131,6 +134,15 @@ function HomeDashboardView({
         <Reveal instant={coldEntering}>
           <NutritionSnapshot onOpenNutrition={onOpenNutrition} />
         </Reveal>
+        <div className="mt-3">
+          <Reveal delayMs={40} instant={coldEntering}>
+            <WaterCard onOpenSettings={() => setWaterSettingsOpen(true)} />
+          </Reveal>
+        </div>
+        <WaterSettingsSheet
+          open={waterSettingsOpen}
+          onClose={() => setWaterSettingsOpen(false)}
+        />
       </div>
 
       <div className="home-cold-enter__group home-cold-enter__group--2">
