@@ -130,6 +130,36 @@ jobs:
           test -f "$PKG"
           grep -q 'CapacitorStatusBar\|status-bar' "$PKG"
 
+          echo "== BottomNav full-bleed (IPA #131 L/R + bottom band) =="
+          BN="src/components/layout/BottomNav.tsx"
+          test -f "$BN"
+          BN_DUMP="$RUNNER_TEMP/bottom-nav-src.txt"
+          cat "$BN" > "$BN_DUMP"
+          if grep -E "width:[[:space:]]*'[^']*100vw[[:space:]]*-[[:space:]]*2\\.5rem" "$BN_DUMP"; then
+            echo "ERROR: floating pill still uses calc(100vw - 2.5rem) side margins"
+            exit 1
+          fi
+          if grep -E "bottom:[[:space:]]*'max\\(0\\.[57]5rem" "$BN_DUMP"; then
+            echo "ERROR: BottomNav still offsets with bottom:max(safe-area) (black band)"
+            exit 1
+          fi
+          grep -q 'data-bottom-nav-edge="flush"' "$BN_DUMP"
+          grep -q 'paddingBottom' "$BN_DUMP"
+          echo "BottomNav flush + single internal safe-area OK"
+
+          echo "== LaunchScreen.storyboard full-bleed (confirm-only) =="
+          LS_SRC="ios/App/App/Base.lproj/LaunchScreen.storyboard"
+          test -f "$LS_SRC"
+          LS_DUMP="$RUNNER_TEMP/launchscreen-src.txt"
+          cat "$LS_SRC" > "$LS_DUMP"
+          if grep -q '<imageView[[:space:]]*key="view"' "$LS_DUMP"; then
+            echo "ERROR: LaunchScreen root is UIImageView (letterbox risk)"
+            exit 1
+          fi
+          grep -q 'widthSizable="YES"' "$LS_DUMP"
+          grep -q 'heightSizable="YES"' "$LS_DUMP"
+          echo "LaunchScreen source contract OK"
+
           echo "Source + sync guards OK"
 
       - name: Show Xcode version
@@ -218,6 +248,16 @@ jobs:
             exit 1
           fi
           echo "Native plugin registration symbols present (MainViewController / SecureStoragePlugin / StatusBar)"
+
+          # LaunchScreen compiled into .app (presence guard; full-bleed checked on source above).
+          echo "== LaunchScreen in packaged .app =="
+          LS_APP="$(find "$APP_PATH" \( -name 'LaunchScreen.storyboardc' -o -name 'LaunchScreen.storyboard' \) | head -n 1 || true)"
+          if [ -z "${LS_APP:-}" ]; then
+            echo "ERROR: LaunchScreen missing from App.app"
+            find "$APP_PATH" -iname '*Launch*' -print || true
+            exit 1
+          fi
+          echo "LaunchScreen present: $LS_APP"
 
           STAGE="$RUNNER_TEMP/ipa-stage"
           rm -rf "$STAGE"
