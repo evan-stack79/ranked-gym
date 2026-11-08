@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   CONTAINER_MAX_ML,
   CONTAINER_MIN_ML,
@@ -7,6 +7,8 @@ import {
 import { CUTOUT_WIFI_HINT, manualCropToPng, runBottleCutout } from '../../services/hydration/cutoutEngine'
 import {
   FACE_REFUSED_MESSAGE,
+  FACE_UNAVAILABLE_MESSAGE,
+  isFaceDetectorAvailable,
   refuseIfFaceDetected,
 } from '../../services/hydration/faceRefuse'
 import { saveBottleShapePng } from '../../services/hydration/bottleShapeStorage'
@@ -25,24 +27,43 @@ interface BottleCaptureFlowProps {
 
 export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCaptureFlowProps) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const [step, setStep] = useState<Step>('guide')
+  const [step, setStep] = useState<Step>(() =>
+    isFaceDetectorAvailable() ? 'guide' : 'fallback',
+  )
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [rawBlob, setRawBlob] = useState<Blob | null>(null)
   const [shapeBlob, setShapeBlob] = useState<Blob | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
+  const [faceCleared, setFaceCleared] = useState(false)
+  const [message, setMessage] = useState<string | null>(() =>
+    isFaceDetectorAvailable() ? null : FACE_UNAVAILABLE_MESSAGE,
+  )
   const [busy, setBusy] = useState(false)
   const [volumeMl, setVolumeMl] = useState(1000)
   const [crop, setCrop] = useState({ x: 40, y: 20, width: 200, height: 320 })
 
+  useEffect(() => {
+    if (!isFaceDetectorAvailable()) {
+      setMessage(FACE_UNAVAILABLE_MESSAGE)
+      setStep('fallback')
+    }
+  }, [])
+
   const clearRaw = () => {
     setRawBlob(null)
+    setFaceCleared(false)
     if (previewUrl) URL.revokeObjectURL(previewUrl)
     setPreviewUrl(null)
   }
 
   const processFile = async (file: File) => {
+    if (!isFaceDetectorAvailable()) {
+      setMessage(FACE_UNAVAILABLE_MESSAGE)
+      setStep('fallback')
+      return
+    }
     setBusy(true)
     setMessage(null)
+    setFaceCleared(false)
     try {
       const face = await refuseIfFaceDetected(file)
       if (face.status === 'face_detected') {
@@ -50,12 +71,14 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
         setStep('fallback')
         return
       }
+      // M3 — sans détecteur fiable : jamais de sauvegarde d’une photo non contrôlée.
       if (face.status === 'unavailable') {
-        setMessage(
-          'Vérification visage indisponible sur cet appareil. Recadre ta bouteille seule, ou passe en mode 2 L.',
-        )
+        setMessage(FACE_UNAVAILABLE_MESSAGE)
+        setStep('fallback')
+        return
       }
 
+      setFaceCleared(true)
       setRawBlob(file)
       const url = URL.createObjectURL(file)
       setPreviewUrl(url)
@@ -69,14 +92,17 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
         setStep('crop')
       }
     } finally {
-      // Effacer référence brute après traitement (HY-08) — le File input est vidé.
       if (inputRef.current) inputRef.current.value = ''
       setBusy(false)
     }
   }
 
   const applyManualCrop = async () => {
-    if (!rawBlob) return
+    if (!rawBlob || !faceCleared) {
+      setMessage(FACE_UNAVAILABLE_MESSAGE)
+      setStep('fallback')
+      return
+    }
     setBusy(true)
     try {
       const png = await manualCropToPng(rawBlob, crop)
@@ -91,12 +117,16 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
   }
 
   const validateShape = async () => {
-    if (!shapeBlob) return
+    if (!shapeBlob || !faceCleared) return
     setStep('volume')
   }
 
   const saveAll = async () => {
-    if (!shapeBlob) return
+    if (!shapeBlob || !faceCleared || !isFaceDetectorAvailable()) {
+      setMessage(FACE_UNAVAILABLE_MESSAGE)
+      setStep('fallback')
+      return
+    }
     const vol = Math.round(volumeMl)
     if (vol < CONTAINER_MIN_ML || vol > CONTAINER_MAX_ML) {
       setMessage(`Volume entre ${CONTAINER_MIN_ML} et ${CONTAINER_MAX_ML} ml.`)
@@ -140,7 +170,7 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
           <div className="relative mx-auto aspect-[3/4] w-full max-w-[260px] rounded-2xl border border-dashed border-white/30 bg-black/40">
             <div className="absolute inset-6 rounded-xl border border-dashed border-[#5AC8FA]/50" />
             <p className="absolute inset-x-4 bottom-4 text-center text-[13px] text-[#C7C7CC]">
-              Fond uni · bouteille droite, entière
+              Fond uni · bouteille droite, entière · sans visage
             </p>
           </div>
           <p className="text-[12px] leading-snug text-[#8E8E93]">{CUTOUT_WIFI_HINT}</p>
@@ -174,7 +204,7 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
         </div>
       ) : null}
 
-      {step === 'crop' && previewUrl ? (
+      {step === 'crop' && previewUrl && faceCleared ? (
         <div className="space-y-3">
           <p className="text-[14px] text-[#C7C7CC]">Recadre ta bouteille à la main</p>
           {message ? <p className="text-[12px] text-[#C7C7CC]">{message}</p> : null}
@@ -210,7 +240,7 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
         </div>
       ) : null}
 
-      {step === 'result' && shapeBlob ? (
+      {step === 'result' && shapeBlob && faceCleared ? (
         <div className="space-y-3">
           <p className="text-[14px] text-[#C7C7CC]">Aperçu découpé</p>
           <img
@@ -248,7 +278,7 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
         </div>
       ) : null}
 
-      {step === 'volume' ? (
+      {step === 'volume' && faceCleared ? (
         <div className="space-y-3">
           <p className="text-[14px] font-semibold text-white">Volume de ta bouteille</p>
           <div className="flex flex-wrap gap-2">
@@ -289,25 +319,28 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
       ) : null}
 
       {step === 'fallback' ? (
-        <div className="space-y-3">
+        <div className="space-y-3" data-hydration-capture-fallback>
           {message ? <p className="text-[14px] leading-snug text-[#C7C7CC]">{message}</p> : null}
           <button
             type="button"
             onClick={onFallback2L}
             className="ios-press min-h-11 w-full rounded-2xl bg-[#FF0702] text-[15px] font-semibold text-white"
+            data-hydration-fallback-2l
           >
             Passer au mode 2 L
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMessage(null)
-              setStep('guide')
-            }}
-            className="ios-press min-h-11 w-full rounded-2xl border border-white/15 text-[14px] text-white"
-          >
-            Réessayer
-          </button>
+          {isFaceDetectorAvailable() ? (
+            <button
+              type="button"
+              onClick={() => {
+                setMessage(null)
+                setStep('guide')
+              }}
+              className="ios-press min-h-11 w-full rounded-2xl border border-white/15 text-[14px] text-white"
+            >
+              Réessayer
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>

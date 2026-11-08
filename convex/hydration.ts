@@ -3,10 +3,20 @@
  * Isolation RK-03 : n’importe rien de ranked* / rewards*.
  */
 import { v } from 'convex/values'
-import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server'
+import {
+  internalMutation,
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from './_generated/server'
 import type { Doc } from './_generated/dataModel'
 import { requireSessionUser } from './lib/auth'
 import { hasActivePro } from './lib/proEntitlement'
+import {
+  extractStoredNutritionAge,
+  NUTRITION_ADULT_MIN,
+} from './lib/nutritionProfile'
 import {
   CLASSIC_BOTTLE_ML,
   CONTAINER_MAX_ML,
@@ -366,6 +376,16 @@ export const updateSettings = mutation({
     }
 
     if (args.goalMl !== undefined) {
+      // M7 — mineurs / âge inconnu : objectif non réglable (défaut serveur conservé).
+      const nutrition = await ctx.db
+        .query('nutrition_state')
+        .withIndex('by_userId', (q) => q.eq('userId', user.userId))
+        .first()
+      const age = extractStoredNutritionAge(nutrition?.profileJson)
+      const goalLocked = age == null || age < NUTRITION_ADULT_MIN
+      if (goalLocked) {
+        throw new Error('HYDRATION_GOAL_LOCKED_MINOR')
+      }
       assertGoalMl(args.goalMl)
       patch.goalMl = clampGoalMl(args.goalMl)
     }
@@ -433,24 +453,26 @@ export const deleteMyBottle = mutation({
   },
 })
 
-/** Dev / tests only — active Pass Pro cosmétique (pas de lien ranked/rewards). */
-export const setProForTests = mutation({
+/**
+ * B1 — grant Pro cosmétique réservé au serveur (tests/seed).
+ * Jamais exposé via `api.*` : `internalMutation` uniquement.
+ */
+export const setProForTests = internalMutation({
   args: {
-    sessionToken: v.string(),
+    userId: v.string(),
     activeUntil: v.number(),
   },
   handler: async (ctx, args) => {
-    const user = await requireSessionUser(ctx, args.sessionToken)
     const existing = await ctx.db
       .query('proEntitlements')
-      .withIndex('by_user', (q) => q.eq('userId', user.userId))
+      .withIndex('by_user', (q) => q.eq('userId', args.userId))
       .first()
     const now = Date.now()
     if (existing) {
       await ctx.db.patch(existing._id, { activeUntil: args.activeUntil, updatedAt: now })
     } else {
       await ctx.db.insert('proEntitlements', {
-        userId: user.userId,
+        userId: args.userId,
         activeUntil: args.activeUntil,
         updatedAt: now,
       })

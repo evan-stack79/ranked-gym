@@ -2,10 +2,7 @@
  * Refus visage (décision Evan v0) — photo Ma bouteille.
  * On-device only. Jamais d’envoi serveur.
  *
- * Ordre :
- * 1. Shape Detection API FaceDetector si dispo
- * 2. Sinon modèle MediaPipe local (si assets présents) — optionnel
- * 3. Sinon `unavailable` → le flux UI force recadrage manuel / mode 2 L (HY-09)
+ * M3 — sans détecteur fiable → unavailable → flux photo indisponible (repli 2 L).
  */
 
 export type FaceRefuseResult =
@@ -20,6 +17,11 @@ type FaceDetectorCtor = new (options?: { fastMode?: boolean; maxDetectedFaces?: 
 function getFaceDetectorCtor(): FaceDetectorCtor | null {
   const w = typeof window !== 'undefined' ? (window as unknown as { FaceDetector?: FaceDetectorCtor }) : null
   return w?.FaceDetector ?? null
+}
+
+/** True seulement si l’API navigateur FaceDetector est présente. */
+export function isFaceDetectorAvailable(): boolean {
+  return getFaceDetectorCtor() != null
 }
 
 /**
@@ -55,7 +57,6 @@ export async function refuseIfFaceDetected(
       if (faces.length > 0) return { status: 'face_detected', faces: faces.length }
       return { status: 'no_face' }
     } catch {
-      // MediaPipe optionnel plus tard — pas de faux négatif inventé.
       return { status: 'unavailable', reason: 'FACE_DETECT_FAILED' }
     }
   } catch (error) {
@@ -76,3 +77,6 @@ export async function refuseIfFaceDetected(
 
 export const FACE_REFUSED_MESSAGE =
   'Un visage est visible sur la photo. Reprends la photo de ta bouteille seule, ou utilise le mode 2 L.'
+
+export const FACE_UNAVAILABLE_MESSAGE =
+  'La photo Ma bouteille n’est pas disponible sur cet appareil (vérification visage requise). Utilise le mode 2 L ou les verres.'

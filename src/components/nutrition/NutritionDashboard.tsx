@@ -61,7 +61,6 @@ import {
 import { formatMealPortionLabel, NutritionDayMealsCard } from './NutritionDayMealsCard'
 import { NutritionPlanCard } from './NutritionPlanCard'
 import { WeightPaceCard } from './WeightPaceCard'
-import { SmartWaterGauge } from './SmartWaterGauge'
 import { MealBudgetsCard } from './MealBudgetsCard'
 import { BarcodeScanner } from './BarcodeScanner'
 import { ScannedProductSheet } from './ScannedProductSheet'
@@ -926,7 +925,6 @@ export function NutritionDashboard({
                 <WeightPaceCard profile={profile} />
               </>
             ) : null}
-            <SmartWaterGauge />
           </div>
         ) : null}
       </div>

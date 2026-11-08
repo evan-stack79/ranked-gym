@@ -1,7 +1,7 @@
 /**
  * Rappels locaux opt-in (HY-c). Web = pas de rappels v0.
  * Natif : @capacitor/local-notifications si le plugin est présent.
- * Stop rappels du jour dès objectif atteint (Evan).
+ * M2 — stop restants du jour à l’objectif, sans casser la récurrence demain.
  */
 import {
   DEFAULT_REMINDER_TIMES,
@@ -15,7 +15,7 @@ import { Capacitor } from '@capacitor/core'
 export type ReminderScheduleInput = {
   enabled: boolean
   times: string[]
-  /** Si true → annule les notifs restantes du jour (objectif atteint). */
+  /** Si true → ignore les créneaux restants aujourd’hui, reprend demain (récurrence intacte). */
   goalReachedToday?: boolean
 }
 
@@ -53,6 +53,31 @@ export function defaultReminderTimes(): string[] {
   return [...DEFAULT_REMINDER_TIMES]
 }
 
+/** Prochaine occurrence locale de HH:MM ; si skipToday, force ≥ demain 00:00. */
+export function nextReminderAt(
+  hour: number,
+  minute: number,
+  now = new Date(),
+  skipToday = false,
+): Date {
+  const at = new Date(now)
+  at.setSeconds(0, 0)
+  at.setHours(hour, minute, 0, 0)
+  if (skipToday) {
+    const tomorrow = new Date(now)
+    tomorrow.setHours(0, 0, 0, 0)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    if (at < tomorrow) {
+      at.setFullYear(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate())
+    }
+    return at
+  }
+  if (at.getTime() <= now.getTime()) {
+    at.setDate(at.getDate() + 1)
+  }
+  return at
+}
+
 /** Annule toutes les notifs hydratation (ids 7101–7103). */
 export async function cancelHydrationReminders(): Promise<void> {
   const mod = await loadLocalNotifications()
@@ -64,14 +89,15 @@ export async function cancelHydrationReminders(): Promise<void> {
 
 /**
  * Planifie rappels quotidiens. Permission OS demandée seulement si enabled=true.
- * Retourne false si permission refusée / non natif / plugin absent.
+ * goalReachedToday : annule le reste du jour puis reprogramme en daily à partir de demain
+ * (la récurrence n’est pas cassée — contrairement à un cancel nu).
  */
 export async function syncHydrationReminders(
   input: ReminderScheduleInput,
 ): Promise<{ ok: boolean; reason?: string }> {
-  if (!input.enabled || input.goalReachedToday) {
+  if (!input.enabled) {
     await cancelHydrationReminders()
-    return { ok: true, reason: input.goalReachedToday ? 'GOAL_REACHED' : 'OFF' }
+    return { ok: true, reason: 'OFF' }
   }
 
   if (!isNative()) {
@@ -97,21 +123,41 @@ export async function syncHydrationReminders(
 
   await cancelHydrationReminders()
 
+  const skipToday = Boolean(input.goalReachedToday)
+  const now = new Date()
   const notifications = times.map((hhmm, index) => {
     const [hour, minute] = hhmm.split(':').map(Number)
+    const at = nextReminderAt(hour, minute, now, skipToday)
     return {
       id: REMINDER_NOTIFICATION_IDS[index] ?? 7101 + index,
       title: 'Ranked Gym',
       body: MSG_REMINDER_BODY,
       schedule: {
-        on: { hour, minute },
+        at,
         repeats: true,
+        every: 'day' as const,
         allowWhileIdle: true,
       },
-      extra: { kind: 'hydration' },
+      extra: { kind: 'hydration', skipToday },
     }
   })
 
   await mod.LocalNotifications.schedule({ notifications })
-  return { ok: true }
+  return { ok: true, reason: skipToday ? 'GOAL_REACHED_RESUME_TOMORROW' : 'SCHEDULED' }
+}
+
+/** Après un ajout : si objectif atteint et rappels on → pause jour / reprise demain. */
+export async function pauseHydrationRemindersIfGoalReached(input: {
+  remindersEnabled: boolean
+  reminderTimes: string[]
+  drunkMl: number
+  goalMl: number
+}): Promise<void> {
+  if (!input.remindersEnabled) return
+  if (input.drunkMl < input.goalMl) return
+  await syncHydrationReminders({
+    enabled: true,
+    times: input.reminderTimes,
+    goalReachedToday: true,
+  })
 }

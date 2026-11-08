@@ -3,6 +3,7 @@ import {
   fillRatio,
   formatDrunkLabel,
   formatRemainingLabel,
+  GOAL_DEFAULT_ML,
   LABEL_EAU_BUE_SEULE,
   MSG_HIGH_INFO,
   MSG_PERMANENT,
@@ -15,10 +16,14 @@ import {
   fetchHydrationToday,
   flushHydrationPendingQueue,
   HYDRATION_CHANGED_EVENT,
+  onHydrationAccountChanged,
   type HydrationToday,
   undoLastHydrationEntry,
 } from '../../services/hydration/hydrationService'
 import { loadBottleShapeUrl } from '../../services/hydration/bottleShapeStorage'
+import { getCalorieProfile } from '../../services/nutritionStorage'
+import { isMinorOrUnknownAge } from '../../services/nutritionSafetyRules'
+import { useAuth } from '../../context/AuthContext'
 import { BottleVisual } from './BottleVisual'
 
 interface WaterCardProps {
@@ -29,9 +34,16 @@ interface WaterCardProps {
 }
 
 export function WaterCard({ compact = false, onOpenSettings, className = '' }: WaterCardProps) {
+  const { user } = useAuth()
   const [today, setToday] = useState<HydrationToday | null>(null)
   const [shapeUrl, setShapeUrl] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const profile = getCalorieProfile()
+  const minorLocked = isMinorOrUnknownAge(profile.age)
+
+  useEffect(() => {
+    onHydrationAccountChanged(user?.id ?? null)
+  }, [user?.id])
 
   const refresh = useCallback(async () => {
     const dayKey = localDayKey()
@@ -69,7 +81,7 @@ export function WaterCard({ compact = false, onOpenSettings, className = '' }: W
     setBusy(true)
     try {
       const amountMl = quickAddAmountMl(source, today.mode, today.myBottleVolumeMl)
-      const next = await addHydrationEntry({ amountMl, source })
+      const next = await addHydrationEntry({ amountMl, source, userId: user?.id ?? null })
       setToday(next)
     } finally {
       setBusy(false)
@@ -99,13 +111,15 @@ export function WaterCard({ compact = false, onOpenSettings, className = '' }: W
     )
   }
 
-  const ratio = fillRatio(today.goalMl, today.drunkMl)
+  const goalMl = minorLocked ? GOAL_DEFAULT_ML : today.goalMl
+  const ratio = fillRatio(goalMl, today.drunkMl)
 
   return (
     <div
       className={`rounded-2xl border border-white/[0.08] bg-[#141416]/92 px-3.5 py-3 ${className}`}
       data-hydration-card="1"
       data-hydration-mode={today.effectiveVisualMode}
+      data-hydration-minor={minorLocked ? '1' : '0'}
     >
       <div className={`flex ${compact ? 'items-center gap-3' : 'flex-col gap-3'}`}>
         <BottleVisual
@@ -119,22 +133,33 @@ export function WaterCard({ compact = false, onOpenSettings, className = '' }: W
             <p className="text-[14px] font-semibold text-white">Eau</p>
             <p className="text-[11px] font-medium text-[#8E8E93]">{LABEL_EAU_BUE_SEULE}</p>
           </div>
-          <p className="mt-0.5 text-[15px] font-semibold tabular-nums text-white" data-hydration-remaining>
-            {formatRemainingLabel(today.goalMl, today.drunkMl)}
-          </p>
+          {minorLocked ? (
+            <p className="mt-0.5 text-[15px] font-semibold text-white" data-hydration-minor-copy>
+              Suivi simple de l&apos;eau du jour
+            </p>
+          ) : (
+            <p className="mt-0.5 text-[15px] font-semibold tabular-nums text-white" data-hydration-remaining>
+              {formatRemainingLabel(goalMl, today.drunkMl)}
+            </p>
+          )}
           <p className="text-[13px] tabular-nums text-[#ACB4BA]" data-hydration-drunk>
             {formatDrunkLabel(today.drunkMl)}
           </p>
-          {!compact ? (
+          {!compact && !minorLocked ? (
             <p className="mt-2 text-[12px] leading-snug text-[#8E8E93]">{MSG_PERMANENT}</p>
           ) : null}
-          {today.showHighInfo ? (
+          {today.showHighInfo && !minorLocked ? (
             <p className="mt-2 text-[12px] leading-snug text-[#C7C7CC]" data-hydration-high-info>
               {MSG_HIGH_INFO}
             </p>
           ) : null}
-          {!compact ? (
+          {!compact && !minorLocked ? (
             <p className="mt-1 text-[12px] leading-snug text-[#8E8E93]">{MSG_SPORT_HEAT}</p>
+          ) : null}
+          {minorLocked ? (
+            <p className="mt-2 text-[12px] leading-snug text-[#8E8E93]" data-hydration-minor-note>
+              L&apos;objectif n&apos;est pas réglable ici.
+            </p>
           ) : null}
         </div>
       </div>
@@ -177,7 +202,7 @@ export function WaterCard({ compact = false, onOpenSettings, className = '' }: W
         >
           Annuler
         </button>
-        {onOpenSettings ? (
+        {onOpenSettings && !minorLocked ? (
           <button
             type="button"
             onClick={onOpenSettings}

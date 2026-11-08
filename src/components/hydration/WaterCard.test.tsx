@@ -4,8 +4,17 @@ import { createRoot, type Root } from 'react-dom/client'
 import { act } from 'react'
 import { LABEL_EAU_BUE_SEULE, MSG_PERMANENT } from '../../shared/hydration'
 
+vi.mock('../../context/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 'user-test' } }),
+}))
+
+vi.mock('../../services/nutritionStorage', () => ({
+  getCalorieProfile: () => ({ age: 30 }),
+}))
+
 vi.mock('../../services/hydration/hydrationService', () => ({
   HYDRATION_CHANGED_EVENT: 'ranked-gym:hydration-changed',
+  onHydrationAccountChanged: vi.fn(),
   fetchHydrationToday: vi.fn(async () => ({
     dayKey: '2026-11-08',
     mode: 'classic_2l',
@@ -25,6 +34,7 @@ vi.mock('../../services/hydration/hydrationService', () => ({
     classicBottleMl: 2000,
     labelEauBueSeule: true,
     pendingMl: 0,
+    confirmedMl: 500,
   })),
   addHydrationEntry: vi.fn(async () => ({
     dayKey: '2026-11-08',
@@ -45,6 +55,7 @@ vi.mock('../../services/hydration/hydrationService', () => ({
     classicBottleMl: 2000,
     labelEauBueSeule: true,
     pendingMl: 0,
+    confirmedMl: 750,
   })),
   undoLastHydrationEntry: vi.fn(),
   flushHydrationPendingQueue: vi.fn(async () => 0),

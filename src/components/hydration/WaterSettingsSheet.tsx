@@ -13,6 +13,12 @@ import {
 import { clearBottleShapeLocal } from '../../services/hydration/bottleShapeStorage'
 import { deleteMyBottleRemote } from '../../services/hydration/hydrationService'
 import { syncHydrationReminders } from '../../services/hydration/hydrationReminders'
+import {
+  FACE_UNAVAILABLE_MESSAGE,
+  isFaceDetectorAvailable,
+} from '../../services/hydration/faceRefuse'
+import { getCalorieProfile } from '../../services/nutritionStorage'
+import { isMinorOrUnknownAge } from '../../services/nutritionSafetyRules'
 import { GOAL_DEFAULT_ML, localDayKey, type HydrationMode } from '../../shared/hydration'
 
 interface WaterSettingsSheetProps {
@@ -24,6 +30,8 @@ export function WaterSettingsSheet({ open, onClose }: WaterSettingsSheetProps) {
   const [today, setToday] = useState<HydrationToday | null>(null)
   const [showCapture, setShowCapture] = useState(false)
   const [showProGate, setShowProGate] = useState(false)
+  const [faceGateMsg, setFaceGateMsg] = useState<string | null>(null)
+  const minorLocked = isMinorOrUnknownAge(getCalorieProfile().age)
 
   const refresh = useCallback(async () => {
     const data = await fetchHydrationToday(localDayKey())
@@ -43,6 +51,7 @@ export function WaterSettingsSheet({ open, onClose }: WaterSettingsSheetProps) {
   }, [open, refresh])
 
   const saveGoal = async (goalMl: number) => {
+    if (minorLocked) return
     await updateHydrationSettings({ goalMl })
     await refresh()
   }
@@ -53,6 +62,11 @@ export function WaterSettingsSheet({ open, onClose }: WaterSettingsSheetProps) {
         setShowProGate(true)
         return
       }
+      if (!isFaceDetectorAvailable()) {
+        setFaceGateMsg(FACE_UNAVAILABLE_MESSAGE)
+        return
+      }
+      setFaceGateMsg(null)
       setShowCapture(true)
       return
     }
@@ -63,6 +77,7 @@ export function WaterSettingsSheet({ open, onClose }: WaterSettingsSheetProps) {
   const fallback2L = async () => {
     setShowCapture(false)
     setShowProGate(false)
+    setFaceGateMsg(null)
     await clearBottleShapeLocal()
     await deleteMyBottleRemote().catch(() => undefined)
     await updateHydrationSettings({ mode: 'classic_2l' })
@@ -89,6 +104,19 @@ export function WaterSettingsSheet({ open, onClose }: WaterSettingsSheetProps) {
           </div>
         ) : null}
 
+        {faceGateMsg ? (
+          <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <p className="text-[13px] leading-snug text-[#C7C7CC]">{faceGateMsg}</p>
+            <button
+              type="button"
+              onClick={() => void fallback2L()}
+              className="ios-press min-h-11 w-full rounded-2xl bg-[#FF0702] text-[14px] font-semibold text-white"
+            >
+              Utiliser le mode 2 L
+            </button>
+          </div>
+        ) : null}
+
         {showCapture ? (
           <BottleCaptureFlow
             onDone={() => {
@@ -106,19 +134,42 @@ export function WaterSettingsSheet({ open, onClose }: WaterSettingsSheetProps) {
               onSelect={(m) => void saveMode(m)}
               onRequestPro={() => setShowProGate(true)}
             />
-            <WaterGoalSlider
-              valueMl={today?.goalMl ?? GOAL_DEFAULT_ML}
-              onChange={(g) => void saveGoal(g)}
-            />
+            {minorLocked ? (
+              <div data-hydration-goal-locked className="space-y-1">
+                <p className="text-[15px] font-semibold text-white">Objectif du jour</p>
+                <p className="text-[13px] text-[#ACB4BA]">
+                  Objectif par défaut — non modifiable ici.
+                </p>
+              </div>
+            ) : (
+              <WaterGoalSlider
+                valueMl={today?.goalMl ?? GOAL_DEFAULT_ML}
+                onChange={(g) => void saveGoal(g)}
+              />
+            )}
             <WaterReminders
               enabled={today?.remindersEnabled ?? false}
               times={today?.reminderTimes ?? []}
               goalReachedToday={Boolean(today && today.drunkMl >= today.goalMl)}
               onChange={(next) => {
-                void updateHydrationSettings({
-                  remindersEnabled: next.enabled,
-                  reminderTimes: next.times,
-                }).then(() => refresh())
+                void (async () => {
+                  await updateHydrationSettings({
+                    remindersEnabled: next.enabled,
+                    reminderTimes: next.times,
+                  })
+                  // M2 — sync conserve la récurrence ; goalReached pause seulement aujourd’hui.
+                  const data = await fetchHydrationToday(localDayKey())
+                  if (next.enabled) {
+                    await syncHydrationReminders({
+                      enabled: true,
+                      times: next.times,
+                      goalReachedToday: data.drunkMl >= data.goalMl,
+                    })
+                  } else {
+                    await syncHydrationReminders({ enabled: false, times: next.times })
+                  }
+                  await refresh()
+                })()
               }}
             />
             <WaterHistory7d goalMl={today?.goalMl ?? GOAL_DEFAULT_ML} />
