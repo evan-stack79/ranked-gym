@@ -378,11 +378,14 @@ export function ImmersiveExerciseSession({
                   {idx + 1}
                 </span>
                 {(() => {
-                  const weightErr = showLastHint
-                    ? null
-                    : setFieldRangeError('weight', set.weightKg)
+                  const weightErr =
+                    showLastHint || !Number.isFinite(set.weightKg)
+                      ? null
+                      : setFieldRangeError('weight', set.weightKg)
                   const repsErr =
-                    showLastHint || isSetLoadBlank(set)
+                    showLastHint ||
+                    isSetLoadBlank(set) ||
+                    !Number.isFinite(set.reps)
                       ? null
                       : setFieldRangeError('reps', set.reps)
                   const effortErr = setFieldRangeError('effort', set.rpe)
@@ -390,11 +393,18 @@ export function ImmersiveExerciseSession({
                     <>
                       <div>
                         <ClearableNumberInput
-                          value={showLastHint ? null : set.weightKg}
+                          value={
+                            showLastHint || !Number.isFinite(set.weightKg)
+                              ? null
+                              : set.weightKg
+                          }
                           onChange={(v) => {
-                            // Vide → ne jamais écrire 0 silencieux ; blur restaure l’avant-focus.
-                            if (v == null) return
-                            patchSet(idx, { weightKg: v }, { autoValidate: false })
+                            // Vide → NaN (pas 0) : champ reste vide ; Valider/Terminer refusent.
+                            patchSet(
+                              idx,
+                              { weightKg: v == null ? Number.NaN : v },
+                              { autoValidate: false },
+                            )
                           }}
                           onFocus={showLastHint ? applyLast : undefined}
                           onBlur={() => tryAutoValidateSet(idx)}
@@ -431,7 +441,7 @@ export function ImmersiveExerciseSession({
                       <div>
                         <ClearableNumberInput
                           value={
-                            showLastHint
+                            showLastHint || !Number.isFinite(set.reps)
                               ? null
                               : repsErr && set.reps === 0
                                 ? 0
@@ -440,8 +450,11 @@ export function ImmersiveExerciseSession({
                                   : set.reps
                           }
                           onChange={(v) => {
-                            if (v == null) return
-                            patchSet(idx, { reps: Math.round(v) }, { autoValidate: false })
+                            patchSet(
+                              idx,
+                              { reps: v == null ? Number.NaN : Math.round(v) },
+                              { autoValidate: false },
+                            )
                           }}
                           onFocus={showLastHint ? applyLast : undefined}
                           onBlur={() => tryAutoValidateSet(idx)}
@@ -564,8 +577,8 @@ export function ImmersiveExerciseSession({
             <button
               type="button"
               onClick={() => {
-                // Architect : commit local (vide → avant-focus) avant Valider.
-                // Hors bornes / non-fini → refus (même règle que Terminer).
+                // Architect : commit local (vide → NaN) avant Valider.
+                // Hors bornes / non-fini / vide → refus (même règle que Terminer).
                 const flushOk = flushPendingClearableNumberInputs()
                 if (!flushOk) {
                   setFinishError(
@@ -575,8 +588,13 @@ export function ImmersiveExerciseSession({
                 }
                 const target = setsRef.current[validateIdx]
                 if (!target || target.done) return
-                // Même gate que l’auto-validate : effort/reps vides → bloque (pas de 0 inventé).
-                if (!isSetReadyForAutoValidate(target)) return
+                // Vide / hors bornes → refus + message (champ vidé reste vide jusqu’ici).
+                if (!isSetReadyForAutoValidate(target)) {
+                  setFinishError(
+                    'Indique un poids et des reps valides avant de valider.',
+                  )
+                  return
+                }
                 setFinishError(null)
                 onValidateSet(
                   { ...exercise, sets: setsRef.current.map((s) => ({ ...s })) },
@@ -584,10 +602,7 @@ export function ImmersiveExerciseSession({
                   restSecResolved,
                 )
               }}
-              disabled={
-                (Boolean(exercise.sets[validateIdx]?.done) && pendingIdx < 0) ||
-                !isSetReadyForAutoValidate(exercise.sets[validateIdx] ?? { reps: 0, weightKg: 0 })
-              }
+              disabled={Boolean(exercise.sets[validateIdx]?.done) && pendingIdx < 0}
               className="ios-press flex min-h-11 flex-[1.35] items-center justify-center rounded-xl bg-[#FF0702] px-3 text-[14px] font-semibold text-white disabled:opacity-40"
             >
               Valider la série

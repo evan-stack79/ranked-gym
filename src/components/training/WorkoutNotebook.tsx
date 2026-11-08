@@ -669,7 +669,7 @@ export function WorkoutNotebook({
   }
 
   const handleSave = async () => {
-    // Architect : commit cases encore focalisées (vide → avant-focus) avant Terminer.
+    // Architect : commit cases encore focalisées (vide → NaN parent) avant Terminer.
     // Même validation que Valider : hors bornes / non-fini → refus + message, pas de save.
     const flushOk = flushPendingClearableNumberInputs()
     const liveExercises = exercisesRef.current
@@ -1065,16 +1065,25 @@ export function WorkoutNotebook({
                         <label className="block">
                           <span className="mb-0.5 block text-[10px] text-[#717C83]">kg</span>
                           {(() => {
-                            const weightErr = showLastHint
-                              ? null
-                              : setFieldRangeError('weight', set.weightKg)
+                            const weightErr =
+                              showLastHint || !Number.isFinite(set.weightKg)
+                                ? null
+                                : setFieldRangeError('weight', set.weightKg)
                             return (
                               <>
                                 <ClearableNumberInput
-                                  value={showLastHint ? null : set.weightKg}
+                                  value={
+                                    showLastHint || !Number.isFinite(set.weightKg)
+                                      ? null
+                                      : set.weightKg
+                                  }
                                   onChange={(v) => {
-                                    if (v == null) return
-                                    updateSet(ex.id, idx, { weightKg: v }, { autoValidate: false })
+                                    updateSet(
+                                      ex.id,
+                                      idx,
+                                      { weightKg: v == null ? Number.NaN : v },
+                                      { autoValidate: false },
+                                    )
                                   }}
                                   onFocus={showLastHint ? applyLast : undefined}
                                   onBlur={() => tryAutoValidateSet(ex.id, idx)}
@@ -1129,14 +1138,17 @@ export function WorkoutNotebook({
                               <>
                                 <ClearableNumberInput
                                   value={
-                                    repsErr && set.reps === 0 ? 0 : repsDisplay
+                                    !Number.isFinite(set.reps)
+                                      ? null
+                                      : repsErr && set.reps === 0
+                                        ? 0
+                                        : repsDisplay
                                   }
                                   onChange={(v) => {
-                                    if (v == null) return
                                     updateSet(
                                       ex.id,
                                       idx,
-                                      { reps: Math.round(v) },
+                                      { reps: v == null ? Number.NaN : Math.round(v) },
                                       { autoValidate: false },
                                     )
                                   }}
@@ -1248,8 +1260,8 @@ export function WorkoutNotebook({
                   <button
                     type="button"
                     onClick={() => {
-                      // Architect : commit local (vide → avant-focus) avant de lire la série.
-                      // Hors bornes / non-fini → même refus que Terminer.
+                      // Architect : commit local (vide → NaN) avant de lire la série.
+                      // Hors bornes / non-fini / vide → même refus que Terminer.
                       const flushOk = flushPendingClearableNumberInputs()
                       if (!flushOk) {
                         setSaveGateError(
@@ -1257,15 +1269,17 @@ export function WorkoutNotebook({
                         )
                         return
                       }
+                      const target = ex.sets[validateIdx]
+                      if (!target || !isSetReadyForAutoValidate(target)) {
+                        setSaveGateError(
+                          'Indique un poids et des reps valides avant de valider.',
+                        )
+                        return
+                      }
                       setSaveGateError(null)
                       finishSet(ex, validateIdx)
                     }}
-                    disabled={
-                      Boolean(ex.sets[validateIdx]?.done) ||
-                      !isSetReadyForAutoValidate(
-                        ex.sets[validateIdx] ?? { reps: 0, weightKg: 0 },
-                      )
-                    }
+                    disabled={Boolean(ex.sets[validateIdx]?.done)}
                     className="ios-press inline-flex min-h-11 items-center gap-1 rounded-full border border-[#30D158]/40 bg-[#30D158]/15 px-3.5 text-[12px] font-semibold text-[#30D158] disabled:opacity-40"
                   >
                     <Check className="h-3.5 w-3.5" />

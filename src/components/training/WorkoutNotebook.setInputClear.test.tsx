@@ -1,6 +1,15 @@
 /** @vitest-environment jsdom */
 /**
- * QA boucle 3 — carnet kg clear / autoValidate blur-only / pas de clamp silencieux.
+ * IPA #131 — carnet (WorkoutNotebook) : impossible de vider les kg.
+ *
+ * Flux bug (HEAD) :
+ * 1. ClearableNumberInput type=text inputMode=decimal + commitOnBlur + fieldKind
+ * 2. clear → onChange(null) immédiat
+ * 3. parent `if (v == null) return` → weightKg reste 20
+ * 4. blur required → restore focusValue 20 (ou re-render value=20 remplit le text)
+ *
+ * Fix : parent écrit NaN ; value prop = null si !Number.isFinite ; fieldKind
+ * garde le vide au blur ; Valider/Terminer refusent.
  */
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -140,7 +149,7 @@ describe('WorkoutNotebook — carnet kg clear (liste séries)', () => {
     ).toBe('5')
   })
 
-  it('kg 20 → tout effacer → blur → 20 (pas 2)', async () => {
+  it('kg 20 → tout effacer → blur → reste vide (pas restore 20)', async () => {
     const exercises: ExerciseEntry[] = [
       {
         id: 'ex-1',
@@ -175,7 +184,7 @@ describe('WorkoutNotebook — carnet kg clear (liste séries)', () => {
     })
     expect(
       (host.querySelector('input[aria-label="Poids"]') as HTMLInputElement).value,
-    ).toBe('20')
+    ).toBe('')
   })
 
   it('autoValidate ON : backspace×2 kg → case vide, série NON validée, pas de repos ; taper 5 puis blur → 1 validation à 5', async () => {
@@ -329,7 +338,7 @@ describe('WorkoutNotebook — carnet kg clear (liste séries)', () => {
     expect(onRestStart).not.toHaveBeenCalled()
   })
 
-  it('kg 20 → vider → Valider clavier ouvert → 20 enregistré', async () => {
+  it('kg 20 → vider → Valider clavier ouvert → refus + message (reste vide)', async () => {
     autoValidateFlag.on = false
     const onRestStart = vi.fn()
     const exercises: ExerciseEntry[] = [
@@ -378,13 +387,14 @@ describe('WorkoutNotebook — carnet kg clear (liste séries)', () => {
       validateBtn!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
-    expect(onRestStart).toHaveBeenCalledTimes(1)
+    expect(onRestStart).not.toHaveBeenCalled()
     expect(
-      (host.querySelector('input[aria-label="Poids"]') as HTMLInputElement | null)?.value ?? '20',
-    ).toBe('20')
+      (host.querySelector('input[aria-label="Poids"]') as HTMLInputElement | null)?.value,
+    ).toBe('')
+    expect(host.textContent).toMatch(/poids et des reps valides/i)
   })
 
-  it('kg 20 → vider → Terminer clavier ouvert → 20 enregistré', async () => {
+  it('kg 20 → vider → Terminer clavier ouvert → refus (pas de save)', async () => {
     autoValidateFlag.on = false
     const savedWeights: number[] = []
     const onSave = vi.fn(
@@ -434,7 +444,33 @@ describe('WorkoutNotebook — carnet kg clear (liste séries)', () => {
       finishBtn!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
-    expect(onSave).toHaveBeenCalled()
-    expect(savedWeights).toEqual([20])
+    expect(onSave).not.toHaveBeenCalled()
+    expect(savedWeights).toEqual([])
+    // Terminer passe par workoutSessionSaveError(NaN) → « Poids invalide »
+    expect(host.textContent).toMatch(/Poids invalide/i)
+  })
+
+  it('input kg : type=text + inputMode=decimal (pas type=number iOS)', async () => {
+    await act(async () => {
+      root.render(
+        <WorkoutNotebook
+          bodyWeightKg={80}
+          routines={[
+            makeRoutine([{ id: 'ex-1', name: 'Squat', sets: [{ reps: 8, weightKg: 20 }] }]),
+          ]}
+          history={[]}
+          initialRoutineId="live"
+          sportId="musculation"
+          onSave={vi.fn()}
+          onDraftSave={vi.fn()}
+          onDeleteNote={vi.fn()}
+          onAddRoutine={vi.fn()}
+          sessionClockLabel={null}
+        />,
+      )
+    })
+    const weight = host.querySelector('input[aria-label="Poids"]') as HTMLInputElement
+    expect(weight.type).toBe('text')
+    expect(weight.inputMode).toBe('decimal')
   })
 })

@@ -65,8 +65,9 @@ const pendingCommits = new Set<PendingCommit>()
 let pendingCommitRejected = false
 
 /**
- * Applique le même commit que blur sur toutes les cases encore focalisées
- * (vide → valeur d’avant le focus). Sans callback `onBlur` parent.
+ * Applique le même commit que blur sur toutes les cases encore focalisées.
+ * Train (`fieldKind`) : vide → null (pas de restore). Nutrition required : restore.
+ * Sans callback `onBlur` parent.
  * @returns `false` si au moins un commit a été refusé (hors bornes / non-fini).
  */
 export function flushPendingClearableNumberInputs(): boolean {
@@ -191,7 +192,16 @@ export function ClearableNumberInput({
     const parsed = parseFloat(currentText)
     if (currentText === '' || currentText === '.' || Number.isNaN(parsed)) {
       setCommitError(null)
-      if (req) {
+      /**
+       * Train (`fieldKind` + commitOnBlur) : un champ vidé RESTE VIDE au blur /
+       * re-render. Valider / Terminer refusent ensuite via flush + bornes (M1).
+       * Nutrition (`required` sans fieldKind) : conserve le restore avant-focus.
+       */
+      if (kind) {
+        onChangeRef.current(null)
+        setText('')
+        textRef.current = ''
+      } else if (req) {
         // Vide → valeur d’AVANT le focus (20), pas la dernière frappe (2).
         let restored = focusValueRef.current
         if (isEmptyValue(restored)) {
@@ -318,7 +328,9 @@ export function ClearableNumberInput({
           textRef.current = raw
           setCommitError(null)
           if (raw === '' || raw === '.') {
-            if (!required) onChange(null)
+            // Train fieldKind : propage null tout de suite pour que le parent
+            // ne réécrive pas l’ancienne valeur au re-render / blur.
+            if (!required || fieldKind) onChange(null)
             return
           }
           if (commitOnInput) {

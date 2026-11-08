@@ -3,7 +3,7 @@
  * Train set kg / reps / effort : vider pendant la saisie.
  *
  * Comportement aligné sur le code existant (jamais un 0 inventé) :
- * - kg / reps vides au blur → garde l’ancienne valeur (`required` + restore).
+ * - kg / reps vides au blur → RESTENT VIDES (fieldKind Train) ; Valider refuse + message.
  * - effort vide → `rpe: undefined` → bloque la validation (`isSetReadyForAutoValidate`).
  * - vrai 0 kg tapé reste autorisé (`min={0}`).
  */
@@ -119,12 +119,12 @@ describe('ImmersiveExerciseSession — clear kg/reps/effort', () => {
     expect(after.value).toBe('5')
   })
 
-  it('vider puis valider → garde l’ancienne charge (jamais 0 silencieux)', async () => {
+  it('vider kg → blur → reste vide ; jamais 0 silencieux ; Valider refuse', async () => {
     const onValidate = vi.fn()
     const onUpdate = vi.fn()
     function Harness() {
       const [exercises, setExercises] = useState<ExerciseEntry[]>([
-        { id: 'ex-1', name: 'Squat', sets: [{ reps: 8, weightKg: 80 }] },
+        { id: 'ex-1', name: 'Squat', sets: [{ reps: 8, weightKg: 80, rpe: 7 }] },
       ])
       return (
         <RestTimerProvider>
@@ -153,7 +153,7 @@ describe('ImmersiveExerciseSession — clear kg/reps/effort', () => {
               onValidate(ex.sets[idx], idx, restSec)
             }}
             onFinishSession={vi.fn()}
-            autoValidate
+            autoValidate={false}
           />
         </RestTimerProvider>
       )
@@ -169,30 +169,25 @@ describe('ImmersiveExerciseSession — clear kg/reps/effort', () => {
     await act(async () => {
       weight.focus()
       typeInto(weight, '')
+      weight.blur()
     })
-    expect(weight.value).toBe('')
+    expect(
+      (host.querySelector('input[aria-label="Série 1 poids"]') as HTMLInputElement).value,
+    ).toBe('')
     // Aucun patch weightKg:0 pendant le clear.
     for (const call of onUpdate.mock.calls) {
       expect(call[2]).not.toEqual(expect.objectContaining({ weightKg: 0 }))
     }
 
-    const effort = host.querySelector(
-      'input[aria-label="Série 1 effort facultatif"]',
-    ) as HTMLInputElement
+    const validateBtn = [...host.querySelectorAll('button')].find((b) =>
+      (b.textContent ?? '').includes('Valider'),
+    )
+    expect(validateBtn).toBeTruthy()
     await act(async () => {
-      // Blur poids → restaure 80 ; puis Effort déclenche la validation.
-      effort.focus()
-      typeInto(effort, '7')
-      effort.blur()
+      validateBtn!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-
-    const weightAfter = host.querySelector(
-      'input[aria-label="Série 1 poids"]',
-    ) as HTMLInputElement
-    expect(weightAfter.value).toBe('80')
-    expect(onValidate).toHaveBeenCalled()
-    const validatedSet = onValidate.mock.calls[0]![0] as { weightKg: number }
-    expect(validatedSet.weightKg).toBe(80)
+    expect(onValidate).not.toHaveBeenCalled()
+    expect(host.textContent).toMatch(/poids et des reps valides/i)
   })
 
   it('vider reps puis taper 5 → reps 5', async () => {
@@ -255,7 +250,7 @@ describe('ImmersiveExerciseSession — clear kg/reps/effort', () => {
     expect(after.value).toBe('5')
   })
 
-  it('vider reps puis valider → garde les anciennes reps (jamais 0)', async () => {
+  it('vider reps → reste vide (jamais 0) ; autoValidate ne valide pas', async () => {
     const onValidate = vi.fn()
     const onUpdate = vi.fn()
     function Harness() {
@@ -305,8 +300,11 @@ describe('ImmersiveExerciseSession — clear kg/reps/effort', () => {
     await act(async () => {
       reps.focus()
       typeInto(reps, '')
+      reps.blur()
     })
-    expect(reps.value).toBe('')
+    expect(
+      (host.querySelector('input[aria-label="Série 1 reps"]') as HTMLInputElement).value,
+    ).toBe('')
     for (const call of onUpdate.mock.calls) {
       expect(call[2]).not.toEqual(expect.objectContaining({ reps: 0 }))
     }
@@ -320,13 +318,11 @@ describe('ImmersiveExerciseSession — clear kg/reps/effort', () => {
       effort.blur()
     })
 
-    const repsAfter = host.querySelector(
-      'input[aria-label="Série 1 reps"]',
-    ) as HTMLInputElement
-    expect(repsAfter.value).toBe('8')
-    expect(onValidate).toHaveBeenCalled()
-    const validatedSet = onValidate.mock.calls[0]![0] as { reps: number }
-    expect(validatedSet.reps).toBe(8)
+    // Reps vides → pas prêt ; autoValidate ne doit pas valider.
+    expect(
+      (host.querySelector('input[aria-label="Série 1 reps"]') as HTMLInputElement).value,
+    ).toBe('')
+    expect(onValidate).not.toHaveBeenCalled()
   })
 
   it('vider effort puis tenter valider → bloque (jamais rpe 0)', async () => {
@@ -626,7 +622,7 @@ describe('ImmersiveExerciseSession — clear kg/reps/effort', () => {
     expect((onValidate.mock.calls[0]![0] as { weightKg: number }).weightKg).toBe(5)
   })
 
-  it('kg 20 → tout effacer → blur → 20 (pas 2)', async () => {
+  it('kg 20 → tout effacer → blur → reste vide (pas restore 20)', async () => {
     function Harness() {
       const [exercises, setExercises] = useState<ExerciseEntry[]>([
         { id: 'ex-1', name: 'Squat', sets: [{ reps: 8, weightKg: 20 }] },
@@ -675,7 +671,7 @@ describe('ImmersiveExerciseSession — clear kg/reps/effort', () => {
     })
     expect(
       (host.querySelector('input[aria-label="Série 1 poids"]') as HTMLInputElement).value,
-    ).toBe('20')
+    ).toBe('')
   })
 
   it('600 kg → message d’erreur, rien enregistré', async () => {
@@ -786,7 +782,7 @@ describe('ImmersiveExerciseSession — clear kg/reps/effort', () => {
     expect(onValidate).not.toHaveBeenCalled()
   })
 
-  it('kg 20 → vider → Valider clavier ouvert → 20 enregistré', async () => {
+  it('kg 20 → vider → Valider clavier ouvert → refus + message (reste vide)', async () => {
     const onValidate = vi.fn()
     function Harness() {
       const [exercises, setExercises] = useState<ExerciseEntry[]>([
@@ -846,14 +842,14 @@ describe('ImmersiveExerciseSession — clear kg/reps/effort', () => {
       validateBtn!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
-    expect(onValidate).toHaveBeenCalled()
-    expect((onValidate.mock.calls[0]![0] as { weightKg: number }).weightKg).toBe(20)
+    expect(onValidate).not.toHaveBeenCalled()
     expect(
       (host.querySelector('input[aria-label="Série 1 poids"]') as HTMLInputElement).value,
-    ).toBe('20')
+    ).toBe('')
+    expect(host.textContent).toMatch(/poids et des reps valides/i)
   })
 
-  it('kg 20 → vider → Terminer clavier ouvert → 20 enregistré', async () => {
+  it('kg 20 → vider → Terminer clavier ouvert → refus (pas de finish)', async () => {
     const live: { current: ExerciseEntry[] } = {
       current: [{ id: 'ex-1', name: 'Squat', sets: [{ reps: 8, weightKg: 20, rpe: 7 }] }],
     }
@@ -915,8 +911,10 @@ describe('ImmersiveExerciseSession — clear kg/reps/effort', () => {
 
     expect(
       (host.querySelector('input[aria-label="Série 1 poids"]') as HTMLInputElement).value,
-    ).toBe('20')
-    expect(finished).toEqual([{ weightKg: 20 }])
+    ).toBe('')
+    expect(finished).toEqual([])
+    // Terminer → workoutSessionSaveError(NaN) → « Poids invalide »
+    expect(host.textContent).toMatch(/Poids invalide/i)
   })
 
   it('taper un vrai 0 kg → enregistré 0 (déjà autorisé)', async () => {
