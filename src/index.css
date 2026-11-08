@@ -904,9 +904,9 @@ img {
   inset: 0;
 }
 
-/* Floating pill nav — clearance for pill + elevated red centre CTA + safe area */
+/* Floating pill nav — content height only (safe-area is nav padding-bottom, once). */
 :root[data-bottom-nav-preview='floating-pill'] {
-  --app-bottom-nav: 120px;
+  --app-bottom-nav: 72px;
 }
 
 /* Liquid glass floating pill — blur limited to the pill (not full-screen) */

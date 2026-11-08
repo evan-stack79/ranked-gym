@@ -7,7 +7,13 @@
 import type { ExerciseEntry, SetDifficulty, WorkoutSet } from '../types/training'
 
 export function totalVolume(sets: WorkoutSet[]): number {
-  return Math.round(sets.reduce((sum, s) => sum + s.reps * s.weightKg, 0))
+  return Math.round(
+    sets.reduce((sum, s) => {
+      // Série en cours de saisie (kg/reps vidés → NaN) : ignore, pas « Volume NaN ».
+      if (!Number.isFinite(s.reps) || !Number.isFinite(s.weightKg)) return sum
+      return sum + s.reps * s.weightKg
+    }, 0),
+  )
 }
 
 export function exercisesVolume(exercises: ExerciseEntry[]): number {

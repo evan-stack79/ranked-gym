@@ -1,4 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import {
+  type SetFieldKind,
+  validateTrainSetNumber,
+} from '../../utils/autoValidateSet'
 
 interface ClearableNumberInputProps {
   value: number | null
@@ -14,8 +18,14 @@ interface ClearableNumberInputProps {
   /**
    * When true (default), blur clamps into [min, max].
    * Set false to avoid silent correction — parent shows a message instead.
+   * With `fieldKind`, out-of-range / non-finite values are refused (same as Valider).
    */
   clampOnBlur?: boolean
+  /**
+   * Train field kind — blur/flush use `validateTrainSetNumber` (same rules as Valider).
+   * Required for kg/reps/effort when `clampOnBlur` is false.
+   */
+  fieldKind?: SetFieldKind
   /**
    * Strip spaces / unit suffixes (g, ml…) so paste like « 150 g » becomes 150.
    */
@@ -25,12 +35,47 @@ interface ClearableNumberInputProps {
    * l’utilisateur frappe / avant blur — évite l’auto-validate prématuré.
    */
   deferAmbiguousIntegerPrefix?: boolean
+  /**
+   * When true, numeric values are committed only on blur (local string while typing).
+   * Empty still reports null immediately when `required` is false.
+   */
+  commitOnBlur?: boolean
+  /**
+   * Legacy: commit a complete valid number on every keystroke.
+   * Prefer `commitOnBlur` for Train (Architect) — Valider/Terminer call
+   * `flushPendingClearableNumberInputs()` first.
+   */
+  commitOnInput?: boolean
   /** Select all text on focus (handy when default is prefilled). */
   selectOnFocus?: boolean
   /** Called on focus — e.g. apply « dernière fois » placeholders into the value. */
   onFocus?: () => void
+  /** After internal blur commit/restore — e.g. Train auto-validate. */
+  onBlur?: () => void
   enterKeyHint?: 'done' | 'enter' | 'go' | 'next' | 'previous' | 'search' | 'send'
   'aria-label'?: string
+}
+
+type PendingCommit = () => void
+
+/** Focused Train fields — Valider / Terminer flush before reading parent state. */
+const pendingCommits = new Set<PendingCommit>()
+
+/** Set when a flush/blur refused an out-of-range or non-finite commit. */
+let pendingCommitRejected = false
+
+/**
+ * Applique le même commit que blur sur toutes les cases encore focalisées.
+ * Train (`fieldKind`) : vide → null (pas de restore). Nutrition required : restore.
+ * Sans callback `onBlur` parent.
+ * @returns `false` si au moins un commit a été refusé (hors bornes / non-fini).
+ */
+export function flushPendingClearableNumberInputs(): boolean {
+  pendingCommitRejected = false
+  for (const commit of [...pendingCommits]) {
+    commit()
+  }
+  return !pendingCommitRejected
 }
 
 /** Remove spaces / common unit suffixes before parsing a quantity. */
@@ -55,6 +100,15 @@ export function isAmbiguousIntegerPrefix(raw: string, min: number, max: number):
   return false
 }
 
+/** Empty or trailing decimal separator — not a complete number yet. */
+export function isIncompleteNumberText(raw: string): boolean {
+  return raw === '' || raw === '.' || /^\d*\.$/.test(raw)
+}
+
+function isEmptyValue(value: number | null | undefined): boolean {
+  return value == null || !Number.isFinite(value)
+}
+
 /**
  * Number field that can be fully cleared while typing.
  * Clamps to min/max only on blur. Supports Apple-style gray placeholders.
@@ -70,26 +124,164 @@ export function ClearableNumberInput({
   placeholderClassName,
   required = true,
   clampOnBlur = true,
+  fieldKind,
   sanitizeUnits = false,
   deferAmbiguousIntegerPrefix = false,
+  commitOnBlur = false,
+  commitOnInput = false,
   selectOnFocus = false,
   onFocus,
+  onBlur,
   enterKeyHint,
   'aria-label': ariaLabel,
 }: ClearableNumberInputProps) {
   const [text, setText] = useState(() => formatValue(value, step))
   const [focused, setFocused] = useState(false)
+  const [commitError, setCommitError] = useState<string | null>(null)
+  const valueRef = useRef(value)
+  /** Valeur au moment du focus — blur vide restaure celle-ci (pas la dernière frappe). */
+  const focusValueRef = useRef(value)
+  const textRef = useRef(text)
+  const focusedRef = useRef(false)
+  const pendingRef = useRef<PendingCommit | null>(null)
+  const onChangeRef = useRef(onChange)
+  const onBlurRef = useRef(onBlur)
+  const propsRef = useRef({ required, clampOnBlur, fieldKind, min, max, step, value })
+
+  textRef.current = text
+  focusedRef.current = focused
+  onChangeRef.current = onChange
+  onBlurRef.current = onBlur
+  propsRef.current = { required, clampOnBlur, fieldKind, min, max, step, value }
 
   useEffect(() => {
     if (!focused) {
       setText(formatValue(value, step))
+      valueRef.current = value
       return
     }
-    // External fill while focused on an empty field (ex. « dernière fois »).
-    if (text === '' && value != null && Number.isFinite(value)) {
-      setText(formatValue(value, step))
+    // Remplissage externe pendant le focus (ex. « dernière fois ») :
+    // parent passe de vide → valeur. Ne jamais réécrire un champ vidé par l’utilisateur.
+    const prev = valueRef.current
+    if (value !== prev) {
+      valueRef.current = value
+      if (
+        text === '' &&
+        !isEmptyValue(value) &&
+        value !== 0 &&
+        (isEmptyValue(prev) || prev === 0)
+      ) {
+        setText(formatValue(value, step))
+        // « dernière fois » appliqué après focus → nouvelle baseline de restore.
+        focusValueRef.current = value
+      }
     }
   }, [value, focused, step, text])
+
+  const applyCommit = (fireBlurCallback: boolean) => {
+    const {
+      required: req,
+      clampOnBlur: clampBlur,
+      fieldKind: kind,
+      min: lo,
+      max: hi,
+      step: st,
+      value: parentValue,
+    } = propsRef.current
+    const currentText = textRef.current
+    const parsed = parseFloat(currentText)
+    if (currentText === '' || currentText === '.' || Number.isNaN(parsed)) {
+      setCommitError(null)
+      /**
+       * Train (`fieldKind` + commitOnBlur) : un champ vidé RESTE VIDE au blur /
+       * re-render. Valider / Terminer refusent ensuite via flush + bornes (M1).
+       * Nutrition (`required` sans fieldKind) : conserve le restore avant-focus.
+       */
+      if (kind) {
+        onChangeRef.current(null)
+        setText('')
+        textRef.current = ''
+      } else if (req) {
+        // Vide → valeur d’AVANT le focus (20), pas la dernière frappe (2).
+        let restored = focusValueRef.current
+        if (isEmptyValue(restored)) {
+          restored = parentValue
+        }
+        if (clampBlur && restored != null && Number.isFinite(restored)) {
+          restored = clamp(restored, lo, hi, st)
+        }
+        const restoredText = formatValue(restored, st)
+        setText(restoredText)
+        textRef.current = restoredText
+        if (
+          restored != null &&
+          Number.isFinite(restored) &&
+          restored !== parentValue
+        ) {
+          onChangeRef.current(restored)
+        }
+      } else {
+        onChangeRef.current(null)
+        setText('')
+        textRef.current = ''
+      }
+    } else if (!clampBlur && kind) {
+      // Même règle que Valider / Terminer — refuse NaN, Infinity, hors bornes.
+      const err = validateTrainSetNumber(kind, parsed)
+      if (err) {
+        pendingCommitRejected = true
+        setCommitError(err)
+        let restored = parentValue
+        if (isEmptyValue(restored)) restored = focusValueRef.current
+        const restoredText = formatValue(restored, st)
+        setText(restoredText)
+        textRef.current = restoredText
+        // Ne jamais écrire la valeur invalide ni déclencher onBlur parent
+        // (sinon auto-validate validerait l’ancienne série encore valide).
+        return
+      }
+      setCommitError(null)
+      onChangeRef.current(parsed)
+      const nextText = formatValue(parsed, st)
+      setText(nextText)
+      textRef.current = nextText
+    } else if (!clampBlur) {
+      onChangeRef.current(parsed)
+      const nextText = formatValue(parsed, st)
+      setText(nextText)
+      textRef.current = nextText
+    } else {
+      setCommitError(null)
+      const clamped = clamp(parsed, lo, hi, st)
+      onChangeRef.current(clamped)
+      const nextText = formatValue(clamped, st)
+      setText(nextText)
+      textRef.current = nextText
+    }
+    if (fireBlurCallback) onBlurRef.current?.()
+  }
+
+  const unregisterPending = () => {
+    if (pendingRef.current) {
+      pendingCommits.delete(pendingRef.current)
+      pendingRef.current = null
+    }
+  }
+
+  const registerPending = () => {
+    unregisterPending()
+    const commit: PendingCommit = () => {
+      if (!focusedRef.current) return
+      focusedRef.current = false
+      setFocused(false)
+      unregisterPending()
+      applyCommit(false)
+    }
+    pendingRef.current = commit
+    pendingCommits.add(commit)
+  }
+
+  useEffect(() => () => unregisterPending(), [])
 
   const showPlaceholder = Boolean(placeholder) && text === '' && !focused
 
@@ -112,10 +304,15 @@ export function ClearableNumberInput({
         enterKeyHint={enterKeyHint}
         autoComplete="off"
         aria-label={ariaLabel}
+        aria-invalid={commitError ? true : undefined}
         value={text}
         placeholder={focused ? placeholder : undefined}
         onFocus={(e) => {
           setFocused(true)
+          focusedRef.current = true
+          focusValueRef.current = valueRef.current
+          setCommitError(null)
+          registerPending()
           onFocus?.()
           if (selectOnFocus) {
             const target = e.currentTarget
@@ -128,39 +325,47 @@ export function ClearableNumberInput({
             : e.target.value.replace(',', '.')
           if (raw !== '' && !/^\d*\.?\d*$/.test(raw)) return
           setText(raw)
+          textRef.current = raw
+          setCommitError(null)
           if (raw === '' || raw === '.') {
-            if (!required) onChange(null)
+            // Train fieldKind : propage null tout de suite pour que le parent
+            // ne réécrive pas l’ancienne valeur au re-render / blur.
+            if (!required || fieldKind) onChange(null)
+            return
+          }
+          if (commitOnInput) {
+            // Incomplet (« 2. ») → ne rien propager ; nombre complet (0 inclus) → commit immédiat.
+            if (isIncompleteNumberText(raw)) return
+          } else if (commitOnBlur) {
             return
           }
           if (deferAmbiguousIntegerPrefix && isAmbiguousIntegerPrefix(raw, min, max)) {
             return
           }
           const next = parseFloat(raw)
-          if (!Number.isNaN(next)) onChange(next)
+          if (Number.isNaN(next)) return
+          // Clamp silencieux seulement si clampOnBlur (nutrition âges/kcal).
+          // Train commitOnBlur : pas de propagation ici.
+          if (fieldKind && !clampOnBlur) {
+            const err = validateTrainSetNumber(fieldKind, next)
+            if (err) return
+          }
+          onChange(commitOnInput && clampOnBlur ? clamp(next, min, max, step) : next)
         }}
         onBlur={() => {
+          if (!focusedRef.current) return
+          focusedRef.current = false
           setFocused(false)
-          const parsed = parseFloat(text)
-          if (text === '' || text === '.' || Number.isNaN(parsed)) {
-            if (required) {
-              setText(formatValue(value, step))
-              return
-            }
-            onChange(null)
-            setText('')
-            return
-          }
-          if (!clampOnBlur) {
-            onChange(parsed)
-            setText(formatValue(parsed, step))
-            return
-          }
-          const clamped = clamp(parsed, min, max, step)
-          onChange(clamped)
-          setText(formatValue(clamped, step))
+          unregisterPending()
+          applyCommit(true)
         }}
         className={`${className ?? ''} ${showPlaceholder ? 'caret-white' : ''}`}
       />
+      {commitError ? (
+        <p className="mt-0.5 text-center text-[10px] font-medium text-[#FF6961]" role="alert">
+          {commitError}
+        </p>
+      ) : null}
     </div>
   )
 }

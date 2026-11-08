@@ -64,8 +64,9 @@ export function AppLayout({
   return (
     <div
       ref={shellRef}
-      className="relative flex h-[100dvh] min-h-0 flex-col overflow-hidden mesh-bg font-sans"
+      className="relative flex h-[100dvh] min-h-0 w-full max-w-none flex-col overflow-hidden mesh-bg font-sans"
       data-app-shell="1"
+      data-app-shell-width="full"
       data-streak-celebration-active={streakCelebrationActive ? '' : undefined}
       inert={streakCelebrationActive ? true : undefined}
     >

@@ -64,12 +64,15 @@ export function BottomNav({
 
   return (
     <nav
-      className={`fixed left-3 right-3 z-50 mx-auto rounded-[22px] border border-[#38383D] bg-[#171719] px-1.5 py-1.5 transition-[max-width,padding] duration-180 ease-out motion-reduce:transition-none ${compact ? 'max-w-[22rem]' : 'max-w-lg'}`}
+      className={`fixed inset-x-0 bottom-0 z-50 border-t border-[#38383D] bg-[#171719] px-1.5 pt-1.5 transition-[padding] duration-180 ease-out motion-reduce:transition-none ${compact ? '' : ''}`}
       aria-label="Navigation principale"
       data-bottom-nav-mode={compact ? 'compact' : 'expanded'}
       data-bottom-nav-variant="dock"
+      data-bottom-nav-edge="flush"
       style={{
-        bottom: 'max(0.75rem, var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px)))',
+        /* Touche le bas de l’écran — un seul safe-area en padding interne (pas de bande noire). */
+        paddingBottom:
+          'var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px))',
       }}
       onClick={(event) => {
         if (event.target === event.currentTarget) onExpand?.()
@@ -165,13 +168,19 @@ function FloatingPillBottomNav({
 
   return (
     <nav
-      className="bottom-nav-pill fixed left-1/2 z-50 -translate-x-1/2 rounded-full px-2 py-1.5"
+      className="bottom-nav-pill fixed inset-x-0 bottom-0 z-50 rounded-none rounded-t-[28px] px-2 pt-1.5"
       aria-label="Navigation principale"
       data-bottom-nav-mode="pill"
       data-bottom-nav-variant="floating-pill"
+      data-bottom-nav-edge="flush"
       style={{
-        bottom: 'max(0.5rem, var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px)))',
-        width: 'min(22.5rem, calc(100vw - 2.5rem))',
+        /*
+          IPA #131 (iPhone 17) : pill inset (vw minus side gutters) + bottom offset
+          safe-area créait ~20–24 px de bandes noires L/R et une bande sous la tab.
+          Flush bottom + full width ; safe-area une seule fois en padding interne.
+        */
+        paddingBottom:
+          'var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px))',
       }}
     >
       <div ref={trackRef} className="bottom-nav-pill__track relative flex items-center justify-between gap-0.5">
