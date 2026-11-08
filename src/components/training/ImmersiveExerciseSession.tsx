@@ -20,6 +20,7 @@ import {
   SET_WEIGHT_MAX_KG,
   SET_WEIGHT_MIN_KG,
   setFieldRangeError,
+  workoutSessionSaveError,
 } from '../../utils/autoValidateSet'
 import {
   findLastPerformance,
@@ -115,6 +116,7 @@ export function ImmersiveExerciseSession({
   excludeHistoryNoteId,
 }: ImmersiveExerciseSessionProps) {
   const rest = useRestTimerContext()
+  const [finishError, setFinishError] = useState<string | null>(null)
   const safeIndex = Math.min(Math.max(0, activeIndex), Math.max(0, exercises.length - 1))
   const exercise = exercises[safeIndex]
   const media = useMemo(
@@ -401,6 +403,7 @@ export function ImmersiveExerciseSession({
                           step={0.5}
                           required={!showLastHint}
                           clampOnBlur={false}
+                          fieldKind="weight"
                           commitOnBlur
                           selectOnFocus
                           placeholder={
@@ -446,6 +449,7 @@ export function ImmersiveExerciseSession({
                           max={SET_REPS_MAX}
                           required={!showLastHint}
                           clampOnBlur={false}
+                          fieldKind="reps"
                           commitOnBlur
                           selectOnFocus
                           placeholder={
@@ -495,6 +499,7 @@ export function ImmersiveExerciseSession({
                             max={SET_EFFORT_MAX}
                             required={false}
                             clampOnBlur={false}
+                          fieldKind="effort"
                             selectOnFocus
                             commitOnBlur
                             deferAmbiguousIntegerPrefix
@@ -560,11 +565,19 @@ export function ImmersiveExerciseSession({
               type="button"
               onClick={() => {
                 // Architect : commit local (vide → avant-focus) avant Valider.
-                flushPendingClearableNumberInputs()
+                // Hors bornes / non-fini → refus (même règle que Terminer).
+                const flushOk = flushPendingClearableNumberInputs()
+                if (!flushOk) {
+                  setFinishError(
+                    'Corrige les poids / reps hors limites avant de valider.',
+                  )
+                  return
+                }
                 const target = setsRef.current[validateIdx]
                 if (!target || target.done) return
                 // Même gate que l’auto-validate : effort/reps vides → bloque (pas de 0 inventé).
                 if (!isSetReadyForAutoValidate(target)) return
+                setFinishError(null)
                 onValidateSet(
                   { ...exercise, sets: setsRef.current.map((s) => ({ ...s })) },
                   validateIdx,
@@ -699,7 +712,21 @@ export function ImmersiveExerciseSession({
             <button
               type="button"
               onClick={() => {
-                flushPendingClearableNumberInputs()
+                const flushOk = flushPendingClearableNumberInputs()
+                const liveExercises = exercises.map((ex, i) =>
+                  i === safeIndex
+                    ? { ...ex, sets: setsRef.current.map((s) => ({ ...s })) }
+                    : ex,
+                )
+                const gateErr = workoutSessionSaveError(liveExercises)
+                if (!flushOk || gateErr) {
+                  setFinishError(
+                    gateErr ??
+                      'Corrige les poids / reps hors limites avant de terminer.',
+                  )
+                  return
+                }
+                setFinishError(null)
                 onFinishSession()
               }}
               disabled={saving}
@@ -707,6 +734,14 @@ export function ImmersiveExerciseSession({
             >
               {saving ? 'Synchro…' : 'Terminer la séance'}
             </button>
+            {finishError ? (
+              <p
+                className="mt-1 text-center text-[12px] font-medium text-[#FF6961]"
+                role="alert"
+              >
+                {finishError}
+              </p>
+            ) : null}
           </>
         )}
       </div>

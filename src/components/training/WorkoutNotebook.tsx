@@ -59,6 +59,7 @@ import {
   SET_WEIGHT_MIN_KG,
   setFieldRangeError,
   shouldCommitAutoValidate,
+  workoutSessionSaveError,
 } from '../../utils/autoValidateSet'
 import { CANONICAL_REST_SEC, resolveRestDuration } from '../../utils/restDuration'
 import { vibrate } from '../../utils/haptics'
@@ -282,6 +283,7 @@ export function WorkoutNotebook({
   const [customOpen, setCustomOpen] = useState(false)
   const [customLabel, setCustomLabel] = useState('')
   const [saving, setSaving] = useState(false)
+  const [saveGateError, setSaveGateError] = useState<string | null>(null)
   const [editingNote, setEditingNote] = useState<WorkoutNote | null>(initialEditNote)
   const [effortHelpOpen, setEffortHelpOpen] = useState(false)
   const [activeExerciseIndex, setActiveExerciseIndex] = useState(() => {
@@ -668,13 +670,28 @@ export function WorkoutNotebook({
 
   const handleSave = async () => {
     // Architect : commit cases encore focalisées (vide → avant-focus) avant Terminer.
-    flushPendingClearableNumberInputs()
+    // Même validation que Valider : hors bornes / non-fini → refus + message, pas de save.
+    const flushOk = flushPendingClearableNumberInputs()
     const liveExercises = exercisesRef.current
+    const gateErr = workoutSessionSaveError(liveExercises)
+    if (!flushOk || gateErr) {
+      setSaveGateError(
+        gateErr ?? 'Corrige les poids / reps hors limites avant de terminer.',
+      )
+      return
+    }
+    setSaveGateError(null)
     const cleaned = liveExercises
       .map((e) => ({
         ...e,
         name: sanitizeExerciseName(e.name.trim() || 'Exercice'),
-        sets: e.sets.filter((s) => s.reps > 0 && s.weightKg >= 0),
+        sets: e.sets.filter(
+          (s) =>
+            s.reps > 0 &&
+            Number.isFinite(s.weightKg) &&
+            s.weightKg >= 0 &&
+            Number.isFinite(s.reps),
+        ),
       }))
       .filter((e) => e.sets.length > 0)
     if (!cleaned.length) return
@@ -1066,6 +1083,7 @@ export function WorkoutNotebook({
                                   step={0.5}
                                   required={!showLastHint}
                                   clampOnBlur={false}
+                          fieldKind="weight"
                                   commitOnBlur
                                   selectOnFocus
                                   placeholder={
@@ -1128,6 +1146,7 @@ export function WorkoutNotebook({
                                   max={SET_REPS_MAX}
                                   required={!showLastHint}
                                   clampOnBlur={false}
+                          fieldKind="reps"
                                   commitOnBlur
                                   selectOnFocus
                                   placeholder={
@@ -1177,6 +1196,7 @@ export function WorkoutNotebook({
                                   max={SET_EFFORT_MAX}
                                   required={false}
                                   clampOnBlur={false}
+                          fieldKind="effort"
                                   selectOnFocus
                                   commitOnBlur
                                   deferAmbiguousIntegerPrefix
@@ -1229,7 +1249,15 @@ export function WorkoutNotebook({
                     type="button"
                     onClick={() => {
                       // Architect : commit local (vide → avant-focus) avant de lire la série.
-                      flushPendingClearableNumberInputs()
+                      // Hors bornes / non-fini → même refus que Terminer.
+                      const flushOk = flushPendingClearableNumberInputs()
+                      if (!flushOk) {
+                        setSaveGateError(
+                          'Corrige les poids / reps hors limites avant de valider.',
+                        )
+                        return
+                      }
+                      setSaveGateError(null)
                       finishSet(ex, validateIdx)
                     }}
                     disabled={
@@ -1303,6 +1331,12 @@ export function WorkoutNotebook({
             <span>{saving ? 'Synchro…' : editingNote ? 'Sauvegarder' : 'Terminer la séance'}</span>
           </button>
         </div>
+
+        {saveGateError ? (
+          <p className="mt-2 text-center text-[12px] font-medium text-[#FF6961]" role="alert">
+            {saveGateError}
+          </p>
+        ) : null}
 
         <p className="mt-2 text-center text-[11px] text-[#717C83]">
           Volume {stats.volume} kg ·{' '}

@@ -42,12 +42,21 @@ export function isRepsInRange(reps: unknown): reps is number {
   )
 }
 
-/** Message d’erreur champ (null si OK / vide). Écran = enregistré ; hors limites → bloquer. */
-export function setFieldRangeError(
+/**
+ * Unique validation Train kg / reps / effort — Valider, blur (commitOnBlur) et Terminer.
+ * - `null` / `undefined` → ok (champ vide pendant la saisie / effort facultatif)
+ * - `NaN` / `±Infinity` / hors bornes → message (valeur refusée, non sauvegardée)
+ */
+export function validateTrainSetNumber(
   kind: SetFieldKind,
   value: number | null | undefined,
 ): string | null {
-  if (value == null || !Number.isFinite(value)) return null
+  if (value == null) return null
+  if (typeof value !== 'number' || Number.isNaN(value) || !Number.isFinite(value)) {
+    if (kind === 'weight') return 'Poids invalide'
+    if (kind === 'reps') return 'Reps invalides'
+    return 'Effort invalide'
+  }
   if (kind === 'weight') {
     if (value < SET_WEIGHT_MIN_KG || value > SET_WEIGHT_MAX_KG) {
       return `Poids hors limites (0–${SET_WEIGHT_MAX_KG} kg)`
@@ -62,6 +71,37 @@ export function setFieldRangeError(
   }
   if (value < SET_EFFORT_MIN || value > SET_EFFORT_MAX) {
     return `Effort hors limites (${SET_EFFORT_MIN}–${SET_EFFORT_MAX})`
+  }
+  return null
+}
+
+/** Alias historique — même fonction que `validateTrainSetNumber`. */
+export const setFieldRangeError = validateTrainSetNumber
+
+/**
+ * Bloque Terminer / Sauvegarder si une série non vide porte un kg/reps invalide
+ * (NaN, Infinity, hors 0–500 kg / 1–50 reps). Les séries 0×0 restent filtrées.
+ */
+export function workoutSessionSaveError(
+  exercises: Array<{ sets: Array<{ weightKg: number; reps: number }> }>,
+): string | null {
+  for (const ex of exercises) {
+    for (const set of ex.sets) {
+      if (typeof set.weightKg === 'number' && !Number.isFinite(set.weightKg)) {
+        return validateTrainSetNumber('weight', set.weightKg)
+      }
+      if (typeof set.reps === 'number' && !Number.isFinite(set.reps)) {
+        return validateTrainSetNumber('reps', set.reps)
+      }
+      // Placeholder 0×0 — Terminer les ignore ; pas d’erreur « reps hors limites ».
+      if (set.reps === 0 && set.weightKg === 0) continue
+      const weightErr = validateTrainSetNumber('weight', set.weightKg)
+      if (weightErr) return weightErr
+      if (set.reps !== 0) {
+        const repsErr = validateTrainSetNumber('reps', set.reps)
+        if (repsErr) return repsErr
+      }
+    }
   }
   return null
 }

@@ -88,7 +88,10 @@ jobs:
 
           echo "== Info.plist status bar ownership =="
           PLIST="ios/App/App/Info.plist"
-          grep -A1 'UIViewControllerBasedStatusBarAppearance' "$PLIST" | grep -q '<true/>'
+          # Avoid `grep | grep -q` under pipefail (SIGPIPE) — dump then grep the file.
+          PLIST_STATUS_DUMP="$RUNNER_TEMP/plist-status-bar.txt"
+          grep -A1 'UIViewControllerBasedStatusBarAppearance' "$PLIST" > "$PLIST_STATUS_DUMP"
+          grep -q '<true/>' "$PLIST_STATUS_DUMP"
 
           echo "== Synced capacitor.config.json (cap sync output) =="
           # cap sync writes JSON next to the App target; accept either path Cap uses.
@@ -196,17 +199,21 @@ jobs:
             ls -la "$APP_PATH" || true
             exit 1
           fi
+          # Dump strings once, then grep the file. Never `strings | grep -q` under
+          # pipefail: grep -q exits early → SIGPIPE on strings → false failure (QA M2).
           echo "Checking native plugin registration symbols in $APP_BINARY"
-          if ! strings "$APP_BINARY" | grep -q 'MainViewController'; then
+          STRINGS_DUMP="$RUNNER_TEMP/app-binary-strings.txt"
+          strings "$APP_BINARY" > "$STRINGS_DUMP"
+          if ! grep -q 'MainViewController' "$STRINGS_DUMP"; then
             echo "ERROR: MainViewController missing from App binary — SecureStorage will not register on iOS"
             exit 1
           fi
-          if ! strings "$APP_BINARY" | grep -q 'SecureStoragePlugin'; then
+          if ! grep -q 'SecureStoragePlugin' "$STRINGS_DUMP"; then
             echo "ERROR: SecureStoragePlugin missing from App binary — Keychain plugin not linked"
             exit 1
           fi
           # StatusBar overlay plugin (safe-area / Dynamic Island full-bleed).
-          if ! strings "$APP_BINARY" | grep -qi 'StatusBar'; then
+          if ! grep -qi 'StatusBar' "$STRINGS_DUMP"; then
             echo "ERROR: StatusBar symbols missing from App binary — overlaysWebView will not apply"
             exit 1
           fi

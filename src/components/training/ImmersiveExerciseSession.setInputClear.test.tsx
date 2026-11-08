@@ -726,7 +726,8 @@ describe('ImmersiveExerciseSession — clear kg/reps/effort', () => {
       typeInto(weight, '600')
       weight.blur()
     })
-    expect(weight.value).toBe('600')
+    // M1 : hors bornes refusées au blur — affichage restauré, message, parent inchangé.
+    expect(weight.value).toBe('20')
     expect(host.textContent).toMatch(/Poids hors limites/)
     expect(onValidate).not.toHaveBeenCalled()
   })
@@ -779,7 +780,8 @@ describe('ImmersiveExerciseSession — clear kg/reps/effort', () => {
       typeInto(reps, '0')
       reps.blur()
     })
-    expect(reps.value).toBe('0')
+    // M1 : 0 rep hors bornes — refus + restauration, pas d’écriture parent.
+    expect(reps.value).toBe('8')
     expect(host.textContent).toMatch(/Reps hors limites/)
     expect(onValidate).not.toHaveBeenCalled()
   })
