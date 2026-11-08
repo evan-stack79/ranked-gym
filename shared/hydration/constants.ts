@@ -101,3 +101,39 @@ export const MSG_REMINDER_PAUSE_GOAL =
 /** Texte Pro upsell — sans rang / points (HY-13). */
 export const MSG_PRO_BOTTLE =
   'Ma bouteille est un avantage Pass Pro cosmétique : ta photo découpée sur l’appareil.'
+
+/**
+ * M1 — clientId stable pour une entrée legacy `nutrition_water_entries.entryId`
+ * (idempotent ; jamais de double compte une fois migrée).
+ */
+export const LEGACY_WATER_CLIENT_PREFIX = 'legacy:'
+
+/** Total journal local sans entrées discrètes (dayKey). */
+export const LEGACY_WATER_DAY_PREFIX = 'legacy-day:'
+
+/** Aligné NUTRITION_ADULT_MIN — majorité pour objectif hydratation. */
+export const HYDRATION_ADULT_MIN_AGE = 18
+
+export function legacyWaterEntryClientId(entryId: string): string {
+  return `${LEGACY_WATER_CLIENT_PREFIX}${entryId}`
+}
+
+export function legacyWaterDayClientId(dayKey: string): string {
+  return `${LEGACY_WATER_DAY_PREFIX}${dayKey}`
+}
+
+export function isLegacyHydrationClientId(clientId: string): boolean {
+  return (
+    clientId.startsWith(LEGACY_WATER_CLIENT_PREFIX)
+    || clientId.startsWith(LEGACY_WATER_DAY_PREFIX)
+  )
+}
+
+/** M7 — mineur / âge inconnu → toujours GOAL_DEFAULT_ML (ignore cible stockée). */
+export function effectiveHydrationGoalMl(
+  storedGoalMl: number,
+  age: number | null | undefined,
+): number {
+  if (age == null || age < HYDRATION_ADULT_MIN_AGE) return GOAL_DEFAULT_ML
+  return storedGoalMl
+}

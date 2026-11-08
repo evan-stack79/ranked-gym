@@ -38,6 +38,8 @@ import {
   isReminderTimeAllowed,
   isValidDayKey,
   lastNDayKeys,
+  legacyWaterEntryClientId,
+  effectiveHydrationGoalMl,
   remainingMl,
   showHighInfo,
 } from './lib/hydrationConstants'
@@ -92,6 +94,34 @@ async function ensureSettings(
   return row
 }
 
+async function findHydrationByClientId(
+  ctx: SessionCtx,
+  userId: string,
+  clientId: string,
+): Promise<Doc<'hydrationEntries'> | null> {
+  return ctx.db
+    .query('hydrationEntries')
+    .withIndex('by_user_client', (q) => q.eq('userId', userId).eq('clientId', clientId))
+    .first()
+}
+
+/** Entrées eau legacy Convex (nutrition_water_entries) actives pour un jour. */
+async function listLegacyWaterRows(
+  ctx: SessionCtx,
+  userId: string,
+  dayKey: string,
+): Promise<Doc<'nutrition_water_entries'>[]> {
+  const rows = await ctx.db
+    .query('nutrition_water_entries')
+    .withIndex('by_userId_dateKey', (q) => q.eq('userId', userId).eq('dateKey', dayKey))
+    .collect()
+  return rows.filter((r) => r.deletedAt == null && Math.round(r.amountMl) > 0)
+}
+
+/**
+ * M1 — somme hydration* + legacy non encore migrée (jamais de double compte :
+ * si `legacy:${entryId}` existe déjà dans hydrationEntries, l’entrée legacy est ignorée).
+ */
 async function sumDrunkMl(
   ctx: SessionCtx,
   userId: string,
@@ -106,7 +136,102 @@ async function sumDrunkMl(
     if (row.undoneAt != null) continue
     total += Math.max(0, Math.round(row.amountMl))
   }
+
+  const legacyRows = await listLegacyWaterRows(ctx, userId, dayKey)
+  for (const leg of legacyRows) {
+    const clientId = legacyWaterEntryClientId(leg.entryId)
+    const migrated = await findHydrationByClientId(ctx, userId, clientId)
+    if (migrated && migrated.undoneAt == null) continue
+    if (migrated && migrated.undoneAt != null) {
+      // Migrée puis annulée : ne pas recompter le legacy (évite résurrection).
+      continue
+    }
+    total += Math.max(0, Math.round(leg.amountMl))
+  }
   return total
+}
+
+/**
+ * M1 — copie idempotente nutrition_water_entries → hydrationEntries (clientId stable).
+ * Rejouable sans effet / sans doublon.
+ */
+async function migrateLegacyWaterDay(
+  ctx: MutationCtx,
+  userId: string,
+  dayKey: string,
+  now: number,
+): Promise<number> {
+  const legacyRows = await listLegacyWaterRows(ctx, userId, dayKey)
+  let inserted = 0
+  for (const leg of legacyRows) {
+    const amountMl = Math.max(0, Math.round(leg.amountMl))
+    if (amountMl < ENTRY_MIN_ML || amountMl > ENTRY_MAX_ML) continue
+    const clientId = legacyWaterEntryClientId(leg.entryId)
+    const existing = await findHydrationByClientId(ctx, userId, clientId)
+    if (existing) continue
+    await ctx.db.insert('hydrationEntries', {
+      userId,
+      dayKey,
+      amountMl,
+      source: 'slider',
+      clientId,
+      createdAt: typeof leg.createdAt === 'number' ? leg.createdAt : now,
+    })
+    inserted += 1
+  }
+  return inserted
+}
+
+async function migrateLegacyWaterWindow(
+  ctx: MutationCtx,
+  userId: string,
+  endDayKey: string,
+  now: number,
+): Promise<{ days: number; inserted: number }> {
+  const keys = lastNDayKeys(endDayKey, 7)
+  let inserted = 0
+  for (const dayKey of keys) {
+    inserted += await migrateLegacyWaterDay(ctx, userId, dayKey, now)
+  }
+  return { days: keys.length, inserted }
+}
+
+async function loadNutritionAge(ctx: SessionCtx, userId: string): Promise<number | null> {
+  const nutrition = await ctx.db
+    .query('nutrition_state')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .first()
+  return extractStoredNutritionAge(nutrition?.profileJson)
+}
+
+async function resolveEffectiveGoalMl(
+  ctx: SessionCtx,
+  userId: string,
+  storedGoalMl: number,
+): Promise<number> {
+  const age = await loadNutritionAge(ctx, userId)
+  return effectiveHydrationGoalMl(storedGoalMl, age)
+}
+
+async function isGoalLockedForUser(ctx: SessionCtx, userId: string): Promise<boolean> {
+  const age = await loadNutritionAge(ctx, userId)
+  return age == null || age < NUTRITION_ADULT_MIN
+}
+
+/**
+ * Mutations : normalise goalMl stocké à 1500 si mineur/inconnu (ancienne cible 3000, etc.).
+ */
+async function normalizeStoredGoalIfLocked(
+  ctx: MutationCtx,
+  userId: string,
+  settings: Doc<'hydrationSettings'>,
+  now: number,
+): Promise<Doc<'hydrationSettings'>> {
+  const locked = await isGoalLockedForUser(ctx, userId)
+  if (!locked || settings.goalMl === GOAL_DEFAULT_ML) return settings
+  await ctx.db.patch(settings._id, { goalMl: GOAL_DEFAULT_ML, updatedAt: now })
+  const next = await ctx.db.get(settings._id)
+  return next ?? { ...settings, goalMl: GOAL_DEFAULT_ML }
 }
 
 async function lastUndoableEntry(
@@ -208,16 +333,18 @@ function toTodayView(
   drunk: number,
   last: Doc<'hydrationEntries'> | null,
   proActive: boolean,
+  goalMlOverride?: number,
 ): HydrationTodayView {
   const mode = settings.mode
   const visual: HydrationMode =
     mode === 'my_bottle' && !proActive ? 'classic_2l' : mode
+  const goalMl = goalMlOverride ?? settings.goalMl
   return {
     dayKey,
     mode,
-    goalMl: settings.goalMl,
+    goalMl,
     drunkMl: drunk,
-    remainingMl: remainingMl(settings.goalMl, drunk),
+    remainingMl: remainingMl(goalMl, drunk),
     showHighInfo: showHighInfo(drunk),
     myBottleVolumeMl: settings.myBottleVolumeMl ?? null,
     myBottleHasShape: settings.myBottleHasShape,
@@ -233,6 +360,20 @@ function toTodayView(
   }
 }
 
+async function buildTodayView(
+  ctx: SessionCtx,
+  userId: string,
+  settings: Doc<'hydrationSettings'> | Omit<Doc<'hydrationSettings'>, '_id' | '_creationTime'>,
+  dayKey: string,
+  now?: number,
+): Promise<HydrationTodayView> {
+  const drunk = await sumDrunkMl(ctx, userId, dayKey)
+  const last = await lastUndoableEntry(ctx, userId, dayKey)
+  const proActive = await hasActivePro(ctx, userId, now)
+  const goalMl = await resolveEffectiveGoalMl(ctx, userId, settings.goalMl)
+  return toTodayView(settings, dayKey, drunk, last, proActive, goalMl)
+}
+
 export const getToday = query({
   args: {
     sessionToken: v.string(),
@@ -243,10 +384,7 @@ export const getToday = query({
     if (!isValidDayKey(args.dayKey)) throw new Error('HYDRATION_INVALID_DAY_KEY')
     const settings = await getOrNullSettings(ctx, user.userId)
     const effective = settings ?? defaultSettings(user.userId, Date.now())
-    const drunk = await sumDrunkMl(ctx, user.userId, args.dayKey)
-    const last = await lastUndoableEntry(ctx, user.userId, args.dayKey)
-    const proActive = await hasActivePro(ctx, user.userId)
-    return toTodayView(effective, args.dayKey, drunk, last, proActive)
+    return buildTodayView(ctx, user.userId, effective, args.dayKey)
   },
 })
 
@@ -264,6 +402,32 @@ export const getHistory = query({
       out.push({ dayKey, drunkMl: await sumDrunkMl(ctx, user.userId, dayKey) })
     }
     return out
+  },
+})
+
+/**
+ * M1 — migre nutrition_water_entries → hydrationEntries (7 j), idempotent.
+ * À appeler au chargement WaterCard / sync.
+ */
+export const migrateLegacyWater = mutation({
+  args: {
+    sessionToken: v.string(),
+    endDayKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx, args.sessionToken)
+    const now = Date.now()
+    if (!isValidDayKey(args.endDayKey)) throw new Error('HYDRATION_INVALID_DAY_KEY')
+    await ensureSettings(ctx, user.userId, now)
+    const result = await migrateLegacyWaterWindow(ctx, user.userId, args.endDayKey, now)
+    const settings = await normalizeStoredGoalIfLocked(
+      ctx,
+      user.userId,
+      (await getOrNullSettings(ctx, user.userId))!,
+      now,
+    )
+    const today = await buildTodayView(ctx, user.userId, settings, args.endDayKey, now)
+    return { ...result, today }
   },
 })
 
@@ -294,18 +458,19 @@ export const addEntry = mutation({
       )
       .first()
     if (dup) {
-      const settings = await ensureSettings(ctx, user.userId, now)
-      const drunk = await sumDrunkMl(ctx, user.userId, args.dayKey)
-      const last = await lastUndoableEntry(ctx, user.userId, args.dayKey)
-      const proActive = await hasActivePro(ctx, user.userId, now)
+      let settings = await ensureSettings(ctx, user.userId, now)
+      settings = await normalizeStoredGoalIfLocked(ctx, user.userId, settings, now)
       return {
         duplicate: true as const,
         entryId: dup._id,
-        today: toTodayView(settings, args.dayKey, drunk, last, proActive),
+        today: await buildTodayView(ctx, user.userId, settings, args.dayKey, now),
       }
     }
 
-    await ensureSettings(ctx, user.userId, now)
+    let settings = await ensureSettings(ctx, user.userId, now)
+    settings = await normalizeStoredGoalIfLocked(ctx, user.userId, settings, now)
+    // Reprise legacy avant nouvel ajout (évite total 0 puis +X sans historique).
+    await migrateLegacyWaterDay(ctx, user.userId, args.dayKey, now)
     const entryId = await ctx.db.insert('hydrationEntries', {
       userId: user.userId,
       dayKey: args.dayKey,
@@ -314,14 +479,10 @@ export const addEntry = mutation({
       clientId: args.clientId,
       createdAt: now,
     })
-    const settings = await ensureSettings(ctx, user.userId, now)
-    const drunk = await sumDrunkMl(ctx, user.userId, args.dayKey)
-    const last = await lastUndoableEntry(ctx, user.userId, args.dayKey)
-    const proActive = await hasActivePro(ctx, user.userId, now)
     return {
       duplicate: false as const,
       entryId,
-      today: toTodayView(settings, args.dayKey, drunk, last, proActive),
+      today: await buildTodayView(ctx, user.userId, settings, args.dayKey, now),
     }
   },
 })
@@ -338,11 +499,9 @@ export const undoLast = mutation({
     const last = await lastUndoableEntry(ctx, user.userId, args.dayKey)
     if (!last) throw new Error('HYDRATION_NOTHING_TO_UNDO')
     await ctx.db.patch(last._id, { undoneAt: now })
-    const settings = await ensureSettings(ctx, user.userId, now)
-    const drunk = await sumDrunkMl(ctx, user.userId, args.dayKey)
-    const nextLast = await lastUndoableEntry(ctx, user.userId, args.dayKey)
-    const proActive = await hasActivePro(ctx, user.userId, now)
-    return toTodayView(settings, args.dayKey, drunk, nextLast, proActive)
+    let settings = await ensureSettings(ctx, user.userId, now)
+    settings = await normalizeStoredGoalIfLocked(ctx, user.userId, settings, now)
+    return buildTodayView(ctx, user.userId, settings, args.dayKey, now)
   },
 })
 
@@ -376,14 +535,8 @@ export const updateSettings = mutation({
     }
 
     if (args.goalMl !== undefined) {
-      // M7 — mineurs / âge inconnu : objectif non réglable (défaut serveur conservé).
-      const nutrition = await ctx.db
-        .query('nutrition_state')
-        .withIndex('by_userId', (q) => q.eq('userId', user.userId))
-        .first()
-      const age = extractStoredNutritionAge(nutrition?.profileJson)
-      const goalLocked = age == null || age < NUTRITION_ADULT_MIN
-      if (goalLocked) {
+      // M7 — mineurs / âge inconnu : objectif non réglable.
+      if (await isGoalLockedForUser(ctx, user.userId)) {
         throw new Error('HYDRATION_GOAL_LOCKED_MINOR')
       }
       assertGoalMl(args.goalMl)
@@ -409,12 +562,15 @@ export const updateSettings = mutation({
     }
 
     await ctx.db.patch(settings._id, patch)
-    const next = await ctx.db.get(settings._id)
+    let next = await ctx.db.get(settings._id)
     if (!next) throw new Error('HYDRATION_SETTINGS_MISSING')
+    next = await normalizeStoredGoalIfLocked(ctx, user.userId, next, now)
     const proActive = await hasActivePro(ctx, user.userId, now)
+    const goalMl = await resolveEffectiveGoalMl(ctx, user.userId, next.goalMl)
     return {
-      settings: next,
+      settings: { ...next, goalMl },
       proActive,
+      effectiveGoalMl: goalMl,
       effectiveVisualMode:
         next.mode === 'my_bottle' && !proActive ? ('classic_2l' as const) : next.mode,
     }

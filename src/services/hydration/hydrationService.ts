@@ -200,6 +200,7 @@ function resolveActiveUserId(): string | null {
 }
 
 export function clearHydrationLocalState(): void {
+  const prev = getHydrationQueueUserId()
   clearHydrationOfflineQueue()
   bindHydrationQueueUser(null)
   try {
@@ -208,6 +209,9 @@ export function clearHydrationLocalState(): void {
     }
   } catch {
     /* ignore */
+  }
+  if (prev) {
+    void import('./hydrationLegacyMigrate').then((m) => m.clearLocalLegacyMigrateFlag(prev))
   }
   emitHydrationChanged()
 }
@@ -234,6 +238,24 @@ export async function fetchHydrationToday(dayKey = localDayKey()): Promise<Hydra
   const userId = resolveActiveUserId()
   try {
     const sessionToken = await requireToken()
+    // M1 — migration serveur idempotente (nutrition_water_entries → hydration*).
+    try {
+      await getConvex().mutation(api.hydration.migrateLegacyWater, {
+        sessionToken,
+        endDayKey: dayKey,
+      })
+    } catch {
+      /* query-only fallback si mutation indisponible */
+    }
+    // M1 — journal local (même clientId legacy:*) pour ne pas perdre 1200 ml hors sync.
+    if (userId) {
+      try {
+        const { migrateLocalLegacyWaterToHydration } = await import('./hydrationLegacyMigrate')
+        await migrateLocalLegacyWaterToHydration(userId, dayKey)
+      } catch {
+        /* ignore */
+      }
+    }
     const today = (await getConvex().query(api.hydration.getToday, {
       sessionToken,
       dayKey,
