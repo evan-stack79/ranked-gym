@@ -44,7 +44,9 @@ import type * as lib_subscriptionApply from "../lib/subscriptionApply.js";
 import type * as lib_subscriptionProducts from "../lib/subscriptionProducts.js";
 import type * as lib_appleJws from "../lib/appleJws.js";
 import type * as lib_appleServerApi from "../lib/appleServerApi.js";
+import type * as lib_googlePlayVerify from "../lib/googlePlayVerify.js";
 import type * as lib_iapHttp from "../lib/iapHttp.js";
+import type * as lib_proEntitlement from "../lib/proEntitlement.js";
 import type * as lib_subscriptionReminders from "../lib/subscriptionReminders.js";
 import type * as subscriptions from "../subscriptions.js";
 
@@ -78,7 +80,9 @@ declare const fullApi: ApiFromModules<{
   "lib/subscriptionProducts": typeof lib_subscriptionProducts;
   "lib/appleJws": typeof lib_appleJws;
   "lib/appleServerApi": typeof lib_appleServerApi;
+  "lib/googlePlayVerify": typeof lib_googlePlayVerify;
   "lib/iapHttp": typeof lib_iapHttp;
+  "lib/proEntitlement": typeof lib_proEntitlement;
   "lib/subscriptionReminders": typeof lib_subscriptionReminders;
   "lib/rateLimit": typeof lib_rateLimit;
   "lib/socialVisibility": typeof lib_socialVisibility;

@@ -36,6 +36,12 @@ import { evaluatePurchaseAgeGate } from '../shared/subscriptions/age'
 import { proL05bForOffer, PRO_CANCEL_LINK_LABEL } from '../shared/subscriptions/legalCopy'
 import { scheduleTrialAndAnnualReminders, dueReminders } from './lib/subscriptionReminders'
 import { PRO_OFFERS } from '../shared/subscriptions/constants'
+import { fetchAppleSubscriptionStatus } from './lib/appleServerApi'
+import {
+  acknowledgeGoogleSubscription,
+  fetchGoogleSubscriptionsv2,
+  normalizeGoogleSubscriptionsv2,
+} from './lib/googlePlayVerify'
 
 const AGE_POLICY_VERSION = 'pro-min-15-civil-2026-11-08'
 
@@ -244,6 +250,30 @@ export const verifyApplePurchase = mutation({
         const ren = await verifyAppleJwsSignature(args.signedRenewalInfo)
         renewal = ren.payload as AppleRenewalClaims
       }
+      // Relecture App Store Server API quand les credentials sont configurés (ARCHI §5.1).
+      if (claims.originalTransactionId) {
+        const env =
+          (claims.environment ?? '').toLowerCase() === 'sandbox' ||
+          (claims.environment ?? '').toLowerCase() === 'xcode'
+            ? 'sandbox'
+            : 'production'
+        try {
+          const snap = await fetchAppleSubscriptionStatus(claims.originalTransactionId, env)
+          if (snap?.signedTransactionInfo) {
+            const re = await verifyAppleJwsSignature(snap.signedTransactionInfo)
+            claims = re.payload as AppleTransactionClaims
+          }
+          if (snap?.signedRenewalInfo) {
+            const ren = await verifyAppleJwsSignature(snap.signedRenewalInfo)
+            renewal = ren.payload as AppleRenewalClaims
+          }
+        } catch (err) {
+          // Credentials absents → null ; HTTP erreur → refuse (pas de grant sur JWS stale seul si API configurée).
+          if (err instanceof Error && err.message.startsWith('APPLE_SERVER_API_')) {
+            throw err
+          }
+        }
+      }
     }
 
     const normalized = normalizeAppleTransaction({
@@ -397,6 +427,20 @@ export const verifyGooglePurchase = mutation({
       if (!isAllowedGoogleProductId(productId)) throw new Error('GOOGLE_PRODUCT_NOT_ALLOWED')
       const billingPeriod = billingPeriodForGoogle(productId, claims.basePlanId ?? args.basePlanId)
       if (!billingPeriod) throw new Error('GOOGLE_PRODUCT_NOT_ALLOWED')
+
+      // Liaison compte : obfuscated id doit matcher storeAccountToken si fourni.
+      if (claims.obfuscatedExternalAccountId) {
+        const account = await ctx.db
+          .query('subscriptionAccounts')
+          .withIndex('by_store_token', (q) =>
+            q.eq('storeAccountToken', claims.obfuscatedExternalAccountId!),
+          )
+          .first()
+        if (account && account.userId !== user.userId) {
+          throw new Error('GOOGLE_ACCOUNT_TOKEN_MISMATCH')
+        }
+      }
+
       const periodEndsAt = claims.expiryTimeMillis ?? Date.now() + 14 * 86400000
       const applied = await applyVerifiedStateCore(ctx, {
         userId: user.userId,
@@ -425,11 +469,77 @@ export const verifyGooglePurchase = mutation({
       }
     }
 
-    // Production path requires Play Developer API credentials (not committed).
-    if (!process.env.GOOGLE_PLAY_PACKAGE_NAME) {
+    const apiBody = await fetchGoogleSubscriptionsv2(args.purchaseToken)
+    if (!apiBody) {
       throw new Error('GOOGLE_PLAY_NOT_CONFIGURED')
     }
-    throw new Error('GOOGLE_PLAY_API_VERIFY_PENDING_CREDENTIALS')
+    const normalized = normalizeGoogleSubscriptionsv2({
+      purchaseToken: args.purchaseToken,
+      body: apiBody,
+    })
+    if (normalized.environment === 'sandbox') {
+      const deployEnv = (process.env.SUBSCRIPTION_DEPLOY_ENV ?? 'production').toLowerCase()
+      if (deployEnv === 'production') throw new Error('SANDBOX_REJECTED_IN_PRODUCTION')
+    }
+    if (normalized.obfuscatedExternalAccountId) {
+      const account = await ctx.db
+        .query('subscriptionAccounts')
+        .withIndex('by_store_token', (q) =>
+          q.eq('storeAccountToken', normalized.obfuscatedExternalAccountId!),
+        )
+        .first()
+      if (account && account.userId !== user.userId) {
+        throw new Error('GOOGLE_ACCOUNT_TOKEN_MISMATCH')
+      }
+    }
+
+    const applied = await applyVerifiedStateCore(ctx, {
+      userId: user.userId,
+      source: 'google',
+      environment: normalized.environment,
+      storeChainKey: normalized.storeChainKey,
+      productId: normalized.productId,
+      basePlanId: normalized.basePlanId,
+      billingPeriod: normalized.billingPeriod,
+      status: normalized.status,
+      periodEndsAt: normalized.periodEndsAt,
+      trialEndsAt: normalized.trialEndsAt,
+      graceEndsAt: normalized.graceEndsAt,
+      autoRenew: normalized.autoRenew,
+      isTrial: normalized.isTrial,
+      billingRetry: normalized.billingRetry,
+      linkedChainKey: normalized.linkedChainKey,
+      purchaseTokenEncrypted: args.purchaseToken,
+      actor: 'verifyGooglePurchase',
+      eventKey: `google:token:${normalized.storeChainKey.slice(0, 64)}`,
+      eventType: 'purchase_verify',
+      payloadHash: `google:${normalized.productId}:${normalized.storeChainKey.slice(0, 32)}`,
+    })
+
+    try {
+      await acknowledgeGoogleSubscription({
+        purchaseToken: args.purchaseToken,
+        subscriptionId: normalized.productId,
+      })
+    } catch {
+      // Acknowledge repris par reconcile — ne pas retirer un droit déjà vérifié.
+    }
+
+    await scheduleTrialAndAnnualReminders(ctx, {
+      userId: user.userId,
+      storeChainKey: normalized.storeChainKey,
+      billingPeriod: normalized.billingPeriod,
+      trialEndsAt: normalized.trialEndsAt,
+      periodEndsAt: normalized.periodEndsAt,
+      isTrial: normalized.isTrial,
+    })
+
+    return {
+      ok: true as const,
+      subscriptionId: applied.subscriptionId,
+      revision: applied.revision,
+      status: await loadProStatusForUser(ctx, user.userId),
+    }
   },
 })
 

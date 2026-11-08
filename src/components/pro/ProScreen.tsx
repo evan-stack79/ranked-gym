@@ -31,6 +31,9 @@ interface ProScreenProps {
   busy?: boolean
   error?: string | null
   firstChargeHint?: string | null
+  needsDateOfBirth?: boolean
+  onSaveDateOfBirth?: (iso: string) => Promise<void>
+  onOpenReceipt?: () => void
 }
 
 export function ProScreen({
@@ -42,11 +45,15 @@ export function ProScreen({
   busy = false,
   error = null,
   firstChargeHint = null,
+  needsDateOfBirth = false,
+  onSaveDateOfBirth,
+  onOpenReceipt,
 }: ProScreenProps) {
   const [offerKey, setOfferKey] = useState<OfferKey>('solo_monthly')
   const [consent, setConsent] = useState(false)
+  const [dob, setDob] = useState('')
   const isNative = Capacitor.isNativePlatform()
-  const canBuy = purchaseAvailable && isNative
+  const canBuy = purchaseAvailable && isNative && !needsDateOfBirth
 
   const l05b = useMemo(() => proL05bForOffer(offerKey), [offerKey])
 
@@ -122,11 +129,34 @@ export function ProScreen({
         ) : null}
       </section>
 
-      {!canBuy ? (
+      {needsDateOfBirth ? (
+        <section className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <h2 className="text-[15px] font-semibold text-white">Date de naissance</h2>
+          <p className="text-[13px] text-[#ACB4BA]">
+            Requis pour acheter Pro (15 ans minimum). Pas une simple case à cocher.
+          </p>
+          <input
+            type="date"
+            value={dob}
+            onChange={(e) => setDob(e.target.value)}
+            className="min-h-11 w-full rounded-xl bg-black/40 px-3 text-white"
+          />
+          <button
+            type="button"
+            disabled={!dob || busy || !onSaveDateOfBirth}
+            onClick={() => onSaveDateOfBirth && void onSaveDateOfBirth(dob)}
+            className="ios-press min-h-11 w-full rounded-2xl bg-white text-[15px] font-semibold text-black disabled:opacity-40"
+          >
+            Enregistrer
+          </button>
+        </section>
+      ) : null}
+
+      {!purchaseAvailable || !isNative ? (
         <p className="rounded-2xl bg-white/5 px-4 py-3 text-[14px] text-[#C7C7CC]">
           {PRO_WEB_PURCHASE_UNAVAILABLE}
         </p>
-      ) : (
+      ) : needsDateOfBirth ? null : (
         <>
           <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">
             <input
@@ -142,7 +172,7 @@ export function ProScreen({
 
           <button
             type="button"
-            disabled={!consent || busy}
+            disabled={!consent || busy || !canBuy}
             onClick={() =>
               void onPrepareAndPurchase({
                 offerKey,
@@ -178,6 +208,15 @@ export function ProScreen({
         >
           {PRO_CANCEL_LINK_LABEL}
         </button>
+        {onOpenReceipt ? (
+          <button
+            type="button"
+            onClick={onOpenReceipt}
+            className="ios-press min-h-11 text-left text-[15px] font-medium text-white underline"
+          >
+            Voir mon reçu Pro
+          </button>
+        ) : null}
       </div>
 
       <nav className="flex flex-wrap gap-x-4 gap-y-2 text-[13px] text-[#ACB4BA]">

@@ -63,6 +63,7 @@ Dashboard Convex uniquement. Pas de `VITE_*`. Ne pas créer ces secrets depuis u
 | `APPLE_IAP_SHARED_SECRET` | Shared secret legacy éventuel — non utilisé pour le flux JWS v2 |
 | `GOOGLE_PLAY_PACKAGE_NAME` | Package Android |
 | `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` | Compte de service Play Developer API |
+| `GOOGLE_PLAY_ACCESS_TOKEN` | Bearer OAuth court (ou à dériver du JSON SA en runtime) pour subscriptionsv2 / acknowledge |
 | `GOOGLE_RTDN_AUDIENCE` | Audience OIDC exacte du push Pub/Sub |
 | `GOOGLE_RTDN_SERVICE_ACCOUNT_EMAIL` | E-mail service account push attendu |
 | `SUBSCRIPTION_TOKEN_ENCRYPTION_KEY` | Chiffrement `purchaseToken` Google au repos |
