@@ -12,6 +12,8 @@ Recapture 2+3 : `node mockups/hydratation-v2/capture.mjs`
 
 Choix rendu : **photos détourées** (plus crédibles que l’illustration SVG A/B `_ab_svg_alimentation.png`).
 
+Eau intérieure (écrans 2+3) : pré-composée dans `assets/cutouts/wet_*.png` via `scripts/bake-water.py` (masque silhouette, bleu translucide, ménisque, assombrissement bas, reflets conservés). Niveau 1,5 L = 620/1500 sur la hauteur utile (hors bouchon).
+
 ## Sources & licences des photos
 
 | Asset | Source | Auteur | Licence | URL |

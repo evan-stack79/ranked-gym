@@ -157,16 +157,30 @@ async function main() {
         }
       }
 
-      // Vérifie ratio eau ~620/1500 sur écran 2
+      // Vérifie ratio eau ~620/1500 + surface utile (~41% zone remplissable)
       if (shot.screen === 'alimentation') {
-        const ratio = await page.getAttribute(
-          '[data-mockup-photo-container="plastic_15"]',
-          'data-fill-ratio',
-        )
-        const n = Number(ratio)
-        if (!(Math.abs(n - 620 / 1500) < 0.01)) {
+        const el = page.locator('[data-mockup-drag-panel] [data-mockup-photo-container="plastic_15"]')
+        const ratio = Number(await el.getAttribute('data-fill-ratio'))
+        const surface = Number(await el.getAttribute('data-water-surface'))
+        if (!(Math.abs(ratio - 620 / 1500) < 0.01)) {
           throw new Error(`fillRatio incorrect: ${ratio}`)
         }
+        // topInset 0.155 + bottomInset 0.035 → useful 0.81 ; surface = 0.035 + 0.4133*0.81 ≈ 0.370
+        if (!(surface > 0.33 && surface < 0.42)) {
+          throw new Error(`water surface hors plage utile: ${surface}`)
+        }
+        const waterVisible = await page
+          .locator('[data-mockup-drag-panel] [data-mockup-water-fill]')
+          .first()
+          .isVisible()
+        if (!waterVisible) throw new Error('eau non visible')
+      }
+      if (shot.screen === 'ma-bouteille') {
+        const waterVisible = await page
+          .locator('[data-mockup-drag-panel] [data-mockup-water-fill]')
+          .first()
+          .isVisible()
+        if (!waterVisible) throw new Error('eau gourde non visible')
       }
 
       const outLocal = join(rendusDir, shot.file)
