@@ -1,7 +1,9 @@
-import { Droplets, Layers } from 'lucide-react'
+import { Layers } from 'lucide-react'
 import type { CSSProperties, ReactNode } from 'react'
 import { CountUpNumber } from '../motion'
 import { AccueilProgressRing } from './AccueilProgressRing'
+import { FlatGlassIcon } from '../hydration/FlatGlassIcon'
+import { GLASS_ML } from '../../shared/hydration'
 import {
   formatWaterGoalHint,
   type NextSessionTileModel,
@@ -137,6 +139,16 @@ export function SeancesSemaineTile({
   )
 }
 
+function formatLitersCompact(ml: number): string {
+  const liters = Math.max(0, ml) / 1000
+  if (Number.isInteger(liters)) return String(liters)
+  return liters.toFixed(2).replace(/0+$/, '').replace(/\.$/, '').replace('.', ',')
+}
+
+/**
+ * Tuile carrée Eau — grille de petits verres (maquette v2 validée).
+ * Objectif = userWaterGoal / hydration goal ; jamais de formule poids.
+ */
 export function EauTile({
   model,
   motion,
@@ -152,8 +164,17 @@ export function EauTile({
   const instant =
     motion.coldEntering || motion.prefersReducedMotion || Boolean(motion.freezeCountUp)
   const ready = model.ready !== false
-  // While loading: never paint « 0 ml » (neutral en-dash placeholder).
   const showValue = ready
+  const goalMl = model.goalMl != null && model.goalMl > 0 ? model.goalMl : null
+  const glassCount = goalMl != null
+    ? Math.min(12, Math.max(1, Math.round(goalMl / GLASS_ML)))
+    : 8
+  const filledCount = showValue
+    ? Math.min(glassCount, Math.floor(Math.max(0, model.waterMl) / GLASS_ML))
+    : 0
+  const drunkLiters = formatLitersCompact(model.waterMl)
+  const goalLiters = goalMl != null ? formatLitersCompact(goalMl) : null
+
   return (
     <TileShell
       accent="#0A84FF"
@@ -161,60 +182,58 @@ export function EauTile({
       ariaLabel={
         !showValue
           ? 'Eau, chargement'
-          : model.showRing
-            ? `Eau, ${model.waterMl} millilitres sur ${model.goalMl}`
-            : `Eau, ${model.waterMl} millilitres`
+          : goalMl != null
+            ? `Eau, ${drunkLiters} litre sur ${goalLiters} litres`
+            : `Eau, ${drunkLiters} litre`
       }
       dataAttr="eau"
       onClick={interactive ? onSetGoal : undefined}
     >
-      {/* Visual pinned top-right so number / unit / hint never overlap at 375–402px */}
-      <span className="accueil-metric-tile__corner" aria-hidden="true">
-        {showValue && model.showRing ? (
-          <AccueilProgressRing
-            progress={model.progress}
-            accent="#0A84FF"
-            instant={instant}
-            size={44}
-            strokeWidth={5}
-          />
-        ) : (
-          <span className="accueil-metric-tile__drop">
-            <Droplets className="h-3.5 w-3.5" strokeWidth={1.75} />
-          </span>
-        )}
-      </span>
-      <div className="accueil-metric-tile__stack mt-auto">
+      {showValue ? (
+        <div
+          className="mt-3 grid grid-cols-4 gap-x-1.5 gap-y-2"
+          aria-hidden="true"
+          data-accueil-eau-glasses="1"
+        >
+          {Array.from({ length: glassCount }, (_, i) => (
+            <span key={i} className="flex items-center justify-center">
+              <FlatGlassIcon filled={i < filledCount} size={20} />
+            </span>
+          ))}
+        </div>
+      ) : (
+        <span
+          className="accueil-metric-tile__value mt-3"
+          data-accueil-eau-placeholder="1"
+          aria-hidden="true"
+        >
+          —
+        </span>
+      )}
+      <div className="accueil-metric-tile__stack mt-auto pt-3">
         <div className="accueil-metric-tile__value-row">
           {showValue ? (
             <>
-              <span className="accueil-metric-tile__value">
+              <span className="accueil-metric-tile__value text-[1.35rem]">
                 <CountUpNumber
                   kind="water"
-                  value={model.waterMl}
+                  value={model.waterMl / 1000}
                   instant={instant}
                   stableId="accueil-eau"
+                  format={(n) => formatLitersCompact(Math.round(n * 1000))}
                 />
               </span>
-              <span className="accueil-metric-tile__unit">ml</span>
+              <span className="accueil-metric-tile__unit">
+                {goalLiters != null ? `L / ${goalLiters} L` : 'L'}
+              </span>
             </>
-          ) : (
-            <span
-              className="accueil-metric-tile__value"
-              data-accueil-eau-placeholder="1"
-              aria-hidden="true"
-            >
-              —
-            </span>
-          )}
+          ) : null}
         </div>
-        <p className="accueil-metric-tile__hint">
-          {!showValue
-            ? ' '
-            : model.showRing && model.goalMl != null
-              ? formatWaterGoalHint(model.goalMl)
-              : 'Choisir mon objectif'}
-        </p>
+        {!showValue ? null : goalMl != null ? (
+          <p className="sr-only">{formatWaterGoalHint(goalMl)}</p>
+        ) : (
+          <p className="accueil-metric-tile__hint">Choisir mon objectif</p>
+        )}
       </div>
     </TileShell>
   )

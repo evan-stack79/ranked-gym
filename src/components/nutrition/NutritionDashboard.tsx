@@ -52,7 +52,7 @@ import { useAuth } from '../../context/AuthContext'
 import { NutritionCalorieRing } from './NutritionCalorieRing'
 import { NutritionCalendarSheet } from './NutritionCalendarSheet'
 import { NutritionMacrosRow } from './NutritionMacrosRow'
-import { WaterCard } from '../hydration/WaterCard'
+import { HydrationPanel } from '../hydration/HydrationPanel'
 import { WaterSettingsSheet } from '../hydration/WaterSettingsSheet'
 import {
   NutritionQuickActions,
@@ -814,7 +814,7 @@ export function NutritionDashboard({
         />
 
         <Reveal delayMs={60}>
-          <WaterCard
+          <HydrationPanel
             onOpenSettings={() => setWaterSettingsOpen(true)}
           />
         </Reveal>

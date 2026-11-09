@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 /**
- * M1 — Accueil n’affiche plus la tuile Eau legacy.
- * Edit/reorder ne doit jamais écrire dans le journal eau legacy.
+ * Accueil tuile Eau v2 — présente dans la grille / l’édition,
+ * mais ne doit jamais écrire dans le journal eau legacy.
  */
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -21,6 +21,33 @@ vi.mock('../../context/AuthContext', () => ({
     profile: { pseudo: 'Alex' },
     isLoading: false,
   }),
+}))
+
+vi.mock('../../services/hydration/hydrationService', () => ({
+  fetchHydrationToday: vi.fn(async () => ({
+    dayKey: '2026-11-08',
+    mode: 'classic_2l',
+    goalMl: 1500,
+    drunkMl: 1200,
+    remainingMl: 300,
+    showHighInfo: false,
+    myBottleVolumeMl: null,
+    myBottleHasShape: false,
+    proActive: false,
+    effectiveVisualMode: 'classic_2l',
+    remindersEnabled: false,
+    reminderTimes: [],
+    canUndo: false,
+    lastEntryId: null,
+    glassMl: 250,
+    classicBottleMl: 2000,
+    labelEauBueSeule: true,
+    pendingMl: 0,
+    confirmedMl: 1200,
+  })),
+  HYDRATION_CHANGED_EVENT: 'ranked-gym:hydration-changed',
+  onHydrationAccountChanged: vi.fn(),
+  flushHydrationPendingQueue: vi.fn(async () => undefined),
 }))
 
 const notifyLocalDataChanged = vi.fn()
@@ -73,7 +100,7 @@ vi.mock('../../services/trainingStorage', async (importOriginal) => {
   }
 })
 
-describe('HomeGalleryView M1 — pas de tuile Eau legacy', () => {
+describe('HomeGalleryView — tuile Eau v2 sans écriture legacy', () => {
   let host: HTMLDivElement
   let root: Root
   let journalBefore: string | null
@@ -113,7 +140,7 @@ describe('HomeGalleryView M1 — pas de tuile Eau legacy', () => {
     localStorage.clear()
   })
 
-  it('edit Accueil n’affiche pas eau et ne touche pas le journal legacy', async () => {
+  it('affiche la tuile Eau et l’édition ne touche pas le journal legacy', async () => {
     const storage = await import('../../services/nutritionStorage')
     const { HomeGalleryView } = await import('./HomeGalleryView')
     const { reorderVisibleAccueilWidget, loadAccueilWidgetPrefs, saveAccueilWidgetPrefs } =
@@ -133,14 +160,13 @@ describe('HomeGalleryView M1 — pas de tuile Eau legacy', () => {
       )
     })
 
-    expect(host.querySelector('[data-accueil-slot="eau"]')).toBeNull()
-    expect(host.querySelector('[data-accueil-eau-placeholder="1"]')).toBeNull()
+    expect(host.querySelector('[data-accueil-slot="eau"], [data-accueil-metric-tile="eau"]')).toBeTruthy()
 
     const openBtn = host.querySelector('[data-accueil-edit-open-footer]') as HTMLButtonElement
     await act(async () => {
       openBtn.click()
     })
-    expect(host.querySelector('[data-accueil-edit-slot="eau"]')).toBeNull()
+    expect(host.querySelector('[data-accueil-edit-slot="eau"]')).toBeTruthy()
 
     const okBtn = host.querySelector('[data-accueil-edit-ok]') as HTMLButtonElement
     await act(async () => {

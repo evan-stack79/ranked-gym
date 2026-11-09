@@ -17,3 +17,13 @@
 
 ## Photo
 Aucune photo brute n’est envoyée au serveur (HY-08). PNG découpé + flag `myBottleHasShape` seulement (image en local appareil).
+
+## Assets contenants hydratation v2 (`public/assets/hydration/shell_*.png`)
+
+| Asset | Source | Licence |
+|-------|--------|---------|
+| Bouteille 1,5 L / 50 cl | [Pexels — nerea arance](https://www.pexels.com/photo/water-bottle-with-blue-bottle-cap-11860563/) | [Pexels License](https://www.pexels.com/license/) |
+| Verre 25 cl | [Pexels — Engin Akyurt](https://www.pexels.com/photo/a-clear-drinking-glass-10965758/) | Pexels License |
+| Gourde (aperçu Pro) | [Unsplash](https://unsplash.com/photos/photo-1602143407151-7111542de6e8) | [Unsplash License](https://unsplash.com/license/) |
+
+Détourage catalogue : `rembg` (local). Détourage « Ma bouteille » utilisateur : flood-fill on-device (pas de service payant).

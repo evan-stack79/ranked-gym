@@ -32,17 +32,18 @@ describe('QA B1 — setProForTests internal only', () => {
 })
 
 describe('QA M1 — un seul compteur visible', () => {
-  it('Accueil/Alimentation n’affichent plus le journal legacy', () => {
+  it('Accueil/Alimentation n’écrivent plus le journal legacy ; UI v2 EauTile + HydrationPanel', () => {
     const gallery = readFileSync(resolve('src/components/home/HomeGalleryView.tsx'), 'utf8')
-    expect(gallery).toMatch(/id !== 'eau'/)
-    expect(gallery).not.toMatch(/getTodayWaterMl/)
-    expect(gallery).toMatch(/WaterCard/)
+    expect(gallery).toMatch(/EauTile/)
+    expect(gallery).toMatch(/fetchHydrationToday/)
+    expect(gallery).not.toMatch(/addWaterEntry/)
+    expect(gallery).not.toMatch(/setWaterTotalFromGauge/)
     const snap = readFileSync(resolve('src/components/home/NutritionSnapshot.tsx'), 'utf8')
     expect(snap).not.toMatch(/getTodayWaterMl/)
     expect(snap).not.toMatch(/tryAddHomeQuickWater/)
     const dash = readFileSync(resolve('src/components/nutrition/NutritionDashboard.tsx'), 'utf8')
     expect(dash).not.toMatch(/SmartWaterGauge/)
-    expect(dash).toMatch(/WaterCard/)
+    expect(dash).toMatch(/HydrationPanel/)
   })
 })
 

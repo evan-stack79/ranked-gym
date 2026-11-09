@@ -41,8 +41,19 @@ import {
   deriveNextSessionTile,
   deriveProgramTileModel,
   deriveSetsTileModel,
+  deriveWaterTileModel,
   deriveWeekSessionBars,
 } from '../../utils/accueilWidgetTiles'
+import { getTodayWaterMl } from '../../services/nutritionStorage'
+import {
+  getUserWaterGoalMl,
+  WATER_GOAL_CHANGED_EVENT,
+} from '../../utils/userWaterGoal'
+import { localDayKey } from '../../shared/hydration'
+import {
+  fetchHydrationToday,
+  HYDRATION_CHANGED_EVENT,
+} from '../../services/hydration/hydrationService'
 import { getHomeGreetingSubtitle, resolveDisplayFirstName } from '../../utils/homeGreeting'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { findActiveStrengthSession } from '../../utils/trainHub'
@@ -50,17 +61,18 @@ import { BlurInText, CountUpNumber, Reveal, SoftBlurIn, TiltCard } from '../moti
 import { HistorySessionThumb } from '../training/HistorySessionThumb'
 import { AccueilAddSheet } from './AccueilAddSheet'
 import {
+  EauTile,
   ProchaineSeanceTile,
   ProgrammeProgressTile,
   SeancesSemaineTile,
   SeriesJourTile,
 } from './AccueilMetricTiles'
+import { WaterGoalSheet } from './WaterGoalSheet'
 import {
   EditableAccueilSlot,
   type DragFloatRect,
   type DragPoint,
 } from './EditableAccueilSlot'
-import { WaterCard } from '../hydration/WaterCard'
 import { WaterSettingsSheet } from '../hydration/WaterSettingsSheet'
 
 interface HomeGalleryViewProps {
@@ -131,6 +143,10 @@ export function HomeGalleryView({
   const [freezeReveals, setFreezeReveals] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [waterSettingsOpen, setWaterSettingsOpen] = useState(false)
+  const [waterGoalOpen, setWaterGoalOpen] = useState(false)
+  const [waterTick, setWaterTick] = useState(0)
+  const [hydrationDrunkMl, setHydrationDrunkMl] = useState<number | null>(null)
+  const [hydrationGoalMl, setHydrationGoalMl] = useState<number | null>(null)
   const [draggingId, setDraggingId] = useState<AccueilWidgetId | null>(null)
   /** Absolute viewport rect of the lifted tile (finger − grab offset). */
   const [dragFloat, setDragFloat] = useState<DragFloatRect | null>(null)
@@ -180,6 +196,36 @@ export function HomeGalleryView({
     // One-time migrate prefs.waterGoalMl → ranked-gym:water-goal (legacy cleanup).
     migrateAccueilWaterGoalFromPrefs()
   }, [])
+
+  useEffect(() => {
+    const sync = () => setWaterTick((n) => n + 1)
+    window.addEventListener(WATER_GOAL_CHANGED_EVENT, sync)
+    window.addEventListener('ranked-gym:water-changed', sync)
+    window.addEventListener(HYDRATION_CHANGED_EVENT, sync)
+    return () => {
+      window.removeEventListener(WATER_GOAL_CHANGED_EVENT, sync)
+      window.removeEventListener('ranked-gym:water-changed', sync)
+      window.removeEventListener(HYDRATION_CHANGED_EVENT, sync)
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchHydrationToday(localDayKey())
+      .then((today) => {
+        if (cancelled) return
+        setHydrationDrunkMl(today.drunkMl)
+        setHydrationGoalMl(today.goalMl)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setHydrationDrunkMl(null)
+        setHydrationGoalMl(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [waterTick])
 
   useEffect(() => {
     const reloadPrefs = () => setPrefs(loadAccueilWidgetPrefs())
@@ -271,8 +317,8 @@ export function HomeGalleryView({
 
   // Sheet open must never leave a tile stuck in the lifted drag state.
   useEffect(() => {
-    if (addOpen || waterSettingsOpen) finishDrag({ skipGlide: true })
-  }, [addOpen, waterSettingsOpen, finishDrag])
+    if (addOpen || waterSettingsOpen || waterGoalOpen) finishDrag({ skipGlide: true })
+  }, [addOpen, waterSettingsOpen, waterGoalOpen, finishDrag])
 
   // Disable scroll anchoring on the page scroller while editing — otherwise the
   // browser retargets scrollTop on reorder and FLIP slides look like teleports.
@@ -301,11 +347,18 @@ export function HomeGalleryView({
   const setsModel = useMemo(() => deriveSetsTileModel(state), [state])
   const nextSession = useMemo(() => deriveNextSessionTile(state), [state])
   const programModel = useMemo(() => deriveProgramTileModel(state), [state])
-  // M1 — tuile Eau legacy retirée ; WaterCard (hydration*) est le seul compteur.
   const visibleWidgets = useMemo(
-    () => resolveVisibleAccueilWidgets(prefs).filter((id) => id !== 'eau'),
+    () => resolveVisibleAccueilWidgets(prefs),
     [prefs],
   )
+  const waterModel = useMemo(() => {
+    const localMl = getTodayWaterMl()
+    const drunk =
+      hydrationDrunkMl != null ? Math.max(hydrationDrunkMl, localMl) : localMl
+    const userGoal = getUserWaterGoalMl()
+    const goal = userGoal ?? hydrationGoalMl
+    return deriveWaterTileModel(drunk, goal, true)
+  }, [waterTick, hydrationDrunkMl, hydrationGoalMl])
   const packs = useMemo(() => packAccueilWidgets(visibleWidgets), [visibleWidgets])
   const visibleOrderKey = visibleWidgets.join('|')
 
@@ -738,7 +791,18 @@ export function HomeGalleryView({
           <SeancesSemaineTile bars={weekBars} sessionCount={weekSessionCount} motion={motion} />,
         )
       case 'eau':
-        return null
+        return wrapMetric(
+          id,
+          <EauTile
+            model={waterModel}
+            motion={motion}
+            onSetGoal={() => {
+              // Objectif Evan (userWaterGoal) + réglages hydratation.
+              setWaterGoalOpen(true)
+            }}
+            interactive={interactive}
+          />,
+        )
       case 'series_jour':
         return wrapMetric(id, <SeriesJourTile model={setsModel} motion={motion} />)
       case 'prochaine_seance':
@@ -917,12 +981,6 @@ export function HomeGalleryView({
         )}
       </header>
 
-      {!editMode ? (
-        <div className="home-cold-enter__group">
-          <WaterCard compact onOpenSettings={() => setWaterSettingsOpen(true)} />
-        </div>
-      ) : null}
-
       <div ref={widgetsRootRef} className="accueil-widgets flex flex-col gap-3">
         {packs.map((pack) => {
           if (pack.kind === 'wide') {
@@ -984,9 +1042,19 @@ export function HomeGalleryView({
           window.dispatchEvent(new Event('ranked-gym:accueil-widgets-changed'))
         }}
       />
+      <WaterGoalSheet
+        open={waterGoalOpen && !editMode}
+        onClose={() => {
+          setWaterGoalOpen(false)
+          setWaterTick((n) => n + 1)
+        }}
+      />
       <WaterSettingsSheet
         open={waterSettingsOpen && !editMode}
-        onClose={() => setWaterSettingsOpen(false)}
+        onClose={() => {
+          setWaterSettingsOpen(false)
+          setWaterTick((n) => n + 1)
+        }}
       />
     </div>
   )
