@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  drunkMlFromStartAndCurrent,
   GLASS_ML,
   LABEL_EAU_BUE_SEULE,
   MSG_HIGH_INFO,
@@ -18,11 +19,16 @@ import {
   undoLastHydrationEntry,
 } from '../../services/hydration/hydrationService'
 import { loadBottleShapeUrl } from '../../services/hydration/bottleShapeStorage'
+import {
+  getMemorizedRemainingMl,
+  setMemorizedRemainingMl,
+} from '../../services/hydration/containerLevelStorage'
 import { getCalorieProfile } from '../../services/nutritionStorage'
 import { isMinorOrUnknownAge } from '../../services/nutritionSafetyRules'
 import { useAuth } from '../../context/AuthContext'
 import { BottleDragPanel } from './BottleDragPanel'
 import { ContainerPicker, type CatalogContainer } from './ContainerPicker'
+import type { BottleDragMode } from './LiveBottleVisual'
 
 interface HydrationPanelProps {
   onOpenSettings?: () => void
@@ -30,15 +36,18 @@ interface HydrationPanelProps {
 }
 
 /**
- * Nutrition › Hydratation v2 — choix contenant photo + glisser + Ajouter.
- * « Ma bouteille » (Pro) : même eau dynamique sur la photo détourée locale.
+ * Nutrition › Hydratation v2 —
+ * 1) Régler le niveau de départ (mémorisé / plein)
+ * 2) Boire : ml bus = départ − final
  */
 export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPanelProps) {
   const { user } = useAuth()
   const [today, setToday] = useState<HydrationToday | null>(null)
   const [shapeUrl, setShapeUrl] = useState<string | null>(null)
   const [container, setContainer] = useState<CatalogContainer>('plastic_15')
-  const [estimateMl, setEstimateMl] = useState(0)
+  const [phase, setPhase] = useState<BottleDragMode>('setup')
+  const [startRemainingMl, setStartRemainingMl] = useState(0)
+  const [remainingMl, setRemainingMl] = useState(0)
   const [busy, setBusy] = useState(false)
   const minorLocked = isMinorOrUnknownAge(getCalorieProfile().age)
 
@@ -87,22 +96,50 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
 
   const kind: WaterContainerKind = myBottleMode ? 'gourd' : container
 
+  const loadLevelForKind = useCallback(
+    (k: WaterContainerKind, cap: number) => {
+      const memorized = getMemorizedRemainingMl(k, cap)
+      setStartRemainingMl(memorized)
+      setRemainingMl(memorized)
+      setPhase('setup')
+    },
+    [],
+  )
+
   useEffect(() => {
-    setEstimateMl(0)
-  }, [container, myBottleMode, capacityMl])
+    loadLevelForKind(kind, capacityMl)
+  }, [kind, capacityMl, loadLevelForKind])
+
+  const drunkMl = useMemo(
+    () =>
+      phase === 'drink'
+        ? drunkMlFromStartAndCurrent(startRemainingMl, remainingMl, capacityMl)
+        : 0,
+    [phase, startRemainingMl, remainingMl, capacityMl],
+  )
+
+  const confirmStartLevel = () => {
+    setStartRemainingMl(remainingMl)
+    setPhase('drink')
+  }
+
+  const backToSetup = () => {
+    setPhase('setup')
+  }
 
   const addEstimate = async () => {
-    if (!today || busy || estimateMl <= 0) return
+    if (!today || busy || drunkMl <= 0) return
     setBusy(true)
     try {
       const next = await addHydrationEntry({
-        amountMl: estimateMl,
+        amountMl: drunkMl,
         source: 'slider',
         userId: user?.id ?? null,
       })
       setToday(next)
-      // Contenant revient plein après Ajouter.
-      setEstimateMl(0)
+      // Niveau final mémorisé ; nouveau départ = final (0 bus).
+      setMemorizedRemainingMl(kind, remainingMl, capacityMl)
+      setStartRemainingMl(remainingMl)
     } finally {
       setBusy(false)
     }
@@ -113,8 +150,8 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
     setBusy(true)
     try {
       setToday(await undoLastHydrationEntry(today.dayKey))
-      // Contenant revient plein après Annuler.
-      setEstimateMl(0)
+      // Retour au niveau de départ.
+      setRemainingMl(startRemainingMl)
     } finally {
       setBusy(false)
     }
@@ -140,6 +177,7 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
       className={`rounded-[28px] border border-white/12 bg-white/[0.04] px-3 py-2.5 ${className}`}
       data-hydration-panel="1"
       data-hydration-mode={today.effectiveVisualMode}
+      data-hydration-phase={phase}
       aria-label="Eau"
     >
       <div className="mb-1.5 flex items-start justify-between gap-2">
@@ -174,30 +212,56 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
           selected={container}
           onSelect={(id) => {
             setContainer(id)
-            setEstimateMl(0)
           }}
         />
       ) : null}
 
-      <div className="mt-2">
+      <p className="mt-2 text-[13px] font-medium text-[#ACB4BA]" data-hydration-phase-label>
+        {phase === 'setup' ? 'Niveau de départ' : 'Boire'}
+      </p>
+
+      <div className="mt-1">
         <BottleDragPanel
           kind={kind}
-          ml={estimateMl}
+          remainingMl={remainingMl}
           capacityMl={capacityMl}
+          startRemainingMl={startRemainingMl}
+          mode={phase}
           shapeUrl={myBottleMode ? shapeUrl : null}
-          onMlChange={setEstimateMl}
+          onRemainingChange={setRemainingMl}
         />
       </div>
 
-      <button
-        type="button"
-        disabled={busy || estimateMl <= 0}
-        onClick={() => void addEstimate()}
-        className="ios-press mt-2 min-h-11 w-full rounded-2xl bg-[#FF0702] text-[15px] font-semibold text-white disabled:opacity-45"
-        data-hydration-add="slider"
-      >
-        Ajouter
-      </button>
+      {phase === 'setup' ? (
+        <button
+          type="button"
+          onClick={confirmStartLevel}
+          className="ios-press mt-2 min-h-11 w-full rounded-2xl bg-[#FF0702] text-[15px] font-semibold text-white"
+          data-hydration-confirm-level
+        >
+          C&apos;est bon
+        </button>
+      ) : (
+        <>
+          <button
+            type="button"
+            disabled={busy || drunkMl <= 0}
+            onClick={() => void addEstimate()}
+            className="ios-press mt-2 min-h-11 w-full rounded-2xl bg-[#FF0702] text-[15px] font-semibold text-white disabled:opacity-45"
+            data-hydration-add="slider"
+          >
+            Ajouter
+          </button>
+          <button
+            type="button"
+            onClick={backToSetup}
+            className="ios-press mt-2 min-h-11 w-full rounded-2xl border border-white/15 bg-white/5 text-[14px] font-semibold text-white"
+            data-hydration-back-setup
+          >
+            Régler le niveau
+          </button>
+        </>
+      )}
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <button

@@ -2,9 +2,10 @@
  * Niveau d’eau dans un contenant photo (v2) — fonctions pures.
  *
  * Modèle glisser (Evan) :
- * - Contenant démarre PLEIN (remaining = capacité, drunk = 0).
- * - Glisser vers le BAS vide l’eau ; la partie vidée = ml bus.
- * - fillRatio = remaining / capacité (1 = plein, 0 = vide).
+ * 1) Régler le niveau de départ (remaining, 0…capacité) — ne compte pas comme bu.
+ * 2) Mode boire : glisser vers le BAS ; ml bus = départ − final (≥ 0).
+ *    Impossible de remonter au-dessus du niveau de départ.
+ * fillRatio = remaining / capacité (1 = plein, 0 = vide).
  */
 
 export type WaterContainerKind = 'plastic_15' | 'small_50' | 'glass_25' | 'gourd'
@@ -109,11 +110,8 @@ export function remainingMlFromDrunkMl(
   return stepMlValue(capacity - drunk, capacity, stepMl)
 }
 
-/**
- * Position Y pointeur → ml bus.
- * Haut de zone utile = 0 bus (plein) ; bas = capacité bus (vide).
- */
-export function drunkMlFromPointerY(
+/** Remaining depuis le pointeur (haut = plein, bas = vide). */
+export function remainingMlFromPointerY(
   clientY: number,
   fillRect: { top: number; height: number; bottom?: number },
   kind: WaterContainerKind,
@@ -126,18 +124,86 @@ export function drunkMlFromPointerY(
   const height =
     Number.isFinite(fillRect.height) && fillRect.height > 0 ? fillRect.height : 0
   if (height <= 0) return 0
-  // 0 en haut de l’image, 1 en bas → surface depuis le bas = 1 − yNorm
   const yNorm = clamp01((clientY - top) / height)
   const surfaceFromBottom = 1 - yNorm
   const remainingRatio = fillRatioFromSurface(kind, surfaceFromBottom)
-  const remainingRaw = remainingRatio * capacity
-  return drunkMlFromRemainingMl(remainingRaw, capacity, stepMl)
+  return stepMlValue(remainingRatio * capacity, capacity, stepMl)
 }
 
 /**
- * @deprecated Prefer drunkMlFromPointerY — conservé pour compat tests/visuels restants.
- * Retourne le remaining (plein en haut).
+ * Mode boire : remaining plafonné au niveau de départ (pas de remontée).
  */
+export function clampRemainingToStart(
+  remainingMl: number,
+  startRemainingMl: number,
+  capacityMl: number,
+  stepMl: number = WATER_LEVEL_STEP_ML,
+): number {
+  const capacity = safeCapacity(capacityMl)
+  if (capacity <= 0) return 0
+  const start = stepMlValue(
+    Number.isFinite(startRemainingMl) ? startRemainingMl : capacity,
+    capacity,
+    stepMl,
+  )
+  const remaining = stepMlValue(
+    Number.isFinite(remainingMl) ? remainingMl : 0,
+    capacity,
+    stepMl,
+  )
+  return Math.min(start, remaining)
+}
+
+/** ml bus = max(0, départ − final). */
+export function drunkMlFromStartAndCurrent(
+  startRemainingMl: number,
+  currentRemainingMl: number,
+  capacityMl: number,
+  stepMl: number = WATER_LEVEL_STEP_ML,
+): number {
+  const capacity = safeCapacity(capacityMl)
+  if (capacity <= 0) return 0
+  const start = stepMlValue(
+    Number.isFinite(startRemainingMl) ? startRemainingMl : capacity,
+    capacity,
+    stepMl,
+  )
+  const current = clampRemainingToStart(
+    currentRemainingMl,
+    start,
+    capacity,
+    stepMl,
+  )
+  return stepMlValue(Math.max(0, start - current), capacity, stepMl)
+}
+
+/**
+ * Position Y → ml bus en mode boire (plafond = niveau de départ).
+ * Haut (départ) = 0 bus ; bas = startRemaining bus.
+ */
+export function drunkMlFromPointerY(
+  clientY: number,
+  fillRect: { top: number; height: number; bottom?: number },
+  kind: WaterContainerKind,
+  capacityMl: number,
+  startRemainingMl?: number,
+  stepMl: number = WATER_LEVEL_STEP_ML,
+): number {
+  const capacity = safeCapacity(capacityMl)
+  const start =
+    startRemainingMl == null
+      ? capacity
+      : stepMlValue(startRemainingMl, capacity, stepMl)
+  const remaining = clampRemainingToStart(
+    remainingMlFromPointerY(clientY, fillRect, kind, capacity, stepMl),
+    start,
+    capacity,
+    stepMl,
+  )
+  return drunkMlFromStartAndCurrent(start, remaining, capacity, stepMl)
+}
+
+/** Alias : remaining depuis le pointeur. */
 export function mlFromPointerY(
   clientY: number,
   fillRect: { top: number; height: number; bottom?: number },
@@ -145,12 +211,7 @@ export function mlFromPointerY(
   capacityMl: number,
   stepMl: number = WATER_LEVEL_STEP_ML,
 ): number {
-  const capacity = safeCapacity(capacityMl)
-  return remainingMlFromDrunkMl(
-    drunkMlFromPointerY(clientY, fillRect, kind, capacity, stepMl),
-    capacity,
-    stepMl,
-  )
+  return remainingMlFromPointerY(clientY, fillRect, kind, capacityMl, stepMl)
 }
 
 /** Position CSS `bottom` (%) de la poignée / ménisque (selon fillRatio remaining). */

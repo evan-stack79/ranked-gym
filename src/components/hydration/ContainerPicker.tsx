@@ -49,7 +49,7 @@ export function ContainerPicker({
               <div className="flex h-[64px] items-end justify-center" aria-hidden>
                 <LiveBottleVisual
                   kind={opt.id}
-                  ml={THUMB_ML[opt.id]}
+                  remainingMl={THUMB_ML[opt.id]}
                   capacityMl={capacity}
                   size="thumb"
                 />
