@@ -176,35 +176,49 @@ jobs:
         run: |
           set -euo pipefail
           LOG="$RUNNER_TEMP/xcodebuild-unsigned.log"
-          # Command-line build settings apply to App + dependent Widget Extension.
-          set +e
-          xcodebuild \
-            -project App.xcodeproj \
-            -scheme App \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM="" \
-            PROVISIONING_PROFILE_SPECIFIER="" \
-            ONLY_ACTIVE_ARCH=NO \
-            build 2>&1 | tee "$LOG"
-          STATUS=${PIPESTATUS[0]}
-          set -e
+          # SPM binary targets (Capacitor.xcframework.zip) can 504 from GitHub Releases.
+          # Retry the whole xcodebuild once after clearing DerivedData SPM caches.
+          attempt=1
+          max_attempts=2
+          STATUS=1
+          while [ "$attempt" -le "$max_attempts" ]; do
+            echo "==== xcodebuild attempt $attempt/$max_attempts ===="
+            rm -rf "$RUNNER_TEMP/DerivedData"
+            set +e
+            xcodebuild \
+              -project App.xcodeproj \
+              -scheme App \
+              -configuration Release \
+              -sdk iphoneos \
+              -destination 'generic/platform=iOS' \
+              -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY="" \
+              DEVELOPMENT_TEAM="" \
+              PROVISIONING_PROFILE_SPECIFIER="" \
+              ONLY_ACTIVE_ARCH=NO \
+              build 2>&1 | tee "$LOG"
+            STATUS=${PIPESTATUS[0]}
+            set -e
+            if [ "$STATUS" -eq 0 ] && grep -q "BUILD SUCCEEDED" "$LOG"; then
+              break
+            fi
+            if [ "$attempt" -lt "$max_attempts" ]; then
+              echo "xcodebuild failed (status=$STATUS); retrying in 20s (SPM/GitHub flake)…"
+              sleep 20
+            fi
+            attempt=$((attempt + 1))
+          done
 
           echo "---- xcodebuild filtered (error|warning|BUILD) ----"
           grep -E "error:|warning:|BUILD " "$LOG" || true
 
-          if [ "$STATUS" -ne 0 ]; then
+          if [ "$STATUS" -ne 0 ] || ! grep -q "BUILD SUCCEEDED" "$LOG"; then
             echo "---- xcodebuild tail (last 80 lines) ----"
             tail -n 80 "$LOG" || true
-            exit "$STATUS"
+            exit "${STATUS:-1}"
           fi
-
-          grep -q "BUILD SUCCEEDED" "$LOG"
 
       - name: Package unsigned IPA
         id: package
