@@ -1,6 +1,7 @@
 /**
- * Faux store de test (ARCHI §10.1) — jamais sélectionnable par un argument joueur en prod.
- * Les preuves sont des payloads `localtest.{json}` refusés si SUBSCRIPTION_DEPLOY_ENV=production.
+ * Faux store de test UI (ARCHI §10.1) — jamais sélectionnable par un argument joueur en prod.
+ * Les payloads `localtest.{json}` Apple ne sont plus acceptés côté serveur (QA m3) :
+ * grantsPro reste false ; seule une JWS Apple signée passe `verifyApplePurchase`.
  */
 import { PRO_OFFERS } from '../../../shared/subscriptions/constants'
 import type { PurchasesAdapter, PurchaseResult, StoreOffer } from './types'

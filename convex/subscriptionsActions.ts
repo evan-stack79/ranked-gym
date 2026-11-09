@@ -9,7 +9,6 @@ import { action, internalAction } from './_generated/server'
 import { api, internal } from './_generated/api'
 import {
   decodeJwsPayloadUnsafe,
-  parseLocalTestApplePayload,
   type AppleRenewalClaims,
   type AppleTransactionClaims,
 } from './lib/appleJws'
@@ -41,36 +40,28 @@ export const verifyApplePurchase = action({
     })
     const userId = session.userId as string
 
-    let claims: AppleTransactionClaims
+    // QA m3 — JWS Apple signé obligatoire (aucun fallback non signé).
+    const verified = await verifyAppleJwsSignature(args.signedTransaction)
+    let claims = verified.payload as AppleTransactionClaims
     let renewal: AppleRenewalClaims | null = null
-    let environmentOverride: 'production' | 'sandbox' | 'local_test' | undefined
-
-    const local = parseLocalTestApplePayload(args.signedTransaction)
-    if (local) {
-      claims = local
-      environmentOverride = 'local_test'
-    } else {
-      const verified = await verifyAppleJwsSignature(args.signedTransaction)
-      claims = verified.payload as AppleTransactionClaims
-      if (args.signedRenewalInfo) {
-        const ren = await verifyAppleJwsSignature(args.signedRenewalInfo)
-        renewal = ren.payload as AppleRenewalClaims
+    if (args.signedRenewalInfo) {
+      const ren = await verifyAppleJwsSignature(args.signedRenewalInfo)
+      renewal = ren.payload as AppleRenewalClaims
+    }
+    if (claims.originalTransactionId) {
+      const env =
+        (claims.environment ?? '').toLowerCase() === 'sandbox' ||
+        (claims.environment ?? '').toLowerCase() === 'xcode'
+          ? 'sandbox'
+          : 'production'
+      const snap = await fetchAppleSubscriptionStatus(claims.originalTransactionId, env)
+      if (snap?.signedTransactionInfo) {
+        const re = await verifyAppleJwsSignature(snap.signedTransactionInfo)
+        claims = re.payload as AppleTransactionClaims
       }
-      if (claims.originalTransactionId) {
-        const env =
-          (claims.environment ?? '').toLowerCase() === 'sandbox' ||
-          (claims.environment ?? '').toLowerCase() === 'xcode'
-            ? 'sandbox'
-            : 'production'
-        const snap = await fetchAppleSubscriptionStatus(claims.originalTransactionId, env)
-        if (snap?.signedTransactionInfo) {
-          const re = await verifyAppleJwsSignature(snap.signedTransactionInfo)
-          claims = re.payload as AppleTransactionClaims
-        }
-        if (snap?.signedRenewalInfo) {
-          const ren = await verifyAppleJwsSignature(snap.signedRenewalInfo)
-          renewal = ren.payload as AppleRenewalClaims
-        }
+      if (snap?.signedRenewalInfo) {
+        const ren = await verifyAppleJwsSignature(snap.signedRenewalInfo)
+        renewal = ren.payload as AppleRenewalClaims
       }
     }
 
@@ -78,7 +69,6 @@ export const verifyApplePurchase = action({
       userId,
       claims,
       renewal: renewal ?? undefined,
-      environmentOverride,
       purchaseAttemptId: args.purchaseAttemptId,
       actor: 'verifyApplePurchase',
     })
@@ -189,17 +179,13 @@ export const ingestAndProcessAppleNotification = internalAction({
     }
 
     try {
-      let claims: AppleTransactionClaims
+      // QA m3 — ASN V2 : JWS signé uniquement.
+      const verified = await verifyAppleJwsSignature(signedTx)
+      const claims = verified.payload as AppleTransactionClaims
       let renewal: AppleRenewalClaims | null = null
-      if (signedTx.startsWith('localtest.')) {
-        claims = parseLocalTestApplePayload(signedTx) ?? JSON.parse(signedTx.slice(10))
-      } else {
-        const verified = await verifyAppleJwsSignature(signedTx)
-        claims = verified.payload as AppleTransactionClaims
-        if (signedRenewal) {
-          const ren = await verifyAppleJwsSignature(signedRenewal)
-          renewal = ren.payload as AppleRenewalClaims
-        }
+      if (signedRenewal) {
+        const ren = await verifyAppleJwsSignature(signedRenewal)
+        renewal = ren.payload as AppleRenewalClaims
       }
       return await ctx.runMutation(internal.subscriptions.applyQueuedAppleNotification, {
         eventId: ingested.eventId,
@@ -306,19 +292,12 @@ export const processQueuedSubscriptionEvents = internalAction({
     for (const row of rows) {
       try {
         if (row.source === 'apple' && row.payloadEncrypted) {
-          let claims: AppleTransactionClaims
+          const verified = await verifyAppleJwsSignature(row.payloadEncrypted)
+          const claims = verified.payload as AppleTransactionClaims
           let renewal: AppleRenewalClaims | null = null
-          if (row.payloadEncrypted.startsWith('localtest.')) {
-            claims =
-              parseLocalTestApplePayload(row.payloadEncrypted) ??
-              JSON.parse(row.payloadEncrypted.slice(10))
-          } else {
-            const verified = await verifyAppleJwsSignature(row.payloadEncrypted)
-            claims = verified.payload as AppleTransactionClaims
-            if (row.after) {
-              const ren = await verifyAppleJwsSignature(row.after)
-              renewal = ren.payload as AppleRenewalClaims
-            }
+          if (row.after) {
+            const ren = await verifyAppleJwsSignature(row.after)
+            renewal = ren.payload as AppleRenewalClaims
           }
           await ctx.runMutation(internal.subscriptions.applyQueuedAppleNotification, {
             eventId: row._id,
