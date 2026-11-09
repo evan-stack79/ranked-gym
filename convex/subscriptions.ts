@@ -9,6 +9,7 @@ import {
   internalQuery,
   mutation,
   query,
+  type MutationCtx,
 } from './_generated/server'
 import { requireSessionUser } from './lib/auth'
 import {
@@ -20,8 +21,6 @@ import {
 import { applyVerifiedStateCore } from './lib/subscriptionApply'
 import {
   normalizeAppleTransaction,
-  parseLocalTestApplePayload,
-  verifyAppleJwsSignature,
   type AppleRenewalClaims,
   type AppleTransactionClaims,
 } from './lib/appleJws'
@@ -31,20 +30,36 @@ import {
   PRO_LEGAL_TEXT_VERSION_L05,
   PRO_LEGAL_TEXT_VERSION_L05B,
   PRO_MIN_AGE_YEARS,
+  PRO_OFFERS,
 } from '../shared/subscriptions/constants'
 import { evaluatePurchaseAgeGate } from '../shared/subscriptions/age'
 import { proL05bForOffer, PRO_CANCEL_LINK_LABEL } from '../shared/subscriptions/legalCopy'
 import { scheduleTrialAndAnnualReminders, dueReminders } from './lib/subscriptionReminders'
-import { PRO_OFFERS } from '../shared/subscriptions/constants'
-import { fetchAppleSubscriptionStatus } from './lib/appleServerApi'
-import {
-  acknowledgeGoogleSubscription,
-  fetchGoogleSubscriptionsv2,
-  normalizeGoogleSubscriptionsv2,
-} from './lib/googlePlayVerify'
+import { normalizeGoogleSubscriptionsv2 } from './lib/googlePlayVerify'
 import { readSubscriptionEnv } from './lib/subscriptionEnv'
 
 const AGE_POLICY_VERSION = 'pro-min-15-civil-2026-11-08'
+
+/** Âge ≥ 15 requis à l’achat ET à la restauration (QA M2). */
+export async function assertUserEligibleForProGrant(
+  ctx: MutationCtx,
+  userId: string,
+  nowMs = Date.now(),
+): Promise<{ ageYears: number }> {
+  const profile = await ctx.db
+    .query('subscriptionUserProfiles')
+    .withIndex('by_user', (q) => q.eq('userId', userId))
+    .first()
+  const gate = evaluatePurchaseAgeGate(profile?.dateOfBirth, nowMs)
+  if (!gate.ok) {
+    if (gate.reason === 'underage') throw new Error('UNDERAGE_PURCHASE_BLOCKED')
+    if (gate.reason === 'invalid_dob' || gate.reason === 'future_dob') {
+      throw new Error('DATE_OF_BIRTH_INVALID')
+    }
+    throw new Error('DATE_OF_BIRTH_REQUIRED')
+  }
+  return { ageYears: gate.ageYears }
+}
 
 function randomUuid(): string {
   const c = globalThis.crypto
@@ -225,65 +240,32 @@ export const assertProForCosmetic = mutation({
 })
 
 /**
- * Vérifie une preuve Apple (JWS StoreKit 2) puis applique l’état.
- * Pas de verifyReceipt legacy. Pas de grant avant vérif.
+ * Finalise un achat/restauration Apple déjà vérifié (crypto + éventuelle relecture API)
+ * dans une action. Aucun fetch ici (QA M1). Garde âge ≥15 (QA M2).
  */
-export const verifyApplePurchase = mutation({
+export const finalizeApplePurchase = internalMutation({
   args: {
-    sessionToken: v.string(),
-    signedTransaction: v.string(),
-    signedRenewalInfo: v.optional(v.string()),
+    userId: v.string(),
+    claims: v.any(),
+    renewal: v.optional(v.any()),
+    environmentOverride: v.optional(
+      v.union(v.literal('production'), v.literal('sandbox'), v.literal('local_test')),
+    ),
     purchaseAttemptId: v.optional(v.id('subscriptionPurchaseAttempts')),
+    actor: v.string(),
   },
   handler: async (ctx, args) => {
-    const user = await requireSessionUser(ctx, args.sessionToken)
+    await assertUserEligibleForProGrant(ctx, args.userId)
 
-    let claims: AppleTransactionClaims
-    let renewal: AppleRenewalClaims | null = null
-
-    const local = parseLocalTestApplePayload(args.signedTransaction)
-    if (local) {
-      claims = local
-    } else {
-      const verified = await verifyAppleJwsSignature(args.signedTransaction)
-      claims = verified.payload as AppleTransactionClaims
-      if (args.signedRenewalInfo) {
-        const ren = await verifyAppleJwsSignature(args.signedRenewalInfo)
-        renewal = ren.payload as AppleRenewalClaims
-      }
-      // Relecture App Store Server API quand les credentials sont configurés (ARCHI §5.1).
-      if (claims.originalTransactionId) {
-        const env =
-          (claims.environment ?? '').toLowerCase() === 'sandbox' ||
-          (claims.environment ?? '').toLowerCase() === 'xcode'
-            ? 'sandbox'
-            : 'production'
-        try {
-          const snap = await fetchAppleSubscriptionStatus(claims.originalTransactionId, env)
-          if (snap?.signedTransactionInfo) {
-            const re = await verifyAppleJwsSignature(snap.signedTransactionInfo)
-            claims = re.payload as AppleTransactionClaims
-          }
-          if (snap?.signedRenewalInfo) {
-            const ren = await verifyAppleJwsSignature(snap.signedRenewalInfo)
-            renewal = ren.payload as AppleRenewalClaims
-          }
-        } catch (err) {
-          // Credentials absents → null ; HTTP erreur → refuse (pas de grant sur JWS stale seul si API configurée).
-          if (err instanceof Error && err.message.startsWith('APPLE_SERVER_API_')) {
-            throw err
-          }
-        }
-      }
-    }
-
+    const claims = args.claims as AppleTransactionClaims
+    const renewal = (args.renewal ?? null) as AppleRenewalClaims | null
     const normalized = normalizeAppleTransaction({
       claims,
       renewal,
       expectedBundleId: readSubscriptionEnv('APPLE_BUNDLE_ID'),
     })
-    if (local) {
-      ;(normalized as { environment: string }).environment = 'local_test'
+    if (args.environmentOverride) {
+      ;(normalized as { environment: string }).environment = args.environmentOverride
     }
 
     if (normalized.appAccountToken) {
@@ -293,14 +275,14 @@ export const verifyApplePurchase = mutation({
           q.eq('storeAccountToken', normalized.appAccountToken!),
         )
         .first()
-      if (account && account.userId !== user.userId) {
+      if (account && account.userId !== args.userId) {
         throw new Error('APP_ACCOUNT_TOKEN_MISMATCH')
       }
     }
 
     if (args.purchaseAttemptId) {
       const attempt = await ctx.db.get(args.purchaseAttemptId)
-      if (!attempt || attempt.userId !== user.userId) {
+      if (!attempt || attempt.userId !== args.userId) {
         throw new Error('ATTEMPT_NOT_FOUND')
       }
       await ctx.db.patch(args.purchaseAttemptId, {
@@ -310,9 +292,9 @@ export const verifyApplePurchase = mutation({
     }
 
     const applied = await applyVerifiedStateCore(ctx, {
-      userId: user.userId,
+      userId: args.userId,
       source: 'apple',
-      environment: local ? 'local_test' : normalized.environment,
+      environment: normalized.environment,
       storeChainKey: normalized.storeChainKey,
       latestTransactionId: normalized.latestTransactionId,
       productId: normalized.productId,
@@ -327,7 +309,7 @@ export const verifyApplePurchase = mutation({
       familyShared: normalized.familyShared,
       revokedAt: normalized.revokedAt,
       refundedAt: normalized.refundedAt,
-      actor: 'verifyApplePurchase',
+      actor: args.actor,
       eventKey: `apple:tx:${normalized.latestTransactionId}`,
       eventType: 'purchase_verify',
       payloadHash: `apple:${normalized.storeChainKey}:${normalized.latestTransactionId}`,
@@ -350,7 +332,7 @@ export const verifyApplePurchase = mutation({
     }
 
     await scheduleTrialAndAnnualReminders(ctx, {
-      userId: user.userId,
+      userId: args.userId,
       storeChainKey: normalized.storeChainKey,
       billingPeriod: normalized.billingPeriod,
       trialEndsAt: normalized.trialEndsAt,
@@ -363,7 +345,7 @@ export const verifyApplePurchase = mutation({
         ? PRO_OFFERS.yearly.priceEurosDisplay + ' / an'
         : PRO_OFFERS.monthly.priceEurosDisplay + ' / mois'
     const receiptId = await ctx.db.insert('subscriptionReceipts', {
-      userId: user.userId,
+      userId: args.userId,
       subscriptionId: applied.subscriptionId,
       purchaseAttemptId: args.purchaseAttemptId,
       offerKey,
@@ -377,7 +359,7 @@ export const verifyApplePurchase = mutation({
       createdAt: Date.now(),
     })
 
-    const status = await loadProStatusForUser(ctx, user.userId)
+    const status = await loadProStatusForUser(ctx, args.userId)
     return {
       ok: true as const,
       subscriptionId: applied.subscriptionId,
@@ -394,31 +376,29 @@ export const verifyApplePurchase = mutation({
 export const recordPurchaseConsent = preparePurchase
 
 /**
- * Google Play — structure v0. Sans credentials API : refuse (fail-closed).
- * Mode local_test : payload `localtest.{json}` comme Apple.
+ * Finalise Google après fetch subscriptionsv2 dans une action (QA M1).
+ * Garde âge ≥15 (QA M2) — achat et restauration.
  */
-export const verifyGooglePurchase = mutation({
+export const finalizeGooglePurchase = internalMutation({
   args: {
-    sessionToken: v.string(),
+    userId: v.string(),
     purchaseToken: v.string(),
     productId: v.string(),
     basePlanId: v.optional(v.string()),
+    apiBody: v.optional(v.any()),
+    localClaims: v.optional(v.any()),
     purchaseAttemptId: v.optional(v.id('subscriptionPurchaseAttempts')),
+    actor: v.string(),
   },
   handler: async (ctx, args) => {
-    const user = await requireSessionUser(ctx, args.sessionToken)
+    await assertUserEligibleForProGrant(ctx, args.userId)
 
-    if (args.purchaseToken.startsWith('localtest.')) {
-      const deployEnv = (readSubscriptionEnv('SUBSCRIPTION_DEPLOY_ENV') ?? 'production').toLowerCase()
-      if (deployEnv === 'production') {
-        throw new Error('LOCAL_TEST_REJECTED_IN_PRODUCTION')
-      }
-      const claims = JSON.parse(args.purchaseToken.slice('localtest.'.length)) as {
+    if (args.localClaims) {
+      const claims = args.localClaims as {
         purchaseToken: string
         productId: string
         basePlanId?: string
         expiryTimeMillis?: number
-        subscriptionState?: string
         obfuscatedExternalAccountId?: string
       }
       const productId = claims.productId || args.productId
@@ -428,8 +408,6 @@ export const verifyGooglePurchase = mutation({
       if (!isAllowedGoogleProductId(productId)) throw new Error('GOOGLE_PRODUCT_NOT_ALLOWED')
       const billingPeriod = billingPeriodForGoogle(productId, claims.basePlanId ?? args.basePlanId)
       if (!billingPeriod) throw new Error('GOOGLE_PRODUCT_NOT_ALLOWED')
-
-      // Liaison compte : obfuscated id doit matcher storeAccountToken si fourni.
       if (claims.obfuscatedExternalAccountId) {
         const account = await ctx.db
           .query('subscriptionAccounts')
@@ -437,14 +415,13 @@ export const verifyGooglePurchase = mutation({
             q.eq('storeAccountToken', claims.obfuscatedExternalAccountId!),
           )
           .first()
-        if (account && account.userId !== user.userId) {
+        if (account && account.userId !== args.userId) {
           throw new Error('GOOGLE_ACCOUNT_TOKEN_MISMATCH')
         }
       }
-
       const periodEndsAt = claims.expiryTimeMillis ?? Date.now() + 14 * 86400000
       const applied = await applyVerifiedStateCore(ctx, {
-        userId: user.userId,
+        userId: args.userId,
         source: 'google',
         environment: 'local_test',
         storeChainKey: claims.purchaseToken || args.purchaseToken,
@@ -457,7 +434,7 @@ export const verifyGooglePurchase = mutation({
         autoRenew: true,
         isTrial: true,
         billingRetry: false,
-        actor: 'verifyGooglePurchase:localtest',
+        actor: args.actor,
         eventKey: `google:local:${claims.purchaseToken || args.purchaseToken}`,
         eventType: 'purchase_verify',
         payloadHash: `google:local:${productId}`,
@@ -466,17 +443,16 @@ export const verifyGooglePurchase = mutation({
         ok: true as const,
         subscriptionId: applied.subscriptionId,
         revision: applied.revision,
-        status: await loadProStatusForUser(ctx, user.userId),
+        status: await loadProStatusForUser(ctx, args.userId),
+        shouldAcknowledge: false as const,
+        acknowledgeProductId: productId,
       }
     }
 
-    const apiBody = await fetchGoogleSubscriptionsv2(args.purchaseToken)
-    if (!apiBody) {
-      throw new Error('GOOGLE_PLAY_NOT_CONFIGURED')
-    }
+    if (!args.apiBody) throw new Error('GOOGLE_PLAY_BODY_REQUIRED')
     const normalized = normalizeGoogleSubscriptionsv2({
       purchaseToken: args.purchaseToken,
-      body: apiBody,
+      body: args.apiBody,
     })
     if (normalized.environment === 'sandbox') {
       const deployEnv = (readSubscriptionEnv('SUBSCRIPTION_DEPLOY_ENV') ?? 'production').toLowerCase()
@@ -489,13 +465,13 @@ export const verifyGooglePurchase = mutation({
           q.eq('storeAccountToken', normalized.obfuscatedExternalAccountId!),
         )
         .first()
-      if (account && account.userId !== user.userId) {
+      if (account && account.userId !== args.userId) {
         throw new Error('GOOGLE_ACCOUNT_TOKEN_MISMATCH')
       }
     }
 
     const applied = await applyVerifiedStateCore(ctx, {
-      userId: user.userId,
+      userId: args.userId,
       source: 'google',
       environment: normalized.environment,
       storeChainKey: normalized.storeChainKey,
@@ -511,23 +487,14 @@ export const verifyGooglePurchase = mutation({
       billingRetry: normalized.billingRetry,
       linkedChainKey: normalized.linkedChainKey,
       purchaseTokenEncrypted: args.purchaseToken,
-      actor: 'verifyGooglePurchase',
+      actor: args.actor,
       eventKey: `google:token:${normalized.storeChainKey.slice(0, 64)}`,
       eventType: 'purchase_verify',
       payloadHash: `google:${normalized.productId}:${normalized.storeChainKey.slice(0, 32)}`,
     })
 
-    try {
-      await acknowledgeGoogleSubscription({
-        purchaseToken: args.purchaseToken,
-        subscriptionId: normalized.productId,
-      })
-    } catch {
-      // Acknowledge repris par reconcile — ne pas retirer un droit déjà vérifié.
-    }
-
     await scheduleTrialAndAnnualReminders(ctx, {
-      userId: user.userId,
+      userId: args.userId,
       storeChainKey: normalized.storeChainKey,
       billingPeriod: normalized.billingPeriod,
       trialEndsAt: normalized.trialEndsAt,
@@ -539,7 +506,9 @@ export const verifyGooglePurchase = mutation({
       ok: true as const,
       subscriptionId: applied.subscriptionId,
       revision: applied.revision,
-      status: await loadProStatusForUser(ctx, user.userId),
+      status: await loadProStatusForUser(ctx, args.userId),
+      shouldAcknowledge: true as const,
+      acknowledgeProductId: normalized.productId,
     }
   },
 })
@@ -661,13 +630,23 @@ export const grantLocalTestPro = internalMutation({
   },
 })
 
+export const resolveSessionUserId = internalQuery({
+  args: { sessionToken: v.string() },
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx, args.sessionToken)
+    return { userId: user.userId }
+  },
+})
+
 export const ingestAppleNotification = internalMutation({
   args: {
     environment: v.string(),
     notificationUUID: v.string(),
     notificationType: v.string(),
     payloadHash: v.string(),
+    /** signedTransactionInfo JWS (ou JSON localtest) pour traitement. */
     payloadEncrypted: v.optional(v.string()),
+    signedRenewalInfo: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -679,7 +658,14 @@ export const ingestAppleNotification = internalMutation({
           .eq('eventKey', args.notificationUUID),
       )
       .first()
-    if (existing) return { duplicate: true as const, eventId: existing._id }
+    if (existing) {
+      // Idempotent : déjà appliqué / en file — ne pas re-créer.
+      return {
+        duplicate: true as const,
+        eventId: existing._id,
+        processingState: existing.processingState,
+      }
+    }
     const eventId = await ctx.db.insert('subscriptionEvents', {
       source: 'apple',
       environment: args.environment,
@@ -691,8 +677,9 @@ export const ingestAppleNotification = internalMutation({
       processingState: 'queued',
       attempts: 0,
       actor: 'apple_asn_v2',
+      after: args.signedRenewalInfo,
     })
-    return { duplicate: false as const, eventId }
+    return { duplicate: false as const, eventId, processingState: 'queued' as const }
   },
 })
 
@@ -702,6 +689,8 @@ export const ingestGoogleRtdn = internalMutation({
     messageId: v.string(),
     notificationType: v.string(),
     payloadHash: v.string(),
+    /** data Pub/Sub décodée (JSON string) pour traitement. */
+    payloadEncrypted: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const eventKey = `pubsub:${args.messageId}`
@@ -711,7 +700,13 @@ export const ingestGoogleRtdn = internalMutation({
         q.eq('source', 'google').eq('environment', args.environment).eq('eventKey', eventKey),
       )
       .first()
-    if (existing) return { duplicate: true as const, eventId: existing._id }
+    if (existing) {
+      return {
+        duplicate: true as const,
+        eventId: existing._id,
+        processingState: existing.processingState,
+      }
+    }
     const eventId = await ctx.db.insert('subscriptionEvents', {
       source: 'google',
       environment: args.environment,
@@ -719,11 +714,228 @@ export const ingestGoogleRtdn = internalMutation({
       type: args.notificationType,
       receivedAt: Date.now(),
       payloadHash: args.payloadHash,
+      payloadEncrypted: args.payloadEncrypted,
       processingState: 'queued',
       attempts: 0,
       actor: 'google_rtdn',
     })
-    return { duplicate: false as const, eventId }
+    return { duplicate: false as const, eventId, processingState: 'queued' as const }
+  },
+})
+
+function mapAppleNotificationToStatus(
+  notificationType: string,
+  claims: AppleTransactionClaims,
+  renewal: AppleRenewalClaims | null,
+  now: number,
+): ReturnType<typeof normalizeAppleTransaction>['status'] {
+  const t = notificationType.toUpperCase()
+  if (t === 'REFUND' || t === 'REVOKE') return t === 'REFUND' ? 'refunded' : 'revoked'
+  if (t === 'EXPIRED' || t === 'GRACE_PERIOD_EXPIRED') return 'expired'
+  if (t === 'DID_FAIL_TO_RENEW') {
+    if (renewal?.gracePeriodExpiresDate && renewal.gracePeriodExpiresDate > now) return 'grace'
+    return 'suspended'
+  }
+  // DID_RENEW / SUBSCRIBED / OFFER_REDEEMED / DID_CHANGE_RENEWAL_STATUS / etc.
+  return normalizeAppleTransaction({ claims, renewal, now }).status
+}
+
+/**
+ * Applique une ASN V2 déjà ingérée (idempotent). Met à jour l’accès Pro (QA M3).
+ */
+export const applyQueuedAppleNotification = internalMutation({
+  args: {
+    eventId: v.id('subscriptionEvents'),
+    claims: v.any(),
+    renewal: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    const event = await ctx.db.get(args.eventId)
+    if (!event) throw new Error('EVENT_NOT_FOUND')
+    if (event.processingState === 'applied') {
+      return { ok: true as const, duplicate: true as const }
+    }
+    await ctx.db.patch(args.eventId, {
+      processingState: 'processing',
+      attempts: event.attempts + 1,
+    })
+
+    const claims = args.claims as AppleTransactionClaims
+    const renewal = (args.renewal ?? null) as AppleRenewalClaims | null
+    const now = Date.now()
+    const chainKey = claims.originalTransactionId
+    if (!chainKey) {
+      await ctx.db.patch(args.eventId, {
+        processingState: 'quarantined',
+        lastError: 'APPLE_MISSING_ORIGINAL_TX',
+      })
+      throw new Error('APPLE_MISSING_ORIGINAL_TX')
+    }
+
+    const envLiteral =
+      event.environment === 'sandbox' || event.environment === 'local_test'
+        ? event.environment
+        : 'production'
+    const existing = await ctx.db
+      .query('subscriptions')
+      .withIndex('by_source_env_chain', (q) =>
+        q.eq('source', 'apple').eq('environment', envLiteral).eq('storeChainKey', chainKey),
+      )
+      .first()
+    const chain =
+      existing ??
+      (await ctx.db.query('subscriptions').collect()).find(
+        (s) => s.source === 'apple' && s.storeChainKey === chainKey,
+      )
+
+    if (!chain) {
+      await ctx.db.patch(args.eventId, {
+        processingState: 'quarantined',
+        lastError: 'SUBSCRIPTION_CHAIN_NOT_FOUND',
+      })
+      return { ok: false as const, reason: 'chain_not_found' as const }
+    }
+
+    const status = mapAppleNotificationToStatus(event.type, claims, renewal, now)
+    const normalized = normalizeAppleTransaction({ claims, renewal, now })
+    const revokedAt =
+      status === 'revoked' || status === 'refunded' ? (claims.revocationDate ?? now) : undefined
+
+    await applyVerifiedStateCore(ctx, {
+      userId: chain.userId,
+      source: 'apple',
+      environment: chain.environment,
+      storeChainKey: chain.storeChainKey,
+      latestTransactionId: normalized.latestTransactionId,
+      productId: normalized.productId,
+      billingPeriod: normalized.billingPeriod,
+      status,
+      periodEndsAt: normalized.periodEndsAt,
+      trialEndsAt: normalized.trialEndsAt,
+      graceEndsAt: normalized.graceEndsAt,
+      autoRenew: normalized.autoRenew,
+      isTrial: normalized.isTrial,
+      billingRetry: normalized.billingRetry,
+      familyShared: normalized.familyShared,
+      revokedAt,
+      refundedAt: status === 'refunded' ? revokedAt : undefined,
+      actor: 'apple_asn_v2',
+      eventKey: event.eventKey,
+      eventType: event.type,
+      payloadHash: event.payloadHash,
+    })
+
+    await ctx.db.patch(args.eventId, {
+      processingState: 'applied',
+      appliedAt: now,
+      userId: chain.userId,
+      subscriptionId: chain._id,
+      lastError: undefined,
+    })
+    return { ok: true as const, duplicate: false as const, userId: chain.userId, status }
+  },
+})
+
+export const applyQueuedGoogleNotification = internalMutation({
+  args: {
+    eventId: v.id('subscriptionEvents'),
+    purchaseToken: v.string(),
+    apiBody: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const event = await ctx.db.get(args.eventId)
+    if (!event) throw new Error('EVENT_NOT_FOUND')
+    if (event.processingState === 'applied') {
+      return { ok: true as const, duplicate: true as const }
+    }
+    await ctx.db.patch(args.eventId, {
+      processingState: 'processing',
+      attempts: event.attempts + 1,
+    })
+
+    const normalized = normalizeGoogleSubscriptionsv2({
+      purchaseToken: args.purchaseToken,
+      body: args.apiBody,
+    })
+    const chain = (await ctx.db.query('subscriptions').collect()).find(
+      (s) => s.source === 'google' && s.storeChainKey === normalized.storeChainKey,
+    )
+    if (!chain) {
+      await ctx.db.patch(args.eventId, {
+        processingState: 'quarantined',
+        lastError: 'SUBSCRIPTION_CHAIN_NOT_FOUND',
+      })
+      return { ok: false as const, reason: 'chain_not_found' as const }
+    }
+
+    // notificationType numérique Google : 12=revoked, 13=expired, 3=canceled, 2=renewed, etc.
+    let status = normalized.status
+    const nType = Number(event.type)
+    if (nType === 12) status = 'revoked'
+    else if (nType === 13) status = 'expired'
+    else if (nType === 3 && status === 'active') status = 'canceled_active_until'
+
+    await applyVerifiedStateCore(ctx, {
+      userId: chain.userId,
+      source: 'google',
+      environment: chain.environment,
+      storeChainKey: chain.storeChainKey,
+      productId: normalized.productId,
+      basePlanId: normalized.basePlanId,
+      billingPeriod: normalized.billingPeriod,
+      status,
+      periodEndsAt: normalized.periodEndsAt,
+      trialEndsAt: normalized.trialEndsAt,
+      graceEndsAt: normalized.graceEndsAt,
+      autoRenew: normalized.autoRenew,
+      isTrial: normalized.isTrial,
+      billingRetry: normalized.billingRetry,
+      linkedChainKey: normalized.linkedChainKey,
+      purchaseTokenEncrypted: args.purchaseToken,
+      actor: 'google_rtdn',
+      eventKey: event.eventKey,
+      eventType: event.type,
+      payloadHash: event.payloadHash,
+    })
+
+    await ctx.db.patch(args.eventId, {
+      processingState: 'applied',
+      appliedAt: Date.now(),
+      userId: chain.userId,
+      subscriptionId: chain._id,
+      lastError: undefined,
+    })
+    return { ok: true as const, duplicate: false as const, userId: chain.userId, status }
+  },
+})
+
+export const listQueuedSubscriptionEvents = internalQuery({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 20
+    const rows = await ctx.db
+      .query('subscriptionEvents')
+      .withIndex('by_processing_state', (q) => q.eq('processingState', 'queued'))
+      .order('asc')
+      .take(limit)
+    return rows
+  },
+})
+
+export const markSubscriptionEventFailed = internalMutation({
+  args: {
+    eventId: v.id('subscriptionEvents'),
+    lastError: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const event = await ctx.db.get(args.eventId)
+    if (!event) return
+    if (event.processingState === 'applied') return
+    await ctx.db.patch(args.eventId, {
+      processingState: 'failed',
+      lastError: args.lastError,
+      attempts: event.attempts + 1,
+    })
   },
 })
 

@@ -53,7 +53,7 @@ export async function verifyApplePurchase(args: {
   purchaseAttemptId?: string
 }) {
   const sessionToken = await requireToken()
-  return getConvex().mutation(api.subscriptions.verifyApplePurchase, {
+  return getConvex().action(api.subscriptionsActions.verifyApplePurchase, {
     sessionToken,
     signedTransaction: args.signedTransaction,
     signedRenewalInfo: args.signedRenewalInfo,
@@ -68,7 +68,7 @@ export async function verifyGooglePurchase(args: {
   purchaseAttemptId?: string
 }) {
   const sessionToken = await requireToken()
-  return getConvex().mutation(api.subscriptions.verifyGooglePurchase, {
+  return getConvex().action(api.subscriptionsActions.verifyGooglePurchase, {
     sessionToken,
     purchaseToken: args.purchaseToken,
     productId: args.productId,

@@ -1,11 +1,8 @@
 /**
- * Vérification App Store Server JWS (ARCHI §5.1).
- * Décoder Base64 n’est PAS vérifier — signature + claims obligatoires.
- *
- * En prod : `jose` + chaîne x5c ancrée sur racines Apple (certificats fournis via env /
- * bundle de confiance). Sans secrets/config, la vérif échoue (fail-closed).
+ * Décodage / normalisation App Store Server JWS (ARCHI §5.1).
+ * La vérification crypto + chaîne x5c vit dans `appleJwsVerify.ts` (Node).
+ * Décoder Base64 n’est PAS vérifier.
  */
-import { compactVerify, importX509, type CompactVerifyResult } from 'jose'
 import {
   PRO_FAMILY_SHARING_ENABLED,
   type SubscriptionChainStatus,
@@ -66,55 +63,6 @@ export function decodeJwsHeaderUnsafe(jws: string): { alg?: string; x5c?: string
   const parts = jws.split('.')
   if (parts.length !== 3) throw new Error('JWS_MALFORMED')
   return JSON.parse(b64urlToUtf8(parts[0]!)) as { alg?: string; x5c?: string[] }
-}
-
-/**
- * Vérifie la signature JWS avec le premier certificat x5c (leaf).
- * Ancrage racine Apple : si `APPLE_ROOT_CA_PEMS` (PEMs concaténés, séparateur `-----END CERTIFICATE-----`)
- * est défini, on exige que le dernier x5c matche une racine listée (comparaison PEM normalisée).
- * Sans ancrage configuré en production → refus.
- */
-export async function verifyAppleJwsSignature(jws: string): Promise<{
-  payload: Record<string, unknown>
-  protectedHeader: CompactVerifyResult['protectedHeader']
-}> {
-  const header = decodeJwsHeaderUnsafe(jws)
-  if (header.alg !== 'ES256') throw new Error('JWS_ALG_UNSUPPORTED')
-  const x5c = header.x5c
-  if (!x5c || x5c.length === 0) throw new Error('JWS_MISSING_X5C')
-
-  const leafPem = derToPem(x5c[0]!)
-  const key = await importX509(leafPem, 'ES256')
-
-  const deployEnv = (readSubscriptionEnv('SUBSCRIPTION_DEPLOY_ENV') ?? 'production').toLowerCase()
-  const roots = (readSubscriptionEnv('APPLE_ROOT_CA_PEMS') ?? '').trim()
-  if (deployEnv === 'production' && !roots) {
-    throw new Error('APPLE_ROOT_CA_NOT_CONFIGURED')
-  }
-  if (roots) {
-    const chainRoot = derToPem(x5c[x5c.length - 1]!)
-    const normalizedRoots = roots
-      .split(/(?=-----BEGIN CERTIFICATE-----)/g)
-      .map((p) => p.trim())
-      .filter(Boolean)
-      .map(normalizePem)
-    if (!normalizedRoots.includes(normalizePem(chainRoot))) {
-      throw new Error('APPLE_ROOT_ANCHOR_MISMATCH')
-    }
-  }
-
-  const { payload, protectedHeader } = await compactVerify(jws, key)
-  const text = new TextDecoder().decode(payload)
-  return { payload: JSON.parse(text) as Record<string, unknown>, protectedHeader }
-}
-
-function derToPem(derB64: string): string {
-  const lines = derB64.match(/.{1,64}/g) ?? [derB64]
-  return `-----BEGIN CERTIFICATE-----\n${lines.join('\n')}\n-----END CERTIFICATE-----`
-}
-
-function normalizePem(pem: string): string {
-  return pem.replace(/\s+/g, '')
 }
 
 export function mapAppleEnvironment(env?: string): SubscriptionEnvironment {

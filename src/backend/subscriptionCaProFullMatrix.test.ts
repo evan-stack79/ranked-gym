@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { upsertReminder } from '../../convex/lib/subscriptionReminders'
 import { normalizeGoogleSubscriptionsv2 } from '../../convex/lib/googlePlayVerify'
-import { verifyAppleJwsSignature } from '../../convex/lib/appleJws'
+import { verifyAppleJwsSignature } from '../../convex/lib/appleJwsVerify'
 import { PRO_L05_CHECKBOX_TEXT, proD02EngagementText } from '../../shared/subscriptions/legalCopy'
 import { PRO_ENGAGEMENT_ASSOCIATION_ANNOUNCE_BY } from '../../shared/subscriptions/constants'
 

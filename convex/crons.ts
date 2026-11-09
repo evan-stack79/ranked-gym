@@ -54,4 +54,18 @@ crons.hourly(
   {},
 )
 
+const processProNotificationsRef = makeFunctionReference<
+  'action',
+  { limit?: number },
+  { scanned: number; applied: number; failed: number }
+>('subscriptionsActions:processQueuedSubscriptionEvents')
+
+/** Ranked Pro — file ASN V2 / RTDN (renouvellement, expiration, remboursement). */
+crons.interval(
+  'ranked pro subscription notifications queue',
+  { minutes: 5 },
+  processProNotificationsRef,
+  {},
+)
+
 export default crons

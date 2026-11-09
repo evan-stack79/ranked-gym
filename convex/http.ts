@@ -96,7 +96,7 @@ http.route({
             headers: { 'Content-Type': 'application/json' },
           })
         }
-        const result = await ctx.runMutation(api.subscriptions.verifyApplePurchase, {
+        const result = await ctx.runAction(api.subscriptionsActions.verifyApplePurchase, {
           sessionToken: body.sessionToken,
           signedTransaction: body.signedTransaction,
           signedRenewalInfo: body.signedRenewalInfo,
@@ -114,7 +114,7 @@ http.route({
             headers: { 'Content-Type': 'application/json' },
           })
         }
-        const result = await ctx.runMutation(api.subscriptions.verifyGooglePurchase, {
+        const result = await ctx.runAction(api.subscriptionsActions.verifyGooglePurchase, {
           sessionToken: body.sessionToken,
           purchaseToken: body.purchaseToken,
           productId: body.productId,

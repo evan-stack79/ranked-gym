@@ -1092,7 +1092,9 @@ export const convexTables = {
     before: v.optional(v.string()),
     after: v.optional(v.string()),
     appliedAt: v.optional(v.number()),
-  }).index('by_source_env_event', ['source', 'environment', 'eventKey']),
+  })
+    .index('by_source_env_event', ['source', 'environment', 'eventKey'])
+    .index('by_processing_state', ['processingState', 'receivedAt']),
 
   subscriptionPurchaseAttempts: defineTable({
     userId: v.string(),
