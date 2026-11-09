@@ -55,7 +55,13 @@ jobs:
           cache: npm
 
       - name: Install JS deps
-        run: npm ci
+        run: |
+          # sharp/libvips download can time out on macOS runners — one retry.
+          npm ci || {
+            echo "npm ci failed once; retrying after 15s…"
+            sleep 15
+            npm ci
+          }
 
       - name: Build web assets
         run: npm run build
