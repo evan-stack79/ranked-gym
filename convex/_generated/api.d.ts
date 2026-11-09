@@ -39,6 +39,20 @@ import type * as sync from "../sync.js";
 import type * as lib_rankedAccess from "../lib/rankedAccess.js";
 import type * as lib_rankedScience from "../lib/rankedScience.js";
 import type * as lib_rewardsEconomy from "../lib/rewardsEconomy.js";
+import type * as lib_subscriptionAccess from "../lib/subscriptionAccess.js";
+import type * as lib_subscriptionApply from "../lib/subscriptionApply.js";
+import type * as lib_subscriptionProducts from "../lib/subscriptionProducts.js";
+import type * as lib_appleJws from "../lib/appleJws.js";
+import type * as lib_appleJwsVerify from "../lib/appleJwsVerify.js";
+import type * as lib_appleServerApi from "../lib/appleServerApi.js";
+import type * as lib_googlePlayVerify from "../lib/googlePlayVerify.js";
+import type * as lib_googleRtdnAuth from "../lib/googleRtdnAuth.js";
+import type * as lib_iapHttp from "../lib/iapHttp.js";
+import type * as lib_proEntitlement from "../lib/proEntitlement.js";
+import type * as lib_subscriptionEnv from "../lib/subscriptionEnv.js";
+import type * as lib_subscriptionReminders from "../lib/subscriptionReminders.js";
+import type * as subscriptions from "../subscriptions.js";
+import type * as subscriptionsActions from "../subscriptionsActions.js";
 
 import type {
   ApiFromModules,
@@ -65,6 +79,18 @@ declare const fullApi: ApiFromModules<{
   "lib/rankedAccess": typeof lib_rankedAccess;
   "lib/rankedScience": typeof lib_rankedScience;
   "lib/rewardsEconomy": typeof lib_rewardsEconomy;
+  "lib/subscriptionAccess": typeof lib_subscriptionAccess;
+  "lib/subscriptionApply": typeof lib_subscriptionApply;
+  "lib/subscriptionProducts": typeof lib_subscriptionProducts;
+  "lib/appleJws": typeof lib_appleJws;
+  "lib/appleJwsVerify": typeof lib_appleJwsVerify;
+  "lib/appleServerApi": typeof lib_appleServerApi;
+  "lib/googlePlayVerify": typeof lib_googlePlayVerify;
+  "lib/googleRtdnAuth": typeof lib_googleRtdnAuth;
+  "lib/iapHttp": typeof lib_iapHttp;
+  "lib/proEntitlement": typeof lib_proEntitlement;
+  "lib/subscriptionEnv": typeof lib_subscriptionEnv;
+  "lib/subscriptionReminders": typeof lib_subscriptionReminders;
   "lib/rateLimit": typeof lib_rateLimit;
   "lib/socialVisibility": typeof lib_socialVisibility;
   "lib/stripJournalMeals": typeof lib_stripJournalMeals;
@@ -77,6 +103,8 @@ declare const fullApi: ApiFromModules<{
   rewards: typeof rewards;
   rpc: typeof rpc;
   social: typeof social;
+  subscriptions: typeof subscriptions;
+  subscriptionsActions: typeof subscriptionsActions;
   sync: typeof sync;
 }>;
 

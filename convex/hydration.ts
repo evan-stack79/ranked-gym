@@ -748,6 +748,8 @@ export const deleteMyBottle = mutation({
 /**
  * B1 — grant Pro cosmétique réservé au serveur (tests/seed).
  * Jamais exposé via `api.*` : `internalMutation` uniquement.
+ * Délègue à `setProEntitlementForTests` → projection `subscriptionAccess`
+ * (un flag `proEntitlements` seul ne donne plus le Pro).
  */
 export const setProForTests = internalMutation({
   args: {
@@ -755,20 +757,8 @@ export const setProForTests = internalMutation({
     activeUntil: v.number(),
   },
   handler: async (ctx, args) => {
-    const existing = await ctx.db
-      .query('proEntitlements')
-      .withIndex('by_user', (q) => q.eq('userId', args.userId))
-      .first()
-    const now = Date.now()
-    if (existing) {
-      await ctx.db.patch(existing._id, { activeUntil: args.activeUntil, updatedAt: now })
-    } else {
-      await ctx.db.insert('proEntitlements', {
-        userId: args.userId,
-        activeUntil: args.activeUntil,
-        updatedAt: now,
-      })
-    }
+    const { setProEntitlementForTests } = await import('./lib/proEntitlement')
+    await setProEntitlementForTests(ctx, args.userId, args.activeUntil)
     return { ok: true as const }
   },
 })

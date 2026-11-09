@@ -35,6 +35,10 @@ const config: CapacitorConfig = {
       style: 'DARK',
       backgroundColor: '#00000000',
     },
+    // Ranked Pro — finaliser seulement après validation Convex (ARCHI AB-a).
+    NativePurchases: {
+      autoFinishTransactions: false,
+    },
   },
   ios: {
     contentInset: 'never',

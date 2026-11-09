@@ -40,4 +40,32 @@ crons.daily(
   {},
 )
 
+const processProRemindersRef = makeFunctionReference<
+  'mutation',
+  { now?: number; limit?: number },
+  { scanned: number; sent: number }
+>('subscriptions:processReminderOutbox')
+
+/** Ranked Pro — outbox rappels essai J−2 + annuel ~J−30 (PRO-P05). */
+crons.hourly(
+  'ranked pro subscription reminder outbox',
+  { minuteUTC: 20 },
+  processProRemindersRef,
+  {},
+)
+
+const processProNotificationsRef = makeFunctionReference<
+  'action',
+  { limit?: number },
+  { scanned: number; applied: number; failed: number }
+>('subscriptionsActions:processQueuedSubscriptionEvents')
+
+/** Ranked Pro — file ASN V2 / RTDN (renouvellement, expiration, remboursement). */
+crons.interval(
+  'ranked pro subscription notifications queue',
+  { minutes: 5 },
+  processProNotificationsRef,
+  {},
+)
+
 export default crons

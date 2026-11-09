@@ -13,6 +13,7 @@ import {
   Gift,
   Trophy,
   UserRound,
+  HandHeart,
 } from 'lucide-react'
 import { isCameraHeartRateEnabled } from '../../native/cameraHeartRate'
 import { Avatar } from '../ui/Avatar'
@@ -46,6 +47,8 @@ export type SettingsMenuId =
   | 'giveFeedback'
   | 'ranked'
   | 'boutiquePartenaires'
+  | 'pro'
+  | 'proEngagement'
 
 interface SettingsScreenProps {
   username: string
@@ -63,6 +66,8 @@ interface SettingsScreenProps {
   onOpenGiveFeedback?: () => void
   onOpenRanked?: () => void
   onOpenBoutiquePartenaires?: () => void
+  onOpenPro?: () => void
+  onOpenProEngagement?: () => void
   onRequireAuth?: () => void
   onTryPro?: () => void
   onDisciplineChange?: (disciplineLabel: string) => void
@@ -103,6 +108,8 @@ export function SettingsScreen({
   onOpenGiveFeedback,
   onOpenRanked,
   onOpenBoutiquePartenaires,
+  onOpenPro,
+  onOpenProEngagement,
   onRequireAuth,
   onTryPro,
   onDisciplineChange,
@@ -161,12 +168,16 @@ export function SettingsScreen({
   }
 
   const handleTryPro = () => {
-    if (onTryPro) {
-      onTryPro()
-      return
-    }
     if (!isAuthenticated) {
       onRequireAuth?.()
+      return
+    }
+    if (onOpenPro) {
+      onOpenPro()
+      return
+    }
+    if (onTryPro) {
+      onTryPro()
       return
     }
     setSheet('payment')
@@ -200,6 +211,12 @@ export function SettingsScreen({
         { id: 'privacy', icon: Shield, label: 'Sécurité & Confidentialité' },
         { id: 'healthSituations', icon: HeartHandshake, label: 'Situations de santé' },
         { id: 'energyInfo', icon: Info, label: 'Informations' },
+        { id: 'pro', icon: CreditCard, label: 'Ranked Pro' },
+        {
+          id: 'proEngagement',
+          icon: HandHeart,
+          label: 'Notre engagement 6 %',
+        },
         { id: 'payment', icon: CreditCard, label: 'Méthodes de paiement' },
         { id: 'preferences', icon: Settings2, label: 'Préférences' },
         ...(isCameraHeartRateEnabled()
@@ -334,6 +351,14 @@ export function SettingsScreen({
                           return
                         }
                         onOpenBoutiquePartenaires?.()
+                        return
+                      }
+                      if (item.id === 'pro') {
+                        handleTryPro()
+                        return
+                      }
+                      if (item.id === 'proEngagement') {
+                        onOpenProEngagement?.()
                         return
                       }
                       if (item.id === 'healthSituations') {

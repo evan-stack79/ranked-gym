@@ -47,6 +47,29 @@ Convex CLI / backend (local `.env.local` only, never git):
 | `AVIS_BETA_USER_HASH_SALT` | Salt used to hash `userId` in webhook + triage payloads (never raw user ids). |
 | `AVIS_BETA_ADMIN_KEY` | Shared secret for admin triage (`listAvisForTriage` / `triageAvis`). Fail-closed if unset. Never `VITE_*`. |
 
+### Ranked Pro Solo v0 (IAP — names only, never commit values)
+
+Dashboard Convex uniquement. Pas de `VITE_*`. Ne pas créer ces secrets depuis un agent ; ne pas `npx convex deploy` pour activer la vente.
+
+| Name | Role |
+|------|------|
+| `SUBSCRIPTION_DEPLOY_ENV` | `production` (défaut) / `test` / `local`. Refuse sandbox & `localtest.` en production. |
+| `APPLE_BUNDLE_ID` | Bundle id attendu dans les JWS (ex. `com.rankedgym.app`) |
+| `APPLE_APP_APPLE_ID` | App Apple ID numérique (Server API) |
+| `APPLE_IAP_ISSUER_ID` | Issuer ID clé App Store Server API |
+| `APPLE_IAP_KEY_ID` | Key ID |
+| `APPLE_IAP_PRIVATE_KEY` | PEM clé privée (.p8) — jamais git |
+| `APPLE_ROOT_CA_PEMS` | PEMs racines Apple pour ancrage x5c (pas secret, mais config serveur) |
+| `APPLE_IAP_SHARED_SECRET` | Shared secret legacy éventuel — non utilisé pour le flux JWS v2 |
+| `GOOGLE_PLAY_PACKAGE_NAME` | Package Android |
+| `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` | Compte de service Play Developer API |
+| `GOOGLE_PLAY_ACCESS_TOKEN` | Bearer OAuth court (ou à dériver du JSON SA en runtime) pour subscriptionsv2 / acknowledge |
+| `GOOGLE_RTDN_AUDIENCE` | Audience OIDC exacte du push Pub/Sub |
+| `GOOGLE_RTDN_SERVICE_ACCOUNT_EMAIL` | E-mail service account push attendu |
+| `SUBSCRIPTION_TOKEN_ENCRYPTION_KEY` | Chiffrement `purchaseToken` Google au repos |
+
+Endpoints HTTP : `/iap/verify`, `/iap/apple/notifications`, `/iap/google/rtdn`.
+
 ### Avis bêta webhook payload
 
 `deliverAvisWebhook` POSTs a stable-key JSON body (HMAC over the exact bytes when `AVIS_BETA_WEBHOOK_SECRET` is set). Retries and rate-limiting are unchanged.

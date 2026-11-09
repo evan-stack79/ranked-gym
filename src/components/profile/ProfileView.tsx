@@ -18,6 +18,8 @@ import {
 import { FullProfileScreen } from './FullProfileScreen'
 import { RankedScreens } from '../ranked/RankedScreens'
 import { BoutiquePartenairesScreen } from '../rewards/BoutiquePartenairesScreen'
+import { ProScreenContainer } from '../pro/ProScreenContainer'
+import { EngagementSixPercentPage } from '../pro/EngagementSixPercentPage'
 import { useAuth } from '../../context/AuthContext'
 import {
   getCalorieProfile,
@@ -313,6 +315,31 @@ function ProfileViewContent() {
     return <BoutiquePartenairesScreen onBack={goBack} />
   }
 
+  if (route === 'proEngagement') {
+    return <EngagementSixPercentPage onBack={goBack} />
+  }
+
+  if (route === 'pro') {
+    if (!isAuthenticated || !user) {
+      return (
+        <div className="flex flex-col gap-4 pb-4 ios-fade-up">
+          <SettingsScreen
+            username="Invité"
+            isAuthenticated={false}
+            onRequireAuth={() => requireAuth(() => navigate('pro'))}
+            onOpenPro={() => requireAuth(() => navigate('pro'))}
+            onOpenProEngagement={() => navigate('proEngagement')}
+            onOpenRanked={() => navigate('ranked')}
+            onOpenBoutiquePartenaires={() =>
+              requireAuth(() => navigate('boutiquePartenaires'))
+            }
+          />
+        </div>
+      )
+    }
+    return <ProScreenContainer onBack={goBack} />
+  }
+
   if (!isAuthenticated || !user) {
     return (
       <div className="flex flex-col gap-6 pb-4 ios-fade-up">
@@ -332,6 +359,8 @@ function ProfileViewContent() {
           onOpenBoutiquePartenaires={() =>
             requireAuth(() => navigate('boutiquePartenaires'))
           }
+          onOpenPro={() => requireAuth(() => navigate('pro'))}
+          onOpenProEngagement={() => navigate('proEngagement')}
         />
         <CloudBackupCard />
       </div>
@@ -360,6 +389,8 @@ function ProfileViewContent() {
         onOpenGiveFeedback={() => navigate('giveFeedback')}
         onOpenRanked={() => navigate('ranked')}
         onOpenBoutiquePartenaires={() => navigate('boutiquePartenaires')}
+        onOpenPro={() => navigate('pro')}
+        onOpenProEngagement={() => navigate('proEngagement')}
         onRequireAuth={() => requireAuth(() => undefined)}
         onDisciplineChange={(label) => {
           setDisciplineId(disciplineFromLabel(label))
