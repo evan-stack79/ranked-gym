@@ -857,9 +857,31 @@ export const applyQueuedGoogleNotification = internalMutation({
       purchaseToken: args.purchaseToken,
       body: args.apiBody,
     })
-    const chain = (await ctx.db.query('subscriptions').collect()).find(
-      (s) => s.source === 'google' && s.storeChainKey === normalized.storeChainKey,
-    )
+    // QA m4 — lookup indexé by_source_env_chain (pas de collect() table entière).
+    const envCandidates: Array<'production' | 'sandbox' | 'local_test'> = [
+      normalized.environment,
+    ]
+    if (
+      (event.environment === 'production' ||
+        event.environment === 'sandbox' ||
+        event.environment === 'local_test') &&
+      event.environment !== normalized.environment
+    ) {
+      envCandidates.push(event.environment)
+    }
+    let chain = null
+    for (const env of envCandidates) {
+      chain = await ctx.db
+        .query('subscriptions')
+        .withIndex('by_source_env_chain', (q) =>
+          q
+            .eq('source', 'google')
+            .eq('environment', env)
+            .eq('storeChainKey', normalized.storeChainKey),
+        )
+        .first()
+      if (chain) break
+    }
     if (!chain) {
       await ctx.db.patch(args.eventId, {
         processingState: 'quarantined',

@@ -16,6 +16,17 @@ import {
 export const APPLE_ROOT_CA_G3_FINGERPRINT_SHA256 =
   '63343abfb89a6a03ebb57e9b3f5fa7be7c4f5c756f3017b3a8c488c3653e9179'
 
+/**
+ * OID feuille App Store receipt signing — Apple CPS WWDR §4.11.10 /
+ * app-store-server-library (QA M4).
+ */
+export const APPLE_LEAF_RECEIPT_OID = '1.2.840.113635.100.6.11.1'
+
+/**
+ * OID intermédiaire Apple Worldwide Developer Relations (QA M4).
+ */
+export const APPLE_WWDR_INTERMEDIATE_OID = '1.2.840.113635.100.6.2.1'
+
 /** PEM officiel Apple Root CA - G3 — ancré dans le code (pas seulement via env). */
 export const APPLE_ROOT_CA_G3_PEM = `-----BEGIN CERTIFICATE-----
 MIICQzCCAcmgAwIBAgIILcX8iNLFS5UwCgYIKoZIzj0EAwMwZzEbMBkGA1UEAwwS
@@ -52,8 +63,56 @@ function assertCertCurrentlyValid(cert: X509Certificate, now = new Date()): void
   }
 }
 
+/** Encode le contenu OBJECT IDENTIFIER (sans tag/longueur) en DER. */
+export function encodeOidDerContent(oid: string): Buffer {
+  const parts = oid.split('.').map((p) => Number(p))
+  if (parts.length < 2 || parts.some((n) => !Number.isInteger(n) || n < 0 || Number.isNaN(n))) {
+    throw new Error('APPLE_OID_INVALID')
+  }
+  const first = parts[0]!
+  const second = parts[1]!
+  if (first > 2 || second >= 40) {
+    throw new Error('APPLE_OID_INVALID')
+  }
+  const body: number[] = [40 * first + second]
+  for (const n of parts.slice(2)) {
+    if (n < 0x80) {
+      body.push(n)
+      continue
+    }
+    const stack: number[] = []
+    let v = n
+    stack.push(v & 0x7f)
+    v >>= 7
+    while (v > 0) {
+      stack.push((v & 0x7f) | 0x80)
+      v >>= 7
+    }
+    for (let i = stack.length - 1; i >= 0; i -= 1) body.push(stack[i]!)
+  }
+  return Buffer.from(body)
+}
+
+/** Présence de l’extension/attribut OID Apple dans le DER du certificat. */
+export function certHasAppleOid(cert: X509Certificate, oid: string): boolean {
+  const content = encodeOidDerContent(oid)
+  if (content.length > 127) throw new Error('APPLE_OID_TOO_LONG')
+  const tagged = Buffer.concat([Buffer.from([0x06, content.length]), content])
+  return cert.raw.includes(tagged)
+}
+
+function assertAppleChainOids(leaf: X509Certificate, intermediate: X509Certificate): void {
+  if (!certHasAppleOid(leaf, APPLE_LEAF_RECEIPT_OID)) {
+    throw new Error('APPLE_LEAF_OID_MISSING')
+  }
+  if (!certHasAppleOid(intermediate, APPLE_WWDR_INTERMEDIATE_OID)) {
+    throw new Error('APPLE_INTERMEDIATE_OID_MISSING')
+  }
+}
+
 /**
- * Vérifie chaque maillon (feuille ← … ← racine) et épingle l'empreinte racine.
+ * Vérifie chaque maillon (feuille ← inter ← racine), épingle l'empreinte racine,
+ * et exige les OID Apple receipt/WWDR (QA M4).
  * Un certificat auto-signé suivi de la racine Apple est REFUSÉ (pas d'émission).
  */
 export function verifyAppleX509Chain(
@@ -63,8 +122,9 @@ export function verifyAppleX509Chain(
     now?: Date
   },
 ): X509Certificate {
-  if (!x5cDerB64 || x5cDerB64.length < 2) {
-    throw new Error('APPLE_CERT_CHAIN_TOO_SHORT')
+  // Chaîne App Store Server : leaf + intermediate + root (bibliothèque Apple officielle).
+  if (!x5cDerB64 || x5cDerB64.length !== 3) {
+    throw new Error('APPLE_CERT_CHAIN_LENGTH_INVALID')
   }
   const pinned = (
     opts?.pinnedRootFingerprintSha256 ?? APPLE_ROOT_CA_G3_FINGERPRINT_SHA256
@@ -72,7 +132,9 @@ export function verifyAppleX509Chain(
   const now = opts?.now ?? new Date()
   const certs = x5cDerB64.map(derB64ToCert)
 
-  const root = certs[certs.length - 1]!
+  const leaf = certs[0]!
+  const intermediate = certs[1]!
+  const root = certs[2]!
   const rootFp = fingerprintSha256Hex(root)
   if (rootFp !== pinned) {
     throw new Error('APPLE_ROOT_FINGERPRINT_MISMATCH')
@@ -95,7 +157,9 @@ export function verifyAppleX509Chain(
     }
   }
 
-  return certs[0]!
+  assertAppleChainOids(leaf, intermediate)
+
+  return leaf
 }
 
 function derToPem(derB64: string): string {

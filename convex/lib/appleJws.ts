@@ -172,15 +172,4 @@ export function normalizeAppleTransaction(args: {
   }
 }
 
-/**
- * Mode test local uniquement : accepte un payload JSON non signé quand
- * SUBSCRIPTION_DEPLOY_ENV=test|local et le corps commence par `localtest.`.
- * Jamais en production.
- */
-export function parseLocalTestApplePayload(signedTransaction: string): AppleTransactionClaims | null {
-  const deployEnv = (readSubscriptionEnv('SUBSCRIPTION_DEPLOY_ENV') ?? 'production').toLowerCase()
-  if (deployEnv === 'production') return null
-  if (!signedTransaction.startsWith('localtest.')) return null
-  const json = signedTransaction.slice('localtest.'.length)
-  return JSON.parse(json) as AppleTransactionClaims
-}
+/* QA m3 — plus de fallback Apple `localtest.` non signé (même en test|local). */
