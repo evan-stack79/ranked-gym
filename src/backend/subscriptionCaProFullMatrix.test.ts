@@ -130,9 +130,11 @@ describe('AB-h sécurité / dédup', () => {
     const raw = readFileSync(resolve(__dirname, '../../convex/lib/proEntitlement.ts'), 'utf8')
     const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
     expect(code).toMatch(/from '\.\/subscriptionAccess'/)
-    expect(code).not.toMatch(/query\(['"]proEntitlements['"]\)/)
     expect(code).toMatch(/assertMyBottlePro/)
     expect(code).toMatch(/export \{\s*hasActivePro/)
+    // Autorité = re-export subscriptionAccess ; pas de hasActivePro local sur proEntitlements.
+    expect(code).not.toMatch(/export async function hasActivePro/)
+    expect(code).toMatch(/applyVerifiedStateCore/)
   })
 
   it('textes Juriste toujours exacts', () => {
