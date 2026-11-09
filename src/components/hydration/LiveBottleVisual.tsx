@@ -7,10 +7,11 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import {
+  drunkMlFromPointerY,
   fillRatioFromMl,
   handleBottomPercent,
   mlFromFillRatio,
-  mlFromPointerY,
+  remainingMlFromDrunkMl,
   type WaterContainerKind,
 } from '../../shared/hydration'
 
@@ -30,7 +31,10 @@ const HEIGHT_CLASS: Record<WaterContainerKind, { large: string; thumb: string }>
 
 interface LiveBottleVisualProps {
   kind: WaterContainerKind
-  /** ml dans le contenant (0…capacity). */
+  /**
+   * Interactive : ml bus (0 = plein, capacité = vide).
+   * Non interactif (thumbs) : remaining ml affiché.
+   */
   ml: number
   capacityMl: number
   /** URL PNG détouré (Ma bouteille) — sinon shell catalogue. */
@@ -38,14 +42,14 @@ interface LiveBottleVisualProps {
   size?: 'large' | 'thumb'
   showHandle?: boolean
   interactive?: boolean
-  onMlChange?: (ml: number) => void
+  /** Interactive : callback avec ml bus. */
+  onMlChange?: (drunkMl: number) => void
   className?: string
 }
 
 /**
  * Contenant photo + eau bleue translucide dessinée en direct.
- * Masque silhouette → teinte eau (plus sombre vers le bas) + ménisque ;
- * PNG shell par-dessus pour conserver les reflets plastique.
+ * Glisser vers le bas vide le contenant ; ml bus = capacité − remaining.
  */
 export function LiveBottleVisual({
   kind,
@@ -59,7 +63,8 @@ export function LiveBottleVisual({
   className = '',
 }: LiveBottleVisualProps) {
   const shell = shapeUrl || SHELL_SRC[kind]
-  const fillRatio = fillRatioFromMl(ml, capacityMl)
+  const remainingMl = interactive ? remainingMlFromDrunkMl(ml, capacityMl) : ml
+  const fillRatio = fillRatioFromMl(remainingMl, capacityMl)
   const waterPct = `${handleBottomPercent(kind, fillRatio)}%`
   const isThumb = size === 'thumb'
   const heightClass = HEIGHT_CLASS[kind][size]
@@ -72,8 +77,7 @@ export function LiveBottleVisual({
       if (!onMlChange || !rootRef.current) return
       const img = rootRef.current.querySelector('[data-hydration-shell]') as HTMLElement | null
       const rect = (img ?? rootRef.current).getBoundingClientRect()
-      const next = mlFromPointerY(clientY, rect, kind, capacityMl)
-      onMlChange(next)
+      onMlChange(drunkMlFromPointerY(clientY, rect, kind, capacityMl))
     },
     [capacityMl, kind, onMlChange],
   )
@@ -134,7 +138,8 @@ export function LiveBottleVisual({
       className={`relative mx-auto ${heightClass} ${isThumb ? 'w-auto' : 'w-full max-w-[200px]'} ${className}`}
       data-hydration-live-bottle={kind}
       data-fill-ratio={fillRatio.toFixed(3)}
-      data-hydration-ml={mlFromFillRatio(fillRatio, capacityMl)}
+      data-hydration-remaining={mlFromFillRatio(fillRatio, capacityMl)}
+      data-hydration-drunk={interactive ? ml : capacityMl - mlFromFillRatio(fillRatio, capacityMl)}
       style={interactive ? { touchAction: 'none', userSelect: 'none' } : undefined}
       onPointerDown={interactive ? onPointerDown : undefined}
       onPointerMove={interactive ? onPointerMove : undefined}
@@ -144,7 +149,7 @@ export function LiveBottleVisual({
       aria-valuemin={interactive ? 0 : undefined}
       aria-valuemax={interactive ? capacityMl : undefined}
       aria-valuenow={interactive ? ml : undefined}
-      aria-label={interactive ? 'Niveau d’eau' : undefined}
+      aria-label={interactive ? 'Millilitres bus' : undefined}
     >
       <div className="relative mx-auto h-full w-fit">
         {/* Photo détourée (reflets / plastique) */}

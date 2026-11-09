@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { AuthProvider } from '../context/AuthContext'
 import { EauTile, SeriesJourTile } from '../components/home/AccueilMetricTiles'
-import { HydrationPanel } from '../components/hydration/HydrationPanel'
 import { BottleDragPanel } from '../components/hydration/BottleDragPanel'
+import { ContainerPicker } from '../components/hydration/ContainerPicker'
 import { deriveWaterTileModel } from '../utils/accueilWidgetTiles'
 import { setUserWaterGoalMl } from '../utils/userWaterGoal'
 import { saveCalorieProfile, saveMealJournal } from '../services/nutritionStorage'
@@ -96,14 +96,43 @@ function AccueilScreen() {
 }
 
 function NutritionScreen() {
+  // Capture : bouteille 1,5 L à moitié vidée (750 ml bus / 750 remaining).
+  const [drunkMl, setDrunkMl] = useState(750)
   return (
     <ScreenShell title="Nutrition" testId="alimentation">
-      <HydrationPanel />
+      <section className="rounded-[28px] border border-white/12 bg-white/[0.04] px-3 py-2.5">
+        <div className="mb-1.5 flex items-start justify-between gap-2">
+          <div>
+            <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#ACB4BA]">
+              Hydratation
+            </p>
+            <h2 className="mt-0.5 text-[22px] font-semibold tracking-tight text-white">Eau</h2>
+          </div>
+          <p className="text-[11px] font-medium text-[#8E8E93]">Eau bue seule</p>
+        </div>
+        <ContainerPicker selected="plastic_15" onSelect={() => undefined} />
+        <div className="mt-2">
+          <BottleDragPanel
+            kind="plastic_15"
+            ml={drunkMl}
+            capacityMl={1500}
+            onMlChange={setDrunkMl}
+          />
+        </div>
+        <button
+          type="button"
+          disabled={drunkMl <= 0}
+          className="ios-press mt-2 min-h-11 w-full rounded-2xl bg-[#FF0702] text-[15px] font-semibold text-white disabled:opacity-45"
+        >
+          Ajouter
+        </button>
+      </section>
     </ScreenShell>
   )
 }
 
 function MaBouteilleScreen() {
+  // ml bus : 480 sur 750 → remaining 270 (à moitié vidée)
   const [ml, setMl] = useState(480)
   return (
     <ScreenShell title="Nutrition" testId="ma-bouteille">

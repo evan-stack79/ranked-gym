@@ -101,6 +101,7 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
         userId: user?.id ?? null,
       })
       setToday(next)
+      // Contenant revient plein après Ajouter.
       setEstimateMl(0)
     } finally {
       setBusy(false)
@@ -112,6 +113,8 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
     setBusy(true)
     try {
       setToday(await undoLastHydrationEntry(today.dayKey))
+      // Contenant revient plein après Annuler.
+      setEstimateMl(0)
     } finally {
       setBusy(false)
     }

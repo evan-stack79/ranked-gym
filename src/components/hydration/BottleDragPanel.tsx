@@ -2,7 +2,8 @@ import { LiveBottleVisual } from './LiveBottleVisual'
 import type { WaterContainerKind } from '../../shared/hydration'
 
 /**
- * Contenant grand + glisser au niveau de l’eau + estimation ml.
+ * Contenant grand + glisser vers le bas (vide) → ml bus.
+ * `ml` = millilitres bus (0 = plein, capacité = vide).
  */
 export function BottleDragPanel({
   kind,
@@ -12,10 +13,11 @@ export function BottleDragPanel({
   onMlChange,
 }: {
   kind: WaterContainerKind
+  /** ml bus (capacité − remaining). */
   ml: number
   capacityMl: number
   shapeUrl?: string | null
-  onMlChange: (ml: number) => void
+  onMlChange: (drunkMl: number) => void
 }) {
   return (
     <div className="relative flex flex-col items-center px-2" data-hydration-drag-panel={kind}>
