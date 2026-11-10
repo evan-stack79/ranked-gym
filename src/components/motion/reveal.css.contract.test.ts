@@ -30,8 +30,8 @@ describe('Evan motion CSS contract', () => {
     expect(css).toMatch(/\.rg-text-flip__measure/)
   })
 
-  it('button press keeps scale(0.96) at 120ms', () => {
-    expect(css).toMatch(/--dur-press:\s*120ms/)
+  it('button press keeps scale(0.96) at ~90ms', () => {
+    expect(css).toMatch(/--dur-press:\s*90ms/)
     expect(css).toMatch(/\.ios-press:active[\s\S]*?scale\(0\.96\)/)
   })
 

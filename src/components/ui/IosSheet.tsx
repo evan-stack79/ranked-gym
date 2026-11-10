@@ -12,6 +12,11 @@ interface IosSheetProps {
   footer?: ReactNode
   /** Prevent backdrop/close while busy */
   dismissible?: boolean
+  /**
+   * Bloque le scroll du contenu (ex. pendant drag curseur eau).
+   * Empêche aussi le drag-to-dismiss via overscroll.
+   */
+  scrollLocked?: boolean
   /** Leading icon or node in header */
   leading?: ReactNode
   /**
@@ -33,6 +38,7 @@ export function IosSheet({
   children,
   footer,
   dismissible = true,
+  scrollLocked = false,
   leading,
   adaptToKeyboard,
 }: IosSheetProps) {
@@ -152,7 +158,13 @@ export function IosSheet({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-2 pt-1">
+        <div
+          className={`min-h-0 flex-1 overscroll-contain px-5 pb-2 pt-1 ${
+            scrollLocked ? 'overflow-hidden touch-none' : 'overflow-y-auto'
+          }`}
+          style={scrollLocked ? { touchAction: 'none' } : undefined}
+          data-ios-sheet-scroll={scrollLocked ? 'locked' : 'open'}
+        >
           {children}
         </div>
 

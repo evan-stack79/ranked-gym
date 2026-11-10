@@ -26,6 +26,8 @@ function buildAuthValue(): AuthContextValue {
     clearStreakWeekBonus: vi.fn(),
     streakCelebration: null,
     clearStreakCelebration: vi.fn(),
+    rankUpCelebration: null,
+    clearRankUpCelebration: vi.fn(),
     refreshProfile: vi.fn(),
     patchProfile: vi.fn(),
     openAuth: vi.fn(),

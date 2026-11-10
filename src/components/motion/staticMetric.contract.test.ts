@@ -61,6 +61,7 @@ describe('kcal / body weight never use CountUpNumber', () => {
     expect(src).toMatch(/'water'/)
     expect(src).toMatch(/'sessions'/)
     expect(src).toMatch(/'successful_sets'/)
+    expect(src).toMatch(/'ranked_points'/)
     expect(src).toMatch(/NEVER add `kcal` or `body_weight`/)
     expect(src).not.toMatch(/'kcal'/)
     expect(src).not.toMatch(/'body_weight'/)

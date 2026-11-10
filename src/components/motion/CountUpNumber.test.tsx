@@ -61,8 +61,9 @@ describe('CountUpNumber', () => {
     resetCountUpStableCacheForTests()
   })
 
-  it('allowlist is water / sessions / successful_sets only', () => {
+  it('allowlist is water / sessions / successful_sets / ranked_points only', () => {
     expect([...COUNT_UP_ALLOWED_KINDS].sort()).toEqual([
+      'ranked_points',
       'sessions',
       'successful_sets',
       'water',
@@ -154,5 +155,20 @@ describe('CountUpNumber', () => {
     // First paint after remount must already be 1200 (not 0).
     const el = host.querySelector('[data-rg-count="water"]') as HTMLElement
     expect(el.textContent?.replace(/\s/g, '')).toBe('1200')
+  })
+
+  it('animates only on increase — decrease jumps immediately', async () => {
+    act(() => {
+      root.render(<CountUpNumber kind="water" value={1000} instant stableId="eau-up-only" />)
+    })
+    expect(host.querySelector('[data-rg-count="water"]')?.textContent?.replace(/\s/g, '')).toBe(
+      '1000',
+    )
+
+    act(() => {
+      root.render(<CountUpNumber kind="water" value={800} stableId="eau-up-only" />)
+    })
+    const el = host.querySelector('[data-rg-count="water"]') as HTMLElement
+    expect(el.textContent?.replace(/\s/g, '')).toBe('800')
   })
 })

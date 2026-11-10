@@ -76,6 +76,8 @@ function buildMinimalAuthValue(
     clearStreakWeekBonus: vi.fn(),
     streakCelebration,
     clearStreakCelebration: clear,
+    rankUpCelebration: null,
+    clearRankUpCelebration: vi.fn(),
     refreshProfile: vi.fn(),
     patchProfile: vi.fn(),
     openAuth: vi.fn(),

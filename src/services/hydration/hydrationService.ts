@@ -8,6 +8,7 @@ import {
   GOAL_DEFAULT_ML,
   isDayKeyWithinTolerance,
   isValidDayKey,
+  lastNDayKeys,
   localDayKey,
   type HydrationEntrySource,
   type HydrationMode,
@@ -71,6 +72,26 @@ async function requireToken(): Promise<string> {
 }
 
 const LOCAL_CACHE_KEY = 'ranked-gym:hydration-settings-cache'
+const PENDING_SETTINGS_KEY = 'ranked-gym:hydration-settings-pending'
+const LOCAL_DELETED_KEY = 'ranked-gym:hydration-deleted-entries'
+
+export type HydrationDayEntry = {
+  clientId: string
+  amountMl: number
+  createdAt: number
+  source: string
+  /** true = seulement en file locale / pas encore confirmé serveur. */
+  pending?: boolean
+}
+
+type LocalDeletedEntry = {
+  clientId: string
+  dayKey: string
+  amountMl: number
+  deletedAt: number
+  /** false tant que Convex deleteEntry n’a pas confirmé. */
+  synced?: boolean
+}
 
 type LocalSettingsCache = {
   userId: string | null
@@ -83,6 +104,16 @@ type LocalSettingsCache = {
   proActive: boolean
   /** M4 — totaux confirmés par dayKey. */
   confirmedByDay: Record<string, number>
+}
+
+/** Patch local non encore accepté par Convex (ex. classic_15 avant deploy). */
+export type PendingHydrationSettings = {
+  mode?: HydrationMode
+  goalMl?: number
+  myBottleVolumeMl?: number
+  remindersEnabled?: boolean
+  reminderTimes?: string[]
+  onboardedAt?: number
 }
 
 function readLocalSettings(): LocalSettingsCache | null {
@@ -108,6 +139,115 @@ function writeLocalSettings(cache: LocalSettingsCache): void {
   } catch {
     /* ignore */
   }
+}
+
+export function readPendingHydrationSettings(): PendingHydrationSettings | null {
+  try {
+    if (typeof localStorage === 'undefined') return null
+    const raw = localStorage.getItem(PENDING_SETTINGS_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as PendingHydrationSettings
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function writePendingHydrationSettings(pending: PendingHydrationSettings | null): void {
+  try {
+    if (typeof localStorage === 'undefined') return
+    if (pending == null || Object.keys(pending).length === 0) {
+      localStorage.removeItem(PENDING_SETTINGS_KEY)
+      return
+    }
+    localStorage.setItem(PENDING_SETTINGS_KEY, JSON.stringify(pending))
+  } catch {
+    /* ignore */
+  }
+}
+
+function readLocalDeleted(): LocalDeletedEntry[] {
+  try {
+    if (typeof localStorage === 'undefined') return []
+    const raw = localStorage.getItem(LOCAL_DELETED_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as LocalDeletedEntry[]
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function writeLocalDeleted(rows: LocalDeletedEntry[]): void {
+  try {
+    if (typeof localStorage === 'undefined') return
+    localStorage.setItem(LOCAL_DELETED_KEY, JSON.stringify(rows))
+  } catch {
+    /* ignore */
+  }
+}
+
+/** ml à retirer du total serveur tant que deleteEntry n’est pas sync. */
+export function localDeletedMlForDay(dayKey: string): number {
+  return readLocalDeleted()
+    .filter((d) => d.dayKey === dayKey && d.synced !== true)
+    .reduce((sum, d) => sum + Math.max(0, Math.round(d.amountMl)), 0)
+}
+
+export function isLocallyDeletedClientId(clientId: string, dayKey: string): boolean {
+  return readLocalDeleted().some((d) => d.clientId === clientId && d.dayKey === dayKey)
+}
+
+function overlayPendingOnToday(
+  today: Omit<HydrationToday, 'pendingMl' | 'confirmedMl'>,
+  pending: PendingHydrationSettings | null,
+): Omit<HydrationToday, 'pendingMl' | 'confirmedMl'> {
+  if (!pending) return today
+  const mode = pending.mode ?? today.mode
+  const goalMl = pending.goalMl ?? today.goalMl
+  const myBottleVolumeMl =
+    pending.myBottleVolumeMl !== undefined
+      ? pending.myBottleVolumeMl
+      : today.myBottleVolumeMl
+  return {
+    ...today,
+    mode,
+    goalMl,
+    myBottleVolumeMl,
+    remindersEnabled: pending.remindersEnabled ?? today.remindersEnabled,
+    reminderTimes: pending.reminderTimes ?? today.reminderTimes,
+    remainingMl: Math.max(0, goalMl - today.drunkMl),
+    effectiveVisualMode:
+      mode === 'my_bottle' && !today.proActive ? 'classic_2l' : mode,
+  }
+}
+
+/** Applique un patch réglages en local (cache + pending) et notifie les cartes. */
+export function applyHydrationSettingsLocal(
+  patch: PendingHydrationSettings,
+  userId?: string | null,
+): LocalSettingsCache {
+  const uid = userId ?? resolveActiveUserId()
+  const prev = readLocalSettings()
+  const next: LocalSettingsCache = {
+    userId: uid,
+    mode: patch.mode ?? prev?.mode ?? 'classic_2l',
+    goalMl: patch.goalMl ?? prev?.goalMl ?? GOAL_DEFAULT_ML,
+    myBottleVolumeMl:
+      patch.myBottleVolumeMl !== undefined
+        ? patch.myBottleVolumeMl
+        : (prev?.myBottleVolumeMl ?? null),
+    myBottleHasShape: prev?.myBottleHasShape ?? false,
+    remindersEnabled: patch.remindersEnabled ?? prev?.remindersEnabled ?? false,
+    reminderTimes: patch.reminderTimes ?? prev?.reminderTimes ?? ['10:00', '14:00', '18:00'],
+    proActive: prev?.proActive ?? false,
+    confirmedByDay: prev?.userId === uid ? (prev.confirmedByDay ?? {}) : {},
+  }
+  writeLocalSettings(next)
+  const existing = readPendingHydrationSettings() ?? {}
+  writePendingHydrationSettings({ ...existing, ...patch })
+  emitHydrationChanged()
+  return next
 }
 
 function cacheFromToday(
@@ -137,7 +277,8 @@ function mergePending(
   userId?: string | null,
 ): HydrationToday {
   const pendingMl = pendingDrunkMlForDay(dayKey, userId)
-  const confirmedMl = today.drunkMl
+  const deletedMl = localDeletedMlForDay(dayKey)
+  const confirmedMl = Math.max(0, today.drunkMl - deletedMl)
   const drunkMl = confirmedMl + pendingMl
   return {
     ...today,
@@ -149,12 +290,14 @@ function mergePending(
   }
 }
 
-function fallbackToday(dayKey: string, userId?: string | null): HydrationToday {
+/** Snapshot local (tests + repli fetch). */
+export function fallbackToday(dayKey: string, userId?: string | null): HydrationToday {
   const uid = userId ?? getHydrationQueueUserId()
   const cache = readLocalSettings()
   const cacheOk = cache != null && (uid == null || cache.userId == null || cache.userId === uid)
   const goalMl = cacheOk ? (cache?.goalMl ?? GOAL_DEFAULT_ML) : GOAL_DEFAULT_ML
-  const confirmedMl = cacheOk ? (cache?.confirmedByDay?.[dayKey] ?? 0) : 0
+  const rawConfirmed = cacheOk ? (cache?.confirmedByDay?.[dayKey] ?? 0) : 0
+  const confirmedMl = Math.max(0, rawConfirmed - localDeletedMlForDay(dayKey))
   const pendingMl = pendingDrunkMlForDay(dayKey, uid)
   const drunkMl = confirmedMl + pendingMl
   const mode = cacheOk ? (cache?.mode ?? 'classic_2l') : 'classic_2l'
@@ -209,6 +352,8 @@ export function clearHydrationLocalState(): void {
   try {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(LOCAL_CACHE_KEY)
+      localStorage.removeItem(PENDING_SETTINGS_KEY)
+      localStorage.removeItem(LOCAL_DELETED_KEY)
     }
   } catch {
     /* ignore */
@@ -232,12 +377,17 @@ export function onHydrationAccountChanged(userId: string | null): void {
   if (prev != null && prev !== userId) {
     clearHydrationOfflineQueue()
     try {
-      if (typeof localStorage !== 'undefined') localStorage.removeItem(LOCAL_CACHE_KEY)
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(LOCAL_CACHE_KEY)
+        localStorage.removeItem(PENDING_SETTINGS_KEY)
+        localStorage.removeItem(LOCAL_DELETED_KEY)
+      }
     } catch {
       /* ignore */
     }
   }
   bindHydrationQueueUser(userId)
+  void flushPendingHydrationSettings()
 }
 
 export async function fetchHydrationToday(dayKey = localDayKey()): Promise<HydrationToday> {
@@ -262,10 +412,13 @@ export async function fetchHydrationToday(dayKey = localDayKey()): Promise<Hydra
         /* ignore */
       }
     }
-    const today = (await getConvex().query(api.hydration.getToday, {
+    const remote = (await getConvex().query(api.hydration.getToday, {
       sessionToken,
       dayKey,
     })) as Omit<HydrationToday, 'pendingMl' | 'confirmedMl'>
+    // Ne jamais écraser un choix local optimiste (ex. classic_15 refusé en prod).
+    const pending = readPendingHydrationSettings()
+    const today = overlayPendingOnToday(remote, pending)
     writeLocalSettings(cacheFromToday(today, userId, dayKey))
     const merged = mergePending(today, dayKey, userId)
     // M2 — réarmement lendemain : pause objectif = jour J seulement.
@@ -287,11 +440,141 @@ export async function fetchHydrationToday(dayKey = localDayKey()): Promise<Hydra
   }
 }
 
+/** Repli local (cache confirmé + file pending) — même esprit que fetchHydrationToday. */
+export function fallbackHydrationHistory(
+  endDayKey = localDayKey(),
+  userId?: string | null,
+): Array<{ dayKey: string; drunkMl: number }> {
+  const uid = userId ?? getHydrationQueueUserId()
+  const cache = readLocalSettings()
+  const cacheOk = cache != null && (uid == null || cache.userId == null || cache.userId === uid)
+  return lastNDayKeys(endDayKey, 7).map((dayKey) => {
+    const confirmed = cacheOk ? (cache?.confirmedByDay?.[dayKey] ?? 0) : 0
+    const pending = pendingDrunkMlForDay(dayKey, uid)
+    return {
+      dayKey,
+      drunkMl: Math.max(0, confirmed + pending - localDeletedMlForDay(dayKey)),
+    }
+  })
+}
+
 export async function fetchHydrationHistory(
   endDayKey = localDayKey(),
 ): Promise<Array<{ dayKey: string; drunkMl: number }>> {
-  const sessionToken = await requireToken()
-  return getConvex().query(api.hydration.getHistory, { sessionToken, endDayKey })
+  const userId = resolveActiveUserId()
+  try {
+    const sessionToken = await requireToken()
+    const rows = (await getConvex().query(api.hydration.getHistory, {
+      sessionToken,
+      endDayKey,
+    })) as Array<{ dayKey: string; drunkMl: number }>
+    // Fusionne pending local non sync − suppressions locales non sync.
+    return rows.map((row) => ({
+      dayKey: row.dayKey,
+      drunkMl: Math.max(
+        0,
+        row.drunkMl
+          + pendingDrunkMlForDay(row.dayKey, userId)
+          - localDeletedMlForDay(row.dayKey),
+      ),
+    }))
+  } catch {
+    return fallbackHydrationHistory(endDayKey, userId)
+  }
+}
+
+function formatLocalDayEntries(
+  dayKey: string,
+  userId?: string | null,
+): HydrationDayEntry[] {
+  const pending = listPendingHydrationEntries(userId)
+    .filter((e) => e.dayKey === dayKey && !isLocallyDeletedClientId(e.clientId, dayKey))
+    .map((e) => ({
+      clientId: e.clientId,
+      amountMl: e.amountMl,
+      createdAt: e.createdAt,
+      source: e.source,
+      pending: true as const,
+    }))
+  return pending.sort((a, b) => b.createdAt - a.createdAt)
+}
+
+export async function fetchHydrationDayEntries(
+  dayKey = localDayKey(),
+): Promise<HydrationDayEntry[]> {
+  const userId = resolveActiveUserId()
+  const localPending = formatLocalDayEntries(dayKey, userId)
+  try {
+    const sessionToken = await requireToken()
+    const remote = (await getConvex().query(api.hydration.listDayEntries, {
+      sessionToken,
+      dayKey,
+    })) as HydrationDayEntry[]
+    const remoteFiltered = remote.filter(
+      (e) => !isLocallyDeletedClientId(e.clientId, dayKey),
+    )
+    const remoteIds = new Set(remoteFiltered.map((e) => e.clientId))
+    const onlyPending = localPending.filter((e) => !remoteIds.has(e.clientId))
+    return [...onlyPending, ...remoteFiltered].sort((a, b) => b.createdAt - a.createdAt)
+  } catch {
+    return localPending
+  }
+}
+
+/**
+ * Suppression d’un ajout du jour — locale immédiate + Convex deleteEntry si dispo.
+ * Deploy Convex requis pour la mutation ; sinon le total local reste correct.
+ */
+export async function deleteHydrationDayEntry(input: {
+  clientId: string
+  dayKey?: string
+  amountMl: number
+}): Promise<HydrationToday> {
+  const dayKey = input.dayKey ?? localDayKey()
+  const userId = resolveActiveUserId()
+  removePendingHydrationEntry(input.clientId, userId)
+  const deleted = readLocalDeleted().filter(
+    (d) => !(d.clientId === input.clientId && d.dayKey === dayKey),
+  )
+  deleted.push({
+    clientId: input.clientId,
+    dayKey,
+    amountMl: Math.round(input.amountMl),
+    deletedAt: Date.now(),
+    synced: false,
+  })
+  writeLocalDeleted(deleted)
+  // Ajuste le cache confirmé localement pour carte / bouteille immédiates.
+  const cache = readLocalSettings()
+  if (cache?.confirmedByDay?.[dayKey] != null) {
+    cache.confirmedByDay[dayKey] = Math.max(
+      0,
+      (cache.confirmedByDay[dayKey] ?? 0) - Math.round(input.amountMl),
+    )
+    writeLocalSettings(cache)
+  }
+  emitHydrationChanged()
+
+  try {
+    const sessionToken = await requireToken()
+    const today = (await getConvex().mutation(api.hydration.deleteEntry, {
+      sessionToken,
+      dayKey,
+      clientId: input.clientId,
+    })) as Omit<HydrationToday, 'pendingMl' | 'confirmedMl'>
+    writeLocalDeleted(
+      readLocalDeleted().map((d) =>
+        d.clientId === input.clientId && d.dayKey === dayKey
+          ? { ...d, synced: true }
+          : d,
+      ),
+    )
+    writeLocalSettings(cacheFromToday(today, userId, dayKey))
+    emitHydrationChanged()
+    return mergePending(today, dayKey, userId)
+  } catch {
+    return fallbackToday(dayKey, userId)
+  }
 }
 
 function isValidAmountClient(amountMl: number): boolean {
@@ -387,34 +670,95 @@ export async function updateHydrationSettings(input: {
   reminderTimes?: string[]
   onboardedAt?: number
 }) {
-  const sessionToken = await requireToken()
   const userId = resolveActiveUserId()
-  const result = await getConvex().mutation(api.hydration.updateSettings, {
-    sessionToken,
-    ...input,
-  })
-  const settings = result.settings as {
-    mode: HydrationMode
-    goalMl: number
-    myBottleVolumeMl?: number
-    myBottleHasShape: boolean
-    remindersEnabled: boolean
-    reminderTimes: string[]
+  // Optimiste : local immédiat (carte Eau / feuille / bouteille), même si Convex refuse.
+  const local = applyHydrationSettingsLocal(input, userId)
+  try {
+    const sessionToken = await requireToken()
+    const result = await getConvex().mutation(api.hydration.updateSettings, {
+      sessionToken,
+      ...input,
+    })
+    const settings = result.settings as {
+      mode: HydrationMode
+      goalMl: number
+      myBottleVolumeMl?: number
+      myBottleHasShape: boolean
+      remindersEnabled: boolean
+      reminderTimes: string[]
+    }
+    const prev = readLocalSettings()
+    // Sync serveur OK — on garde toutefois les champs pending non couverts par ce patch.
+    const stillPending = readPendingHydrationSettings()
+    const remaining: PendingHydrationSettings = { ...(stillPending ?? {}) }
+    for (const key of Object.keys(input) as (keyof PendingHydrationSettings)[]) {
+      if (input[key] !== undefined) delete remaining[key]
+    }
+    writePendingHydrationSettings(
+      Object.keys(remaining).length > 0 ? remaining : null,
+    )
+    const pendingLeft = readPendingHydrationSettings()
+    writeLocalSettings({
+      userId,
+      mode: pendingLeft?.mode ?? settings.mode,
+      goalMl: pendingLeft?.goalMl ?? settings.goalMl,
+      myBottleVolumeMl:
+        pendingLeft?.myBottleVolumeMl !== undefined
+          ? pendingLeft.myBottleVolumeMl
+          : (settings.myBottleVolumeMl ?? null),
+      myBottleHasShape: settings.myBottleHasShape,
+      remindersEnabled: pendingLeft?.remindersEnabled ?? settings.remindersEnabled,
+      reminderTimes: pendingLeft?.reminderTimes ?? settings.reminderTimes,
+      proActive: Boolean(result.proActive),
+      confirmedByDay: prev?.userId === userId ? (prev.confirmedByDay ?? {}) : {},
+    })
+    emitHydrationChanged()
+    // Réessaie d’éventuels autres champs pending (silencieux).
+    if (pendingLeft) void flushPendingHydrationSettings()
+    return result
+  } catch {
+    // Garde le local ; réessaie plus tard sans erreur visible.
+    void flushPendingHydrationSettings()
+    return {
+      settings: {
+        mode: local.mode,
+        goalMl: local.goalMl,
+        myBottleVolumeMl: local.myBottleVolumeMl ?? undefined,
+        myBottleHasShape: local.myBottleHasShape,
+        remindersEnabled: local.remindersEnabled,
+        reminderTimes: local.reminderTimes,
+      },
+      proActive: local.proActive,
+      pendingLocal: true as const,
+    }
   }
-  const prev = readLocalSettings()
-  writeLocalSettings({
-    userId,
-    mode: settings.mode,
-    goalMl: settings.goalMl,
-    myBottleVolumeMl: settings.myBottleVolumeMl ?? null,
-    myBottleHasShape: settings.myBottleHasShape,
-    remindersEnabled: settings.remindersEnabled,
-    reminderTimes: settings.reminderTimes,
-    proActive: Boolean(result.proActive),
-    confirmedByDay: prev?.userId === userId ? (prev.confirmedByDay ?? {}) : {},
-  })
-  emitHydrationChanged()
-  return result
+}
+
+let pendingFlushTimer: number | null = null
+
+/** Réessaie le patch pending sans surface d’erreur UI. */
+export async function flushPendingHydrationSettings(): Promise<boolean> {
+  const pending = readPendingHydrationSettings()
+  if (!pending || Object.keys(pending).length === 0) return true
+  try {
+    const sessionToken = await requireToken()
+    await getConvex().mutation(api.hydration.updateSettings, {
+      sessionToken,
+      ...pending,
+    })
+    writePendingHydrationSettings(null)
+    emitHydrationChanged()
+    return true
+  } catch {
+    if (typeof window !== 'undefined') {
+      if (pendingFlushTimer != null) window.clearTimeout(pendingFlushTimer)
+      pendingFlushTimer = window.setTimeout(() => {
+        pendingFlushTimer = null
+        void flushPendingHydrationSettings()
+      }, 15_000) as unknown as number
+    }
+    return false
+  }
 }
 
 export async function setBottleShapeFlag(hasShape: boolean) {

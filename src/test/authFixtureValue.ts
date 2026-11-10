@@ -30,6 +30,8 @@ export function buildAuthContextValue(
     clearStreakWeekBonus: noop,
     streakCelebration: null,
     clearStreakCelebration: noop,
+    rankUpCelebration: null,
+    clearRankUpCelebration: noop,
     refreshProfile: asyncNoop,
     patchProfile: noop,
     openAuth: noop,

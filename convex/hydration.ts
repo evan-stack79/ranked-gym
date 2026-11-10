@@ -49,6 +49,7 @@ import {
 type SessionCtx = QueryCtx | MutationCtx
 
 const modeValidator = v.union(
+  v.literal('classic_15'),
   v.literal('classic_2l'),
   v.literal('glasses_250'),
   v.literal('my_bottle'),
@@ -449,6 +450,60 @@ export const getHistory = query({
       out.push({ dayKey, drunkMl: await sumDrunkMl(ctx, user.userId, dayKey) })
     }
     return out
+  },
+})
+
+/** Entrées actives du jour (pour panneau « Aujourd’hui » + suppression). */
+export const listDayEntries = query({
+  args: {
+    sessionToken: v.string(),
+    dayKey: v.string(),
+  },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<
+    Array<{ clientId: string; amountMl: number; createdAt: number; source: string }>
+  > => {
+    const user = await requireSessionUser(ctx, args.sessionToken)
+    if (!isValidDayKey(args.dayKey)) throw new Error('HYDRATION_INVALID_DAY_KEY')
+    const rows = await ctx.db
+      .query('hydrationEntries')
+      .withIndex('by_user_day', (q) => q.eq('userId', user.userId).eq('dayKey', args.dayKey))
+      .collect()
+    return rows
+      .filter((r) => r.undoneAt == null)
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .map((r) => ({
+        clientId: r.clientId,
+        amountMl: r.amountMl,
+        createdAt: r.createdAt,
+        source: r.source,
+      }))
+  },
+})
+
+/** Soft-delete d’une entrée par clientId (idempotent). Deploy Convex requis en prod. */
+export const deleteEntry = mutation({
+  args: {
+    sessionToken: v.string(),
+    dayKey: v.string(),
+    clientId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireSessionUser(ctx, args.sessionToken)
+    const now = Date.now()
+    if (!isValidDayKey(args.dayKey)) throw new Error('HYDRATION_INVALID_DAY_KEY')
+    if (typeof args.clientId !== 'string' || args.clientId.length < 8 || args.clientId.length > 128) {
+      throw new Error('HYDRATION_INVALID_CLIENT_ID')
+    }
+    const existing = await findHydrationByClientId(ctx, user.userId, args.clientId)
+    if (existing && existing.dayKey === args.dayKey && existing.undoneAt == null) {
+      await ctx.db.patch(existing._id, { undoneAt: now })
+    }
+    let settings = await ensureSettings(ctx, user.userId, now)
+    settings = await normalizeStoredGoalIfLocked(ctx, user.userId, settings, now)
+    return buildTodayView(ctx, user.userId, settings, args.dayKey, now)
   },
 })
 

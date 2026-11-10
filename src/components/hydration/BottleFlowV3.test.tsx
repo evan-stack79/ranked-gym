@@ -45,7 +45,7 @@ describe('BottleFlowV3 — logique variante B', () => {
     expect(resolveOpenPhase(true, 'setup')).toBe('setup')
   })
 
-  it('relâchement à 0 ml → pas d’ajout', () => {
+  it('montant 0 ml → pas d’ajout (bouton désactivé côté UI)', () => {
     expect(shouldCommitDrunkOnRelease(0)).toBe(false)
     expect(
       shouldCommitDrunkOnRelease(
@@ -54,7 +54,7 @@ describe('BottleFlowV3 — logique variante B', () => {
     ).toBe(false)
   })
 
-  it('relâchement avec 250 ml → ajout', () => {
+  it('montant 250 ml → éligible au bouton J’ai bu', () => {
     const drunk = drunkMlFromStartAndCurrent(1200, 950, 1500, WATER_DRAG_STEP_ML)
     expect(drunk).toBe(250)
     expect(shouldCommitDrunkOnRelease(drunk)).toBe(true)

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
+import { useBrandPress } from '../../hooks/useBrandPress'
 
 interface NeonButtonProps {
   children: ReactNode
@@ -26,12 +27,18 @@ export function NeonButton({
     destructive: 'glass-card text-[#FF453A] active:bg-ios-inset',
   }[variant]
 
+  const { ref, pressProps } = useBrandPress<HTMLButtonElement>()
+  const useMotionPress = variant === 'primary'
+
   return (
     <button
+      ref={useMotionPress ? ref : undefined}
       type="button"
       onClick={onClick}
       disabled={disabled || loading}
       className={`ios-press w-full rounded-2xl px-6 py-4 text-[17px] font-semibold tracking-tight disabled:cursor-not-allowed disabled:opacity-40 ${variantClass} ${className}`}
+      data-rg-press={useMotionPress ? 'motion' : undefined}
+      {...(useMotionPress ? pressProps : {})}
     >
       {loading ? (
         <span className="flex items-center justify-center gap-2">

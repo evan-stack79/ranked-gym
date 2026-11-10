@@ -5,7 +5,6 @@ import {
   formatLitersFr,
   formatRemainingLabel,
   GOAL_DEFAULT_ML,
-  LABEL_EAU_BUE_SEULE,
   LABEL_REPERE_JOUR,
   MSG_HIGH_INFO,
   MSG_MINOR_PERMANENT,
@@ -134,10 +133,7 @@ export function WaterCard({ compact = false, onOpenSettings, className = '' }: W
           className={compact ? 'h-20 w-12 shrink-0' : undefined}
         />
         <div className="min-w-0 flex-1">
-          <div className="flex items-baseline justify-between gap-2">
-            <p className="text-[14px] font-semibold text-white">Eau</p>
-            <p className="text-[11px] font-medium text-[#8E8E93]">{LABEL_EAU_BUE_SEULE}</p>
-          </div>
+          <p className="text-[14px] font-semibold text-white">Eau</p>
           {minorLocked ? (
             <p
               className="mt-0.5 text-[15px] font-semibold tabular-nums text-white"
@@ -223,10 +219,27 @@ export function WaterCard({ compact = false, onOpenSettings, className = '' }: W
           <button
             type="button"
             onClick={onOpenSettings}
-            className="ios-press ml-auto min-h-11 rounded-xl px-2 text-[13px] font-medium text-[#8E8E93]"
+            className="ios-press ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#2C3032] text-white"
             data-hydration-settings
+            aria-label="Changer de bouteille"
           >
-            Réglages
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M5 2.5h4" />
+              <path d="M5.2 2.5v2.3C3.8 5.6 3 6.8 3 8.4V20a1.5 1.5 0 0 0 1.5 1.5h5A1.5 1.5 0 0 0 11 20V8.4c0-1.6-.8-2.8-2.2-3.6V2.5" />
+              <path d="M3 12h8" />
+              <path d="M14 8.5h7M18.5 6l2.5 2.5-2.5 2.5" />
+              <path d="M21 15.5h-7M16.5 13L14 15.5l2.5 2.5" />
+            </svg>
           </button>
         ) : null}
       </div>

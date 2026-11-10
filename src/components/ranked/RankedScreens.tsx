@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { ChevronLeft, Trophy, BookOpen, Flame, Users, Info, Pause } from 'lucide-react'
+import { CountUpNumber } from '../motion'
 import {
   confirmRankedVerifyFriend,
   confirmRankedVerifySelf,
@@ -501,7 +502,11 @@ function RankedForceScreen({ onBack }: { onBack: () => void }) {
       <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
         <p className="text-[12px] uppercase tracking-wide text-[#717C83]">Score cycle</p>
         <p className="text-[36px] font-bold text-white" data-testid="ranked-force-score">
-          {league?.score ?? 0}
+          <CountUpNumber
+            kind="ranked_points"
+            value={Number(league?.score ?? 0)}
+            stableId="ranked-force-score"
+          />
         </p>
         <p className="text-[14px] text-[#ACB4BA]">
           Ligue {league?.league?.name ?? '—'}
