@@ -41,6 +41,8 @@ const HEALTH_LOCAL_KEY_PREFIXES = [
   PROFILE_BASE,
   JOURNAL_BASE,
   'ranked-gym:sleep-log',
+  'ranked-gym:sleep-schedule',
+  'ranked-gym:sleep-morning-prompt',
   'ranked-gym:training',
   'ranked-gym:profile',
   'ranked-gym:last-location',

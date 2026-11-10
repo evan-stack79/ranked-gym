@@ -1,22 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getSleepHomeSnapshot } from '../../services/sleepEngineAdapter'
-import { SLEEP_CHANGED_EVENT } from '../../services/sleepStorage'
+import { Pencil } from 'lucide-react'
+import { computeTibHours } from '../../sleep-engine'
+import { SLEEP_CHANGED_EVENT, getLatestSleepNight } from '../../services/sleepStorage'
 import {
-  compactHomeQuantityStatusLabel,
-  getSleepHomeCompactView,
-  sleepHomeStatusColorClass,
-} from '../../utils/sleepHomeCompact'
-import { LogSleepNightSheet } from './LogSleepNightSheet'
-import { SleepDetailsSheet } from './SleepDetailsSheet'
+  formatDurationHoursLabel,
+  formatNightRangeLabel,
+} from '../../utils/sleepTimeFormat'
+import { AccueilProgressRing } from './AccueilProgressRing'
+import { SleepScreen } from './SleepScreen'
+
+const RED = '#ff0702'
+/** Repère visuel anneau (adulte haut de fourchette) — pas un score. */
+const RING_REF_HOURS = 9
 
 /**
- * Carte Accueil sommeil — résumé compact (1–2 lignes).
- * Détails, conseils et historique dans les sheets existantes.
+ * Carte Accueil sommeil — tout en haut, 1 tap → écran Sommeil.
+ * Affiche TIB + plage, sans statut qualité /100.
  */
 export function SleepSnapshot() {
   const [tick, setTick] = useState(0)
-  const [logOpen, setLogOpen] = useState(false)
-  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [screenOpen, setScreenOpen] = useState(false)
 
   useEffect(() => {
     const sync = () => setTick((n) => n + 1)
@@ -30,77 +33,63 @@ export function SleepSnapshot() {
     }
   }, [])
 
-  const snapshot = useMemo(() => getSleepHomeSnapshot(), [tick])
-  const compact = useMemo(() => getSleepHomeCompactView(snapshot), [snapshot])
-
-  const handleAction = () => {
-    if (compact.action === 'log') {
-      setLogOpen(true)
-      return
-    }
-    setDetailsOpen(true)
-  }
+  const latest = useMemo(() => getLatestSleepNight(), [tick])
+  const tib = latest ? computeTibHours(latest.bedtime, latest.waketime) : null
+  const tibLabel = tib != null && tib > 0 ? formatDurationHoursLabel(tib) : null
+  const rangeLabel =
+    latest != null ? formatNightRangeLabel(latest.bedtime, latest.waketime) : null
+  const progress = tib != null && tib > 0 ? Math.min(1, tib / RING_REF_HOURS) : 0
 
   return (
     <>
-      <section className="glass-card rounded-2xl p-4" aria-label="Sommeil">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-medium text-[#ACB4BA]">Sommeil</p>
-            {!snapshot.hasData ? (
-              <p className="mt-1 text-[15px] font-semibold leading-snug text-white">
-                {compact.secondaryLine}
-              </p>
-            ) : snapshot.tstKnown && snapshot.tstLabel ? (
-              <p className="mt-1 text-[15px] font-semibold leading-snug text-white">
-                {snapshot.tstLabel} dormies
-                {(snapshot.statusKey || snapshot.statusLabel) && (
-                  <>
-                    {' · '}
-                    <span className={sleepHomeStatusColorClass(snapshot.statusKey)}>
-                      {snapshot.statusKey
-                        ? compactHomeQuantityStatusLabel(snapshot.statusKey)
-                        : snapshot.statusLabel}
-                    </span>
-                  </>
-                )}
-              </p>
-            ) : (
-              <p className="mt-1 text-[15px] font-semibold leading-snug text-white">
-                {snapshot.tibLabel ? `${snapshot.tibLabel} au lit` : '—'}
-                {' · '}
-                <span className="text-[#ACB4BA]">Sommeil non estimé</span>
-              </p>
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={handleAction}
-            aria-label={compact.actionLabel}
-            className={
-              compact.action === 'log'
-                ? 'btn-brand ios-press min-h-11 shrink-0 rounded-2xl border border-white/15 px-4 py-2.5 text-[14px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#000000]'
-                : 'ios-press min-h-11 shrink-0 rounded-2xl border border-white/12 bg-white/5 px-4 py-2.5 text-[14px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-[#000000]'
-            }
-          >
-            {compact.actionLabel}
-          </button>
+      <button
+        type="button"
+        onClick={() => setScreenOpen(true)}
+        className="ios-press flex w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/55"
+        style={{
+          backgroundColor: 'rgba(20,20,22,0.92)',
+          borderColor: 'rgba(255,7,2,0.28)',
+        }}
+        aria-label="Sommeil"
+        data-sleep-home-card
+      >
+        <div className="relative shrink-0">
+          <AccueilProgressRing
+            progress={progress}
+            accent={RED}
+            track="rgba(255,255,255,0.12)"
+            size={56}
+            strokeWidth={5}
+          />
         </div>
-      </section>
 
-      <SleepDetailsSheet
-        open={detailsOpen && snapshot.hasData}
-        onClose={() => setDetailsOpen(false)}
-        snapshot={snapshot}
-        onEditNight={() => setLogOpen(true)}
-      />
-      <LogSleepNightSheet
-        open={logOpen}
-        onClose={() => setLogOpen(false)}
-        onSaved={() => setTick((n) => n + 1)}
-        initial={snapshot.latest}
-      />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-medium text-[#ACB4BA]">Sommeil</p>
+          {tibLabel ? (
+            <>
+              <p className="mt-0.5 text-[17px] font-bold leading-snug tabular-nums text-white">
+                {tibLabel} au lit
+              </p>
+              {rangeLabel ? (
+                <p className="mt-0.5 text-[13px] tabular-nums text-[#8E8E93]">{rangeLabel}</p>
+              ) : null}
+            </>
+          ) : (
+            <p className="mt-0.5 text-[15px] font-semibold leading-snug text-white">
+              Comment était ta nuit ?
+            </p>
+          )}
+        </div>
+
+        <span
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#2C3032] text-white"
+          aria-hidden
+        >
+          <Pencil className="h-4 w-4" strokeWidth={2} />
+        </span>
+      </button>
+
+      <SleepScreen open={screenOpen} onClose={() => setScreenOpen(false)} />
     </>
   )
 }

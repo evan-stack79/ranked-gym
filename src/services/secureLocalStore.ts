@@ -21,6 +21,8 @@ export const SENSITIVE_LOCAL_KEY_PREFIXES = [
   'ranked-gym:nutrition-profile',
   'ranked-gym:nutrition-journal',
   'ranked-gym:sleep-log',
+  'ranked-gym:sleep-schedule',
+  'ranked-gym:sleep-morning-prompt',
   'ranked-gym:profile',
   'ranked-gym:custom-gyms',
   'ranked-gym:check-in',
