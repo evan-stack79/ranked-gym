@@ -58,7 +58,7 @@ interface LiveBottleVisualProps {
   dragStepMl?: number
   onRemainingChange?: (remainingMl: number) => void
   onDraggingChange?: (dragging: boolean) => void
-  /** Appelé à la fin du glisser (variante B : commit au relâchement). */
+  /** Appelé à la fin du glisser (preview seule — commit via bouton explicite). */
   onDragEnd?: () => void
   className?: string
 }

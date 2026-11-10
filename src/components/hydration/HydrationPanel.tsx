@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  LABEL_EAU_BUE_SEULE,
-  localDayKey,
-} from '../../shared/hydration'
+import { localDayKey } from '../../shared/hydration'
 import {
   addHydrationEntry,
   fetchHydrationToday,
@@ -199,14 +196,9 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
               />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-baseline justify-between gap-2">
-                <p className="text-[14px] font-semibold text-white">
-                  {myBottleMode ? 'Ma bouteille' : 'Eau'}
-                </p>
-                <p className="shrink-0 text-[11px] font-medium text-[#8E8E93]">
-                  {LABEL_EAU_BUE_SEULE}
-                </p>
-              </div>
+              <p className="text-[14px] font-semibold text-white">
+                {myBottleMode ? 'Ma bouteille' : 'Eau'}
+              </p>
               <p className="mt-0.5 text-[15px] font-semibold tabular-nums text-white" data-hydration-drunk>
                 {drunkL}&nbsp;/&nbsp;{goalL}&nbsp;L
               </p>

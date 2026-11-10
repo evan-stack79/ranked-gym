@@ -264,7 +264,8 @@ export function BottleFlowV3({
     onMarkBottleRefilled?.()
   }
 
-  const commitOnRelease = useCallback(async () => {
+  /** Ajout volontaire uniquement — le relâchement du glisser ne commit plus. */
+  const commitDrunkExplicit = useCallback(async () => {
     if (phaseRef.current !== 'drink' || committingRef.current || busy || toast) return
     const start = startRef.current
     const rem = remainingRef.current
@@ -289,8 +290,8 @@ export function BottleFlowV3({
 
   const onDragEnd = useCallback(() => {
     setDragging(false)
-    void commitOnRelease()
-  }, [commitOnRelease])
+    // Intentionnel : aucun ajout à la relâche (anti-ajout fantôme / test animations).
+  }, [])
 
   const handleUndo = useCallback(() => {
     if (!toast || busy) return
@@ -362,7 +363,7 @@ export function BottleFlowV3({
         >
           Fermer
         </button>
-        <p className="text-[13px] font-medium text-[#8E8E93]">Eau bue seule</p>
+        <span className="w-14" aria-hidden />
       </div>
 
       {phase === 'setup' ? (
@@ -488,9 +489,24 @@ export function BottleFlowV3({
                 />
               </div>
             ) : (
-              <p className="text-[15px] font-medium text-[#ACB4BA]" data-hydration-release-hint>
-                {dragging || drunkMl > 0 ? 'Lâche pour ajouter' : 'Glisse vers le bas'}
-              </p>
+              <>
+                <p className="text-[15px] font-medium text-[#ACB4BA]" data-hydration-release-hint>
+                  {dragging
+                    ? 'Règle le niveau…'
+                    : drunkMl > 0
+                      ? 'Confirme pour ajouter'
+                      : 'Glisse vers le bas'}
+                </p>
+                <button
+                  type="button"
+                  disabled={busy || drunkMl <= 0 || committingRef.current}
+                  onClick={() => void commitDrunkExplicit()}
+                  className="ios-press min-h-[52px] w-full max-w-sm shrink-0 rounded-2xl bg-[#FF0702] text-[17px] font-semibold text-white disabled:opacity-40"
+                  data-hydration-commit-drunk
+                >
+                  J&apos;ai bu {drunkMl.toLocaleString('fr-FR')}&nbsp;ml
+                </button>
+              </>
             )}
             <button
               type="button"

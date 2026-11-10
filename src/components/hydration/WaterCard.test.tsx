@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRoot, type Root } from 'react-dom/client'
 import { act } from 'react'
-import { LABEL_EAU_BUE_SEULE, MSG_PERMANENT } from '../../shared/hydration'
+import { MSG_PERMANENT } from '../../shared/hydration'
 
 vi.mock('../../context/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'user-test' } }),
@@ -86,7 +86,7 @@ describe('WaterCard', () => {
     host.remove()
   })
 
-  it('CA-HY10 affiche Eau bue seule + pas de café/jus', async () => {
+  it('CA-HY10 règle eau-seule dans la copie + pas de café/jus (sans libellé « Eau bue seule »)', async () => {
     const { WaterCard } = await import('./WaterCard')
     await act(async () => {
       root.render(<WaterCard />)
@@ -95,7 +95,7 @@ describe('WaterCard', () => {
       await Promise.resolve()
       await Promise.resolve()
     })
-    expect(host.textContent).toContain(LABEL_EAU_BUE_SEULE)
+    expect(host.textContent).not.toContain('Eau bue seule')
     expect(host.textContent).toContain(MSG_PERMANENT)
     expect(host.textContent?.toLowerCase()).not.toContain('café')
     expect(host.textContent?.toLowerCase()).not.toContain('jus')

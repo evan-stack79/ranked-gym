@@ -50,35 +50,35 @@ export function capacityForMode(
   return WATER_CONTAINER_CAPACITY_ML.plastic_15
 }
 
-/** Titre carrousel (court). */
+/** Titre tuile (court, 390 px × 4, sans troncature). */
 export function carouselTitleForMode(mode: HydrationMode): string {
   switch (mode) {
     case 'glasses_250':
       return 'Verre'
     case 'classic_15':
-      return 'Bouteille'
+      return '1,5 L'
     case 'classic_2l':
-      return 'Bouteille'
+      return '2 L'
     case 'my_bottle':
-      return 'Ma bouteille'
+      return 'Ma bout.'
     default:
-      return 'Bouteille'
+      return '2 L'
   }
 }
 
-/** Sous-titre carrousel (capacité / PRO). */
+/** Sous-titre tuile (capacité / PRO). */
 export function carouselDetailForMode(mode: HydrationMode): string {
   switch (mode) {
     case 'glasses_250':
       return '250 ml'
     case 'classic_15':
-      return '1,5 L'
+      return ' '
     case 'classic_2l':
-      return '2 L'
+      return ' '
     case 'my_bottle':
       return 'PRO'
     default:
-      return '2 L'
+      return ' '
   }
 }
 

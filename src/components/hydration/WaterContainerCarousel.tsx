@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react'
 import type { HydrationMode } from '../../shared/hydration'
 import {
   WATER_SETTINGS_CAROUSEL_ORDER,
@@ -14,33 +13,25 @@ interface WaterContainerCarouselProps {
   onRequestPro: () => void
 }
 
+/**
+ * Rangée de 4 tuiles entières (390 px) — tap = sélection.
+ * Plus de carrousel scrollable (évite les tuiles tronquées).
+ */
 export function WaterContainerCarousel({
   mode,
   proActive,
   onSelect,
   onRequestPro,
 }: WaterContainerCarouselProps) {
-  const scrollerRef = useRef<HTMLDivElement>(null)
-  const selectedIndex = Math.max(0, WATER_SETTINGS_CAROUSEL_ORDER.indexOf(mode))
-
-  useEffect(() => {
-    const root = scrollerRef.current
-    if (!root) return
-    const tile = root.querySelector<HTMLElement>(`[data-hydration-carousel-tile="${mode}"]`)
-    tile?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
-  }, [mode])
-
   return (
-    <div data-hydration-carousel className="space-y-3">
-      <div
-        ref={scrollerRef}
-        className="flex snap-x snap-mandatory gap-3.5 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        style={{ WebkitOverflowScrolling: 'touch' }}
-      >
+    <div data-hydration-carousel className="w-full min-w-0">
+      <div className="grid w-full grid-cols-4 gap-1.5">
         {WATER_SETTINGS_CAROUSEL_ORDER.map((id) => {
           const selected = mode === id
           const shell = shellForMode(id)
           const pro = id === 'my_bottle'
+          const title = carouselTitleForMode(id)
+          const detail = carouselDetailForMode(id)
           return (
             <button
               key={id}
@@ -54,21 +45,25 @@ export function WaterContainerCarousel({
                 }
                 onSelect(id)
               }}
-              className={`relative flex w-[148px] shrink-0 snap-center flex-col items-center justify-end rounded-[26px] border pb-4 pt-3 ${
+              className={`relative flex min-w-0 flex-col items-center rounded-2xl border px-1 pb-2 pt-2 ${
                 selected
-                  ? 'h-[232px] w-[186px] border-2 border-[#FF0702] bg-[#FF0702]/10'
-                  : 'h-[192px] border border-white/10 bg-[#25282A] opacity-50'
+                  ? 'border-2 border-[#FF0702] bg-[#FF0702]/10'
+                  : 'border border-white/10 bg-[#25282A]'
               }`}
             >
+              {selected ? (
+                <span
+                  className="absolute right-1 top-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#FF0702]"
+                  aria-hidden
+                >
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12.5l4.5 4.5L19 7.5" />
+                  </svg>
+                </span>
+              ) : null}
               <div
-                className={`relative ${
-                  id === 'glasses_250'
-                    ? selected
-                      ? 'h-24 w-14'
-                      : 'h-20 w-12'
-                    : selected
-                      ? 'h-[146px] w-11'
-                      : 'h-[126px] w-10'
+                className={`relative shrink-0 ${
+                  id === 'glasses_250' ? 'h-14 w-8' : 'h-14 w-7'
                 }`}
               >
                 <img
@@ -77,7 +72,7 @@ export function WaterContainerCarousel({
                   draggable={false}
                   className="relative z-0 h-full w-full object-contain"
                 />
-                {id !== 'my_bottle' || !pro ? (
+                {id !== 'my_bottle' ? (
                   <div
                     className="pointer-events-none absolute inset-0 z-[1] overflow-hidden"
                     style={{
@@ -95,7 +90,7 @@ export function WaterContainerCarousel({
                     <div
                       className="absolute inset-x-0 bottom-0"
                       style={{
-                        height: selected ? '70%' : '60%',
+                        height: selected ? '70%' : '55%',
                         background:
                           'linear-gradient(to top, rgba(40,120,205,0.92), rgba(120,200,245,0.78))',
                       }}
@@ -103,45 +98,19 @@ export function WaterContainerCarousel({
                   </div>
                 ) : null}
               </div>
-              <b
-                className={`mt-3 text-white ${selected ? 'text-[18px]' : 'text-[15px]'}`}
-              >
-                {carouselTitleForMode(id)}
-              </b>
-              <span className="mt-0.5 text-[13px] text-[#ACB4BA]">
+              <span className="mt-1.5 w-full text-center text-[11px] font-semibold leading-tight text-white">
+                {title}
+              </span>
+              <span className="mt-0.5 min-h-[12px] w-full text-center text-[10px] leading-tight text-[#ACB4BA]">
                 {pro ? (
-                  <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#FF907F]">
-                    PRO
-                  </span>
+                  <span className="font-semibold uppercase tracking-wide text-[#FF907F]">PRO</span>
                 ) : (
-                  carouselDetailForMode(id)
+                  detail.trim() || '\u00a0'
                 )}
               </span>
-              {selected ? (
-                <span
-                  className="absolute right-2 top-2 flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#FF0702]"
-                  aria-hidden
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 12.5l4.5 4.5L19 7.5" />
-                  </svg>
-                </span>
-              ) : null}
             </button>
           )
         })}
-      </div>
-      <div className="flex items-center justify-center gap-1.5" aria-hidden>
-        {WATER_SETTINGS_CAROUSEL_ORDER.map((id, i) => (
-          <i
-            key={id}
-            className={
-              i === selectedIndex
-                ? 'h-[7px] w-5 rounded bg-[#FF0702]'
-                : 'h-[7px] w-[7px] rounded-full bg-[#42484C]'
-            }
-          />
-        ))}
       </div>
     </div>
   )

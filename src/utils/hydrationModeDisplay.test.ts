@@ -14,9 +14,10 @@ describe('hydrationModeDisplay B v2', () => {
     expect(bottleScreenLabelForMode('classic_15')).toBe('Cristaline 1,5 L')
     expect(bottleScreenLabelForMode('classic_2l')).toBe('Bouteille 2 L')
     expect(bottleScreenLabelForMode('classic_2l')).not.toMatch(/Cristaline/)
-    expect(carouselDetailForMode('classic_15')).toBe('1,5 L')
-    expect(carouselDetailForMode('classic_2l')).toBe('2 L')
+    expect(carouselTitleForMode('classic_15')).toBe('1,5 L')
+    expect(carouselTitleForMode('classic_2l')).toBe('2 L')
     expect(carouselTitleForMode('glasses_250')).toBe('Verre')
+    expect(carouselDetailForMode('glasses_250')).toBe('250 ml')
   })
 
   it('capacités + kind carousel', () => {

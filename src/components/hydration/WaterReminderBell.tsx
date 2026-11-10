@@ -21,14 +21,14 @@ interface WaterReminderBellProps {
 }
 
 const BELL_ON = (
-  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
     <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" fill="#fff" />
     <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
   </svg>
 )
 
 const BELL_OFF = (
-  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
     <path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5" />
     <path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7" />
     <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
@@ -37,8 +37,8 @@ const BELL_OFF = (
 )
 
 /**
- * Cloche B v2 — à droite de la colonne d’eau.
- * Tap = on/off ; appui long / lien Horaires = feuille créneaux.
+ * Ligne Rappels pleine largeur :
+ * cloche (tap on/off, long-press Horaires) · « Rappels » · état · Horaires à droite.
  */
 export function WaterReminderBell({
   enabled,
@@ -94,85 +94,85 @@ export function WaterReminderBell({
   }
 
   return (
-    <div
-      className="flex w-[104px] shrink-0 flex-col items-center"
-      data-hydration-reminders
-      data-hydration-reminders-bell
-    >
-      <button
-        ref={bellRef}
-        type="button"
-        role="switch"
-        aria-checked={enabled}
-        aria-label={enabled ? 'Couper les rappels' : 'Activer les rappels'}
-        data-hydration-reminders-toggle
-        className={`rg-water-bell flex h-[84px] w-[84px] shrink-0 items-center justify-center rounded-full ${
-          enabled ? 'rg-water-bell--on' : 'rg-water-bell--off'
-        }`}
-        onPointerDown={(e) => {
-          if (e.button != null && e.button !== 0) return
-          longPressFired.current = false
-          if (bellRef.current) void pressIn(bellRef.current, reduced)
-          clearLongPress()
-          longPressTimer.current = window.setTimeout(() => {
-            longPressFired.current = true
+    <div className="w-full min-w-0" data-hydration-reminders data-hydration-reminders-bell>
+      <div className="flex w-full min-w-0 items-center gap-2.5">
+        <button
+          ref={bellRef}
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          aria-label={enabled ? 'Couper les rappels' : 'Activer les rappels'}
+          data-hydration-reminders-toggle
+          className={`rg-water-bell flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
+            enabled ? 'rg-water-bell--on' : 'rg-water-bell--off'
+          }`}
+          onPointerDown={(e) => {
+            if (e.button != null && e.button !== 0) return
+            longPressFired.current = false
+            if (bellRef.current) void pressIn(bellRef.current, reduced)
+            clearLongPress()
+            longPressTimer.current = window.setTimeout(() => {
+              longPressFired.current = true
+              onOpenSchedule()
+            }, 480)
+          }}
+          onPointerUp={(e) => {
+            clearLongPress()
+            if (bellRef.current) void pressOut(bellRef.current, reduced)
+            if (longPressFired.current) return
+            if (e.button != null && e.button !== 0) return
+            void toggle(!enabled)
+          }}
+          onPointerCancel={() => {
+            clearLongPress()
+            if (bellRef.current) void pressOut(bellRef.current, reduced)
+          }}
+          onPointerLeave={() => {
+            clearLongPress()
+            if (bellRef.current) void pressOut(bellRef.current, reduced)
+          }}
+          onContextMenu={(e) => {
+            e.preventDefault()
             onOpenSchedule()
-          }, 480)
-        }}
-        onPointerUp={(e) => {
-          clearLongPress()
-          if (bellRef.current) void pressOut(bellRef.current, reduced)
-          if (longPressFired.current) return
-          if (e.button != null && e.button !== 0) return
-          void toggle(!enabled)
-        }}
-        onPointerCancel={() => {
-          clearLongPress()
-          if (bellRef.current) void pressOut(bellRef.current, reduced)
-        }}
-        onPointerLeave={() => {
-          clearLongPress()
-          if (bellRef.current) void pressOut(bellRef.current, reduced)
-        }}
-        onContextMenu={(e) => {
-          e.preventDefault()
-          onOpenSchedule()
-        }}
-      >
-        <span
-          className={`rg-water-bell__ic flex ${ringing && !reduced ? 'rg-water-bell__ic--ring' : ''}`}
+          }}
         >
-          {enabled ? BELL_ON : BELL_OFF}
-        </span>
-      </button>
-      <p
-        className={`mt-2.5 max-w-[104px] text-center text-[12px] font-semibold leading-tight ${
-          enabled ? 'text-white' : 'text-[#ACB4BA]'
-        }`}
-        data-hydration-reminders-status
-      >
-        {enabled ? 'Rappels activés' : 'Rappels coupés'}
-      </p>
-      <button
-        type="button"
-        onClick={onOpenSchedule}
-        className="mt-1 text-[13px] font-semibold text-[#FF0702]"
-        data-hydration-reminders-schedule-link
-      >
-        Horaires
-      </button>
+          <span
+            className={`rg-water-bell__ic flex ${ringing && !reduced ? 'rg-water-bell__ic--ring' : ''}`}
+          >
+            {enabled ? BELL_ON : BELL_OFF}
+          </span>
+        </button>
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[15px] font-semibold text-white">Rappels</p>
+          <p
+            className={`truncate text-[13px] ${enabled ? 'text-[#ACB4BA]' : 'text-[#8E8E93]'}`}
+            data-hydration-reminders-status
+          >
+            {enabled ? 'activés' : 'coupés'}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onOpenSchedule}
+          className="shrink-0 text-[14px] font-semibold text-[#FF0702]"
+          data-hydration-reminders-schedule-link
+        >
+          Horaires
+        </button>
+      </div>
+
       {goalReachedToday && enabled ? (
         <p
-          className="mt-2 max-w-[104px] text-center text-[11px] leading-snug text-[#C7C7CC]"
+          className="mt-2 text-[11px] leading-snug text-[#C7C7CC]"
           data-hydration-reminder-pause={useRepereCopy ? 'repere' : 'goal'}
         >
           {useRepereCopy ? MSG_REMINDER_PAUSE_NEUTRAL : MSG_REMINDER_PAUSE_GOAL}
         </p>
       ) : null}
       {error ? (
-        <p className="mt-2 max-w-[104px] text-center text-[11px] leading-snug text-[#C7C7CC]">
-          {error}
-        </p>
+        <p className="mt-2 text-[11px] leading-snug text-[#C7C7CC]">{error}</p>
       ) : null}
     </div>
   )

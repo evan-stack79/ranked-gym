@@ -40,6 +40,7 @@ export function WaterSettingsSheet({ open, onClose }: WaterSettingsSheetProps) {
   const [showProGate, setShowProGate] = useState(false)
   const [faceGateMsg, setFaceGateMsg] = useState<string | null>(null)
   const [scheduleOpen, setScheduleOpen] = useState(false)
+  const [goalDragging, setGoalDragging] = useState(false)
   const minorLocked = isMinorOrUnknownAge(getCalorieProfile().age)
 
   const refresh = useCallback(async () => {
@@ -61,7 +62,17 @@ export function WaterSettingsSheet({ open, onClose }: WaterSettingsSheetProps) {
 
   const saveGoal = async (goalMl: number) => {
     if (minorLocked) return
+    setToday((prev) =>
+      prev
+        ? {
+            ...prev,
+            goalMl,
+            remainingMl: Math.max(0, goalMl - prev.drunkMl),
+          }
+        : prev,
+    )
     await updateHydrationSettings({ goalMl })
+    // refresh respecte le pending local si Convex a refusé
     await refresh()
   }
 
@@ -79,6 +90,16 @@ export function WaterSettingsSheet({ open, onClose }: WaterSettingsSheetProps) {
       setShowCapture(true)
       return
     }
+    // Optimiste UI immédiat — updateHydrationSettings écrit aussi le cache local.
+    setToday((prev) =>
+      prev
+        ? {
+            ...prev,
+            mode,
+            effectiveVisualMode: mode,
+          }
+        : prev,
+    )
     await updateHydrationSettings({ mode })
     await refresh()
   }
@@ -89,11 +110,25 @@ export function WaterSettingsSheet({ open, onClose }: WaterSettingsSheetProps) {
     setFaceGateMsg(null)
     await clearBottleShapeLocal()
     await deleteMyBottleRemote().catch(() => undefined)
+    setToday((prev) =>
+      prev
+        ? { ...prev, mode: 'classic_2l', effectiveVisualMode: 'classic_2l' }
+        : prev,
+    )
     await updateHydrationSettings({ mode: 'classic_2l' })
     await refresh()
   }
 
   const persistReminders = async (next: { enabled: boolean; times: string[] }) => {
+    setToday((prev) =>
+      prev
+        ? {
+            ...prev,
+            remindersEnabled: next.enabled,
+            reminderTimes: next.times,
+          }
+        : prev,
+    )
     await updateHydrationSettings({
       remindersEnabled: next.enabled,
       reminderTimes: next.times,
@@ -113,7 +148,13 @@ export function WaterSettingsSheet({ open, onClose }: WaterSettingsSheetProps) {
 
   return (
     <>
-      <IosSheet open={open} onClose={onClose} title="Eau">
+      <IosSheet
+        open={open}
+        onClose={onClose}
+        title="Eau"
+        dismissible={!goalDragging}
+        scrollLocked={goalDragging}
+      >
         <div className="space-y-5 pb-8" data-hydration-settings-bv2>
           {showProGate ? (
             <div className="space-y-3 rounded-2xl border border-[#FF0702]/25 bg-[#FF0702]/5 p-4">
@@ -202,36 +243,23 @@ export function WaterSettingsSheet({ open, onClose }: WaterSettingsSheetProps) {
                   </p>
                 </div>
               ) : (
-                <div className="flex items-start gap-3">
-                  <WaterGoalColumn
-                    valueMl={today?.goalMl ?? GOAL_DEFAULT_ML}
-                    onChange={(g) => void saveGoal(g)}
-                  />
-                  <WaterReminderBell
-                    enabled={today?.remindersEnabled ?? false}
-                    times={today?.reminderTimes ?? []}
-                    goalReachedToday={Boolean(today && today.drunkMl >= today.goalMl)}
-                    useRepereCopy={minorLocked}
-                    onChange={(next) => {
-                      void persistReminders(next)
-                    }}
-                    onOpenSchedule={() => setScheduleOpen(true)}
-                  />
-                </div>
+                <WaterGoalColumn
+                  valueMl={today?.goalMl ?? GOAL_DEFAULT_ML}
+                  onChange={(g) => void saveGoal(g)}
+                  onDraggingChange={setGoalDragging}
+                />
               )}
 
-              {minorLocked ? (
-                <WaterReminderBell
-                  enabled={today?.remindersEnabled ?? false}
-                  times={today?.reminderTimes ?? []}
-                  goalReachedToday={Boolean(today && today.drunkMl >= today.goalMl)}
-                  useRepereCopy
-                  onChange={(next) => {
-                    void persistReminders(next)
-                  }}
-                  onOpenSchedule={() => setScheduleOpen(true)}
-                />
-              ) : null}
+              <WaterReminderBell
+                enabled={today?.remindersEnabled ?? false}
+                times={today?.reminderTimes ?? []}
+                goalReachedToday={Boolean(today && today.drunkMl >= today.goalMl)}
+                useRepereCopy={minorLocked}
+                onChange={(next) => {
+                  void persistReminders(next)
+                }}
+                onOpenSchedule={() => setScheduleOpen(true)}
+              />
             </>
           )}
         </div>

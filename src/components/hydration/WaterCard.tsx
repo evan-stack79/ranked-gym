@@ -5,7 +5,6 @@ import {
   formatLitersFr,
   formatRemainingLabel,
   GOAL_DEFAULT_ML,
-  LABEL_EAU_BUE_SEULE,
   LABEL_REPERE_JOUR,
   MSG_HIGH_INFO,
   MSG_MINOR_PERMANENT,
@@ -134,10 +133,7 @@ export function WaterCard({ compact = false, onOpenSettings, className = '' }: W
           className={compact ? 'h-20 w-12 shrink-0' : undefined}
         />
         <div className="min-w-0 flex-1">
-          <div className="flex items-baseline justify-between gap-2">
-            <p className="text-[14px] font-semibold text-white">Eau</p>
-            <p className="text-[11px] font-medium text-[#8E8E93]">{LABEL_EAU_BUE_SEULE}</p>
-          </div>
+          <p className="text-[14px] font-semibold text-white">Eau</p>
           {minorLocked ? (
             <p
               className="mt-0.5 text-[15px] font-semibold tabular-nums text-white"

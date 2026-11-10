@@ -15,22 +15,21 @@ vi.mock('./LiveBottleVisual', () => ({
   }) => (
     <button
       type="button"
-      data-testid="fake-bottle-commit"
+      data-testid="fake-bottle-drag"
       onClick={() => {
         const start = props.startRemainingMl ?? 1200
         props.onRemainingChange?.(start - 250)
-        // onRemainingChange is async in parent setState — defer drag end
         queueMicrotask(() => props.onDragEnd?.())
       }}
     >
-      fake-commit
+      fake-drag
     </button>
   ),
 }))
 
 import { BottleFlowV3 } from './BottleFlowV3'
 
-describe('BottleFlowV3 — Annuler garde le plein écran', () => {
+describe('BottleFlowV3 — commit explicite + Annuler', () => {
   let host: HTMLDivElement
   let root: Root
 
@@ -48,7 +47,7 @@ describe('BottleFlowV3 — Annuler garde le plein écran', () => {
     __resetBodyScrollLockForTests()
   })
 
-  it('après lâcher : toast Annuler restaure le niveau, overlay reste ouvert, undo once', async () => {
+  it('relâchement seul → aucun ajout ; bouton J’ai bu X ml → commit + undo once', async () => {
     host = document.createElement('div')
     document.body.appendChild(host)
     root = createRoot(host)
@@ -75,17 +74,33 @@ describe('BottleFlowV3 — Annuler garde le plein écran', () => {
     expect(document.querySelector('[data-hydration-bottle-flow="v3b"]')).toBeTruthy()
 
     await act(async () => {
-      document.querySelector<HTMLButtonElement>('[data-testid="fake-bottle-commit"]')!.click()
+      document.querySelector<HTMLButtonElement>('[data-testid="fake-bottle-drag"]')!.click()
       await Promise.resolve()
       await Promise.resolve()
       await Promise.resolve()
     })
 
-    expect(onCommit).toHaveBeenCalled()
+    // Relâchement ne commit plus.
+    expect(onCommit).not.toHaveBeenCalled()
+
+    const commitBtn = document.querySelector(
+      '[data-hydration-commit-drunk]',
+    ) as HTMLButtonElement
+    expect(commitBtn).toBeTruthy()
+    expect(commitBtn.textContent).toMatch(/J'ai bu/)
+
+    await act(async () => {
+      commitBtn.click()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(onCommit).toHaveBeenCalledTimes(1)
     const commitCalls = onCommit.mock.calls as unknown as Array<
-      [{ amountMl: number; remainingAfterMl: number }]
+      [{ amountMl: number; remainingAfterMl: number; clientId: string }]
     >
     expect(commitCalls[0]?.[0]?.amountMl).toBe(250)
+    expect(commitCalls[0]?.[0]?.clientId).toBeTruthy()
     expect(onClose).not.toHaveBeenCalled()
 
     const toastBtn = document.querySelector(
@@ -99,10 +114,6 @@ describe('BottleFlowV3 — Annuler garde le plein écran', () => {
       await Promise.resolve()
     })
     expect(onUndo).toHaveBeenCalledTimes(1)
-    const undoCalls = onUndo.mock.calls as unknown as Array<
-      [{ restoreRemainingMl: number; amountMl: number }]
-    >
-    expect(undoCalls[0]?.[0]?.restoreRemainingMl).toBe(1200)
 
     await act(async () => {
       toastBtn.click()
