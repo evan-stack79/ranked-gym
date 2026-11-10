@@ -1,5 +1,5 @@
 /**
- * Fixture capture — Réglages Eau B v2 (4 tuiles + colonne centrée + ligne Rappels).
+ * Fixture capture — Réglages Eau B v2 (4 tuiles + colonne|cloche compactes).
  * Route: /water-settings-bv2-fixture
  */
 import { useEffect, useState } from 'react'
@@ -71,21 +71,26 @@ function WaterSettingsBv2FixtureShell() {
             onSelect={selectMode}
             onRequestPro={() => undefined}
           />
-          <WaterGoalColumn
-            valueMl={goalMl}
-            onChange={setGoalMl}
-            onDraggingChange={setGoalDragging}
-          />
-          <WaterReminderBell
-            enabled={remindersEnabled}
-            times={times}
-            goalReachedToday={false}
-            onChange={(next) => {
-              setRemindersEnabled(next.enabled)
-              setTimes(next.times)
-            }}
-            onOpenSchedule={() => setScheduleOpen(true)}
-          />
+          <div
+            className="mx-auto flex w-fit max-w-full items-start justify-center gap-5"
+            data-hydration-goal-bell-row
+          >
+            <WaterGoalColumn
+              valueMl={goalMl}
+              onChange={setGoalMl}
+              onDraggingChange={setGoalDragging}
+            />
+            <WaterReminderBell
+              enabled={remindersEnabled}
+              times={times}
+              goalReachedToday={false}
+              onChange={(next) => {
+                setRemindersEnabled(next.enabled)
+                setTimes(next.times)
+              }}
+              onOpenSchedule={() => setScheduleOpen(true)}
+            />
+          </div>
         </div>
       </IosSheet>
       <WaterReminderScheduleSheet

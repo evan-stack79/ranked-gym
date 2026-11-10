@@ -41,7 +41,7 @@ if (typeof globalThis.PointerEvent === 'undefined') {
     PointerEventPolyfill as unknown as typeof PointerEvent
 }
 
-describe('Réglages Eau B v2 — layout + cloche ligne', () => {
+describe('Réglages Eau B v2 — layout colonne|cloche compact', () => {
   let host: HTMLDivElement
   let root: Root
 
@@ -58,7 +58,7 @@ describe('Réglages Eau B v2 — layout + cloche ligne', () => {
     host.remove()
   })
 
-  it('4 tuiles entières + Objectif centré + ligne Rappels (pas de cloche isolée)', async () => {
+  it('4 tuiles + bloc compact colonne|cloche (gap serré, pas de ligne Rappels)', async () => {
     const onSelect = vi.fn()
     await act(async () => {
       root.render(
@@ -69,30 +69,38 @@ describe('Réglages Eau B v2 — layout + cloche ligne', () => {
             onSelect={onSelect}
             onRequestPro={() => undefined}
           />
-          <WaterGoalColumn valueMl={2000} onChange={() => undefined} />
-          <WaterReminderBell
-            enabled
-            times={['10:00', '14:00', '18:00']}
-            goalReachedToday={false}
-            onChange={() => undefined}
-            onOpenSchedule={() => undefined}
-          />
+          <div
+            className="mx-auto flex w-fit max-w-full items-start justify-center gap-5"
+            data-hydration-goal-bell-row
+          >
+            <WaterGoalColumn valueMl={2000} onChange={() => undefined} />
+            <WaterReminderBell
+              enabled
+              times={['10:00', '14:00', '18:00']}
+              goalReachedToday={false}
+              onChange={() => undefined}
+              onOpenSchedule={() => undefined}
+            />
+          </div>
         </div>,
       )
     })
 
     const tiles = host.querySelectorAll('[data-hydration-carousel-tile]')
     expect(tiles.length).toBe(4)
-    expect(host.querySelector('[data-hydration-goal-column]')?.className).toMatch(/items-center/)
+    const row = host.querySelector('[data-hydration-goal-bell-row]')
+    expect(row?.className).toMatch(/gap-5/)
+    expect(row?.className).toMatch(/w-fit/)
+    expect(host.querySelector('[data-hydration-goal-column]')?.className).toMatch(/shrink-0/)
+    expect(host.querySelector('[data-hydration-reminders-bell]')?.className).toMatch(/shrink-0/)
     expect(host.textContent).toContain('Objectif')
-    expect(host.textContent).toContain('Rappels')
+    expect(host.textContent).not.toMatch(/\bRappels\b/)
     expect(host.querySelector('[data-hydration-reminders-status]')?.textContent).toMatch(/activés/)
     expect(host.querySelector('[data-hydration-reminders-schedule-link]')?.textContent).toBe(
       'Horaires',
     )
-    // Pas de grosse cloche isolée à droite
     const bell = host.querySelector('[data-hydration-reminders-toggle]')
-    expect(bell?.className).toMatch(/h-11/)
+    expect(bell?.className).toMatch(/h-\[84px\]/)
     expect(host.textContent).not.toContain('Eau bue seule')
 
     await act(async () => {
@@ -128,7 +136,7 @@ describe('Réglages Eau B v2 — layout + cloche ligne', () => {
         />,
       )
     })
-    expect(host.textContent).toContain('coupés')
+    expect(host.textContent).toContain('désactivés')
     const toggle = host.querySelector('[data-hydration-reminders-toggle]') as HTMLButtonElement
     await act(async () => {
       toggle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }))

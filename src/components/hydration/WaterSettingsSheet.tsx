@@ -233,33 +233,51 @@ export function WaterSettingsSheet({ open, onClose }: WaterSettingsSheetProps) {
               ) : null}
 
               {minorLocked ? (
-                <div data-hydration-goal-locked className="space-y-1">
-                  <p className="text-[15px] font-semibold text-white">{LABEL_REPERE_JOUR}</p>
-                  <p className="text-[13px] text-[#ACB4BA]" data-hydration-repere-locked>
-                    {MSG_REPERE_LOCKED}
-                  </p>
-                  <p className="text-[12px] leading-snug text-[#8E8E93]" data-hydration-minor-permanent>
-                    {MSG_MINOR_PERMANENT}
-                  </p>
+                <div className="space-y-4">
+                  <div data-hydration-goal-locked className="space-y-1">
+                    <p className="text-[15px] font-semibold text-white">{LABEL_REPERE_JOUR}</p>
+                    <p className="text-[13px] text-[#ACB4BA]" data-hydration-repere-locked>
+                      {MSG_REPERE_LOCKED}
+                    </p>
+                    <p className="text-[12px] leading-snug text-[#8E8E93]" data-hydration-minor-permanent>
+                      {MSG_MINOR_PERMANENT}
+                    </p>
+                  </div>
+                  <div className="flex justify-center">
+                    <WaterReminderBell
+                      enabled={today?.remindersEnabled ?? false}
+                      times={today?.reminderTimes ?? []}
+                      goalReachedToday={Boolean(today && today.drunkMl >= today.goalMl)}
+                      useRepereCopy
+                      onChange={(next) => {
+                        void persistReminders(next)
+                      }}
+                      onOpenSchedule={() => setScheduleOpen(true)}
+                    />
+                  </div>
                 </div>
               ) : (
-                <WaterGoalColumn
-                  valueMl={today?.goalMl ?? GOAL_DEFAULT_ML}
-                  onChange={(g) => void saveGoal(g)}
-                  onDraggingChange={setGoalDragging}
-                />
+                <div
+                  className="mx-auto flex w-fit max-w-full items-start justify-center gap-5"
+                  data-hydration-goal-bell-row
+                >
+                  <WaterGoalColumn
+                    valueMl={today?.goalMl ?? GOAL_DEFAULT_ML}
+                    onChange={(g) => void saveGoal(g)}
+                    onDraggingChange={setGoalDragging}
+                  />
+                  <WaterReminderBell
+                    enabled={today?.remindersEnabled ?? false}
+                    times={today?.reminderTimes ?? []}
+                    goalReachedToday={Boolean(today && today.drunkMl >= today.goalMl)}
+                    useRepereCopy={false}
+                    onChange={(next) => {
+                      void persistReminders(next)
+                    }}
+                    onOpenSchedule={() => setScheduleOpen(true)}
+                  />
+                </div>
               )}
-
-              <WaterReminderBell
-                enabled={today?.remindersEnabled ?? false}
-                times={today?.reminderTimes ?? []}
-                goalReachedToday={Boolean(today && today.drunkMl >= today.goalMl)}
-                useRepereCopy={minorLocked}
-                onChange={(next) => {
-                  void persistReminders(next)
-                }}
-                onOpenSchedule={() => setScheduleOpen(true)}
-              />
             </>
           )}
         </div>

@@ -105,9 +105,9 @@ export function WaterGoalColumn({
   return (
     <div
       data-hydration-goal-column
-      className="mx-auto flex w-full max-w-[280px] flex-col items-center"
+      className="flex w-[132px] shrink-0 flex-col items-center"
     >
-      <div className="flex items-start justify-center gap-2">
+      <div className="flex items-start gap-1.5">
         <div
           ref={trackRef}
           role="slider"
@@ -131,7 +131,7 @@ export function WaterGoalColumn({
               onChange(clampGoalMl(safe - GOAL_STEP_ML))
             }
           }}
-          className="relative h-[200px] w-24 shrink-0 touch-none overflow-hidden rounded-[32px] border border-white/10 bg-[#25282A]"
+          className="relative h-[200px] w-[88px] shrink-0 touch-none overflow-hidden rounded-[32px] border border-white/10 bg-[#25282A]"
           style={{ touchAction: 'none' }}
           data-hydration-goal-slider
         >
@@ -144,20 +144,20 @@ export function WaterGoalColumn({
             }}
           />
           <div
-            className="absolute left-1/2 h-3 w-14 -translate-x-1/2 -translate-y-1/2 rounded-md bg-white shadow-[0_2px_6px_rgba(0,0,0,0.4)]"
+            className="absolute left-1/2 h-3 w-12 -translate-x-1/2 -translate-y-1/2 rounded-md bg-white shadow-[0_2px_6px_rgba(0,0,0,0.4)]"
             style={{ bottom: `${fillPct}%` }}
             aria-hidden
           />
         </div>
-        <div className="flex h-[200px] shrink-0 flex-col justify-between py-3.5 text-[12px] tabular-nums text-[#8E8E93]">
+        <div className="flex h-[200px] shrink-0 flex-col justify-between py-3.5 text-[11px] tabular-nums text-[#8E8E93]">
           <span>3 L</span>
           <span>1 L</span>
         </div>
       </div>
 
       <div className="relative mt-3 w-full min-w-0 text-center">
-        <div className="flex items-center justify-center gap-2">
-          <span className="text-[15px] font-semibold text-white">Objectif</span>
+        <div className="flex items-center justify-center gap-1.5">
+          <span className="text-[14px] font-semibold text-white">Objectif</span>
           <button
             type="button"
             aria-label="Informations santé hydratation"
@@ -171,14 +171,14 @@ export function WaterGoalColumn({
             i
           </button>
         </div>
-        <p className="mt-1 text-[36px] font-bold leading-none tracking-[-0.03em] tabular-nums text-white">
+        <p className="mt-1 text-[32px] font-bold leading-none tracking-[-0.03em] tabular-nums text-white">
           {formatLitersFr(safe).replace(' L', '')}&nbsp;L
         </p>
-        <p className="mt-1 text-[12px] text-[#8E8E93]">Glisse pour régler.</p>
+        <p className="mt-1 text-[11px] text-[#8E8E93]">Glisse pour régler.</p>
 
         {infoOpen ? (
           <div
-            className="absolute left-0 right-0 top-7 z-20 rounded-2xl border border-white/10 bg-[#2C3032] p-3.5 text-left shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
+            className="absolute left-1/2 top-7 z-20 w-[min(280px,78vw)] -translate-x-1/2 rounded-2xl border border-white/10 bg-[#2C3032] p-3.5 text-left shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
             data-hydration-goal-info-bubble
             role="dialog"
             aria-label="Mentions santé"
