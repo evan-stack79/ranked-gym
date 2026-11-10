@@ -2909,9 +2909,14 @@ select,
 }
 
 /* Fond header : calque séparé — blur autorisé ICI seulement, jamais sur <header> parent.
- * Mode transparent : pas de bloc noir opaque (dégradé inline uniquement). */
+ * Mode transparent : aucun fond (ni #000 ni dégradé) — logo seul. */
 [data-brand-header-bg='1']:not([data-brand-header-bg-mode='transparent']) {
   background-color: #000000;
+}
+
+[data-brand-header-bg='1'][data-brand-header-bg-mode='transparent'] {
+  background: none !important;
+  background-color: transparent !important;
 }
 
 .home-cold-enter--active .home-cold-enter__group {

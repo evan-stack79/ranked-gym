@@ -70,6 +70,9 @@ jobs:
           VITE_CONVEX_SITE_URL: ${{ secrets.VITE_CONVEX_SITE_URL }}
           VITE_ENABLE_CONVEX_AUTH: "true"
           VITE_ENABLE_CONVEX_PRIMARY: "true"
+          # GO produit Evan (#147) : anneau kcal + « Fixer un objectif » pour non-TCA.
+          # Protections TCA/mineurs inchangées (getNutritionTarget / allowGoalSetup).
+          VITE_ENABLE_CALORIE_GOAL: "true"
 
       - name: Sync Capacitor iOS
         run: npx cap sync ios

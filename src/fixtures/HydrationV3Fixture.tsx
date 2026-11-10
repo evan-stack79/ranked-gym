@@ -4,7 +4,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { AuthProvider } from '../context/AuthContext'
 import { LiveBottleVisual } from '../components/hydration/LiveBottleVisual'
-import { BottleFlowV3, HydrationUndoToast } from '../components/hydration/BottleFlowV3'
+import { BottleFlowV3 } from '../components/hydration/BottleFlowV3'
 import {
   WATER_CONTAINER_CAPACITY_ML,
   WATER_DRAG_STEP_ML,
@@ -153,8 +153,11 @@ export default function HydrationV3Fixture() {
               onClose={() => undefined}
               capacityMl={CAP}
               kind="plastic_15"
-              initialRemainingMl={CAP}
-              initialPhase="intro"
+              initialRemainingMl={START}
+              hasMemorizedLevel
+              initialPhase="drink"
+              captureStartMl={START}
+              captureRemainingMl={START}
               onCommitDrunk={async () => undefined}
             />
           </div>
@@ -193,46 +196,21 @@ export default function HydrationV3Fixture() {
         ) : null}
 
         {screen === '05B' ? (
-          <Phone testId="05B">
-            <button type="button" className="text-[17px] font-medium text-[#FF0702]">
-              Retour
-            </button>
-            <h1 className="mt-2 text-[28px] font-bold">Alimentation</h1>
-            <p className="text-[14px] text-[#8E8E93]">Aujourd&apos;hui</p>
-            <div className="mt-4 rounded-2xl border border-white/[0.08] bg-[#141416]/92 px-3.5 py-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-[72px] w-12 items-end justify-center">
-                  <LiveBottleVisual
-                    kind="plastic_15"
-                    remainingMl={AFTER}
-                    capacityMl={CAP}
-                    size="thumb"
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[14px] font-semibold">Eau</p>
-                  <p className="mt-0.5 text-[15px] font-semibold tabular-nums">
-                    {(DAY_AFTER / 1000).toFixed(2).replace('.', ',')}&nbsp;/&nbsp;2&nbsp;L
-                  </p>
-                  <p className="mt-0.5 text-[13px] text-[#ACB4BA]">Cristaline 1,5&nbsp;L</p>
-                </div>
-              </div>
-              <div className="mt-2.5 h-[3px] overflow-hidden rounded-full bg-[#2A2A2E]">
-                <div
-                  className="h-full rounded-full bg-[#FF0702]"
-                  style={{ width: `${(DAY_AFTER / 2000) * 100}%` }}
-                />
-              </div>
-            </div>
-            <div className="mt-auto">
-              <HydrationUndoToast
-                amountMl={DRUNK}
-                progress={0.62}
-                onUndo={() => undefined}
-                onDismiss={() => undefined}
-              />
-            </div>
-          </Phone>
+          <div style={{ width: 402, height: 874 }} data-hydration-v3-screen="05B">
+            <BottleFlowV3
+              open
+              onClose={() => undefined}
+              capacityMl={CAP}
+              kind="plastic_15"
+              initialRemainingMl={AFTER}
+              hasMemorizedLevel
+              initialPhase="drink"
+              captureStartMl={AFTER}
+              captureRemainingMl={AFTER}
+              captureToastMl={DRUNK}
+              onCommitDrunk={async () => undefined}
+            />
+          </div>
         ) : null}
 
         {screen === '06' ? (

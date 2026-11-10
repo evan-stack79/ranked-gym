@@ -134,11 +134,7 @@ function NutritionFixtureShell() {
             aria-hidden="true"
             data-brand-header-bg="1"
             data-brand-header-bg-mode="transparent"
-            className="pointer-events-none absolute inset-0 -z-10"
-            style={{
-              background:
-                'linear-gradient(to bottom, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.12) 55%, rgba(0,0,0,0) 100%)',
-            }}
+            className="pointer-events-none absolute inset-0 -z-10 bg-transparent"
           />
           <div className="mx-auto flex max-w-lg items-center justify-center px-4 pb-2 pt-0">
             <div data-cold-launch-target="compact">

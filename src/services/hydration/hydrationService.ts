@@ -222,6 +222,9 @@ export function clearHydrationLocalState(): void {
 /** À appeler au login / switch compte (M5). */
 export function onHydrationAccountChanged(userId: string | null): void {
   const prev = getHydrationQueueUserId()
+  void import('./containerLevelStorage').then((m) => {
+    m.setContainerLevelUserId(userId)
+  })
   if (userId == null) {
     clearHydrationLocalState()
     return

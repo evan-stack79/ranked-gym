@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { describe, expect, it, vi, afterEach } from 'vitest'
 import { createRoot } from 'react-dom/client'
 import { act } from 'react'
 import { NutritionDashboard } from './NutritionDashboard'
@@ -105,7 +105,6 @@ async function renderDashboard(profile: CalorieProfile) {
       />,
     )
   })
-  // HydrationPanel charge en async
   await act(async () => {
     await Promise.resolve()
     await Promise.resolve()
@@ -113,52 +112,62 @@ async function renderDashboard(profile: CalorieProfile) {
   return { host, root }
 }
 
-describe('NutritionDashboard — placement anneau kcal / carte Eau', () => {
+describe('NutritionDashboard — anneau kcal / Eau / TCA', () => {
   const prev = import.meta.env.VITE_ENABLE_CALORIE_GOAL
-
-  beforeEach(() => {
-    vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', 'true')
-  })
 
   afterEach(() => {
     if (prev === undefined) vi.unstubAllEnvs()
     else vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', prev)
   })
 
-  it('anneau « kcal restantes » présent au-dessus de la carte Eau', async () => {
+  it('non-TCA avec objectif → anneau au-dessus de la carte Eau (espacée)', async () => {
+    vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', 'true')
     const { host, root } = await renderDashboard(eligibleProfile)
-    const ring = host.querySelector('[data-testid="nutrition-calorie-ring"]') as HTMLElement | null
-    const eau = host.querySelector('[data-testid="nutrition-eau-card"]') as HTMLElement | null
-    expect(ring).not.toBeNull()
-    expect(eau).not.toBeNull()
-    expect(ring?.getAttribute('data-calorie-ring-mode')).toBe('ring')
-    expect(ring?.textContent).toMatch(/kcal restantes/)
-    expect(ring?.textContent).toMatch(/Calories aujourd/)
-    expect(host.textContent).toMatch(/Protéines/)
-    expect(host.textContent).toMatch(/Glucides/)
-    expect(host.textContent).toMatch(/Lipides/)
-
-    const position = ring!.compareDocumentPosition(eau!)
-    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-
+    const ring = host.querySelector('[data-testid="nutrition-calorie-ring"]') as HTMLElement
+    const eau = host.querySelector('[data-testid="nutrition-eau-card"]') as HTMLElement
+    const spacer = host.querySelector('[data-nutrition-eau-spacer="1"]')
+    expect(ring.getAttribute('data-calorie-ring-mode')).toBe('ring')
+    expect(ring.textContent).toMatch(/kcal restantes/)
+    expect(eau).toBeTruthy()
+    expect(spacer).toBeTruthy()
+    expect(ring.compareDocumentPosition(eau) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(host.textContent).not.toMatch(/Touche la carte pour dire/)
     root.unmount()
     host.remove()
   })
 
-  it('profil TCA : pas d’anneau « kcal restantes » (cible masquée)', async () => {
+  it('non-TCA sans objectif (profil incomplet) → bouton Fixer un objectif', async () => {
+    vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', 'true')
+    const { host, root } = await renderDashboard({
+      ...eligibleProfile,
+      onboardingComplete: false,
+      weightKg: 0,
+      heightCm: 0,
+    })
+    const ring = host.querySelector('[data-testid="nutrition-calorie-ring"]') as HTMLElement
+    expect(ring.getAttribute('data-calorie-ring-mode')).toBe('empty')
+    expect(host.querySelector('[data-testid="define-calorie-goal"]')?.textContent).toMatch(
+      /Fixer un objectif/,
+    )
+    expect(ring.textContent).not.toMatch(/kcal restantes/)
+    root.unmount()
+    host.remove()
+  })
+
+  it('TCA → jamais d’anneau kcal restantes', async () => {
+    vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', 'true')
     const { host, root } = await renderDashboard({
       ...eligibleProfile,
       healthAnswer: 'situations',
       declaredEatingDisorder: true,
     })
-    const ring = host.querySelector('[data-testid="nutrition-calorie-ring"]') as HTMLElement | null
-    expect(ring).not.toBeNull()
-    expect(ring?.getAttribute('data-calorie-ring-mode')).toBe('empty')
-    expect(ring?.textContent).not.toMatch(/kcal restantes/)
-    expect(host.querySelector('[aria-label="Progression calorique"]')).toBeNull()
+    const ring = host.querySelector('[data-testid="nutrition-calorie-ring"]') as HTMLElement
+    expect(ring.getAttribute('data-calorie-ring-mode')).toBe('empty')
+    expect(ring.getAttribute('data-calorie-lock')).toBe('tca')
+    expect(ring.textContent).not.toMatch(/kcal restantes/)
     expect(host.querySelector('[data-testid="define-calorie-goal"]')).toBeNull()
-    expect(host.querySelector('[data-testid="nutrition-eau-card"]')).not.toBeNull()
-
+    expect(host.querySelector('[aria-label="Progression calorique"]')).toBeNull()
+    expect(ring.textContent).toMatch(/Situations de santé/)
     root.unmount()
     host.remove()
   })

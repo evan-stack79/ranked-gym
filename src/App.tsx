@@ -97,17 +97,10 @@ function SessionChrome({
                 aria-hidden="true"
                 data-brand-header-bg="1"
                 data-brand-header-bg-mode="transparent"
-                className="pointer-events-none absolute inset-0 -z-10"
-                style={{
-                  background:
-                    'linear-gradient(to bottom, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.12) 55%, rgba(0,0,0,0) 100%)',
-                }}
+                className="pointer-events-none absolute inset-0 -z-10 bg-transparent"
               />
               <div className="mx-auto flex max-w-lg items-center justify-center px-4 py-3">
-                <span
-                  className="text-[17px] font-semibold tracking-tight text-white"
-                  style={{ textShadow: '0 1px 2px rgba(0,0,0,0.55)' }}
-                >
+                <span className="text-[17px] font-semibold tracking-tight text-white">
                   Ranked <span className="text-[#FF0702]">Gym</span>
                 </span>
               </div>

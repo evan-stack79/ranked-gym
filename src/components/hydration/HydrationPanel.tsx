@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   GLASS_ML,
   LABEL_EAU_BUE_SEULE,
-  MSG_HIGH_INFO,
-  MSG_PERMANENT,
   WATER_CONTAINER_CAPACITY_ML,
   localDayKey,
   type WaterContainerKind,
@@ -20,19 +18,14 @@ import {
 import { loadBottleShapeUrl } from '../../services/hydration/bottleShapeStorage'
 import {
   getMemorizedRemainingMl,
+  hasMemorizedRemainingMl,
   setMemorizedRemainingMl,
 } from '../../services/hydration/containerLevelStorage'
 import { getCalorieProfile } from '../../services/nutritionStorage'
 import { isMinorOrUnknownAge } from '../../services/nutritionSafetyRules'
 import { useAuth } from '../../context/AuthContext'
 import { LiveBottleVisual } from './LiveBottleVisual'
-import {
-  BottleFlowV3,
-  HydrationUndoToast,
-  UNDO_TOAST_MS,
-  createUndoOnce,
-  type BottleFlowCommit,
-} from './BottleFlowV3'
+import { BottleFlowV3, type BottleFlowCommit } from './BottleFlowV3'
 import type { CatalogContainer } from './ContainerPicker'
 
 interface HydrationPanelProps {
@@ -41,8 +34,8 @@ interface HydrationPanelProps {
 }
 
 /**
- * Nutrition › Hydratation v3 (variante B test) —
- * carte Eau → plein écran → étape 1 (départ) → étape 2 (relâche = ajouter).
+ * Nutrition › Hydratation v3 —
+ * carte Eau → plein écran (niveau mémorisé → boire ; sinon régler).
  */
 export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPanelProps) {
   const { user } = useAuth()
@@ -51,14 +44,13 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
   const [container] = useState<CatalogContainer>('plastic_15')
   const [flowOpen, setFlowOpen] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [toast, setToast] = useState<{ amountMl: number; clientId: string } | null>(null)
-  const [toastProgress, setToastProgress] = useState(1)
-  const undoGateRef = useRef<ReturnType<typeof createUndoOnce> | null>(null)
+  const [levelTick, setLevelTick] = useState(0)
   const minorLocked = isMinorOrUnknownAge(getCalorieProfile().age)
+  const userId = user?.id ?? null
 
   useEffect(() => {
-    onHydrationAccountChanged(user?.id ?? null)
-  }, [user?.id])
+    onHydrationAccountChanged(userId)
+  }, [userId])
 
   const refresh = useCallback(async () => {
     const data = await fetchHydrationToday(localDayKey())
@@ -89,27 +81,6 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
     }
   }, [refresh])
 
-  // Toast timer
-  useEffect(() => {
-    if (!toast) {
-      setToastProgress(1)
-      return
-    }
-    undoGateRef.current = null
-    setToastProgress(1)
-    const started = Date.now()
-    const id = window.setInterval(() => {
-      const elapsed = Date.now() - started
-      const left = Math.max(0, 1 - elapsed / UNDO_TOAST_MS)
-      setToastProgress(left)
-      if (left <= 0) {
-        window.clearInterval(id)
-        setToast(null)
-      }
-    }, 50)
-    return () => window.clearInterval(id)
-  }, [toast])
-
   const myBottleMode =
     today?.effectiveVisualMode === 'my_bottle' && Boolean(shapeUrl)
 
@@ -122,10 +93,13 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
 
   const kind: WaterContainerKind = myBottleMode ? 'gourd' : container
 
-  const initialRemainingMl = useMemo(
-    () => getMemorizedRemainingMl(kind, capacityMl),
-    [kind, capacityMl, today?.drunkMl],
-  )
+  const memorized = useMemo(() => {
+    void levelTick
+    return {
+      has: hasMemorizedRemainingMl(kind, userId),
+      remaining: getMemorizedRemainingMl(kind, capacityMl, userId),
+    }
+  }, [kind, capacityMl, userId, levelTick, today?.drunkMl])
 
   const handleCommit = useCallback(
     async (commit: BottleFlowCommit) => {
@@ -136,39 +110,32 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
           amountMl: commit.amountMl,
           source: 'slider',
           clientId: commit.clientId,
-          userId: user?.id ?? null,
+          userId,
         })
         setToday(next)
-        setMemorizedRemainingMl(kind, commit.remainingAfterMl, capacityMl)
-        setToast({ amountMl: commit.amountMl, clientId: commit.clientId })
+        setMemorizedRemainingMl(kind, commit.remainingAfterMl, capacityMl, userId)
+        setLevelTick((n) => n + 1)
       } finally {
         setBusy(false)
       }
     },
-    [today, busy, user?.id, kind, capacityMl],
+    [today, busy, userId, kind, capacityMl],
   )
 
-  const handleUndoToast = useCallback(() => {
-    if (!toast || busy) return
-    if (!undoGateRef.current) {
-      undoGateRef.current = createUndoOnce(async () => {
-        setBusy(true)
-        try {
-          const next = await undoLastHydrationEntry(today?.dayKey ?? localDayKey())
-          setToday(next)
-          const restored = Math.min(
-            capacityMl,
-            getMemorizedRemainingMl(kind, capacityMl) + toast.amountMl,
-          )
-          setMemorizedRemainingMl(kind, restored, capacityMl)
-          setToast(null)
-        } finally {
-          setBusy(false)
-        }
-      })
-    }
-    undoGateRef.current()
-  }, [toast, busy, today?.dayKey, kind, capacityMl])
+  const handleUndoCommit = useCallback(
+    async (args: { amountMl: number; restoreRemainingMl: number }) => {
+      setBusy(true)
+      try {
+        const next = await undoLastHydrationEntry(today?.dayKey ?? localDayKey())
+        setToday(next)
+        setMemorizedRemainingMl(kind, args.restoreRemainingMl, capacityMl, userId)
+        setLevelTick((n) => n + 1)
+      } finally {
+        setBusy(false)
+      }
+    },
+    [today?.dayKey, kind, capacityMl, userId],
+  )
 
   if (!today) {
     return (
@@ -207,7 +174,7 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
           <div className="flex h-[72px] w-12 shrink-0 items-end justify-center">
             <LiveBottleVisual
               kind={kind}
-              remainingMl={initialRemainingMl}
+              remainingMl={memorized.remaining}
               capacityMl={capacityMl}
               shapeUrl={myBottleMode ? shapeUrl : null}
               size="thumb"
@@ -239,17 +206,6 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
           />
         </div>
 
-        <p className="mt-2 text-[12px] leading-snug text-[#8E8E93]">
-          Touche la carte pour dire ce que tu as bu.
-        </p>
-
-        <p className="mt-2 text-[12px] leading-snug text-[#8E8E93]">{MSG_PERMANENT}</p>
-        {today.showHighInfo && !minorLocked ? (
-          <p className="mt-1 text-[12px] leading-snug text-[#C7C7CC]" data-hydration-high-info>
-            {MSG_HIGH_INFO}
-          </p>
-        ) : null}
-
         {onOpenSettings && !minorLocked ? (
           <button
             type="button"
@@ -262,26 +218,25 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
         ) : null}
       </section>
 
-      {toast ? (
-        <div className="mt-3">
-          <HydrationUndoToast
-            amountMl={toast.amountMl}
-            progress={toastProgress}
-            onUndo={handleUndoToast}
-            onDismiss={() => setToast(null)}
-          />
-        </div>
-      ) : null}
-
       <BottleFlowV3
         open={flowOpen}
         onClose={() => setFlowOpen(false)}
         capacityMl={capacityMl}
         kind={kind}
         shapeUrl={myBottleMode ? shapeUrl : null}
-        initialRemainingMl={initialRemainingMl}
+        initialRemainingMl={memorized.remaining}
+        hasMemorizedLevel={memorized.has}
         busy={busy}
         onCommitDrunk={handleCommit}
+        onUndoCommit={handleUndoCommit}
+        onMarkBottleRefilled={() => {
+          setMemorizedRemainingMl(kind, capacityMl, capacityMl, userId)
+          setLevelTick((n) => n + 1)
+        }}
+        onConfirmLevel={(ml) => {
+          setMemorizedRemainingMl(kind, ml, capacityMl, userId)
+          setLevelTick((n) => n + 1)
+        }}
       />
     </>
   )

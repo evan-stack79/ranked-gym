@@ -23,16 +23,38 @@ describe('containerLevelStorage — mémorisation par contenant', () => {
       getMemorizedRemainingMl,
       setMemorizedRemainingMl,
       clearMemorizedRemainingMl,
+      hasMemorizedRemainingMl,
+      setContainerLevelUserId,
     } = await import('./containerLevelStorage')
 
+    setContainerLevelUserId('u1')
+    expect(hasMemorizedRemainingMl('plastic_15')).toBe(false)
     expect(getMemorizedRemainingMl('plastic_15', 1500)).toBe(1500)
     setMemorizedRemainingMl('plastic_15', 750, 1500)
+    expect(hasMemorizedRemainingMl('plastic_15')).toBe(true)
     expect(getMemorizedRemainingMl('plastic_15', 1500)).toBe(750)
     setMemorizedRemainingMl('glass_25', 100, 250)
     expect(getMemorizedRemainingMl('glass_25', 250)).toBe(100)
     expect(getMemorizedRemainingMl('plastic_15', 1500)).toBe(750)
     expect(getMemorizedRemainingMl('plastic_15', 500)).toBe(500)
     clearMemorizedRemainingMl('plastic_15')
+    expect(hasMemorizedRemainingMl('plastic_15')).toBe(false)
     expect(getMemorizedRemainingMl('plastic_15', 1500)).toBe(1500)
+  })
+
+  it('isole le niveau par utilisateur', async () => {
+    const {
+      getMemorizedRemainingMl,
+      setMemorizedRemainingMl,
+      setContainerLevelUserId,
+    } = await import('./containerLevelStorage')
+
+    setContainerLevelUserId('alice')
+    setMemorizedRemainingMl('plastic_15', 900, 1500)
+    setContainerLevelUserId('bob')
+    expect(getMemorizedRemainingMl('plastic_15', 1500)).toBe(1500)
+    setMemorizedRemainingMl('plastic_15', 400, 1500)
+    setContainerLevelUserId('alice')
+    expect(getMemorizedRemainingMl('plastic_15', 1500)).toBe(900)
   })
 })

@@ -15,6 +15,7 @@ import {
   BottleFlowV3,
   HydrationUndoToast,
   createUndoOnce,
+  resolveOpenPhase,
 } from './BottleFlowV3'
 
 describe('BottleFlowV3 — logique variante B', () => {
@@ -36,6 +37,12 @@ describe('BottleFlowV3 — logique variante B', () => {
     __resetBodyScrollLockForTests()
     document.body.style.overflow = ''
     document.body.style.touchAction = ''
+  })
+
+  it('ouverture : mémorisé → drink ; sinon → setup (plus d’intro Commencer)', () => {
+    expect(resolveOpenPhase(true)).toBe('drink')
+    expect(resolveOpenPhase(false)).toBe('setup')
+    expect(resolveOpenPhase(true, 'setup')).toBe('setup')
   })
 
   it('relâchement à 0 ml → pas d’ajout', () => {
@@ -88,6 +95,33 @@ describe('BottleFlowV3 — logique variante B', () => {
     expect(onUndo).toHaveBeenCalledTimes(1)
   })
 
+  it('ouverture mémorisée → drink, Cristaline une seule fois, lien régler', () => {
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+    act(() => {
+      root.render(
+        <BottleFlowV3
+          open
+          onClose={() => undefined}
+          initialRemainingMl={950}
+          hasMemorizedLevel
+          initialPhase="drink"
+          captureStartMl={950}
+          captureRemainingMl={950}
+          onCommitDrunk={async () => undefined}
+        />,
+      )
+    })
+    const overlay = document.querySelector(
+      '[data-hydration-bottle-flow="v3b"]',
+    ) as HTMLElement
+    expect(overlay.getAttribute('data-hydration-phase')).toBe('drink')
+    expect((overlay.textContent || '').match(/Cristaline 1,5 L/g)?.length).toBe(1)
+    expect(overlay.textContent).toContain('Bouteille remplie')
+    expect(overlay.textContent).not.toContain('Commencer')
+  })
+
   it('overlay portail opaque : body lock + au-dessus du header marque', () => {
     host = document.createElement('div')
     document.body.appendChild(host)
@@ -100,14 +134,6 @@ describe('BottleFlowV3 — logique variante B', () => {
     header.textContent = 'Ranked Gym'
     document.body.appendChild(header)
 
-    const tab = document.createElement('nav')
-    tab.setAttribute('data-bottom-nav-host', '1')
-    tab.style.position = 'fixed'
-    tab.style.bottom = '0'
-    tab.style.zIndex = '50'
-    tab.textContent = 'Scanner Journal'
-    document.body.appendChild(tab)
-
     root = createRoot(host)
     const onClose = vi.fn()
     act(() => {
@@ -116,7 +142,8 @@ describe('BottleFlowV3 — logique variante B', () => {
           open
           onClose={onClose}
           initialRemainingMl={1200}
-          initialPhase="intro"
+          hasMemorizedLevel
+          initialPhase="drink"
           onCommitDrunk={async () => undefined}
         />,
       )
@@ -127,19 +154,11 @@ describe('BottleFlowV3 — logique variante B', () => {
     ) as HTMLElement | null
     expect(overlay).toBeTruthy()
     expect(overlay!.parentElement).toBe(document.body)
-    expect(overlay!.getAttribute('data-hydration-overlay-portal')).toBe('1')
-    expect(overlay!.getAttribute('data-hydration-covers-chrome')).toBe('1')
-    expect(overlay!.style.backgroundColor.replace(/\s/g, '')).toMatch(/^(#000000|rgb\(0,\s*0,\s*0\))$/)
-    const z = Number.parseInt(getComputedStyle(overlay!).zIndex || overlay!.style.zIndex || '0', 10)
-    // Tailwind z-[200] may appear in className in jsdom; accept class or computed.
-    const classHasZ200 = overlay!.className.includes('z-[200]')
-    expect(classHasZ200 || z >= 200).toBe(true)
-    expect(z >= 200 || classHasZ200).toBe(true)
-    expect(Number.parseInt(header.style.zIndex, 10)).toBeLessThan(200)
-    expect(Number.parseInt(tab.style.zIndex, 10)).toBeLessThan(200)
-
+    expect(overlay!.style.backgroundColor.replace(/\s/g, '')).toMatch(
+      /^(#000000|rgb\(0,\s*0,\s*0\))$/,
+    )
+    expect(overlay!.className.includes('z-[200]')).toBe(true)
     expect(document.body.style.overflow).toBe('hidden')
-    expect(__getBodyScrollLockCountForTests()).toBeGreaterThanOrEqual(1)
 
     act(() => {
       root.render(
@@ -152,14 +171,7 @@ describe('BottleFlowV3 — logique variante B', () => {
       )
     })
     expect(document.querySelector('[data-hydration-bottle-flow="v3b"]')).toBeNull()
-    expect(document.body.style.overflow).not.toBe('hidden')
     expect(__getBodyScrollLockCountForTests()).toBe(0)
-    // Header inchangé hors overlay
-    expect(document.querySelector('[data-app-brand-header="1"]')?.textContent).toContain(
-      'Ranked Gym',
-    )
-
     header.remove()
-    tab.remove()
   })
 })

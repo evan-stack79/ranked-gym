@@ -1,7 +1,7 @@
 /**
- * Hydratation bouteille v3 — variante B (test).
- * Étape 1 : niveau de départ (ne compte pas comme bu).
- * Étape 2 : glisser bas → ml bus ; ajout au RELÂCHEMENT (pas de bouton Ajouter).
+ * Hydratation bouteille v3 — variante B.
+ * Ouverture intelligente : niveau mémorisé → étape boire ; sinon → régler le niveau.
+ * Relâche = ajouter ; Annuler ne ferme pas le plein écran.
  */
 import {
   useCallback,
@@ -28,7 +28,8 @@ import { LiveBottleVisual, type BottleDragMode } from './LiveBottleVisual'
 
 const UNDO_TOAST_MS = 5000
 
-export type BottleFlowPhase = 'intro' | BottleDragMode
+/** Plus d’écran « Commencer » — setup | drink uniquement. */
+export type BottleFlowPhase = BottleDragMode
 
 export interface BottleFlowCommit {
   amountMl: number
@@ -43,14 +44,27 @@ interface BottleFlowV3Props {
   kind?: WaterContainerKind
   shapeUrl?: string | null
   initialRemainingMl: number
+  /** True si un niveau a déjà été mémorisé pour cet utilisateur/contenant. */
+  hasMemorizedLevel?: boolean
   busy?: boolean
   onCommitDrunk: (commit: BottleFlowCommit) => Promise<void>
+  /** Annuler l’ajout serveur + persister le niveau restauré (parent). */
+  onUndoCommit?: (args: {
+    amountMl: number
+    restoreRemainingMl: number
+  }) => Promise<void>
+  /** « Bouteille remplie » : parent mémorise le plein. */
+  onMarkBottleRefilled?: () => void
+  /** Après « C'est bon » (setup) : parent mémorise le niveau choisi. */
+  onConfirmLevel?: (remainingMl: number) => void
   /** Fixture / capture : force la phase initiale. */
   initialPhase?: BottleFlowPhase
   /** Fixture / capture : remaining forcé (ex. 950 ml en étape 2). */
   captureRemainingMl?: number
   /** Fixture / capture : départ forcé. */
   captureStartMl?: number
+  /** Fixture / capture : affiche le toast Annuler (overlay reste ouvert). */
+  captureToastMl?: number
 }
 
 function newClientId(): string {
@@ -64,6 +78,14 @@ function stepClamp(ml: number, capacity: number, step: number): number {
   const s = step > 0 ? step : 1
   const rounded = Math.round(ml / s) * s
   return Math.min(capacity, Math.max(0, rounded))
+}
+
+function resolveOpenPhase(
+  hasMemorized: boolean,
+  forced?: BottleFlowPhase,
+): BottleFlowPhase {
+  if (forced === 'setup' || forced === 'drink') return forced
+  return hasMemorized ? 'drink' : 'setup'
 }
 
 function MlBubble({ ml, style }: { ml: number; style?: CSSProperties }) {
@@ -87,36 +109,72 @@ export function BottleFlowV3({
   kind = 'plastic_15',
   shapeUrl = null,
   initialRemainingMl,
+  hasMemorizedLevel = false,
   busy = false,
   onCommitDrunk,
-  initialPhase = 'intro',
+  onUndoCommit,
+  onMarkBottleRefilled,
+  onConfirmLevel,
+  initialPhase,
   captureRemainingMl,
   captureStartMl,
+  captureToastMl,
 }: BottleFlowV3Props) {
   const capacity = capacityMl
-  const [phase, setPhase] = useState<BottleFlowPhase>(initialPhase)
+  const [phase, setPhase] = useState<BottleFlowPhase>(() =>
+    resolveOpenPhase(hasMemorizedLevel, initialPhase),
+  )
   const [startRemainingMl, setStartRemainingMl] = useState(capacity)
   const [remainingMl, setRemainingMl] = useState(capacity)
   const [dragging, setDragging] = useState(false)
+  const [toast, setToast] = useState<{ amountMl: number; clientId: string } | null>(
+    null,
+  )
+  const [toastProgress, setToastProgress] = useState(1)
   const committingRef = useRef(false)
+  const undoGateRef = useRef<ReturnType<typeof createUndoOnce> | null>(null)
+  const lastCommitBeforeRef = useRef<number | null>(null)
+  const remainingRef = useRef(remainingMl)
+  const startRef = useRef(startRemainingMl)
+  const phaseRef = useRef(phase)
+  remainingRef.current = remainingMl
+  startRef.current = startRemainingMl
+  phaseRef.current = phase
 
   useEffect(() => {
     if (!open) return
     const init = stepClamp(initialRemainingMl, capacity, WATER_LEVEL_STEP_ML)
+    const openPhase = resolveOpenPhase(hasMemorizedLevel, initialPhase)
     const start = captureStartMl != null
       ? stepClamp(captureStartMl, capacity, WATER_LEVEL_STEP_ML)
       : init
     const rem = captureRemainingMl != null
       ? stepClamp(captureRemainingMl, capacity, WATER_DRAG_STEP_ML)
       : start
-    setPhase(initialPhase)
+    setPhase(openPhase)
     setStartRemainingMl(start)
     setRemainingMl(rem)
-    setDragging(initialPhase === 'drink' && rem < start)
+    setDragging(false)
+    undoGateRef.current = null
+    if (captureToastMl != null && captureToastMl > 0) {
+      lastCommitBeforeRef.current = start
+      setToast({ amountMl: Math.round(captureToastMl), clientId: 'capture' })
+    } else {
+      lastCommitBeforeRef.current = null
+      setToast(null)
+    }
     committingRef.current = false
-  }, [open, initialRemainingMl, capacity, initialPhase, captureRemainingMl, captureStartMl])
+  }, [
+    open,
+    initialRemainingMl,
+    capacity,
+    initialPhase,
+    captureRemainingMl,
+    captureStartMl,
+    captureToastMl,
+    hasMemorizedLevel,
+  ])
 
-  // Portail plein écran : bloque le scroll de la page (pas le glisser bouteille).
   useEffect(() => {
     if (!open) return
     const releaseScroll = acquireBodyScrollLock()
@@ -130,6 +188,22 @@ export function BottleFlowV3({
       document.body.style.overscrollBehavior = prevOverscroll
     }
   }, [open])
+
+  useEffect(() => {
+    if (!toast) return
+    undoGateRef.current = null
+    setToastProgress(1)
+    const started = Date.now()
+    const id = window.setInterval(() => {
+      const left = Math.max(0, 1 - (Date.now() - started) / UNDO_TOAST_MS)
+      setToastProgress(left)
+      if (left <= 0) {
+        window.clearInterval(id)
+        setToast(null)
+      }
+    }, 50)
+    return () => window.clearInterval(id)
+  }, [toast])
 
   const drunkMl = useMemo(
     () =>
@@ -165,29 +239,67 @@ export function BottleFlowV3({
   const confirmStart = () => {
     setStartRemainingMl(remainingMl)
     setPhase('drink')
+    setToast(null)
+    onConfirmLevel?.(remainingMl)
+  }
+
+  const goToSetupFresh = () => {
+    setRemainingMl(capacity)
+    setStartRemainingMl(capacity)
+    setPhase('setup')
+    setToast(null)
+    setDragging(false)
+    onMarkBottleRefilled?.()
   }
 
   const commitOnRelease = useCallback(async () => {
-    if (phase !== 'drink' || committingRef.current || busy) return
-    if (!shouldCommitDrunkOnRelease(drunkMl)) return
+    if (phaseRef.current !== 'drink' || committingRef.current || busy || toast) return
+    const start = startRef.current
+    const rem = remainingRef.current
+    const amount = drunkMlFromStartAndCurrent(start, rem, capacity, WATER_DRAG_STEP_ML)
+    if (!shouldCommitDrunkOnRelease(amount)) return
     committingRef.current = true
     const clientId = newClientId()
     try {
       await onCommitDrunk({
-        amountMl: Math.round(drunkMl),
-        remainingAfterMl: remainingMl,
+        amountMl: Math.round(amount),
+        remainingAfterMl: rem,
         clientId,
       })
-      onClose()
+      // Reste ouvert : le départ devient le niveau actuel pour un prochain glisser.
+      lastCommitBeforeRef.current = start
+      setStartRemainingMl(rem)
+      setToast({ amountMl: Math.round(amount), clientId })
     } finally {
       committingRef.current = false
     }
-  }, [phase, busy, drunkMl, remainingMl, onCommitDrunk, onClose])
+  }, [busy, toast, capacity, onCommitDrunk])
 
   const onDragEnd = useCallback(() => {
     setDragging(false)
     void commitOnRelease()
   }, [commitOnRelease])
+
+  const handleUndo = useCallback(() => {
+    if (!toast || busy) return
+    if (!undoGateRef.current) {
+      undoGateRef.current = createUndoOnce(async () => {
+        const before = lastCommitBeforeRef.current ?? remainingMl + toast.amountMl
+        const restored = Math.min(capacity, Math.max(0, before))
+        if (onUndoCommit) {
+          await onUndoCommit({
+            amountMl: toast.amountMl,
+            restoreRemainingMl: restored,
+          })
+        }
+        setRemainingMl(restored)
+        setStartRemainingMl(restored)
+        setToast(null)
+        lastCommitBeforeRef.current = null
+      })
+    }
+    undoGateRef.current()
+  }, [toast, busy, onUndoCommit, remainingMl, capacity])
 
   if (!open || typeof document === 'undefined') return null
 
@@ -201,8 +313,8 @@ export function BottleFlowV3({
           : 'Ma bouteille'
 
   const bottleSlot = (node: ReactNode) => (
-    <div className="relative mt-2 flex min-h-0 flex-1 flex-col justify-center overflow-hidden">
-      <div className="relative mx-auto flex h-full max-h-full w-full max-w-[300px] items-center justify-center">
+    <div className="relative mt-2 flex min-h-0 flex-1 flex-col justify-center overflow-visible">
+      <div className="relative mx-auto flex h-full max-h-full w-full max-w-[300px] items-center justify-center overflow-visible">
         {node}
       </div>
     </div>
@@ -223,6 +335,7 @@ export function BottleFlowV3({
       data-hydration-phase={phase}
       data-hydration-overlay-portal="1"
       data-hydration-covers-chrome="1"
+      data-hydration-has-memorized={hasMemorizedLevel ? '1' : '0'}
       role="dialog"
       aria-modal="true"
       aria-label="Eau"
@@ -234,63 +347,16 @@ export function BottleFlowV3({
           className="ios-press text-[17px] font-medium text-[#FF0702]"
           data-hydration-flow-close
         >
-          {phase === 'intro' ? 'Fermer' : 'Retour'}
+          Fermer
         </button>
-        <p className="text-[13px] font-medium text-[#8E8E93]">
-          {phase === 'intro' ? 'Eau bue seule' : label}
-        </p>
+        <p className="text-[13px] font-medium text-[#8E8E93]">Eau bue seule</p>
       </div>
-
-      {phase === 'intro' ? (
-        <>
-          <div className="shrink-0">
-            <p className="mt-2 text-center text-[11px] font-semibold uppercase tracking-[0.12em] text-[#ACB4BA]">
-              Hydratation
-            </p>
-            <h2 className="mt-0.5 text-center text-[22px] font-bold tracking-tight text-white">
-              {label}
-            </h2>
-            <p className="mt-1 text-center text-[13px] leading-snug text-[#ACB4BA]">
-              On règle d&apos;abord le niveau. Ensuite tu diras ce que tu as bu.
-            </p>
-          </div>
-          {bottleSlot(
-            <LiveBottleVisual
-              kind={kind}
-              remainingMl={capacity}
-              capacityMl={capacity}
-              shapeUrl={shapeUrl}
-              size="hero"
-              showHandle
-              handleHint={false}
-              interactive={false}
-              className="!max-h-[min(46dvh,400px)]"
-            />,
-          )}
-          <button
-            type="button"
-            onClick={() => setPhase('setup')}
-            className="ios-press mt-auto min-h-[52px] w-full shrink-0 rounded-2xl bg-[#FF0702] text-[17px] font-semibold text-white"
-            data-hydration-flow-start
-          >
-            Commencer
-          </button>
-        </>
-      ) : null}
 
       {phase === 'setup' ? (
         <>
-          <div className="shrink-0">
-            <div className="flex items-center justify-between">
-              <p className="text-[13px] font-semibold tabular-nums text-[#ACB4BA]">Étape 1/2</p>
-              <p className="text-[12px] font-medium text-[#8E8E93]">{label}</p>
-            </div>
-            <h2 className="mt-1 text-[21px] font-bold tracking-tight text-white">
-              Où en est ta bouteille&nbsp;?
-            </h2>
-            <p className="mt-0.5 text-[12px] leading-snug text-[#ACB4BA]">
-              Glisse le trait, ou utilise −&nbsp;10&nbsp;ml / +&nbsp;10&nbsp;ml.
-            </p>
+          <div className="shrink-0 text-center">
+            <h2 className="mt-1 text-[21px] font-bold tracking-tight text-white">{label}</h2>
+            <p className="mt-1 text-[15px] font-semibold text-white">Où en est ta bouteille&nbsp;?</p>
           </div>
 
           {bottleSlot(
@@ -308,7 +374,7 @@ export function BottleFlowV3({
               dragStepMl={WATER_DRAG_STEP_ML}
               onRemainingChange={setRemainingMl}
               onDraggingChange={setDragging}
-              className="!max-h-[min(42dvh,380px)]"
+              className="!max-h-[min(48dvh,420px)]"
             />,
           )}
 
@@ -321,9 +387,6 @@ export function BottleFlowV3({
             >
               −&nbsp;10&nbsp;ml
             </button>
-            <p className="min-w-[80px] text-center text-[15px] font-semibold tabular-nums text-white">
-              {remainingMl.toLocaleString('fr-FR')}&nbsp;ml
-            </p>
             <button
               type="button"
               onClick={() => nudge(WATER_LEVEL_STEP_ML)}
@@ -334,39 +397,27 @@ export function BottleFlowV3({
             </button>
           </div>
 
-          <p className="mt-1.5 shrink-0 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-center text-[12px] leading-snug text-[#C7C7CC]">
-            Ce niveau ne compte pas comme bu. C&apos;est juste pour savoir où en est la bouteille.
-          </p>
-
           <button
             type="button"
             onClick={confirmStart}
             className="ios-press mt-auto min-h-[52px] w-full shrink-0 rounded-2xl bg-[#FF0702] text-[17px] font-semibold text-white"
             data-hydration-confirm-level
           >
-            C&apos;est bon — étape suivante
+            C&apos;est bon
           </button>
         </>
       ) : null}
 
       {phase === 'drink' ? (
         <>
-          <div className="shrink-0">
-            <div className="flex items-center justify-between">
-              <p className="text-[13px] font-semibold tabular-nums text-[#ACB4BA]">Étape 2/2</p>
-              <p className="text-[12px] font-medium text-[#8E8E93]">{label}</p>
-            </div>
-            <h2 className="mt-1 text-[21px] font-bold tracking-tight text-white">
-              Combien tu as bu&nbsp;?
-            </h2>
-            <p className="mt-0.5 text-[12px] leading-snug text-[#ACB4BA]">
-              Glisse vers le bas. Le niveau baisse = tu as bu.
-            </p>
+          <div className="shrink-0 text-center">
+            <h2 className="mt-1 text-[21px] font-bold tracking-tight text-white">{label}</h2>
+            <p className="mt-1 text-[15px] font-semibold text-white">Combien tu as bu&nbsp;?</p>
             <p
-              className="mt-1.5 text-center text-[26px] font-bold tabular-nums tracking-tight text-white"
+              className="mt-2 text-[28px] font-bold tabular-nums tracking-tight text-white"
               data-hydration-drunk-big
             >
-              Tu as bu {drunkMl.toLocaleString('fr-FR')}&nbsp;ml
+              {drunkMl.toLocaleString('fr-FR')}&nbsp;ml
             </p>
           </div>
 
@@ -384,17 +435,17 @@ export function BottleFlowV3({
                 handleHint={false}
                 showDrunkZone
                 showMlBubble
-                interactive
+                interactive={!toast}
                 dragStepMl={WATER_DRAG_STEP_ML}
                 onRemainingChange={setRemainingMl}
                 onDraggingChange={setDragging}
                 onDragEnd={onDragEnd}
-                className="!max-h-[min(42dvh,380px)]"
+                className="!max-h-[min(46dvh,400px)]"
               />
               {drunkMl > 0 ? (
                 <div
                   className="pointer-events-none absolute z-40 rounded-lg border border-[#FF0702]/45 bg-[#0B0B0D] px-2.5 py-1"
-                  style={{ bottom: `calc(${startPct}% + 6px)`, left: 4 }}
+                  style={{ bottom: `calc(${startPct}% + 6px)`, right: 4 }}
                   data-hydration-drunk-label
                 >
                   <p className="text-[11px] font-semibold text-[#FF907F]">partie bue</p>
@@ -403,15 +454,29 @@ export function BottleFlowV3({
             </>,
           )}
 
-          <div className="mt-auto shrink-0 pb-1 pt-2 text-center">
-            <p className="text-[17px] font-semibold tracking-tight text-white">
-              {dragging || drunkMl > 0 ? 'Lâche pour ajouter' : 'Glisse vers le bas'}
-            </p>
-            <p className="mt-1 text-[13px] text-[#8E8E93]" data-hydration-release-hint>
-              {drunkMl > 0
-                ? `${drunkMl.toLocaleString('fr-FR')} ml seront ajoutés`
-                : 'À 0 ml, rien n’est ajouté'}
-            </p>
+          <div className="mt-2 flex shrink-0 flex-col items-center gap-2 pb-1">
+            {toast ? (
+              <div className="w-full max-w-sm">
+                <HydrationUndoToast
+                  amountMl={toast.amountMl}
+                  progress={toastProgress}
+                  onUndo={handleUndo}
+                  onDismiss={() => setToast(null)}
+                />
+              </div>
+            ) : (
+              <p className="text-[15px] font-medium text-[#ACB4BA]" data-hydration-release-hint>
+                {dragging || drunkMl > 0 ? 'Lâche pour ajouter' : 'Glisse vers le bas'}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={goToSetupFresh}
+              className="ios-press text-[13px] font-medium text-[#8E8E93] underline-offset-2 hover:underline"
+              data-hydration-reset-level
+            >
+              Bouteille remplie · Régler le niveau
+            </button>
           </div>
         </>
       ) : null}
@@ -477,4 +542,4 @@ export function createUndoOnce(undo: () => void | Promise<void>) {
   }
 }
 
-export { UNDO_TOAST_MS, MlBubble }
+export { UNDO_TOAST_MS, MlBubble, resolveOpenPhase }

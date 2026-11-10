@@ -291,8 +291,9 @@ export function LiveBottleVisual({
             className="pointer-events-none absolute z-[6] whitespace-nowrap rounded-2xl border border-white/20 bg-[#1C1C1E] px-3 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.55)]"
             style={{
               bottom: `calc(${waterPct} + 12px)`,
-              left: '0%',
-              transform: 'translateX(-8%)',
+              /* À droite du trait — évite la coupe « H / é » hors cadre. */
+              right: '0%',
+              transform: 'translateX(12%)',
             }}
             data-hydration-ml-bubble
           >

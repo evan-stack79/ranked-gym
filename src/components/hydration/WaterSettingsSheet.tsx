@@ -23,6 +23,7 @@ import {
   GOAL_DEFAULT_ML,
   LABEL_REPERE_JOUR,
   MSG_MINOR_PERMANENT,
+  MSG_PERMANENT,
   MSG_REPERE_LOCKED,
   localDayKey,
   type HydrationMode,
@@ -135,6 +136,9 @@ export function WaterSettingsSheet({ open, onClose }: WaterSettingsSheetProps) {
           />
         ) : (
           <>
+            <p className="text-[13px] leading-snug text-[#8E8E93]" data-hydration-settings-permanent>
+              {MSG_PERMANENT}
+            </p>
             <WaterModePicker
               mode={today?.mode ?? 'classic_2l'}
               proActive={today?.proActive ?? false}

@@ -30,7 +30,7 @@ describe('QA BUG-07 — TCA : pas de CTA objectif calorique', () => {
     host.remove()
   })
 
-  it('allowGoalSetup=true propose le CTA (adulte éligible, drapeau ON)', async () => {
+  it('allowGoalSetup=true propose le CTA Fixer un objectif (adulte éligible, drapeau ON)', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const root = createRoot(host)
@@ -46,7 +46,9 @@ describe('QA BUG-07 — TCA : pas de CTA objectif calorique', () => {
         />,
       )
     })
-    expect(host.querySelector('[data-testid="define-calorie-goal"]')).toBeTruthy()
+    const btn = host.querySelector('[data-testid="define-calorie-goal"]')
+    expect(btn).toBeTruthy()
+    expect(btn?.textContent).toMatch(/Fixer un objectif/)
     root.unmount()
     host.remove()
   })

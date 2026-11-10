@@ -86,24 +86,17 @@ export function AppLayout({
           }}
         >
           {/*
-            Fond TRANSPARENT (dégradé discret) en calque frère ABSOLU sous le contenu —
-            jamais backdrop-filter / opacity / filter sur un ancêtre du logo/texte
-            (WebKit iOS rasterise alors les enfants en basse résolution).
-            Pas de bloc noir opaque.
+            Fond vraiment transparent — logo seul, safe-area top.
+            Jamais backdrop-filter / opacity / filter sur un ancêtre du logo/texte.
           */}
           <div className="relative">
             <div
               aria-hidden="true"
               data-brand-header-bg="1"
               data-brand-header-bg-mode="transparent"
-              className="pointer-events-none absolute inset-0 -z-10"
-              style={{
-                background:
-                  'linear-gradient(to bottom, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.12) 55%, rgba(0,0,0,0) 100%)',
-              }}
+              className="pointer-events-none absolute inset-0 -z-10 bg-transparent"
             />
             <div className="mx-auto flex max-w-lg items-center justify-center px-4 pb-2 pt-0">
-              {/* Pas de filter/opacity sur l’ancêtre du logo (anti-flou iOS WebKit). */}
               <div data-cold-launch-target="compact">
                 <BrandMark variant="compact" />
               </div>

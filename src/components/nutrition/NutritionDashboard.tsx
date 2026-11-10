@@ -295,6 +295,13 @@ export function NutritionDashboard({
     !declarations.pregnancy &&
     !declarations.breastfeeding &&
     !nutrition.showCalorieGoal
+  const calorieLockReason = !calorieGoalEnabled
+    ? ('flag_off' as const)
+    : declarations.eatingDisorder
+      ? ('tca' as const)
+      : declarations.diabetes || declarations.pregnancy || declarations.breastfeeding
+        ? ('health' as const)
+        : ('none' as const)
 
   const totals = useMemo(() => {
     return meals.reduce(
@@ -764,7 +771,7 @@ export function NutritionDashboard({
               <ChevronRight className="h-5 w-5" />
             </button>
           </div>
-          {/* Compteur kcal (NutritionCalorieRing) + macros, puis carte Eau juste en dessous. */}
+          {/* Compteur kcal + macros, puis carte Eau avec vrai espacement. */}
           <div data-nutrition-calorie-block="1" className="flex flex-col gap-4">
             <Reveal>
               <NutritionCalorieRing
@@ -774,6 +781,7 @@ export function NutritionDashboard({
                 progress={calorieProgress}
                 onOpenSetup={onOpenSetup}
                 allowGoalSetup={allowGoalSetup}
+                lockReason={calorieLockReason}
               />
             </Reveal>
             <NutritionMacrosRow
@@ -794,11 +802,11 @@ export function NutritionDashboard({
               }}
             />
           </div>
-          <Reveal delayMs={60}>
-            <HydrationPanel
-              onOpenSettings={() => setWaterSettingsOpen(true)}
-            />
-          </Reveal>
+          <div className="mt-6" data-nutrition-eau-spacer="1">
+            <Reveal delayMs={60}>
+              <HydrationPanel onOpenSettings={() => setWaterSettingsOpen(true)} />
+            </Reveal>
+          </div>
           {nutrition.showCalorieGoal ? (
             <div className="mt-1 space-y-2 px-1" data-testid="dashboard-estimation-notices">
               <p className="text-[12px] leading-relaxed text-[#ACB4BA]">{M_CAL_2}</p>
