@@ -49,6 +49,7 @@ import {
 type SessionCtx = QueryCtx | MutationCtx
 
 const modeValidator = v.union(
+  v.literal('classic_15'),
   v.literal('classic_2l'),
   v.literal('glasses_250'),
   v.literal('my_bottle'),

@@ -53,6 +53,9 @@ describe('hydration math', () => {
     expect(quickAddAmountMl('full_bottle', 'classic_2l', null)).toBe(2000)
     expect(quickAddAmountMl('half_bottle', 'my_bottle', 750)).toBe(375)
     expect(containerVolumeMl('glasses_250', null)).toBe(250)
+    expect(containerVolumeMl('classic_15', null)).toBe(1500)
+    expect(quickAddAmountMl('full_bottle', 'classic_15', null)).toBe(1500)
+    expect(quickAddAmountMl('half_bottle', 'classic_15', null)).toBe(750)
   })
 
   it('goal bounds', () => {

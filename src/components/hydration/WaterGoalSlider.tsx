@@ -3,6 +3,7 @@ import {
   GOAL_MAX_ML,
   GOAL_MIN_ML,
   GOAL_STEP_ML,
+  MSG_GOAL_RANGE,
   MSG_MEDICAL_LIMIT,
   MSG_PREGNANCY,
   formatLitersFr,
@@ -37,9 +38,7 @@ export function WaterGoalSlider({ valueMl, onChange, disabled }: WaterGoalSlider
         aria-valuemax={GOAL_MAX_ML}
         aria-valuenow={safe}
       />
-      <p className="text-[12px] text-[#8E8E93]">
-        Réglable de {formatLitersFr(GOAL_MIN_ML)} à {formatLitersFr(GOAL_MAX_ML)} — repère, pas limite de santé.
-      </p>
+      <p className="text-[12px] text-[#8E8E93]">{MSG_GOAL_RANGE}</p>
       <p className="text-[12px] leading-snug text-[#8E8E93]">{MSG_PREGNANCY}</p>
       <p className="text-[12px] leading-snug text-[#8E8E93]">{MSG_MEDICAL_LIMIT}</p>
     </div>

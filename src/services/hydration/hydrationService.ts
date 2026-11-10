@@ -8,6 +8,7 @@ import {
   GOAL_DEFAULT_ML,
   isDayKeyWithinTolerance,
   isValidDayKey,
+  lastNDayKeys,
   localDayKey,
   type HydrationEntrySource,
   type HydrationMode,
@@ -287,11 +288,39 @@ export async function fetchHydrationToday(dayKey = localDayKey()): Promise<Hydra
   }
 }
 
+/** Repli local (cache confirmé + file pending) — même esprit que fetchHydrationToday. */
+export function fallbackHydrationHistory(
+  endDayKey = localDayKey(),
+  userId?: string | null,
+): Array<{ dayKey: string; drunkMl: number }> {
+  const uid = userId ?? getHydrationQueueUserId()
+  const cache = readLocalSettings()
+  const cacheOk = cache != null && (uid == null || cache.userId == null || cache.userId === uid)
+  return lastNDayKeys(endDayKey, 7).map((dayKey) => {
+    const confirmed = cacheOk ? (cache?.confirmedByDay?.[dayKey] ?? 0) : 0
+    const pending = pendingDrunkMlForDay(dayKey, uid)
+    return { dayKey, drunkMl: confirmed + pending }
+  })
+}
+
 export async function fetchHydrationHistory(
   endDayKey = localDayKey(),
 ): Promise<Array<{ dayKey: string; drunkMl: number }>> {
-  const sessionToken = await requireToken()
-  return getConvex().query(api.hydration.getHistory, { sessionToken, endDayKey })
+  const userId = resolveActiveUserId()
+  try {
+    const sessionToken = await requireToken()
+    const rows = (await getConvex().query(api.hydration.getHistory, {
+      sessionToken,
+      endDayKey,
+    })) as Array<{ dayKey: string; drunkMl: number }>
+    // Fusionne pending local non sync pour le jour courant.
+    return rows.map((row) => ({
+      dayKey: row.dayKey,
+      drunkMl: row.drunkMl + pendingDrunkMlForDay(row.dayKey, userId),
+    }))
+  } catch {
+    return fallbackHydrationHistory(endDayKey, userId)
+  }
 }
 
 function isValidAmountClient(amountMl: number): boolean {

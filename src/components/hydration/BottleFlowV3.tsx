@@ -25,6 +25,8 @@ import {
 } from '../../shared/hydration'
 import { acquireBodyScrollLock } from '../../utils/bodyScrollLock'
 import { LiveBottleVisual, type BottleDragMode } from './LiveBottleVisual'
+import { WaterHistory7d } from './WaterHistory7d'
+import { GOAL_DEFAULT_ML } from '../../shared/hydration'
 
 const UNDO_TOAST_MS = 5000
 
@@ -42,11 +44,14 @@ interface BottleFlowV3Props {
   onClose: () => void
   capacityMl?: number
   kind?: WaterContainerKind
+  /** Libellé écran (cohérent mode 1,5 L / 2 L). */
+  title?: string
   shapeUrl?: string | null
   initialRemainingMl: number
   /** True si un niveau a déjà été mémorisé pour cet utilisateur/contenant. */
   hasMemorizedLevel?: boolean
   busy?: boolean
+  goalMl?: number
   onCommitDrunk: (commit: BottleFlowCommit) => Promise<void>
   /** Annuler l’ajout serveur + persister le niveau restauré (parent). */
   onUndoCommit?: (args: {
@@ -107,10 +112,12 @@ export function BottleFlowV3({
   onClose,
   capacityMl = WATER_CONTAINER_CAPACITY_ML.plastic_15,
   kind = 'plastic_15',
+  title,
   shapeUrl = null,
   initialRemainingMl,
   hasMemorizedLevel = false,
   busy = false,
+  goalMl = GOAL_DEFAULT_ML,
   onCommitDrunk,
   onUndoCommit,
   onMarkBottleRefilled,
@@ -131,6 +138,7 @@ export function BottleFlowV3({
     null,
   )
   const [toastProgress, setToastProgress] = useState(1)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const committingRef = useRef(false)
   const undoGateRef = useRef<ReturnType<typeof createUndoOnce> | null>(null)
   const lastCommitBeforeRef = useRef<number | null>(null)
@@ -140,6 +148,10 @@ export function BottleFlowV3({
   remainingRef.current = remainingMl
   startRef.current = startRemainingMl
   phaseRef.current = phase
+
+  useEffect(() => {
+    if (!open) setHistoryOpen(false)
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -304,13 +316,14 @@ export function BottleFlowV3({
   if (!open || typeof document === 'undefined') return null
 
   const label =
-    kind === 'plastic_15'
+    title ??
+    (kind === 'plastic_15'
       ? 'Cristaline 1,5 L'
       : kind === 'small_50'
         ? 'Petite bouteille 50 cl'
         : kind === 'glass_25'
           ? 'Verre 25 cl'
-          : 'Ma bouteille'
+          : 'Ma bouteille')
 
   const bottleSlot = (node: ReactNode) => (
     <div className="relative mt-2 flex min-h-0 flex-1 flex-col justify-center overflow-visible">
@@ -405,6 +418,16 @@ export function BottleFlowV3({
           >
             C&apos;est bon
           </button>
+          <button
+            type="button"
+            onClick={() => setHistoryOpen(true)}
+            className="ios-press mt-2 flex shrink-0 flex-col items-center gap-1 text-[#8E8E93]"
+            data-hydration-history-open
+            aria-label="7 derniers jours"
+          >
+            <span className="h-1 w-10 rounded-full bg-white/25" aria-hidden />
+            <span className="text-[12px] font-medium">7 derniers jours</span>
+          </button>
         </>
       ) : null}
 
@@ -477,8 +500,36 @@ export function BottleFlowV3({
             >
               Bouteille remplie · Régler le niveau
             </button>
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(true)}
+              className="ios-press mt-1 flex flex-col items-center gap-1 text-[#8E8E93]"
+              data-hydration-history-open
+              aria-label="7 derniers jours"
+            >
+              <span className="h-1 w-10 rounded-full bg-white/25" aria-hidden />
+              <span className="text-[12px] font-medium">7 derniers jours</span>
+            </button>
           </div>
         </>
+      ) : null}
+
+      {historyOpen ? (
+        <div
+          className="absolute inset-0 z-[30] flex flex-col justify-end bg-black/55"
+          data-hydration-history-sheet
+        >
+          <button
+            type="button"
+            className="min-h-0 flex-1 cursor-default"
+            aria-label="Fermer l’historique"
+            onClick={() => setHistoryOpen(false)}
+          />
+          <div className="max-h-[58%] overflow-y-auto rounded-t-[28px] border-t border-white/10 bg-[#1D1F20] px-5 pb-6 pt-3">
+            <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-white/25" aria-hidden />
+            <WaterHistory7d goalMl={goalMl} active={historyOpen} />
+          </div>
+        </div>
       ) : null}
     </div>
   )

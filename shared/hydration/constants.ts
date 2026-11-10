@@ -20,6 +20,9 @@ export const GLASS_ML = 250
 /** HY-01 — bouteille classique 2 L. */
 export const CLASSIC_BOTTLE_ML = 2000
 
+/** Bouteille Cristaline / classique 1,5 L. */
+export const CLASSIC_BOTTLE_15_ML = 1500
+
 /** Volume saisi Ma bouteille (prudence Archi, vérifié serveur). */
 export const CONTAINER_MIN_ML = 50
 export const CONTAINER_MAX_ML = 5000
@@ -42,8 +45,12 @@ export const REMINDER_NOTIFICATION_IDS = [7101, 7102, 7103] as const
 /** Volumes rapides Ma bouteille (écran 5). */
 export const MY_BOTTLE_PRESET_ML = [500, 750, 1000, 1500] as const
 
-export const HYDRATION_MODES = ['classic_2l', 'glasses_250', 'my_bottle'] as const
+export const HYDRATION_MODES = ['classic_15', 'classic_2l', 'glasses_250', 'my_bottle'] as const
 export type HydrationMode = (typeof HYDRATION_MODES)[number]
+
+/** Ligne exacte sous le curseur objectif (WaterGoalSlider / bulle « i »). */
+export const MSG_GOAL_RANGE =
+  'Réglable de 1 L à 3 L — repère, pas limite de santé.'
 
 export const HYDRATION_ENTRY_SOURCES = [
   'glass',

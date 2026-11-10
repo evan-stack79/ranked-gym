@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  GLASS_ML,
   LABEL_EAU_BUE_SEULE,
-  WATER_CONTAINER_CAPACITY_ML,
   localDayKey,
-  type WaterContainerKind,
 } from '../../shared/hydration'
 import {
   addHydrationEntry,
@@ -26,11 +23,38 @@ import { isMinorOrUnknownAge } from '../../services/nutritionSafetyRules'
 import { useAuth } from '../../context/AuthContext'
 import { LiveBottleVisual } from './LiveBottleVisual'
 import { BottleFlowV3, type BottleFlowCommit } from './BottleFlowV3'
-import type { CatalogContainer } from './ContainerPicker'
+import {
+  bottleScreenLabelForMode,
+  capacityForMode,
+  kindForMode,
+} from '../../utils/hydrationModeDisplay'
 
 interface HydrationPanelProps {
   onOpenSettings?: () => void
   className?: string
+}
+
+/** Icône ronde « changer de bouteille » (bouteille + flèches). */
+function ChangeBottleIcon() {
+  return (
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M5 2.5h4" />
+      <path d="M5.2 2.5v2.3C3.8 5.6 3 6.8 3 8.4V20a1.5 1.5 0 0 0 1.5 1.5h5A1.5 1.5 0 0 0 11 20V8.4c0-1.6-.8-2.8-2.2-3.6V2.5" />
+      <path d="M3 12h8" />
+      <path d="M14 8.5h7M18.5 6l2.5 2.5-2.5 2.5" />
+      <path d="M21 15.5h-7M16.5 13L14 15.5l2.5 2.5" />
+    </svg>
+  )
 }
 
 /**
@@ -41,7 +65,6 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
   const { user } = useAuth()
   const [today, setToday] = useState<HydrationToday | null>(null)
   const [shapeUrl, setShapeUrl] = useState<string | null>(null)
-  const [container] = useState<CatalogContainer>('plastic_15')
   const [flowOpen, setFlowOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [levelTick, setLevelTick] = useState(0)
@@ -81,17 +104,11 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
     }
   }, [refresh])
 
-  const myBottleMode =
-    today?.effectiveVisualMode === 'my_bottle' && Boolean(shapeUrl)
-
-  const capacityMl = useMemo(() => {
-    if (myBottleMode) {
-      return Math.max(GLASS_ML, today?.myBottleVolumeMl ?? 750)
-    }
-    return WATER_CONTAINER_CAPACITY_ML[container]
-  }, [container, myBottleMode, today?.myBottleVolumeMl])
-
-  const kind: WaterContainerKind = myBottleMode ? 'gourd' : container
+  const visualMode = today?.effectiveVisualMode ?? 'classic_2l'
+  const myBottleMode = visualMode === 'my_bottle' && Boolean(shapeUrl)
+  const kind = kindForMode(visualMode)
+  const capacityMl = capacityForMode(visualMode, today?.myBottleVolumeMl)
+  const bottleLabel = bottleScreenLabelForMode(visualMode)
 
   const memorized = useMemo(() => {
     void levelTick
@@ -99,7 +116,7 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
       has: hasMemorizedRemainingMl(kind, userId),
       remaining: getMemorizedRemainingMl(kind, capacityMl, userId),
     }
-  }, [kind, capacityMl, userId, levelTick, today?.drunkMl])
+  }, [kind, capacityMl, userId, levelTick])
 
   const handleCommit = useCallback(
     async (commit: BottleFlowCommit) => {
@@ -160,44 +177,57 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
       <section
         className={`rounded-2xl border border-white/[0.08] bg-[#141416]/92 px-3.5 py-3 ${className}`}
         data-hydration-panel="1"
-        data-hydration-mode={today.effectiveVisualMode}
+        data-hydration-mode={visualMode}
         data-hydration-v3="b"
         data-testid="nutrition-eau-card"
         aria-label="Eau"
       >
-        <button
-          type="button"
-          onClick={() => setFlowOpen(true)}
-          className="ios-press flex w-full items-center gap-3 text-left"
-          data-hydration-eau-card
-        >
-          <div className="flex h-[72px] w-12 shrink-0 items-end justify-center">
-            <LiveBottleVisual
-              kind={kind}
-              remainingMl={memorized.remaining}
-              capacityMl={capacityMl}
-              shapeUrl={myBottleMode ? shapeUrl : null}
-              size="thumb"
-            />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline justify-between gap-2">
-              <p className="text-[14px] font-semibold text-white">
-                {myBottleMode ? 'Ma bouteille' : 'Eau'}
-              </p>
-              <p className="text-[11px] font-medium text-[#8E8E93]">{LABEL_EAU_BUE_SEULE}</p>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setFlowOpen(true)}
+            className="ios-press flex min-w-0 flex-1 items-center gap-3 text-left"
+            data-hydration-eau-card
+          >
+            <div className="flex h-[72px] w-12 shrink-0 items-end justify-center">
+              <LiveBottleVisual
+                kind={kind}
+                remainingMl={memorized.remaining}
+                capacityMl={capacityMl}
+                shapeUrl={myBottleMode ? shapeUrl : null}
+                size="thumb"
+              />
             </div>
-            <p className="mt-0.5 text-[15px] font-semibold tabular-nums text-white" data-hydration-drunk>
-              {drunkL}&nbsp;/&nbsp;{goalL}&nbsp;L
-            </p>
-            <p className="mt-0.5 text-[13px] text-[#ACB4BA]">
-              {myBottleMode ? 'Pass Pro' : 'Cristaline 1,5 L'}
-            </p>
-          </div>
-          <span className="text-[20px] font-light text-[#8E8E93]" aria-hidden>
-            ›
-          </span>
-        </button>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="text-[14px] font-semibold text-white">
+                  {myBottleMode ? 'Ma bouteille' : 'Eau'}
+                </p>
+                <p className="shrink-0 text-[11px] font-medium text-[#8E8E93]">
+                  {LABEL_EAU_BUE_SEULE}
+                </p>
+              </div>
+              <p className="mt-0.5 text-[15px] font-semibold tabular-nums text-white" data-hydration-drunk>
+                {drunkL}&nbsp;/&nbsp;{goalL}&nbsp;L
+              </p>
+              <p className="mt-0.5 truncate text-[13px] text-[#ACB4BA]" data-hydration-bottle-label>
+                {bottleLabel}
+              </p>
+            </div>
+          </button>
+
+          {onOpenSettings && !minorLocked ? (
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="ios-press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#2C3032] text-white"
+              data-hydration-settings
+              aria-label="Changer de bouteille"
+            >
+              <ChangeBottleIcon />
+            </button>
+          ) : null}
+        </div>
 
         <div className="mt-2.5 h-[3px] overflow-hidden rounded-full bg-[#2A2A2E]">
           <div
@@ -205,17 +235,6 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
             style={{ width: `${Math.max(2, progress * 100)}%` }}
           />
         </div>
-
-        {onOpenSettings && !minorLocked ? (
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className="ios-press mt-1 min-h-10 rounded-xl px-1 text-[13px] font-medium text-[#8E8E93]"
-            data-hydration-settings
-          >
-            Réglages
-          </button>
-        ) : null}
       </section>
 
       <BottleFlowV3
@@ -223,10 +242,12 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
         onClose={() => setFlowOpen(false)}
         capacityMl={capacityMl}
         kind={kind}
+        title={bottleLabel}
         shapeUrl={myBottleMode ? shapeUrl : null}
         initialRemainingMl={memorized.remaining}
         hasMemorizedLevel={memorized.has}
         busy={busy}
+        goalMl={goalMl}
         onCommitDrunk={handleCommit}
         onUndoCommit={handleUndoCommit}
         onMarkBottleRefilled={() => {

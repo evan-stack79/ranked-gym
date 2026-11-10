@@ -2,6 +2,7 @@
  * Calculs d’affichage hydratation autorisés (Archi §2) — fonctions pures.
  */
 import {
+  CLASSIC_BOTTLE_15_ML,
   CLASSIC_BOTTLE_ML,
   CONTAINER_MAX_ML,
   CONTAINER_MIN_ML,
@@ -54,6 +55,7 @@ export function containerVolumeMl(
   myBottleVolumeMl: number | null | undefined,
 ): number {
   if (mode === 'glasses_250') return GLASS_ML
+  if (mode === 'classic_15') return CLASSIC_BOTTLE_15_ML
   if (mode === 'my_bottle' && isValidContainerMl(myBottleVolumeMl ?? NaN)) {
     return myBottleVolumeMl as number
   }

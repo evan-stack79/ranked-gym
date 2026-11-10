@@ -1258,6 +1258,56 @@ img {
   outline-offset: 2px;
 }
 
+/* Réglages Eau B v2 — cloche rappels (à droite de la colonne d’eau) */
+.rg-water-bell {
+  position: relative;
+}
+
+.rg-water-bell--on {
+  background: #ff0702;
+  box-shadow: 0 0 0 8px rgb(255 7 2 / 0.14);
+}
+
+.rg-water-bell--off {
+  background: #2c3032;
+  border: 1.5px solid #3a3a3c;
+}
+
+.rg-water-bell__ic {
+  transform-origin: 50% 12%;
+}
+
+.rg-water-bell__ic--ring {
+  animation: rg-water-bell-ring 360ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes rg-water-bell-ring {
+  0% {
+    transform: rotate(0);
+  }
+  20% {
+    transform: rotate(16deg);
+  }
+  40% {
+    transform: rotate(-13deg);
+  }
+  60% {
+    transform: rotate(8deg);
+  }
+  80% {
+    transform: rotate(-4deg);
+  }
+  100% {
+    transform: rotate(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rg-water-bell__ic--ring {
+    animation: none;
+  }
+}
+
 /* Historique — lignes compactes, rouge seulement press / selected / focus */
 .history-page {
   background: #070708;
