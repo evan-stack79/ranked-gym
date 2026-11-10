@@ -64,7 +64,7 @@ export function NutritionCalorieRing({
 
   if (!hasTarget) {
     return (
-      <div className="flex flex-col items-center text-center">
+      <div className="flex flex-col items-center text-center" data-testid="nutrition-calorie-ring" data-calorie-ring-mode="empty">
         {heading}
         <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-[#19191C]">
           <img src="/panther-trim.png" alt="" width={38} height={38} className="h-10 w-10 object-contain" draggable={false} />
@@ -96,7 +96,7 @@ export function NutritionCalorieRing({
   }
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center" data-testid="nutrition-calorie-ring" data-calorie-ring-mode="ring">
       {heading}
       <div className="relative aspect-square w-full max-w-[282px]">
         <svg viewBox="0 0 240 240" className="h-full w-full overflow-visible" role="img" aria-label="Progression calorique">

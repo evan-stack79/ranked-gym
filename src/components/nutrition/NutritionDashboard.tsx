@@ -764,18 +764,43 @@ export function NutritionDashboard({
               <ChevronRight className="h-5 w-5" />
             </button>
           </div>
-          <Reveal>
-            <NutritionCalorieRing
-              remainingCalories={remainingCalories}
-              consumedCalories={totals.calories}
-              targetCalories={targetCalories}
-              progress={calorieProgress}
-              onOpenSetup={onOpenSetup}
-              allowGoalSetup={allowGoalSetup}
+          {/* Compteur kcal (NutritionCalorieRing) + macros, puis carte Eau juste en dessous. */}
+          <div data-nutrition-calorie-block="1" className="flex flex-col gap-4">
+            <Reveal>
+              <NutritionCalorieRing
+                remainingCalories={remainingCalories}
+                consumedCalories={totals.calories}
+                targetCalories={targetCalories}
+                progress={calorieProgress}
+                onOpenSetup={onOpenSetup}
+                allowGoalSetup={allowGoalSetup}
+              />
+            </Reveal>
+            <NutritionMacrosRow
+              protein={{
+                label: 'Protéines',
+                consumedG: totals.protein,
+                targetG: nutrition.proteinG,
+              }}
+              carbs={{
+                label: 'Glucides',
+                consumedG: totals.carbs,
+                targetG: nutrition.carbsG,
+              }}
+              fat={{
+                label: 'Lipides',
+                consumedG: totals.fat,
+                targetG: nutrition.fatG,
+              }}
+            />
+          </div>
+          <Reveal delayMs={60}>
+            <HydrationPanel
+              onOpenSettings={() => setWaterSettingsOpen(true)}
             />
           </Reveal>
           {nutrition.showCalorieGoal ? (
-            <div className="mt-3 space-y-2 px-1" data-testid="dashboard-estimation-notices">
+            <div className="mt-1 space-y-2 px-1" data-testid="dashboard-estimation-notices">
               <p className="text-[12px] leading-relaxed text-[#ACB4BA]">{M_CAL_2}</p>
               {otherSafetyNotices.map((notice) => (
                 <p key={notice} className="text-[12px] leading-relaxed text-[#ACB4BA]">
@@ -784,7 +809,7 @@ export function NutritionDashboard({
               ))}
             </div>
           ) : otherSafetyNotices.length > 0 ? (
-            <div className="mt-3 space-y-2 px-1" data-testid="dashboard-safety-notices">
+            <div className="mt-1 space-y-2 px-1" data-testid="dashboard-safety-notices">
               {otherSafetyNotices.map((notice) => (
                 <p key={notice} className="text-[12px] leading-relaxed text-[#ACB4BA]">
                   {notice}
@@ -794,30 +819,6 @@ export function NutritionDashboard({
           ) : null}
           <SafetyNote onNeedToTalk={() => setShowNeedToTalk(true)} />
         </div>
-
-        <NutritionMacrosRow
-          protein={{
-            label: 'Protéines',
-            consumedG: totals.protein,
-            targetG: nutrition.proteinG,
-          }}
-          carbs={{
-            label: 'Glucides',
-            consumedG: totals.carbs,
-            targetG: nutrition.carbsG,
-          }}
-          fat={{
-            label: 'Lipides',
-            consumedG: totals.fat,
-            targetG: nutrition.fatG,
-          }}
-        />
-
-        <Reveal delayMs={60}>
-          <HydrationPanel
-            onOpenSettings={() => setWaterSettingsOpen(true)}
-          />
-        </Reveal>
         <WaterSettingsSheet
           open={waterSettingsOpen}
           onClose={() => setWaterSettingsOpen(false)}

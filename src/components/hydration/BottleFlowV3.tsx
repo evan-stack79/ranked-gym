@@ -10,7 +10,9 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
 } from 'react'
+import { createPortal } from 'react-dom'
 import {
   drunkMlFromStartAndCurrent,
   fillRatioFromMl,
@@ -21,6 +23,7 @@ import {
   WATER_LEVEL_STEP_ML,
   type WaterContainerKind,
 } from '../../shared/hydration'
+import { acquireBodyScrollLock } from '../../utils/bodyScrollLock'
 import { LiveBottleVisual, type BottleDragMode } from './LiveBottleVisual'
 
 const UNDO_TOAST_MS = 5000
@@ -113,6 +116,21 @@ export function BottleFlowV3({
     committingRef.current = false
   }, [open, initialRemainingMl, capacity, initialPhase, captureRemainingMl, captureStartMl])
 
+  // Portail plein écran : bloque le scroll de la page (pas le glisser bouteille).
+  useEffect(() => {
+    if (!open) return
+    const releaseScroll = acquireBodyScrollLock()
+    const prevTouch = document.body.style.touchAction
+    const prevOverscroll = document.body.style.overscrollBehavior
+    document.body.style.touchAction = 'none'
+    document.body.style.overscrollBehavior = 'none'
+    return () => {
+      releaseScroll()
+      document.body.style.touchAction = prevTouch
+      document.body.style.overscrollBehavior = prevOverscroll
+    }
+  }, [open])
+
   const drunkMl = useMemo(
     () =>
       phase === 'drink'
@@ -171,7 +189,7 @@ export function BottleFlowV3({
     void commitOnRelease()
   }, [commitOnRelease])
 
-  if (!open) return null
+  if (!open || typeof document === 'undefined') return null
 
   const label =
     kind === 'plastic_15'
@@ -182,16 +200,34 @@ export function BottleFlowV3({
           ? 'Verre 25 cl'
           : 'Ma bouteille'
 
-  return (
+  const bottleSlot = (node: ReactNode) => (
+    <div className="relative mt-2 flex min-h-0 flex-1 flex-col justify-center overflow-hidden">
+      <div className="relative mx-auto flex h-full max-h-full w-full max-w-[300px] items-center justify-center">
+        {node}
+      </div>
+    </div>
+  )
+
+  const overlay = (
     <div
-      className="fixed inset-0 z-[80] flex flex-col bg-black px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(3.25rem,env(safe-area-inset-top))] text-white"
+      className="fixed inset-0 z-[200] flex flex-col overflow-hidden text-white"
+      style={{
+        backgroundColor: '#000000',
+        paddingTop: 'max(0.75rem, var(--app-safe-area-top, env(safe-area-inset-top, 0px)))',
+        paddingBottom:
+          'max(0.75rem, var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px)))',
+        paddingLeft: 'max(1.25rem, var(--app-safe-area-left, env(safe-area-inset-left, 0px)))',
+        paddingRight: 'max(1.25rem, var(--app-safe-area-right, env(safe-area-inset-right, 0px)))',
+      }}
       data-hydration-bottle-flow="v3b"
       data-hydration-phase={phase}
+      data-hydration-overlay-portal="1"
+      data-hydration-covers-chrome="1"
       role="dialog"
       aria-modal="true"
       aria-label="Eau"
     >
-      <div className="mb-1 flex items-center justify-between">
+      <div className="mb-1 flex shrink-0 items-center justify-between">
         <button
           type="button"
           onClick={onClose}
@@ -207,16 +243,18 @@ export function BottleFlowV3({
 
       {phase === 'intro' ? (
         <>
-          <p className="mt-2 text-center text-[11px] font-semibold uppercase tracking-[0.12em] text-[#ACB4BA]">
-            Hydratation
-          </p>
-          <h2 className="mt-0.5 text-center text-[22px] font-bold tracking-tight text-white">
-            {label}
-          </h2>
-          <p className="mt-1 text-center text-[13px] leading-snug text-[#ACB4BA]">
-            On règle d&apos;abord le niveau. Ensuite tu diras ce que tu as bu.
-          </p>
-          <div className="mt-2 flex flex-1 items-center justify-center">
+          <div className="shrink-0">
+            <p className="mt-2 text-center text-[11px] font-semibold uppercase tracking-[0.12em] text-[#ACB4BA]">
+              Hydratation
+            </p>
+            <h2 className="mt-0.5 text-center text-[22px] font-bold tracking-tight text-white">
+              {label}
+            </h2>
+            <p className="mt-1 text-center text-[13px] leading-snug text-[#ACB4BA]">
+              On règle d&apos;abord le niveau. Ensuite tu diras ce que tu as bu.
+            </p>
+          </div>
+          {bottleSlot(
             <LiveBottleVisual
               kind={kind}
               remainingMl={capacity}
@@ -226,12 +264,13 @@ export function BottleFlowV3({
               showHandle
               handleHint={false}
               interactive={false}
-            />
-          </div>
+              className="!max-h-[min(46dvh,400px)]"
+            />,
+          )}
           <button
             type="button"
             onClick={() => setPhase('setup')}
-            className="ios-press mt-auto min-h-[52px] w-full rounded-2xl bg-[#FF0702] text-[17px] font-semibold text-white"
+            className="ios-press mt-auto min-h-[52px] w-full shrink-0 rounded-2xl bg-[#FF0702] text-[17px] font-semibold text-white"
             data-hydration-flow-start
           >
             Commencer
@@ -241,38 +280,39 @@ export function BottleFlowV3({
 
       {phase === 'setup' ? (
         <>
-          <div className="flex items-center justify-between">
-            <p className="text-[13px] font-semibold tabular-nums text-[#ACB4BA]">Étape 1/2</p>
-            <p className="text-[12px] font-medium text-[#8E8E93]">{label}</p>
-          </div>
-          <h2 className="mt-1 text-[21px] font-bold tracking-tight text-white">
-            Où en est ta bouteille&nbsp;?
-          </h2>
-          <p className="mt-0.5 text-[12px] leading-snug text-[#ACB4BA]">
-            Glisse le trait, ou utilise −&nbsp;10&nbsp;ml / +&nbsp;10&nbsp;ml.
-          </p>
-
-          <div className="relative mt-2 flex flex-1 flex-col justify-center">
-            <div className="relative mx-auto w-full max-w-[340px]">
-              <LiveBottleVisual
-                kind={kind}
-                remainingMl={remainingMl}
-                capacityMl={capacity}
-                mode="setup"
-                shapeUrl={shapeUrl}
-                size="hero"
-                showHandle
-                handleHint={false}
-                showMlBubble
-                interactive
-                dragStepMl={WATER_DRAG_STEP_ML}
-                onRemainingChange={setRemainingMl}
-                onDraggingChange={setDragging}
-              />
+          <div className="shrink-0">
+            <div className="flex items-center justify-between">
+              <p className="text-[13px] font-semibold tabular-nums text-[#ACB4BA]">Étape 1/2</p>
+              <p className="text-[12px] font-medium text-[#8E8E93]">{label}</p>
             </div>
+            <h2 className="mt-1 text-[21px] font-bold tracking-tight text-white">
+              Où en est ta bouteille&nbsp;?
+            </h2>
+            <p className="mt-0.5 text-[12px] leading-snug text-[#ACB4BA]">
+              Glisse le trait, ou utilise −&nbsp;10&nbsp;ml / +&nbsp;10&nbsp;ml.
+            </p>
           </div>
 
-          <div className="mt-1 flex items-center justify-center gap-3">
+          {bottleSlot(
+            <LiveBottleVisual
+              kind={kind}
+              remainingMl={remainingMl}
+              capacityMl={capacity}
+              mode="setup"
+              shapeUrl={shapeUrl}
+              size="hero"
+              showHandle
+              handleHint={false}
+              showMlBubble
+              interactive
+              dragStepMl={WATER_DRAG_STEP_ML}
+              onRemainingChange={setRemainingMl}
+              onDraggingChange={setDragging}
+              className="!max-h-[min(42dvh,380px)]"
+            />,
+          )}
+
+          <div className="mt-1 flex shrink-0 items-center justify-center gap-3">
             <button
               type="button"
               onClick={() => nudge(-WATER_LEVEL_STEP_ML)}
@@ -294,14 +334,14 @@ export function BottleFlowV3({
             </button>
           </div>
 
-          <p className="mt-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-center text-[12px] leading-snug text-[#C7C7CC]">
+          <p className="mt-1.5 shrink-0 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-center text-[12px] leading-snug text-[#C7C7CC]">
             Ce niveau ne compte pas comme bu. C&apos;est juste pour savoir où en est la bouteille.
           </p>
 
           <button
             type="button"
             onClick={confirmStart}
-            className="ios-press mt-auto min-h-[52px] w-full rounded-2xl bg-[#FF0702] text-[17px] font-semibold text-white"
+            className="ios-press mt-auto min-h-[52px] w-full shrink-0 rounded-2xl bg-[#FF0702] text-[17px] font-semibold text-white"
             data-hydration-confirm-level
           >
             C&apos;est bon — étape suivante
@@ -311,25 +351,27 @@ export function BottleFlowV3({
 
       {phase === 'drink' ? (
         <>
-          <div className="flex items-center justify-between">
-            <p className="text-[13px] font-semibold tabular-nums text-[#ACB4BA]">Étape 2/2</p>
-            <p className="text-[12px] font-medium text-[#8E8E93]">{label}</p>
+          <div className="shrink-0">
+            <div className="flex items-center justify-between">
+              <p className="text-[13px] font-semibold tabular-nums text-[#ACB4BA]">Étape 2/2</p>
+              <p className="text-[12px] font-medium text-[#8E8E93]">{label}</p>
+            </div>
+            <h2 className="mt-1 text-[21px] font-bold tracking-tight text-white">
+              Combien tu as bu&nbsp;?
+            </h2>
+            <p className="mt-0.5 text-[12px] leading-snug text-[#ACB4BA]">
+              Glisse vers le bas. Le niveau baisse = tu as bu.
+            </p>
+            <p
+              className="mt-1.5 text-center text-[26px] font-bold tabular-nums tracking-tight text-white"
+              data-hydration-drunk-big
+            >
+              Tu as bu {drunkMl.toLocaleString('fr-FR')}&nbsp;ml
+            </p>
           </div>
-          <h2 className="mt-1 text-[21px] font-bold tracking-tight text-white">
-            Combien tu as bu&nbsp;?
-          </h2>
-          <p className="mt-0.5 text-[12px] leading-snug text-[#ACB4BA]">
-            Glisse vers le bas. Le niveau baisse = tu as bu.
-          </p>
-          <p
-            className="mt-1.5 text-center text-[26px] font-bold tabular-nums tracking-tight text-white"
-            data-hydration-drunk-big
-          >
-            Tu as bu {drunkMl.toLocaleString('fr-FR')}&nbsp;ml
-          </p>
 
-          <div className="relative mt-1 flex flex-1 flex-col justify-center">
-            <div className="relative mx-auto w-full max-w-[340px]">
+          {bottleSlot(
+            <>
               <LiveBottleVisual
                 kind={kind}
                 remainingMl={remainingMl}
@@ -347,6 +389,7 @@ export function BottleFlowV3({
                 onRemainingChange={setRemainingMl}
                 onDraggingChange={setDragging}
                 onDragEnd={onDragEnd}
+                className="!max-h-[min(42dvh,380px)]"
               />
               {drunkMl > 0 ? (
                 <div
@@ -357,10 +400,10 @@ export function BottleFlowV3({
                   <p className="text-[11px] font-semibold text-[#FF907F]">partie bue</p>
                 </div>
               ) : null}
-            </div>
-          </div>
+            </>,
+          )}
 
-          <div className="mt-auto pb-1 pt-2 text-center">
+          <div className="mt-auto shrink-0 pb-1 pt-2 text-center">
             <p className="text-[17px] font-semibold tracking-tight text-white">
               {dragging || drunkMl > 0 ? 'Lâche pour ajouter' : 'Glisse vers le bas'}
             </p>
@@ -372,9 +415,10 @@ export function BottleFlowV3({
           </div>
         </>
       ) : null}
-
     </div>
   )
+
+  return createPortal(overlay, document.body)
 }
 
 export function HydrationUndoToast({

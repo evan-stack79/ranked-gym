@@ -77,7 +77,7 @@ export function AppLayout({
       */}
       {showHeader ? (
         <header
-          className="sticky top-0 z-30 shrink-0 border-b border-white/5"
+          className="sticky top-0 z-30 shrink-0"
           data-app-brand-header="1"
           aria-hidden={streakCelebrationActive ? true : undefined}
           /* Safe-area seule — pas de padding fixe empilé par-dessus (Dynamic Island). */
@@ -86,17 +86,24 @@ export function AppLayout({
           }}
         >
           {/*
-            Fond (et éventuel blur) en calque frère ABSOLU sous le contenu —
+            Fond TRANSPARENT (dégradé discret) en calque frère ABSOLU sous le contenu —
             jamais backdrop-filter / opacity / filter sur un ancêtre du logo/texte
             (WebKit iOS rasterise alors les enfants en basse résolution).
+            Pas de bloc noir opaque.
           */}
           <div className="relative">
             <div
               aria-hidden="true"
               data-brand-header-bg="1"
-              className="pointer-events-none absolute inset-0 -z-10 bg-[#000000]"
+              data-brand-header-bg-mode="transparent"
+              className="pointer-events-none absolute inset-0 -z-10"
+              style={{
+                background:
+                  'linear-gradient(to bottom, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.12) 55%, rgba(0,0,0,0) 100%)',
+              }}
             />
             <div className="mx-auto flex max-w-lg items-center justify-center px-4 pb-2 pt-0">
+              {/* Pas de filter/opacity sur l’ancêtre du logo (anti-flou iOS WebKit). */}
               <div data-cold-launch-target="compact">
                 <BrandMark variant="compact" />
               </div>

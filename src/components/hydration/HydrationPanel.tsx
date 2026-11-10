@@ -175,6 +175,7 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
       <section
         className={`rounded-2xl border border-white/[0.08] bg-[#141416]/92 px-3.5 py-3 ${className}`}
         data-hydration-panel="loading"
+        data-testid="nutrition-eau-card"
       >
         <p className="text-[14px] font-semibold text-white">Eau</p>
         <p className="mt-1 text-[13px] text-[#ACB4BA]">Chargement…</p>
@@ -194,6 +195,7 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
         data-hydration-panel="1"
         data-hydration-mode={today.effectiveVisualMode}
         data-hydration-v3="b"
+        data-testid="nutrition-eau-card"
         aria-label="Eau"
       >
         <button

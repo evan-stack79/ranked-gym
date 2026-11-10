@@ -122,7 +122,32 @@ export default function HydrationV3Fixture() {
         {screen === '01' ? <CardScreen drunkMl={DAY_BEFORE} testId="01" /> : null}
 
         {screen === '02' ? (
-          <div style={{ width: 402, height: 874 }} data-hydration-v3-screen="02">
+          <div
+            className="relative mx-auto overflow-hidden bg-black text-white"
+            style={{ width: 402, height: 874 }}
+            data-hydration-v3-screen="02"
+          >
+            {/* Chrome volontairement présent derrière — l’overlay portail doit tout recouvrir. */}
+            <header
+              className="absolute inset-x-0 top-0 z-30"
+              data-app-brand-header="1"
+              style={{ paddingTop: 47 }}
+            >
+              <div className="px-4 pb-2 pt-0 text-center text-[17px] font-semibold">
+                Ranked <span className="text-[#FF0702]">Gym</span>
+              </div>
+            </header>
+            <div className="absolute inset-x-0 bottom-24 z-40 space-y-2 px-5 text-[15px] text-[#ACB4BA]">
+              <p>Scanner</p>
+              <p>Journal</p>
+              <p>Repas du jour</p>
+            </div>
+            <nav
+              className="absolute inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#171719] px-3 py-3 text-center text-[13px]"
+              data-bottom-nav-host="1"
+            >
+              Accueil · Train · Nutri · Profil
+            </nav>
             <BottleFlowV3
               open
               onClose={() => undefined}

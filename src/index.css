@@ -2908,8 +2908,9 @@ select,
   image-rendering: -webkit-optimize-contrast;
 }
 
-/* Fond header : calque séparé — blur autorisé ICI seulement, jamais sur <header> parent. */
-[data-brand-header-bg='1'] {
+/* Fond header : calque séparé — blur autorisé ICI seulement, jamais sur <header> parent.
+ * Mode transparent : pas de bloc noir opaque (dégradé inline uniquement). */
+[data-brand-header-bg='1']:not([data-brand-header-bg-mode='transparent']) {
   background-color: #000000;
 }
 
