@@ -2908,9 +2908,15 @@ select,
   image-rendering: -webkit-optimize-contrast;
 }
 
-/* Fond header : calque séparé — blur autorisé ICI seulement, jamais sur <header> parent. */
-[data-brand-header-bg='1'] {
+/* Fond header : calque séparé — blur autorisé ICI seulement, jamais sur <header> parent.
+ * Mode transparent : aucun fond (ni #000 ni dégradé) — logo seul. */
+[data-brand-header-bg='1']:not([data-brand-header-bg-mode='transparent']) {
   background-color: #000000;
+}
+
+[data-brand-header-bg='1'][data-brand-header-bg-mode='transparent'] {
+  background: none !important;
+  background-color: transparent !important;
 }
 
 .home-cold-enter--active .home-cold-enter__group {

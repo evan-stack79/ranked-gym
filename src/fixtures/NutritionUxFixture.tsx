@@ -23,6 +23,11 @@ const FIXTURE_PROFILE: CalorieProfile = {
   goal: 'cut',
   weeklyPaceKg: 0.4,
   onboardingComplete: true,
+  healthAnswer: 'none',
+  declaredPregnancy: false,
+  declaredBreastfeeding: false,
+  declaredEatingDisorder: false,
+  preferNotAnswerHealth: false,
 }
 
 function buildFixtureMeals(): MealEntry[] {
@@ -118,7 +123,7 @@ function NutritionFixtureShell() {
       data-nutrition-fixture="1"
     >
       <header
-        className="sticky top-0 z-30 shrink-0 border-b border-white/5"
+        className="sticky top-0 z-30 shrink-0"
         data-app-brand-header="1"
         style={{
           paddingTop: 'var(--app-safe-area-top, env(safe-area-inset-top, 0px))',
@@ -128,7 +133,8 @@ function NutritionFixtureShell() {
           <div
             aria-hidden="true"
             data-brand-header-bg="1"
-            className="pointer-events-none absolute inset-0 -z-10 bg-[#000000]"
+            data-brand-header-bg-mode="transparent"
+            className="pointer-events-none absolute inset-0 -z-10 bg-transparent"
           />
           <div className="mx-auto flex max-w-lg items-center justify-center px-4 pb-2 pt-0">
             <div data-cold-launch-target="compact">

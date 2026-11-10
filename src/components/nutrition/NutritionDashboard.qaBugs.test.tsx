@@ -130,6 +130,12 @@ describe('NutritionDashboard — drapeau OFF : un seul M_INFO_1', () => {
       Q8_SCREEN_TITLE,
     )
     expect(host.querySelector('[data-testid="dashboard-safety-notices"]')).toBeNull()
+    // SEC-NUT-02 / flag_off : pas de CTA chiffré quand le drapeau est éteint
+    expect(host.querySelector('[data-testid="define-calorie-goal"]')).toBeNull()
+    expect(host.textContent).not.toContain('Fixer un objectif')
+    expect(
+      host.querySelector('[data-testid="nutrition-calorie-ring"]')?.getAttribute('data-calorie-lock'),
+    ).toBe('flag_off')
 
     root.unmount()
     host.remove()

@@ -7,10 +7,12 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import {
+  clampRemainingToStart,
   fillRatioFromMl,
   handleBottomPercent,
   mlFromFillRatio,
-  mlFromPointerY,
+  remainingMlFromPointerY,
+  WATER_DRAG_STEP_ML,
   type WaterContainerKind,
 } from '../../shared/hydration'
 
@@ -21,69 +23,107 @@ export const SHELL_SRC: Record<WaterContainerKind, string> = {
   gourd: '/assets/hydration/shell_gourde.png',
 }
 
-const HEIGHT_CLASS: Record<WaterContainerKind, { large: string; thumb: string }> = {
-  plastic_15: { large: 'h-[176px]', thumb: 'h-[58px]' },
-  small_50: { large: 'h-[156px]', thumb: 'h-[52px]' },
-  glass_25: { large: 'h-[156px]', thumb: 'h-[52px]' },
-  gourd: { large: 'h-[176px]', thumb: 'h-[56px]' },
+const HEIGHT_CLASS: Record<
+  WaterContainerKind,
+  { large: string; thumb: string; hero: string }
+> = {
+  plastic_15: { large: 'h-[176px]', thumb: 'h-[58px]', hero: 'h-[min(52vh,420px)]' },
+  small_50: { large: 'h-[156px]', thumb: 'h-[52px]', hero: 'h-[min(48vh,380px)]' },
+  glass_25: { large: 'h-[156px]', thumb: 'h-[52px]', hero: 'h-[min(48vh,380px)]' },
+  gourd: { large: 'h-[176px]', thumb: 'h-[56px]', hero: 'h-[min(52vh,420px)]' },
 }
+
+export type BottleDragMode = 'setup' | 'drink'
 
 interface LiveBottleVisualProps {
   kind: WaterContainerKind
-  /** ml dans le contenant (0…capacity). */
-  ml: number
+  /** Remaining ml affiché (0…capacity). */
+  remainingMl: number
   capacityMl: number
-  /** URL PNG détouré (Ma bouteille) — sinon shell catalogue. */
+  /** Mode boire : plafond = niveau de départ. */
+  startRemainingMl?: number
+  mode?: BottleDragMode
   shapeUrl?: string | null
-  size?: 'large' | 'thumb'
+  size?: 'large' | 'thumb' | 'hero'
   showHandle?: boolean
+  /** Affiche le libellé « glisse pour régler » (désactivé en v3). */
+  handleHint?: boolean
+  /** Zone rouge discrète entre départ et niveau actuel (mode boire). */
+  showDrunkZone?: boolean
+  /** Bulle ml à gauche du trait (jamais sous le doigt). */
+  showMlBubble?: boolean
   interactive?: boolean
-  onMlChange?: (ml: number) => void
+  /** Pas de glisser (défaut = précision doigt 1 ml). */
+  dragStepMl?: number
+  onRemainingChange?: (remainingMl: number) => void
+  onDraggingChange?: (dragging: boolean) => void
+  /** Appelé à la fin du glisser (variante B : commit au relâchement). */
+  onDragEnd?: () => void
   className?: string
 }
 
 /**
- * Contenant photo + eau bleue translucide dessinée en direct.
- * Masque silhouette → teinte eau (plus sombre vers le bas) + ménisque ;
- * PNG shell par-dessus pour conserver les reflets plastique.
+ * Contenant photo + eau live.
+ * setup : remaining libre 0…capacité.
+ * drink : remaining plafonné au départ (glisser bas uniquement).
  */
 export function LiveBottleVisual({
   kind,
-  ml,
+  remainingMl,
   capacityMl,
+  startRemainingMl,
+  mode = 'setup',
   shapeUrl = null,
   size = 'large',
   showHandle = false,
+  handleHint = false,
+  showDrunkZone = false,
+  showMlBubble = false,
   interactive = false,
-  onMlChange,
+  dragStepMl = WATER_DRAG_STEP_ML,
+  onRemainingChange,
+  onDraggingChange,
+  onDragEnd,
   className = '',
 }: LiveBottleVisualProps) {
   const shell = shapeUrl || SHELL_SRC[kind]
-  const fillRatio = fillRatioFromMl(ml, capacityMl)
-  const waterPct = `${handleBottomPercent(kind, fillRatio)}%`
+  const fillRatio = fillRatioFromMl(remainingMl, capacityMl)
+  const fillPct = handleBottomPercent(kind, fillRatio)
+  const waterPct = `${fillPct}%`
+  const startPct =
+    startRemainingMl != null
+      ? handleBottomPercent(kind, fillRatioFromMl(startRemainingMl, capacityMl))
+      : fillPct
+  const drunkBandPct = Math.max(0, startPct - fillPct)
   const isThumb = size === 'thumb'
   const heightClass = HEIGHT_CLASS[kind][size]
   const rootRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef(false)
   const [dragging, setDragging] = useState(false)
+  const step = dragStepMl > 0 ? dragStepMl : WATER_DRAG_STEP_ML
 
   const applyPointer = useCallback(
     (clientY: number) => {
-      if (!onMlChange || !rootRef.current) return
+      if (!onRemainingChange || !rootRef.current) return
       const img = rootRef.current.querySelector('[data-hydration-shell]') as HTMLElement | null
       const rect = (img ?? rootRef.current).getBoundingClientRect()
-      const next = mlFromPointerY(clientY, rect, kind, capacityMl)
-      onMlChange(next)
+      let next = remainingMlFromPointerY(clientY, rect, kind, capacityMl, step)
+      if (mode === 'drink') {
+        const start = startRemainingMl ?? capacityMl
+        next = clampRemainingToStart(next, start, capacityMl, step)
+      }
+      onRemainingChange(next)
     },
-    [capacityMl, kind, onMlChange],
+    [capacityMl, kind, mode, onRemainingChange, startRemainingMl, step],
   )
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!interactive || !onMlChange) return
+    if (!interactive || !onRemainingChange) return
     e.preventDefault()
     e.stopPropagation()
     dragRef.current = true
     setDragging(true)
+    onDraggingChange?.(true)
     e.currentTarget.setPointerCapture(e.pointerId)
     applyPointer(e.clientY)
   }
@@ -98,11 +138,13 @@ export function LiveBottleVisual({
     if (!dragRef.current) return
     dragRef.current = false
     setDragging(false)
+    onDraggingChange?.(false)
     try {
       e.currentTarget.releasePointerCapture(e.pointerId)
     } catch {
       /* already released */
     }
+    onDragEnd?.()
   }
 
   useEffect(() => {
@@ -131,10 +173,12 @@ export function LiveBottleVisual({
   return (
     <div
       ref={rootRef}
-      className={`relative mx-auto ${heightClass} ${isThumb ? 'w-auto' : 'w-full max-w-[200px]'} ${className}`}
+      className={`relative mx-auto ${heightClass} ${isThumb ? 'w-auto' : 'w-full max-w-[220px]'} ${className}`}
       data-hydration-live-bottle={kind}
+      data-hydration-drag-mode={mode}
       data-fill-ratio={fillRatio.toFixed(3)}
-      data-hydration-ml={mlFromFillRatio(fillRatio, capacityMl)}
+      data-hydration-remaining={mlFromFillRatio(fillRatio, capacityMl)}
+      data-hydration-dragging={dragging ? '1' : '0'}
       style={interactive ? { touchAction: 'none', userSelect: 'none' } : undefined}
       onPointerDown={interactive ? onPointerDown : undefined}
       onPointerMove={interactive ? onPointerMove : undefined}
@@ -142,12 +186,13 @@ export function LiveBottleVisual({
       onPointerCancel={interactive ? endDrag : undefined}
       role={interactive ? 'slider' : undefined}
       aria-valuemin={interactive ? 0 : undefined}
-      aria-valuemax={interactive ? capacityMl : undefined}
-      aria-valuenow={interactive ? ml : undefined}
-      aria-label={interactive ? 'Niveau d’eau' : undefined}
+      aria-valuemax={
+        interactive ? (mode === 'drink' ? (startRemainingMl ?? capacityMl) : capacityMl) : undefined
+      }
+      aria-valuenow={interactive ? remainingMl : undefined}
+      aria-label={interactive ? (mode === 'drink' ? 'Niveau restant' : 'Niveau de départ') : undefined}
     >
       <div className="relative mx-auto h-full w-fit">
-        {/* Photo détourée (reflets / plastique) */}
         <img
           src={shell}
           alt=""
@@ -156,11 +201,6 @@ export function LiveBottleVisual({
           className="relative z-0 h-full w-auto select-none object-contain"
         />
 
-        {/*
-          Eau intérieure : même silhouette (masque), hauteur = niveau.
-          mix-blend-mode multiply + soft-light pour teinter le plastique
-          sans écraser les reflets du PNG.
-        */}
         <div
           className="pointer-events-none absolute inset-0 z-[1] overflow-hidden"
           style={maskStyle}
@@ -185,7 +225,20 @@ export function LiveBottleVisual({
               mixBlendMode: 'soft-light',
             }}
           />
-          {/* Ménisque */}
+          {showDrunkZone && mode === 'drink' && drunkBandPct > 0.4 ? (
+            <div
+              className="absolute inset-x-0"
+              data-hydration-drunk-zone
+              style={{
+                bottom: waterPct,
+                height: `${drunkBandPct}%`,
+                background:
+                  'linear-gradient(to top, rgba(255, 7, 2, 0.32) 0%, rgba(255, 7, 2, 0.16) 100%)',
+                boxShadow:
+                  'inset 0 1px 0 rgba(255,7,2,0.55), inset 0 -1px 0 rgba(255,7,2,0.35)',
+              }}
+            />
+          ) : null}
           <div
             className="absolute inset-x-0"
             style={{ bottom: waterPct }}
@@ -203,7 +256,6 @@ export function LiveBottleVisual({
           </div>
         </div>
 
-        {/* Léger voile highlights pour garder le « plastique » au-dessus de l’eau */}
         <img
           src={shell}
           alt=""
@@ -225,12 +277,29 @@ export function LiveBottleVisual({
               <span className="absolute right-0 top-1/2 flex h-5 w-5 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border border-[#5AC8FA]/85 bg-[#0B0B0D]">
                 <span className="h-2 w-2 rounded-full bg-[#5AC8FA]" />
               </span>
-              {!isThumb ? (
+              {handleHint && !isThumb ? (
                 <span className="absolute left-[calc(100%+12px)] top-1/2 w-[5.5rem] -translate-y-1/2 text-[10px] font-medium leading-snug text-[#ACB4BA]">
                   glisse pour régler
                 </span>
               ) : null}
             </div>
+          </div>
+        ) : null}
+
+        {showMlBubble && !isThumb ? (
+          <div
+            className="pointer-events-none absolute z-[6] whitespace-nowrap rounded-2xl border border-white/20 bg-[#1C1C1E] px-3 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.55)]"
+            style={{
+              bottom: `calc(${waterPct} + 12px)`,
+              /* À droite du trait — évite la coupe « H / é » hors cadre. */
+              right: '0%',
+              transform: 'translateX(12%)',
+            }}
+            data-hydration-ml-bubble
+          >
+            <p className="text-[15px] font-semibold tabular-nums tracking-tight text-white">
+              {Math.round(remainingMl).toLocaleString('fr-FR')}&nbsp;ml
+            </p>
           </div>
         ) : null}
       </div>

@@ -116,9 +116,14 @@ describe('AppLayout — barre marque sticky Nutrition / Train', () => {
     // Safe-area seule sur le header — pas de max(fixe, safe-area) empilé sur l’inner.
     expect(header?.style.paddingTop).toContain('safe-area-inset-top')
     expect(header?.style.paddingTop).not.toContain('0.75rem')
-    // Fond en calque frère (pas backdrop-filter sur le <header> ancêtre du logo/texte).
+    // Fond vraiment transparent (pas de bloc noir / dégradé, pas backdrop-filter).
     expect(header?.className).not.toMatch(/backdrop-blur|glass-bar/)
-    expect(header?.querySelector('[data-brand-header-bg="1"]')).not.toBeNull()
+    const bg = header?.querySelector('[data-brand-header-bg="1"]') as HTMLElement | null
+    expect(bg).not.toBeNull()
+    expect(bg?.getAttribute('data-brand-header-bg-mode')).toBe('transparent')
+    expect(bg?.className).not.toMatch(/bg-\[#000000\]/)
+    expect(bg?.className).toMatch(/bg-transparent/)
+    expect(bg?.style.background || '').toBe('')
     expect(header?.querySelector('[data-brand-mark-svg="compact"]')).toBeNull()
     const mark = header?.querySelector(
       '[data-brand-mark-image="compact"]',

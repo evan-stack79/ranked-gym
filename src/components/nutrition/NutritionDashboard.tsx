@@ -295,6 +295,13 @@ export function NutritionDashboard({
     !declarations.pregnancy &&
     !declarations.breastfeeding &&
     !nutrition.showCalorieGoal
+  const calorieLockReason = !calorieGoalEnabled
+    ? ('flag_off' as const)
+    : declarations.eatingDisorder
+      ? ('tca' as const)
+      : declarations.diabetes || declarations.pregnancy || declarations.breastfeeding
+        ? ('health' as const)
+        : ('none' as const)
 
   const totals = useMemo(() => {
     return meals.reduce(
@@ -764,18 +771,44 @@ export function NutritionDashboard({
               <ChevronRight className="h-5 w-5" />
             </button>
           </div>
-          <Reveal>
-            <NutritionCalorieRing
-              remainingCalories={remainingCalories}
-              consumedCalories={totals.calories}
-              targetCalories={targetCalories}
-              progress={calorieProgress}
-              onOpenSetup={onOpenSetup}
-              allowGoalSetup={allowGoalSetup}
+          {/* Compteur kcal + macros, puis carte Eau avec vrai espacement. */}
+          <div data-nutrition-calorie-block="1" className="flex flex-col gap-4">
+            <Reveal>
+              <NutritionCalorieRing
+                remainingCalories={remainingCalories}
+                consumedCalories={totals.calories}
+                targetCalories={targetCalories}
+                progress={calorieProgress}
+                onOpenSetup={onOpenSetup}
+                allowGoalSetup={allowGoalSetup}
+                lockReason={calorieLockReason}
+              />
+            </Reveal>
+            <NutritionMacrosRow
+              protein={{
+                label: 'Protéines',
+                consumedG: totals.protein,
+                targetG: nutrition.proteinG,
+              }}
+              carbs={{
+                label: 'Glucides',
+                consumedG: totals.carbs,
+                targetG: nutrition.carbsG,
+              }}
+              fat={{
+                label: 'Lipides',
+                consumedG: totals.fat,
+                targetG: nutrition.fatG,
+              }}
             />
-          </Reveal>
+          </div>
+          <div className="mt-6" data-nutrition-eau-spacer="1">
+            <Reveal delayMs={60}>
+              <HydrationPanel onOpenSettings={() => setWaterSettingsOpen(true)} />
+            </Reveal>
+          </div>
           {nutrition.showCalorieGoal ? (
-            <div className="mt-3 space-y-2 px-1" data-testid="dashboard-estimation-notices">
+            <div className="mt-1 space-y-2 px-1" data-testid="dashboard-estimation-notices">
               <p className="text-[12px] leading-relaxed text-[#ACB4BA]">{M_CAL_2}</p>
               {otherSafetyNotices.map((notice) => (
                 <p key={notice} className="text-[12px] leading-relaxed text-[#ACB4BA]">
@@ -784,7 +817,7 @@ export function NutritionDashboard({
               ))}
             </div>
           ) : otherSafetyNotices.length > 0 ? (
-            <div className="mt-3 space-y-2 px-1" data-testid="dashboard-safety-notices">
+            <div className="mt-1 space-y-2 px-1" data-testid="dashboard-safety-notices">
               {otherSafetyNotices.map((notice) => (
                 <p key={notice} className="text-[12px] leading-relaxed text-[#ACB4BA]">
                   {notice}
@@ -794,30 +827,6 @@ export function NutritionDashboard({
           ) : null}
           <SafetyNote onNeedToTalk={() => setShowNeedToTalk(true)} />
         </div>
-
-        <NutritionMacrosRow
-          protein={{
-            label: 'Protéines',
-            consumedG: totals.protein,
-            targetG: nutrition.proteinG,
-          }}
-          carbs={{
-            label: 'Glucides',
-            consumedG: totals.carbs,
-            targetG: nutrition.carbsG,
-          }}
-          fat={{
-            label: 'Lipides',
-            consumedG: totals.fat,
-            targetG: nutrition.fatG,
-          }}
-        />
-
-        <Reveal delayMs={60}>
-          <HydrationPanel
-            onOpenSettings={() => setWaterSettingsOpen(true)}
-          />
-        </Reveal>
         <WaterSettingsSheet
           open={waterSettingsOpen}
           onClose={() => setWaterSettingsOpen(false)}

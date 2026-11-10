@@ -40,7 +40,6 @@ export function ColdLaunchAccueilFixture() {
         }}
       >
         <header
-          className="border-b border-white/5"
           data-app-brand-header="1"
           style={{ paddingTop: 'var(--app-safe-area-top, env(safe-area-inset-top, 0px))' }}
         >
@@ -48,7 +47,8 @@ export function ColdLaunchAccueilFixture() {
             <div
               aria-hidden="true"
               data-brand-header-bg="1"
-              className="pointer-events-none absolute inset-0 -z-10 bg-[#000000]"
+              data-brand-header-bg-mode="transparent"
+              className="pointer-events-none absolute inset-0 -z-10 bg-transparent"
             />
             <div className="mx-auto flex max-w-lg items-center justify-center px-4 pb-2 pt-0">
               <div data-cold-launch-target="compact">

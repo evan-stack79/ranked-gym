@@ -2,8 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   GLASS_ML,
   LABEL_EAU_BUE_SEULE,
-  MSG_HIGH_INFO,
-  MSG_PERMANENT,
   WATER_CONTAINER_CAPACITY_ML,
   localDayKey,
   type WaterContainerKind,
@@ -18,11 +16,17 @@ import {
   undoLastHydrationEntry,
 } from '../../services/hydration/hydrationService'
 import { loadBottleShapeUrl } from '../../services/hydration/bottleShapeStorage'
+import {
+  getMemorizedRemainingMl,
+  hasMemorizedRemainingMl,
+  setMemorizedRemainingMl,
+} from '../../services/hydration/containerLevelStorage'
 import { getCalorieProfile } from '../../services/nutritionStorage'
 import { isMinorOrUnknownAge } from '../../services/nutritionSafetyRules'
 import { useAuth } from '../../context/AuthContext'
-import { BottleDragPanel } from './BottleDragPanel'
-import { ContainerPicker, type CatalogContainer } from './ContainerPicker'
+import { LiveBottleVisual } from './LiveBottleVisual'
+import { BottleFlowV3, type BottleFlowCommit } from './BottleFlowV3'
+import type { CatalogContainer } from './ContainerPicker'
 
 interface HydrationPanelProps {
   onOpenSettings?: () => void
@@ -30,21 +34,23 @@ interface HydrationPanelProps {
 }
 
 /**
- * Nutrition › Hydratation v2 — choix contenant photo + glisser + Ajouter.
- * « Ma bouteille » (Pro) : même eau dynamique sur la photo détourée locale.
+ * Nutrition › Hydratation v3 —
+ * carte Eau → plein écran (niveau mémorisé → boire ; sinon régler).
  */
 export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPanelProps) {
   const { user } = useAuth()
   const [today, setToday] = useState<HydrationToday | null>(null)
   const [shapeUrl, setShapeUrl] = useState<string | null>(null)
-  const [container, setContainer] = useState<CatalogContainer>('plastic_15')
-  const [estimateMl, setEstimateMl] = useState(0)
+  const [container] = useState<CatalogContainer>('plastic_15')
+  const [flowOpen, setFlowOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [levelTick, setLevelTick] = useState(0)
   const minorLocked = isMinorOrUnknownAge(getCalorieProfile().age)
+  const userId = user?.id ?? null
 
   useEffect(() => {
-    onHydrationAccountChanged(user?.id ?? null)
-  }, [user?.id])
+    onHydrationAccountChanged(userId)
+  }, [userId])
 
   const refresh = useCallback(async () => {
     const data = await fetchHydrationToday(localDayKey())
@@ -87,164 +93,151 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
 
   const kind: WaterContainerKind = myBottleMode ? 'gourd' : container
 
-  useEffect(() => {
-    setEstimateMl(0)
-  }, [container, myBottleMode, capacityMl])
-
-  const addEstimate = async () => {
-    if (!today || busy || estimateMl <= 0) return
-    setBusy(true)
-    try {
-      const next = await addHydrationEntry({
-        amountMl: estimateMl,
-        source: 'slider',
-        userId: user?.id ?? null,
-      })
-      setToday(next)
-      setEstimateMl(0)
-    } finally {
-      setBusy(false)
+  const memorized = useMemo(() => {
+    void levelTick
+    return {
+      has: hasMemorizedRemainingMl(kind, userId),
+      remaining: getMemorizedRemainingMl(kind, capacityMl, userId),
     }
-  }
+  }, [kind, capacityMl, userId, levelTick, today?.drunkMl])
 
-  const undo = async () => {
-    if (!today || busy || !today.canUndo) return
-    setBusy(true)
-    try {
-      setToday(await undoLastHydrationEntry(today.dayKey))
-    } finally {
-      setBusy(false)
-    }
-  }
+  const handleCommit = useCallback(
+    async (commit: BottleFlowCommit) => {
+      if (!today || busy) return
+      setBusy(true)
+      try {
+        const next = await addHydrationEntry({
+          amountMl: commit.amountMl,
+          source: 'slider',
+          clientId: commit.clientId,
+          userId,
+        })
+        setToday(next)
+        setMemorizedRemainingMl(kind, commit.remainingAfterMl, capacityMl, userId)
+        setLevelTick((n) => n + 1)
+      } finally {
+        setBusy(false)
+      }
+    },
+    [today, busy, userId, kind, capacityMl],
+  )
+
+  const handleUndoCommit = useCallback(
+    async (args: { amountMl: number; restoreRemainingMl: number }) => {
+      setBusy(true)
+      try {
+        const next = await undoLastHydrationEntry(today?.dayKey ?? localDayKey())
+        setToday(next)
+        setMemorizedRemainingMl(kind, args.restoreRemainingMl, capacityMl, userId)
+        setLevelTick((n) => n + 1)
+      } finally {
+        setBusy(false)
+      }
+    },
+    [today?.dayKey, kind, capacityMl, userId],
+  )
 
   if (!today) {
     return (
       <section
-        className={`rounded-[28px] border border-white/12 bg-white/[0.04] px-3 py-3 ${className}`}
+        className={`rounded-2xl border border-white/[0.08] bg-[#141416]/92 px-3.5 py-3 ${className}`}
         data-hydration-panel="loading"
+        data-testid="nutrition-eau-card"
       >
-        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#ACB4BA]">
-          Hydratation
-        </p>
-        <h2 className="mt-0.5 text-[22px] font-semibold tracking-tight text-white">Eau</h2>
-        <p className="mt-2 text-[13px] text-[#ACB4BA]">Chargement…</p>
+        <p className="text-[14px] font-semibold text-white">Eau</p>
+        <p className="mt-1 text-[13px] text-[#ACB4BA]">Chargement…</p>
       </section>
     )
   }
 
+  const goalMl = today.goalMl
+  const drunkL = (today.drunkMl / 1000).toFixed(2).replace('.', ',')
+  const goalL = (goalMl / 1000).toFixed(goalMl % 1000 === 0 ? 0 : 2).replace('.', ',')
+  const progress = goalMl > 0 ? Math.min(1, today.drunkMl / goalMl) : 0
+
   return (
-    <section
-      className={`rounded-[28px] border border-white/12 bg-white/[0.04] px-3 py-2.5 ${className}`}
-      data-hydration-panel="1"
-      data-hydration-mode={today.effectiveVisualMode}
-      aria-label="Eau"
-    >
-      <div className="mb-1.5 flex items-start justify-between gap-2">
-        <div>
-          <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#ACB4BA]">
-            Hydratation
-          </p>
-          <h2 className="mt-0.5 text-[22px] font-semibold tracking-tight text-white">
-            {myBottleMode ? 'Ma bouteille' : 'Eau'}
-          </h2>
-        </div>
-        {myBottleMode ? (
-          <span
-            className="rounded-md bg-white/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#FF907F]"
-            data-hydration-pro-chip
-          >
-            Pro
-          </span>
-        ) : (
-          <p className="text-[11px] font-medium text-[#8E8E93]">{LABEL_EAU_BUE_SEULE}</p>
-        )}
-      </div>
-
-      {myBottleMode ? (
-        <p className="mb-2 text-[12px] leading-snug text-[#8E8E93]">
-          Look cosmétique Pass Pro. Aucun avantage de jeu.
-        </p>
-      ) : null}
-
-      {!myBottleMode ? (
-        <ContainerPicker
-          selected={container}
-          onSelect={(id) => {
-            setContainer(id)
-            setEstimateMl(0)
-          }}
-        />
-      ) : null}
-
-      <div className="mt-2">
-        <BottleDragPanel
-          kind={kind}
-          ml={estimateMl}
-          capacityMl={capacityMl}
-          shapeUrl={myBottleMode ? shapeUrl : null}
-          onMlChange={setEstimateMl}
-        />
-      </div>
-
-      <button
-        type="button"
-        disabled={busy || estimateMl <= 0}
-        onClick={() => void addEstimate()}
-        className="ios-press mt-2 min-h-11 w-full rounded-2xl bg-[#FF0702] text-[15px] font-semibold text-white disabled:opacity-45"
-        data-hydration-add="slider"
+    <>
+      <section
+        className={`rounded-2xl border border-white/[0.08] bg-[#141416]/92 px-3.5 py-3 ${className}`}
+        data-hydration-panel="1"
+        data-hydration-mode={today.effectiveVisualMode}
+        data-hydration-v3="b"
+        data-testid="nutrition-eau-card"
+        aria-label="Eau"
       >
-        Ajouter
-      </button>
+        <button
+          type="button"
+          onClick={() => setFlowOpen(true)}
+          className="ios-press flex w-full items-center gap-3 text-left"
+          data-hydration-eau-card
+        >
+          <div className="flex h-[72px] w-12 shrink-0 items-end justify-center">
+            <LiveBottleVisual
+              kind={kind}
+              remainingMl={memorized.remaining}
+              capacityMl={capacityMl}
+              shapeUrl={myBottleMode ? shapeUrl : null}
+              size="thumb"
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-[14px] font-semibold text-white">
+                {myBottleMode ? 'Ma bouteille' : 'Eau'}
+              </p>
+              <p className="text-[11px] font-medium text-[#8E8E93]">{LABEL_EAU_BUE_SEULE}</p>
+            </div>
+            <p className="mt-0.5 text-[15px] font-semibold tabular-nums text-white" data-hydration-drunk>
+              {drunkL}&nbsp;/&nbsp;{goalL}&nbsp;L
+            </p>
+            <p className="mt-0.5 text-[13px] text-[#ACB4BA]">
+              {myBottleMode ? 'Pass Pro' : 'Cristaline 1,5 L'}
+            </p>
+          </div>
+          <span className="text-[20px] font-light text-[#8E8E93]" aria-hidden>
+            ›
+          </span>
+        </button>
 
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() =>
-            void addHydrationEntry({
-              amountMl: GLASS_ML,
-              source: 'glass',
-              userId: user?.id ?? null,
-            }).then(setToday)
-          }
-          className="ios-press min-h-10 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-semibold text-white disabled:opacity-50"
-          data-hydration-add="glass"
-        >
-          +1 verre
-        </button>
-        <button
-          type="button"
-          disabled={busy || !today.canUndo}
-          onClick={() => void undo()}
-          className="ios-press min-h-10 rounded-xl border border-white/10 px-3 py-2 text-[13px] font-medium text-[#ACB4BA] disabled:opacity-40"
-          data-hydration-undo
-        >
-          Annuler
-        </button>
+        <div className="mt-2.5 h-[3px] overflow-hidden rounded-full bg-[#2A2A2E]">
+          <div
+            className="h-full rounded-full bg-[#FF0702]"
+            style={{ width: `${Math.max(2, progress * 100)}%` }}
+          />
+        </div>
+
         {onOpenSettings && !minorLocked ? (
           <button
             type="button"
             onClick={onOpenSettings}
-            className="ios-press ml-auto min-h-10 rounded-xl px-2 text-[13px] font-medium text-[#8E8E93]"
+            className="ios-press mt-1 min-h-10 rounded-xl px-1 text-[13px] font-medium text-[#8E8E93]"
             data-hydration-settings
           >
             Réglages
           </button>
         ) : null}
-      </div>
+      </section>
 
-      <p className="mt-2 text-[12px] leading-snug text-[#8E8E93]">{MSG_PERMANENT}</p>
-      {today.showHighInfo && !minorLocked ? (
-        <p className="mt-1 text-[12px] leading-snug text-[#C7C7CC]" data-hydration-high-info>
-          {MSG_HIGH_INFO}
-        </p>
-      ) : null}
-
-      {myBottleMode ? (
-        <p className="mt-1.5 text-center text-[12px] leading-snug text-[#8E8E93]">
-          Pas de visage sur la photo
-        </p>
-      ) : null}
-    </section>
+      <BottleFlowV3
+        open={flowOpen}
+        onClose={() => setFlowOpen(false)}
+        capacityMl={capacityMl}
+        kind={kind}
+        shapeUrl={myBottleMode ? shapeUrl : null}
+        initialRemainingMl={memorized.remaining}
+        hasMemorizedLevel={memorized.has}
+        busy={busy}
+        onCommitDrunk={handleCommit}
+        onUndoCommit={handleUndoCommit}
+        onMarkBottleRefilled={() => {
+          setMemorizedRemainingMl(kind, capacityMl, capacityMl, userId)
+          setLevelTick((n) => n + 1)
+        }}
+        onConfirmLevel={(ml) => {
+          setMemorizedRemainingMl(kind, ml, capacityMl, userId)
+          setLevelTick((n) => n + 1)
+        }}
+      />
+    </>
   )
 }

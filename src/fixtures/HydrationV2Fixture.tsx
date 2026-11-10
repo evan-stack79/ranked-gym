@@ -1,13 +1,14 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { AuthProvider } from '../context/AuthContext'
 import { EauTile, SeriesJourTile } from '../components/home/AccueilMetricTiles'
-import { HydrationPanel } from '../components/hydration/HydrationPanel'
 import { BottleDragPanel } from '../components/hydration/BottleDragPanel'
+import { ContainerPicker } from '../components/hydration/ContainerPicker'
 import { deriveWaterTileModel } from '../utils/accueilWidgetTiles'
 import { setUserWaterGoalMl } from '../utils/userWaterGoal'
 import { saveCalorieProfile, saveMealJournal } from '../services/nutritionStorage'
 import { todayKey } from '../utils/calories'
 import type { CalorieProfile } from '../types/nutrition'
+import type { BottleDragMode } from '../components/hydration/LiveBottleVisual'
 
 const PROFILE: CalorieProfile = {
   weightKg: 78,
@@ -95,61 +96,92 @@ function AccueilScreen() {
   )
 }
 
-function NutritionScreen() {
+function NutritionPhaseScreen({
+  testId,
+  phase,
+  remainingMl,
+  startRemainingMl,
+}: {
+  testId: string
+  phase: BottleDragMode
+  remainingMl: number
+  startRemainingMl: number
+}) {
+  const [remaining, setRemaining] = useState(remainingMl)
   return (
-    <ScreenShell title="Nutrition" testId="alimentation">
-      <HydrationPanel />
-    </ScreenShell>
-  )
-}
-
-function MaBouteilleScreen() {
-  const [ml, setMl] = useState(480)
-  return (
-    <ScreenShell title="Nutrition" testId="ma-bouteille">
+    <ScreenShell title="Nutrition" testId={testId}>
       <section className="rounded-[28px] border border-white/12 bg-white/[0.04] px-3 py-2.5">
-        <div className="mb-1 flex items-center justify-between gap-2">
+        <div className="mb-1.5 flex items-start justify-between gap-2">
           <div>
             <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#ACB4BA]">
               Hydratation
             </p>
-            <h2 className="mt-1 text-[22px] font-semibold tracking-tight text-white">
-              Ma bouteille
-            </h2>
+            <h2 className="mt-0.5 text-[22px] font-semibold tracking-tight text-white">Eau</h2>
           </div>
-          <span className="rounded-md bg-white/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#FF907F]">
-            Pro
-          </span>
+          <p className="text-[11px] font-medium text-[#8E8E93]">Eau bue seule</p>
         </div>
-        <p className="mb-3 text-[12px] leading-snug text-[#8E8E93]">
-          Look cosmétique Pass Pro. Aucun avantage de jeu.
+        <ContainerPicker selected="plastic_15" onSelect={() => undefined} />
+        <p className="mt-2 text-[13px] font-medium text-[#ACB4BA]">
+          {phase === 'setup' ? 'Niveau de départ' : 'Boire'}
         </p>
-        <BottleDragPanel kind="gourd" ml={ml} capacityMl={750} onMlChange={setMl} />
-        <button
-          type="button"
-          className="ios-press mt-2 min-h-11 w-full rounded-2xl bg-[#FF0702] text-[15px] font-semibold text-white"
-        >
-          Ajouter
-        </button>
-        <p className="mt-1.5 text-center text-[12px] text-[#8E8E93]">Pas de visage sur la photo</p>
+        <div className="mt-1">
+          <BottleDragPanel
+            kind="plastic_15"
+            remainingMl={remaining}
+            capacityMl={1500}
+            startRemainingMl={startRemainingMl}
+            mode={phase}
+            onRemainingChange={setRemaining}
+          />
+        </div>
+        {phase === 'setup' ? (
+          <button
+            type="button"
+            className="ios-press mt-2 min-h-11 w-full rounded-2xl bg-[#FF0702] text-[15px] font-semibold text-white"
+          >
+            C&apos;est bon
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="ios-press mt-2 min-h-11 w-full rounded-2xl bg-[#FF0702] text-[15px] font-semibold text-white"
+            >
+              Ajouter
+            </button>
+            <button
+              type="button"
+              className="ios-press mt-2 min-h-11 w-full rounded-2xl border border-white/15 bg-white/5 text-[14px] font-semibold text-white"
+            >
+              Régler le niveau
+            </button>
+          </>
+        )}
       </section>
-      <p className="mt-3 px-1 text-center text-[12px] text-[#8E8E93]">
-        Photo prise le 12 oct. · Changer la photo
-      </p>
     </ScreenShell>
   )
 }
 
 export default function HydrationV2Fixture() {
   const [ready, setReady] = useState(false)
-  const [screen, setScreen] = useState<'accueil' | 'alimentation' | 'ma-bouteille'>('accueil')
+  const [screen, setScreen] = useState<
+    'accueil' | 'alimentation' | 'ma-bouteille' | 'setup' | 'drink'
+  >('accueil')
 
   useEffect(() => {
     seed()
     setReady(true)
     const params = new URLSearchParams(window.location.search)
     const s = params.get('screen')
-    if (s === 'alimentation' || s === 'ma-bouteille' || s === 'accueil') setScreen(s)
+    if (
+      s === 'alimentation'
+      || s === 'ma-bouteille'
+      || s === 'accueil'
+      || s === 'setup'
+      || s === 'drink'
+    ) {
+      setScreen(s)
+    }
   }, [])
 
   if (!ready) return null
@@ -158,8 +190,30 @@ export default function HydrationV2Fixture() {
     <AuthProvider>
       <div className="min-h-screen bg-black" data-hydration-v2-fixture="1">
         {screen === 'accueil' ? <AccueilScreen /> : null}
-        {screen === 'alimentation' ? <NutritionScreen /> : null}
-        {screen === 'ma-bouteille' ? <MaBouteilleScreen /> : null}
+        {screen === 'alimentation' || screen === 'setup' ? (
+          <NutritionPhaseScreen
+            testId={screen === 'setup' ? 'setup' : 'alimentation'}
+            phase="setup"
+            remainingMl={1100}
+            startRemainingMl={1100}
+          />
+        ) : null}
+        {screen === 'drink' ? (
+          <NutritionPhaseScreen
+            testId="drink"
+            phase="drink"
+            remainingMl={750}
+            startRemainingMl={1500}
+          />
+        ) : null}
+        {screen === 'ma-bouteille' ? (
+          <NutritionPhaseScreen
+            testId="ma-bouteille"
+            phase="drink"
+            remainingMl={270}
+            startRemainingMl={750}
+          />
+        ) : null}
       </div>
     </AuthProvider>
   )

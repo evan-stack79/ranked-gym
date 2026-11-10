@@ -1,13 +1,17 @@
 import { SoftBlurIn, StaticKcalNumber } from '../motion'
 
+export type CalorieRingLockReason = 'tca' | 'health' | 'flag_off' | 'none'
+
 interface NutritionCalorieRingProps {
   remainingCalories: number
   consumedCalories: number
   targetCalories: number
   progress: number
   onOpenSetup: () => void
-  /** Si false : pas de CTA « Définir mon objectif » (drapeau OFF, TCA, grossesse…). */
+  /** Si true : CTA « Fixer un objectif » (non-TCA, drapeau ON, pas encore de cible). */
   allowGoalSetup?: boolean
+  /** Cause du mode vide sans CTA — pour le bon message (ne contourne jamais TCA). */
+  lockReason?: CalorieRingLockReason
 }
 
 // SAFETY (PM / Vérificateur): kcal renders via StaticKcalNumber — never CountUpNumber.
@@ -33,6 +37,7 @@ export function NutritionCalorieRing({
   progress,
   onOpenSetup,
   allowGoalSetup = false,
+  lockReason = 'none',
 }: NutritionCalorieRingProps) {
   const hasTarget = Number.isFinite(targetCalories) && targetCalories > 0
   const safeConsumed = Number.isFinite(consumedCalories) ? Math.max(0, consumedCalories) : 0
@@ -63,18 +68,43 @@ export function NutritionCalorieRing({
   )
 
   if (!hasTarget) {
+    const lockedCopy =
+      lockReason === 'tca'
+        ? 'Les chiffres caloriques sont masqués pour ton profil. Tu peux revoir ça dans Réglages → Situations de santé.'
+        : lockReason === 'health'
+          ? 'Objectif indisponible pour ta situation de santé. Réglages → Situations de santé.'
+          : lockReason === 'flag_off'
+            ? 'Suivi sans objectif chiffré'
+            : 'Suivi sans objectif chiffré'
+
     return (
-      <div className="flex flex-col items-center text-center">
+      <div
+        className="flex flex-col items-center text-center"
+        data-testid="nutrition-calorie-ring"
+        data-calorie-ring-mode="empty"
+        data-calorie-lock={allowGoalSetup ? 'setup' : lockReason}
+      >
         {heading}
         <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-[#19191C]">
-          <img src="/panther-trim.png" alt="" width={38} height={38} className="h-10 w-10 object-contain" draggable={false} />
+          <img
+            src="/panther-trim.png"
+            alt=""
+            width={38}
+            height={38}
+            className="h-10 w-10 object-contain"
+            draggable={false}
+          />
         </div>
         <p className="mt-4 text-[16px] font-semibold text-white">
-          {allowGoalSetup ? 'Définis ton objectif calorique' : 'Suivi sans objectif chiffré'}
+          {allowGoalSetup ? 'Fixe ton objectif calorique' : lockedCopy}
         </p>
         {allowGoalSetup ? (
           <p className="mt-1 max-w-[18rem] text-[13px] leading-5 text-[#ACB4BA]">
-            Ton compteur apparaîtra dès que ton plan nutrition sera renseigné.
+            Calcul auto depuis ton profil, avec les bornes de sécurité.
+          </p>
+        ) : lockReason === 'tca' || lockReason === 'health' ? (
+          <p className="mt-2 max-w-[20rem] text-[13px] leading-5 text-[#ACB4BA]">
+            Aucun anneau kcal n&apos;est affiché.
           </p>
         ) : null}
         {allowGoalSetup ? (
@@ -84,7 +114,7 @@ export function NutritionCalorieRing({
             className="ios-press mt-5 rounded-xl bg-[#FF0702] px-4 py-2.5 text-[13px] font-semibold text-white"
             data-testid="define-calorie-goal"
           >
-            Définir mon objectif
+            Fixer un objectif
           </button>
         ) : (
           <p className="mt-4 text-[13px] tabular-nums text-white">
@@ -96,10 +126,19 @@ export function NutritionCalorieRing({
   }
 
   return (
-    <div className="flex flex-col items-center">
+    <div
+      className="flex flex-col items-center"
+      data-testid="nutrition-calorie-ring"
+      data-calorie-ring-mode="ring"
+    >
       {heading}
       <div className="relative aspect-square w-full max-w-[282px]">
-        <svg viewBox="0 0 240 240" className="h-full w-full overflow-visible" role="img" aria-label="Progression calorique">
+        <svg
+          viewBox="0 0 240 240"
+          className="h-full w-full overflow-visible"
+          role="img"
+          aria-label="Progression calorique"
+        >
           <circle
             cx="120"
             cy="120"
@@ -135,7 +174,14 @@ export function NutritionCalorieRing({
             strokeDasharray={`${Math.max(0.01, RING_DASH * safeProgress)} ${2 * Math.PI * RING_RADIUS}`}
             transform={`rotate(${RING_ROTATION} 120 120)`}
           />
-          <circle cx={indicator.x} cy={indicator.y} r="5" fill="#FF0702" stroke="#000000" strokeWidth="3" />
+          <circle
+            cx={indicator.x}
+            cy={indicator.y}
+            r="5"
+            fill="#FF0702"
+            stroke="#000000"
+            strokeWidth="3"
+          />
         </svg>
         <div className="absolute inset-[18%] flex flex-col items-center justify-center text-center">
           <img
@@ -151,7 +197,9 @@ export function NutritionCalorieRing({
               value={isOverTarget ? Math.abs(remainingCalories) : remainingCalories}
             />
           </p>
-          <p className={`mt-1 text-[14px] font-medium ${isOverTarget ? 'text-[#FF6B6B]' : 'text-[#ACB4BA]'}`}>
+          <p
+            className={`mt-1 text-[14px] font-medium ${isOverTarget ? 'text-[#FF6B6B]' : 'text-[#ACB4BA]'}`}
+          >
             {isOverTarget ? 'kcal dépassées' : 'kcal restantes'}
           </p>
           <p className="mt-1 text-[11px] leading-snug text-[#ACB4BA]">Estimation</p>
