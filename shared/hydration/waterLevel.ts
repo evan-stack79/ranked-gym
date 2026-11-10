@@ -32,6 +32,17 @@ export const WATER_CONTAINER_CAPACITY_ML: Record<
 
 export const WATER_LEVEL_STEP_ML = 10
 
+/** Précision au doigt (glisser) — 1 ml, bornes 0…capacité. */
+export const WATER_DRAG_STEP_ML = 1
+
+/**
+ * Variante B : au relâchement, n’ajouter que si ml bus > 0.
+ * (0 ml → aucun ajout.)
+ */
+export function shouldCommitDrunkOnRelease(drunkMl: number): boolean {
+  return Number.isFinite(drunkMl) && Math.round(drunkMl) > 0
+}
+
 function clamp01(n: number): number {
   if (!Number.isFinite(n)) return 0
   return Math.min(1, Math.max(0, n))

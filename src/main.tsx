@@ -12,6 +12,7 @@ import { NutritionAiErrorFixture } from './fixtures/NutritionAiErrorFixture.tsx'
 import { TrainUxFixture } from './fixtures/TrainUxFixture.tsx'
 import { WaterGoalFixture } from './fixtures/WaterGoalFixture.tsx'
 import HydrationV2Fixture from './fixtures/HydrationV2Fixture.tsx'
+import HydrationV3Fixture from './fixtures/HydrationV3Fixture.tsx'
 import { HeightWeightFixture } from './fixtures/HeightWeightFixture.tsx'
 import { InscriptionFixture } from './fixtures/InscriptionFixture.tsx'
 import { AddFoodScreenFixture } from './fixtures/AddFoodScreenFixture.tsx'
@@ -66,6 +67,7 @@ function resolveBootTree() {
   if (QA_FIXTURES_ENABLED && path === '/your-data-meals-fixture') return <YourDataMealsEraseFixture />
   if (QA_FIXTURES_ENABLED && path === '/water-goal-fixture') return <WaterGoalFixture />
   if (QA_FIXTURES_ENABLED && path === '/hydration-v2-fixture') return <HydrationV2Fixture />
+  if (QA_FIXTURES_ENABLED && path === '/hydration-v3-fixture') return <HydrationV3Fixture />
   if (QA_FIXTURES_ENABLED && path === '/height-weight-fixture') return <HeightWeightFixture />
   if (QA_FIXTURES_ENABLED && path === '/inscription-fixture') return <InscriptionFixture />
   if (QA_FIXTURES_ENABLED && path === '/train-fixture') return <TrainUxFixture />
@@ -90,6 +92,7 @@ function isColdLaunchPath() {
   if (QA_FIXTURES_ENABLED && path === '/add-food-fixture') return false
   if (QA_FIXTURES_ENABLED && path === '/water-goal-fixture') return false
   if (QA_FIXTURES_ENABLED && path === '/hydration-v2-fixture') return false
+  if (QA_FIXTURES_ENABLED && path === '/hydration-v3-fixture') return false
   if (QA_FIXTURES_ENABLED && path === '/height-weight-fixture') return false
   if (QA_FIXTURES_ENABLED && path === '/inscription-fixture') return false
   if (QA_FIXTURES_ENABLED && path === '/train-fixture') return false

@@ -46,6 +46,7 @@ export function BottleDragPanel({
           shapeUrl={shapeUrl}
           size="large"
           showHandle
+          handleHint
           interactive
           onRemainingChange={onRemainingChange}
         />

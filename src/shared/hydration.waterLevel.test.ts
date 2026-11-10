@@ -7,8 +7,10 @@ import {
   fillRatioFromMl,
   remainingMlFromDrunkMl,
   remainingMlFromPointerY,
+  shouldCommitDrunkOnRelease,
   waterSurfaceFromBottom,
   WATER_CONTAINER_CAPACITY_ML,
+  WATER_DRAG_STEP_ML,
   WATER_FILLABLE,
 } from '../../shared/hydration/waterLevel'
 
@@ -65,5 +67,34 @@ describe('hydration waterLevel — départ / final / ml bus', () => {
     const surface = waterSurfaceFromBottom('plastic_15', ratio)
     expect(surface).toBeGreaterThan(0)
     expect(drunkMlFromStartAndCurrent(1500, remaining, 1500)).toBe(620)
+  })
+
+  it('variante B : commit au relâchement seulement si ml bus > 0', () => {
+    expect(shouldCommitDrunkOnRelease(0)).toBe(false)
+    expect(shouldCommitDrunkOnRelease(-1)).toBe(false)
+    expect(shouldCommitDrunkOnRelease(Number.NaN)).toBe(false)
+    expect(shouldCommitDrunkOnRelease(1)).toBe(true)
+    expect(shouldCommitDrunkOnRelease(250)).toBe(true)
+  })
+
+  it('étape 1 non comptée : drunk à départ = final est 0', () => {
+    expect(drunkMlFromStartAndCurrent(1200, 1200, 1500, WATER_DRAG_STEP_ML)).toBe(0)
+  })
+
+  it('précision doigt 1 ml (bornes 0…capacité)', () => {
+    const kind = 'plastic_15' as const
+    const capacity = 1500
+    const rect = { top: 0, height: 1000 }
+    const mid = remainingMlFromPointerY(500, rect, kind, capacity, WATER_DRAG_STEP_ML)
+    expect(mid % 1).toBe(0)
+    expect(mid).toBeGreaterThanOrEqual(0)
+    expect(mid).toBeLessThanOrEqual(capacity)
+    // Pas forcé au pas 10
+    const near = remainingMlFromPointerY(501, rect, kind, capacity, WATER_DRAG_STEP_ML)
+    expect(Math.abs(near - mid)).toBeLessThanOrEqual(5)
+  })
+
+  it('bu au relâchement = départ − final (ex. 1200 → 950 = 250)', () => {
+    expect(drunkMlFromStartAndCurrent(1200, 950, 1500, WATER_DRAG_STEP_ML)).toBe(250)
   })
 })
