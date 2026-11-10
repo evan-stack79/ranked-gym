@@ -157,7 +157,7 @@ img {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
-  --dur-press: 120ms;
+  --dur-press: 90ms;
   --dur-fast: 180ms;
   --dur-ui: 220ms;
   --dur-drawer: 260ms;
@@ -980,7 +980,14 @@ img {
 
 .btn-brand:active {
   opacity: 0.9;
-  transform: scale(0.98);
+  transform: scale(0.96);
+}
+
+/* motion/mini press owns scale — avoid CSS fighting the spring return */
+.btn-brand[data-rg-press='motion']:active,
+.btn-brand[data-rg-press='motion'][data-pressed='true'] {
+  transform: none;
+  opacity: 1;
 }
 
 @keyframes card-shine {
@@ -3070,6 +3077,43 @@ select,
 
   .welcome-screen .ios-press {
     transition: none;
+  }
+
+  .rg-bravo-title.rg-bravo-shine {
+    animation: none !important;
+    background-position: 50% 0 !important;
+  }
+}
+
+/* Bravo shine — single 1.2 s sweep (background-position), no kcal. */
+.rg-bravo-title {
+  color: transparent;
+  background-image: linear-gradient(
+    105deg,
+    #dfe2e5 0%,
+    #dfe2e5 38%,
+    #ffffff 45%,
+    #ff907f 50%,
+    #ffffff 55%,
+    #dfe2e5 62%,
+    #dfe2e5 100%
+  );
+  background-size: 250% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.rg-bravo-title.rg-bravo-shine {
+  animation: rg-bravo-sweep 1.2s cubic-bezier(0.4, 0, 0.2, 1) 1 forwards;
+}
+
+@keyframes rg-bravo-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
   }
 }
 

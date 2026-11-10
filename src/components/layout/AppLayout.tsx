@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { BrandMark } from '../brand/BrandMark'
 import { BottomNav } from './BottomNav'
 import { StreakCelebrationHost } from '../streak/StreakCelebrationHost'
+import { RankUpCelebrationHost } from '../ranked/RankUpCelebrationHost'
 import { RestTimerOverlay, REST_BAR_CONTENT_PAD } from '../training/RestTimerOverlay'
 import { useRestTimerContext, type RestPresetSec } from '../../context/RestTimerContext'
 import type { TabId } from '../../types'
@@ -192,6 +193,7 @@ export function AppLayout({
         </>
       ) : null}
       <StreakCelebrationHost shellRef={shellRef} />
+      <RankUpCelebrationHost />
     </div>
   )
 }

@@ -68,6 +68,7 @@ import {
   setLocalGhostModeEnabled,
 } from '../services/ghostModeStorage'
 import { safeError, safeWarn } from '../utils/safeLog'
+import { didRankTierUp } from '../utils/rankTierUp'
 
 function syncLocalDiscipline(label: string) {
   const id = disciplineFromLabel(label)
@@ -87,6 +88,13 @@ export type StreakCelebration = {
   previousStreak: number
   currentStreak: number
   dateKey: string
+}
+
+/** Payload for Ranked tier-up celebration (Bronze → Argent, …). */
+export type RankUpCelebration = {
+  previousLevel: number
+  nextLevel: number
+  currentXp: number
 }
 
 export interface AuthContextValue {
@@ -115,6 +123,9 @@ export interface AuthContextValue {
   /** Set only when streak actually increments N → N+1 (first open of local day). */
   streakCelebration: StreakCelebration | null
   clearStreakCelebration: () => void
+  /** Set when profile level crosses a Ranked tier boundary. */
+  rankUpCelebration: RankUpCelebration | null
+  clearRankUpCelebration: () => void
   refreshProfile: () => Promise<void>
   /** Met à jour localement le profil (ex. avatar) sans refetch. */
   patchProfile: (patch: Partial<ProfileRow>) => void
@@ -202,6 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
   const [streakWeekBonus, setStreakWeekBonus] = useState<StreakWeekBonus | null>(null)
   const [streakCelebration, setStreakCelebration] = useState<StreakCelebration | null>(null)
+  const [rankUpCelebration, setRankUpCelebration] = useState<RankUpCelebration | null>(null)
   const pendingRef = useRef<AuthSuccessCallback | null>(null)
   const hydrateGenRef = useRef(0)
   const streakInFlightRef = useRef(false)
@@ -210,6 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearStreakWeekBonus = useCallback(() => setStreakWeekBonus(null), [])
   const clearStreakCelebration = useCallback(() => setStreakCelebration(null), [])
+  const clearRankUpCelebration = useCallback(() => setRankUpCelebration(null), [])
 
   useEffect(() => {
     profileRef.current = profile
@@ -252,6 +265,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             previousStreak,
             currentStreak,
             dateKey,
+          })
+        }
+
+        if (
+          streakResult.didUpdate &&
+          didRankTierUp(row.level, streakResult.profile.level)
+        ) {
+          setRankUpCelebration({
+            previousLevel: row.level,
+            nextLevel: streakResult.profile.level,
+            currentXp: streakResult.profile.xp ?? 0,
           })
         }
 
@@ -767,6 +791,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null)
     setStreakWeekBonus(null)
     setStreakCelebration(null)
+    setRankUpCelebration(null)
     setIsPasswordRecovery(false)
     setAuthInfo(null)
     setAuthError(null)
@@ -809,6 +834,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearStreakWeekBonus,
       streakCelebration,
       clearStreakCelebration,
+      rankUpCelebration,
+      clearRankUpCelebration,
       refreshProfile,
       patchProfile,
       openAuth,
@@ -840,6 +867,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearStreakWeekBonus,
       streakCelebration,
       clearStreakCelebration,
+      rankUpCelebration,
+      clearRankUpCelebration,
       refreshProfile,
       patchProfile,
       openAuth,

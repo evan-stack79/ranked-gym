@@ -13,13 +13,14 @@ import { BETA_FEEDBACK_SESSION_LINK } from '../../content/betaFeedbackCopy'
 import { canOpenBetaFeedback } from '../../services/betaFeedbackAccess'
 import { requestOpenBetaFeedback } from '../../services/betaFeedbackNav'
 import { BETA_FEEDBACK_PAGE_SESSION_END } from '../../services/betaFeedbackPages'
+import { BravoShine } from './BravoShine'
 
 interface VictoryCameraProps {
   stats: VictorySessionStats
   onComplete: () => void
 }
 
-type Phase = 'camera' | 'preview'
+type Phase = 'bravo' | 'camera' | 'preview'
 type FacingMode = 'user' | 'environment'
 
 function formatVolume(kg: number): string {
@@ -47,7 +48,7 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
   const streamRef = useRef<MediaStream | null>(null)
   const { setChromeHidden, dismiss } = useRestTimerContext()
 
-  const [phase, setPhase] = useState<Phase>('camera')
+  const [phase, setPhase] = useState<Phase>('bravo')
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [facingMode] = useState<FacingMode>('user')
@@ -113,6 +114,20 @@ export function VictoryCamera({ stats, onComplete }: VictoryCameraProps) {
       if (photoUrl) URL.revokeObjectURL(photoUrl)
     }
   }, [photoUrl])
+
+  if (phase === 'bravo') {
+    return (
+      <BravoShine
+        stats={{
+          title: stats.title,
+          durationMin: stats.durationMin,
+          volumeKg: stats.volumeKg,
+          prCount: stats.prCount,
+        }}
+        onContinue={() => setPhase('camera')}
+      />
+    )
+  }
 
   const capturePhoto = () => {
     const video = videoRef.current

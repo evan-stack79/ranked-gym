@@ -15,6 +15,7 @@ import {
   WATER_DRAG_STEP_ML,
   type WaterContainerKind,
 } from '../../shared/hydration'
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 
 export const SHELL_SRC: Record<WaterContainerKind, string> = {
   plastic_15: '/assets/hydration/shell_bottle_15.png',
@@ -101,6 +102,59 @@ export function LiveBottleVisual({
   const dragRef = useRef(false)
   const [dragging, setDragging] = useState(false)
   const step = dragStepMl > 0 ? dragStepMl : WATER_DRAG_STEP_ML
+  const reducedMotion = usePrefersReducedMotion()
+  const [waveAmp, setWaveAmp] = useState(0)
+  const ampRef = useRef(0)
+  const lastMlRef = useRef(remainingMl)
+  const mlRef = useRef(remainingMl)
+  const rafWaveRef = useRef<number | null>(null)
+  const draggingRef = useRef(false)
+
+  useEffect(() => {
+    mlRef.current = remainingMl
+  }, [remainingMl])
+
+  useEffect(() => {
+    draggingRef.current = dragging
+    // Relance le tick si on recommence à glisser alors que la boucle s’était arrêtée.
+    if (!reducedMotion && dragging && rafWaveRef.current == null) {
+      const tick = () => {
+        const ml = mlRef.current
+        const v = Math.abs(ml - lastMlRef.current)
+        lastMlRef.current = ml
+        const target = draggingRef.current ? Math.min(1, 0.18 + v / 9) : 0
+        ampRef.current += (target - ampRef.current) * (target > ampRef.current ? 0.35 : 0.06)
+        if (ampRef.current < 0.004 && target === 0) ampRef.current = 0
+        setWaveAmp(ampRef.current)
+        if (ampRef.current > 0 || draggingRef.current) {
+          rafWaveRef.current = requestAnimationFrame(tick)
+        } else {
+          rafWaveRef.current = null
+        }
+      }
+      rafWaveRef.current = requestAnimationFrame(tick)
+    }
+  }, [dragging, reducedMotion])
+
+  // Ondulation transform-only : amplitude ↑ pendant le glisser, amortie ~600 ms après.
+  useEffect(() => {
+    if (reducedMotion) {
+      ampRef.current = 0
+      setWaveAmp(0)
+      if (rafWaveRef.current != null) {
+        cancelAnimationFrame(rafWaveRef.current)
+        rafWaveRef.current = null
+      }
+      return
+    }
+
+    return () => {
+      if (rafWaveRef.current != null) {
+        cancelAnimationFrame(rafWaveRef.current)
+        rafWaveRef.current = null
+      }
+    }
+  }, [reducedMotion])
 
   const applyPointer = useCallback(
     (clientY: number) => {
@@ -254,6 +308,60 @@ export function LiveBottleVisual({
               }}
             />
           </div>
+
+          {/* Surface ondulation — transform scaleY only (no infinite loop). */}
+          {!reducedMotion && waveAmp > 0.004 ? (
+            <>
+              <div
+                className="pointer-events-none absolute inset-x-0 origin-bottom"
+                data-hydration-wave="b"
+                style={{
+                  bottom: `calc(${waterPct} - 1px)`,
+                  height: 22,
+                  width: '200%',
+                  left: '-50%',
+                  transform: `scaleY(${waveAmp * 0.8})`,
+                  willChange: 'transform',
+                }}
+              >
+                <svg
+                  viewBox="0 0 400 16"
+                  preserveAspectRatio="none"
+                  className="block h-full w-full"
+                  aria-hidden
+                >
+                  <path
+                    fill="rgba(120,200,245,0.5)"
+                    d="M0 8 Q25 0 50 8 T100 8 T150 8 T200 8 T250 8 T300 8 T350 8 T400 8 V16 H0Z"
+                  />
+                </svg>
+              </div>
+              <div
+                className="pointer-events-none absolute inset-x-0 origin-bottom"
+                data-hydration-wave="a"
+                style={{
+                  bottom: `calc(${waterPct} - 1px)`,
+                  height: 22,
+                  width: '200%',
+                  left: '-50%',
+                  transform: `scaleY(${waveAmp})`,
+                  willChange: 'transform',
+                }}
+              >
+                <svg
+                  viewBox="0 0 400 16"
+                  preserveAspectRatio="none"
+                  className="block h-full w-full"
+                  aria-hidden
+                >
+                  <path
+                    fill="rgba(150,222,255,0.85)"
+                    d="M0 9 Q33 1 66 9 T133 9 T200 9 T266 9 T333 9 T400 9 V16 H0Z"
+                  />
+                </svg>
+              </div>
+            </>
+          ) : null}
         </div>
 
         <img
