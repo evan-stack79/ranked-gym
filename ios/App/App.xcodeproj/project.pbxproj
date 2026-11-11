@@ -7,6 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A1B200022FEA0601000D01A1 /* RankedGymAlarmMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B200012FEA0601000D01A0 /* RankedGymAlarmMetadata.swift */; };
+		A1B200032FEA0601000D01A2 /* RankedGymAlarmMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B200012FEA0601000D01A0 /* RankedGymAlarmMetadata.swift */; };
+		A1B200052FEA0601000D01A4 /* RankedAlarmPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B200042FEA0601000D01A3 /* RankedAlarmPlugin.swift */; };
+		A1B200072FEA0601000D01A6 /* RankedAlarmKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B200062FEA0601000D01A5 /* RankedAlarmKit.swift */; };
+		A1B200092FEA0601000D01A8 /* RankedAlarmLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B200082FEA0601000D01A7 /* RankedAlarmLiveActivity.swift */; };
+		A1B2000C2FEA0601000D01AB /* RugissementRankedGym.caf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2000B2FEA0601000D01AA /* RugissementRankedGym.caf */; };
+		A1B2000E2FEA0601000D01AD /* RugissementRankedGym.wav in Resources */ = {isa = PBXBuildFile; fileRef = A1B2000D2FEA0601000D01AC /* RugissementRankedGym.wav */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
@@ -52,6 +59,12 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A1B200012FEA0601000D01A0 /* RankedGymAlarmMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankedGymAlarmMetadata.swift; sourceTree = "<group>"; };
+		A1B200042FEA0601000D01A3 /* RankedAlarmPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankedAlarmPlugin.swift; sourceTree = "<group>"; };
+		A1B200062FEA0601000D01A5 /* RankedAlarmKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankedAlarmKit.swift; sourceTree = "<group>"; };
+		A1B200082FEA0601000D01A7 /* RankedAlarmLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankedAlarmLiveActivity.swift; sourceTree = "<group>"; };
+		A1B2000B2FEA0601000D01AA /* RugissementRankedGym.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = RugissementRankedGym.caf; sourceTree = "<group>"; };
+		A1B2000D2FEA0601000D01AC /* RugissementRankedGym.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = RugissementRankedGym.wav; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -93,6 +106,25 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		A1B2000A2FEA0601000D01A9 /* RankedAlarm */ = {
+			isa = PBXGroup;
+			children = (
+				A1B200012FEA0601000D01A0 /* RankedGymAlarmMetadata.swift */,
+				A1B200042FEA0601000D01A3 /* RankedAlarmPlugin.swift */,
+				A1B200062FEA0601000D01A5 /* RankedAlarmKit.swift */,
+			);
+			path = RankedAlarm;
+			sourceTree = "<group>";
+		};
+		A1B2000F2FEA0601000D01AE /* Sounds */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2000B2FEA0601000D01AA /* RugissementRankedGym.caf */,
+				A1B2000D2FEA0601000D01AC /* RugissementRankedGym.wav */,
+			);
+			path = Sounds;
+			sourceTree = "<group>";
+		};
 		504EC2FB1FED79650016851F = {
 			isa = PBXGroup;
 			children = (
@@ -121,6 +153,7 @@
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				B7E4A1932FEA0101000C01A3 /* Plugins */,
+				A1B2000F2FEA0601000D01AE /* Sounds */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -137,6 +170,7 @@
 				B7E4A1912FEA0101000C01A1 /* CameraHeartRatePlugin.swift */,
 				B7E4A1962FEA0301000C01B1 /* SecureStoragePlugin.swift */,
 				C1A100102FEA0401000C02B0 /* RestTimerLiveActivity */,
+				A1B2000A2FEA0601000D01A9 /* RankedAlarm */,
 			);
 			path = Plugins;
 			sourceTree = "<group>";
@@ -145,6 +179,7 @@
 			isa = PBXGroup;
 			children = (
 				C1A100062FEA0401000C02A6 /* RestTimerLiveActivityWidget.swift */,
+				A1B200082FEA0601000D01A7 /* RankedAlarmLiveActivity.swift */,
 				C1A100082FEA0401000C02A8 /* Info.plist */,
 			);
 			path = RestTimerLiveActivityWidget;
@@ -248,6 +283,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2000C2FEA0601000D01AB /* RugissementRankedGym.caf in Resources */,
+				A1B2000E2FEA0601000D01AD /* RugissementRankedGym.wav in Resources */,
 				504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */,
 				50B271D11FEDC1A000F3C39B /* public in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,
@@ -277,6 +314,9 @@
 				B7E4A1972FEA0301000C01B2 /* SecureStoragePlugin.swift in Sources */,
 				C1A100012FEA0401000C02A1 /* RestTimerAttributes.swift in Sources */,
 				C1A100032FEA0401000C02A3 /* RestTimerLiveActivityPlugin.swift in Sources */,
+				A1B200022FEA0601000D01A1 /* RankedGymAlarmMetadata.swift in Sources */,
+				A1B200052FEA0601000D01A4 /* RankedAlarmPlugin.swift in Sources */,
+				A1B200072FEA0601000D01A6 /* RankedAlarmKit.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 				8E4A1C2B2FE993A80072D4E8 /* RankedPalette.swift in Sources */,
 			);
@@ -288,6 +328,8 @@
 			files = (
 				C1A100052FEA0401000C02A5 /* RestTimerAttributes.swift in Sources */,
 				C1A100072FEA0401000C02A7 /* RestTimerLiveActivityWidget.swift in Sources */,
+				A1B200032FEA0601000D01A2 /* RankedGymAlarmMetadata.swift in Sources */,
+				A1B200092FEA0601000D01A8 /* RankedAlarmLiveActivity.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -109,5 +109,6 @@ private func formatClock(_ totalSec: Int) -> String {
 struct RestTimerLiveActivityWidgetBundle: WidgetBundle {
     var body: some Widget {
         RestTimerLiveActivityWidget()
+        RankedAlarmLiveActivity()
     }
 }

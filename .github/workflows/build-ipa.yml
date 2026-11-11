@@ -10,6 +10,7 @@ on:
     paths:
       - 'ios/**'
       - 'ios-native/**'
+      - 'plugins/**'
       - 'src/**'
       - 'package.json'
       - 'package-lock.json'
@@ -19,6 +20,7 @@ on:
     paths:
       - 'ios/**'
       - 'ios-native/**'
+      - 'plugins/**'
       - 'src/**'
       - 'package.json'
       - 'package-lock.json'
@@ -31,12 +33,40 @@ permissions:
 jobs:
   build-ipa:
     name: Build unsigned iOS IPA
-    runs-on: macos-latest
+    runs-on: macos-26
     timeout-minutes: 45
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Select Xcode 26 (AlarmKit)
+        run: |
+          set -euo pipefail
+          # Prefer Xcode 26.x for AlarmKit (iOS 26 SDK).
+          CANDIDATES=(
+            "/Applications/Xcode_26.6.app"
+            "/Applications/Xcode_26.5.app"
+            "/Applications/Xcode_26.4.app"
+            "/Applications/Xcode_26.3.app"
+            "/Applications/Xcode_26.2.app"
+            "/Applications/Xcode_26.1.app"
+            "/Applications/Xcode_26.0.app"
+            "/Applications/Xcode_26.app"
+            "/Applications/Xcode.app"
+          )
+          SELECTED=""
+          for c in "${CANDIDATES[@]}"; do
+            if [ -d "$c" ]; then SELECTED="$c"; break; fi
+          done
+          if [ -z "$SELECTED" ]; then
+            echo "No Xcode 26 candidate found" >&2
+            ls /Applications | grep -i xcode || true
+            exit 1
+          fi
+          echo "Using $SELECTED"
+          sudo xcode-select -s "$SELECTED"
+          xcodebuild -version
 
       - name: Resolve Node version
         id: node

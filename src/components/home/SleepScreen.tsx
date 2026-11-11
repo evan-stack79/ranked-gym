@@ -1,13 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Bell } from 'lucide-react'
+import { AlarmClock, Bell } from 'lucide-react'
 import {
   getBedtimeReminderEnabled,
   getSleepSchedule,
   setBedtimeReminderEnabled,
   SLEEP_CHANGED_EVENT,
 } from '../../services/sleepStorage'
+import {
+  SLEEP_ALARM_CHANGED_EVENT,
+  getSleepAlarmSettings,
+} from '../../services/sleepAlarmStorage'
+import { isSleepAlarmPlatformSupported } from '../../services/sleepAlarmService'
 import { formatClockHm } from '../../utils/sleepTimeFormat'
+import { formatRepeatSummary } from '../../utils/sleepAlarmSchedule'
 import { IosSheet } from '../ui/IosSheet'
+import { SleepAlarmSheet } from './SleepAlarmSheet'
 import { SleepNightSummaryCard } from './SleepNightSummaryCard'
 import { SleepScheduleSheet } from './SleepScheduleSheet'
 
@@ -26,23 +33,31 @@ const CARD_BG = '#1C1C1E'
 export function SleepScreen({ open, onClose }: SleepScreenProps) {
   const [tick, setTick] = useState(0)
   const [scheduleOpen, setScheduleOpen] = useState(false)
+  const [alarmOpen, setAlarmOpen] = useState(false)
+  const showAlarm = isSleepAlarmPlatformSupported()
 
   useEffect(() => {
-    if (!open) setScheduleOpen(false)
+    if (!open) {
+      setScheduleOpen(false)
+      setAlarmOpen(false)
+    }
   }, [open])
 
   useEffect(() => {
     const sync = () => setTick((n) => n + 1)
     window.addEventListener(SLEEP_CHANGED_EVENT, sync)
+    window.addEventListener(SLEEP_ALARM_CHANGED_EVENT, sync)
     window.addEventListener('ranked-gym:backup-restored', sync)
     return () => {
       window.removeEventListener(SLEEP_CHANGED_EVENT, sync)
+      window.removeEventListener(SLEEP_ALARM_CHANGED_EVENT, sync)
       window.removeEventListener('ranked-gym:backup-restored', sync)
     }
   }, [])
 
   const schedule = useMemo(() => getSleepSchedule(), [tick])
   const reminderOn = useMemo(() => getBedtimeReminderEnabled(), [tick])
+  const alarm = useMemo(() => getSleepAlarmSettings(), [tick])
   const hasSchedule = schedule != null
 
   const onToggleReminder = () => {
@@ -84,6 +99,32 @@ export function SleepScreen({ open, onClose }: SleepScreenProps) {
           ) : null}
 
           <SleepNightSummaryCard variant="sommeil" showAction={hasSchedule} />
+
+          {hasSchedule && showAlarm ? (
+            <button
+              type="button"
+              onClick={() => setAlarmOpen(true)}
+              className="ios-press flex w-full items-center gap-3 rounded-[22px] px-4 py-3.5 text-left"
+              style={{ backgroundColor: CARD_BG }}
+              data-sleep-alarm-row
+            >
+              <span
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/40"
+                aria-hidden
+              >
+                <AlarmClock className="h-5 w-5 text-[#ACB4BA]" strokeWidth={2} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold text-white">Réveil</span>
+                <span className="mt-0.5 block text-[13px] text-[#ACB4BA]">
+                  {alarm.enabled
+                    ? `${formatClockHm(alarm.timeHm)} · ${formatRepeatSummary(alarm.days)}`
+                    : 'Régler le réveil'}
+                </span>
+              </span>
+              <span className="text-[13px] text-[#ACB4BA]">{alarm.enabled ? 'ON' : 'OFF'}</span>
+            </button>
+          ) : null}
 
           {hasSchedule ? (
             <button
@@ -158,6 +199,10 @@ export function SleepScreen({ open, onClose }: SleepScreenProps) {
           if (!getBedtimeReminderEnabled()) setBedtimeReminderEnabled(true)
         }}
       />
+
+      {showAlarm ? (
+        <SleepAlarmSheet open={alarmOpen} onClose={() => setAlarmOpen(false)} />
+      ) : null}
     </>
   )
 }

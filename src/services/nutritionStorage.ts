@@ -45,6 +45,7 @@ const HEALTH_LOCAL_KEY_PREFIXES = [
   'ranked-gym:sleep-morning-prompt',
   'ranked-gym:sleep-goal',
   'ranked-gym:sleep-bedtime-reminder',
+  'ranked-gym:sleep-alarm',
   'ranked-gym:training',
   'ranked-gym:profile',
   'ranked-gym:last-location',
