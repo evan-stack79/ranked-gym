@@ -1,3 +1,4 @@
+import ActivityKit
 import AlarmKit
 import Capacitor
 import Foundation
@@ -7,6 +8,8 @@ import SwiftUI
  * AlarmKit scheduler — fork lineage: @capawesome/capacitor-alarm (MIT).
  * Ranked Gym: snooze 9 min (countdown), French Arrêter/Répéter, custom sound.
  * Soft volume ramp is baked into RugissementRankedGym.* (no AlarmKit volume API).
+ *
+ * Sound type is ActivityKit.AlertConfiguration.AlertSound (WWDC25).
  */
 @available(iOS 26.0, *)
 final class RankedAlarmKit {
@@ -110,7 +113,10 @@ final class RankedAlarmKit {
             }
             return .default
         }()
-        let configuration: AlarmManager.AlarmConfiguration<RankedGymAlarmMetadata> = .alarm(
+
+        // Prefer the documented memberwise init (countdown + schedule + sound).
+        // Capawesome’s `.alarm(schedule:attributes:)` has no sound / snooze hooks.
+        let configuration = AlarmManager.AlarmConfiguration<RankedGymAlarmMetadata>(
             countdownDuration: countdownDuration,
             schedule: schedule,
             attributes: attributes,
