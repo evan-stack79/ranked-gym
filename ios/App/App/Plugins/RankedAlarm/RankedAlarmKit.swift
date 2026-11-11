@@ -19,9 +19,17 @@ import SwiftUI
  */
 @available(iOS 26.0, *)
 final class RankedAlarmKit {
+    struct Diagnostics {
+        let authorization: String
+        let alarmCount: Int
+        let lastError: String?
+        let hasUsageDescription: Bool
+    }
+
     private let manager = AlarmManager.shared
     private let labelsKey = "ranked_gym_alarm_labels"
     private weak var plugin: CAPPlugin?
+    private(set) var lastError: String?
 
     init(plugin: CAPPlugin) {
         self.plugin = plugin
@@ -31,21 +39,80 @@ final class RankedAlarmKit {
         mapAuth(manager.authorizationState)
     }
 
+    /// Raw AlarmKit authorization for the beta diagnostic panel.
+    func rawAuthorization() -> String {
+        switch manager.authorizationState {
+        case .authorized: return "authorized"
+        case .denied: return "denied"
+        case .notDetermined: return "notDetermined"
+        @unknown default: return "unknown"
+        }
+    }
+
+    func diagnostics() throws -> Diagnostics {
+        let usage = Bundle.main.object(forInfoDictionaryKey: "NSAlarmKitUsageDescription") as? String
+        return Diagnostics(
+            authorization: rawAuthorization(),
+            alarmCount: try manager.alarms.count,
+            lastError: lastError,
+            hasUsageDescription: !(usage ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        )
+    }
+
     /// Always hits AlarmManager when not already granted so the system prompt appears.
     func requestPermissions() async throws -> String {
-        try ensureUsageDescription()
-        switch manager.authorizationState {
-        case .authorized:
-            return "granted"
-        case .denied:
-            // Caller must open Settings — do not throw (JS needs a clean "denied").
-            return "denied"
-        case .notDetermined:
-            let state = try await manager.requestAuthorization()
-            return mapAuth(state)
-        @unknown default:
-            let state = try await manager.requestAuthorization()
-            return mapAuth(state)
+        do {
+            try ensureUsageDescription()
+            switch manager.authorizationState {
+            case .authorized:
+                return "granted"
+            case .denied:
+                lastError = "authorizationState=denied"
+                return "denied"
+            case .notDetermined:
+                let state = try await manager.requestAuthorization()
+                let mapped = mapAuth(state)
+                if mapped != "granted" {
+                    lastError = "requestAuthorization→\(rawAuthorization())"
+                }
+                return mapped
+            @unknown default:
+                let state = try await manager.requestAuthorization()
+                return mapAuth(state)
+            }
+        } catch {
+            lastError = error.localizedDescription
+            throw error
+        }
+    }
+
+    /// Beta: one-shot fixed alarm in N seconds (always rings path, snooze off).
+    func scheduleFixedTest(secondsFromNow: Int) async throws -> String {
+        try await authorizeIfNeeded()
+        let fire = Date().addingTimeInterval(TimeInterval(max(15, secondsFromNow)))
+        let attributes = makeAttributes(label: "Test Ranked Gym", snoozeEnabled: false)
+        let sound: AlertConfiguration.AlertSound = .named("RugissementRankedGym")
+        let configuration = AlarmManager.AlarmConfiguration<RankedGymAlarmMetadata>(
+            countdownDuration: nil,
+            schedule: .fixed(fire),
+            attributes: attributes,
+            stopIntent: nil,
+            secondaryIntent: nil,
+            sound: sound
+        )
+        let id = UUID()
+        do {
+            _ = try await manager.schedule(id: id, configuration: configuration)
+            setLabel("Test Ranked Gym", for: id)
+            guard try manager.alarms.contains(where: { $0.id == id }) else {
+                lastError = "test alarm not listed after schedule"
+                throw RankedAlarmError.notListedAfterSchedule
+            }
+            lastError = nil
+            return id.uuidString
+        } catch {
+            lastError = error.localizedDescription
+            throw error
         }
     }
 
@@ -68,7 +135,12 @@ final class RankedAlarmKit {
         snoozeEnabled: Bool,
         soundName: String?
     ) async throws -> String {
-        try await authorizeIfNeeded()
+        do {
+            try await authorizeIfNeeded()
+        } catch {
+            lastError = error.localizedDescription
+            throw error
+        }
 
         let weekdays = try parseDays(days)
         let schedule = try makeSchedule(hour: hour, minute: minute, weekdays: weekdays)
@@ -101,15 +173,20 @@ final class RankedAlarmKit {
         )
 
         let id = UUID()
-        _ = try await manager.schedule(id: id, configuration: configuration)
-        setLabel(label, for: id)
-
-        // Re-read from AlarmManager — never assume schedule succeeded.
-        let confirmed = try manager.alarms.contains { $0.id == id }
-        guard confirmed else {
-            throw RankedAlarmError.notListedAfterSchedule
+        do {
+            _ = try await manager.schedule(id: id, configuration: configuration)
+            setLabel(label, for: id)
+            let confirmed = try manager.alarms.contains { $0.id == id }
+            guard confirmed else {
+                lastError = "alarm not listed after schedule"
+                throw RankedAlarmError.notListedAfterSchedule
+            }
+            lastError = nil
+            return id.uuidString
+        } catch {
+            lastError = error.localizedDescription
+            throw error
         }
-        return id.uuidString
     }
 
     func getAlarms() throws -> [[String: Any]] {

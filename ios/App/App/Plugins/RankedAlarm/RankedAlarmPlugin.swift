@@ -3,64 +3,127 @@ import Foundation
 import UIKit
 
 /**
- * Capacitor bridge for Ranked Gym réveil (fork of @capawesome/capacitor-alarm, MIT).
- * jsName "Alarm" matches `@ranked-gym/capacitor-alarm`.
- *
- * Auth: requestPermissions MUST surface the system AlarmKit prompt before schedule.
- * openAppSettings: deep-link when authorization is denied.
+ * Capacitor bridge — jsName **RankedAlarm** (App-local CAPBridgedPlugin).
+ * Registered in MainViewController.capacitorDidLoad via registerPluginInstance.
+ * Lazy-inits AlarmKit so we never resolve "denied" just because load() raced.
  */
 @objc(RankedAlarmPlugin)
 public class RankedAlarmPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "RankedAlarmPlugin"
-    public let jsName = "Alarm"
+    public let jsName = "RankedAlarm"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "cancelAlarm", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "checkPermissions", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "createAlarm", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "createTimer", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getAlarms", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getDiagnostics", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "isAvailable", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "openAlarms", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "openAppSettings", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestPermissions", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "scheduleTestInOneMinute", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "verifyAlarm", returnType: CAPPluginReturnPromise),
     ]
 
     private var implementation: Any?
 
     override public func load() {
+        ensureImpl()
+    }
+
+    @discardableResult
+    private func ensureImpl() -> Any? {
+        if implementation != nil { return implementation }
         if #available(iOS 26.0, *) {
-            self.implementation = RankedAlarmKit(plugin: self)
+            implementation = RankedAlarmKit(plugin: self)
         }
+        return implementation
     }
 
     @objc func isAvailable(_ call: CAPPluginCall) {
         if #available(iOS 26.0, *) {
-            call.resolve(["available": true])
+            call.resolve(["available": true, "native": true])
         } else {
-            call.resolve(["available": false])
+            call.resolve(["available": false, "native": true])
         }
     }
 
     @objc func openAppSettings(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
             guard let url = URL(string: UIApplication.openSettingsURLString) else {
-                call.reject("Cannot open Settings")
+                call.reject("Cannot open Settings", "SETTINGS")
                 return
             }
             UIApplication.shared.open(url, options: [:]) { ok in
-                if ok { call.resolve() } else { call.reject("Settings open failed") }
+                if ok { call.resolve() } else { call.reject("Settings open failed", "SETTINGS") }
+            }
+        }
+    }
+
+    @objc func getDiagnostics(_ call: CAPPluginCall) {
+        let ios = UIDevice.current.systemVersion
+        if #available(iOS 26.0, *), let impl = ensureImpl() as? RankedAlarmKit {
+            do {
+                let diag = try impl.diagnostics()
+                call.resolve([
+                    "native": true,
+                    "iosVersion": ios,
+                    "alarmKitAvailable": true,
+                    "authorization": diag.authorization,
+                    "alarmCount": diag.alarmCount,
+                    "lastError": diag.lastError as Any,
+                    "hasUsageDescription": diag.hasUsageDescription,
+                ])
+            } catch {
+                call.resolve([
+                    "native": true,
+                    "iosVersion": ios,
+                    "alarmKitAvailable": true,
+                    "authorization": "unknown",
+                    "alarmCount": 0,
+                    "lastError": error.localizedDescription,
+                    "hasUsageDescription": Bundle.main.object(forInfoDictionaryKey: "NSAlarmKitUsageDescription") is String,
+                ])
+            }
+            return
+        }
+        call.resolve([
+            "native": true,
+            "iosVersion": ios,
+            "alarmKitAvailable": false,
+            "authorization": "unavailable",
+            "alarmCount": 0,
+            "lastError": "AlarmKit requires iOS 26+",
+            "hasUsageDescription": Bundle.main.object(forInfoDictionaryKey: "NSAlarmKitUsageDescription") is String,
+        ])
+    }
+
+    @objc func scheduleTestInOneMinute(_ call: CAPPluginCall) {
+        guard #available(iOS 26.0, *), let impl = ensureImpl() as? RankedAlarmKit else {
+            call.reject("AlarmKit unavailable (requires iOS 26+)", "UNAVAILABLE")
+            return
+        }
+        Task {
+            do {
+                let auth = try await impl.requestPermissions()
+                guard auth == "granted" else {
+                    call.reject("Permission AlarmKit refusée", "PERMISSION_DENIED")
+                    return
+                }
+                let id = try await impl.scheduleFixedTest(secondsFromNow: 60)
+                call.resolve(["id": id, "secondsFromNow": 60])
+            } catch {
+                call.reject(error.localizedDescription, "SCHEDULE_FAILED", error)
             }
         }
     }
 
     @objc func cancelAlarm(_ call: CAPPluginCall) {
-        guard #available(iOS 26.0, *), let impl = implementation as? RankedAlarmKit else {
-            call.reject("AlarmKit unavailable (requires iOS 26+)")
+        guard #available(iOS 26.0, *), let impl = ensureImpl() as? RankedAlarmKit else {
+            call.reject("AlarmKit unavailable (requires iOS 26+)", "UNAVAILABLE")
             return
         }
         guard let id = call.getString("id"), let uuid = UUID(uuidString: id) else {
-            call.reject("Invalid alarm id")
+            call.reject("Invalid alarm id", "INVALID_ID")
             return
         }
         impl.cancelAlarm(id: uuid) { error in
@@ -73,17 +136,15 @@ public class RankedAlarmPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc override public func checkPermissions(_ call: CAPPluginCall) {
-        guard #available(iOS 26.0, *), let impl = implementation as? RankedAlarmKit else {
+        guard #available(iOS 26.0, *), let impl = ensureImpl() as? RankedAlarmKit else {
             call.resolve(["alarms": "denied"])
             return
         }
         call.resolve(["alarms": impl.permissionState()])
     }
 
-    /// Always calls AlarmManager.requestAuthorization when not already granted,
-    /// so the system prompt appears on first réveil setup.
     @objc override public func requestPermissions(_ call: CAPPluginCall) {
-        guard #available(iOS 26.0, *), let impl = implementation as? RankedAlarmKit else {
+        guard #available(iOS 26.0, *), let impl = ensureImpl() as? RankedAlarmKit else {
             call.resolve(["alarms": "denied"])
             return
         }
@@ -98,7 +159,7 @@ public class RankedAlarmPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func createAlarm(_ call: CAPPluginCall) {
-        guard #available(iOS 26.0, *), let impl = implementation as? RankedAlarmKit else {
+        guard #available(iOS 26.0, *), let impl = ensureImpl() as? RankedAlarmKit else {
             call.reject("AlarmKit unavailable (requires iOS 26+)", "UNAVAILABLE")
             return
         }
@@ -118,7 +179,6 @@ public class RankedAlarmPlugin: CAPPlugin, CAPBridgedPlugin {
 
         Task {
             do {
-                // Auth FIRST — never schedule without an explicit authorization pass.
                 let auth = try await impl.requestPermissions()
                 guard auth == "granted" else {
                     call.reject("Permission AlarmKit refusée", "PERMISSION_DENIED")
@@ -135,22 +195,13 @@ public class RankedAlarmPlugin: CAPPlugin, CAPBridgedPlugin {
                 )
                 call.resolve(["id": id])
             } catch {
-                let msg = error.localizedDescription
-                let code: String
-                if msg.localizedCaseInsensitiveContains("refus") || msg.localizedCaseInsensitiveContains("permission") {
-                    code = "PERMISSION_DENIED"
-                } else if msg.localizedCaseInsensitiveContains("confirmé") {
-                    code = "NOT_CONFIRMED"
-                } else {
-                    code = "SCHEDULE_FAILED"
-                }
-                call.reject(msg, code, error)
+                call.reject(error.localizedDescription, "SCHEDULE_FAILED", error)
             }
         }
     }
 
     @objc func getAlarms(_ call: CAPPluginCall) {
-        guard #available(iOS 26.0, *), let impl = implementation as? RankedAlarmKit else {
+        guard #available(iOS 26.0, *), let impl = ensureImpl() as? RankedAlarmKit else {
             call.resolve(["alarms": []])
             return
         }
@@ -162,7 +213,7 @@ public class RankedAlarmPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func verifyAlarm(_ call: CAPPluginCall) {
-        guard #available(iOS 26.0, *), let impl = implementation as? RankedAlarmKit else {
+        guard #available(iOS 26.0, *), let impl = ensureImpl() as? RankedAlarmKit else {
             call.resolve(["present": false])
             return
         }
@@ -175,13 +226,5 @@ public class RankedAlarmPlugin: CAPPlugin, CAPBridgedPlugin {
         } catch {
             call.reject(error.localizedDescription, nil, error)
         }
-    }
-
-    @objc func createTimer(_ call: CAPPluginCall) {
-        call.unimplemented("createTimer is not used by Ranked Gym")
-    }
-
-    @objc func openAlarms(_ call: CAPPluginCall) {
-        call.unimplemented("openAlarms is Android-only")
     }
 }

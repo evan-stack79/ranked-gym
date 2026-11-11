@@ -10,6 +10,8 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL: string
   readonly VITE_SUPABASE_ANON_KEY: string
   readonly VITE_GOOGLE_MAPS_API_KEY: string
+  /** Short git SHA injected at build (sleep-alarm diagnostics). */
+  readonly VITE_GIT_SHA?: string
   /** Prototype BPM caméra — activer uniquement en build de test natif. */
   readonly VITE_ENABLE_CAMERA_HEART_RATE?: string
   /** Convex deployment URL (https://….convex.cloud). Unused until cutover. */

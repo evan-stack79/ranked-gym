@@ -120,7 +120,14 @@ jobs:
           test -f "$MVC"
           grep -q 'contentInsetAdjustmentBehavior = .never' "$MVC"
           grep -q 'SecureStoragePlugin' "$MVC"
+          grep -q 'RankedAlarmPlugin' "$MVC"
+          grep -q 'registerPluginInstance(RankedAlarmPlugin' "$MVC"
           grep -q 'preferredStatusBarStyle' "$MVC"
+
+          echo "== RankedAlarm jsName =="
+          RAP="ios/App/App/Plugins/RankedAlarm/RankedAlarmPlugin.swift"
+          test -f "$RAP"
+          grep -q 'jsName = "RankedAlarm"' "$RAP"
 
           echo "== Info.plist status bar ownership =="
           PLIST="ios/App/App/Info.plist"
@@ -292,12 +299,16 @@ jobs:
             echo "ERROR: SecureStoragePlugin missing from App binary — Keychain plugin not linked"
             exit 1
           fi
+          if ! grep -q 'RankedAlarmPlugin' "$STRINGS_DUMP"; then
+            echo "ERROR: RankedAlarmPlugin missing from App binary — AlarmKit bridge not linked"
+            exit 1
+          fi
           # StatusBar overlay plugin (safe-area / Dynamic Island full-bleed).
           if ! grep -qi 'StatusBar' "$STRINGS_DUMP"; then
             echo "ERROR: StatusBar symbols missing from App binary — overlaysWebView will not apply"
             exit 1
           fi
-          echo "Native plugin registration symbols present (MainViewController / SecureStoragePlugin / StatusBar)"
+          echo "Native plugin registration symbols present (MainViewController / SecureStoragePlugin / RankedAlarmPlugin / StatusBar)"
 
           # LaunchScreen compiled into .app (presence guard; full-bleed checked on source above).
           echo "== LaunchScreen in packaged .app =="

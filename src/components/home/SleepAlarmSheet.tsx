@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import {
   SLEEP_ALARM_CHANGED_EVENT,
@@ -18,9 +18,11 @@ import {
   syncSleepAlarm,
   type SleepAlarmUiStatus,
 } from '../../services/sleepAlarmService'
+import { RankedAlarm, isRankedAlarmPluginAvailable } from '../../native/rankedAlarm'
 import { formatRepeatSummary } from '../../utils/sleepAlarmSchedule'
 import { IosSheet } from '../ui/IosSheet'
 import type { AlarmBackend } from '../../utils/sleepAlarmSchedule'
+import { SleepAlarmDiagBlock } from './SleepAlarmDiagBlock'
 import { SleepAlarmStatusBanner } from './SleepAlarmStatusBanner'
 
 const BG = '#000000'
@@ -131,12 +133,14 @@ function TimeWheels({
 export function SleepAlarmSheet({ open, onClose }: SleepAlarmSheetProps) {
   const [draft, setDraft] = useState<SleepAlarmSettings>(() => getSleepAlarmSettings())
   const [pane, setPane] = useState<'main' | 'days' | 'sound'>('main')
-  const [backend, setBackend] = useState<AlarmBackend>('unavailable')
+  const [backend, setBackend] = useState<AlarmBackend | 'plugin-missing'>('unavailable')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<SleepAlarmUiStatus>({ kind: 'off' })
   const [confirmMsg, setConfirmMsg] = useState<string | null>(null)
   const [labelEditing, setLabelEditing] = useState(false)
+  const [diagExpanded, setDiagExpanded] = useState(false)
+  const titleTaps = useRef({ count: 0, last: 0 })
 
   useEffect(() => {
     if (!open) {
@@ -144,6 +148,8 @@ export function SleepAlarmSheet({ open, onClose }: SleepAlarmSheetProps) {
       setError(null)
       setConfirmMsg(null)
       setLabelEditing(false)
+      setDiagExpanded(false)
+      titleTaps.current = { count: 0, last: 0 }
       return
     }
     setDraft(getSleepAlarmSettings())
@@ -151,10 +157,9 @@ export function SleepAlarmSheet({ open, onClose }: SleepAlarmSheetProps) {
       const b = await resolveAlarmBackend()
       setBackend(b)
       // Premier réglage : demander AlarmKit dès l’ouverture si encore « prompt ».
-      if (b === 'alarmkit') {
+      if (b === 'alarmkit' && isRankedAlarmPluginAvailable()) {
         try {
-          const mod = await import('@ranked-gym/capacitor-alarm')
-          const perm = await mod.Alarm.requestPermissions()
+          const perm = await RankedAlarm.requestPermissions()
           if (perm.alarms === 'denied') setStatus({ kind: 'permission' })
         } catch (err) {
           console.error('[sleep-alarm] requestPermissions on open', err)
@@ -163,6 +168,17 @@ export function SleepAlarmSheet({ open, onClose }: SleepAlarmSheetProps) {
       setStatus(await readSleepAlarmUiStatus())
     })()
   }, [open])
+
+  const onTitleClick = () => {
+    const now = Date.now()
+    if (now - titleTaps.current.last > 1200) titleTaps.current.count = 0
+    titleTaps.current.last = now
+    titleTaps.current.count += 1
+    if (titleTaps.current.count >= 5) {
+      titleTaps.current.count = 0
+      setDiagExpanded((v) => !v)
+    }
+  }
 
   useEffect(() => {
     const sync = () => {
@@ -220,6 +236,7 @@ export function SleepAlarmSheet({ open, onClose }: SleepAlarmSheetProps) {
       open={open}
       onClose={onCancel}
       title={sheetTitle}
+      onTitleClick={pane === 'main' ? onTitleClick : undefined}
       leading={
         pane === 'main' ? (
           <button
@@ -367,6 +384,8 @@ export function SleepAlarmSheet({ open, onClose }: SleepAlarmSheetProps) {
             {error && status.kind !== 'permission' ? (
               <p className="px-1 text-[13px] text-[#FF907F]">{error}</p>
             ) : null}
+
+            <SleepAlarmDiagBlock open={open} expanded={diagExpanded} />
           </>
         ) : null}
 
