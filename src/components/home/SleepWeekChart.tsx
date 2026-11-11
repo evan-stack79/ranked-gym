@@ -1,104 +1,105 @@
 import { computeTibHours } from '../../sleep-engine'
 import type { SleepNightEntry } from '../../services/sleepStorage'
+import { getSleepGoalHours } from '../../services/sleepStorage'
 import {
-  frenchDayShortLabel,
-  hmToMinutes,
+  frenchDayLetter,
   shiftDateKey,
   todayDateKey,
 } from '../../utils/sleepTimeFormat'
+import { averageTibHours, formatAverageTibLabel } from '../../utils/sleepStats'
 
 const RED = '#ff0702'
-const GREY = '#636366'
-
-/** Fenêtre visuelle : 22 h → 10 h (12 h), wrap minuit. */
-const WINDOW_START = 22 * 60
-const WINDOW_SPAN = 12 * 60
+const GREY = '#3A3A3C'
 
 interface SleepWeekChartProps {
   nights: SleepNightEntry[]
   today?: string
-}
-
-function toWindowOffset(minutes: number): number {
-  // minutes since WINDOW_START, wrapping
-  let offset = minutes - WINDOW_START
-  if (offset < 0) offset += 24 * 60
-  return Math.min(WINDOW_SPAN, Math.max(0, offset))
+  /** Affiche la moyenne une seule fois sous les barres. */
+  showAverage?: boolean
+  compact?: boolean
 }
 
 /**
- * Barres flottantes bedtime→waketime sur 7 jours.
- * Aujourd’hui en rouge #ff0702, autres en gris. Pas de score.
+ * 7 barres de durée (pas d’axe 22 h / 2 h / 6 h / 10 h).
+ * Nuit en cours rouge (~10 %), autres gris. Pas de chiffres au-dessus.
  */
-export function SleepWeekChart({ nights, today = todayDateKey() }: SleepWeekChartProps) {
+export function SleepWeekChart({
+  nights,
+  today = todayDateKey(),
+  showAverage = true,
+  compact = false,
+}: SleepWeekChartProps) {
   const byKey = new Map(nights.map((n) => [n.dateKey, n]))
+  const goal = getSleepGoalHours()
   const days = Array.from({ length: 7 }, (_, i) => {
     const dateKey = shiftDateKey(today, i - 6)
-    return { dateKey, night: byKey.get(dateKey) ?? null, isToday: dateKey === today }
+    const night = byKey.get(dateKey) ?? null
+    const tib = night ? computeTibHours(night.bedtime, night.waketime) : null
+    return { dateKey, night, tib, isToday: dateKey === today }
   })
+  const avgLabel = formatAverageTibLabel(days.filter((d) => d.night).map((d) => d.night!))
+  const maxHours = Math.max(goal, averageTibHours(nights) ?? 0, 8, ...days.map((d) => d.tib ?? 0))
 
   return (
-    <div className="w-full" data-sleep-week-chart>
-      <div className="relative flex h-44 gap-2">
-        <div
-          className="flex w-8 shrink-0 flex-col justify-between pb-5 pt-1 text-right text-[10px] tabular-nums text-[#8E8E93]"
-          aria-hidden
-        >
-          <span>22 h</span>
-          <span>2 h</span>
-          <span>6 h</span>
-          <span>10 h</span>
-        </div>
-        <div className="flex min-w-0 flex-1 items-stretch gap-1.5">
-          {days.map((day) => {
-            const night = day.night
-            let topPct = 20
-            let heightPct = 40
-            if (night) {
-              const bed = hmToMinutes(night.bedtime)
-              const wake = hmToMinutes(night.waketime)
-              if (bed != null && wake != null) {
-                const start = toWindowOffset(bed)
-                let end = toWindowOffset(wake)
-                if (end <= start) end = Math.min(WINDOW_SPAN, start + 30)
-                topPct = (start / WINDOW_SPAN) * 100
-                heightPct = Math.max(8, ((end - start) / WINDOW_SPAN) * 100)
-              }
-            }
-            const tib = night ? computeTibHours(night.bedtime, night.waketime) : null
-            return (
-              <div key={day.dateKey} className="flex min-w-0 flex-1 flex-col items-center">
-                <div className="relative w-full flex-1">
-                  {night && tib != null ? (
-                    <div
-                      className="absolute left-1/2 w-[70%] max-w-[18px] -translate-x-1/2 rounded-full"
-                      style={{
-                        top: `${topPct}%`,
-                        height: `${heightPct}%`,
-                        backgroundColor: day.isToday ? RED : GREY,
-                      }}
-                      title={`${day.dateKey}`}
-                      data-sleep-week-bar={day.isToday ? 'today' : 'past'}
-                    />
-                  ) : (
-                    <div
-                      className="absolute bottom-[8%] left-1/2 h-2 w-[70%] max-w-[18px] -translate-x-1/2 rounded-full bg-white/10"
-                      data-sleep-week-bar="empty"
-                    />
-                  )}
-                </div>
-                <p
-                  className={`mt-1 text-[11px] ${
-                    day.isToday ? 'font-semibold text-white' : 'text-[#8E8E93]'
-                  }`}
-                >
-                  {frenchDayShortLabel(day.dateKey, today)}
-                </p>
+    <div className="w-full" data-sleep-week-chart data-sleep-week-compact={compact ? '1' : '0'}>
+      <div className={`flex items-end gap-1.5 ${compact ? 'h-16' : 'h-24'}`}>
+        {days.map((day) => {
+          const ratio =
+            day.tib != null && maxHours > 0 ? Math.min(1, Math.max(0.08, day.tib / maxHours)) : 0
+          const emptyToday = day.isToday && day.tib == null
+          return (
+            <div key={day.dateKey} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
+              <div className={`relative flex w-full items-end justify-center ${compact ? 'h-12' : 'h-20'}`}>
+                {day.tib != null ? (
+                  <div
+                    className="w-[55%] max-w-[14px] rounded-full"
+                    style={{
+                      height: `${ratio * 100}%`,
+                      backgroundColor: day.isToday ? RED : GREY,
+                      minHeight: 8,
+                    }}
+                    data-sleep-week-bar={day.isToday ? 'today' : 'past'}
+                  />
+                ) : emptyToday ? (
+                  <div
+                    className="w-[55%] max-w-[14px] rounded-full border border-dashed"
+                    style={{
+                      height: '42%',
+                      borderColor: RED,
+                      minHeight: 18,
+                    }}
+                    data-sleep-week-bar="today-empty"
+                  />
+                ) : (
+                  <div
+                    className="w-[55%] max-w-[14px] rounded-full bg-white/10"
+                    style={{ height: 6 }}
+                    data-sleep-week-bar="empty"
+                  />
+                )}
               </div>
-            )
-          })}
-        </div>
+              <p
+                className={`text-[11px] ${
+                  day.isToday ? 'font-semibold text-white' : 'text-[#8E8E93]'
+                }`}
+              >
+                {frenchDayLetter(day.dateKey)}
+              </p>
+            </div>
+          )
+        })}
       </div>
+      {showAverage ? (
+        <p className="mt-2 text-center text-[12px] text-[#ACB4BA]" data-sleep-week-avg>
+          {avgLabel ? (
+            <>
+              Moyenne <span className="font-semibold text-white">{avgLabel}</span> au lit
+            </>
+          ) : (
+            'Pas encore assez de nuits pour une moyenne.'
+          )}
+        </p>
+      ) : null}
     </div>
   )
 }

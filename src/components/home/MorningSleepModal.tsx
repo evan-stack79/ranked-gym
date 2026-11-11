@@ -16,24 +16,11 @@ import {
   formatNightRangeLabel,
 } from '../../utils/sleepTimeFormat'
 import { LogSleepNightSheet } from './LogSleepNightSheet'
+import { SLEEP_FEELING_LABELS, SLEEP_PANTHER_SRC } from './sleepFeeling'
 
 const RED = '#ff0702'
 
-export const SLEEP_FEELING_LABELS: Record<SleepFeelingLevel, string> = {
-  1: 'Très mal',
-  2: 'Mal',
-  3: 'Moyen',
-  4: 'Bien',
-  5: 'Très bien',
-}
-
-export const SLEEP_PANTHER_SRC: Record<SleepFeelingLevel, string> = {
-  1: '/sleep/tete_1.png',
-  2: '/sleep/tete_2.png',
-  3: '/sleep/tete_3.png',
-  4: '/sleep/tete_4.png',
-  5: '/sleep/tete_5.png',
-}
+export { SLEEP_FEELING_LABELS, SLEEP_PANTHER_SRC } from './sleepFeeling'
 
 interface MorningSleepModalProps {
   open: boolean

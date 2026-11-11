@@ -1,10 +1,22 @@
 /** Affichage heures sommeil — français, sans jargon. */
 
+export interface DurationParts {
+  hours: number
+  minutes: number
+}
+
+/** Parties heures/minutes pour typo « 8 » + « h » + « 29 » + « min ». */
+export function durationPartsFromHours(hours: number): DurationParts {
+  const totalMinutes = Math.round(hours * 60)
+  return {
+    hours: Math.floor(totalMinutes / 60),
+    minutes: totalMinutes % 60,
+  }
+}
+
 /** « 7 h 30 » / « 8 h » — minutes arrondies. */
 export function formatDurationHoursLabel(hours: number): string {
-  const totalMinutes = Math.round(hours * 60)
-  const h = Math.floor(totalMinutes / 60)
-  const m = totalMinutes % 60
+  const { hours: h, minutes: m } = durationPartsFromHours(hours)
   if (m === 0) return `${h} h`
   return `${h} h ${String(m).padStart(2, '0')}`
 }
@@ -44,6 +56,14 @@ export function frenchDayShortLabel(dateKey: string, today = todayDateKey()): st
   const weekday = new Date(y, m - 1, d).getDay() // 0=dim
   const labels = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.']
   return labels[weekday] ?? ''
+}
+
+/** Lettre jour FR (L M M J V S D) — axe 7 barres v10. */
+export function frenchDayLetter(dateKey: string): string {
+  const [y, m, d] = dateKey.split('-').map(Number)
+  const weekday = new Date(y, m - 1, d).getDay() // 0=dim
+  const letters = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
+  return letters[weekday] ?? ''
 }
 
 export function dateToHm(now: Date): string {

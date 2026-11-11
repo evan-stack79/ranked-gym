@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Moon, Sun } from 'lucide-react'
 import { getSleepSchedule, saveSleepSchedule } from '../../services/sleepStorage'
 import { formatClockHm } from '../../utils/sleepTimeFormat'
 import { IosSheet } from '../ui/IosSheet'
 import { SleepClockDial } from './SleepClockDial'
+import { SleepMoonIcon, SleepSunIcon } from './SleepMoonSunIcons'
 
 interface SleepScheduleSheetProps {
   open: boolean
@@ -14,8 +14,8 @@ interface SleepScheduleSheetProps {
 const RED = '#ff0702'
 
 /**
- * « Tes horaires » — cadran pour coucher / lever prévus (une fois).
- * Aucune alarme, aucun son, aucune notif nocturne.
+ * « Tes horaires » — cartes Coucher/Lever EN HAUT, puis cadran.
+ * Aucune alarme / sonnerie ici (hors périmètre réveil).
  */
 export function SleepScheduleSheet({ open, onClose, onSaved }: SleepScheduleSheetProps) {
   const [bedtime, setBedtime] = useState('23:00')
@@ -60,6 +60,27 @@ export function SleepScheduleSheet({ open, onClose, onSaved }: SleepScheduleShee
       }
     >
       <div className="space-y-4 pb-2" data-sleep-schedule-sheet>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl bg-[#1C1C1E] px-3.5 py-3">
+            <p className="flex items-center gap-1.5 text-[12px] text-[#ACB4BA]">
+              <SleepMoonIcon size={13} />
+              Coucher
+            </p>
+            <p className="mt-1 text-[22px] font-bold tabular-nums text-white">
+              {formatClockHm(bedtime)}
+            </p>
+          </div>
+          <div className="rounded-2xl bg-[#1C1C1E] px-3.5 py-3">
+            <p className="flex items-center gap-1.5 text-[12px] text-[#ACB4BA]">
+              <SleepSunIcon size={13} />
+              Lever
+            </p>
+            <p className="mt-1 text-[22px] font-bold tabular-nums text-white">
+              {formatClockHm(waketime)}
+            </p>
+          </div>
+        </div>
+
         <SleepClockDial
           bedtime={bedtime}
           waketime={waketime}
@@ -69,27 +90,6 @@ export function SleepScheduleSheet({ open, onClose, onSaved }: SleepScheduleShee
             setError(null)
           }}
         />
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-white/8 bg-[#1C1C1E] px-3.5 py-3">
-            <p className="flex items-center gap-1.5 text-[12px] text-[#ACB4BA]">
-              <Moon className="h-3.5 w-3.5" style={{ color: RED }} aria-hidden />
-              Coucher
-            </p>
-            <p className="mt-1 text-[22px] font-bold tabular-nums text-white">
-              {formatClockHm(bedtime)}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-white/8 bg-[#1C1C1E] px-3.5 py-3">
-            <p className="flex items-center gap-1.5 text-[12px] text-[#ACB4BA]">
-              <Sun className="h-3.5 w-3.5" style={{ color: RED }} aria-hidden />
-              Lever
-            </p>
-            <p className="mt-1 text-[22px] font-bold tabular-nums text-white">
-              {formatClockHm(waketime)}
-            </p>
-          </div>
-        </div>
 
         {error ? <p className="text-[13px] text-[#FF907F]">{error}</p> : null}
       </div>

@@ -14,6 +14,12 @@ import { readLocal, removeLocal, writeLocal } from './secureLocalStore'
 const LOG_BASE = 'ranked-gym:sleep-log'
 const SCHEDULE_BASE = 'ranked-gym:sleep-schedule'
 const MORNING_PROMPT_BASE = 'ranked-gym:sleep-morning-prompt'
+const GOAL_BASE = 'ranked-gym:sleep-goal'
+const BEDTIME_REMINDER_BASE = 'ranked-gym:sleep-bedtime-reminder'
+
+export const DEFAULT_SLEEP_GOAL_HOURS = 8
+export const MIN_SLEEP_GOAL_HOURS = 5
+export const MAX_SLEEP_GOAL_HOURS = 12
 
 export const SLEEP_CHANGED_EVENT = 'ranked-gym:sleep-changed'
 
@@ -42,6 +48,12 @@ export interface SleepNightEntry {
 export interface SleepSchedule {
   bedtime: string
   waketime: string
+}
+
+function clampGoalHours(raw: number): number {
+  if (!Number.isFinite(raw)) return DEFAULT_SLEEP_GOAL_HOURS
+  const rounded = Math.round(raw * 2) / 2
+  return Math.min(MAX_SLEEP_GOAL_HOURS, Math.max(MIN_SLEEP_GOAL_HOURS, rounded))
 }
 
 export type SleepStorageSaveOptions = { skipCloud?: boolean }
@@ -285,5 +297,44 @@ export function markMorningPromptShown(
 
 export function clearMorningPrompt(options?: SleepStorageSaveOptions): void {
   removeLocal(scopedKey(MORNING_PROMPT_BASE))
+  notifySleepChanged(options)
+}
+
+/** Objectif perso « ton objectif : 8 h » — local only. */
+export function getSleepGoalHours(): number {
+  const raw = readLocal(scopedKey(GOAL_BASE))
+  if (!raw) return DEFAULT_SLEEP_GOAL_HOURS
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return DEFAULT_SLEEP_GOAL_HOURS
+  return clampGoalHours(n)
+}
+
+export function saveSleepGoalHours(
+  hours: number,
+  options?: SleepStorageSaveOptions,
+): number {
+  const next = clampGoalHours(hours)
+  writeLocal(scopedKey(GOAL_BASE), String(next))
+  notifySleepChanged(options)
+  return next
+}
+
+/**
+ * Interrupteur « Heure d'aller dormir » — UI locale uniquement.
+ * Aucune notification nocturne (veto).
+ */
+export function getBedtimeReminderEnabled(): boolean {
+  const raw = readLocal(scopedKey(BEDTIME_REMINDER_BASE))
+  if (raw === '1' || raw === 'true') return true
+  if (raw === '0' || raw === 'false') return false
+  // Défaut : activé seulement si des horaires existent.
+  return getSleepSchedule() != null
+}
+
+export function setBedtimeReminderEnabled(
+  enabled: boolean,
+  options?: SleepStorageSaveOptions,
+): void {
+  writeLocal(scopedKey(BEDTIME_REMINDER_BASE), enabled ? '1' : '0')
   notifySleepChanged(options)
 }

@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SleepSnapshot } from './SleepSnapshot'
-import { saveSleepNight } from '../../services/sleepStorage'
+import { saveSleepNight, saveSleepSchedule } from '../../services/sleepStorage'
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 
@@ -28,7 +28,7 @@ vi.mock('../../services/cloudSession', () => ({
   getActiveCloudUserId: vi.fn(() => null),
 }))
 
-describe('SleepSnapshot Accueil card', () => {
+describe('SleepSnapshot v10 summary card', () => {
   let host: HTMLDivElement
   let root: Root
 
@@ -59,9 +59,16 @@ describe('SleepSnapshot Accueil card', () => {
     host.remove()
   })
 
-  it('affiche le TIB et ouvre l’écran Sommeil au tap', () => {
+  it('affiche durée typo + Noter, ouvre l’éditeur inline', () => {
+    const today = new Date()
+    const y = today.getFullYear()
+    const mo = String(today.getMonth() + 1).padStart(2, '0')
+    const d = String(today.getDate()).padStart(2, '0')
+    const dateKey = `${y}-${mo}-${d}`
+
+    saveSleepSchedule({ bedtime: '23:00', waketime: '07:00' }, { skipCloud: true })
     saveSleepNight(
-      { bedtime: '23:00', waketime: '06:30', tstHours: null, dateKey: '2026-11-10' },
+      { bedtime: '23:00', waketime: '06:30', tstHours: null, dateKey },
       { skipCloud: true },
     )
 
@@ -69,18 +76,25 @@ describe('SleepSnapshot Accueil card', () => {
       root.render(<SleepSnapshot />)
     })
 
-    expect(host.textContent).toContain('7 h 30 au lit')
-    expect(host.textContent).toMatch(/23:00 → 6:30/)
-
-    const card = host.querySelector('[data-sleep-home-card]') as HTMLButtonElement
-    expect(card).toBeTruthy()
+    expect(host.textContent).toContain("Comment s'est passée ta nuit")
+    expect(host.textContent).toMatch(/30/)
+    expect(host.textContent).toContain('ton objectif')
+    expect(host.querySelector('[data-sleep-primary-action="modifier"]')).toBeTruthy()
+    expect(host.textContent).not.toContain('Au réveil')
 
     act(() => {
-      card.click()
+      ;(host.querySelector('[data-sleep-primary-action="modifier"]') as HTMLButtonElement).click()
     })
 
-    expect(document.body.textContent).toContain('Ma semaine')
-    expect(document.body.textContent).toContain('Noter ma nuit')
-    expect(document.body.textContent).not.toContain('Au réveil')
+    expect(host.querySelector('[data-sleep-inline-editor]')).toBeTruthy()
+    expect(host.querySelector('[data-sleep-clock-dial]')).toBeTruthy()
+  })
+
+  it('état vide : bouton Noter', () => {
+    act(() => {
+      root.render(<SleepSnapshot />)
+    })
+    expect(host.querySelector('[data-sleep-primary-action="noter"]')).toBeTruthy()
+    expect(host.textContent).toContain('z z')
   })
 })

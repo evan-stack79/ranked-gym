@@ -1,17 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Moon, Sun } from 'lucide-react'
 import { saveSleepNight, type SleepNightEntry, getSleepSchedule } from '../../services/sleepStorage'
 import { formatClockHm, todayDateKey } from '../../utils/sleepTimeFormat'
 import { IosSheet } from '../ui/IosSheet'
 import { SleepClockDial } from './SleepClockDial'
+import { SleepMoonIcon, SleepSunIcon } from './SleepMoonSunIcons'
 
 interface LogSleepNightSheetProps {
   open: boolean
   onClose: () => void
   onSaved: () => void
-  /** Prefill when editing an existing night */
   initial?: SleepNightEntry | null
-  /** Optional override dateKey (defaults to today / initial). */
   dateKey?: string
   title?: string
 }
@@ -19,8 +17,8 @@ interface LogSleepNightSheetProps {
 const RED = '#ff0702'
 
 /**
- * Saisie « Ta nuit » — cadran 24 h (coucher / lever).
- * Pas de TST inventé ; pas de texte « Au réveil ».
+ * Feuille cadran conservée pour Corriger (matin) / cas ponctuels.
+ * Accueil + Sommeil notent inline via SleepNightSummaryCard (v10).
  */
 export function LogSleepNightSheet({
   open,
@@ -84,6 +82,27 @@ export function LogSleepNightSheet({
       }
     >
       <div className="space-y-4 pb-2" data-sleep-log-sheet>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl bg-[#1C1C1E] px-3.5 py-3">
+            <p className="flex items-center gap-1.5 text-[12px] text-[#ACB4BA]">
+              <SleepMoonIcon size={13} />
+              Coucher
+            </p>
+            <p className="mt-1 text-[22px] font-bold tabular-nums text-white">
+              {formatClockHm(bedtime)}
+            </p>
+          </div>
+          <div className="rounded-2xl bg-[#1C1C1E] px-3.5 py-3">
+            <p className="flex items-center gap-1.5 text-[12px] text-[#ACB4BA]">
+              <SleepSunIcon size={13} />
+              Lever
+            </p>
+            <p className="mt-1 text-[22px] font-bold tabular-nums text-white">
+              {formatClockHm(waketime)}
+            </p>
+          </div>
+        </div>
+
         <SleepClockDial
           bedtime={bedtime}
           waketime={waketime}
@@ -93,27 +112,6 @@ export function LogSleepNightSheet({
             setError(null)
           }}
         />
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-white/8 bg-[#1C1C1E] px-3.5 py-3">
-            <p className="flex items-center gap-1.5 text-[12px] text-[#ACB4BA]">
-              <Moon className="h-3.5 w-3.5" style={{ color: RED }} aria-hidden />
-              Coucher
-            </p>
-            <p className="mt-1 text-[22px] font-bold tabular-nums text-white">
-              {formatClockHm(bedtime)}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-white/8 bg-[#1C1C1E] px-3.5 py-3">
-            <p className="flex items-center gap-1.5 text-[12px] text-[#ACB4BA]">
-              <Sun className="h-3.5 w-3.5" style={{ color: RED }} aria-hidden />
-              Lever
-            </p>
-            <p className="mt-1 text-[22px] font-bold tabular-nums text-white">
-              {formatClockHm(waketime)}
-            </p>
-          </div>
-        </div>
 
         {error ? <p className="text-[13px] text-[#FF907F]">{error}</p> : null}
       </div>

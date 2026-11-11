@@ -3296,3 +3296,21 @@ select,
     transition: none;
   }
 }
+
+/* Sleep v10 — panthère se réveille (désactivé si prefers-reduced-motion) */
+@keyframes sleep-panther-wake {
+  from {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-sleep-panther-awake] {
+    animation: none !important;
+  }
+}
