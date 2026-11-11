@@ -6,10 +6,16 @@ import SwiftUI
 
 /**
  * AlarmKit scheduler — fork lineage: @capawesome/capacitor-alarm (MIT).
- * Ranked Gym: snooze 9 min (countdown), French Arrêter/Répéter, custom sound.
- * Soft volume ramp is baked into RugissementRankedGym.* (no AlarmKit volume API).
  *
- * Sound type is ActivityKit.AlertConfiguration.AlertSound (WWDC25).
+ * Root-cause fix (Evan IPA f1a9516, iPhone 17 / iOS 26, silence à l’heure) :
+ * Apple : if an alarm supports a *countdown presentation* but the Live Activity
+ * cannot present, “the system may unexpectedly dismiss alarms and fail to alert”.
+ * We therefore:
+ *  1) Always build a stop-only alert that can ring without countdown UI.
+ *  2) Only attach postAlert countdown / Répéter when snooze is on, with a full
+ *     AlarmPresentation (alert + countdown + paused) matching the widget.
+ *  3) Prefer `.fixed(Date)` for one-shot (no days) so “next HH:MM” is unambiguous.
+ *  4) Re-read AlarmManager.alarms after schedule and fail if the id is missing.
  */
 @available(iOS 26.0, *)
 final class RankedAlarmKit {
@@ -25,10 +31,22 @@ final class RankedAlarmKit {
         mapAuth(manager.authorizationState)
     }
 
+    /// Always hits AlarmManager when not already granted so the system prompt appears.
     func requestPermissions() async throws -> String {
         try ensureUsageDescription()
-        let state = try await manager.requestAuthorization()
-        return mapAuth(state)
+        switch manager.authorizationState {
+        case .authorized:
+            return "granted"
+        case .denied:
+            // Caller must open Settings — do not throw (JS needs a clean "denied").
+            return "denied"
+        case .notDetermined:
+            let state = try await manager.requestAuthorization()
+            return mapAuth(state)
+        @unknown default:
+            let state = try await manager.requestAuthorization()
+            return mapAuth(state)
+        }
     }
 
     func cancelAlarm(id: UUID, completion: @escaping (Error?) -> Void) {
@@ -53,60 +71,11 @@ final class RankedAlarmKit {
         try await authorizeIfNeeded()
 
         let weekdays = try parseDays(days)
-        let schedule: Alarm.Schedule = {
-            let time = Alarm.Schedule.Relative.Time(hour: hour, minute: minute)
-            if weekdays.isEmpty {
-                return .relative(Alarm.Schedule.Relative(time: time, repeats: .never))
-            }
-            return .relative(Alarm.Schedule.Relative(time: time, repeats: .weekly(weekdays)))
-        }()
-
-        let stop = AlarmButton(text: "Arrêter", textColor: .white, systemImageName: "stop.circle")
-        let alert: AlarmPresentation.Alert
-        let presentation: AlarmPresentation
-        let countdownDuration: Alarm.CountdownDuration?
-
-        if snoozeEnabled {
-            let snooze = AlarmButton(text: "Répéter", textColor: .white, systemImageName: "repeat")
-            if #available(iOS 26.1, *) {
-                alert = AlarmPresentation.Alert(
-                    title: LocalizedStringResource(stringLiteral: label),
-                    secondaryButton: snooze,
-                    secondaryButtonBehavior: .countdown
-                )
-            } else {
-                alert = AlarmPresentation.Alert(
-                    title: LocalizedStringResource(stringLiteral: label),
-                    stopButton: stop,
-                    secondaryButton: snooze,
-                    secondaryButtonBehavior: .countdown
-                )
-            }
-            let countdown = AlarmPresentation.Countdown(title: LocalizedStringResource("Répéter"))
-            presentation = AlarmPresentation(alert: alert, countdown: countdown)
-            let seconds = max(60, snoozeMinutes * 60)
-            countdownDuration = Alarm.CountdownDuration(preAlert: nil, postAlert: TimeInterval(seconds))
-        } else {
-            if #available(iOS 26.1, *) {
-                alert = AlarmPresentation.Alert(title: LocalizedStringResource(stringLiteral: label))
-            } else {
-                alert = AlarmPresentation.Alert(
-                    title: LocalizedStringResource(stringLiteral: label),
-                    stopButton: stop
-                )
-            }
-            presentation = AlarmPresentation(alert: alert)
-            countdownDuration = nil
-        }
-
-        // Tint: grey (marketing — red rare). Eyes/crown stay brand red elsewhere.
-        let tint = Color(red: 0.67, green: 0.70, blue: 0.73)
-        let attributes = AlarmAttributes<RankedGymAlarmMetadata>(
-            presentation: presentation,
-            metadata: RankedGymAlarmMetadata(),
-            tintColor: tint
+        let schedule = try makeSchedule(hour: hour, minute: minute, weekdays: weekdays)
+        let attributes = makeAttributes(
+            label: label,
+            snoozeEnabled: snoozeEnabled
         )
-
         let sound: AlertConfiguration.AlertSound = {
             if let soundName, !soundName.isEmpty {
                 return .named(soundName)
@@ -114,8 +83,14 @@ final class RankedAlarmKit {
             return .default
         }()
 
-        // Prefer the documented memberwise init (countdown + schedule + sound).
-        // Capawesome’s `.alarm(schedule:attributes:)` has no sound / snooze hooks.
+        let countdownDuration: Alarm.CountdownDuration?
+        if snoozeEnabled {
+            let seconds = max(60, snoozeMinutes * 60)
+            countdownDuration = Alarm.CountdownDuration(preAlert: nil, postAlert: TimeInterval(seconds))
+        } else {
+            countdownDuration = nil
+        }
+
         let configuration = AlarmManager.AlarmConfiguration<RankedGymAlarmMetadata>(
             countdownDuration: countdownDuration,
             schedule: schedule,
@@ -128,6 +103,12 @@ final class RankedAlarmKit {
         let id = UUID()
         _ = try await manager.schedule(id: id, configuration: configuration)
         setLabel(label, for: id)
+
+        // Re-read from AlarmManager — never assume schedule succeeded.
+        let confirmed = try manager.alarms.contains { $0.id == id }
+        guard confirmed else {
+            throw RankedAlarmError.notListedAfterSchedule
+        }
         return id.uuidString
     }
 
@@ -145,6 +126,99 @@ final class RankedAlarmKit {
         }
     }
 
+    /// True when `id` is currently present in AlarmManager.alarms.
+    func hasAlarm(id: UUID) throws -> Bool {
+        try manager.alarms.contains { $0.id == id }
+    }
+
+    // MARK: - Schedule builders
+
+    private func makeSchedule(hour: Int, minute: Int, weekdays: [Locale.Weekday]) throws -> Alarm.Schedule {
+        if weekdays.isEmpty {
+            // One-shot: fixed local Date at next HH:MM (avoids Relative.never ambiguity).
+            let next = try nextFixedDate(hour: hour, minute: minute)
+            return .fixed(next)
+        }
+        let time = Alarm.Schedule.Relative.Time(hour: hour, minute: minute)
+        return .relative(Alarm.Schedule.Relative(time: time, repeats: .weekly(weekdays)))
+    }
+
+    private func nextFixedDate(hour: Int, minute: Int, now: Date = Date()) throws -> Date {
+        var calendar = Calendar.current
+        calendar.timeZone = .current
+        var comps = calendar.dateComponents([.year, .month, .day], from: now)
+        comps.hour = hour
+        comps.minute = minute
+        comps.second = 0
+        comps.nanosecond = 0
+        guard var date = calendar.date(from: comps) else {
+            throw RankedAlarmError.invalidSchedule
+        }
+        // Must be strictly in the future — AlarmKit rejects past fixed dates.
+        if date.timeIntervalSince(now) < 5 {
+            guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: date) else {
+                throw RankedAlarmError.invalidSchedule
+            }
+            date = tomorrow
+        }
+        return date
+    }
+
+    private func makeAttributes(label: String, snoozeEnabled: Bool) -> AlarmAttributes<RankedGymAlarmMetadata> {
+        let title = LocalizedStringResource(stringLiteral: label)
+        let stop = AlarmButton(text: "Arrêter", textColor: .white, systemImageName: "stop.circle")
+        let tint = Color(red: 0.67, green: 0.70, blue: 0.73)
+
+        let alert: AlarmPresentation.Alert
+        let presentation: AlarmPresentation
+
+        if snoozeEnabled {
+            let snooze = AlarmButton(text: "Répéter", textColor: .white, systemImageName: "repeat")
+            if #available(iOS 26.1, *) {
+                alert = AlarmPresentation.Alert(
+                    title: title,
+                    secondaryButton: snooze,
+                    secondaryButtonBehavior: .countdown
+                )
+            } else {
+                alert = AlarmPresentation.Alert(
+                    title: title,
+                    stopButton: stop,
+                    secondaryButton: snooze,
+                    secondaryButtonBehavior: .countdown
+                )
+            }
+            // Full presentation — required so AlarmKit does not dismiss countdown alarms.
+            let pauseBtn = AlarmButton(text: "Pause", textColor: .white, systemImageName: "pause")
+            let resumeBtn = AlarmButton(text: "Reprendre", textColor: .white, systemImageName: "play")
+            let countdown = AlarmPresentation.Countdown(
+                title: LocalizedStringResource("Répéter"),
+                pauseButton: pauseBtn
+            )
+            let paused = AlarmPresentation.Paused(
+                title: LocalizedStringResource("En pause"),
+                resumeButton: resumeBtn
+            )
+            presentation = AlarmPresentation(alert: alert, countdown: countdown, paused: paused)
+        } else {
+            // Capawesome-style stop-only alert — rings without Live Activity countdown.
+            if #available(iOS 26.1, *) {
+                alert = AlarmPresentation.Alert(title: title)
+            } else {
+                alert = AlarmPresentation.Alert(title: title, stopButton: stop)
+            }
+            presentation = AlarmPresentation(alert: alert)
+        }
+
+        return AlarmAttributes(
+            presentation: presentation,
+            metadata: RankedGymAlarmMetadata(),
+            tintColor: tint
+        )
+    }
+
+    // MARK: - Auth / labels
+
     private func authorizeIfNeeded() async throws {
         switch manager.authorizationState {
         case .authorized:
@@ -161,7 +235,9 @@ final class RankedAlarmKit {
     }
 
     private func ensureUsageDescription() throws {
-        guard Bundle.main.object(forInfoDictionaryKey: "NSAlarmKitUsageDescription") is String else {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: "NSAlarmKitUsageDescription") as? String,
+              !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
             throw RankedAlarmError.missingUsageDescription
         }
     }
@@ -213,12 +289,16 @@ enum RankedAlarmError: LocalizedError {
     case permissionDenied
     case missingUsageDescription
     case invalidDay
+    case invalidSchedule
+    case notListedAfterSchedule
 
     var errorDescription: String? {
         switch self {
         case .permissionDenied: return "Permission AlarmKit refusée"
         case .missingUsageDescription: return "NSAlarmKitUsageDescription manquante"
         case .invalidDay: return "Jour de répétition invalide"
+        case .invalidSchedule: return "Horaires de réveil invalides"
+        case .notListedAfterSchedule: return "Réveil non confirmé par AlarmKit"
         }
     }
 }

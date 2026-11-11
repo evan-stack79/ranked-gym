@@ -55,6 +55,36 @@ describe('sleepAlarmSchedule', () => {
     expect(next.getTime()).toBeGreaterThan(now.getTime())
   })
 
+  it('one-shot (no days): same day if time is still ahead', () => {
+    const now = new Date(2026, 10, 11, 20, 0, 0) // Wed 20:00
+    const next = nextAlarmDate(21, 0, [], now)
+    expect(next.getFullYear()).toBe(2026)
+    expect(next.getMonth()).toBe(10)
+    expect(next.getDate()).toBe(11)
+    expect(next.getHours()).toBe(21)
+    expect(next.getMinutes()).toBe(0)
+  })
+
+  it('one-shot (no days): next day if time already passed or equal', () => {
+    const now = new Date(2026, 10, 11, 21, 0, 0)
+    const next = nextAlarmDate(21, 0, [], now)
+    expect(next.getDate()).toBe(12)
+    expect(next.getHours()).toBe(21)
+
+    const after = new Date(2026, 10, 11, 21, 1, 0)
+    const next2 = nextAlarmDate(21, 0, [], after)
+    expect(next2.getDate()).toBe(12)
+  })
+
+  it('weekday already passed today → next matching weekday', () => {
+    // Wednesday 21:01 — next Wednesday 21:00 is next week if only Wed selected
+    const now = new Date(2026, 10, 11, 21, 1, 0)
+    const next = nextAlarmDate(21, 0, [3], now)
+    expect(next.getDay()).toBe(3) // Wednesday
+    expect(next.getDate()).toBe(18)
+    expect(next.getHours()).toBe(21)
+  })
+
   it('snoozes by 9 minutes', () => {
     const from = new Date(2026, 10, 11, 7, 0, 0)
     const snoozed = snoozeFrom(from, 9)

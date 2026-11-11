@@ -13,6 +13,13 @@ import {
   type SleepFeelingLevel,
 } from '../../services/sleepStorage'
 import {
+  isSleepAlarmPlatformSupported,
+  readSleepAlarmUiStatus,
+  type SleepAlarmUiStatus,
+} from '../../services/sleepAlarmService'
+import { SLEEP_ALARM_CHANGED_EVENT } from '../../services/sleepAlarmStorage'
+import { SleepAlarmStatusBanner } from './SleepAlarmStatusBanner'
+import {
   durationPartsFromHours,
   formatClockHm,
   todayDateKey,
@@ -84,18 +91,33 @@ export function SleepNightSummaryCard({
   const [bedtime, setBedtime] = useState('23:00')
   const [waketime, setWaketime] = useState('07:00')
   const [error, setError] = useState<string | null>(null)
+  const [alarmStatus, setAlarmStatus] = useState<SleepAlarmUiStatus>({ kind: 'off' })
+  const showAlarmStatus = isSleepAlarmPlatformSupported()
 
   useEffect(() => {
     const sync = () => setTick((n) => n + 1)
     window.addEventListener(SLEEP_CHANGED_EVENT, sync)
+    window.addEventListener(SLEEP_ALARM_CHANGED_EVENT, sync)
     window.addEventListener('ranked-gym:backup-restored', sync)
     window.addEventListener('focus', sync)
     return () => {
       window.removeEventListener(SLEEP_CHANGED_EVENT, sync)
+      window.removeEventListener(SLEEP_ALARM_CHANGED_EVENT, sync)
       window.removeEventListener('ranked-gym:backup-restored', sync)
       window.removeEventListener('focus', sync)
     }
   }, [])
+
+  useEffect(() => {
+    if (!showAlarmStatus) return
+    let cancelled = false
+    void readSleepAlarmUiStatus().then((s) => {
+      if (!cancelled) setAlarmStatus(s)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [showAlarmStatus, tick])
 
   const dateKey = todayDateKey()
   const night = useMemo(() => getSleepNightByDateKey(dateKey), [tick, dateKey])
@@ -374,6 +396,12 @@ export function SleepNightSummaryCard({
         >
           {logged ? 'Modifier' : 'Noter'}
         </button>
+      ) : null}
+
+      {showAlarmStatus && alarmStatus.kind !== 'off' ? (
+        <div className="mt-3 border-t border-white/10 pt-3" data-sleep-alarm-under-night>
+          <SleepAlarmStatusBanner status={alarmStatus} compact />
+        </div>
       ) : null}
     </section>
   )

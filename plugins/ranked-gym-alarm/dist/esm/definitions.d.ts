@@ -81,6 +81,14 @@ export interface AlarmPlugin {
      * @since 0.1.0
      */
     requestPermissions(): Promise<PermissionStatus>;
+    /**
+     * Ranked Gym: open iOS app Settings (AlarmKit auth denied).
+     */
+    openAppSettings(): Promise<void>;
+    /**
+     * Ranked Gym: confirm an alarm id is still in AlarmManager.alarms.
+     */
+    verifyAlarm(options: { id: string }): Promise<{ present: boolean }>;
 }
 /**
  * @since 0.1.0

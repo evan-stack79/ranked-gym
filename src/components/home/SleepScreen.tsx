@@ -10,7 +10,10 @@ import {
   SLEEP_ALARM_CHANGED_EVENT,
   getSleepAlarmSettings,
 } from '../../services/sleepAlarmStorage'
-import { isSleepAlarmPlatformSupported } from '../../services/sleepAlarmService'
+import {
+  formatAlarmScheduledMessage,
+  isSleepAlarmPlatformSupported,
+} from '../../services/sleepAlarmService'
 import { formatClockHm } from '../../utils/sleepTimeFormat'
 import { formatRepeatSummary } from '../../utils/sleepAlarmSchedule'
 import { IosSheet } from '../ui/IosSheet'
@@ -118,7 +121,7 @@ export function SleepScreen({ open, onClose }: SleepScreenProps) {
                 <span className="block text-[15px] font-semibold text-white">Réveil</span>
                 <span className="mt-0.5 block text-[13px] text-[#ACB4BA]">
                   {alarm.enabled
-                    ? `${formatClockHm(alarm.timeHm)} · ${formatRepeatSummary(alarm.days)}`
+                    ? `${formatAlarmScheduledMessage(alarm.timeHm)} · ${formatRepeatSummary(alarm.days)}`
                     : 'Régler le réveil'}
                 </span>
               </span>

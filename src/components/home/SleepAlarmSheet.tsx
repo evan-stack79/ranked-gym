@@ -9,14 +9,19 @@ import {
   type SleepAlarmWeekday,
 } from '../../services/sleepAlarmStorage'
 import {
+  formatAlarmScheduledMessage,
   isSleepAlarmPlatformSupported,
+  readSleepAlarmUiStatus,
   resolveAlarmBackend,
   sleepAlarmFallbackHint,
+  syncFailureMessage,
   syncSleepAlarm,
+  type SleepAlarmUiStatus,
 } from '../../services/sleepAlarmService'
 import { formatRepeatSummary } from '../../utils/sleepAlarmSchedule'
 import { IosSheet } from '../ui/IosSheet'
 import type { AlarmBackend } from '../../utils/sleepAlarmSchedule'
+import { SleepAlarmStatusBanner } from './SleepAlarmStatusBanner'
 
 const BG = '#000000'
 const CARD = '#1C1C1E'
@@ -129,21 +134,41 @@ export function SleepAlarmSheet({ open, onClose }: SleepAlarmSheetProps) {
   const [backend, setBackend] = useState<AlarmBackend>('unavailable')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [status, setStatus] = useState<SleepAlarmUiStatus>({ kind: 'off' })
+  const [confirmMsg, setConfirmMsg] = useState<string | null>(null)
   const [labelEditing, setLabelEditing] = useState(false)
 
   useEffect(() => {
     if (!open) {
       setPane('main')
       setError(null)
+      setConfirmMsg(null)
       setLabelEditing(false)
       return
     }
     setDraft(getSleepAlarmSettings())
-    void resolveAlarmBackend().then(setBackend)
+    void (async () => {
+      const b = await resolveAlarmBackend()
+      setBackend(b)
+      // Premier réglage : demander AlarmKit dès l’ouverture si encore « prompt ».
+      if (b === 'alarmkit') {
+        try {
+          const mod = await import('@ranked-gym/capacitor-alarm')
+          const perm = await mod.Alarm.requestPermissions()
+          if (perm.alarms === 'denied') setStatus({ kind: 'permission' })
+        } catch (err) {
+          console.error('[sleep-alarm] requestPermissions on open', err)
+        }
+      }
+      setStatus(await readSleepAlarmUiStatus())
+    })()
   }, [open])
 
   useEffect(() => {
-    const sync = () => setDraft(getSleepAlarmSettings())
+    const sync = () => {
+      setDraft(getSleepAlarmSettings())
+      void readSleepAlarmUiStatus().then(setStatus)
+    }
     window.addEventListener(SLEEP_ALARM_CHANGED_EVENT, sync)
     return () => window.removeEventListener(SLEEP_ALARM_CHANGED_EVENT, sync)
   }, [])
@@ -159,17 +184,30 @@ export function SleepAlarmSheet({ open, onClose }: SleepAlarmSheetProps) {
   const onSave = async () => {
     setSaving(true)
     setError(null)
+    setConfirmMsg(null)
+    // Auth is requested inside syncSleepAlarm → scheduleAlarmKit (before schedule).
     const result = await syncSleepAlarm({ ...draft, enabled: true })
     setSaving(false)
     if (!result.ok) {
-      setError(
-        result.reason === 'PERMISSION_DENIED'
-          ? 'Autorise le réveil dans Réglages pour qu’il sonne.'
-          : 'Impossible d’enregistrer le réveil.',
-      )
+      const msg = syncFailureMessage(result.reason)
+      setError(msg)
+      if (result.reason === 'PERMISSION_DENIED') {
+        setStatus({ kind: 'permission' })
+      } else {
+        setStatus({ kind: 'error', message: msg })
+      }
       return
     }
-    onClose()
+    const timeHm = result.timeHm ?? draft.timeHm
+    const msg = formatAlarmScheduledMessage(timeHm)
+    setConfirmMsg(msg)
+    setStatus({
+      kind: 'scheduled',
+      timeHm,
+      summary: formatRepeatSummary(draft.days),
+    })
+    // Keep sheet open briefly so Evan sees the confirmation, then close.
+    window.setTimeout(() => onClose(), 700)
   }
 
   const onCancel = () => onClose()
@@ -319,7 +357,16 @@ export function SleepAlarmSheet({ open, onClose }: SleepAlarmSheetProps) {
                 {hint}
               </p>
             ) : null}
-            {error ? <p className="px-1 text-[13px] text-[#FF907F]">{error}</p> : null}
+            {confirmMsg ? (
+              <p className="px-1 text-[14px] font-medium text-white" data-sleep-alarm-confirm>
+                {confirmMsg}
+              </p>
+            ) : (
+              <SleepAlarmStatusBanner status={status} />
+            )}
+            {error && status.kind !== 'permission' ? (
+              <p className="px-1 text-[13px] text-[#FF907F]">{error}</p>
+            ) : null}
           </>
         ) : null}
 
