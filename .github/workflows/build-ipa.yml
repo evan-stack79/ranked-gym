@@ -130,13 +130,13 @@ jobs:
           grep -q 'jsName = "RankedAlarm"' "$RAP"
           grep -q 'consumePendingMorningPrompt' "$RAP"
 
-          echo "== RankedAlarm stopIntent + roar sound sources =="
+          echo "== RankedAlarm stopIntent + Petits oiseaux sound sources =="
           test -f ios/App/App/Plugins/RankedAlarm/RankedAlarmStopIntent.swift
           grep -q 'LiveActivityIntent' ios/App/App/Plugins/RankedAlarm/RankedAlarmStopIntent.swift
           grep -q 'openAppWhenRun' ios/App/App/Plugins/RankedAlarm/RankedAlarmStopIntent.swift
           grep -q 'stopIntent:' ios/App/App/Plugins/RankedAlarm/RankedAlarmKit.swift
-          grep -q 'RugissementRankedGym.caf' ios/App/App/Plugins/RankedAlarm/RankedAlarmKit.swift
-          test -f ios/App/App/Sounds/RugissementRankedGym.caf
+          grep -q 'PetitsOiseaux.caf' ios/App/App/Plugins/RankedAlarm/RankedAlarmKit.swift
+          test -f ios/App/App/Sounds/PetitsOiseaux.caf
           node scripts/check-alarm-sound-bundle.mjs
 
           echo "== Info.plist status bar ownership =="
@@ -318,23 +318,17 @@ jobs:
             exit 1
           fi
 
-          echo "== Alarm roar sound in App.app (Copy Bundle Resources) =="
-          SOUND_OK=0
-          for sound in RugissementRankedGym.caf RugissementRankedGym.wav; do
-            if [ -f "$APP_PATH/$sound" ]; then
-              echo "Found $sound ($(wc -c < "$APP_PATH/$sound") bytes)"
-              SOUND_OK=1
-            fi
-          done
-          if [ "$SOUND_OK" -ne 1 ]; then
-            echo "ERROR: RugissementRankedGym.(caf|wav) missing from $APP_PATH"
-            find "$APP_PATH" -iname '*Rugissement*' -print || true
+          echo "== Alarm Petits oiseaux sound in App.app (Copy Bundle Resources) =="
+          if [ ! -f "$APP_PATH/PetitsOiseaux.caf" ]; then
+            echo "ERROR: PetitsOiseaux.caf missing from $APP_PATH"
+            find "$APP_PATH" -iname '*PetitsOiseaux*' -o -iname '*Oiseaux*' -print || true
             ls -la "$APP_PATH" | head -80 || true
             exit 1
           fi
+          echo "Found PetitsOiseaux.caf ($(wc -c < "$APP_PATH/PetitsOiseaux.caf") bytes)"
           # pbxproj must list the sound in App Resources (not only on disk in repo).
           PBX="ios/App/App.xcodeproj/project.pbxproj"
-          grep -q 'RugissementRankedGym.caf in Resources' "$PBX"
+          grep -q 'PetitsOiseaux.caf in Resources' "$PBX"
           echo "Alarm sound bundle + pbxproj Resources OK"
           # StatusBar overlay plugin (safe-area / Dynamic Island full-bleed).
           if ! grep -qi 'StatusBar' "$STRINGS_DUMP"; then

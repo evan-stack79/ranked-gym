@@ -16,8 +16,8 @@
 		A1B200142FEA0701000D01B4 /* RankedAlarmStopIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B200132FEA0701000D01B3 /* RankedAlarmStopIntent.swift */; };
 		A1B200152FEA0701000D01B5 /* RankedAlarmStopIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B200132FEA0701000D01B3 /* RankedAlarmStopIntent.swift */; };
 		A1B200092FEA0601000D01A8 /* RankedAlarmLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B200082FEA0601000D01A7 /* RankedAlarmLiveActivity.swift */; };
-		A1B2000C2FEA0601000D01AB /* RugissementRankedGym.caf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2000B2FEA0601000D01AA /* RugissementRankedGym.caf */; };
-		A1B2000E2FEA0601000D01AD /* RugissementRankedGym.wav in Resources */ = {isa = PBXBuildFile; fileRef = A1B2000D2FEA0601000D01AC /* RugissementRankedGym.wav */; };
+		A1B2000C2FEA0601000D01AB /* PetitsOiseaux.caf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2000B2FEA0601000D01AA /* PetitsOiseaux.caf */; };
+		A1B2000E2FEA0601000D01AD /* PetitsOiseaux.wav in Resources */ = {isa = PBXBuildFile; fileRef = A1B2000D2FEA0601000D01AC /* PetitsOiseaux.wav */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
@@ -69,8 +69,8 @@
 		A1B200102FEA0701000D01B0 /* RankedAlarmPendingMorning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankedAlarmPendingMorning.swift; sourceTree = "<group>"; };
 		A1B200132FEA0701000D01B3 /* RankedAlarmStopIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankedAlarmStopIntent.swift; sourceTree = "<group>"; };
 		A1B200082FEA0601000D01A7 /* RankedAlarmLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankedAlarmLiveActivity.swift; sourceTree = "<group>"; };
-		A1B2000B2FEA0601000D01AA /* RugissementRankedGym.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = RugissementRankedGym.caf; sourceTree = "<group>"; };
-		A1B2000D2FEA0601000D01AC /* RugissementRankedGym.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = RugissementRankedGym.wav; sourceTree = "<group>"; };
+		A1B2000B2FEA0601000D01AA /* PetitsOiseaux.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = PetitsOiseaux.caf; sourceTree = "<group>"; };
+		A1B2000D2FEA0601000D01AC /* PetitsOiseaux.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = PetitsOiseaux.wav; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -127,8 +127,8 @@
 		A1B2000F2FEA0601000D01AE /* Sounds */ = {
 			isa = PBXGroup;
 			children = (
-				A1B2000B2FEA0601000D01AA /* RugissementRankedGym.caf */,
-				A1B2000D2FEA0601000D01AC /* RugissementRankedGym.wav */,
+				A1B2000B2FEA0601000D01AA /* PetitsOiseaux.caf */,
+				A1B2000D2FEA0601000D01AC /* PetitsOiseaux.wav */,
 			);
 			path = Sounds;
 			sourceTree = "<group>";
@@ -291,8 +291,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A1B2000C2FEA0601000D01AB /* RugissementRankedGym.caf in Resources */,
-				A1B2000E2FEA0601000D01AD /* RugissementRankedGym.wav in Resources */,
+				A1B2000C2FEA0601000D01AB /* PetitsOiseaux.caf in Resources */,
+				A1B2000E2FEA0601000D01AD /* PetitsOiseaux.wav in Resources */,
 				504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */,
 				50B271D11FEDC1A000F3C39B /* public in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,

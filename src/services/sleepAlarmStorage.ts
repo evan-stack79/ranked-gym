@@ -10,10 +10,10 @@ import { getSleepSchedule } from './sleepStorage'
 export const SLEEP_ALARM_STORAGE_BASE = 'ranked-gym:sleep-alarm'
 export const SLEEP_ALARM_CHANGED_EVENT = 'ranked-gym:sleep-alarm-changed'
 
-export const SLEEP_ALARM_SOUND_ID = 'rugissement_ranked_gym' as const
-export const SLEEP_ALARM_SOUND_LABEL = 'Rugissement Ranked Gym'
+export const SLEEP_ALARM_SOUND_ID = 'petits_oiseaux' as const
+export const SLEEP_ALARM_SOUND_LABEL = 'Petits oiseaux'
 /** Exact bundle resource name (with extension) for AlarmKit AlertSound.named */
-export const SLEEP_ALARM_SOUND_FILE = 'RugissementRankedGym.caf'
+export const SLEEP_ALARM_SOUND_FILE = 'PetitsOiseaux.caf'
 export const SLEEP_ALARM_SNOOZE_MINUTES = 9
 
 /** ISO weekday: 1=lundi … 7=dimanche (aligné UX FR). */

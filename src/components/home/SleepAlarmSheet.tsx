@@ -393,7 +393,7 @@ export function SleepAlarmSheet({
           <div className="overflow-hidden rounded-2xl" style={{ backgroundColor: CARD }}>
             <button
               type="button"
-              onClick={() => setDraft((d) => ({ ...d, soundId: 'rugissement_ranked_gym' }))}
+              onClick={() => setDraft((d) => ({ ...d, soundId: 'petits_oiseaux' }))}
               className="ios-press flex w-full items-start justify-between gap-3 px-4 py-3.5 text-left"
             >
               <span>

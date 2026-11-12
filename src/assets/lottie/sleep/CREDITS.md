@@ -13,3 +13,9 @@ Original licences: Lottie Simple License (commercial OK, attribution optional) u
 | `success-checkmark.json` | Success Checkmark | Pipzen Motion | https://lottiefiles.com/free-animation/success-checkmark-jN6a1IDXvg |
 | `moon.json` | Moon | useAnimations | https://useanimations.com/icons/moon.json (MIT) |
 | `sunrise.json` | Sunrise | useAnimations | https://useanimations.com/icons/sunrise.json (MIT) |
+
+## Alarm sound
+
+| File | Title | Source | Licence |
+| --- | --- | --- | --- |
+| `ios/App/App/Sounds/PetitsOiseaux.caf` | Petits oiseaux (from Mixkit « Little birds singing in the trees », id 17) | https://assets.mixkit.co/active_storage/sfx/17/17.wav | Mixkit Sound Effects Free License (commercial OK, attribution optional) |

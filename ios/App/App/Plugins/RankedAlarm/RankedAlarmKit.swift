@@ -11,11 +11,11 @@ import SwiftUI
  * Evan IPA 870b206 (iPhone) — alarm rings, but:
  *  1) Arrêter must open app → morning « Tu as bien dormi ? » (stopIntent LiveActivityIntent)
  *  2) Répéter requires snooze presentation + postAlert countdown (test was snooze-off)
- *  3) Custom roar needs exact bundle filename with extension for AlertSound.named
+ *  3) Custom sound needs exact bundle filename with extension for AlertSound.named
  */
 @available(iOS 26.0, *)
 final class RankedAlarmKit {
-    static let defaultSoundFileName = "RugissementRankedGym.caf"
+    static let defaultSoundFileName = "PetitsOiseaux.caf"
 
     struct Diagnostics {
         let authorization: String
@@ -229,8 +229,8 @@ final class RankedAlarmKit {
         }
         candidates.append(contentsOf: [
             defaultSoundFileName,
-            "RugissementRankedGym.wav",
-            "RugissementRankedGym",
+            "PetitsOiseaux.wav",
+            "PetitsOiseaux",
         ])
         for name in candidates {
             if bundleContainsSound(name) {
