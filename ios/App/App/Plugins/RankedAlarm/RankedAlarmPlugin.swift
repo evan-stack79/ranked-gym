@@ -22,6 +22,7 @@ public class RankedAlarmPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "requestPermissions", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "scheduleTestInOneMinute", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "verifyAlarm", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "consumePendingMorningPrompt", returnType: CAPPluginReturnPromise),
     ]
 
     private var implementation: Any?
@@ -72,6 +73,8 @@ public class RankedAlarmPlugin: CAPPlugin, CAPBridgedPlugin {
                     "alarmCount": diag.alarmCount,
                     "lastError": diag.lastError as Any,
                     "hasUsageDescription": diag.hasUsageDescription,
+                    "soundInBundle": diag.soundInBundle,
+                    "soundResolvedName": diag.soundResolvedName,
                 ])
             } catch {
                 call.resolve([
@@ -82,6 +85,8 @@ public class RankedAlarmPlugin: CAPPlugin, CAPBridgedPlugin {
                     "alarmCount": 0,
                     "lastError": error.localizedDescription,
                     "hasUsageDescription": Bundle.main.object(forInfoDictionaryKey: "NSAlarmKitUsageDescription") is String,
+                    "soundInBundle": false,
+                    "soundResolvedName": RankedAlarmKit.defaultSoundFileName,
                 ])
             }
             return
@@ -94,7 +99,22 @@ public class RankedAlarmPlugin: CAPPlugin, CAPBridgedPlugin {
             "alarmCount": 0,
             "lastError": "AlarmKit requires iOS 26+",
             "hasUsageDescription": Bundle.main.object(forInfoDictionaryKey: "NSAlarmKitUsageDescription") is String,
+            "soundInBundle": false,
+            "soundResolvedName": "",
         ])
+    }
+
+    /// One-shot after Arrêter (stopIntent) — JS opens « Tu as bien dormi ? ».
+    @objc func consumePendingMorningPrompt(_ call: CAPPluginCall) {
+        if let raw = RankedAlarmPendingMorning.consume() {
+            call.resolve([
+                "pending": true,
+                "alarmID": raw["alarmID"] as? String ?? "",
+                "at": raw["at"] as? Double ?? 0,
+            ])
+        } else {
+            call.resolve(["pending": false])
+        }
     }
 
     @objc func scheduleTestInOneMinute(_ call: CAPPluginCall) {

@@ -128,6 +128,16 @@ jobs:
           RAP="ios/App/App/Plugins/RankedAlarm/RankedAlarmPlugin.swift"
           test -f "$RAP"
           grep -q 'jsName = "RankedAlarm"' "$RAP"
+          grep -q 'consumePendingMorningPrompt' "$RAP"
+
+          echo "== RankedAlarm stopIntent + roar sound sources =="
+          test -f ios/App/App/Plugins/RankedAlarm/RankedAlarmStopIntent.swift
+          grep -q 'LiveActivityIntent' ios/App/App/Plugins/RankedAlarm/RankedAlarmStopIntent.swift
+          grep -q 'openAppWhenRun' ios/App/App/Plugins/RankedAlarm/RankedAlarmStopIntent.swift
+          grep -q 'stopIntent:' ios/App/App/Plugins/RankedAlarm/RankedAlarmKit.swift
+          grep -q 'RugissementRankedGym.caf' ios/App/App/Plugins/RankedAlarm/RankedAlarmKit.swift
+          test -f ios/App/App/Sounds/RugissementRankedGym.caf
+          node scripts/check-alarm-sound-bundle.mjs
 
           echo "== Info.plist status bar ownership =="
           PLIST="ios/App/App/Info.plist"
@@ -303,6 +313,29 @@ jobs:
             echo "ERROR: RankedAlarmPlugin missing from App binary — AlarmKit bridge not linked"
             exit 1
           fi
+          if ! grep -q 'RankedAlarmStopIntent' "$STRINGS_DUMP"; then
+            echo "ERROR: RankedAlarmStopIntent missing — Arrêter will not open the app"
+            exit 1
+          fi
+
+          echo "== Alarm roar sound in App.app (Copy Bundle Resources) =="
+          SOUND_OK=0
+          for sound in RugissementRankedGym.caf RugissementRankedGym.wav; do
+            if [ -f "$APP_PATH/$sound" ]; then
+              echo "Found $sound ($(wc -c < "$APP_PATH/$sound") bytes)"
+              SOUND_OK=1
+            fi
+          done
+          if [ "$SOUND_OK" -ne 1 ]; then
+            echo "ERROR: RugissementRankedGym.(caf|wav) missing from $APP_PATH"
+            find "$APP_PATH" -iname '*Rugissement*' -print || true
+            ls -la "$APP_PATH" | head -80 || true
+            exit 1
+          fi
+          # pbxproj must list the sound in App Resources (not only on disk in repo).
+          PBX="ios/App/App.xcodeproj/project.pbxproj"
+          grep -q 'RugissementRankedGym.caf in Resources' "$PBX"
+          echo "Alarm sound bundle + pbxproj Resources OK"
           # StatusBar overlay plugin (safe-area / Dynamic Island full-bleed).
           if ! grep -qi 'StatusBar' "$STRINGS_DUMP"; then
             echo "ERROR: StatusBar symbols missing from App binary — overlaysWebView will not apply"

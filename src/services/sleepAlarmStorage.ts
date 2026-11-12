@@ -12,7 +12,8 @@ export const SLEEP_ALARM_CHANGED_EVENT = 'ranked-gym:sleep-alarm-changed'
 
 export const SLEEP_ALARM_SOUND_ID = 'rugissement_ranked_gym' as const
 export const SLEEP_ALARM_SOUND_LABEL = 'Rugissement Ranked Gym'
-export const SLEEP_ALARM_SOUND_FILE = 'RugissementRankedGym'
+/** Exact bundle resource name (with extension) for AlarmKit AlertSound.named */
+export const SLEEP_ALARM_SOUND_FILE = 'RugissementRankedGym.caf'
 export const SLEEP_ALARM_SNOOZE_MINUTES = 9
 
 /** ISO weekday: 1=lundi … 7=dimanche (aligné UX FR). */

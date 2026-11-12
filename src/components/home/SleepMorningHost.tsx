@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { planMorningAutoLog } from '../../utils/sleepAutoLog'
-import { todayDateKey } from '../../utils/sleepTimeFormat'
+import { todayDateKey, minutesToHm } from '../../utils/sleepTimeFormat'
 import {
   getMorningPromptDateKey,
   getSleepNightByDateKey,
@@ -12,15 +12,55 @@ import {
   type SleepNightEntry,
 } from '../../services/sleepStorage'
 import { handleSleepAlarmNotificationAction } from '../../services/sleepAlarmService'
+import {
+  isRankedAlarmPluginAvailable,
+  RankedAlarm,
+} from '../../native/rankedAlarm'
 import { MorningSleepModal } from './MorningSleepModal'
 
 /**
  * Au 1er passage Accueil le matin (04–12 h) : auto-log + modal ressenti.
- * Une fois par jour max. Données locales.
+ * Aussi après Arrêter AlarmKit (stopIntent → pending flag), cold launch inclus.
  */
 export function SleepMorningHost() {
   const [open, setOpen] = useState(false)
   const [night, setNight] = useState<SleepNightEntry | null>(null)
+
+  const openMorningForNight = useCallback((entry: SleepNightEntry) => {
+    markMorningPromptShown(entry.dateKey)
+    setNight(entry)
+    setOpen(true)
+  }, [])
+
+  /** Force path after AlarmKit stop — works outside 04–12 (ex. Tester 1 min). */
+  const openFromAlarmStop = useCallback(async (): Promise<boolean> => {
+    if (!isRankedAlarmPluginAvailable()) return false
+    try {
+      const pending = await RankedAlarm.consumePendingMorningPrompt()
+      if (!pending.pending) return false
+      const now = new Date()
+      const dateKey = todayDateKey(now)
+      const schedule = getSleepSchedule()
+      const openHm = minutesToHm(now.getHours() * 60 + now.getMinutes()) ?? '07:00'
+      const bedtime = schedule?.bedtime ?? '23:00'
+      const waketime = schedule?.waketime ?? openHm
+      let entry = getSleepNightByDateKey(dateKey)
+      if (!entry) {
+        entry = saveSleepNight({
+          dateKey,
+          bedtime,
+          waketime,
+          tstHours: null,
+          source: 'auto',
+        })
+      }
+      if (!entry) return false
+      openMorningForNight(entry)
+      return true
+    } catch {
+      return false
+    }
+  }, [openMorningForNight])
 
   const evaluate = useCallback(() => {
     const now = new Date()
@@ -41,22 +81,41 @@ export function SleepMorningHost() {
       tstHours: null,
       source: 'auto',
     })
-    markMorningPromptShown(plan.dateKey)
     if (!saved) return
-    setNight(saved)
-    setOpen(true)
-  }, [])
+    openMorningForNight(saved)
+  }, [openMorningForNight])
 
   useEffect(() => {
-    evaluate()
-    const onFocus = () => evaluate()
+    void (async () => {
+      const fromStop = await openFromAlarmStop()
+      if (!fromStop) evaluate()
+    })()
+    const onFocus = () => {
+      void (async () => {
+        const fromStop = await openFromAlarmStop()
+        if (!fromStop) evaluate()
+      })()
+    }
     window.addEventListener('focus', onFocus)
     window.addEventListener(SLEEP_CHANGED_EVENT, onFocus)
     return () => {
       window.removeEventListener('focus', onFocus)
       window.removeEventListener(SLEEP_CHANGED_EVENT, onFocus)
     }
-  }, [evaluate])
+  }, [evaluate, openFromAlarmStop])
+
+  // Resume after stopIntent opened / foregrounded the app (no @capacitor/app dep).
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void openFromAlarmStop()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('pageshow', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('pageshow', onVisible)
+    }
+  }, [openFromAlarmStop])
 
   // iOS < 26 : actions Répéter / Arrêter de la notif locale réveil.
   useEffect(() => {
@@ -73,7 +132,6 @@ export function SleepMorningHost() {
             const kind = (event.notification.extra as { kind?: string } | undefined)?.kind
             if (kind !== 'sleep-alarm' && kind !== 'sleep-alarm-snooze') return
             void handleSleepAlarmNotificationAction(actionId)
-            // Arrêter → la modal « Tu as bien dormi ? » s’affiche via evaluate() au focus.
             if (actionId === 'SLEEP_ALARM_STOP') evaluate()
           },
         )

@@ -11,6 +11,10 @@
 		A1B200032FEA0601000D01A2 /* RankedGymAlarmMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B200012FEA0601000D01A0 /* RankedGymAlarmMetadata.swift */; };
 		A1B200052FEA0601000D01A4 /* RankedAlarmPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B200042FEA0601000D01A3 /* RankedAlarmPlugin.swift */; };
 		A1B200072FEA0601000D01A6 /* RankedAlarmKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B200062FEA0601000D01A5 /* RankedAlarmKit.swift */; };
+		A1B200112FEA0701000D01B1 /* RankedAlarmPendingMorning.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B200102FEA0701000D01B0 /* RankedAlarmPendingMorning.swift */; };
+		A1B200122FEA0701000D01B2 /* RankedAlarmPendingMorning.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B200102FEA0701000D01B0 /* RankedAlarmPendingMorning.swift */; };
+		A1B200142FEA0701000D01B4 /* RankedAlarmStopIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B200132FEA0701000D01B3 /* RankedAlarmStopIntent.swift */; };
+		A1B200152FEA0701000D01B5 /* RankedAlarmStopIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B200132FEA0701000D01B3 /* RankedAlarmStopIntent.swift */; };
 		A1B200092FEA0601000D01A8 /* RankedAlarmLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B200082FEA0601000D01A7 /* RankedAlarmLiveActivity.swift */; };
 		A1B2000C2FEA0601000D01AB /* RugissementRankedGym.caf in Resources */ = {isa = PBXBuildFile; fileRef = A1B2000B2FEA0601000D01AA /* RugissementRankedGym.caf */; };
 		A1B2000E2FEA0601000D01AD /* RugissementRankedGym.wav in Resources */ = {isa = PBXBuildFile; fileRef = A1B2000D2FEA0601000D01AC /* RugissementRankedGym.wav */; };
@@ -62,6 +66,8 @@
 		A1B200012FEA0601000D01A0 /* RankedGymAlarmMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankedGymAlarmMetadata.swift; sourceTree = "<group>"; };
 		A1B200042FEA0601000D01A3 /* RankedAlarmPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankedAlarmPlugin.swift; sourceTree = "<group>"; };
 		A1B200062FEA0601000D01A5 /* RankedAlarmKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankedAlarmKit.swift; sourceTree = "<group>"; };
+		A1B200102FEA0701000D01B0 /* RankedAlarmPendingMorning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankedAlarmPendingMorning.swift; sourceTree = "<group>"; };
+		A1B200132FEA0701000D01B3 /* RankedAlarmStopIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankedAlarmStopIntent.swift; sourceTree = "<group>"; };
 		A1B200082FEA0601000D01A7 /* RankedAlarmLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankedAlarmLiveActivity.swift; sourceTree = "<group>"; };
 		A1B2000B2FEA0601000D01AA /* RugissementRankedGym.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = RugissementRankedGym.caf; sourceTree = "<group>"; };
 		A1B2000D2FEA0601000D01AC /* RugissementRankedGym.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = RugissementRankedGym.wav; sourceTree = "<group>"; };
@@ -112,6 +118,8 @@
 				A1B200012FEA0601000D01A0 /* RankedGymAlarmMetadata.swift */,
 				A1B200042FEA0601000D01A3 /* RankedAlarmPlugin.swift */,
 				A1B200062FEA0601000D01A5 /* RankedAlarmKit.swift */,
+				A1B200102FEA0701000D01B0 /* RankedAlarmPendingMorning.swift */,
+				A1B200132FEA0701000D01B3 /* RankedAlarmStopIntent.swift */,
 			);
 			path = RankedAlarm;
 			sourceTree = "<group>";
@@ -317,6 +325,8 @@
 				A1B200022FEA0601000D01A1 /* RankedGymAlarmMetadata.swift in Sources */,
 				A1B200052FEA0601000D01A4 /* RankedAlarmPlugin.swift in Sources */,
 				A1B200072FEA0601000D01A6 /* RankedAlarmKit.swift in Sources */,
+				A1B200112FEA0701000D01B1 /* RankedAlarmPendingMorning.swift in Sources */,
+				A1B200142FEA0701000D01B4 /* RankedAlarmStopIntent.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 				8E4A1C2B2FE993A80072D4E8 /* RankedPalette.swift in Sources */,
 			);
@@ -329,6 +339,8 @@
 				C1A100052FEA0401000C02A5 /* RestTimerAttributes.swift in Sources */,
 				C1A100072FEA0401000C02A7 /* RestTimerLiveActivityWidget.swift in Sources */,
 				A1B200032FEA0601000D01A2 /* RankedGymAlarmMetadata.swift in Sources */,
+				A1B200122FEA0701000D01B2 /* RankedAlarmPendingMorning.swift in Sources */,
+				A1B200152FEA0701000D01B5 /* RankedAlarmStopIntent.swift in Sources */,
 				A1B200092FEA0601000D01A8 /* RankedAlarmLiveActivity.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

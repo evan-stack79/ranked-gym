@@ -15,6 +15,8 @@ export type RankedAlarmDiagnostics = {
   alarmCount: number
   lastError: string | null
   hasUsageDescription: boolean
+  soundInBundle?: boolean
+  soundResolvedName?: string
 }
 
 export type RankedAlarmNative = {
@@ -36,6 +38,12 @@ export type RankedAlarmNative = {
   openAppSettings: () => Promise<void>
   getDiagnostics: () => Promise<RankedAlarmDiagnostics>
   scheduleTestInOneMinute: () => Promise<{ id: string; secondsFromNow: number }>
+  /** After AlarmKit Arrêter (stopIntent) — one-shot pending morning modal. */
+  consumePendingMorningPrompt: () => Promise<{
+    pending: boolean
+    alarmID?: string
+    at?: number
+  }>
 }
 
 const RankedAlarmWeb: RankedAlarmNative = {
@@ -72,6 +80,9 @@ const RankedAlarmWeb: RankedAlarmNative = {
   },
   async scheduleTestInOneMinute() {
     throw new Error('RankedAlarm web stub — native plugin missing')
+  },
+  async consumePendingMorningPrompt() {
+    return { pending: false }
   },
 }
 

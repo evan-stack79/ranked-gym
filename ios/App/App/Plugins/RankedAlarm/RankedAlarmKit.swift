@@ -1,5 +1,6 @@
 import ActivityKit
 import AlarmKit
+import AppIntents
 import Capacitor
 import Foundation
 import SwiftUI
@@ -7,23 +8,22 @@ import SwiftUI
 /**
  * AlarmKit scheduler — fork lineage: @capawesome/capacitor-alarm (MIT).
  *
- * Root-cause fix (Evan IPA f1a9516, iPhone 17 / iOS 26, silence à l’heure) :
- * Apple : if an alarm supports a *countdown presentation* but the Live Activity
- * cannot present, “the system may unexpectedly dismiss alarms and fail to alert”.
- * We therefore:
- *  1) Always build a stop-only alert that can ring without countdown UI.
- *  2) Only attach postAlert countdown / Répéter when snooze is on, with a full
- *     AlarmPresentation (alert + countdown + paused) matching the widget.
- *  3) Prefer `.fixed(Date)` for one-shot (no days) so “next HH:MM” is unambiguous.
- *  4) Re-read AlarmManager.alarms after schedule and fail if the id is missing.
+ * Evan IPA 870b206 (iPhone) — alarm rings, but:
+ *  1) Arrêter must open app → morning « Tu as bien dormi ? » (stopIntent LiveActivityIntent)
+ *  2) Répéter requires snooze presentation + postAlert countdown (test was snooze-off)
+ *  3) Custom roar needs exact bundle filename with extension for AlertSound.named
  */
 @available(iOS 26.0, *)
 final class RankedAlarmKit {
+    static let defaultSoundFileName = "RugissementRankedGym.caf"
+
     struct Diagnostics {
         let authorization: String
         let alarmCount: Int
         let lastError: String?
         let hasUsageDescription: Bool
+        let soundInBundle: Bool
+        let soundResolvedName: String
     }
 
     private let manager = AlarmManager.shared
@@ -51,11 +51,14 @@ final class RankedAlarmKit {
 
     func diagnostics() throws -> Diagnostics {
         let usage = Bundle.main.object(forInfoDictionaryKey: "NSAlarmKitUsageDescription") as? String
+        let resolved = Self.resolveBundledSoundName(preferred: Self.defaultSoundFileName)
         return Diagnostics(
             authorization: rawAuthorization(),
             alarmCount: try manager.alarms.count,
             lastError: lastError,
-            hasUsageDescription: !(usage ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            hasUsageDescription: !(usage ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            soundInBundle: Self.bundleContainsSound(resolved),
+            soundResolvedName: resolved
         )
     }
 
@@ -86,21 +89,22 @@ final class RankedAlarmKit {
         }
     }
 
-    /// Beta: one-shot fixed alarm in N seconds (always rings path, snooze off).
+    /// Beta: one-shot fixed alarm — always includes Répéter (9 min) + stopIntent.
     func scheduleFixedTest(secondsFromNow: Int) async throws -> String {
         try await authorizeIfNeeded()
         let fire = Date().addingTimeInterval(TimeInterval(max(15, secondsFromNow)))
-        let attributes = makeAttributes(label: "Test Ranked Gym", snoozeEnabled: false)
-        let sound: AlertConfiguration.AlertSound = .named("RugissementRankedGym")
+        let id = UUID()
+        let attributes = makeAttributes(label: "Test Ranked Gym", snoozeEnabled: true)
+        let sound = makeAlertSound(named: Self.defaultSoundFileName)
+        let snoozeSeconds = TimeInterval(9 * 60)
         let configuration = AlarmManager.AlarmConfiguration<RankedGymAlarmMetadata>(
-            countdownDuration: nil,
+            countdownDuration: Alarm.CountdownDuration(preAlert: nil, postAlert: snoozeSeconds),
             schedule: .fixed(fire),
             attributes: attributes,
-            stopIntent: nil,
+            stopIntent: RankedAlarmStopIntent(alarmID: id.uuidString),
             secondaryIntent: nil,
             sound: sound
         )
-        let id = UUID()
         do {
             _ = try await manager.schedule(id: id, configuration: configuration)
             setLabel("Test Ranked Gym", for: id)
@@ -148,12 +152,7 @@ final class RankedAlarmKit {
             label: label,
             snoozeEnabled: snoozeEnabled
         )
-        let sound: AlertConfiguration.AlertSound = {
-            if let soundName, !soundName.isEmpty {
-                return .named(soundName)
-            }
-            return .default
-        }()
+        let sound = makeAlertSound(named: soundName)
 
         let countdownDuration: Alarm.CountdownDuration?
         if snoozeEnabled {
@@ -163,16 +162,16 @@ final class RankedAlarmKit {
             countdownDuration = nil
         }
 
+        let id = UUID()
         let configuration = AlarmManager.AlarmConfiguration<RankedGymAlarmMetadata>(
             countdownDuration: countdownDuration,
             schedule: schedule,
             attributes: attributes,
-            stopIntent: nil,
+            stopIntent: RankedAlarmStopIntent(alarmID: id.uuidString),
             secondaryIntent: nil,
             sound: sound
         )
 
-        let id = UUID()
         do {
             _ = try await manager.schedule(id: id, configuration: configuration)
             setLabel(label, for: id)
@@ -208,11 +207,59 @@ final class RankedAlarmKit {
         try manager.alarms.contains { $0.id == id }
     }
 
+    // MARK: - Sound
+
+    func makeAlertSound(named preferred: String?) -> AlertConfiguration.AlertSound {
+        let resolved = Self.resolveBundledSoundName(preferred: preferred)
+        if !Self.bundleContainsSound(resolved) {
+            lastError = "sound missing in bundle: \(resolved)"
+        }
+        return .named(resolved)
+    }
+
+    static func resolveBundledSoundName(preferred: String?) -> String {
+        var candidates: [String] = []
+        if let preferred, !preferred.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let trimmed = preferred.trimmingCharacters(in: .whitespacesAndNewlines)
+            candidates.append(trimmed)
+            if !trimmed.contains(".") {
+                candidates.append("\(trimmed).caf")
+                candidates.append("\(trimmed).wav")
+            }
+        }
+        candidates.append(contentsOf: [
+            defaultSoundFileName,
+            "RugissementRankedGym.wav",
+            "RugissementRankedGym",
+        ])
+        for name in candidates {
+            if bundleContainsSound(name) {
+                return name.contains(".") ? name : "\(name).caf"
+            }
+        }
+        return defaultSoundFileName
+    }
+
+    static func bundleContainsSound(_ fileName: String) -> Bool {
+        let ns = fileName as NSString
+        let ext = ns.pathExtension
+        let base = ns.deletingPathExtension
+        if !ext.isEmpty, Bundle.main.url(forResource: base, withExtension: ext) != nil {
+            return true
+        }
+        if Bundle.main.url(forResource: fileName, withExtension: nil) != nil {
+            return true
+        }
+        if Bundle.main.path(forResource: base, ofType: ext.isEmpty ? "caf" : ext) != nil {
+            return true
+        }
+        return false
+    }
+
     // MARK: - Schedule builders
 
     private func makeSchedule(hour: Int, minute: Int, weekdays: [Locale.Weekday]) throws -> Alarm.Schedule {
         if weekdays.isEmpty {
-            // One-shot: fixed local Date at next HH:MM (avoids Relative.never ambiguity).
             let next = try nextFixedDate(hour: hour, minute: minute)
             return .fixed(next)
         }
@@ -231,7 +278,6 @@ final class RankedAlarmKit {
         guard var date = calendar.date(from: comps) else {
             throw RankedAlarmError.invalidSchedule
         }
-        // Must be strictly in the future — AlarmKit rejects past fixed dates.
         if date.timeIntervalSince(now) < 5 {
             guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: date) else {
                 throw RankedAlarmError.invalidSchedule
@@ -251,6 +297,8 @@ final class RankedAlarmKit {
 
         if snoozeEnabled {
             let snooze = AlarmButton(text: "Répéter", textColor: .white, systemImageName: "repeat")
+            // iOS 26.1+ : stopButton param deprecated — system provides Arrêter;
+            // secondaryButton + .countdown shows Répéter with postAlert duration.
             if #available(iOS 26.1, *) {
                 alert = AlarmPresentation.Alert(
                     title: title,
@@ -265,7 +313,6 @@ final class RankedAlarmKit {
                     secondaryButtonBehavior: .countdown
                 )
             }
-            // Full presentation — required so AlarmKit does not dismiss countdown alarms.
             let pauseBtn = AlarmButton(text: "Pause", textColor: .white, systemImageName: "pause")
             let resumeBtn = AlarmButton(text: "Reprendre", textColor: .white, systemImageName: "play")
             let countdown = AlarmPresentation.Countdown(
@@ -278,7 +325,6 @@ final class RankedAlarmKit {
             )
             presentation = AlarmPresentation(alert: alert, countdown: countdown, paused: paused)
         } else {
-            // Capawesome-style stop-only alert — rings without Live Activity countdown.
             if #available(iOS 26.1, *) {
                 alert = AlarmPresentation.Alert(title: title)
             } else {

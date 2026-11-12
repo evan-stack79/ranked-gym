@@ -66,6 +66,7 @@ export function SleepAlarmDiagBlock({ expanded, open }: SleepAlarmDiagBlockProps
         `AlarmKit: ${yn(diag.alarmKitAvailable)}`,
         `auth: ${diag.authorization}`,
         `alarmes: ${diag.alarmCount}`,
+        `son: ${diag.soundResolvedName ?? '—'} (${yn(Boolean(diag.soundInBundle))})`,
         `erreur: ${diag.lastError ?? '—'}`,
       ]
     : ['diagnostic…']
