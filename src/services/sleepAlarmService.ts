@@ -118,7 +118,7 @@ async function scheduleLocalFallback(settings: SleepAlarmSettings): Promise<void
   if (perm.display !== 'granted') throw new Error('PERMISSION_DENIED')
   await ensureNotifActions(mod, settings.snoozeEnabled)
   const sound =
-    settings.soundId === SLEEP_ALARM_SOUND_ID ? SLEEP_ALARM_SOUND_FILE.replace(/\.caf$/i, '.wav') : undefined
+    settings.soundId === SLEEP_ALARM_SOUND_ID ? SLEEP_ALARM_SOUND_FILE : undefined
   const base = {
     title: settings.label || 'Réveil',
     body: 'Ranked Gym',
@@ -241,7 +241,7 @@ export async function handleSleepAlarmNotificationAction(actionId: string): Prom
     if (!mod) return
     const at = snoozeFrom(new Date(), settings.snoozeMinutes || SLEEP_ALARM_SNOOZE_MINUTES)
     const sound =
-      settings.soundId === SLEEP_ALARM_SOUND_ID ? SLEEP_ALARM_SOUND_FILE.replace(/\.caf$/i, '.wav') : undefined
+      settings.soundId === SLEEP_ALARM_SOUND_ID ? SLEEP_ALARM_SOUND_FILE : undefined
     await mod.LocalNotifications.schedule({
       notifications: [
         {

@@ -12,6 +12,12 @@ import SwiftUI
  *  1) Arrêter must open app → morning « Tu as bien dormi ? » (stopIntent LiveActivityIntent)
  *  2) Répéter requires snooze presentation + postAlert countdown (test was snooze-off)
  *  3) Custom sound needs exact bundle filename with extension for AlertSound.named
+ *
+ * Sound looping: AlarmKit has no loop API (WWDC25-230). Apple forum 797172 said
+ * keep custom alert sounds under ~30 s; early betas often played once. Device
+ * evidence on iOS 26.6.1 shows a ~44 s bundled CAF plays fully and loops until
+ * Arrêter/Répéter (donminzzi report). We ship a seamless ~44 s PCM CAF so the
+ * alert stays audible even when the OS does not loop a short clip.
  */
 @available(iOS 26.0, *)
 final class RankedAlarmKit {
@@ -229,7 +235,6 @@ final class RankedAlarmKit {
         }
         candidates.append(contentsOf: [
             defaultSoundFileName,
-            "PetitsOiseaux.wav",
             "PetitsOiseaux",
         ])
         for name in candidates {

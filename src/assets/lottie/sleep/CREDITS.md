@@ -19,3 +19,5 @@ Original licences: Lottie Simple License (commercial OK, attribution optional) u
 | File | Title | Source | Licence |
 | --- | --- | --- | --- |
 | `ios/App/App/Sounds/PetitsOiseaux.caf` | Petits oiseaux (from Mixkit « Little birds singing in the trees », id 17) | https://assets.mixkit.co/active_storage/sfx/17/17.wav | Mixkit Sound Effects Free License (commercial OK, attribution optional) |
+
+Processing (from Mixkit WAV md5 `7dca80b6da4bc84fbecf1e04708f0dd1`): stereo PCM s16le CAF @ 44.1 kHz (not IMA4); equal-power `acrossfade` seams (~1.2 s, `qsin`); two-pass `loudnorm` ≈ −16 LUFS / true peak ≤ −1.5 dBTP; ~2.5 s fade-in; ~44 s seamless repeats so AlarmKit keeps sounding until Arrêter / Répéter.
