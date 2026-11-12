@@ -1,0 +1,15 @@
+# Sommeil Lottie credits
+
+Assets recolored to Ranked red `#ff0702`, black, white (anthracite where needed).
+Original licences: Lottie Simple License (commercial OK, attribution optional) unless noted.
+
+| File | Animation | Creator | Source |
+| --- | --- | --- | --- |
+| `sleepy-moon.json` | Sleepy Moon | Rene Breslauer | https://lottiefiles.com/free-animation/sleepy-moon-J2fXB4Jqgn |
+| `its-sleeptime.json` | It's Sleeptime | Prasil Lakshmanan | https://lottiefiles.com/free-animation/its-sleeptime-DlGpjEPhS4 |
+| `alarm.json` | Alarm | Animo Arts | https://lottiefiles.com/free-animation/alarm-MBHuek1ISm |
+| `sunset-sunrise.json` | Sunset & Sunrise | Gio | https://lottiefiles.com/free-animation/sunset-sunrise-1EJATd1cwG |
+| `sparkle-twinkle-stars.json` | Sparkle twinkle stars | Miti | https://lottiefiles.com/free-animation/sparkle-twinkle-stars-m18oFHQLF4 |
+| `success-checkmark.json` | Success Checkmark | Pipzen Motion | https://lottiefiles.com/free-animation/success-checkmark-jN6a1IDXvg |
+| `moon.json` | Moon | useAnimations | https://useanimations.com/icons/moon.json (MIT) |
+| `sunrise.json` | Sunrise | useAnimations | https://useanimations.com/icons/sunrise.json (MIT) |

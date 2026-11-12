@@ -32,6 +32,7 @@ import {
   SLEEP_PANTHER_SLEEPING_SRC,
   SLEEP_PANTHER_SRC,
 } from './sleepFeeling'
+import { SleepLottie } from './sleepLottie/SleepLottie'
 
 const RED = '#ff0702'
 const CARD_BG = '#1C1C1E'
@@ -87,6 +88,8 @@ export function SleepNightSummaryCard({
   const [tick, setTick] = useState(0)
   const [editing, setEditing] = useState(false)
   const [feelingOpen, setFeelingOpen] = useState(false)
+  const [sparklePlay, setSparklePlay] = useState(false)
+  const [successPlay, setSuccessPlay] = useState(false)
   const [goalOpen, setGoalOpen] = useState(false)
   const [bedtime, setBedtime] = useState('23:00')
   const [waketime, setWaketime] = useState('07:00')
@@ -172,6 +175,8 @@ export function SleepNightSummaryCard({
     if (!night) return
     saveSleepFeeling(dateKey, level)
     setFeelingOpen(false)
+    if (reduced) return
+    setSuccessPlay(true)
   }
 
   return (
@@ -246,14 +251,16 @@ export function SleepNightSummaryCard({
             </span>
           </div>
         ) : night?.feelingLevel ? (
-          <div
-            className="flex items-center gap-2"
+          <button
+            type="button"
+            className="relative flex items-center gap-2"
             data-sleep-panther-awake={night.feelingLevel}
             style={
               reduced
                 ? undefined
                 : { animation: 'sleep-panther-wake 320ms ease-out' }
             }
+            onClick={() => setSparklePlay(true)}
           >
             <img
               src={SLEEP_PANTHER_SRC[night.feelingLevel]}
@@ -263,7 +270,27 @@ export function SleepNightSummaryCard({
             <span className="text-[14px] font-semibold text-white">
               {SLEEP_FEELING_LABELS[night.feelingLevel]}
             </span>
-          </div>
+            {sparklePlay ? (
+              <SleepLottie
+                name="sparkle-twinkle-stars"
+                playing
+                loop={false}
+                className="pointer-events-none absolute -left-2 -top-2 h-14 w-14"
+                aria-hidden
+                onComplete={() => setSparklePlay(false)}
+              />
+            ) : null}
+            {successPlay ? (
+              <SleepLottie
+                name="success-checkmark"
+                playing
+                loop={false}
+                className="pointer-events-none absolute -right-1 -top-1 h-10 w-10"
+                aria-hidden
+                onComplete={() => setSuccessPlay(false)}
+              />
+            ) : null}
+          </button>
         ) : (
           <button
             type="button"

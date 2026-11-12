@@ -25,10 +25,12 @@ import { MorningSleepModal } from './MorningSleepModal'
 export function SleepMorningHost() {
   const [open, setOpen] = useState(false)
   const [night, setNight] = useState<SleepNightEntry | null>(null)
+  const [fromAlarm, setFromAlarm] = useState(false)
 
-  const openMorningForNight = useCallback((entry: SleepNightEntry) => {
+  const openMorningForNight = useCallback((entry: SleepNightEntry, opts?: { fromAlarm?: boolean }) => {
     markMorningPromptShown(entry.dateKey)
     setNight(entry)
+    setFromAlarm(Boolean(opts?.fromAlarm))
     setOpen(true)
   }, [])
 
@@ -55,7 +57,7 @@ export function SleepMorningHost() {
         })
       }
       if (!entry) return false
-      openMorningForNight(entry)
+      openMorningForNight(entry, { fromAlarm: true })
       return true
     } catch {
       return false
@@ -150,9 +152,14 @@ export function SleepMorningHost() {
     <MorningSleepModal
       open={open}
       night={night}
-      onClose={() => setOpen(false)}
+      fromAlarm={fromAlarm}
+      onClose={() => {
+        setOpen(false)
+        setFromAlarm(false)
+      }}
       onDone={() => {
         setOpen(false)
+        setFromAlarm(false)
         setNight(getSleepNightByDateKey(todayDateKey()))
       }}
     />

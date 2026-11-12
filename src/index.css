@@ -3339,3 +3339,26 @@ select,
     animation: none !important;
   }
 }
+
+/* Sommeil — 7 barres semaine : grow staggered once on mount */
+@keyframes sleep-week-bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+[data-sleep-week-bar-grow='1'] {
+  transform-origin: bottom center;
+  animation: sleep-week-bar-grow 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--sleep-week-bar-i, 0) * 55ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-sleep-week-bar-grow='1'] {
+    animation: none !important;
+    transform: none !important;
+  }
+}

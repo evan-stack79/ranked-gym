@@ -17,6 +17,7 @@ import {
 } from '../../utils/sleepTimeFormat'
 import { LogSleepNightSheet } from './LogSleepNightSheet'
 import { SLEEP_FEELING_LABELS, SLEEP_PANTHER_SRC } from './sleepFeeling'
+import { SleepLottie } from './sleepLottie/SleepLottie'
 
 const RED = '#ff0702'
 
@@ -25,6 +26,8 @@ export { SLEEP_FEELING_LABELS, SLEEP_PANTHER_SRC } from './sleepFeeling'
 interface MorningSleepModalProps {
   open: boolean
   night: SleepNightEntry | null
+  /** Opened after AlarmKit stop / ringing — show alarm Lottie once. */
+  fromAlarm?: boolean
   onClose: () => void
   onDone: () => void
 }
@@ -33,13 +36,24 @@ interface MorningSleepModalProps {
  * « Tu as bien dormi ? » — ressenti 1–5, facultatif.
  * Pas de score, pas de points, pas de message médical.
  */
-export function MorningSleepModal({ open, night, onClose, onDone }: MorningSleepModalProps) {
+export function MorningSleepModal({
+  open,
+  night,
+  fromAlarm = false,
+  onClose,
+  onDone,
+}: MorningSleepModalProps) {
   const reduced = usePrefersReducedMotion()
   const [mounted, setMounted] = useState(false)
   const [visible, setVisible] = useState(false)
   const [level, setLevel] = useState<SleepFeelingLevel>(4)
   const [correctOpen, setCorrectOpen] = useState(false)
   const [nightLocal, setNightLocal] = useState<SleepNightEntry | null>(night)
+  const [sunsetPlay, setSunsetPlay] = useState(false)
+  const [sparklePlay, setSparklePlay] = useState(false)
+  const [successPlay, setSuccessPlay] = useState(false)
+  const [alarmPlay, setAlarmPlay] = useState(false)
+  const [pendingFeeling, setPendingFeeling] = useState<SleepFeelingLevel | null>(null)
 
   useEffect(() => {
     if (open) {
@@ -47,6 +61,11 @@ export function MorningSleepModal({ open, night, onClose, onDone }: MorningSleep
       setLevel((night?.feelingLevel as SleepFeelingLevel) || 4)
       setNightLocal(night)
       setCorrectOpen(false)
+      setSunsetPlay(true)
+      setSparklePlay(false)
+      setSuccessPlay(false)
+      setAlarmPlay(fromAlarm)
+      setPendingFeeling(null)
       const id = requestAnimationFrame(() => {
         requestAnimationFrame(() => setVisible(true))
       })
@@ -55,7 +74,7 @@ export function MorningSleepModal({ open, night, onClose, onDone }: MorningSleep
     setVisible(false)
     const t = window.setTimeout(() => setMounted(false), reduced ? 0 : 280)
     return () => window.clearTimeout(t)
-  }, [open, night, reduced])
+  }, [open, night, reduced, fromAlarm])
 
   useEffect(() => {
     if (!open) return
@@ -77,9 +96,22 @@ export function MorningSleepModal({ open, night, onClose, onDone }: MorningSleep
 
   if (!mounted || typeof document === 'undefined') return null
 
+  const afterSuccess = () => {
+    setSuccessPlay(false)
+    onClose()
+    queueMicrotask(() => onDone())
+  }
+
   const finish = (feeling: SleepFeelingLevel | null) => {
     if (nightLocal && feeling != null) {
       saveSleepFeeling(nightLocal.dateKey, feeling)
+      setPendingFeeling(feeling)
+      if (reduced) {
+        afterSuccess()
+        return
+      }
+      setSuccessPlay(true)
+      return
     }
     onClose()
     queueMicrotask(() => onDone())
@@ -123,20 +155,72 @@ export function MorningSleepModal({ open, night, onClose, onDone }: MorningSleep
           Tu as bien dormi ?
         </h1>
         <p className="mt-1.5 text-[13px] text-[#C7C7CC]">Facultatif · visible par toi seul(e)</p>
+        {alarmPlay ? (
+          <div className="mt-3 flex justify-center" data-sleep-alarm-from-ring>
+            <SleepLottie
+              name="alarm"
+              playing
+              loop={false}
+              className="h-14 w-14"
+              aria-hidden
+              onComplete={() => setAlarmPlay(false)}
+            />
+          </div>
+        ) : null}
 
-        <div className="mt-6 flex flex-1 flex-col items-center justify-center">
-          <img
-            key={level}
-            src={SLEEP_PANTHER_SRC[level]}
-            alt=""
-            className="h-40 w-40 object-contain"
-            style={{
-              transition: reduced ? undefined : 'opacity 180ms ease',
-            }}
-            data-sleep-feeling-panther={level}
-          />
-          <p className="mt-3 text-[18px] font-semibold text-white" data-sleep-feeling-label>
-            {SLEEP_FEELING_LABELS[level]}
+        <div className="relative mt-6 flex flex-1 flex-col items-center justify-center">
+          {sunsetPlay ? (
+            <SleepLottie
+              name="sunset-sunrise"
+              playing
+              loop={false}
+              className="pointer-events-none absolute inset-x-0 top-0 z-0 mx-auto h-56 w-56 opacity-40"
+              aria-hidden
+              onComplete={() => setSunsetPlay(false)}
+              data-testid="sleep-lottie-sunset"
+            />
+          ) : null}
+          <button
+            type="button"
+            className="relative z-[1]"
+            onClick={() => setSparklePlay(true)}
+            aria-label="Panthère"
+          >
+            <img
+              key={level}
+              src={SLEEP_PANTHER_SRC[level]}
+              alt=""
+              className="h-40 w-40 object-contain"
+              style={{
+                transition: reduced ? undefined : 'opacity 180ms ease',
+              }}
+              data-sleep-feeling-panther={level}
+            />
+            {sparklePlay ? (
+              <SleepLottie
+                name="sparkle-twinkle-stars"
+                playing
+                loop={false}
+                className="pointer-events-none absolute inset-0 z-[2]"
+                aria-hidden
+                onComplete={() => setSparklePlay(false)}
+                data-testid="sleep-lottie-sparkle"
+              />
+            ) : null}
+            {successPlay ? (
+              <SleepLottie
+                name="success-checkmark"
+                playing
+                loop={false}
+                className="pointer-events-none absolute inset-0 z-[3]"
+                aria-hidden
+                onComplete={afterSuccess}
+                data-testid="sleep-lottie-success"
+              />
+            ) : null}
+          </button>
+          <p className="relative z-[1] mt-3 text-[18px] font-semibold text-white" data-sleep-feeling-label>
+            {SLEEP_FEELING_LABELS[pendingFeeling ?? level]}
           </p>
 
           <div className="mt-6 w-full max-w-sm px-2">

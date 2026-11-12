@@ -43,10 +43,11 @@ export function SleepWeekChart({
   return (
     <div className="w-full" data-sleep-week-chart data-sleep-week-compact={compact ? '1' : '0'}>
       <div className={`flex items-end gap-1.5 ${compact ? 'h-16' : 'h-24'}`}>
-        {days.map((day) => {
+        {days.map((day, barIndex) => {
           const ratio =
             day.tib != null && maxHours > 0 ? Math.min(1, Math.max(0.08, day.tib / maxHours)) : 0
           const emptyToday = day.isToday && day.tib == null
+          const barStyle = { ['--sleep-week-bar-i' as string]: String(barIndex) }
           return (
             <div key={day.dateKey} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
               <div className={`relative flex w-full items-end justify-center ${compact ? 'h-12' : 'h-20'}`}>
@@ -57,8 +58,10 @@ export function SleepWeekChart({
                       height: `${ratio * 100}%`,
                       backgroundColor: day.isToday ? RED : GREY,
                       minHeight: 8,
+                      ...barStyle,
                     }}
                     data-sleep-week-bar={day.isToday ? 'today' : 'past'}
+                    data-sleep-week-bar-grow="1"
                   />
                 ) : emptyToday ? (
                   <div
@@ -67,14 +70,17 @@ export function SleepWeekChart({
                       height: '42%',
                       borderColor: RED,
                       minHeight: 18,
+                      ...barStyle,
                     }}
                     data-sleep-week-bar="today-empty"
+                    data-sleep-week-bar-grow="1"
                   />
                 ) : (
                   <div
                     className="w-[55%] max-w-[14px] rounded-full bg-white/10"
-                    style={{ height: 6 }}
+                    style={{ height: 6, ...barStyle }}
                     data-sleep-week-bar="empty"
+                    data-sleep-week-bar-grow="1"
                   />
                 )}
               </div>

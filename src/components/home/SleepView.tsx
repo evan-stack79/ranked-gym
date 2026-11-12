@@ -24,11 +24,13 @@ import {
   formatClockHm,
   formatFrenchLongDate,
 } from '../../utils/sleepTimeFormat'
+import { useSleepPageActive } from '../../hooks/useSleepPageActive'
 import { SleepAlarmDiagBlock } from './SleepAlarmDiagBlock'
 import { SleepAlarmSheet, type SleepAlarmSheetPane } from './SleepAlarmSheet'
 import { SleepAlarmStatusBanner } from './SleepAlarmStatusBanner'
 import { SleepClockDial } from './SleepClockDial'
 import { SleepHmWheelSheet } from './SleepHmWheelSheet'
+import { SleepLottie } from './sleepLottie/SleepLottie'
 
 const RED = '#ff0702'
 const CARD = '#1C1C1E'
@@ -50,7 +52,11 @@ export function SleepView() {
   const [status, setStatus] = useState<SleepAlarmUiStatus>({ kind: 'off' })
   const [diagExpanded, setDiagExpanded] = useState(false)
   const [dialSize, setDialSize] = useState(320)
+  const [sleepNowAnim, setSleepNowAnim] = useState(false)
+  const [bedIconPlay, setBedIconPlay] = useState(false)
+  const [wakeIconPlay, setWakeIconPlay] = useState(false)
   const showAlarm = isSleepAlarmPlatformSupported()
+  const pageActive = useSleepPageActive()
   const titleTaps = useRef({ count: 0, last: 0 })
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -116,16 +122,53 @@ export function SleepView() {
     }
   }
 
+  /** Reschedule AlarmKit when the réveil window changes and an alarm is armed. */
+  const rescheduleAlarmIfNeeded = (nextWake: string) => {
+    if (!showAlarm) return
+    const cur = getSleepAlarmSettings()
+    if (!cur.enabled) return
+    void syncSleepAlarm({ ...cur, timeHm: nextWake, enabled: true }).then((result) => {
+      if (!result.ok) {
+        const msg = syncFailureMessage(result.reason)
+        setError(msg)
+        if (result.reason === 'PERMISSION_DENIED') {
+          setStatus({ kind: 'permission' })
+        } else {
+          setStatus({ kind: 'error', message: msg })
+        }
+        return
+      }
+      const timeHm = result.timeHm ?? nextWake
+      setStatus({
+        kind: 'scheduled',
+        timeHm,
+        summary: formatRepeatSummary(getSleepAlarmSettings().days),
+      })
+      setTick((n) => n + 1)
+    })
+  }
+
   const onDialChange = (next: { bedtime: string; waketime: string }) => {
     persistWindow(next.bedtime, next.waketime)
   }
 
+  const onDialCommit = (next: { bedtime: string; waketime: string }) => {
+    persistWindow(next.bedtime, next.waketime)
+    rescheduleAlarmIfNeeded(next.waketime)
+  }
+
   const onWheelSave = (hm: string) => {
-    if (wheelTarget === 'bed') persistWindow(hm, waketime)
-    else if (wheelTarget === 'wake') persistWindow(bedtime, hm)
+    if (wheelTarget === 'bed') {
+      persistWindow(hm, waketime)
+      rescheduleAlarmIfNeeded(waketime)
+    } else if (wheelTarget === 'wake') {
+      persistWindow(bedtime, hm)
+      rescheduleAlarmIfNeeded(hm)
+    }
   }
 
   const onSleepNow = async () => {
+    setSleepNowAnim(true)
     setSaving(true)
     setError(null)
     setConfirmMsg(null)
@@ -187,25 +230,50 @@ export function SleepView() {
         </p>
       </header>
 
-      <div className="shrink-0 py-1">
-        <SleepClockDial
-          bedtime={bedtime}
-          waketime={waketime}
-          onChange={onDialChange}
-          size={dialSize}
+      <div className="relative shrink-0 py-1">
+        {/* Only looping Lottie on this page — paused when hidden / background. */}
+        <SleepLottie
+          name="its-sleeptime"
+          loop
+          playing={pageActive && !sleepNowAnim}
+          className="pointer-events-none absolute inset-0 z-0 mx-auto opacity-[0.22]"
+          style={{ width: dialSize + 48, height: dialSize + 48, left: '50%', transform: 'translateX(-50%)' }}
+          aria-hidden
+          data-testid="sleep-lottie-dial-bg"
         />
+        <div className="relative z-[1]">
+          <SleepClockDial
+            bedtime={bedtime}
+            waketime={waketime}
+            onChange={onDialChange}
+            onCommit={onDialCommit}
+            size={dialSize}
+          />
+        </div>
       </div>
 
       <div className="mt-2 grid shrink-0 grid-cols-2 gap-2.5">
         <button
           type="button"
-          onClick={() => setWheelTarget('bed')}
+          onClick={() => {
+            setBedIconPlay(true)
+            setWheelTarget('bed')
+          }}
           className="ios-press rounded-2xl px-3 py-2.5 text-left"
           style={{ backgroundColor: CARD }}
           data-sleep-card-bed
         >
           <span className="flex items-center justify-between gap-2">
-            <span className="text-[12px]" style={{ color: GRAY }}>
+            <span className="flex items-center gap-1.5 text-[12px]" style={{ color: GRAY }}>
+              <span className="inline-flex h-5 w-5 items-center justify-center" aria-hidden>
+                <SleepLottie
+                  name="moon"
+                  playing={bedIconPlay}
+                  loop={false}
+                  className="h-5 w-5"
+                  onComplete={() => setBedIconPlay(false)}
+                />
+              </span>
               Coucher
             </span>
             <Pencil className="h-3.5 w-3.5" style={{ color: GRAY }} aria-hidden />
@@ -216,13 +284,25 @@ export function SleepView() {
         </button>
         <button
           type="button"
-          onClick={() => setWheelTarget('wake')}
+          onClick={() => {
+            setWakeIconPlay(true)
+            setWheelTarget('wake')
+          }}
           className="ios-press rounded-2xl px-3 py-2.5 text-left"
           style={{ backgroundColor: CARD }}
           data-sleep-card-wake
         >
           <span className="flex items-center justify-between gap-2">
-            <span className="text-[12px]" style={{ color: GRAY }}>
+            <span className="flex items-center gap-1.5 text-[12px]" style={{ color: GRAY }}>
+              <span className="inline-flex h-5 w-5 items-center justify-center" aria-hidden>
+                <SleepLottie
+                  name="sunrise"
+                  playing={wakeIconPlay}
+                  loop={false}
+                  className="h-5 w-5"
+                  onComplete={() => setWakeIconPlay(false)}
+                />
+              </span>
               Réveil
             </span>
             <Pencil className="h-3.5 w-3.5" style={{ color: GRAY }} aria-hidden />
@@ -268,18 +348,29 @@ export function SleepView() {
         type="button"
         onClick={() => void onSleepNow()}
         disabled={saving}
-        className="ios-press mt-3 w-full shrink-0 rounded-2xl py-3.5 text-[16px] font-semibold text-white disabled:opacity-50"
+        className="ios-press mt-3 flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl py-3.5 text-[16px] font-semibold text-white disabled:opacity-50"
         style={{ backgroundColor: RED }}
         data-sleep-now
       >
+        {(sleepNowAnim || saving) && (
+          <SleepLottie
+            name="sleepy-moon"
+            playing
+            loop={false}
+            className="h-7 w-7 shrink-0"
+            aria-hidden
+            onComplete={() => setSleepNowAnim(false)}
+          />
+        )}
         {saving ? 'Enregistrement…' : 'Dormir maintenant'}
       </button>
 
       <div className="mt-2 shrink-0 space-y-1">
         {confirmMsg ? (
-          <p className="text-[13px] font-medium text-white" data-sleep-alarm-confirm>
-            {confirmMsg}
-          </p>
+          <div className="flex items-center gap-2" data-sleep-alarm-confirm>
+            <SleepLottie name="alarm" playing loop={false} className="h-8 w-8 shrink-0" aria-hidden />
+            <p className="text-[13px] font-medium text-white">{confirmMsg}</p>
+          </div>
         ) : (
           <SleepAlarmStatusBanner status={status} />
         )}
