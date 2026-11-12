@@ -13,12 +13,13 @@ import {
 const RED = '#ff0702'
 /** ViewBox fixe ; affichage ≈ largeur − 80 pt (~320 sur iPhone 17). */
 const SIZE = 320
-const PAD = 28
-const CX = SIZE / 2
-const CY = SIZE / 2
-/** Anneau remplit le cadran — chiffres / poignées proportionnels. */
-const TRACK_R = 122
-const HANDLE_R = 21
+const C = SIZE / 2
+/** v12 C Ranked Gym geometry */
+const SW = 26
+const ARC_W = 20
+const HS = 36
+const R = C - HS / 2 - 10 // 132
+const HANDLE_HIT = HS / 2 + 8
 const LONG_PRESS_MS = 420
 
 type DragTarget = 'bed' | 'wake' | 'shift'
@@ -32,6 +33,7 @@ interface SleepClockDialProps {
   size?: number
 }
 
+/** Minute m → degrees clockwise from 12 o’clock (m/1440·360). */
 function minutesToAngle(minutes: number): number {
   return (minutes / (24 * 60)) * 360
 }
@@ -41,25 +43,36 @@ function angleToMinutes(angleDeg: number): number {
   return snapMinutes((norm / 360) * 24 * 60, 5)
 }
 
-function polar(angleDeg: number, r: number) {
+/** Polar: 0° at top, clockwise — matches m/1440·2π − π/2 in radians. */
+function polar(angleDeg: number, radius: number) {
   const rad = ((angleDeg - 90) * Math.PI) / 180
-  return { x: CX + r * Math.cos(rad), y: CY + r * Math.sin(rad) }
+  return { x: C + radius * Math.cos(rad), y: C + radius * Math.sin(rad) }
 }
 
-function describeArc(startMin: number, endMin: number, r: number): string {
+function describeArc(startMin: number, endMin: number, radius: number): string {
   let span = endMin - startMin
   if (span <= 0) span += 24 * 60
   if (span >= 24 * 60 - 1) {
-    const a = polar(0, r)
-    const b = polar(180, r)
-    return `M ${a.x} ${a.y} A ${r} ${r} 0 1 1 ${b.x} ${b.y} A ${r} ${r} 0 1 1 ${a.x} ${a.y}`
+    const a = polar(0, radius)
+    const b = polar(180, radius)
+    return `M ${a.x} ${a.y} A ${radius} ${radius} 0 1 1 ${b.x} ${b.y} A ${radius} ${radius} 0 1 1 ${a.x} ${a.y}`
   }
   const startAngle = minutesToAngle(startMin)
   const endAngle = minutesToAngle(endMin)
   const large = span > 12 * 60 ? 1 : 0
-  const s = polar(startAngle, r)
-  const e = polar(endAngle, r)
-  return `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`
+  const s = polar(startAngle, radius)
+  const e = polar(endAngle, radius)
+  return `M ${s.x} ${s.y} A ${radius} ${radius} 0 ${large} 1 ${e.x} ${e.y}`
+}
+
+/** Arc path from startDeg to endDeg (degrees from 12, clockwise), span < 180°. */
+function describeDegArc(startDeg: number, endDeg: number, radius: number): string {
+  const s = polar(startDeg, radius)
+  const e = polar(endDeg, radius)
+  let delta = endDeg - startDeg
+  if (delta < 0) delta += 360
+  const large = delta > 180 ? 1 : 0
+  return `M ${s.x} ${s.y} A ${radius} ${radius} 0 ${large} 1 ${e.x} ${e.y}`
 }
 
 function pointNearArc(
@@ -70,13 +83,13 @@ function pointNearArc(
   bedPos: { x: number; y: number },
   wakePos: { x: number; y: number },
 ): boolean {
-  const dx = x - CX
-  const dy = y - CY
+  const dx = x - C
+  const dy = y - C
   const dist = Math.hypot(dx, dy)
-  if (Math.abs(dist - TRACK_R) > 22) return false
+  if (Math.abs(dist - R) > SW / 2 + 8) return false
   const dBed = Math.hypot(x - bedPos.x, y - bedPos.y)
   const dWake = Math.hypot(x - wakePos.x, y - wakePos.y)
-  if (dBed < HANDLE_R + 10 || dWake < HANDLE_R + 10) return false
+  if (dBed < HANDLE_HIT || dWake < HANDLE_HIT) return false
   const angle = ((Math.atan2(dy, dx) * 180) / Math.PI + 90 + 360) % 360
   const min = angleToMinutes(angle)
   let span = wakeMin - bedMin
@@ -86,56 +99,92 @@ function pointNearArc(
   return fromBed <= span
 }
 
-/** Lit — icône Coucher (cercle blanc). */
-function BedIcon({ x, y, color }: { x: number; y: number; color: string }) {
+/** White bed icon — 18×18, stroke 2.2, upright. */
+function BedIcon() {
   return (
-    <g transform={`translate(${x - 11} ${y - 11}) scale(1.22)`} aria-hidden>
+    <g aria-hidden>
       <path
-        d="M2 14V7.5A1.5 1.5 0 0 1 3.5 6H7a3 3 0 0 1 3 3v1h5.5A1.5 1.5 0 0 1 17 11.5V14"
+        d="M3.5 14.5V8.2A1.6 1.6 0 0 1 5.1 6.6H8.2a2.8 2.8 0 0 1 2.8 2.8v1.2h4.4A1.5 1.5 0 0 1 16.9 12v2.5"
         fill="none"
-        stroke={color}
-        strokeWidth="1.7"
+        stroke="#fff"
+        strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <path
-        d="M1 14h16"
-        fill="none"
-        stroke={color}
-        strokeWidth="1.7"
-        strokeLinecap="round"
-      />
-      <circle cx="5.2" cy="9.2" r="1.5" fill={color} />
+      <path d="M2.5 14.5h13.5" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" />
+      <circle cx="6.2" cy="9.4" r="1.35" fill="#fff" />
     </g>
   )
 }
 
-/** Alarme — icône Réveil (cercle rouge). */
-function AlarmIcon({ x, y, color }: { x: number; y: number; color: string }) {
+/** White alarm icon — 18×18, stroke 2.2, upright. */
+function AlarmIcon() {
   return (
-    <g transform={`translate(${x - 11} ${y - 11}) scale(1.22)`} aria-hidden>
-      <circle cx="9" cy="10" r="5.2" fill="none" stroke={color} strokeWidth="1.7" />
+    <g aria-hidden>
+      <circle cx="9" cy="10" r="5.1" fill="none" stroke="#fff" strokeWidth="2.2" />
       <path
-        d="M9 7.6v2.8l1.8 1.2"
+        d="M9 7.4v2.9l1.9 1.2"
         fill="none"
-        stroke={color}
-        strokeWidth="1.7"
+        stroke="#fff"
+        strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
-        d="M3.2 4.2 1.6 5.6M14.8 4.2 16.4 5.6"
+        d="M3.1 4.1 1.6 5.5M14.9 4.1 16.4 5.5"
         fill="none"
-        stroke={color}
-        strokeWidth="1.7"
+        stroke="#fff"
+        strokeWidth="2.2"
         strokeLinecap="round"
       />
+    </g>
+  )
+}
+
+function Handle({
+  x,
+  y,
+  kind,
+  filterId,
+}: {
+  x: number
+  y: number
+  kind: 'bed' | 'wake'
+  filterId: string
+}) {
+  const half = HS / 2
+  const inset = 1.4
+  return (
+    <g transform={`translate(${x} ${y})`} filter={`url(#${filterId})`}>
+      <rect
+        x={-half}
+        y={-half}
+        width={HS}
+        height={HS}
+        rx={6}
+        ry={6}
+        fill={RED}
+        stroke="rgba(0,0,0,.3)"
+        strokeWidth={1.15}
+      />
+      <rect
+        x={-half + inset}
+        y={-half + inset}
+        width={HS - inset * 2}
+        height={HS - inset * 2}
+        rx={5}
+        ry={5}
+        fill="none"
+        stroke="rgba(255,255,255,.25)"
+        strokeWidth={1}
+      />
+      <g transform="translate(-9 -9)">{kind === 'bed' ? <BedIcon /> : <AlarmIcon />}</g>
     </g>
   )
 }
 
 /**
- * Cadran 24 h — poignées = une heure ; appui long sur l’arc = décalage durée fixe.
+ * Cadran 24 h v12 C — poignées = une heure ; appui long sur l’arc = décalage durée fixe.
  */
 export function SleepClockDial({
   bedtime,
@@ -159,8 +208,8 @@ export function SleepClockDial({
 
   const bedAngle = minutesToAngle(bedMin)
   const wakeAngle = minutesToAngle(wakeMin)
-  const bedPos = polar(bedAngle, TRACK_R)
-  const wakePos = polar(wakeAngle, TRACK_R)
+  const bedPos = polar(bedAngle, R)
+  const wakePos = polar(wakeAngle, R)
 
   const clearLongPress = useCallback(() => {
     if (longPressTimer.current != null) {
@@ -185,7 +234,7 @@ export function SleepClockDial({
     (clientX: number, clientY: number) => {
       const pt = clientToSvg(clientX, clientY)
       if (!pt) return null
-      const angle = ((Math.atan2(pt.y - CY, pt.x - CX) * 180) / Math.PI + 90 + 360) % 360
+      const angle = ((Math.atan2(pt.y - C, pt.x - C) * 180) / Math.PI + 90 + 360) % 360
       return angleToMinutes(angle)
     },
     [clientToSvg],
@@ -196,7 +245,7 @@ export function SleepClockDial({
     if (!pt) return null
     const dBed = Math.hypot(pt.x - bedPos.x, pt.y - bedPos.y)
     const dWake = Math.hypot(pt.x - wakePos.x, pt.y - wakePos.y)
-    if (dBed <= HANDLE_R + 14 || dWake <= HANDLE_R + 14) {
+    if (dBed <= HANDLE_HIT || dWake <= HANDLE_HIT) {
       return dWake < dBed ? 'wake' : 'bed'
     }
     return null
@@ -266,7 +315,6 @@ export function SleepClockDial({
       return
     }
 
-    // Moved before long-press fired → cancel shift intent
     if (longPressTimer.current != null && shiftOriginMin.current != null) {
       const moved = Math.abs(minutes - shiftOriginMin.current)
       if (moved > 8) clearLongPress()
@@ -284,32 +332,58 @@ export function SleepClockDial({
     setShifting(false)
   }
 
-  const ticks = Array.from({ length: 48 }, (_, i) => {
-    const minutes = i * 30
-    const angle = minutesToAngle(minutes)
-    const major = minutes % 60 === 0
-    const hourMajor = minutes % (6 * 60) === 0
-    const outer = polar(angle, TRACK_R + (hourMajor ? 12 : major ? 9 : 6))
-    const inner = polar(angle, TRACK_R - (hourMajor ? 10 : major ? 6 : 3))
-    return { i, outer, inner, major, hourMajor }
+  const trackSegments = Array.from({ length: 48 }, (_, i) => {
+    const startDeg = i * 7.5 + 0.675
+    const endDeg = startDeg + (7.5 - 1.35)
+    return { i, d: describeDegArc(startDeg, endDeg, R) }
   })
 
-  const labels = [
-    { h: 0, text: '0' },
-    { h: 6, text: '6' },
-    { h: 12, text: '12' },
-    { h: 18, text: '18' },
-  ].map((l) => ({
-    ...l,
-    pos: polar(minutesToAngle(l.h * 60), TRACK_R + PAD - 8),
+  const hourTicks = Array.from({ length: 24 }, (_, h) => {
+    const angle = minutesToAngle(h * 60)
+    const major = h % 6 === 0
+    const startR = R - 13 - 4
+    const len = major ? 8 : 5
+    const a = polar(angle, startR)
+    const b = polar(angle, startR - len)
+    return {
+      h,
+      a,
+      b,
+      stroke: major ? '#eceeef' : '#636366',
+      width: major ? 2 : 1.35,
+    }
+  })
+
+  const cardinals = [0, 6, 12, 18] as const
+  const triangles = cardinals.map((h) => {
+    const angle = minutesToAngle(h * 60)
+    const tipR = R + 13 + 2
+    const tip = polar(angle, tipR)
+    // Tip points toward centre → base further out.
+    const baseR = tipR + 6.2
+    const mid = polar(angle, baseR)
+    const tang = ((angle - 90) * Math.PI) / 180
+    const hx = 4 * Math.cos(tang)
+    const hy = 4 * Math.sin(tang)
+    const b1 = { x: mid.x + hx, y: mid.y + hy }
+    const b2 = { x: mid.x - hx, y: mid.y - hy }
+    return { h, tip, b1, b2 }
+  })
+
+  const labels = cardinals.map((h) => ({
+    h,
+    text: String(h),
+    pos: polar(minutesToAngle(h * 60), R - 13 - 24),
   }))
 
   const displaySize = Math.max(180, Math.min(360, Math.round(size)))
+  const shadowId = 'sleep-dial-handle-shadow'
 
   return (
     <div
       className="mx-auto flex flex-col items-center"
       data-sleep-clock-dial
+      data-sleep-dial-variant="v12c"
       data-sleep-shifting={shifting ? '1' : '0'}
       data-sleep-dial-size={displaySize}
       style={{ width: displaySize, maxWidth: '100%' }}
@@ -327,70 +401,80 @@ export function SleepClockDial({
         onPointerCancel={onPointerUp}
         style={{ touchAction: 'none' }}
       >
-        <circle
-          cx={CX}
-          cy={CY}
-          r={TRACK_R}
-          fill="#1C1C1E"
-          stroke={shifting ? 'rgba(255,7,2,0.45)' : '#2C2C2E'}
-          strokeWidth={shifting ? 18 : 16}
-        />
+        <defs>
+          <filter id={shadowId} x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="1.1" stdDeviation="1" floodOpacity="0.4" />
+          </filter>
+        </defs>
 
-        {ticks.map((t) => (
-          <line
-            key={t.i}
-            x1={t.inner.x}
-            y1={t.inner.y}
-            x2={t.outer.x}
-            y2={t.outer.y}
-            stroke={
-              t.hourMajor
-                ? 'rgba(255,255,255,0.55)'
-                : t.major
-                  ? 'rgba(255,255,255,0.28)'
-                  : 'rgba(255,255,255,0.12)'
-            }
-            strokeWidth={t.hourMajor ? 1.8 : 1.1}
-            strokeLinecap="round"
+        {/* Segmented track — 48 × 30 min */}
+        {trackSegments.map((seg) => (
+          <path
+            key={seg.i}
+            d={seg.d}
+            fill="none"
+            stroke="#353a3d"
+            strokeWidth={SW}
+            strokeLinecap="butt"
           />
         ))}
 
+        {/* Night arc bedtime → wake */}
+        <path
+          d={describeArc(bedMin, wakeMin, R)}
+          fill="none"
+          stroke={RED}
+          strokeWidth={shifting ? ARC_W + 2 : ARC_W}
+          strokeLinecap="butt"
+          style={reduced ? undefined : { transition: 'stroke-width 120ms ease' }}
+        />
+
+        {/* Cardinal triangles (point tip toward centre) */}
+        {triangles.map((t) => (
+          <polygon
+            key={`tri-${t.h}`}
+            points={`${t.tip.x},${t.tip.y} ${t.b1.x},${t.b1.y} ${t.b2.x},${t.b2.y}`}
+            fill={RED}
+          />
+        ))}
+
+        {/* Inner hour ticks */}
+        {hourTicks.map((t) => (
+          <line
+            key={`tick-${t.h}`}
+            x1={t.a.x}
+            y1={t.a.y}
+            x2={t.b.x}
+            y2={t.b.y}
+            stroke={t.stroke}
+            strokeWidth={t.width}
+            strokeLinecap="butt"
+          />
+        ))}
+
+        {/* Bold 0 / 6 / 12 / 18 */}
         {labels.map((l) => (
           <text
-            key={l.h}
+            key={`lbl-${l.h}`}
             x={l.pos.x}
             y={l.pos.y}
             textAnchor="middle"
             dominantBaseline="middle"
-            fill="rgba(255,255,255,0.78)"
-            fontSize="16"
+            fill="#eceeef"
+            fontSize="17"
+            fontWeight="800"
             fontFamily="system-ui, -apple-system, sans-serif"
           >
             {l.text}
           </text>
         ))}
 
-        <path
-          d={describeArc(bedMin, wakeMin, TRACK_R)}
-          fill="none"
-          stroke={RED}
-          strokeWidth={shifting ? 18 : 16}
-          strokeLinecap="round"
-          opacity={shifting ? 1 : 0.95}
-          style={reduced ? undefined : { transition: 'stroke-width 120ms ease' }}
-        />
-
-        {/* Coucher : rond blanc + lit */}
-        <circle cx={bedPos.x} cy={bedPos.y} r={HANDLE_R} fill="#FFFFFF" />
-        <BedIcon x={bedPos.x} y={bedPos.y} color="#1C1C1E" />
-
-        {/* Réveil : rond rouge + alarme */}
-        <circle cx={wakePos.x} cy={wakePos.y} r={HANDLE_R} fill={RED} />
-        <AlarmIcon x={wakePos.x} y={wakePos.y} color="#FFFFFF" />
+        <Handle x={bedPos.x} y={bedPos.y} kind="bed" filterId={shadowId} />
+        <Handle x={wakePos.x} y={wakePos.y} kind="wake" filterId={shadowId} />
 
         <text
-          x={CX}
-          y={CY - 12}
+          x={C}
+          y={C - 12}
           textAnchor="middle"
           fill="#FFFFFF"
           fontSize="40"
@@ -400,8 +484,8 @@ export function SleepClockDial({
           {tibLabel}
         </text>
         <text
-          x={CX}
-          y={CY + 20}
+          x={C}
+          y={C + 20}
           textAnchor="middle"
           fill="#8E8E93"
           fontSize="14"

@@ -105,15 +105,14 @@ async function assertLayout(page, label) {
       const titleRect = title.getBoundingClientRect()
       const vh = window.innerHeight
       const btnFullyAboveNav = btnRect.bottom <= navRect.top + 2
-      const dialSize = Number(
-        document.querySelector('[data-sleep-dial-size]')?.getAttribute('data-sleep-dial-size') ??
-          '0',
-      )
+      const dialEl = document.querySelector('[data-sleep-clock-dial]')
+      const dialSize = Number(dialEl?.getAttribute('data-sleep-dial-size') ?? '0')
+      const dialVariant = dialEl?.getAttribute('data-sleep-dial-variant')
       const labels = [...nav.querySelectorAll('[data-nav-tab]')].map(
         (el) => el.getAttribute('aria-label'),
       )
       const overflow = scrollMain.scrollHeight - scrollMain.clientHeight
-      const dialOk = dialSize >= opts.minDial
+      const dialOk = dialSize >= opts.minDial && dialVariant === 'v12c'
       return {
         ok:
           btnFullyAboveNav &&
@@ -129,6 +128,7 @@ async function assertLayout(page, label) {
         vh,
         labels,
         variant: nav.getAttribute('data-bottom-nav-variant'),
+        dialVariant,
         scrollHeight: scrollMain.scrollHeight,
         clientHeight: scrollMain.clientHeight,
         overflow,
