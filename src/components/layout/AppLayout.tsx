@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react'
+import { isAccueilGalleryEnabled } from '../../backend/accueilGalleryFeatureFlag'
 import { useAuth } from '../../context/AuthContext'
 import { BrandMark } from '../brand/BrandMark'
 import { BottomNav } from './BottomNav'
@@ -49,15 +50,19 @@ export function AppLayout({
   const showBottomNav = !chromeHidden && !hideBottomNav && !keyboardOpen
   const bottomNavObscured = streakCelebrationActive
   const showReadyBar = !chromeHidden && activeTab === 'training' && readyBarEnabled
-  // v11 : dock avec libellés partout (Accueil gallery garde ses tuiles, pas la pill nav).
+  const floatingPillNav = isAccueilGalleryEnabled()
   const sleepTab = activeTab === 'sleep'
 
   useEffect(() => {
-    delete document.documentElement.dataset.bottomNavPreview
+    if (floatingPillNav) {
+      document.documentElement.dataset.bottomNavPreview = 'floating-pill'
+    } else {
+      delete document.documentElement.dataset.bottomNavPreview
+    }
     return () => {
       delete document.documentElement.dataset.bottomNavPreview
     }
-  }, [])
+  }, [floatingPillNav])
 
   return (
     <div

@@ -136,6 +136,31 @@ img {
   user-drag: none;
 }
 
+/*
+ * Hydratation : appui long pour glisser le niveau — iOS ne doit pas ouvrir
+ * le menu image (Partager / Enregistrer / Copier…). Zone + shells PNG.
+ */
+[data-hydration-live-bottle],
+[data-hydration-visual],
+[data-hydration-carousel],
+.hydration-no-callout {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+[data-hydration-live-bottle] img,
+[data-hydration-visual] img,
+[data-hydration-carousel] img,
+[data-hydration-shell],
+.hydration-no-callout img {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
 /* Layout dock — BottomNav + îlot repos (Train) */
 :root {
   /* Hauteur utile BottomNav (hors safe-area), ~70–80px */

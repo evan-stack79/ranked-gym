@@ -11,13 +11,14 @@ import {
 } from '../../utils/sleepTimeFormat'
 
 const RED = '#ff0702'
-/** Plus grand + marge pour que 0/6/12/18 h ne soient jamais coupés (iPhone). */
+/** ViewBox fixe ; affichage ≈ largeur − 80 pt (~320 sur iPhone 17). */
 const SIZE = 320
-const PAD = 36
+const PAD = 28
 const CX = SIZE / 2
 const CY = SIZE / 2
-const TRACK_R = 102
-const HANDLE_R = 17
+/** Anneau remplit le cadran — chiffres / poignées proportionnels. */
+const TRACK_R = 122
+const HANDLE_R = 21
 const LONG_PRESS_MS = 420
 
 type DragTarget = 'bed' | 'wake' | 'shift'
@@ -88,7 +89,7 @@ function pointNearArc(
 /** Lit — icône Coucher (cercle blanc). */
 function BedIcon({ x, y, color }: { x: number; y: number; color: string }) {
   return (
-    <g transform={`translate(${x - 9} ${y - 9})`} aria-hidden>
+    <g transform={`translate(${x - 11} ${y - 11}) scale(1.22)`} aria-hidden>
       <path
         d="M2 14V7.5A1.5 1.5 0 0 1 3.5 6H7a3 3 0 0 1 3 3v1h5.5A1.5 1.5 0 0 1 17 11.5V14"
         fill="none"
@@ -112,7 +113,7 @@ function BedIcon({ x, y, color }: { x: number; y: number; color: string }) {
 /** Alarme — icône Réveil (cercle rouge). */
 function AlarmIcon({ x, y, color }: { x: number; y: number; color: string }) {
   return (
-    <g transform={`translate(${x - 9} ${y - 9})`} aria-hidden>
+    <g transform={`translate(${x - 11} ${y - 11}) scale(1.22)`} aria-hidden>
       <circle cx="9" cy="10" r="5.2" fill="none" stroke={color} strokeWidth="1.7" />
       <path
         d="M9 7.6v2.8l1.8 1.2"
@@ -303,7 +304,7 @@ export function SleepClockDial({
     pos: polar(minutesToAngle(l.h * 60), TRACK_R + PAD - 8),
   }))
 
-  const displaySize = Math.max(180, Math.min(SIZE, Math.round(size)))
+  const displaySize = Math.max(180, Math.min(360, Math.round(size)))
 
   return (
     <div
@@ -332,7 +333,7 @@ export function SleepClockDial({
           r={TRACK_R}
           fill="#1C1C1E"
           stroke={shifting ? 'rgba(255,7,2,0.45)' : '#2C2C2E'}
-          strokeWidth={shifting ? 16 : 14}
+          strokeWidth={shifting ? 18 : 16}
         />
 
         {ticks.map((t) => (
@@ -349,7 +350,7 @@ export function SleepClockDial({
                   ? 'rgba(255,255,255,0.28)'
                   : 'rgba(255,255,255,0.12)'
             }
-            strokeWidth={t.hourMajor ? 1.6 : 1}
+            strokeWidth={t.hourMajor ? 1.8 : 1.1}
             strokeLinecap="round"
           />
         ))}
@@ -361,8 +362,8 @@ export function SleepClockDial({
             y={l.pos.y}
             textAnchor="middle"
             dominantBaseline="middle"
-            fill="rgba(255,255,255,0.72)"
-            fontSize="13"
+            fill="rgba(255,255,255,0.78)"
+            fontSize="16"
             fontFamily="system-ui, -apple-system, sans-serif"
           >
             {l.text}
@@ -373,7 +374,7 @@ export function SleepClockDial({
           d={describeArc(bedMin, wakeMin, TRACK_R)}
           fill="none"
           stroke={RED}
-          strokeWidth={shifting ? 16 : 14}
+          strokeWidth={shifting ? 18 : 16}
           strokeLinecap="round"
           opacity={shifting ? 1 : 0.95}
           style={reduced ? undefined : { transition: 'stroke-width 120ms ease' }}
@@ -389,10 +390,10 @@ export function SleepClockDial({
 
         <text
           x={CX}
-          y={CY - 10}
+          y={CY - 12}
           textAnchor="middle"
           fill="#FFFFFF"
-          fontSize="34"
+          fontSize="40"
           fontWeight="700"
           fontFamily="system-ui, -apple-system, sans-serif"
         >
@@ -400,10 +401,10 @@ export function SleepClockDial({
         </text>
         <text
           x={CX}
-          y={CY + 18}
+          y={CY + 20}
           textAnchor="middle"
           fill="#8E8E93"
-          fontSize="13"
+          fontSize="14"
           fontFamily="system-ui, -apple-system, sans-serif"
         >
           Durée de sommeil

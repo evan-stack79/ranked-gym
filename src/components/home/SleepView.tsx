@@ -49,21 +49,17 @@ export function SleepView() {
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<SleepAlarmUiStatus>({ kind: 'off' })
   const [diagExpanded, setDiagExpanded] = useState(false)
-  const [dialSize, setDialSize] = useState(248)
+  const [dialSize, setDialSize] = useState(320)
   const showAlarm = isSleepAlarmPlatformSupported()
   const titleTaps = useRef({ count: 0, last: 0 })
   const rootRef = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
     const compute = () => {
-      const vh = window.visualViewport?.height ?? window.innerHeight
-      // Contenu hors cadran (titre, cartes, liste, CTA, statut, diag compact).
-      const bodyChrome = 52 + 64 + 84 + 50 + 24 + 64
-      // Navbar dock + safe-area (main padding-bottom) + petit air.
-      const navChrome = 96
-      const available = vh - bodyChrome - navChrome
-      // iPhone 17 ≈ 240–264 ; SE ≈ 180–200 ; marge pour overflow ≤ 0 à 393×852.
-      setDialSize(Math.round(Math.max(180, Math.min(264, available))))
+      // ≈ largeur écran − 2×40 pt (Evan) — iPhone 17 ≈ 320 ; SE un peu moins.
+      const vw = window.visualViewport?.width ?? window.innerWidth
+      const byWidth = Math.round(vw - 80)
+      setDialSize(Math.max(260, Math.min(340, byWidth)))
     }
     compute()
     window.addEventListener('resize', compute)

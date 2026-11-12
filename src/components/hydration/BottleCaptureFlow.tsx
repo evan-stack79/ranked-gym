@@ -208,7 +208,14 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
         <div className="space-y-3">
           <p className="text-[14px] text-[#C7C7CC]">Recadre ta bouteille à la main</p>
           {message ? <p className="text-[12px] text-[#C7C7CC]">{message}</p> : null}
-          <img src={previewUrl} alt="" className="mx-auto max-h-64 rounded-xl object-contain" />
+          <img
+            src={previewUrl}
+            alt=""
+            draggable={false}
+            className="hydration-no-callout mx-auto max-h-64 rounded-xl object-contain select-none"
+            style={{ WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
+            onContextMenu={(e) => e.preventDefault()}
+          />
           <div className="grid grid-cols-2 gap-2 text-[12px] text-[#ACB4BA]">
             {(['x', 'y', 'width', 'height'] as const).map((key) => (
               <label key={key} className="flex flex-col gap-1">
@@ -246,7 +253,10 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
           <img
             src={URL.createObjectURL(shapeBlob)}
             alt=""
-            className="mx-auto max-h-64 object-contain"
+            draggable={false}
+            className="hydration-no-callout mx-auto max-h-64 object-contain select-none"
+            style={{ WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
+            onContextMenu={(e) => e.preventDefault()}
           />
           <div className="flex gap-2">
             <button

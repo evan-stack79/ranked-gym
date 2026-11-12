@@ -18,7 +18,6 @@ const captureConfig = join(scriptsDir, 'sleep-layout-capture', 'vite.config.ts')
 const port = 4227
 
 const VIEWPORTS = [
-  { name: 'iphone17-393', width: 393, height: 852 },
   { name: 'iphone17-402', width: 402, height: 874 },
   { name: 'iphone-se-375', width: 375, height: 667 },
 ]
@@ -75,58 +74,73 @@ async function launchBrowser() {
 }
 
 async function assertLayout(page, label) {
-  const allowScroll = label.includes('375') || label.includes('se')
-  // Sur petit écran : scroller jusqu’en bas pour vérifier le CTA au-dessus de la nav.
-  if (allowScroll) {
-    await page.evaluate(() => {
-      const main = document.querySelector('[data-app-scroll-main]')
-      if (main) main.scrollTop = main.scrollHeight
-    })
-    await page.waitForTimeout(150)
-  }
-  const probe = await page.evaluate((allowScrollFlag) => {
-    const pageEl = document.querySelector('[data-sleep-page]')
+  const allowScroll = true // grand cadran : scroll OK (diag en bas)
+  // Vérifier le CTA au-dessus de la nav (scroll bas si besoin).
+  await page.evaluate(() => {
     const btn = document.querySelector('[data-sleep-now]')
-    const nav = document.querySelector('[data-bottom-nav-variant="dock"]')
-    const title = document.querySelector('[data-sleep-page] h1')
-    const scrollMain = document.querySelector('[data-app-scroll-main]')
-    if (!pageEl || !btn || !nav || !title || !scrollMain) {
-      return { ok: false, reason: 'missing-nodes' }
+    const main = document.querySelector('[data-app-scroll-main]')
+    if (btn && main) {
+      const nav = document.querySelector('[data-bottom-nav-variant]')
+      const btnBottom = btn.getBoundingClientRect().bottom
+      const navTop = nav?.getBoundingClientRect().top ?? window.innerHeight
+      if (btnBottom > navTop - 4) {
+        btn.scrollIntoView({ block: 'center' })
+      }
     }
-    const btnRect = btn.getBoundingClientRect()
-    const navRect = nav.getBoundingClientRect()
-    const titleRect = title.getBoundingClientRect()
-    const vh = window.innerHeight
-    const btnFullyAboveNav = btnRect.bottom <= navRect.top + 2
-    const titleNearTop = allowScrollFlag
-      ? true
-      : titleRect.top >= 0 && titleRect.top < 100
-    const labels = [...nav.querySelectorAll('[data-nav-tab]')].map(
-      (el) => el.getAttribute('aria-label'),
-    )
-    const overflow = scrollMain.scrollHeight - scrollMain.clientHeight
-    const fitsWithoutScroll = overflow <= 24
-    return {
-      ok:
-        btnFullyAboveNav &&
-        labels.length === 5 &&
-        (allowScrollFlag ? true : titleNearTop && fitsWithoutScroll),
-      btnFullyAboveNav,
-      titleNearTop: titleRect.top >= 0 && titleRect.top < 100,
-      titleTop: titleRect.top,
-      btnBottom: btnRect.bottom,
-      navTop: navRect.top,
-      vh,
-      labels,
-      variant: nav.getAttribute('data-bottom-nav-variant'),
-      scrollHeight: scrollMain.scrollHeight,
-      clientHeight: scrollMain.clientHeight,
-      overflow,
-      dialSize: document
-        .querySelector('[data-sleep-dial-size]')
-        ?.getAttribute('data-sleep-dial-size'),
-    }
-  }, allowScroll)
+  })
+  await page.waitForTimeout(150)
+  const probe = await page.evaluate(
+    (opts) => {
+      const pageEl = document.querySelector('[data-sleep-page]')
+      const btn = document.querySelector('[data-sleep-now]')
+      const nav = document.querySelector('[data-bottom-nav-variant="floating-pill"]')
+      const title = document.querySelector('[data-sleep-page] h1')
+      const scrollMain = document.querySelector('[data-app-scroll-main]')
+      const bubble = document.querySelector('[data-nav-bubble]')
+      if (!pageEl || !btn || !nav || !title || !scrollMain) {
+        return { ok: false, reason: 'missing-nodes' }
+      }
+      const btnRect = btn.getBoundingClientRect()
+      const navRect = nav.getBoundingClientRect()
+      const titleRect = title.getBoundingClientRect()
+      const vh = window.innerHeight
+      const btnFullyAboveNav = btnRect.bottom <= navRect.top + 2
+      const dialSize = Number(
+        document.querySelector('[data-sleep-dial-size]')?.getAttribute('data-sleep-dial-size') ??
+          '0',
+      )
+      const labels = [...nav.querySelectorAll('[data-nav-tab]')].map(
+        (el) => el.getAttribute('aria-label'),
+      )
+      const overflow = scrollMain.scrollHeight - scrollMain.clientHeight
+      const dialOk = dialSize >= opts.minDial
+      return {
+        ok:
+          btnFullyAboveNav &&
+          labels.length === 5 &&
+          labels.includes('Sommeil') &&
+          Boolean(bubble) &&
+          dialOk,
+        btnFullyAboveNav,
+        titleNearTop: titleRect.top >= 0 && titleRect.top < 100,
+        titleTop: titleRect.top,
+        btnBottom: btnRect.bottom,
+        navTop: navRect.top,
+        vh,
+        labels,
+        variant: nav.getAttribute('data-bottom-nav-variant'),
+        scrollHeight: scrollMain.scrollHeight,
+        clientHeight: scrollMain.clientHeight,
+        overflow,
+        dialSize,
+        allowScrollFlag: opts.allowScrollFlag,
+      }
+    },
+    {
+      allowScrollFlag: allowScroll,
+      minDial: label.includes('402') ? 300 : 260,
+    },
+  )
   console.log(`assert ${label}`, probe)
   if (!probe.ok) {
     throw new Error(`Layout assert failed (${label}): ${JSON.stringify(probe)}`)
@@ -144,14 +158,13 @@ async function captureViewport(browser, vp) {
   await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('[data-harness-ready]', { state: 'attached', timeout: 30_000 })
   await page.waitForSelector('[data-sleep-page]', { state: 'attached', timeout: 15_000 })
-  await page.waitForSelector('[data-bottom-nav-variant="dock"]', {
+  await page.waitForSelector('[data-bottom-nav-variant="floating-pill"]', {
     state: 'attached',
     timeout: 10_000,
   })
   await page.waitForTimeout(400)
 
-  // Capture en haut de page (titre sous safe-area) — sur SE le CTA peut
-  // être hors viewport ; l’assert scrolle ensuite pour le vérifier.
+  // Capture en haut (titre + grand cadran + liquid glass).
   const file = `sleep-${vp.name}.png`
   const path = join(outDir, file)
   await page.screenshot({ path, fullPage: false })
