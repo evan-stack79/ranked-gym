@@ -12,7 +12,6 @@ import { DailyStreak } from './DailyStreak'
 import { HomeGalleryView } from './HomeGalleryView'
 import { TodayWorkoutCard } from './TodayWorkoutCard'
 import { NutritionSnapshot } from './NutritionSnapshot'
-import { SleepSnapshot } from './SleepSnapshot'
 import { WaterCard } from '../hydration/WaterCard'
 import { WaterSettingsSheet } from '../hydration/WaterSettingsSheet'
 
@@ -129,12 +128,6 @@ function HomeDashboardView({
           <SoftBlurIn instant={coldEntering}>{subtitle}</SoftBlurIn>
         </p>
       </header>
-
-      <div className="home-cold-enter__group home-cold-enter__group--1">
-        <Reveal instant={coldEntering}>
-          <SleepSnapshot />
-        </Reveal>
-      </div>
 
       <div className="home-cold-enter__group home-cold-enter__group--2">
         <Reveal delayMs={40} instant={coldEntering}>

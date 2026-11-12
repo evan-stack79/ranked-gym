@@ -19,6 +19,26 @@ afterEach(async () => {
 })
 
 describe('BottomNav centre', () => {
+  it('dock : 5 onglets dont Sommeil avant Profil', async () => {
+    await act(async () => {
+      root.render(
+        <BottomNav
+          activeTab="sleep"
+          onTabChange={vi.fn()}
+          hasActiveWorkout={false}
+          floatingPill={false}
+        />,
+      )
+    })
+    const tabs = [...host.querySelectorAll('[data-nav-tab]')].map((el) =>
+      el.getAttribute('data-nav-tab'),
+    )
+    expect(tabs).toEqual(['home', 'training', 'nutrition', 'sleep', 'profile'])
+    expect(host.querySelector('[aria-current="page"]')?.getAttribute('aria-label')).toBe(
+      'Sommeil',
+    )
+  })
+
   it('Nouvelle séance s’il n’y a pas de brouillon (dock)', async () => {
     await act(async () => {
       root.render(
@@ -68,19 +88,21 @@ describe('BottomNav centre', () => {
     expect(host.querySelector('[aria-label="Accueil"]')).toBeTruthy()
     expect(host.querySelector('[aria-label="Train"]')).toBeTruthy()
     expect(host.querySelector('[aria-label="Nutri"]')).toBeTruthy()
+    expect(host.querySelector('[aria-label="Sommeil"]')).toBeTruthy()
     expect(host.querySelector('[aria-label="Profil"]')).toBeTruthy()
     expect(host.querySelector('[aria-label="Nouvelle séance"]')).toBeTruthy()
     expect(host.querySelector('[aria-current="page"]')?.getAttribute('aria-label')).toBe('Train')
     // No visible tab labels in the pill (aria-label only)
-    expect(host.textContent).not.toMatch(/Accueil|Train|Nutri|Profil/)
+    expect(host.textContent).not.toMatch(/Accueil|Train|Nutri|Sommeil|Profil/)
   })
 
   it('floating pill : liquid-glass bubble slides to active tab (skips centre play)', async () => {
     const tabLeft: Record<string, number> = {
       home: 8,
-      training: 72,
-      nutrition: 200,
-      profile: 264,
+      training: 64,
+      nutrition: 176,
+      sleep: 232,
+      profile: 288,
     }
     const rect = (left: number, width: number, height = 44) =>
       ({
@@ -121,7 +143,8 @@ describe('BottomNav centre', () => {
       expect(bubble?.getAttribute('aria-hidden')).toBe('true')
       expect(bubble?.getAttribute('data-ready')).toBe('true')
       expect(host.querySelector('[data-nav-center]')).toBeTruthy()
-      expect(host.querySelectorAll('[data-nav-tab]')).toHaveLength(4)
+      expect(host.querySelectorAll('[data-nav-tab]')).toHaveLength(5)
+      expect(host.querySelector('[data-nav-tab="sleep"]')).toBeTruthy()
 
       // home: left 8 + (56-36)/2 = 18
       expect(bubble!.style.transform).toBe('translate3d(18px, -50%, 0)')
@@ -138,9 +161,9 @@ describe('BottomNav centre', () => {
       })
 
       expect(host.querySelector('[aria-current="page"]')?.getAttribute('aria-label')).toBe('Profil')
-      // profile: left 264 + (56-36)/2 = 274
+      // profile: left 288 + (56-36)/2 = 298
       expect((host.querySelector('[data-nav-bubble]') as HTMLElement).style.transform).toBe(
-        'translate3d(274px, -50%, 0)',
+        'translate3d(298px, -50%, 0)',
       )
     } finally {
       gbr.mockRestore()

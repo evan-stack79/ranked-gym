@@ -6,6 +6,10 @@ describe('sleepDialMath — décalage durée fixe', () => {
   it('calcule la durée au lit (minuit inclus)', () => {
     expect(sleepSpanMinutes('23:00', '07:00')).toBe(8 * 60)
     expect(sleepSpanMinutes('23:00', '06:30')).toBe(7 * 60 + 30)
+    expect(sleepSpanMinutes('22:00', '06:00')).toBe(8 * 60)
+    // Même jour (sieste) et passage de minuit
+    expect(sleepSpanMinutes('01:00', '09:00')).toBe(8 * 60)
+    expect(sleepSpanMinutes('23:45', '00:15')).toBe(30)
   })
 
   it('décale lune et soleil ensemble sans changer la durée', () => {

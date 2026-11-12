@@ -41,9 +41,13 @@ const DAY_ROWS: { day: SleepAlarmWeekday; label: string }[] = [
   { day: 7, label: 'Chaque dimanche' },
 ]
 
+export type SleepAlarmSheetPane = 'main' | 'days' | 'sound'
+
 interface SleepAlarmSheetProps {
   open: boolean
   onClose: () => void
+  /** Open directly on Sonnerie / Répétition (page Sommeil v11). */
+  initialPane?: SleepAlarmSheetPane
 }
 
 function WheelColumn({
@@ -130,9 +134,13 @@ function TimeWheels({
  * Réglage réveil façon Alarme iPhone — iOS only.
  * Rouge rare (actions Annuler / Enregistrer / check). Fond presque noir + gris.
  */
-export function SleepAlarmSheet({ open, onClose }: SleepAlarmSheetProps) {
+export function SleepAlarmSheet({
+  open,
+  onClose,
+  initialPane = 'main',
+}: SleepAlarmSheetProps) {
   const [draft, setDraft] = useState<SleepAlarmSettings>(() => getSleepAlarmSettings())
-  const [pane, setPane] = useState<'main' | 'days' | 'sound'>('main')
+  const [pane, setPane] = useState<SleepAlarmSheetPane>('main')
   const [backend, setBackend] = useState<AlarmBackend | 'plugin-missing'>('unavailable')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -152,6 +160,7 @@ export function SleepAlarmSheet({ open, onClose }: SleepAlarmSheetProps) {
       titleTaps.current = { count: 0, last: 0 }
       return
     }
+    setPane(initialPane)
     setDraft(getSleepAlarmSettings())
     void (async () => {
       const b = await resolveAlarmBackend()
@@ -167,7 +176,7 @@ export function SleepAlarmSheet({ open, onClose }: SleepAlarmSheetProps) {
       }
       setStatus(await readSleepAlarmUiStatus())
     })()
-  }, [open])
+  }, [open, initialPane])
 
   const onTitleClick = () => {
     const now = Date.now()

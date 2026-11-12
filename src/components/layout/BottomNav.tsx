@@ -1,4 +1,4 @@
-import { Dumbbell, Home, Play, Salad, User } from 'lucide-react'
+import { Dumbbell, Home, Moon, Play, Salad, User } from 'lucide-react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { isAccueilGalleryEnabled } from '../../backend/accueilGalleryFeatureFlag'
 import type { TabId } from '../../types'
@@ -14,10 +14,12 @@ interface BottomNavProps {
   floatingPill?: boolean
 }
 
+/** Accueil · Train · [PLAY] · Nutri · Sommeil · Profil */
 const tabs: { id: TabId; label: string; icon: typeof Home }[] = [
   { id: 'home', label: 'Accueil', icon: Home },
   { id: 'training', label: 'Train', icon: Dumbbell },
   { id: 'nutrition', label: 'Nutri', icon: Salad },
+  { id: 'sleep', label: 'Sommeil', icon: Moon },
   { id: 'profile', label: 'Profil', icon: User },
 ]
 
@@ -46,16 +48,17 @@ export function BottomNav({
     )
   }
 
-  const labelClass = `text-[11px] leading-tight transition-opacity duration-180 motion-reduce:transition-none ${compact ? 'invisible absolute opacity-0' : 'opacity-100'}`
+  // 5 tabs + centre : labels un peu plus serrés pour tenir sur 390–440 pt.
+  const labelClass = `text-[10px] leading-tight transition-opacity duration-180 motion-reduce:transition-none ${compact ? 'invisible absolute opacity-0' : 'opacity-100'}`
   const centralAction = (
     <button
       type="button"
       onClick={onStartTraining}
-      className="ios-press flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[#ACB4BA] transition-colors duration-150"
+      className="ios-press flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1.5 text-[#ACB4BA] transition-colors duration-150"
       aria-label={hasActiveWorkout ? 'Reprendre' : 'Nouvelle séance'}
       data-nav-center={hasActiveWorkout ? 'resume' : 'new'}
     >
-      <span className={`flex items-center justify-center rounded-full border-4 border-[#171719] bg-[#FF0702] text-white transition-[height,width] duration-180 motion-reduce:transition-none ${compact ? 'h-12 w-12 -mt-1' : 'h-14 w-14 -mt-5'}`}>
+      <span className={`flex items-center justify-center rounded-full border-4 border-[#171719] bg-[#FF0702] text-white transition-[height,width] duration-180 motion-reduce:transition-none ${compact ? 'h-11 w-11 -mt-1' : 'h-12 w-12 -mt-3'}`}>
         <Play className="ml-0.5 h-5 w-5 fill-current" strokeWidth={2.25} aria-hidden="true" />
       </span>
       <span className={labelClass}>{hasActiveWorkout ? 'Reprendre' : 'Nouvelle séance'}</span>
@@ -87,11 +90,12 @@ export function BottomNav({
               key={id}
               type="button"
               onClick={() => onTabChange(id)}
-              className={`ios-press flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 transition-colors duration-150 ${isActive ? 'text-[#FF0702]' : 'text-[#ACB4BA]'}`}
+              className={`ios-press flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1.5 transition-colors duration-150 ${isActive ? 'text-[#FF0702]' : 'text-[#ACB4BA]'}`}
               aria-current={isActive ? 'page' : undefined}
               aria-label={label}
+              data-nav-tab={id}
             >
-              <Icon className="h-[22px] w-[22px]" strokeWidth={isActive ? 2.25 : 1.75} aria-hidden="true" />
+              <Icon className="h-[20px] w-[20px]" strokeWidth={isActive ? 2.25 : 1.75} aria-hidden="true" />
               <span className={labelClass}>{label}</span>
             </button>
           )

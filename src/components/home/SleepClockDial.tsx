@@ -83,36 +83,50 @@ function pointNearArc(
   return fromBed <= span
 }
 
-function MoonIcon({ x, y }: { x: number; y: number }) {
+/** Lit — icône Coucher (cercle blanc). */
+function BedIcon({ x, y, color }: { x: number; y: number; color: string }) {
   return (
-    <g transform={`translate(${x - 8} ${y - 8})`} aria-hidden>
+    <g transform={`translate(${x - 9} ${y - 9})`} aria-hidden>
       <path
-        d="M10.2 2.2a6.8 6.8 0 1 0 7.6 9.4A5.6 5.6 0 0 1 10.2 2.2Z"
-        fill={RED}
+        d="M2 14V7.5A1.5 1.5 0 0 1 3.5 6H7a3 3 0 0 1 3 3v1h5.5A1.5 1.5 0 0 1 17 11.5V14"
+        fill="none"
+        stroke={color}
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
+      <path
+        d="M1 14h16"
+        fill="none"
+        stroke={color}
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+      <circle cx="5.2" cy="9.2" r="1.5" fill={color} />
     </g>
   )
 }
 
-function SunIcon({ x, y }: { x: number; y: number }) {
+/** Alarme — icône Réveil (cercle rouge). */
+function AlarmIcon({ x, y, color }: { x: number; y: number; color: string }) {
   return (
     <g transform={`translate(${x - 9} ${y - 9})`} aria-hidden>
-      <circle cx="9" cy="9" r="3.2" fill={RED} />
-      {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => {
-        const rad = (deg * Math.PI) / 180
-        return (
-          <line
-            key={deg}
-            x1={9 + Math.cos(rad) * 5.2}
-            y1={9 + Math.sin(rad) * 5.2}
-            x2={9 + Math.cos(rad) * 7.6}
-            y2={9 + Math.sin(rad) * 7.6}
-            stroke={RED}
-            strokeWidth="1.6"
-            strokeLinecap="round"
-          />
-        )
-      })}
+      <circle cx="9" cy="10" r="5.2" fill="none" stroke={color} strokeWidth="1.7" />
+      <path
+        d="M9 7.6v2.8l1.8 1.2"
+        fill="none"
+        stroke={color}
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M3.2 4.2 1.6 5.6M14.8 4.2 16.4 5.6"
+        fill="none"
+        stroke={color}
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
     </g>
   )
 }
@@ -272,10 +286,10 @@ export function SleepClockDial({ bedtime, waketime, onChange, disabled }: SleepC
   })
 
   const labels = [
-    { h: 0, text: '0 h' },
-    { h: 6, text: '6 h' },
-    { h: 12, text: '12 h' },
-    { h: 18, text: '18 h' },
+    { h: 0, text: '0' },
+    { h: 6, text: '6' },
+    { h: 12, text: '12' },
+    { h: 18, text: '18' },
   ].map((l) => ({
     ...l,
     pos: polar(minutesToAngle(l.h * 60), TRACK_R + PAD - 8),
@@ -289,7 +303,7 @@ export function SleepClockDial({ bedtime, waketime, onChange, disabled }: SleepC
         viewBox={`0 0 ${SIZE} ${SIZE}`}
         className="max-w-[320px] touch-none select-none"
         role="group"
-        aria-label="Cadran coucher et lever"
+        aria-label="Cadran coucher et réveil"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -302,7 +316,7 @@ export function SleepClockDial({ bedtime, waketime, onChange, disabled }: SleepC
           r={TRACK_R}
           fill="#1C1C1E"
           stroke={shifting ? 'rgba(255,7,2,0.45)' : '#2C2C2E'}
-          strokeWidth={shifting ? 16 : 12}
+          strokeWidth={shifting ? 16 : 14}
         />
 
         {ticks.map((t) => (
@@ -343,24 +357,26 @@ export function SleepClockDial({ bedtime, waketime, onChange, disabled }: SleepC
           d={describeArc(bedMin, wakeMin, TRACK_R)}
           fill="none"
           stroke={RED}
-          strokeWidth={shifting ? 16 : 12}
+          strokeWidth={shifting ? 16 : 14}
           strokeLinecap="round"
           opacity={shifting ? 1 : 0.95}
           style={reduced ? undefined : { transition: 'stroke-width 120ms ease' }}
         />
 
-        <circle cx={bedPos.x} cy={bedPos.y} r={HANDLE_R} fill="#F5F5F7" />
-        <MoonIcon x={bedPos.x} y={bedPos.y} />
+        {/* Coucher : rond blanc + lit */}
+        <circle cx={bedPos.x} cy={bedPos.y} r={HANDLE_R} fill="#FFFFFF" />
+        <BedIcon x={bedPos.x} y={bedPos.y} color="#1C1C1E" />
 
-        <circle cx={wakePos.x} cy={wakePos.y} r={HANDLE_R} fill="#F5F5F7" />
-        <SunIcon x={wakePos.x} y={wakePos.y} />
+        {/* Réveil : rond rouge + alarme */}
+        <circle cx={wakePos.x} cy={wakePos.y} r={HANDLE_R} fill={RED} />
+        <AlarmIcon x={wakePos.x} y={wakePos.y} color="#FFFFFF" />
 
         <text
           x={CX}
-          y={CY - 8}
+          y={CY - 10}
           textAnchor="middle"
           fill="#FFFFFF"
-          fontSize="30"
+          fontSize="34"
           fontWeight="700"
           fontFamily="system-ui, -apple-system, sans-serif"
         >
@@ -371,15 +387,12 @@ export function SleepClockDial({ bedtime, waketime, onChange, disabled }: SleepC
           y={CY + 18}
           textAnchor="middle"
           fill="#8E8E93"
-          fontSize="14"
+          fontSize="13"
           fontFamily="system-ui, -apple-system, sans-serif"
         >
-          au lit
+          Durée de sommeil
         </text>
       </svg>
-      <p className="mt-1 text-center text-[12px] text-[#8E8E93]">
-        {shifting ? 'Décalage… durée fixe.' : 'Appui long sur l’arc pour tout décaler.'}
-      </p>
     </div>
   )
 }

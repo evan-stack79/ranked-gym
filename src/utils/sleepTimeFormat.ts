@@ -21,6 +21,17 @@ export function formatDurationHoursLabel(hours: number): string {
   return `${h} h ${String(m).padStart(2, '0')}`
 }
 
+/** « Jeudi 12 novembre » — date du jour pour la page Sommeil. */
+export function formatFrenchLongDate(now = new Date()): string {
+  const raw = new Intl.DateTimeFormat('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(now)
+  // Capitalize weekday (fr-FR often returns lowercase).
+  return raw.replace(/^\p{L}/u, (c) => c.toUpperCase())
+}
+
 /** Affiche HH:MM → « 6:30 » (sans zéro inutile sur l’heure). */
 export function formatClockHm(hm: string): string {
   const m = /^(\d{1,2}):(\d{2})$/.exec(hm.trim())

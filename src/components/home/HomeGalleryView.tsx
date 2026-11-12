@@ -74,7 +74,6 @@ import {
   type DragPoint,
 } from './EditableAccueilSlot'
 import { WaterSettingsSheet } from '../hydration/WaterSettingsSheet'
-import { SleepSnapshot } from './SleepSnapshot'
 
 interface HomeGalleryViewProps {
   onStartTraining: (routineId: string) => void
@@ -981,14 +980,6 @@ export function HomeGalleryView({
           </>
         )}
       </header>
-
-      {!editMode ? (
-        <div className="home-cold-enter__group home-cold-enter__group--1">
-          <Reveal delayMs={20} instant={revealInstant}>
-            <SleepSnapshot />
-          </Reveal>
-        </div>
-      ) : null}
 
       <div ref={widgetsRootRef} className="accueil-widgets flex flex-col gap-3">
         {packs.map((pack) => {
