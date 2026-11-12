@@ -116,13 +116,49 @@ export function SleepView() {
     }
   }
 
+  /** Reschedule AlarmKit when the réveil window changes and an alarm is armed. */
+  const rescheduleAlarmIfNeeded = (nextWake: string) => {
+    if (!showAlarm) return
+    const cur = getSleepAlarmSettings()
+    if (!cur.enabled) return
+    void syncSleepAlarm({ ...cur, timeHm: nextWake, enabled: true }).then((result) => {
+      if (!result.ok) {
+        const msg = syncFailureMessage(result.reason)
+        setError(msg)
+        if (result.reason === 'PERMISSION_DENIED') {
+          setStatus({ kind: 'permission' })
+        } else {
+          setStatus({ kind: 'error', message: msg })
+        }
+        return
+      }
+      const timeHm = result.timeHm ?? nextWake
+      setStatus({
+        kind: 'scheduled',
+        timeHm,
+        summary: formatRepeatSummary(getSleepAlarmSettings().days),
+      })
+      setTick((n) => n + 1)
+    })
+  }
+
   const onDialChange = (next: { bedtime: string; waketime: string }) => {
     persistWindow(next.bedtime, next.waketime)
   }
 
+  const onDialCommit = (next: { bedtime: string; waketime: string }) => {
+    persistWindow(next.bedtime, next.waketime)
+    rescheduleAlarmIfNeeded(next.waketime)
+  }
+
   const onWheelSave = (hm: string) => {
-    if (wheelTarget === 'bed') persistWindow(hm, waketime)
-    else if (wheelTarget === 'wake') persistWindow(bedtime, hm)
+    if (wheelTarget === 'bed') {
+      persistWindow(hm, waketime)
+      rescheduleAlarmIfNeeded(waketime)
+    } else if (wheelTarget === 'wake') {
+      persistWindow(bedtime, hm)
+      rescheduleAlarmIfNeeded(hm)
+    }
   }
 
   const onSleepNow = async () => {
@@ -192,6 +228,7 @@ export function SleepView() {
           bedtime={bedtime}
           waketime={waketime}
           onChange={onDialChange}
+          onCommit={onDialCommit}
           size={dialSize}
         />
       </div>

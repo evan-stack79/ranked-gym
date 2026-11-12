@@ -15,4 +15,14 @@ describe('SleepClockDial v12 C visual contract', () => {
     expect(src).toMatch(/length: 48/)
     expect(src).not.toMatch(/gradient|glow|feGaussianBlur/i)
   })
+
+  it('centre durée un peu plus bas + drag arc immédiat (pas d’appui long)', () => {
+    expect(src).toMatch(/CENTER_DURATION_Y = C \+ 2/)
+    expect(src).toMatch(/CENTER_LABEL_Y = C \+ 34/)
+    expect(src).toMatch(/data-sleep-dial-drag="arc-immediate"/)
+    expect(src).not.toMatch(/LONG_PRESS/)
+    expect(src).not.toMatch(/longPressTimer/)
+    expect(src).toMatch(/onCommit/)
+    expect(src).toMatch(/touchAction: 'pan-y'/)
+  })
 })

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { computeTibHours } from '../../sleep-engine'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { shiftSleepWindow, sleepSpanMinutes } from '../../utils/sleepDialMath'
@@ -20,7 +20,9 @@ const ARC_W = 20
 const HS = 36
 const R = C - HS / 2 - 10 // 132
 const HANDLE_HIT = HS / 2 + 8
-const LONG_PRESS_MS = 420
+/** Centre typo : bloc « durée + label » un peu plus bas pour centrage optique. */
+const CENTER_DURATION_Y = C + 2
+const CENTER_LABEL_Y = C + 34
 
 type DragTarget = 'bed' | 'wake' | 'shift'
 
@@ -28,6 +30,8 @@ interface SleepClockDialProps {
   bedtime: string
   waketime: string
   onChange: (next: { bedtime: string; waketime: string }) => void
+  /** Appelé à la fin d’un drag (sauvegarde / AlarmKit côté parent). */
+  onCommit?: (next: { bedtime: string; waketime: string }) => void
   disabled?: boolean
   /** Display width in px (viewBox stays 320 — scales cleanly). */
   size?: number
@@ -184,21 +188,24 @@ function Handle({
 }
 
 /**
- * Cadran 24 h v12 C — poignées = une heure ; appui long sur l’arc = décalage durée fixe.
+ * Cadran 24 h v12 C — poignées = une heure ; drag direct sur l’arc = décalage durée fixe.
  */
 export function SleepClockDial({
   bedtime,
   waketime,
   onChange,
+  onCommit,
   disabled,
   size = SIZE,
 }: SleepClockDialProps) {
   const reduced = usePrefersReducedMotion()
   const svgRef = useRef<SVGSVGElement>(null)
   const dragRef = useRef<DragTarget | null>(null)
-  const longPressTimer = useRef<number | null>(null)
   const shiftOriginMin = useRef<number | null>(null)
   const shiftStart = useRef<{ bed: number; wake: number; span: number } | null>(null)
+  const lastHapticMin = useRef<number | null>(null)
+  const latestRef = useRef({ bedtime, waketime })
+  latestRef.current = { bedtime, waketime }
   const [shifting, setShifting] = useState(false)
 
   const bedMin = hmToMinutes(bedtime) ?? 23 * 60
@@ -210,15 +217,6 @@ export function SleepClockDial({
   const wakeAngle = minutesToAngle(wakeMin)
   const bedPos = polar(bedAngle, R)
   const wakePos = polar(wakeAngle, R)
-
-  const clearLongPress = useCallback(() => {
-    if (longPressTimer.current != null) {
-      window.clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
-    }
-  }, [])
-
-  useEffect(() => () => clearLongPress(), [clearLongPress])
 
   const clientToSvg = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current
@@ -251,22 +249,36 @@ export function SleepClockDial({
     return null
   }
 
+  const tickHaptic = (minutes: number) => {
+    if (lastHapticMin.current === minutes) return
+    lastHapticMin.current = minutes
+    vibrate(10)
+  }
+
   const applyHandle = (target: 'bed' | 'wake', minutes: number) => {
+    const { bedtime: bed, waketime: wake } = latestRef.current
+    const other = target === 'bed' ? hmToMinutes(wake) : hmToMinutes(bed)
+    if (other != null && minutes === other) return
+    tickHaptic(minutes)
     if (target === 'bed') {
-      if (minutes === wakeMin) return
-      onChange({ bedtime: minutesToHm(minutes), waketime })
+      const next = { bedtime: minutesToHm(minutes), waketime: wake }
+      latestRef.current = next
+      onChange(next)
     } else {
-      if (minutes === bedMin) return
-      onChange({ bedtime, waketime: minutesToHm(minutes) })
+      const next = { bedtime: bed, waketime: minutesToHm(minutes) }
+      latestRef.current = next
+      onChange(next)
     }
   }
 
   const onPointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (disabled) return
-    event.currentTarget.setPointerCapture(event.pointerId)
     const handle = pickHandle(event.clientX, event.clientY)
     if (handle) {
+      event.currentTarget.setPointerCapture(event.pointerId)
+      event.preventDefault()
       dragRef.current = handle
+      lastHapticMin.current = null
       const minutes = pointerToMinutes(event.clientX, event.clientY)
       if (minutes != null) applyHandle(handle, minutes)
       return
@@ -275,29 +287,29 @@ export function SleepClockDial({
     const pt = clientToSvg(event.clientX, event.clientY)
     const onArc =
       pt != null && pointNearArc(pt.x, pt.y, bedMin, wakeMin, bedPos, wakePos)
+    // Hors arc / poignée → laisser le scroll de page (pas de capture).
     if (!onArc) return
 
     const startMin = pointerToMinutes(event.clientX, event.clientY)
     const span = sleepSpanMinutes(bedtime, waketime)
     if (startMin == null || span == null) return
 
+    event.currentTarget.setPointerCapture(event.pointerId)
+    event.preventDefault()
     shiftOriginMin.current = startMin
     shiftStart.current = { bed: bedMin, wake: wakeMin, span }
-    clearLongPress()
-    longPressTimer.current = window.setTimeout(() => {
-      dragRef.current = 'shift'
-      setShifting(true)
-      vibrate(14)
-    }, LONG_PRESS_MS)
+    dragRef.current = 'shift'
+    lastHapticMin.current = null
+    setShifting(true)
+    vibrate(14)
   }
 
   const onPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (disabled) return
+    if (disabled || dragRef.current == null) return
     const minutes = pointerToMinutes(event.clientX, event.clientY)
     if (minutes == null) return
 
     if (dragRef.current === 'bed' || dragRef.current === 'wake') {
-      clearLongPress()
       applyHandle(dragRef.current, minutes)
       return
     }
@@ -311,25 +323,27 @@ export function SleepClockDial({
         minutesToHm(shiftStart.current.wake),
         delta,
       )
-      if (next) onChange(next)
-      return
-    }
-
-    if (longPressTimer.current != null && shiftOriginMin.current != null) {
-      const moved = Math.abs(minutes - shiftOriginMin.current)
-      if (moved > 8) clearLongPress()
+      if (next) {
+        tickHaptic(hmToMinutes(next.bedtime) ?? minutes)
+        latestRef.current = next
+        onChange(next)
+      }
     }
   }
 
   const onPointerUp = (event: ReactPointerEvent<SVGSVGElement>) => {
-    clearLongPress()
+    const wasDragging = dragRef.current != null
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
     dragRef.current = null
     shiftOriginMin.current = null
     shiftStart.current = null
+    lastHapticMin.current = null
     setShifting(false)
+    if (wasDragging) {
+      onCommit?.(latestRef.current)
+    }
   }
 
   const trackSegments = Array.from({ length: 48 }, (_, i) => {
@@ -359,7 +373,6 @@ export function SleepClockDial({
     const angle = minutesToAngle(h * 60)
     const tipR = R + 13 + 2
     const tip = polar(angle, tipR)
-    // Tip points toward centre → base further out.
     const baseR = tipR + 6.2
     const mid = polar(angle, baseR)
     const tang = ((angle - 90) * Math.PI) / 180
@@ -386,20 +399,21 @@ export function SleepClockDial({
       data-sleep-dial-variant="v12c"
       data-sleep-shifting={shifting ? '1' : '0'}
       data-sleep-dial-size={displaySize}
+      data-sleep-dial-drag="arc-immediate"
       style={{ width: displaySize, maxWidth: '100%' }}
     >
       <svg
         ref={svgRef}
         width="100%"
         viewBox={`0 0 ${SIZE} ${SIZE}`}
-        className="touch-none select-none"
+        className="select-none"
         role="group"
         aria-label="Cadran coucher et réveil"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        style={{ touchAction: 'none' }}
+        style={{ touchAction: 'pan-y' }}
       >
         <defs>
           <filter id={shadowId} x="-50%" y="-50%" width="200%" height="200%">
@@ -407,7 +421,6 @@ export function SleepClockDial({
           </filter>
         </defs>
 
-        {/* Segmented track — 48 × 30 min */}
         {trackSegments.map((seg) => (
           <path
             key={seg.i}
@@ -419,17 +432,15 @@ export function SleepClockDial({
           />
         ))}
 
-        {/* Night arc bedtime → wake */}
         <path
           d={describeArc(bedMin, wakeMin, R)}
           fill="none"
           stroke={RED}
-          strokeWidth={shifting ? ARC_W + 2 : ARC_W}
+          strokeWidth={shifting && !reduced ? ARC_W + 2 : ARC_W}
           strokeLinecap="butt"
           style={reduced ? undefined : { transition: 'stroke-width 120ms ease' }}
         />
 
-        {/* Cardinal triangles (point tip toward centre) */}
         {triangles.map((t) => (
           <polygon
             key={`tri-${t.h}`}
@@ -438,7 +449,6 @@ export function SleepClockDial({
           />
         ))}
 
-        {/* Inner hour ticks */}
         {hourTicks.map((t) => (
           <line
             key={`tick-${t.h}`}
@@ -452,7 +462,6 @@ export function SleepClockDial({
           />
         ))}
 
-        {/* Bold 0 / 6 / 12 / 18 */}
         {labels.map((l) => (
           <text
             key={`lbl-${l.h}`}
@@ -474,22 +483,26 @@ export function SleepClockDial({
 
         <text
           x={C}
-          y={C - 12}
+          y={CENTER_DURATION_Y}
           textAnchor="middle"
+          dominantBaseline="middle"
           fill="#FFFFFF"
           fontSize="40"
           fontWeight="700"
           fontFamily="system-ui, -apple-system, sans-serif"
+          data-sleep-dial-center-duration
         >
           {tibLabel}
         </text>
         <text
           x={C}
-          y={C + 20}
+          y={CENTER_LABEL_Y}
           textAnchor="middle"
+          dominantBaseline="middle"
           fill="#8E8E93"
           fontSize="14"
           fontFamily="system-ui, -apple-system, sans-serif"
+          data-sleep-dial-center-label
         >
           Durée de sommeil
         </text>
