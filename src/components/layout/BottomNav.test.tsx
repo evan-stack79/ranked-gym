@@ -19,7 +19,7 @@ afterEach(async () => {
 })
 
 describe('BottomNav centre', () => {
-  it('dock : 5 onglets dont Sommeil avant Profil', async () => {
+  it('dock : 5 onglets dont Sommeil avant Profil, PLAY centré, libellés', async () => {
     await act(async () => {
       root.render(
         <BottomNav
@@ -37,6 +37,14 @@ describe('BottomNav centre', () => {
     expect(host.querySelector('[aria-current="page"]')?.getAttribute('aria-label')).toBe(
       'Sommeil',
     )
+    expect(host.textContent).toMatch(/Sommeil/)
+    expect(host.textContent).toMatch(/Accueil/)
+    expect(host.querySelector('[data-bottom-nav-variant="dock"]')).toBeTruthy()
+    expect(host.querySelector('[data-nav-bubble]')).toBeNull()
+    // PLAY size class (origin) — no giant ring / red glow classes
+    const play = host.querySelector('[data-nav-center] span')
+    expect(play?.className).toMatch(/h-14/)
+    expect(play?.className).not.toMatch(/shadow-\[/)
   })
 
   it('Nouvelle séance s’il n’y a pas de brouillon (dock)', async () => {

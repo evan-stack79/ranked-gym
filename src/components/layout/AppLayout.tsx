@@ -1,5 +1,4 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import { isAccueilGalleryEnabled } from '../../backend/accueilGalleryFeatureFlag'
 import { useAuth } from '../../context/AuthContext'
 import { BrandMark } from '../brand/BrandMark'
 import { BottomNav } from './BottomNav'
@@ -50,18 +49,15 @@ export function AppLayout({
   const showBottomNav = !chromeHidden && !hideBottomNav && !keyboardOpen
   const bottomNavObscured = streakCelebrationActive
   const showReadyBar = !chromeHidden && activeTab === 'training' && readyBarEnabled
-  const floatingPillNav = isAccueilGalleryEnabled()
+  // v11 : dock avec libellés partout (Accueil gallery garde ses tuiles, pas la pill nav).
+  const sleepTab = activeTab === 'sleep'
 
   useEffect(() => {
-    if (floatingPillNav) {
-      document.documentElement.dataset.bottomNavPreview = 'floating-pill'
-    } else {
-      delete document.documentElement.dataset.bottomNavPreview
-    }
+    delete document.documentElement.dataset.bottomNavPreview
     return () => {
       delete document.documentElement.dataset.bottomNavPreview
     }
-  }, [floatingPillNav])
+  }, [])
 
   return (
     <div
@@ -137,16 +133,27 @@ export function AppLayout({
       >
         <div
           className={
-            chromeHidden ? undefined : 'mx-auto w-full max-w-lg px-5 py-8'
+            chromeHidden
+              ? undefined
+              : sleepTab
+                ? 'mx-auto w-full max-w-lg px-5'
+                : 'mx-auto w-full max-w-lg px-5 py-8'
           }
           style={
             chromeHidden || showHeader
               ? undefined
-              : {
-                  /* Pas de barre marque : le contenu gère l’encoche iOS (safe-area). */
-                  paddingTop: 'max(2rem, calc(env(safe-area-inset-top, 0px) + 1rem))',
-                }
+              : sleepTab
+                ? {
+                    /* Sommeil : même safe-area que les autres onglets, sans py-8 empilé. */
+                    paddingTop:
+                      'max(0.75rem, calc(var(--app-safe-area-top, env(safe-area-inset-top, 0px)) + 0.35rem))',
+                  }
+                : {
+                    /* Pas de barre marque : le contenu gère l’encoche iOS (safe-area). */
+                    paddingTop: 'max(2rem, calc(env(safe-area-inset-top, 0px) + 1rem))',
+                  }
           }
+          data-app-content-pad={sleepTab ? 'sleep' : showHeader ? 'brand' : 'default'}
         >
           {children}
         </div>

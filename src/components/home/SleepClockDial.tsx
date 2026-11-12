@@ -27,6 +27,8 @@ interface SleepClockDialProps {
   waketime: string
   onChange: (next: { bedtime: string; waketime: string }) => void
   disabled?: boolean
+  /** Display width in px (viewBox stays 320 — scales cleanly). */
+  size?: number
 }
 
 function minutesToAngle(minutes: number): number {
@@ -134,7 +136,13 @@ function AlarmIcon({ x, y, color }: { x: number; y: number; color: string }) {
 /**
  * Cadran 24 h — poignées = une heure ; appui long sur l’arc = décalage durée fixe.
  */
-export function SleepClockDial({ bedtime, waketime, onChange, disabled }: SleepClockDialProps) {
+export function SleepClockDial({
+  bedtime,
+  waketime,
+  onChange,
+  disabled,
+  size = SIZE,
+}: SleepClockDialProps) {
   const reduced = usePrefersReducedMotion()
   const svgRef = useRef<SVGSVGElement>(null)
   const dragRef = useRef<DragTarget | null>(null)
@@ -295,13 +303,21 @@ export function SleepClockDial({ bedtime, waketime, onChange, disabled }: SleepC
     pos: polar(minutesToAngle(l.h * 60), TRACK_R + PAD - 8),
   }))
 
+  const displaySize = Math.max(180, Math.min(SIZE, Math.round(size)))
+
   return (
-    <div className="flex flex-col items-center" data-sleep-clock-dial data-sleep-shifting={shifting ? '1' : '0'}>
+    <div
+      className="mx-auto flex flex-col items-center"
+      data-sleep-clock-dial
+      data-sleep-shifting={shifting ? '1' : '0'}
+      data-sleep-dial-size={displaySize}
+      style={{ width: displaySize, maxWidth: '100%' }}
+    >
       <svg
         ref={svgRef}
         width="100%"
         viewBox={`0 0 ${SIZE} ${SIZE}`}
-        className="max-w-[320px] touch-none select-none"
+        className="touch-none select-none"
         role="group"
         aria-label="Cadran coucher et réveil"
         onPointerDown={onPointerDown}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight, Pencil } from 'lucide-react'
 import {
   getSleepSchedule,
@@ -35,8 +35,8 @@ const CARD = '#1C1C1E'
 const GRAY = '#ACB4BA'
 
 /**
- * Page Sommeil v11 — onglet navbar (plein écran).
- * Cadran + cartes Coucher/Réveil + Sonnerie/Répétition + Dormir maintenant.
+ * Page Sommeil v11 — tient en un écran sur iPhone 17 (scroll seulement si trop petit).
+ * Pas de padding safe-area ici : AppLayout (data-app-content-pad=sleep) le gère.
  */
 export function SleepView() {
   const [tick, setTick] = useState(0)
@@ -49,8 +49,30 @@ export function SleepView() {
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<SleepAlarmUiStatus>({ kind: 'off' })
   const [diagExpanded, setDiagExpanded] = useState(false)
+  const [dialSize, setDialSize] = useState(248)
   const showAlarm = isSleepAlarmPlatformSupported()
   const titleTaps = useRef({ count: 0, last: 0 })
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    const compute = () => {
+      const vh = window.visualViewport?.height ?? window.innerHeight
+      // Contenu hors cadran (titre, cartes, liste, CTA, statut, diag compact).
+      const bodyChrome = 52 + 64 + 84 + 50 + 24 + 64
+      // Navbar dock + safe-area (main padding-bottom) + petit air.
+      const navChrome = 96
+      const available = vh - bodyChrome - navChrome
+      // iPhone 17 ≈ 240–264 ; SE ≈ 180–200 ; marge pour overflow ≤ 0 à 393×852.
+      setDialSize(Math.round(Math.max(180, Math.min(264, available))))
+    }
+    compute()
+    window.addEventListener('resize', compute)
+    window.visualViewport?.addEventListener('resize', compute)
+    return () => {
+      window.removeEventListener('resize', compute)
+      window.visualViewport?.removeEventListener('resize', compute)
+    }
+  }, [])
 
   useEffect(() => {
     const sync = () => setTick((n) => n + 1)
@@ -92,7 +114,6 @@ export function SleepView() {
     setBedtime(nextBed)
     setWaketime(nextWake)
     saveSleepSchedule({ bedtime: nextBed, waketime: nextWake })
-    // Keep alarm time aligned with réveil handle (without enabling).
     const cur = getSleepAlarmSettings()
     if (cur.timeHm !== nextWake) {
       saveSleepAlarmSettings({ timeHm: nextWake })
@@ -141,15 +162,12 @@ export function SleepView() {
 
   return (
     <div
-      className="mx-auto flex min-h-0 w-full max-w-lg flex-col px-5 pb-8"
-      style={{
-        paddingTop: 'max(1.25rem, calc(env(safe-area-inset-top, 0px) + 0.75rem))',
-        backgroundColor: '#000000',
-      }}
+      ref={rootRef}
+      className="flex min-h-0 w-full flex-col"
       data-sleep-page
       data-sleep-route="sommeil"
     >
-      <header className="mb-3">
+      <header className="shrink-0 pb-1">
         <button
           type="button"
           className="text-left"
@@ -164,61 +182,73 @@ export function SleepView() {
             }
           }}
         >
-          <h1 className="text-[28px] font-bold tracking-tight text-white">Sommeil</h1>
+          <h1 className="text-[26px] font-bold leading-tight tracking-tight text-white">
+            Sommeil
+          </h1>
         </button>
-        <p className="mt-0.5 text-[15px]" style={{ color: GRAY }} data-sleep-page-date>
+        <p className="mt-0.5 text-[14px]" style={{ color: GRAY }} data-sleep-page-date>
           {dateLabel}
         </p>
       </header>
 
-      <SleepClockDial bedtime={bedtime} waketime={waketime} onChange={onDialChange} />
+      <div className="shrink-0 py-1">
+        <SleepClockDial
+          bedtime={bedtime}
+          waketime={waketime}
+          onChange={onDialChange}
+          size={dialSize}
+        />
+      </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className="mt-2 grid shrink-0 grid-cols-2 gap-2.5">
         <button
           type="button"
           onClick={() => setWheelTarget('bed')}
-          className="ios-press rounded-2xl px-3.5 py-3 text-left"
+          className="ios-press rounded-2xl px-3 py-2.5 text-left"
           style={{ backgroundColor: CARD }}
           data-sleep-card-bed
         >
           <span className="flex items-center justify-between gap-2">
-            <span className="text-[13px]" style={{ color: GRAY }}>
+            <span className="text-[12px]" style={{ color: GRAY }}>
               Coucher
             </span>
             <Pencil className="h-3.5 w-3.5" style={{ color: GRAY }} aria-hidden />
           </span>
-          <span className="mt-1 block text-[22px] font-bold tabular-nums text-white">
+          <span className="mt-0.5 block text-[20px] font-bold tabular-nums text-white">
             {formatClockHm(bedtime)}
           </span>
         </button>
         <button
           type="button"
           onClick={() => setWheelTarget('wake')}
-          className="ios-press rounded-2xl px-3.5 py-3 text-left"
+          className="ios-press rounded-2xl px-3 py-2.5 text-left"
           style={{ backgroundColor: CARD }}
           data-sleep-card-wake
         >
           <span className="flex items-center justify-between gap-2">
-            <span className="text-[13px]" style={{ color: GRAY }}>
+            <span className="text-[12px]" style={{ color: GRAY }}>
               Réveil
             </span>
             <Pencil className="h-3.5 w-3.5" style={{ color: GRAY }} aria-hidden />
           </span>
-          <span className="mt-1 block text-[22px] font-bold tabular-nums text-white">
+          <span className="mt-0.5 block text-[20px] font-bold tabular-nums text-white">
             {formatClockHm(waketime)}
           </span>
         </button>
       </div>
 
-      <div className="mt-3 overflow-hidden rounded-2xl" style={{ backgroundColor: CARD }}>
+      <div
+        className="mt-2.5 shrink-0 overflow-hidden rounded-2xl"
+        style={{ backgroundColor: CARD }}
+      >
         <button
           type="button"
           onClick={() => setAlarmPane('sound')}
-          className="ios-press flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left"
+          className="ios-press flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
           data-sleep-row-sound
         >
-          <span className="text-[16px] text-white">Sonnerie</span>
-          <span className="flex min-w-0 items-center gap-1 text-[15px]" style={{ color: GRAY }}>
+          <span className="text-[15px] text-white">Sonnerie</span>
+          <span className="flex min-w-0 items-center gap-1 text-[14px]" style={{ color: GRAY }}>
             <span className="truncate">{soundLabel}</span>
             <ChevronRight className="h-4 w-4 shrink-0" />
           </span>
@@ -227,11 +257,11 @@ export function SleepView() {
         <button
           type="button"
           onClick={() => setAlarmPane('days')}
-          className="ios-press flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left"
+          className="ios-press flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
           data-sleep-row-repeat
         >
-          <span className="text-[16px] text-white">Répétition</span>
-          <span className="flex min-w-0 items-center gap-1 text-[15px]" style={{ color: GRAY }}>
+          <span className="text-[15px] text-white">Répétition</span>
+          <span className="flex min-w-0 items-center gap-1 text-[14px]" style={{ color: GRAY }}>
             <span className="truncate">{repeatLabel}</span>
             <ChevronRight className="h-4 w-4 shrink-0" />
           </span>
@@ -242,28 +272,29 @@ export function SleepView() {
         type="button"
         onClick={() => void onSleepNow()}
         disabled={saving}
-        className="ios-press mt-5 w-full rounded-2xl py-4 text-[17px] font-semibold text-white disabled:opacity-50"
+        className="ios-press mt-3 w-full shrink-0 rounded-2xl py-3.5 text-[16px] font-semibold text-white disabled:opacity-50"
         style={{ backgroundColor: RED }}
         data-sleep-now
       >
         {saving ? 'Enregistrement…' : 'Dormir maintenant'}
       </button>
 
-      <div className="mt-3 space-y-2">
+      <div className="mt-2 shrink-0 space-y-1">
         {confirmMsg ? (
-          <p className="text-[14px] font-medium text-white" data-sleep-alarm-confirm>
+          <p className="text-[13px] font-medium text-white" data-sleep-alarm-confirm>
             {confirmMsg}
           </p>
         ) : (
           <SleepAlarmStatusBanner status={status} />
         )}
         {error && status.kind !== 'permission' ? (
-          <p className="text-[13px] text-[#FF907F]">{error}</p>
+          <p className="text-[12px] text-[#FF907F]">{error}</p>
         ) : null}
       </div>
 
-      {/* Diag beta always visible on page (iOS native gets live AlarmKit fields). */}
-      <SleepAlarmDiagBlock open expanded={diagExpanded} />
+      <div className="mt-1 shrink-0">
+        <SleepAlarmDiagBlock open expanded={diagExpanded} />
+      </div>
 
       <SleepHmWheelSheet
         open={wheelTarget != null}

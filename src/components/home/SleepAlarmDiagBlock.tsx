@@ -72,12 +72,12 @@ export function SleepAlarmDiagBlock({ expanded, open }: SleepAlarmDiagBlockProps
 
   return (
     <div
-      className="mt-4 space-y-2 border-t border-white/10 pt-3"
+      className="mt-2 space-y-1.5 border-t border-white/10 pt-2"
       data-sleep-alarm-diag
       data-sleep-alarm-diag-expanded={expanded ? '1' : '0'}
     >
       <p
-        className="px-1 font-mono text-[10px] leading-relaxed"
+        className="px-1 font-mono text-[9px] leading-snug"
         style={{ color: GRAY }}
         data-sleep-alarm-diag-lines
       >
@@ -98,7 +98,7 @@ export function SleepAlarmDiagBlock({ expanded, open }: SleepAlarmDiagBlockProps
         type="button"
         onClick={() => void onTest()}
         disabled={busy}
-        className="ios-press w-full rounded-xl px-3 py-2.5 text-left text-[12px] disabled:opacity-50"
+        className="ios-press w-full rounded-xl px-3 py-2 text-left text-[11px] disabled:opacity-50"
         style={{ backgroundColor: '#1C1C1E', color: GRAY }}
         data-sleep-alarm-test-1min
       >
