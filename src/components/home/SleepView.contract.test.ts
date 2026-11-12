@@ -19,6 +19,14 @@ describe('SleepView v11 page contracts', () => {
     expect(src).not.toMatch(/flamme|streak|BPM|kcal/i)
   })
 
+  it('wheel/dial persist window + reschedule AlarmKit on commit', () => {
+    const src = readFileSync(resolve(__dirname, 'SleepView.tsx'), 'utf8')
+    expect(src).toMatch(/onCommit=\{onDialCommit\}/)
+    expect(src).toMatch(/rescheduleAlarmIfNeeded/)
+    expect(src).toMatch(/syncSleepAlarm/)
+    expect(src).toMatch(/SleepHmWheelSheet/)
+  })
+
   it('durée cadran (minuit) → label « 8 h » / « 8 h 30 »', () => {
     expect(sleepSpanMinutes('23:00', '07:00')).toBe(8 * 60)
     expect(formatDurationHoursLabel(computeTibHours('23:00', '07:00')!)).toBe('8 h')

@@ -24,6 +24,7 @@ import { IosSheet } from '../ui/IosSheet'
 import type { AlarmBackend } from '../../utils/sleepAlarmSchedule'
 import { SleepAlarmDiagBlock } from './SleepAlarmDiagBlock'
 import { SleepAlarmStatusBanner } from './SleepAlarmStatusBanner'
+import { SleepTimeWheelColumn } from './SleepTimeWheelColumn'
 
 const BG = '#000000'
 const CARD = '#1C1C1E'
@@ -50,51 +51,6 @@ interface SleepAlarmSheetProps {
   initialPane?: SleepAlarmSheetPane
 }
 
-function WheelColumn({
-  values,
-  value,
-  onChange,
-  ariaLabel,
-}: {
-  values: number[]
-  value: number
-  onChange: (n: number) => void
-  ariaLabel: string
-}) {
-  return (
-    <div
-      className="relative h-[180px] w-[72px] overflow-y-auto snap-y snap-mandatory"
-      style={{ scrollbarWidth: 'none' }}
-      aria-label={ariaLabel}
-      role="listbox"
-    >
-      <div className="h-[68px]" aria-hidden />
-      {values.map((n) => {
-        const selected = n === value
-        return (
-          <button
-            key={n}
-            type="button"
-            role="option"
-            aria-selected={selected}
-            onClick={() => onChange(n)}
-            className="flex h-[44px] w-full snap-center items-center justify-center tabular-nums"
-            style={{
-              color: selected ? '#FFFFFF' : GRAY,
-              fontSize: selected ? 28 : 22,
-              fontWeight: selected ? 600 : 400,
-              opacity: selected ? 1 : 0.45,
-            }}
-          >
-            {String(n).padStart(2, '0')}
-          </button>
-        )
-      })}
-      <div className="h-[68px]" aria-hidden />
-    </div>
-  )
-}
-
 function TimeWheels({
   hour,
   minute,
@@ -113,14 +69,14 @@ function TimeWheels({
         style={{ backgroundColor: ROW }}
         aria-hidden
       />
-      <WheelColumn
+      <SleepTimeWheelColumn
         values={hours}
         value={hour}
         onChange={(h) => onChange(h, minute)}
         ariaLabel="Heures"
       />
       <span className="relative z-[1] text-[28px] font-semibold text-white">:</span>
-      <WheelColumn
+      <SleepTimeWheelColumn
         values={minutes}
         value={minute}
         onChange={(m) => onChange(hour, m)}
