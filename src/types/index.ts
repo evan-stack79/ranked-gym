@@ -44,7 +44,7 @@ export interface GeoCoordinates {
 }
 
 /** Navigation principale V1 : Lobby retiré du BottomNav (infra Lobby conservée). */
-export type TabId = 'home' | 'training' | 'nutrition' | 'profile'
+export type TabId = 'home' | 'training' | 'nutrition' | 'sleep' | 'profile'
 
 export interface NavTab {
   id: TabId

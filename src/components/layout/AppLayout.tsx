@@ -5,6 +5,7 @@ import { BrandMark } from '../brand/BrandMark'
 import { BottomNav } from './BottomNav'
 import { StreakCelebrationHost } from '../streak/StreakCelebrationHost'
 import { RankUpCelebrationHost } from '../ranked/RankUpCelebrationHost'
+import { SleepMorningHost } from '../home/SleepMorningHost'
 import { RestTimerOverlay, REST_BAR_CONTENT_PAD } from '../training/RestTimerOverlay'
 import { useRestTimerContext, type RestPresetSec } from '../../context/RestTimerContext'
 import type { TabId } from '../../types'
@@ -50,6 +51,7 @@ export function AppLayout({
   const bottomNavObscured = streakCelebrationActive
   const showReadyBar = !chromeHidden && activeTab === 'training' && readyBarEnabled
   const floatingPillNav = isAccueilGalleryEnabled()
+  const sleepTab = activeTab === 'sleep'
 
   useEffect(() => {
     if (floatingPillNav) {
@@ -136,16 +138,27 @@ export function AppLayout({
       >
         <div
           className={
-            chromeHidden ? undefined : 'mx-auto w-full max-w-lg px-5 py-8'
+            chromeHidden
+              ? undefined
+              : sleepTab
+                ? 'mx-auto w-full max-w-lg px-5'
+                : 'mx-auto w-full max-w-lg px-5 py-8'
           }
           style={
             chromeHidden || showHeader
               ? undefined
-              : {
-                  /* Pas de barre marque : le contenu gère l’encoche iOS (safe-area). */
-                  paddingTop: 'max(2rem, calc(env(safe-area-inset-top, 0px) + 1rem))',
-                }
+              : sleepTab
+                ? {
+                    /* Sommeil : même safe-area que les autres onglets, sans py-8 empilé. */
+                    paddingTop:
+                      'max(0.75rem, calc(var(--app-safe-area-top, env(safe-area-inset-top, 0px)) + 0.35rem))',
+                  }
+                : {
+                    /* Pas de barre marque : le contenu gère l’encoche iOS (safe-area). */
+                    paddingTop: 'max(2rem, calc(env(safe-area-inset-top, 0px) + 1rem))',
+                  }
           }
+          data-app-content-pad={sleepTab ? 'sleep' : showHeader ? 'brand' : 'default'}
         >
           {children}
         </div>
@@ -194,6 +207,7 @@ export function AppLayout({
       ) : null}
       <StreakCelebrationHost shellRef={shellRef} />
       <RankUpCelebrationHost />
+      <SleepMorningHost />
     </div>
   )
 }

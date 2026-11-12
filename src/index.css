@@ -136,6 +136,31 @@ img {
   user-drag: none;
 }
 
+/*
+ * Hydratation : appui long pour glisser le niveau — iOS ne doit pas ouvrir
+ * le menu image (Partager / Enregistrer / Copier…). Zone + shells PNG.
+ */
+[data-hydration-live-bottle],
+[data-hydration-visual],
+[data-hydration-carousel],
+.hydration-no-callout {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+[data-hydration-live-bottle] img,
+[data-hydration-visual] img,
+[data-hydration-carousel] img,
+[data-hydration-shell],
+.hydration-no-callout img {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
 /* Layout dock — BottomNav + îlot repos (Train) */
 :root {
   /* Hauteur utile BottomNav (hors safe-area), ~70–80px */
@@ -3243,5 +3268,97 @@ select,
 
   .welcome-screen__cta {
     margin-top: 1rem;
+  }
+}
+
+/* Sleep feeling slider — discrete 1–5, accent #ff0702 */
+.sleep-feeling-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    #ff0702 0%,
+    #ff0702 var(--sleep-slider-pct, 75%),
+    rgba(255, 255, 255, 0.18) var(--sleep-slider-pct, 75%),
+    rgba(255, 255, 255, 0.18) 100%
+  );
+  outline: none;
+}
+
+.sleep-feeling-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #ff0702;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.sleep-feeling-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #ff0702;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.sleep-feeling-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sleep-feeling-slider::-webkit-slider-thumb,
+  .sleep-feeling-slider::-moz-range-thumb {
+    transition: none;
+  }
+}
+
+/* Sleep v10 — panthère se réveille (désactivé si prefers-reduced-motion) */
+@keyframes sleep-panther-wake {
+  from {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-sleep-panther-awake] {
+    animation: none !important;
+  }
+}
+
+/* Sommeil — 7 barres semaine : grow staggered once on mount */
+@keyframes sleep-week-bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+[data-sleep-week-bar-grow='1'] {
+  transform-origin: bottom center;
+  animation: sleep-week-bar-grow 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--sleep-week-bar-i, 0) * 55ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-sleep-week-bar-grow='1'] {
+    animation: none !important;
+    transform: none !important;
   }
 }

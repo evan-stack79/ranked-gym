@@ -12,7 +12,6 @@ import { DailyStreak } from './DailyStreak'
 import { HomeGalleryView } from './HomeGalleryView'
 import { TodayWorkoutCard } from './TodayWorkoutCard'
 import { NutritionSnapshot } from './NutritionSnapshot'
-import { SleepSnapshot } from './SleepSnapshot'
 import { WaterCard } from '../hydration/WaterCard'
 import { WaterSettingsSheet } from '../hydration/WaterSettingsSheet'
 
@@ -54,7 +53,7 @@ export function HomeView({
 
 /**
  * Accueil = dashboard quotidien (default).
- * Ordre : Nutrition (calories + eau) → Séance → Sommeil → Série → Alertes (si besoin).
+ * Ordre : Sommeil (haut) → Nutrition (calories + eau) → Séance → Série → Alertes (si besoin).
  * Ghost mode / Lobby / feed social : hors nav principale (infra conservée).
  */
 function HomeDashboardView({
@@ -130,12 +129,12 @@ function HomeDashboardView({
         </p>
       </header>
 
-      <div className="home-cold-enter__group home-cold-enter__group--1">
-        <Reveal instant={coldEntering}>
+      <div className="home-cold-enter__group home-cold-enter__group--2">
+        <Reveal delayMs={40} instant={coldEntering}>
           <NutritionSnapshot onOpenNutrition={onOpenNutrition} />
         </Reveal>
         <div className="mt-3">
-          <Reveal delayMs={40} instant={coldEntering}>
+          <Reveal delayMs={60} instant={coldEntering}>
             <WaterCard onOpenSettings={() => setWaterSettingsOpen(true)} />
           </Reveal>
         </div>
@@ -145,8 +144,8 @@ function HomeDashboardView({
         />
       </div>
 
-      <div className="home-cold-enter__group home-cold-enter__group--2">
-        <Reveal delayMs={60} instant={coldEntering}>
+      <div className="home-cold-enter__group home-cold-enter__group--3">
+        <Reveal delayMs={80} instant={coldEntering}>
           <TodayWorkoutCard
             workout={todayWorkout}
             onStart={() => {
@@ -155,10 +154,6 @@ function HomeDashboardView({
             onOpenNotebook={onOpenTraining}
           />
         </Reveal>
-      </div>
-
-      <div className="home-cold-enter__group home-cold-enter__group--3">
-        <SleepSnapshot />
       </div>
 
       <div className="home-cold-enter__group home-cold-enter__group--4">
