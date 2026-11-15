@@ -31,6 +31,10 @@ import {
 } from '../../utils/sleepTimeFormat'
 import { useSleepPageActive } from '../../hooks/useSleepPageActive'
 import { SleepAlarmDiagBlock } from './SleepAlarmDiagBlock'
+import {
+  isSleepAlarmDiagEnabled,
+  setSleepAlarmDiagEnabled,
+} from '../../utils/sleepAlarmDiagGate'
 import { SleepAlarmSheet, type SleepAlarmSheetPane } from './SleepAlarmSheet'
 import { SleepAlarmStatusBanner } from './SleepAlarmStatusBanner'
 import { SleepClockDial } from './SleepClockDial'
@@ -56,6 +60,11 @@ export function SleepView() {
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<SleepAlarmUiStatus>({ kind: 'off' })
   const [diagExpanded, setDiagExpanded] = useState(false)
+  const [diagGateTick, setDiagGateTick] = useState(0)
+  const diagOpen = useMemo(() => {
+    void diagGateTick
+    return isSleepAlarmDiagEnabled()
+  }, [diagGateTick])
   const [dialSize, setDialSize] = useState(320)
   const [sleepNowAnim, setSleepNowAnim] = useState(false)
   const [bedIconPlay, setBedIconPlay] = useState(false)
@@ -268,7 +277,14 @@ export function SleepView() {
             titleTaps.current.count += 1
             if (titleTaps.current.count >= 5) {
               titleTaps.current.count = 0
-              setDiagExpanded((v) => !v)
+              // Hidden unlock for release IPA / expand in DEV.
+              if (!isSleepAlarmDiagEnabled()) {
+                setSleepAlarmDiagEnabled(true)
+                setDiagExpanded(true)
+              } else {
+                setDiagExpanded((v) => !v)
+              }
+              setDiagGateTick((n) => n + 1)
             }
           }}
         >
@@ -448,9 +464,11 @@ export function SleepView() {
         ) : null}
       </div>
 
-      <div className="mt-1 shrink-0">
-        <SleepAlarmDiagBlock open expanded={diagExpanded} />
-      </div>
+      {diagOpen ? (
+        <div className="mt-1 shrink-0" data-sleep-alarm-diag-host>
+          <SleepAlarmDiagBlock open expanded={diagExpanded} />
+        </div>
+      ) : null}
 
       <SleepWeekBlock
         key={`sleep-week-${tick}`}

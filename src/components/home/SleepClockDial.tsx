@@ -1,6 +1,13 @@
-import { useCallback, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import { computeTibHours } from '../../sleep-engine'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
+import { attachDialTouchScrollLock } from '../../utils/dialTouchScrollLock'
 import { shiftSleepWindow, sleepSpanMinutes } from '../../utils/sleepDialMath'
 import { vibrate } from '../../utils/haptics'
 import {
@@ -199,6 +206,7 @@ export function SleepClockDial({
   size = SIZE,
 }: SleepClockDialProps) {
   const reduced = usePrefersReducedMotion()
+  const rootRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const dragRef = useRef<DragTarget | null>(null)
   const shiftOriginMin = useRef<number | null>(null)
@@ -207,6 +215,13 @@ export function SleepClockDial({
   const latestRef = useRef({ bedtime, waketime })
   latestRef.current = { bedtime, waketime }
   const [shifting, setShifting] = useState(false)
+
+  // iOS WKWebView: block page scroll while dragging the dial (passive:false touchmove).
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    return attachDialTouchScrollLock(el, () => dragRef.current != null)
+  }, [])
 
   const bedMin = hmToMinutes(bedtime) ?? 23 * 60
   const wakeMin = hmToMinutes(waketime) ?? 7 * 60
@@ -394,13 +409,19 @@ export function SleepClockDial({
 
   return (
     <div
+      ref={rootRef}
       className="mx-auto flex flex-col items-center"
       data-sleep-clock-dial
       data-sleep-dial-variant="v12c"
       data-sleep-shifting={shifting ? '1' : '0'}
       data-sleep-dial-size={displaySize}
       data-sleep-dial-drag="arc-immediate"
-      style={{ width: displaySize, maxWidth: '100%' }}
+      style={{
+        width: displaySize,
+        maxWidth: '100%',
+        touchAction: 'none',
+        overscrollBehavior: 'contain',
+      }}
     >
       <svg
         ref={svgRef}
@@ -413,7 +434,7 @@ export function SleepClockDial({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        style={{ touchAction: 'pan-y' }}
+        style={{ touchAction: 'none', overscrollBehavior: 'contain' }}
       >
         <defs>
           <filter id={shadowId} x="-50%" y="-50%" width="200%" height="200%">

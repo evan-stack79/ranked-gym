@@ -12,6 +12,29 @@ describe('etat fixtures (priorité C)', () => {
     expect(etat(PROVISOIRE.nights, PROVISOIRE.age, PROVISOIRE.q).id).toBe(0)
   })
 
+  it('0 nuit → état 0 (pas d’état 3 ni conseil)', () => {
+    const r = etat([], 24, {})
+    expect(r.s.n).toBe(0)
+    expect(r.id).toBe(0)
+  })
+
+  it('4 nuits courtes « en forme » → état 0 (pas d’état 3 avant 5 nuits)', () => {
+    // Durée < 6 h + R ≥ 4 matcherait l’état 3 si on ignorait le seuil de 5 nuits.
+    const nights = [
+      { day: 'lun', bed: '01:00', wake: '06:00', R: 5 },
+      { day: 'mar', bed: '01:00', wake: '06:00', R: 5 },
+      { day: 'mer', bed: '01:00', wake: '06:00', R: 4 },
+      { day: 'jeu', bed: '01:00', wake: '06:00', R: 5 },
+    ]
+    const r = etat(nights, 24, {})
+    expect(r.s.n).toBe(4)
+    expect(r.id).toBe(0)
+  })
+
+  it('≥5 nuits : comportement état 3 inchangé (fixture)', () => {
+    expect(etat(ETATS[3]!.nights, ETATS[3]!.age, ETATS[3]!.q).id).toBe(3)
+  })
+
   for (const key of Object.keys(ETATS)) {
     it(`ETATS[${key}] → id ${key}`, () => {
       const fixture = ETATS[+key]!

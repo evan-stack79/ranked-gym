@@ -17,6 +17,8 @@ describe('SleepView v11 page contracts', () => {
     expect(src).toMatch(/Batterie faible/)
     expect(src).toMatch(/cancelSleepAlarm/)
     expect(src).toMatch(/SleepAlarmDiagBlock/)
+    expect(src).toMatch(/isSleepAlarmDiagEnabled/)
+    expect(src).toMatch(/diagOpen/)
     expect(src).toMatch(/Sonnerie/)
     expect(src).toMatch(/Répétition/)
     expect(src).not.toMatch(/Au réveil/)

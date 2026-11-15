@@ -105,7 +105,8 @@ export function SleepWeekBlock({ nights, age }: SleepWeekBlockProps) {
   const [aideOpen, setAideOpen] = useState(false)
 
   const tip = useMemo(() => {
-    if (!model || model.provisional) return null
+    // SCIENCE_12 : aucun conseil / profil d'état avant 5 nuits valides (y compris état 3).
+    if (!model || model.provisional || model.validCount < 5) return null
     const r = etat(model.nights, age > 0 ? age : 24, {})
     if (r.id < 1 || r.id > 12) return null
     const texts = etatTexts(r.id, r)

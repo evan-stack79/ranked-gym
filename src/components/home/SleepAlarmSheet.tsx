@@ -25,6 +25,10 @@ import type { AlarmBackend } from '../../utils/sleepAlarmSchedule'
 import { SleepAlarmDiagBlock } from './SleepAlarmDiagBlock'
 import { SleepAlarmStatusBanner } from './SleepAlarmStatusBanner'
 import { SleepTimeWheelColumn } from './SleepTimeWheelColumn'
+import {
+  isSleepAlarmDiagEnabled,
+  setSleepAlarmDiagEnabled,
+} from '../../utils/sleepAlarmDiagGate'
 
 const BG = '#000000'
 const CARD = '#1C1C1E'
@@ -104,7 +108,12 @@ export function SleepAlarmSheet({
   const [confirmMsg, setConfirmMsg] = useState<string | null>(null)
   const [labelEditing, setLabelEditing] = useState(false)
   const [diagExpanded, setDiagExpanded] = useState(false)
+  const [diagGateTick, setDiagGateTick] = useState(0)
   const titleTaps = useRef({ count: 0, last: 0 })
+  const diagOpen = useMemo(() => {
+    void diagGateTick
+    return isSleepAlarmDiagEnabled()
+  }, [diagGateTick, open])
 
   useEffect(() => {
     if (!open) {
@@ -141,7 +150,13 @@ export function SleepAlarmSheet({
     titleTaps.current.count += 1
     if (titleTaps.current.count >= 5) {
       titleTaps.current.count = 0
-      setDiagExpanded((v) => !v)
+      if (!isSleepAlarmDiagEnabled()) {
+        setSleepAlarmDiagEnabled(true)
+        setDiagExpanded(true)
+      } else {
+        setDiagExpanded((v) => !v)
+      }
+      setDiagGateTick((n) => n + 1)
     }
   }
 
@@ -353,7 +368,9 @@ export function SleepAlarmSheet({
               <p className="px-1 text-[13px] text-[#FF907F]">{error}</p>
             ) : null}
 
-            <SleepAlarmDiagBlock open={open} expanded={diagExpanded} />
+            {diagOpen ? (
+              <SleepAlarmDiagBlock open={open} expanded={diagExpanded} />
+            ) : null}
           </>
         ) : null}
 
