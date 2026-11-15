@@ -17,6 +17,17 @@ export type HvDayKind = 'tot' | 'soir' | 'nuit' | 'repos' | 'unset'
 
 export type HvWeekTemplate = 'A' | 'B'
 
+/** ISO weekday 1=lun … 7=dim — template row for activation / A/B. */
+export type HvIsoWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7
+
+export type HvWeekdaySlot = {
+  weekday: HvIsoWeekday
+  /** repos = pas de réveil ; work = début + réveil calculé */
+  kind: 'work' | 'repos'
+  /** HH:MM when kind=work */
+  startHm: string | null
+}
+
 export type HvDayPlan = {
   /** YYYY-MM-DD local */
   dateKey: string
@@ -40,6 +51,10 @@ export type HvSettings = {
   prepMin: number
   decompressionMin: number
   weeksAb: boolean
+  /** Semaine unique (A/B off) ou modèle A */
+  weekASlots: HvWeekdaySlot[]
+  /** Modèle B (utilisé seulement si weeksAb) */
+  weekBSlots: HvWeekdaySlot[]
   /** Reference Monday dateKey that starts week A */
   weekARefMondayKey: string
   sundayReminderHm: string
@@ -52,6 +67,20 @@ export type HvSettings = {
   /** Last time a startHm was set (ISO) — for idle detection */
   lastStartEditAt: string | null
   activatedAt: string | null
+}
+
+/** Duration / start-time step for activation pickers (Evan 21h03). */
+export const HV_DURATION_STEP_MIN = 15
+export const HV_DURATION_MAX_MIN = 120
+
+export const HV_WEEKDAY_LABELS_FR: Record<HvIsoWeekday, string> = {
+  1: 'Lundi',
+  2: 'Mardi',
+  3: 'Mercredi',
+  4: 'Jeudi',
+  5: 'Vendredi',
+  6: 'Samedi',
+  7: 'Dimanche',
 }
 
 export type HvSleepSegment = {
@@ -112,6 +141,15 @@ export function clampInt(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.round(n)))
 }
 
+export function defaultWeekSlots(startHm = '08:00'): HvWeekdaySlot[] {
+  return ([1, 2, 3, 4, 5, 6, 7] as const).map((weekday) => {
+    if (weekday >= 6) {
+      return { weekday, kind: 'repos' as const, startHm: null }
+    }
+    return { weekday, kind: 'work' as const, startHm }
+  })
+}
+
 export function defaultHvSettings(now = new Date()): HvSettings {
   return {
     enabled: false,
@@ -119,6 +157,8 @@ export function defaultHvSettings(now = new Date()): HvSettings {
     prepMin: 30,
     decompressionMin: HV_DEFAULT_DECOMPRESSION_MIN,
     weeksAb: false,
+    weekASlots: defaultWeekSlots('08:00'),
+    weekBSlots: defaultWeekSlots('14:00'),
     weekARefMondayKey: mondayKeyOf(now),
     sundayReminderHm: HV_SUNDAY_REMINDER_MIN_HM,
     sundayReminderEnabled: true,
@@ -138,8 +178,160 @@ export function sanitizeSundayReminderHm(hm: string): string {
   return minutesToHm(clampInt(v, min, max))
 }
 
+/** Snap to 15 min steps in [0, 120]. */
+export function snapDurationMin(
+  min: number,
+  step = HV_DURATION_STEP_MIN,
+  max = HV_DURATION_MAX_MIN,
+): number {
+  if (!Number.isFinite(min)) return 0
+  const snapped = Math.round(min / step) * step
+  return clampInt(snapped, 0, max)
+}
+
 export function sanitizeDecompressionMin(min: number): number {
-  return clampInt(min, 0, 120)
+  return snapDurationMin(min)
+}
+
+export function sanitizeTrajetMin(min: number): number {
+  return snapDurationMin(min)
+}
+
+export function sanitizePrepMin(min: number): number {
+  return snapDurationMin(min)
+}
+
+/** All allowed duration values 0…120 by 15 min. */
+export function durationOptionsMin(
+  step = HV_DURATION_STEP_MIN,
+  max = HV_DURATION_MAX_MIN,
+): number[] {
+  const out: number[] = []
+  for (let m = 0; m <= max; m += step) out.push(m)
+  return out
+}
+
+/** Start times 00:00…23:45 by 15 min. */
+export function startHmOptions(step = HV_DURATION_STEP_MIN): string[] {
+  const out: string[] = []
+  for (let m = 0; m < 24 * 60; m += step) {
+    out.push(minutesToHm(m))
+  }
+  return out
+}
+
+export function formatDurationFr(totalMin: number): string {
+  const m = snapDurationMin(totalMin)
+  if (m === 0) return '0 min'
+  if (m < 60) return `${m} min`
+  const h = Math.floor(m / 60)
+  const r = m % 60
+  if (r === 0) return h === 1 ? '1 h' : `${h} h`
+  return `${h} h ${r}`
+}
+
+export function sanitizeWeekSlots(
+  raw: unknown,
+  fallback: HvWeekdaySlot[],
+): HvWeekdaySlot[] {
+  if (!Array.isArray(raw) || raw.length === 0) return fallback.map((s) => ({ ...s }))
+  const byWd = new Map<number, HvWeekdaySlot>()
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue
+    const r = row as Partial<HvWeekdaySlot>
+    const wd = Number(r.weekday)
+    if (wd < 1 || wd > 7) continue
+    const kind = r.kind === 'repos' ? 'repos' : 'work'
+    let startHm: string | null = null
+    if (kind === 'work') {
+      startHm = typeof r.startHm === 'string' ? snapHmToStep(r.startHm) ?? '08:00' : '08:00'
+    }
+    byWd.set(wd, {
+      weekday: wd as HvIsoWeekday,
+      kind,
+      startHm: kind === 'repos' ? null : startHm,
+    })
+  }
+  return ([1, 2, 3, 4, 5, 6, 7] as const).map(
+    (weekday) => byWd.get(weekday) ?? fallback.find((s) => s.weekday === weekday) ?? {
+      weekday,
+      kind: weekday >= 6 ? 'repos' : 'work',
+      startHm: weekday >= 6 ? null : '08:00',
+    },
+  )
+}
+
+/** Snap HH:MM to 15-minute grid. */
+export function snapHmToStep(hm: string, step = HV_DURATION_STEP_MIN): string | null {
+  const total = hmToMinutes(hm)
+  if (total == null) return null
+  const snapped = Math.round(total / step) * step
+  return minutesToHm(((snapped % (24 * 60)) + 24 * 60) % (24 * 60))
+}
+
+export function slotWakeLabel(
+  slot: HvWeekdaySlot,
+  trajetMin: number,
+  prepMin: number,
+): string | null {
+  if (slot.kind === 'repos' || !slot.startHm) return null
+  return computeWakeHm(slot.startHm, trajetMin, prepMin)
+}
+
+/**
+ * Expand week A/B templates into concrete day plans for the next horizon.
+ * Preserves one-shot overrides on existing days when dateKey matches.
+ */
+export function materializeDaysFromTemplates(args: {
+  settings: HvSettings
+  existingDays?: HvDayPlan[]
+  fromDateKey: string
+  horizonDays?: number
+}): HvDayPlan[] {
+  const horizon = args.horizonDays ?? HV_PLAN_HORIZON_DAYS
+  const existing = new Map((args.existingDays ?? []).map((d) => [d.dateKey, d]))
+  const out: HvDayPlan[] = []
+  for (let i = 0; i < horizon; i++) {
+    const key = addDaysKey(args.fromDateKey, i)
+    if (!key) continue
+    const wd = isoWeekdayFromKey(key)
+    if (!wd) continue
+    const tmpl = args.settings.weeksAb
+      ? weekTemplateForDate(key, args.settings.weekARefMondayKey)
+      : 'A'
+    const slots = tmpl === 'B' ? args.settings.weekBSlots : args.settings.weekASlots
+    const slot = slots.find((s) => s.weekday === wd) ?? {
+      weekday: wd,
+      kind: 'repos' as const,
+      startHm: null,
+    }
+    const prev = existing.get(key)
+    if (slot.kind === 'repos') {
+      out.push({
+        ...(prev ?? emptyDayPlan(key)),
+        dateKey: key,
+        kind: 'repos',
+        startHm: null,
+        noAlarm: !(prev?.softWake),
+        softWake: prev?.softWake ?? false,
+        softWakeHm: prev?.softWakeHm ?? HV_REST_SOFT_WAKE_HM,
+        wakeOverrideHm: null,
+        oneShotOffsetMin: 0,
+      })
+      continue
+    }
+    out.push({
+      ...(prev ?? emptyDayPlan(key)),
+      dateKey: key,
+      kind: 'tot',
+      startHm: slot.startHm,
+      noAlarm: false,
+      // Keep same-day one-shot / override if already set for this date
+      wakeOverrideHm: prev?.wakeOverrideHm ?? null,
+      oneShotOffsetMin: prev?.oneShotOffsetMin ?? 0,
+    })
+  }
+  return out
 }
 
 /**

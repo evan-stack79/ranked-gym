@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { IosSheet } from '../../ui/IosSheet'
 import { HvLottie } from './HvLottie'
+import { HvIosSwitch } from './HvIosSwitch'
+import { HvDurationPickerSheet } from './HvDurationPickerSheet'
+import { HvStartPickerSheet } from './HvStartPickerSheet'
 import {
   HV_FEATURE_NAME,
   HV_FEATURE_SUBTITLE,
@@ -24,16 +27,22 @@ import {
   decompressionCopy,
   effectiveWakeForDay,
   emptyDayPlan,
+  formatDurationFr,
   isMinorAge,
   canUseNightMode,
+  materializeDaysFromTemplates,
   mondayKeyOf,
   sanitizeDecompressionMin,
   sanitizeSundayReminderHm,
   shortNightShiftSuggestion,
+  slotWakeLabel,
   suggestedBedtimeHm,
   vacationResumeKey,
   weekTemplateForDate,
+  HV_WEEKDAY_LABELS_FR,
   type HvDayPlan,
+  type HvIsoWeekday,
+  type HvWeekdaySlot,
 } from '../../../horaires-variables/engine'
 import {
   getHvState,
@@ -157,6 +166,14 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
   const [vacationUntil, setVacationUntil] = useState<string | null>(null)
   const [weekTab, setWeekTab] = useState<'this' | 'next'>('next')
   const [nightAck, setNightAck] = useState(false)
+  const [durationField, setDurationField] = useState<
+    null | 'trajet' | 'prep' | 'souffler'
+  >(null)
+  const [abTab, setAbTab] = useState<'A' | 'B'>('A')
+  const [slotEdit, setSlotEdit] = useState<{
+    week: 'A' | 'B'
+    weekday: HvIsoWeekday
+  } | null>(null)
 
   useEffect(() => {
     if (open) {
@@ -240,19 +257,50 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
               : HV_FEATURE_NAME
 
   const activate = async () => {
-    const now = new Date().toISOString()
+    const nowIso = new Date().toISOString()
+    const todayKey = dateKeyOf(new Date())
+    const days = materializeDaysFromTemplates({
+      settings: state.settings,
+      existingDays: state.days,
+      fromDateKey: todayKey,
+    })
     saveHvState({
       settings: {
         ...state.settings,
         enabled: true,
-        activatedAt: now,
+        activatedAt: nowIso,
         autoPaused: false,
-        lastStartEditAt: now,
+        lastStartEditAt: nowIso,
       },
+      days,
     })
     await syncHvAlarms()
     setPane(minor ? 'minor' : 'planning')
   }
+
+  const updateSlot = (week: 'A' | 'B', weekday: HvIsoWeekday, next: HvWeekdaySlot) => {
+    const key = week === 'A' ? 'weekASlots' : 'weekBSlots'
+    const slots = state.settings[key].map((s) => (s.weekday === weekday ? next : s))
+    const settings = { ...state.settings, [key]: slots }
+    const days = materializeDaysFromTemplates({
+      settings,
+      existingDays: state.days,
+      fromDateKey: today,
+    })
+    saveHvState({ settings, days })
+  }
+
+  const editingSlots =
+    state.settings.weeksAb && abTab === 'B'
+      ? state.settings.weekBSlots
+      : state.settings.weekASlots
+  const editingWeek: 'A' | 'B' =
+    state.settings.weeksAb && abTab === 'B' ? 'B' : 'A'
+  const slotBeingEdited = slotEdit
+    ? (slotEdit.week === 'B' ? state.settings.weekBSlots : state.settings.weekASlots).find(
+        (s) => s.weekday === slotEdit.weekday,
+      ) ?? null
+    : null
 
   const openDay = (day: HvDayPlan) => {
     setEditKey(day.dateKey)
@@ -310,6 +358,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
   const sheetNight = pane === 'night'
 
   return (
+    <>
     <IosSheet
       open={open}
       onClose={onClose}
@@ -339,63 +388,134 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
             <p className="text-[13px] font-semibold" style={{ color: GRAY }}>
               À régler une seule fois
             </p>
-            <div className="overflow-hidden rounded-2xl" style={{ backgroundColor: CARD }}>
+            <div className="overflow-hidden rounded-2xl" style={{ backgroundColor: CARD }} data-hv-activation-settings>
               {(
                 [
-                  ['Trajet', `${Math.floor(state.settings.trajetMin / 60)} h ${state.settings.trajetMin % 60 || ''}`.trim()],
-                  ['Me préparer', `${state.settings.prepMin} min`],
-                  ['Temps pour souffler', `${Math.round(state.settings.decompressionMin / 60) || state.settings.decompressionMin} h`],
+                  {
+                    key: 'trajet' as const,
+                    label: 'Trajet',
+                    value: formatDurationFr(state.settings.trajetMin),
+                    hint: 'Pour aller au travail ou à l’école',
+                  },
+                  {
+                    key: 'prep' as const,
+                    label: 'Me préparer',
+                    value: formatDurationFr(state.settings.prepMin),
+                    hint: 'Avant de partir',
+                  },
+                  {
+                    key: 'souffler' as const,
+                    label: 'Temps pour souffler',
+                    value: formatDurationFr(state.settings.decompressionMin),
+                    hint: 'Entre la fin et le coucher',
+                  },
                 ] as const
-              ).map(([k, v]) => (
-                <div
-                  key={k}
-                  className="flex items-center justify-between border-b border-white/5 px-4 py-3"
-                >
-                  <span className="text-[15px] text-white">{k}</span>
-                  <button
-                    type="button"
-                    className="text-[15px]"
-                    style={{ color: GRAY }}
-                    onClick={() => {
-                      if (k === 'Trajet') {
-                        saveHvState({
-                          settings: {
-                            ...state.settings,
-                            trajetMin: state.settings.trajetMin === 75 ? 60 : 75,
-                          },
-                        })
-                      } else if (k === 'Me préparer') {
-                        saveHvState({
-                          settings: {
-                            ...state.settings,
-                            prepMin: state.settings.prepMin === 30 ? 20 : 30,
-                          },
-                        })
-                      } else {
-                        setPane('decompression')
-                      }
-                    }}
-                  >
-                    {v}
-                  </button>
-                </div>
-              ))}
-              <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-[15px] text-white">Semaines A / B</span>
+              ).map((row) => (
                 <button
+                  key={row.key}
                   type="button"
-                  role="switch"
-                  aria-checked={state.settings.weeksAb}
-                  className="h-7 w-12 rounded-full"
-                  style={{ backgroundColor: state.settings.weeksAb ? HV_RED : ROW }}
-                  onClick={() =>
-                    saveHvState({
-                      settings: { ...state.settings, weeksAb: !state.settings.weeksAb },
+                  onClick={() => setDurationField(row.key)}
+                  className="ios-press flex min-h-[44px] w-full items-center gap-3 px-4 py-3 text-left"
+                  style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+                  data-hv-duration-row={row.key}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] text-white">{row.label}</span>
+                    <span className="block text-[12px]" style={{ color: GRAY }}>
+                      {row.hint}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-[15px] tabular-nums" style={{ color: GRAY }}>
+                    {row.value}
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0" style={{ color: GRAY }} aria-hidden />
+                </button>
+              ))}
+              <div className="flex min-h-[44px] items-center justify-between gap-3 px-4 py-3">
+                <span className="text-[15px] text-white">Semaines A / B</span>
+                <HvIosSwitch
+                  checked={state.settings.weeksAb}
+                  aria-label="Semaines A / B"
+                  onChange={(on) => {
+                    const settings = { ...state.settings, weeksAb: on }
+                    const days = materializeDaysFromTemplates({
+                      settings,
+                      existingDays: state.days,
+                      fromDateKey: today,
                     })
-                  }
+                    saveHvState({ settings, days })
+                    if (on) setAbTab('A')
+                  }}
                 />
               </div>
             </div>
+
+            <p className="text-[13px] font-semibold" style={{ color: GRAY }}>
+              {state.settings.weeksAb ? 'Tes deux semaines types' : 'Ta semaine type'}
+            </p>
+            {state.settings.weeksAb ? (
+              <div className="flex rounded-xl p-1" style={{ backgroundColor: CARD }} data-hv-ab-tabs>
+                {(['A', 'B'] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    className="flex-1 rounded-lg py-2.5 text-[14px] font-semibold"
+                    style={{
+                      backgroundColor: abTab === t ? ROW : 'transparent',
+                      color: abTab === t ? '#fff' : GRAY,
+                    }}
+                    onClick={() => setAbTab(t)}
+                  >
+                    Semaine {t}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="overflow-hidden rounded-2xl" style={{ backgroundColor: CARD }} data-hv-week-slots>
+              {editingSlots.map((slot, i) => {
+                const wake = slotWakeLabel(
+                  slot,
+                  state.settings.trajetMin,
+                  state.settings.prepMin,
+                )
+                return (
+                  <button
+                    key={`${editingWeek}-${slot.weekday}`}
+                    type="button"
+                    onClick={() => setSlotEdit({ week: editingWeek, weekday: slot.weekday })}
+                    className="ios-press flex min-h-[44px] w-full items-center gap-2 px-4 py-3 text-left"
+                    style={{
+                      borderBottom:
+                        i < editingSlots.length - 1 ? '1px solid rgba(255,255,255,0.05)' : undefined,
+                    }}
+                    data-hv-slot-day={slot.weekday}
+                  >
+                    <span className="w-[88px] text-[15px] font-semibold text-white">
+                      {HV_WEEKDAY_LABELS_FR[slot.weekday]}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      {slot.kind === 'repos' || !slot.startHm ? (
+                        <span className="text-[14px]" style={{ color: GRAY }}>
+                          Repos
+                        </span>
+                      ) : (
+                        <>
+                          <span className="block text-[14px] text-white">
+                            Début {fmtHm(slot.startHm)}
+                          </span>
+                          <span className="block text-[12px]" style={{ color: GRAY }}>
+                            {wake ? `Réveil ${fmtHm(wake)}` : 'Réveil —'}
+                          </span>
+                        </>
+                      )}
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0" style={{ color: GRAY }} aria-hidden />
+                  </button>
+                )
+              })}
+            </div>
+
             <p className="text-[13px]" style={{ color: GRAY }}>
               Un seul planning, un seul réveil. Il remplace « Mes réveils », il ne fait pas de
               doublon.
@@ -755,13 +875,10 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                   À {HV_REST_SOFT_WAKE_HM}, ton lever des jours de repos
                 </small>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={softWake}
-                className="h-7 w-12 rounded-full"
-                style={{ backgroundColor: softWake ? HV_RED : ROW }}
-                onClick={() => setSoftWake((v) => !v)}
+              <HvIosSwitch
+                checked={softWake}
+                aria-label="Réveil doux"
+                onChange={setSoftWake}
               />
             </div>
             <button
@@ -1172,5 +1289,63 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
         <span className="sr-only">{HV_FEATURE_SUBTITLE}</span>
       </div>
     </IosSheet>
+
+    <HvDurationPickerSheet
+      open={durationField != null}
+      onClose={() => setDurationField(null)}
+      title={
+        durationField === 'trajet'
+          ? 'Trajet'
+          : durationField === 'prep'
+            ? 'Me préparer'
+            : 'Temps pour souffler'
+      }
+      valueMin={
+        durationField === 'trajet'
+          ? state.settings.trajetMin
+          : durationField === 'prep'
+            ? state.settings.prepMin
+            : state.settings.decompressionMin
+      }
+      onSave={(min) => {
+        const settings = {
+          ...state.settings,
+          ...(durationField === 'trajet'
+            ? { trajetMin: min }
+            : durationField === 'prep'
+              ? { prepMin: min }
+              : { decompressionMin: min }),
+        }
+        const days = materializeDaysFromTemplates({
+          settings,
+          existingDays: state.days,
+          fromDateKey: today,
+        })
+        saveHvState({ settings, days })
+      }}
+    />
+
+    <HvStartPickerSheet
+      open={slotEdit != null && slotBeingEdited != null}
+      onClose={() => setSlotEdit(null)}
+      title={
+        slotEdit
+          ? `${HV_WEEKDAY_LABELS_FR[slotEdit.weekday]}${
+              state.settings.weeksAb ? ` · Semaine ${slotEdit.week}` : ''
+            }`
+          : 'Début'
+      }
+      mode={slotBeingEdited?.kind ?? 'work'}
+      startHm={slotBeingEdited?.startHm ?? '08:00'}
+      onSave={(next) => {
+        if (!slotEdit) return
+        updateSlot(slotEdit.week, slotEdit.weekday, {
+          weekday: slotEdit.weekday,
+          kind: next.kind,
+          startHm: next.startHm,
+        })
+      }}
+    />
+    </>
   )
 }

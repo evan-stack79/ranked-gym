@@ -6,11 +6,19 @@ import {
   computeWeekDebt,
   copyWeekTemplate,
   decompressionCopy,
+  defaultWeekSlots,
+  durationOptionsMin,
   effectiveWakeForDay,
   emptyDayPlan,
+  formatDurationFr,
   isMinorAge,
   canUseNightMode,
+  materializeDaysFromTemplates,
   shouldAutoPause,
+  slotWakeLabel,
+  snapDurationMin,
+  snapHmToStep,
+  startHmOptions,
   suggestedBedtimeHm,
   totalSleepMinutes,
   vacationResumeKey,
@@ -202,5 +210,78 @@ describe('HV A/B arm cap', () => {
     expect(copied[0].dateKey).toBe('2026-11-23')
     expect(copied[0].startHm).toBe('08:00')
     expect(copied[1].startHm).toBe('14:00')
+  })
+})
+
+describe('HV activation pickers (Evan 21h03)', () => {
+  it('pas de 15 min pour durées 0–2 h (inclut 30 min)', () => {
+    const opts = durationOptionsMin()
+    expect(opts[0]).toBe(0)
+    expect(opts.at(-1)).toBe(120)
+    expect(opts).toContain(30)
+    expect(opts).toContain(60)
+    expect(opts.every((m) => m % 15 === 0)).toBe(true)
+    expect(snapDurationMin(37)).toBe(30)
+    expect(snapDurationMin(38)).toBe(45)
+    expect(formatDurationFr(30)).toBe('30 min')
+    expect(formatDurationFr(60)).toBe('1 h')
+  })
+
+  it('Evan : début 8:00 − prépa 30 − trajet 30 → réveil 7:00', () => {
+    expect(computeWakeHm('08:00', 30, 30)).toBe('07:00')
+    expect(
+      slotWakeLabel({ weekday: 1, kind: 'work', startHm: '08:00' }, 30, 30),
+    ).toBe('07:00')
+  })
+
+  it('jour repos → pas de réveil', () => {
+    expect(
+      slotWakeLabel({ weekday: 6, kind: 'repos', startHm: null }, 30, 30),
+    ).toBeNull()
+    const day = {
+      ...emptyDayPlan('2026-11-21'),
+      kind: 'repos' as const,
+      startHm: null,
+      noAlarm: true,
+      softWake: false,
+    }
+    expect(effectiveWakeForDay(day, 30, 30)).toBeNull()
+  })
+
+  it('heures de début par pas de 15 min', () => {
+    const opts = startHmOptions(15)
+    expect(opts).toContain('08:00')
+    expect(opts).toContain('08:15')
+    expect(opts).not.toContain('08:10')
+    expect(snapHmToStep('08:07')).toBe('08:00')
+    expect(snapHmToStep('08:08')).toBe('08:15')
+  })
+
+  it('A/B materialize : semaine A vs B + repos week-end', () => {
+    const settings = {
+      ...defaultHvSettings(new Date('2026-11-09T12:00:00')),
+      weeksAb: true,
+      trajetMin: 30,
+      prepMin: 30,
+      weekARefMondayKey: '2026-11-09',
+      weekASlots: defaultWeekSlots('08:00'),
+      weekBSlots: defaultWeekSlots('14:00'),
+    }
+    // 2026-11-09 = lundi A ; 2026-11-16 = lundi B
+    const days = materializeDaysFromTemplates({
+      settings,
+      fromDateKey: '2026-11-09',
+      horizonDays: 14,
+    })
+    const monA = days.find((d) => d.dateKey === '2026-11-09')
+    const satA = days.find((d) => d.dateKey === '2026-11-14')
+    const monB = days.find((d) => d.dateKey === '2026-11-16')
+    expect(monA?.startHm).toBe('08:00')
+    expect(effectiveWakeForDay(monA!, 30, 30)).toBe('07:00')
+    expect(satA?.kind).toBe('repos')
+    expect(effectiveWakeForDay(satA!, 30, 30)).toBeNull()
+    expect(monB?.startHm).toBe('14:00')
+    // 14:00 − 1 h 15 − 30 min = 12:15
+    expect(effectiveWakeForDay(monB!, 75, 30)).toBe('12:15')
   })
 })

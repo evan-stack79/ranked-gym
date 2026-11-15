@@ -9,7 +9,10 @@ import {
   defaultHvSettings,
   emptyDayPlan,
   sanitizeDecompressionMin,
+  sanitizePrepMin,
   sanitizeSundayReminderHm,
+  sanitizeTrajetMin,
+  sanitizeWeekSlots,
   type HvDayPlan,
   type HvSettings,
 } from '../../horaires-variables/engine'
@@ -68,18 +71,16 @@ function sanitizeSettings(raw: Partial<HvSettings> | null | undefined): HvSettin
   if (!raw) return base
   return {
     enabled: Boolean(raw.enabled),
-    trajetMin:
-      typeof raw.trajetMin === 'number' && Number.isFinite(raw.trajetMin)
-        ? Math.max(0, Math.round(raw.trajetMin))
-        : base.trajetMin,
-    prepMin:
-      typeof raw.prepMin === 'number' && Number.isFinite(raw.prepMin)
-        ? Math.max(0, Math.round(raw.prepMin))
-        : base.prepMin,
+    trajetMin: sanitizeTrajetMin(
+      typeof raw.trajetMin === 'number' ? raw.trajetMin : base.trajetMin,
+    ),
+    prepMin: sanitizePrepMin(typeof raw.prepMin === 'number' ? raw.prepMin : base.prepMin),
     decompressionMin: sanitizeDecompressionMin(
       typeof raw.decompressionMin === 'number' ? raw.decompressionMin : base.decompressionMin,
     ),
     weeksAb: Boolean(raw.weeksAb),
+    weekASlots: sanitizeWeekSlots(raw.weekASlots, base.weekASlots),
+    weekBSlots: sanitizeWeekSlots(raw.weekBSlots, base.weekBSlots),
     weekARefMondayKey:
       typeof raw.weekARefMondayKey === 'string' ? raw.weekARefMondayKey : base.weekARefMondayKey,
     sundayReminderHm: sanitizeSundayReminderHm(
