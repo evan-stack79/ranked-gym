@@ -11,11 +11,11 @@ const cancelHydrationReminders = vi.fn(async () => undefined)
 const clearBottleShapeLocal = vi.fn(async () => undefined)
 
 vi.mock('./hydration/hydrationReminders', () => ({
-  cancelHydrationReminders: (...args: unknown[]) => cancelHydrationReminders(...args),
+  cancelHydrationReminders: () => cancelHydrationReminders(),
 }))
 
 vi.mock('./hydration/bottleShapeStorage', () => ({
-  clearBottleShapeLocal: (...args: unknown[]) => clearBottleShapeLocal(...args),
+  clearBottleShapeLocal: () => clearBottleShapeLocal(),
 }))
 
 vi.mock('./cloudSession', () => ({

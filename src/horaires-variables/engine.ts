@@ -599,9 +599,8 @@ export function suggestedBedtimeHm(finishHm: string, decompressionMin: number): 
 
 export function decompressionCopy(finishHm: string, decompressionMin: number): string {
   const bed = suggestedBedtimeHm(finishHm, decompressionMin)
-  const dec = sanitizeDecompressionMin(decompressionMin)
-  const decLabel =
-    dec === 0 ? '0 min' : dec < 60 ? `${dec} min` : dec % 60 === 0 ? `${dec / 60} h` : `${Math.floor(dec / 60)} h ${dec % 60}`
+  // Keep decompression applied via suggestedBedtimeHm; copy is short (AUDIT).
+  void sanitizeDecompressionMin(decompressionMin)
   const finLabel = finishHm.replace(/^0/, '')
   const bedLabel = (bed ?? '?').replace(/^0/, '')
   return `Fini à ${finLabel} → au lit vers ${bedLabel}.`
