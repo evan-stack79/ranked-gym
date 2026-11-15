@@ -60,25 +60,25 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
 
   if (!snapshot.onboardingComplete) {
     return (
-      <section className="glass-card rounded-2xl p-4" aria-label="Nutrition">
-        <p className="text-[11px] font-medium text-[#ACB4BA]">Nutrition</p>
+      <section className="glass-card rounded-2xl p-4" aria-label="Repas">
+        <p className="text-[11px] font-medium text-[#ACB4BA]">Repas</p>
         <p className="mt-2 text-[14px] leading-snug text-[#ACB4BA]">
-          Configure ton plan dans l&apos;onglet Nutri pour voir ton suivi.
+          Règle ton plan dans Repas.
         </p>
       </section>
     )
   }
 
   return (
-    <section className="glass-card rounded-2xl p-4" aria-label="Nutrition">
+    <section className="glass-card rounded-2xl p-4" aria-label="Repas">
       <div>
         <p className="text-[11px] font-medium text-[#ACB4BA]">
-          <SoftBlurIn>Nutrition</SoftBlurIn>
+          <SoftBlurIn>Repas</SoftBlurIn>
         </p>
         {snapshot.showUnavailableGoal ? (
           <>
-            <p className="mt-1 text-[17px] font-semibold text-white">Objectif indisponible</p>
-            <p className="mt-1 text-[13px] text-[#ACB4BA]">Ouvre Nutri pour vérifier ton plan.</p>
+            <p className="mt-1 text-[17px] font-semibold text-white">Pas d&apos;objectif pour l&apos;instant</p>
+            <p className="mt-1 text-[13px] text-[#ACB4BA]">Règle-le dans Repas.</p>
           </>
         ) : snapshot.targetAvailable ? (
           <>
@@ -92,7 +92,7 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
           </>
         ) : (
           <>
-            <p className="mt-1 text-[17px] font-semibold text-white">Suivi du jour</p>
+            <p className="mt-1 text-[17px] font-semibold text-white">Aujourd&apos;hui</p>
             <p className="mt-1 text-[13px] text-[#ACB4BA]">
               <StaticKcalNumber value={snapshot.consumedCalories} /> kcal consommées
             </p>
@@ -106,7 +106,7 @@ export function NutritionSnapshot({ onOpenNutrition }: NutritionSnapshotProps) {
             aria-valuenow={Math.round(snapshot.progress * 100)}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-label="Progression calorique"
+            aria-label="Calories du jour"
           >
             <div
               className="motion-progress-fill h-full rounded-full bg-gradient-to-r from-[#B91C1C] to-[#FF0702]"

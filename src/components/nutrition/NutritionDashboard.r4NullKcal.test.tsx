@@ -106,6 +106,7 @@ describe('NutritionDashboard — R4-01 kcal vides', () => {
     })
 
     const journalBtn = Array.from(document.querySelectorAll('button')).find((b) =>
+      (b.textContent ?? '').includes('Voir le détail') ||
       (b.textContent ?? '').includes('Journal'),
     ) as HTMLButtonElement | undefined
     expect(journalBtn).toBeTruthy()
@@ -116,7 +117,7 @@ describe('NutritionDashboard — R4-01 kcal vides', () => {
       })
     })
 
-    const section = document.querySelector('[aria-label="Détail du journal"]')
+    const section = document.querySelector('[aria-label="Détail"]')
     expect(section).toBeTruthy()
     const text = section!.textContent ?? ''
     expect(text).toContain('Plat sans kcal')

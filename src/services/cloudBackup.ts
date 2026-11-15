@@ -76,15 +76,28 @@ let cloudSyncReady = false
 let deferredPush = false
 let lifecycleWired = false
 
+const CLOUD_ERR_RETRY = 'Sauvegarde ratée. Réessaie.'
+const CLOUD_ERR_PANNE = "Sauvegarde en panne. On s'en occupe."
+const CLOUD_ERR_PULL = 'Récupération impossible. Réessaie.'
+const CLOUD_ERR_LOGIN = 'Connecte-toi pour sauver tes données.'
+
+function sanitizeCloudUserError(raw: string, fallback: string): string {
+  if (
+    /supabase|rls|upsert|convex|schema\.sql|sql editor|vite_|plugin|session|hydratation|gemini/i.test(
+      raw,
+    )
+  ) {
+    return fallback
+  }
+  return raw
+}
+
 function mapCloudBackupError(
   error: unknown,
   operation: 'pull' | 'push',
 ): string {
-  const fallback =
-    operation === 'pull'
-      ? 'Restauration cloud indisponible pour le moment. Réessaie.'
-      : 'Sauvegarde cloud indisponible pour le moment. Réessaie.'
-  return toUserFacingError(error, fallback)
+  const fallback = operation === 'pull' ? CLOUD_ERR_PULL : CLOUD_ERR_RETRY
+  return sanitizeCloudUserError(toUserFacingError(error, fallback), fallback)
 }
 
 function readCloudUserId(): string | null {
@@ -502,8 +515,8 @@ async function fetchRemotePayload(userId: string): Promise<{
         payload: null,
         source: 'supabase',
         error: isMissingTableError(error.message)
-          ? 'Tables manquantes : exécute supabase/schema.sql dans le SQL Editor Supabase.'
-          : error.message,
+          ? CLOUD_ERR_PANNE
+          : sanitizeCloudUserError(error.message, CLOUD_ERR_RETRY),
       }
     }
     if (!data?.payload) return { payload: null, source: 'supabase' }
@@ -514,10 +527,18 @@ async function fetchRemotePayload(userId: string): Promise<{
   if (tableError && !isMissingTableError(tableError)) {
     // nutrition/workouts may 404 if not created; profiles always exists
     if (nutritionRes.error && !isMissingTableError(nutritionRes.error.message)) {
-      return { payload: null, source: 'supabase', error: nutritionRes.error.message }
+      return {
+        payload: null,
+        source: 'supabase',
+        error: sanitizeCloudUserError(nutritionRes.error.message, CLOUD_ERR_RETRY),
+      }
     }
     if (workoutsRes.error && !isMissingTableError(workoutsRes.error.message)) {
-      return { payload: null, source: 'supabase', error: workoutsRes.error.message }
+      return {
+        payload: null,
+        source: 'supabase',
+        error: sanitizeCloudUserError(workoutsRes.error.message, CLOUD_ERR_RETRY),
+      }
     }
   }
 
@@ -610,12 +631,12 @@ async function upsertTables(userId: string, payload: CloudBackupPayload): Promis
 
       const workoutsErr = workoutsRes.error?.message
       // Train data lives in workouts — surface that first
-      const primary = workoutsErr || parts[0]?.message || 'Erreur Supabase'
+      const primary = workoutsErr || parts[0]?.message || CLOUD_ERR_RETRY
 
       if (workoutsErr && isRlsOrAuthError(workoutsErr)) {
         return {
           error:
-            'RLS bloque l’écriture workouts (INSERT/UPDATE). Exécute la migration workouts_rls_write_fix.sql.',
+            CLOUD_ERR_PANNE,
         }
       }
 
@@ -633,15 +654,15 @@ async function upsertTables(userId: string, payload: CloudBackupPayload): Promis
           safeError('[cloudBackup] fallback user_backups failed', error.message)
           return {
             error: isMissingTableError(error.message)
-              ? 'Tables manquantes : exécute supabase/schema.sql dans le SQL Editor Supabase.'
-              : error.message,
+              ? CLOUD_ERR_PANNE
+              : sanitizeCloudUserError(error.message, CLOUD_ERR_RETRY),
           }
         }
         safeWarn('[cloudBackup] tables manquantes — écriture via user_backups uniquement')
         return {}
       }
 
-      return { error: primary }
+      return { error: sanitizeCloudUserError(primary, CLOUD_ERR_RETRY) }
     }
 
     const { error: mirrorError } = await supabase.from('user_backups').upsert(
@@ -658,7 +679,7 @@ async function upsertTables(userId: string, payload: CloudBackupPayload): Promis
 
     return {}
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Erreur upsert cloud'
+    const msg = CLOUD_ERR_RETRY
     safeError('[cloudBackup] upsertTables exception', e)
     return { error: msg }
   }
@@ -671,7 +692,7 @@ export async function pushCloudBackup(
 ): Promise<{ ok: boolean; error?: string }> {
   const uid = userId ?? activeUserId
   if (!uid || !isActiveCloudBackendConfigured()) {
-    return { ok: false, error: 'Connecte-toi pour activer la sauvegarde cloud.' }
+    return { ok: false, error: CLOUD_ERR_LOGIN }
   }
   if (pushInFlight) {
     needsRepush = true
@@ -727,7 +748,7 @@ export async function pullCloudBackup(
 ): Promise<{ ok: boolean; applied: boolean; error?: string }> {
   const uid = userId ?? activeUserId
   if (!uid || !isActiveCloudBackendConfigured()) {
-    return { ok: false, applied: false, error: 'Connexion requise.' }
+    return { ok: false, applied: false, error: "Connecte-toi d'abord." }
   }
 
   const preferRemote = options?.preferRemote ?? true
@@ -786,21 +807,19 @@ export function flushCloudPush() {
 /** Flush immédiat — retourne le résultat (pour toasts Train / Sauver). */
 export async function flushCloudPushAsync(): Promise<{ ok: boolean; error?: string }> {
   if (!activeUserId) {
-    const error = 'Connecte-toi pour sauvegarder dans le cloud.'
+    const error = CLOUD_ERR_LOGIN
     safeError('[cloudBackup] flush', error)
     return { ok: false, error }
   }
   if (!isActiveCloudBackendConfigured()) {
-    const error = isConvexDomainActive()
-      ? 'Convex non configuré (VITE_CONVEX_URL).'
-      : 'Supabase non configuré (VITE_SUPABASE_URL / ANON_KEY).'
+    const error = CLOUD_ERR_PANNE
     safeError('[cloudBackup] flush', error)
     return { ok: false, error }
   }
   if (!cloudSyncReady) {
     deferredPush = true
     setMeta({ pending: true })
-    return { ok: false, error: 'Sync cloud pas encore prête — nouvel essai après hydratation.' }
+    return { ok: false, error: 'Sauvegarde dans un instant…' }
   }
   if (pushTimer) {
     clearTimeout(pushTimer)

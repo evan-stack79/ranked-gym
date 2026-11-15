@@ -50,12 +50,12 @@ describe('sleep alarm status copy', () => {
     const { formatAlarmScheduledMessage, syncFailureMessage } = await import(
       './sleepAlarmService'
     )
-    expect(formatAlarmScheduledMessage('21:00')).toBe('Réveil prévu à 21:00')
-    expect(formatAlarmScheduledMessage('07:05')).toMatch(/^Réveil prévu à /)
-    expect(syncFailureMessage('PERMISSION_DENIED')).toBe(
-      'Autorise les alarmes pour Ranked Gym dans Réglages',
+    expect(formatAlarmScheduledMessage('21:00')).toBe('Réveil à 21:00')
+    expect(formatAlarmScheduledMessage('07:05')).toMatch(/^Réveil à /)
+    expect(syncFailureMessage('PERMISSION_DENIED')).toBe('Autorise les alarmes')
+    expect(syncFailureMessage('ALARM_PLUGIN_MISSING')).toBe(
+      "Le réveil ne marche pas. Relance l'app.",
     )
-    expect(syncFailureMessage('ALARM_PLUGIN_MISSING')).toMatch(/RankedAlarm/)
     const { makeBeforeBreakSteps } = await import('./sleepAlarmService')
     expect(makeBeforeBreakSteps()).toEqual(['create', 'verify', 'cancelOthers'])
   })

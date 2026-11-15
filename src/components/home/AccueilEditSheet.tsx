@@ -59,7 +59,7 @@ export function AccueilEditSheet({ open, prefs, onClose, onSave }: AccueilEditSh
       open={open}
       onClose={onClose}
       title="Modifier l'accueil"
-      subtitle="Affiche, cache ou déplace les blocs"
+      subtitle="Montre, cache ou déplace"
       footer={
         <div className="flex flex-col gap-2.5">
           <button

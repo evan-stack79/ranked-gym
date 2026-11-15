@@ -78,7 +78,7 @@ export function HydrationConseilCard({
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-[12px] font-medium" style={{ color: RED }}>
-            Ton conseil de la semaine
+            Ton conseil
           </p>
           <p className="mt-0.5 text-[16px] font-semibold text-white">{title}</p>
         </div>
@@ -97,7 +97,7 @@ export function HydrationConseilCard({
       </ul>
       {caffeineDrinksToday > 0 && id === 7 ? (
         <p className="mt-2 text-[13px]" style={{ color: GRAY }} data-hydration-caffeine>
-          Caféine aujourd’hui : {caffeineDrinksToday} boisson
+          Café, thé, cola aujourd’hui : {caffeineDrinksToday} boisson
           {caffeineDrinksToday > 1 ? 's' : ''}
         </p>
       ) : null}
@@ -110,7 +110,7 @@ export function HydrationConseilCard({
             data-hydration-conseil-aide
           >
             <span className="text-[13px]" style={{ color: GRAY }}>
-              Pourquoi ce conseil ?
+              Pourquoi ?
             </span>
             <ChevronRight className="h-4 w-4" style={{ color: GRAY }} />
           </button>
@@ -126,7 +126,7 @@ export function HydrationConseilCard({
                   {caffeineDrinksToday > 0 ? (
                     <div className="rounded-xl bg-black/30 px-3 py-2.5" data-hydration-aide-caffeine>
                       <p className="text-[12px]" style={{ color: GRAY }}>
-                        Caféine aujourd’hui
+                        Café, thé, cola aujourd’hui
                       </p>
                       <p className="mt-0.5 text-[28px] font-bold tabular-nums leading-none text-white">
                         {caffeineDrinksToday} boisson{caffeineDrinksToday > 1 ? 's' : ''}

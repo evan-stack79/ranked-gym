@@ -44,7 +44,7 @@ describe('sleepAlarmStorage', () => {
       enabled: true,
       timeHm: '07:15',
       days: [1, 2, 3, 4, 5],
-      label: 'Lever',
+      label: 'Réveil',
     })
     const loaded = getSleepAlarmSettings()
     expect(loaded.enabled).toBe(true)

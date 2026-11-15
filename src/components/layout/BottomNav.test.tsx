@@ -47,7 +47,7 @@ describe('BottomNav centre', () => {
     expect(play?.className).not.toMatch(/shadow-\[/)
   })
 
-  it('Nouvelle séance s’il n’y a pas de brouillon (dock)', async () => {
+  it('Lancer s’il n’y a pas de brouillon (dock)', async () => {
     await act(async () => {
       root.render(
         <BottomNav
@@ -58,7 +58,7 @@ describe('BottomNav centre', () => {
         />,
       )
     })
-    expect(host.textContent).toContain('Nouvelle séance')
+    expect(host.textContent).toContain('Lancer')
     expect(host.querySelector('[data-nav-center="new"]')).toBeTruthy()
     expect(host.textContent).not.toContain('Démarrer')
     expect(host.querySelector('[data-bottom-nav-variant="dock"]')).toBeTruthy()
@@ -77,7 +77,7 @@ describe('BottomNav centre', () => {
     })
     expect(host.textContent).toContain('Reprendre')
     expect(host.querySelector('[data-nav-center="resume"]')).toBeTruthy()
-    expect(host.textContent).not.toContain('Nouvelle séance')
+    expect(host.textContent).not.toContain('Lancer')
   })
 
   it('floating pill : icons only, same tabs + aria-labels, prominent centre', async () => {
@@ -94,14 +94,14 @@ describe('BottomNav centre', () => {
     const nav = host.querySelector('[data-bottom-nav-variant="floating-pill"]')
     expect(nav).toBeTruthy()
     expect(host.querySelector('[aria-label="Accueil"]')).toBeTruthy()
-    expect(host.querySelector('[aria-label="Train"]')).toBeTruthy()
-    expect(host.querySelector('[aria-label="Nutri"]')).toBeTruthy()
+    expect(host.querySelector('[aria-label="Sport"]')).toBeTruthy()
+    expect(host.querySelector('[aria-label="Repas"]')).toBeTruthy()
     expect(host.querySelector('[aria-label="Sommeil"]')).toBeTruthy()
     expect(host.querySelector('[aria-label="Profil"]')).toBeTruthy()
-    expect(host.querySelector('[aria-label="Nouvelle séance"]')).toBeTruthy()
-    expect(host.querySelector('[aria-current="page"]')?.getAttribute('aria-label')).toBe('Train')
+    expect(host.querySelector('[aria-label="Lancer"]')).toBeTruthy()
+    expect(host.querySelector('[aria-current="page"]')?.getAttribute('aria-label')).toBe('Sport')
     // No visible tab labels in the pill (aria-label only)
-    expect(host.textContent).not.toMatch(/Accueil|Train|Nutri|Sommeil|Profil/)
+    expect(host.textContent).not.toMatch(/Accueil|Sport|Repas|Sommeil|Profil/)
   })
 
   it('floating pill : liquid-glass bubble slides to active tab (skips centre play)', async () => {

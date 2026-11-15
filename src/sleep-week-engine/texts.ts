@@ -49,18 +49,17 @@ export function etatTexts(id: number, r: SleepEtatResult): SleepEtatTexts | unde
   const rep = `${(r.Bb ?? 0) / 60} à ${(r.Bh ?? 0) / 60} h`
   const T: Record<number, SleepEtatTexts> = {
     1: {
-      nom: 'Nuits courtes et fatigué',
-      texte: `Ta semaine a été chargée. On regagne du sommeil un petit pas à la fois : ce soir, coucher à ${c(cible)}.`,
+      nom: 'Nuits courtes, fatigue',
+      texte: `Semaine chargée. Ce soir, au lit à ${c(cible)}.`,
       actions: [
         `Ce soir, au lit à ${c(cible)}. Ensuite 15 min plus tôt chaque soir, jusqu'à ton repère (${rep}).`,
         '45 min avant le coucher : écran posé ou en mode nuit, lumière douce.',
-        'Pas de café, thé fort, cola ni boisson énergisante dans les 6 h avant le coucher.',
+        'Ni café, ni thé fort, ni cola, ni boisson énergisante 6 h avant le lit.',
       ],
     },
     2: {
-      nom: 'Longues nuits, fatigue le matin ou le soir',
-      texte:
-        "Tu dors beaucoup, c'est déjà une force. Pour te réveiller plus en forme, essaie le même réveil chaque jour.",
+      nom: 'Longues nuits, mais fatigue',
+      texte: 'Tu dors beaucoup, top. Essaie le même réveil chaque jour.',
       actions: [
         `Lève-toi à la même heure chaque jour (vers ${c(s.Lmed)}, à 30 min près).`,
         "30 min dehors ou près d'une fenêtre, peu après le lever.",
@@ -70,18 +69,17 @@ export function etatTexts(id: number, r: SleepEtatResult): SleepEtatTexts | unde
     3: {
       nom: 'Nuits très courtes mais en forme',
       texte:
-        'Tu te sens en forme, top ! Ton corps a quand même besoin de plus de nuit. On teste 15 min de plus ce soir ?',
+        'En forme, top ! Ton corps a quand même besoin de plus de nuit. On teste 15 min de plus ce soir ?',
       actions: [
         `Café, thé, cola ou boisson énergisante : le dernier avant ${c(cible - 360)}.`,
         `Ce soir, au lit à ${c(cible)}. Ensuite 15 min plus tôt chaque soir.`,
-        'Petit test « 3 jours » : 3 nuits à ton repère, puis compare ton ressenti.',
+        'Test : 3 nuits à ton repère, puis compare ta forme.',
       ],
       aide: true,
     },
     4: {
-      nom: 'Juste sous le besoin',
-      texte:
-        "Il te manque juste un petit quart d'heure. 15 min de plus ce soir, et l'après-midi sera plus facile.",
+      nom: 'Presque assez',
+      texte: 'Il manque 15 min. Au lit 15 min plus tôt ce soir.',
       actions: [
         `Ce soir et demain : au lit 15 min plus tôt (${c(cible)}).`,
         'Coup de barre ? Sieste flash de 10 à 20 min, avant 15 h.',
@@ -89,9 +87,8 @@ export function etatTexts(id: number, r: SleepEtatResult): SleepEtatTexts | unde
       ],
     },
     5: {
-      nom: 'Très longues nuits et épuisé tout le temps',
-      texte:
-        "Tu dors beaucoup et tu restes fatigué : ce n'est pas de ta faute. On essaie un réveil à heure fixe et un peu de lumière le matin.",
+      nom: 'Longues nuits, toujours fatigue',
+      texte: "Ce n'est pas ta faute. On essaie un réveil fixe et la lumière du matin.",
       actions: [
         `Lève-toi à la même heure chaque jour (vers ${c(s.Lmed)}), aussi le week-end.`,
         "30 min de lumière le matin : dehors ou près d'une fenêtre.",
@@ -99,18 +96,17 @@ export function etatTexts(id: number, r: SleepEtatResult): SleepEtatTexts | unde
       aide: true,
     },
     6: {
-      nom: 'Yo-yo semaine / week-end',
+      nom: 'Semaine ≠ week-end',
       texte: 'Le week-end, tu rattrapes beaucoup. On rapproche tes deux rythmes, petit à petit.',
       bars: true,
       actions: [
         'En semaine : au lit 15 min plus tôt chaque soir.',
-        'Le week-end : lève-toi au plus 1 h après ton lever de semaine, puis va à la lumière.',
+        'Le week-end : réveil max 1 h plus tard, puis lumière.',
       ],
     },
     7: {
       nom: 'Couche-tard régulier',
-      texte:
-        'Ton rythme est tardif mais régulier, et tu dors assez. Si tu veux te coucher plus tôt, on avance de 15 min par jour.',
+      texte: "Tard mais régulier, et tu dors assez. Envie d'avancer ? 15 min par jour.",
       actions: [
         "Envie d'avancer ? Coucher et lever 15 min plus tôt chaque jour, avec de la lumière dès le lever.",
         "Moins d'écrans dans l'heure avant le coucher.",
@@ -118,9 +114,8 @@ export function etatTexts(id: number, r: SleepEtatResult): SleepEtatTexts | unde
       ],
     },
     8: {
-      nom: 'Horaires en zigzag',
-      texte:
-        'Tes horaires bougent beaucoup. Commence par un seul repère : te lever à la même heure chaque jour.',
+      nom: 'Heures en zigzag',
+      texte: 'Tes heures bougent. Un seul but : même réveil chaque jour.',
       actions: [
         'Un seul repère : lève-toi à la même heure 7 jours sur 7 (à 30 min près).',
         'Le soir, à heure fixe : on ralentit.',
@@ -131,7 +126,7 @@ export function etatTexts(id: number, r: SleepEtatResult): SleepEtatTexts | unde
       nom: 'Nuit en morceaux',
       texte: 'Tes nuits sont en petits morceaux. Ce soir, on essaie une routine calme de 5 min.',
       actions: [
-        'Pas sommeil ? Lève-toi, fais une activité calme dans une lumière douce, reviens quand le sommeil arrive.',
+        'Pas sommeil ? Lève-toi, fais un truc calme dans une lumière douce, reviens quand le sommeil arrive.',
         'Ce soir : 5 min de respiration lente.',
         `Café ou thé : le dernier avant ${c(s.Cmed - 360)}.`,
       ],
@@ -139,16 +134,15 @@ export function etatTexts(id: number, r: SleepEtatResult): SleepEtatTexts | unde
     },
     10: {
       nom: 'Nuit courte + grosse sieste',
-      texte:
-        "Ta sieste t'aide, mais elle vole du sommeil à ta nuit. On la garde courte et tôt, et ta nuit grandit.",
+      texte: "Ta sieste t'aide, mais elle vole du sommeil à ta nuit. Garde-la courte et tôt.",
       actions: [
         'Sieste courte : 20 min au plus, avant 15 h.',
         `Au lit 15 min plus tôt chaque soir (ce soir ${c(cible)}).`,
-        'Minuteur « sieste flash » de 20 min.',
+        'Minuteur sieste : 20 min.',
       ],
     },
     11: {
-      nom: 'Ado / jeune adulte un peu court',
+      nom: 'Un peu court pour ton âge',
       texte: 'À ton âge, le corps aime 8 à 10 h. Tu es tout près : 15 min de plus ce soir !',
       actions: [
         `Au lit 15 min plus tôt chaque soir (ce soir ${c(cible)}), jusqu'à 8 h de nuit.`,
@@ -158,7 +152,7 @@ export function etatTexts(id: number, r: SleepEtatResult): SleepEtatTexts | unde
     },
     12: {
       nom: 'Rythme au top',
-      texte: 'Bravo, ton rythme est régulier et ta durée colle à ton âge. Continue comme ça !',
+      texte: 'Bravo, rythme régulier et une durée qui colle à ton âge !',
       actions: ['Garde la même heure de lever.'],
     },
   }
@@ -166,9 +160,9 @@ export function etatTexts(id: number, r: SleepEtatResult): SleepEtatTexts | unde
 }
 
 export const AIDE: Record<number, string> = {
-  3: "Moins de 6 h, c'est sous ton repère, même quand tu te sens en forme. On avance doucement, 15 min à la fois.",
-  5: "Une longue nuit ne repose pas toujours plus. Le même lever chaque jour et la lumière du matin aident ton corps à se caler. L'app ne te dira jamais de dormir encore plus.",
-  9: "Quand le sommeil tarde, rester au lit à attendre peut agacer. Un moment calme hors du lit aide le sommeil à revenir. Pas de minuteur, pas de règle stricte.",
+  3: "Moins de 6 h, c'est sous ton repère, même quand tu te sens en forme. On avance de 15 min à la fois.",
+  5: "Une longue nuit ne repose pas toujours plus. Même réveil et lumière du matin aident. L'app ne te dira jamais de dormir encore plus.",
+  9: 'Pas sommeil ? Un moment calme hors du lit aide. Pas de minuteur, pas de règle stricte.',
 }
 
 export const LIGNE_PRO = 'Si la fatigue dure malgré tout, un pro de santé peut aider.'

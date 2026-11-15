@@ -85,14 +85,20 @@ class FakeDb {
     avis_beta: [],
   }
 
-  insert(table: TableName, value: Record<string, unknown>) {
+  private ensure(table: string): StoredRow[] {
+    const bag = this.rows as Record<string, StoredRow[]>
+    if (!bag[table]) bag[table] = []
+    return bag[table]
+  }
+
+  insert(table: TableName | string, value: Record<string, unknown>) {
     const row = { _id: `${table}:${this.idCounter += 1}`, ...value }
-    this.rows[table].push(row)
+    this.ensure(table).push(row)
     return Promise.resolve(row._id)
   }
 
-  query(table: TableName) {
-    return new FakeQuery(this.rows[table])
+  query(table: TableName | string) {
+    return new FakeQuery(this.ensure(table))
   }
 
   get(id: string) {

@@ -96,7 +96,7 @@ export function SleepScreen({ open, onClose }: SleepScreenProps) {
                 <p className="text-[15px] font-semibold text-white">
                   Tes nuits se notent toutes seules.
                 </p>
-                <p className="mt-0.5 text-[13px] text-[#ACB4BA]">Règle tes horaires une fois.</p>
+                <p className="mt-0.5 text-[13px] text-[#ACB4BA]">Règle tes heures une fois.</p>
               </div>
             </section>
           ) : null}
@@ -122,7 +122,7 @@ export function SleepScreen({ open, onClose }: SleepScreenProps) {
                 <span className="mt-0.5 block text-[13px] text-[#ACB4BA]">
                   {alarm.enabled
                     ? `${formatAlarmScheduledMessage(alarm.timeHm)} · ${formatRepeatSummary(alarm.days)}`
-                    : 'Régler le réveil'}
+                    : 'Régler mon réveil'}
                 </span>
               </span>
               <span className="text-[13px] text-[#ACB4BA]">{alarm.enabled ? 'ON' : 'OFF'}</span>
@@ -149,7 +149,7 @@ export function SleepScreen({ open, onClose }: SleepScreenProps) {
                   Heure d&apos;aller dormir
                 </span>
                 <span className="mt-0.5 block text-[13px] text-[#ACB4BA]" data-sleep-bedtime-status>
-                  {formatClockHm(schedule!.bedtime)} · lever {formatClockHm(schedule!.waketime)}
+                  {formatClockHm(schedule!.bedtime)} · réveil {formatClockHm(schedule!.waketime)}
                 </span>
               </span>
               <span
@@ -188,7 +188,7 @@ export function SleepScreen({ open, onClose }: SleepScreenProps) {
               style={{ backgroundColor: RED }}
               data-sleep-setup-horaires
             >
-              Régler mes horaires
+              Régler mes heures
             </button>
           )}
         </div>

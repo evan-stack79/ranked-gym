@@ -13,11 +13,11 @@ export interface SleepHomeCompactView {
 export function compactHomeQuantityStatusLabel(status: SleepQuantityStatus): string {
   switch (status) {
     case 'optimal':
-      return 'Récupération optimale'
+      return 'Nuit complète'
     case 'deficit':
       return 'Nuit courte'
     case 'excess':
-      return 'Au-dessus de la plage recommandée'
+      return 'Longue nuit'
   }
 }
 
@@ -44,7 +44,7 @@ export function getSleepHomeCompactView(
     return {
       action: 'log',
       actionLabel: 'Enregistrer',
-      secondaryLine: 'Comment était ta nuit ?',
+      secondaryLine: 'Tu as bien dormi ?',
     }
   }
 
@@ -65,6 +65,6 @@ export function getSleepHomeCompactView(
   return {
     action: 'details',
     actionLabel: 'Voir',
-    secondaryLine: `${tibPart} · Sommeil non estimé`,
+    secondaryLine: `${tibPart} · temps dormi inconnu`,
   }
 }

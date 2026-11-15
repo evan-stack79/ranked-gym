@@ -34,9 +34,11 @@ export const HV_REST_SOFT_WAKE_HM = '10:30'
 export const HV_SUNDAY_REMINDER_MIN_HM = '18:00'
 export const HV_SUNDAY_REMINDER_MAX_HM = '21:00'
 
-/** Feature display name — single source of truth (never the legacy réveil-sheet label). */
+/** Feature display name — subtitle once (never the legacy réveil-sheet label). */
 export const HV_FEATURE_NAME = 'Emploi du temps variable'
-export const HV_FEATURE_SUBTITLE = 'Ton réveil suit tes horaires'
+/** Titles and buttons — A/B n°2. */
+export const HV_FEATURE_TITLE = 'Mon planning'
+export const HV_FEATURE_SUBTITLE = 'Ton réveil suit ton planning'
 
 /** Exact minor phrases (veto 12 A). */
 export const HV_MINOR_BODY_PHRASE =
@@ -45,7 +47,7 @@ export const HV_MINOR_ADULT_HELP =
   "Une question sur tes horaires ? Un adulte de confiance peut t'aider."
 export const HV_MINOR_NO_NIGHT_MODE = 'Pas de mode « Nuit » avant 18 ans.'
 
-/** Short-night driving line (veto 15 A) — passive, required. */
+/** Short-night driving line (veto 15 A) — passive, required. MOT POUR MOT. */
 export const HV_SHORT_NIGHT_DRIVE =
   'Après une nuit très courte, si tu as sommeil, évite de prendre le volant.'
 
@@ -54,4 +56,4 @@ export const HV_NIGHT_CONFIRM = "C'est noté. Rendors-toi tranquille."
 
 /** Water day copy (état 26). */
 export const HV_WATER_DAY_PHRASE =
-  "Ta journée d'eau va de ton lever à ton lever suivant."
+  "Ta journée d'eau va d'un réveil au suivant."

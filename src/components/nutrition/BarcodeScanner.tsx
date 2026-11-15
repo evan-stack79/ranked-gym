@@ -83,7 +83,7 @@ export function BarcodeScanner({ open, onClose, onProduct }: BarcodeScannerProps
       } catch (err) {
         setLookingUp(false)
         handledRef.current = false
-        setError(err instanceof Error ? err.message : 'Scan impossible.')
+        setError('Code pas lu. Réessaie.')
         try {
           await scanner.start(
             { facingMode: 'environment' },
@@ -94,7 +94,7 @@ export function BarcodeScanner({ open, onClose, onProduct }: BarcodeScannerProps
             () => undefined,
           )
         } catch {
-          setError('Impossible de relancer la caméra.')
+          setError('Caméra bloquée. Ferme et rouvre.')
         }
       }
     }
@@ -109,7 +109,7 @@ export function BarcodeScanner({ open, onClose, onProduct }: BarcodeScannerProps
         () => undefined,
       )
       .catch(() => {
-        setError('Autorise l’accès à la caméra pour scanner un code-barres.')
+        setError('Autorise la caméra pour lire le code-barres.')
       })
 
     return () => {
@@ -153,9 +153,9 @@ export function BarcodeScanner({ open, onClose, onProduct }: BarcodeScannerProps
         <div className="flex items-center gap-2">
           <Camera className="h-5 w-5 text-[#30D158]" />
           <div>
-            <p className="text-[16px] font-semibold text-white">Scanner Open Food Facts</p>
+            <p className="text-[16px] font-semibold text-white">Code-barres</p>
             <p className="text-[12px] text-[#ACB4BA]">
-              Tiens le code un peu plus loin — pas besoin de coller l’écran
+              Recule un peu le téléphone
             </p>
           </div>
         </div>
@@ -177,7 +177,7 @@ export function BarcodeScanner({ open, onClose, onProduct }: BarcodeScannerProps
         {lookingUp && (
           <p className="mt-3 flex items-center justify-center gap-2 text-[13px] text-[#ACB4BA]">
             <Loader2 className="h-4 w-4 animate-spin text-[#30D158]" />
-            Recherche Open Food Facts…
+            Je cherche…
           </p>
         )}
         {error && (

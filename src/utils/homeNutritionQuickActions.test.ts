@@ -107,7 +107,7 @@ describe('homeNutritionQuickActions', () => {
     const { tryAddHomeQuickWater } = await import('./homeNutritionQuickActions')
     const result = tryAddHomeQuickWater()
 
-    expect(result).toEqual({ ok: false, message: "Impossible d'ajouter l'eau" })
+    expect(result).toEqual({ ok: false, message: 'Eau pas ajoutée. Réessaie.' })
     expect(storage.getTodayWaterMl()).toBe(0)
   })
 

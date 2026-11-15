@@ -787,6 +787,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     resetCloudBackupHydration()
     void clearCachedSessionUser()
     // Wipe AlarmKit + scoped sleep-alarm storage on account change.
+    // Account-delete local wipe (HV / eau / gourde / rappels 7101–7103) runs in
+    // deleteOwnAccount after the server mutation — not here, so logout keeps HV.
     void import('../services/sleepAlarmService')
       .then((m) => m.cancelAllSleepAlarmsOnLogout())
       .catch(() => {})

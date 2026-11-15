@@ -23,7 +23,7 @@ describe('sleepAlarmSchedule', () => {
   })
 
   it('summarizes repetition labels', () => {
-    expect(formatRepeatSummary([1, 2, 3, 4, 5])).toBe('En semaine')
+    expect(formatRepeatSummary([1, 2, 3, 4, 5])).toBe('Lun → ven')
     expect(formatRepeatSummary([6, 7])).toBe('Week-end')
     expect(formatRepeatSummary([1, 2, 3, 4, 5, 6, 7])).toBe('Tous les jours')
     expect(formatRepeatSummary([])).toBe('Une fois')

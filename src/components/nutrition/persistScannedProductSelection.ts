@@ -11,7 +11,7 @@ export async function persistScannedProductSelection(
     await saveAliment(product, userId)
     return true
   } catch (error) {
-    onError(toUserFacingError(error, 'Impossible d’enregistrer cet aliment.'))
+    onError(toUserFacingError(error, 'Aliment pas enregistré. Réessaie.'))
     return false
   }
 }

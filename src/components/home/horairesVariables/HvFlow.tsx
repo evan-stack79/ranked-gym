@@ -9,6 +9,7 @@ import { HvStartPickerSheet } from './HvStartPickerSheet'
 import {
   HV_FEATURE_NAME,
   HV_FEATURE_SUBTITLE,
+  HV_FEATURE_TITLE,
   HV_MAX_ARMED_ALARMS,
   HV_MINOR_ADULT_HELP,
   HV_MINOR_BODY_PHRASE,
@@ -32,6 +33,7 @@ import {
   effectiveWakeInstant,
   emptyDayPlan,
   formatDurationFr,
+  formatHoursMinutesFr,
   hmToMinutes,
   hvStatus,
   isMinorAge,
@@ -312,12 +314,12 @@ function DayRow({
             ) : day.startHm ? (
               <>
                 <span className="block text-[13px] text-white">
-                  Début {fmtHm(day.startHm)}
+                  Je commence à {fmtHm(day.startHm)}
                   {wake ? ` · Réveil ${fmtHm(wake)}` : ''}
                 </span>
                 {bed ? (
                   <span className="block text-[11px]" style={{ color: GRAY }}>
-                    Coucher conseillé vers {fmtHm(bed.bedHm)}
+                    Au lit vers {fmtHm(bed.bedHm)}
                   </span>
                 ) : null}
               </>
@@ -372,7 +374,7 @@ function DayRow({
 
 /**
  * Emploi du temps variable — sheets for the 17 maquette screens.
- * Shared « Mes réveils » planning (extends classic alarm, does not duplicate).
+ * Shared « Mon planning » (extends classic alarm, does not duplicate).
  */
 export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
   const [pane, setPane] = useState<HvFlowPane>(initialPane)
@@ -487,6 +489,19 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
     tibHours: nights.map((n) => n.tstHours ?? 0),
     referenceHours: debtReferenceHours(age),
   })
+  const napDaySummary = (() => {
+    const nightHours = nights.find((n) => n.tstHours != null)?.tstHours ?? null
+    if (nightHours == null) return null
+    const nightMin = Math.round(nightHours * 60)
+    const refMin = Math.round(debtReferenceHours(age) * 60)
+    const napMin = Math.max(0, refMin - nightMin)
+    return {
+      night: formatHoursMinutesFr(nightMin),
+      nap: formatHoursMinutesFr(napMin),
+      total: formatHoursMinutesFr(nightMin + napMin),
+      hasNap: napMin > 0,
+    }
+  })()
 
   const editingWeek =
     settings.cycleWeeks.find((w) => w.letter === cycleTab) ?? settings.cycleWeeks[0]
@@ -499,18 +514,18 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
 
   const title =
     pane === 'planning' || pane === 'quick' || pane === 'day' || pane === 'rest' || pane === 'nap'
-      ? 'Mes réveils'
+      ? HV_FEATURE_TITLE
       : pane === 'activation' && settings.enabled
-        ? 'Ma semaine type'
+        ? 'Ma semaine'
         : pane === 'debt'
           ? 'Ta semaine'
           : pane === 'armed'
             ? 'Réveils prêts'
             : pane === 'decompression'
-              ? 'Temps pour souffler'
+              ? 'Pause avant le lit'
               : pane === 'water'
-                ? 'Nutrition'
-                : HV_FEATURE_NAME
+                ? 'Eau'
+                : HV_FEATURE_TITLE
 
   const persistSettings = (nextSettings: typeof settings, days?: HvDayPlan[]) => {
     const synced = syncCycleSlots(nextSettings)
@@ -545,7 +560,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
       days,
     })
     await syncHvAlarms()
-    setToast('Un seul planning, un seul réveil.')
+    setToast('Tes réveils sont prêts.')
     setPane(minor ? 'minor' : 'planning')
   }
 
@@ -734,7 +749,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
     const wd = weekdayLong(day.dateKey)
     if (offsetMin === 'off') {
       upsertHvDay({ ...day, noAlarm: true, oneShotOffsetMin: 0, exception: true })
-      setToast('Pas de réveil, juste pour ce jour.')
+      setToast('Pas de réveil ce jour-là.')
     } else {
       const nextDay: HvDayPlan = {
         ...day,
@@ -809,7 +824,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
     ]
     saveHvState({ days: merged })
     void syncHvAlarms()
-    setToast(`Semaine ${weekModelName} cette semaine. Tes réveils sont prêts.`)
+    setToast(`Semaine ${weekModelName} : réveils prêts.`)
   }
 
   const draftOffsets = {
@@ -899,10 +914,10 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
           style={{ backgroundColor: HV_RED }}
           data-hv-activate
         >
-          {settings.enabled ? 'Enregistrer' : 'Activer'}
+          {settings.enabled ? 'Enregistrer' : 'Activer mon planning'}
         </button>
         <p className="text-center text-[12px]" style={{ color: GRAY }}>
-          Tes données restent sur ton téléphone.
+          Ton planning reste sur ton téléphone.
         </p>
       </div>
     ) : pane === 'day' && editKey ? (
@@ -912,7 +927,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
         className="ios-press w-full rounded-2xl py-3.5 text-[17px] font-semibold text-white"
         style={{ backgroundColor: HV_RED }}
       >
-        Valider
+        C&apos;est bon
       </button>
     ) : pane === 'rest' && editKey ? (
       <button
@@ -924,7 +939,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
         className="ios-press w-full rounded-2xl py-3.5 text-[17px] font-semibold text-white"
         style={{ backgroundColor: HV_RED }}
       >
-        Valider
+        C&apos;est bon
       </button>
     ) : pane === 'vacation' ? (
       <button
@@ -971,7 +986,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
           setPane(settings.enabled ? 'planning' : 'activation')
         }}
       >
-        Valider
+        C&apos;est bon
       </button>
     ) : undefined
 
@@ -1015,11 +1030,10 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
             <>
               <HvLottie id="02" className="mx-auto h-24 w-full max-w-[240px]" />
               <p className="text-[15px] leading-snug text-white">
-                Tes horaires changent, ton app aussi. On ne te demande pas de te lever à la même heure
-                chaque jour.
+                Tes heures changent ? Ton réveil suit.
               </p>
               <p className="text-[13px] font-semibold" style={{ color: GRAY }}>
-                À régler une seule fois
+                À régler une fois
               </p>
               <div
                 className="overflow-hidden rounded-2xl"
@@ -1032,7 +1046,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                       key: 'trajet' as const,
                       label: 'Trajet',
                       value: formatDurationFr(settings.trajetMin),
-                      hint: 'Pour aller au travail ou à l’école',
+                      hint: "Aller à l'école ou au travail",
                     },
                     {
                       key: 'prep' as const,
@@ -1042,9 +1056,9 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                     },
                     {
                       key: 'souffler' as const,
-                      label: 'Temps pour souffler',
+                      label: 'Pause avant le lit',
                       value: formatDurationFr(settings.decompressionMin),
-                      hint: 'Entre la fin et le coucher',
+                      hint: 'Après la fin, avant le lit',
                     },
                   ] as const
                 ).map((row) => (
@@ -1094,7 +1108,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
               {settings.cycleLength > 1 ? (
                 <>
                   <p className="text-[13px] font-semibold" style={{ color: GRAY }}>
-                    Cette semaine, je suis en…
+                    Cette semaine, je suis du…
                   </p>
                   <div className="flex gap-2" data-hv-this-week-letter>
                     {settings.cycleWeeks.map((w) => (
@@ -1123,7 +1137,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
               ) : null}
 
               <p className="text-[13px] font-semibold" style={{ color: GRAY }}>
-                {settings.cycleLength > 1 ? 'Tes semaines types' : 'Ta semaine type'}
+                {settings.cycleLength > 1 ? 'Tes semaines' : 'Ta semaine'}
               </p>
               {settings.cycleLength > 1 ? (
                 <div className="flex rounded-xl p-1" style={{ backgroundColor: CARD }} data-hv-ab-tabs>
@@ -1165,7 +1179,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                 }}
                 data-hv-rename-model
               >
-                Renommer : {editingWeek?.name ?? 'A'} (Matin, Après-midi, Nuit)
+                Renommer la semaine {editingWeek?.name ?? 'A'}
               </button>
 
               <div
@@ -1209,10 +1223,10 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                           ) : (
                             <>
                               <span className="block text-[14px] text-white">
-                                Début {fmtHm(slot.startHm)}
+                                Je commence à {fmtHm(slot.startHm)}
                               </span>
                               <span className="block text-[12px]" style={{ color: GRAY }}>
-                                {wake ? `Réveil ${fmtHm(wake)}` : 'Réveil —'}
+                                {wake ? `Réveil ${fmtHm(wake)}` : 'Réveil : à régler'}
                               </span>
                             </>
                           )}
@@ -1223,11 +1237,6 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                   )
                 })}
               </div>
-
-              <p className="text-[13px]" style={{ color: GRAY }}>
-                Un seul planning, un seul réveil. Il remplace « Mes réveils », il ne fait pas de
-                doublon.
-              </p>
             </>
           ) : null}
 
@@ -1235,7 +1244,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
             <>
               <HvLottie id="03" className="mx-auto h-24 w-24" />
               <p className="text-[16px] font-semibold leading-snug text-white">
-                Tu n&apos;as pas encore ton planning ? Règle juste demain, le reste attendra.
+                Pas encore ton planning ? Règle juste demain.
               </p>
               <button
                 type="button"
@@ -1246,9 +1255,9 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
               >
                 <b className="block text-[15px] text-white">Ta semaine</b>
                 <small className="text-[12px]" style={{ color: GRAY }}>
-                  Manque environ {debt.manqueDisplayHours} h · Déjà récupéré {debt.recupereDisplayHours}{' '}
+                  En retard : {debt.manqueDisplayHours} h · rattrapé : {debt.recupereDisplayHours}{' '}
                   h
-                  {nights.length >= 3 && nights.length < 7 ? ' · provisoire' : ''}
+                  {nights.length >= 3 && nights.length < 7 ? ' · pas fini' : ''}
                 </small>
               </button>
               <div className="flex rounded-xl p-1" style={{ backgroundColor: CARD }} data-hv-week-tabs>
@@ -1305,9 +1314,6 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                   <b className="block text-[15px] text-white">
                     Reprendre ma semaine {weekModelName}
                   </b>
-                  <small className="text-[12px]" style={{ color: GRAY }}>
-                    Le modèle {weekModelName}, pas une copie du passé
-                  </small>
                 </div>
                 <ChevronRight className="ml-auto" size={16} color={GRAY} />
               </button>
@@ -1316,9 +1322,9 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                 style={{ backgroundColor: CARD }}
                 data-hv-reminder
               >
-                <b className="block text-[15px] text-white">Rappel du planning</b>
+                <b className="block text-[15px] text-white">Rappel du dimanche</b>
                 <small className="text-[12px]" style={{ color: GRAY }}>
-                  Ta semaine arrive / Tu règles tes réveils ?
+                  Le dimanche soir, on te demande ton planning.
                 </small>
                 <div className="mt-2 flex gap-1">
                   {([1, 2, 3, 4, 5, 6, 7] as const).map((wd) => (
@@ -1378,7 +1384,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                   style={{ backgroundColor: CARD }}
                   onClick={() => setPane('armed')}
                 >
-                  Réveils armés
+                  Réveils prêts
                 </button>
               </div>
               <div className="flex gap-2">
@@ -1388,7 +1394,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                   style={{ backgroundColor: CARD, color: GRAY }}
                   onClick={() => setPane('activation')}
                 >
-                  Ma semaine type
+                  Ma semaine
                 </button>
                 <button
                   type="button"
@@ -1404,7 +1410,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                   style={{ backgroundColor: CARD, color: GRAY }}
                   onClick={() => setPane('decompression')}
                 >
-                  Souffler
+                  Pause
                 </button>
               </div>
             </>
@@ -1427,7 +1433,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                   className="ios-press flex min-h-[44px] w-full items-center justify-between px-4 py-3"
                   onClick={() => setStartPickerOpen(true)}
                 >
-                  <span className="text-white">Début</span>
+                  <span className="text-white">Je commence à</span>
                   <span className="flex items-center gap-1 text-white">
                     {fmtHm(draftStart)}
                     <ChevronRight size={16} color={GRAY} />
@@ -1439,7 +1445,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                   onClick={() => setDurationField('dayTrajet')}
                 >
                   <span>
-                    <span className="block text-white">Trajet ce jour</span>
+                    <span className="block text-white">Trajet</span>
                     {draftTrajetMin == null ? (
                       <span className="text-[12px]" style={{ color: GRAY }}>
                         comme d&apos;habitude
@@ -1482,7 +1488,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                       </span>
                     ) : (
                       <span className="text-[12px]" style={{ color: GRAY }}>
-                        Je me lève à…
+                        Réveil à…
                       </span>
                     )}
                   </span>
@@ -1497,7 +1503,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                   onClick={() => setWheelField('finish')}
                 >
                   <span>
-                    <span className="block text-white">Fin</span>
+                    <span className="block text-white">Je finis à</span>
                     <span className="text-[12px]" style={{ color: GRAY }}>
                       facultatif
                     </span>
@@ -1518,7 +1524,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                   setDraftFinishHm(minutesToHm(start + 7 * 60))
                 }}
               >
-                Fin = début + 7 h
+                Je finis 7 h après
               </button>
               {draftWakeInstant?.crossesMidnight ? (
                 <>
@@ -1546,13 +1552,12 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                 </>
               ) : null}
               <p className="text-center text-[14px]" style={{ color: GRAY }}>
-                Début {fmtHm(draftStart)}, trajet {formatDurationFr(draftOffsets.trajetMin)},
-                préparation {formatDurationFr(draftOffsets.prepMin)} : réveil à{' '}
-                {fmtHm(draftWakeInstant?.wakeHm ?? '?')}.
+                Je commence à {fmtHm(draftStart)} → réveil à{' '}
+                {fmtHm(draftWakeInstant?.wakeHm ?? '?')}
               </p>
               {wakeTooClose ? (
                 <p className="text-[13px]" style={{ color: GRAY }}>
-                  Le réveil tombe au moins 30 min avant le début. On propose{' '}
+                  Réveil trop près du début. On te propose{' '}
                   {fmtHm(minutesToHm((hmToMinutes(draftStart) ?? 0) - 30))}.
                 </p>
               ) : null}
@@ -1565,7 +1570,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                 className="flex min-h-[44px] items-center justify-between rounded-2xl px-4 py-3"
                 style={{ backgroundColor: CARD }}
               >
-                <span className="text-[15px] text-white">Pour tous mes jours Tôt</span>
+                <span className="text-[15px] text-white">Tous mes jours « Tôt »</span>
                 <HvIosSwitch
                   checked={applyToKind}
                   aria-label="Pour tous mes jours Tôt"
@@ -1646,7 +1651,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                 style={{ color: GRAY }}
                 onClick={() => setPane('nap')}
               >
-                + Sieste prévue
+                + Sieste
               </button>
             </>
           ) : null}
@@ -1707,7 +1712,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                   }
                 }}
               >
-                Demain change
+                Demain, ça change ?
               </button>
               <button
                 type="button"
@@ -1754,7 +1759,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                     setPane('day')
                   }}
                 >
-                  Début
+                  Je commence à
                 </button>
                 <button
                   type="button"
@@ -1765,7 +1770,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                 </button>
               </div>
               <p className="text-center text-[15px] text-white">
-                Repos ! Pas d&apos;heure de début, pas de réveil, sauf si tu en veux un.
+                Repos ! Pas de réveil, sauf si tu en veux un.
               </p>
               <div
                 className="flex items-center justify-between rounded-2xl px-4 py-3"
@@ -1774,7 +1779,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                 <div>
                   <b className="text-white">Réveil doux</b>
                   <small className="block text-[12px]" style={{ color: GRAY }}>
-                    À {HV_REST_SOFT_WAKE_HM}, ton lever des jours de repos
+                    À {HV_REST_SOFT_WAKE_HM}, les jours de repos
                   </small>
                 </div>
                 <HvIosSwitch
@@ -1821,7 +1826,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                 J&apos;ai fini à… {fmtHm(finishHm)}
               </button>
               <p className="text-center text-[12px]" style={{ color: GRAY }}>
-                Coucher conseillé vers {fmtHm(suggestedBedtimeHm(finishHm, decMin) ?? '?')}
+                Au lit vers {fmtHm(suggestedBedtimeHm(finishHm, decMin) ?? '?')}
               </p>
             </>
           ) : null}
@@ -1830,17 +1835,17 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
             <>
               <HvLottie id="12" className="mx-auto h-28 w-28" />
               <p className="text-center text-[15px] leading-snug text-white">
-                Ta semaine a été courte : il te manque environ {debt.manqueDisplayHours} h. On en
-                reprend un peu chaque jour, sans forcer.
+                Semaine courte : {debt.manqueDisplayHours} h en retard. On rattrape un peu chaque
+                jour.
               </p>
               <div className="rounded-2xl p-4" style={{ backgroundColor: CARD }}>
                 <div className="mb-3 flex justify-between">
                   <div>
-                    <small style={{ color: GRAY }}>Manque</small>
+                    <small style={{ color: GRAY }}>En retard</small>
                     <b className="block text-white">environ {debt.manqueDisplayHours} h</b>
                   </div>
                   <div>
-                    <small style={{ color: GRAY }}>Déjà récupéré</small>
+                    <small style={{ color: GRAY }}>Rattrapé</small>
                     <b className="block text-white">{debt.recupereDisplayHours} h</b>
                   </div>
                 </div>
@@ -1865,8 +1870,8 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                   })}
                 </div>
                 <p className="mt-2 text-[12px]" style={{ color: GRAY }}>
-                  Nuit (au lit) + siestes notées
-                  {nights.length >= 3 && nights.length < 7 ? ' · provisoire' : ''}
+                  Nuit + siestes
+                  {nights.length >= 3 && nights.length < 7 ? ' · pas fini' : ''}
                 </p>
               </div>
             </>
@@ -1892,11 +1897,11 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
             <>
               <HvLottie id="14" className="mx-auto h-36 w-36" />
               <h2 className="text-center text-[22px] font-bold text-white">
-                Mode en pause. Ton planning t&apos;attend.
+                Planning en pause.
               </h2>
               <p className="text-center text-[14px]" style={{ color: GRAY }}>
-                Pendant la pause, ton réveil simple reprend : {fmtHm(simpleWakeHm)}.
-                {resumeLabel ? ` Tes horaires reviennent ${resumeLabel}.` : ''}
+                En attendant, réveil à {fmtHm(simpleWakeHm)}.
+                {resumeLabel ? ` Retour ${resumeLabel}.` : ''}
               </p>
               <p className="text-[13px] font-semibold" style={{ color: GRAY }}>
                 Fin de la pause
@@ -1942,7 +1947,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                   setPane('planning')
                 }}
               >
-                Reprendre maintenant
+                Reprendre
               </button>
             </>
           ) : null}
@@ -1951,10 +1956,10 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
             <>
               <HvLottie id="16" className="mx-auto h-20 w-20" />
               <p className="text-[17px] font-semibold text-white">
-                Semaine {weekModelName} cette semaine. Tes réveils sont prêts.
+                Semaine {weekModelName} : réveils prêts.
               </p>
               <p className="text-[14px]" style={{ color: GRAY }}>
-                {armed.length} réveils armés sur les 14 prochains jours (max {HV_MAX_ARMED_ALARMS}).
+                {armed.length} réveils prêts pour les 2 semaines.
               </p>
               <div className="max-h-64 space-y-1 overflow-y-auto">
                 {armed.map((a) => (
@@ -1969,8 +1974,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                 ))}
               </div>
               <p className="text-[13px]" style={{ color: GRAY }}>
-                Ils sonnent même si l&apos;app reste fermée. À chaque ouverture, l&apos;app les remet à
-                jour.
+                Ils sonnent même app fermée.
               </p>
             </>
           ) : null}
@@ -2025,7 +2029,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                 </div>
               )}
               <p className="text-[13px]" style={{ color: GRAY }}>
-                Sans réponse, ton réveil reste à {fmtHm(nextWake?.wakeHm ?? '07:00')}.
+                Sinon, il reste à {fmtHm(nextWake?.wakeHm ?? '07:00')}.
               </p>
             </>
           ) : null}
@@ -2035,7 +2039,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
               <HvLottie id="06" className="mx-auto h-48 w-48" />
               <h2 className="text-center text-[26px] font-bold text-white">Matinée libre !</h2>
               <p className="text-center text-[15px]" style={{ color: GRAY }}>
-                Tu as un peu de sommeil à récupérer : rendors-toi, je te réveille à 10:30.
+                Rendors-toi, je te réveille à 10 h 30.
               </p>
               <button
                 type="button"
@@ -2049,7 +2053,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                   onClose()
                 }}
               >
-                Je me rendors jusqu&apos;à 10:30
+                Dodo jusqu&apos;à 10 h 30
               </button>
               <button
                 type="button"
@@ -2105,13 +2109,17 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
             <>
               <HvLottie id="07" className="mx-auto h-28 w-40" />
               <p className="text-[13px] font-semibold" style={{ color: GRAY }}>
-                Nuit + sieste prévue
+                Nuit + sieste
               </p>
-              <p className="text-[15px] text-white">
-                4 h 30 + 2 h 30 = 7 h sur ta journée. C&apos;est bien compté.
-              </p>
+              {napDaySummary ? (
+                <p className="text-[15px] text-white">
+                  {napDaySummary.hasNap
+                    ? `${napDaySummary.night} + ${napDaySummary.nap} = ${napDaySummary.total} sur ta journée. C'est bien compté.`
+                    : `${napDaySummary.night} sur ta journée. C'est bien compté.`}
+                </p>
+              ) : null}
               <p className="text-[13px]" style={{ color: GRAY }}>
-                Une sieste prévue dans ton planning n&apos;est jamais jugée.
+                Ta sieste compte aussi.
               </p>
               <button
                 type="button"
@@ -2119,7 +2127,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                 style={{ backgroundColor: HV_RED }}
                 onClick={() => setPane('planning')}
               >
-                Valider
+                C&apos;est bon
               </button>
             </>
           ) : null}
@@ -2129,7 +2137,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
               <HvLottie id="17" className="mx-auto h-32 w-32" />
               <p className="text-[15px] text-white">{HV_WATER_DAY_PHRASE}</p>
               <p className="text-[13px]" style={{ color: GRAY }}>
-                Rappels à lever +2 h, +5 h et +8 h — jamais la nuit.
+                Rappels 2 h, 5 h et 8 h après ton réveil. Jamais la nuit.
               </p>
             </>
           ) : null}
@@ -2149,7 +2157,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
             ? 'Trajet'
             : durationField === 'prep' || durationField === 'dayPrep'
               ? 'Me préparer'
-              : 'Temps pour souffler'
+              : 'Pause avant le lit'
         }
         valueMin={
           durationField === 'trajet'
@@ -2193,12 +2201,12 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
           startPickerOpen
             ? editKey
               ? formatShortFrDate(editKey)
-              : 'Début'
+              : 'Je commence à'
             : slotEdit
               ? `${HV_WEEKDAY_LABELS_FR[slotEdit.weekday]}${
                   settings.cycleLength > 1 ? ` · Semaine ${slotEdit.week}` : ''
                 }`
-              : 'Début'
+              : 'Je commence à'
         }
         mode={
           startPickerOpen
@@ -2236,7 +2244,11 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
         open={wheelField != null}
         onClose={() => setWheelField(null)}
         title={
-          wheelField === 'wake' ? 'Je me lève à…' : wheelField === 'finish' ? 'Fin' : 'Début'
+          wheelField === 'wake'
+            ? 'Réveil à…'
+            : wheelField === 'finish'
+              ? 'Je finis à'
+              : 'Je commence à'
         }
         valueHm={
           wheelField === 'wake'

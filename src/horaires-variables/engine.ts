@@ -604,7 +604,7 @@ export function decompressionCopy(finishHm: string, decompressionMin: number): s
     dec === 0 ? '0 min' : dec < 60 ? `${dec} min` : dec % 60 === 0 ? `${dec / 60} h` : `${Math.floor(dec / 60)} h ${dec % 60}`
   const finLabel = finishHm.replace(/^0/, '')
   const bedLabel = (bed ?? '?').replace(/^0/, '')
-  return `Fin à ${finLabel}, ${decLabel} pour souffler : coucher conseillé vers ${bedLabel}.`
+  return `Fini à ${finLabel} → au lit vers ${bedLabel}.`
 }
 
 /** Total sleep on a day = principal + planned naps (état 7 / 8). */
@@ -740,10 +740,10 @@ export function hvStatus(settings: HvSettings, todayKey: string): {
     settings.cycleWeeks?.find((w) => w.letter === letter) ?? null
   const name = week && week.name !== letter ? week.name : letter
   if (!settings.enabled) {
-    return { kind: 'draft', label: 'Pas encore activé', letter }
+    return { kind: 'draft', label: 'Pas activé', letter }
   }
   if (settings.autoPaused) {
-    return { kind: 'auto', label: 'En pause tout seul', letter }
+    return { kind: 'auto', label: 'En pause', letter }
   }
   if (settings.vacationPauseUntilKey && todayKey <= settings.vacationPauseUntilKey) {
     const d = parseDateKey(settings.vacationPauseUntilKey)
@@ -752,7 +752,7 @@ export function hvStatus(settings: HvSettings, todayKey: string): {
       : settings.vacationPauseUntilKey
     return { kind: 'vacation', label: `En pause jusqu'au ${until}`, letter }
   }
-  return { kind: 'active', label: `Actif · semaine ${name}`, letter }
+  return { kind: 'active', label: `Semaine ${name}`, letter }
 }
 
 export function isHvPaused(

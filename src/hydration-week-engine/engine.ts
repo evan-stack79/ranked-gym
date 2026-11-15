@@ -177,9 +177,10 @@ function isMale(sex: HydrationSex): boolean {
 }
 
 /**
- * EFSA beverage ranges (part boissons).
- * 14+ : men 1.75–2.0, women 1.4–1.6.
+ * EFSA beverage ranges (part boissons). App minimum display age is 15.
+ * 15–64 : men 1.75–2.0, women 1.4–1.6.
  * 65+ : at least 2.0 / 1.6 (ESPEN).
+ * Never return 4–8 or 9–13 labels (those ranges are not shown).
  */
 export function drinkRepereRange(age: number, sex: HydrationSex): DrinkRepereRange {
   const male = isMale(sex)
@@ -188,23 +189,13 @@ export function drinkRepereRange(age: number, sex: HydrationSex): DrinkRepereRan
     return {
       lowL,
       highL: lowL,
-      label: male
-        ? 'au moins 2,0 L de boissons (repère)'
-        : 'au moins 1,6 L de boissons (repère)',
+      label: male ? 'au moins 2,0 L de boissons' : 'au moins 1,6 L de boissons',
     }
   }
-  if (age >= 14) {
-    return male
-      ? { lowL: 1.75, highL: 2.0, label: 'environ 1,75 à 2,0 L de boissons (repère)' }
-      : { lowL: 1.4, highL: 1.6, label: 'environ 1,4 à 1,6 L de boissons (repère)' }
-  }
-  if (age >= 9) {
-    return male
-      ? { lowL: 1.5, highL: 1.7, label: 'environ 1,5 à 1,7 L de boissons (repère)' }
-      : { lowL: 1.3, highL: 1.5, label: 'environ 1,3 à 1,5 L de boissons (repère)' }
-  }
-  // 4–8 ans
-  return { lowL: 1.1, highL: 1.3, label: 'environ 1,1 à 1,3 L de boissons (repère)' }
+  // 15–64, and fallback for younger ages (UI hides < 15 — no 4–8 / 9–13 display).
+  return male
+    ? { lowL: 1.75, highL: 2.0, label: 'environ 1,75 à 2,0 L de boissons' }
+    : { lowL: 1.4, highL: 1.6, label: 'environ 1,4 à 1,6 L de boissons' }
 }
 
 /**

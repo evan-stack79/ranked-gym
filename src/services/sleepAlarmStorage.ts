@@ -78,7 +78,7 @@ export function defaultSleepAlarmSettings(): SleepAlarmSettings {
     enabled: false,
     timeHm: schedule?.waketime ?? '07:00',
     days: [...DEFAULT_WEEKDAYS],
-    label: 'Lever',
+    label: 'Réveil',
     soundId: SLEEP_ALARM_SOUND_ID,
     snoozeEnabled: true,
     snoozeMinutes: SLEEP_ALARM_SNOOZE_MINUTES,
@@ -127,7 +127,7 @@ export function saveSleepAlarmSettings(
   }
   if (patch.days) next.days = sanitizeDays(patch.days)
   if (typeof patch.label === 'string') {
-    next.label = patch.label.trim().slice(0, 40) || 'Lever'
+    next.label = patch.label.trim().slice(0, 40) || 'Réveil'
   }
   writeLocal(scopedKey(), JSON.stringify(next))
   notifyChanged()

@@ -21,6 +21,8 @@ export interface SleepInput {
   workdayTstHours?: number[]
   /** Time In Bed courant (heures), si disponible. */
   currentTibHours?: number
+  /** Âge en années — uniquement pour les libellés (repères NSF par âge). */
+  age?: number
 }
 
 export interface SleepQuantityResult {

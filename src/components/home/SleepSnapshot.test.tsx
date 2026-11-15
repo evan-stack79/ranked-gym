@@ -76,7 +76,7 @@ describe('SleepSnapshot v10 summary card', () => {
       root.render(<SleepSnapshot />)
     })
 
-    expect(host.textContent).toContain("Comment s'est passée ta nuit")
+    expect(host.textContent).toContain('Tu as bien dormi ?')
     expect(host.textContent).toMatch(/30/)
     expect(host.textContent).toContain('ton objectif')
     expect(host.querySelector('[data-sleep-primary-action="modifier"]')).toBeTruthy()

@@ -54,4 +54,15 @@ describe('HV storage', () => {
     })
     expect(getHvState().settings.enabled).toBe(true)
   })
+
+  it('clearHvState drops saved planning so account delete can wipe it', async () => {
+    const { clearHvState, getHvState, saveHvState } = await import('./storage')
+    saveHvState({
+      settings: { ...getHvState().settings, enabled: true, activatedAt: new Date().toISOString() },
+    })
+    expect(getHvState().settings.enabled).toBe(true)
+    clearHvState()
+    expect(getHvState().settings.enabled).toBe(false)
+    expect(getHvState().days).toEqual([])
+  })
 })

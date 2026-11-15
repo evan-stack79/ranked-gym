@@ -42,7 +42,7 @@ export function AccueilAddSheet({ open, prefs, onClose, onSave }: AccueilAddShee
       open={open}
       onClose={onClose}
       title="Ajouter"
-      subtitle="Remets un bloc masqué sur l’Accueil"
+      subtitle="Remets un bloc caché"
       footer={
         <button
           type="button"

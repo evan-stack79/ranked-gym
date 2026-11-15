@@ -166,7 +166,7 @@ export function AddFoodScreenLegacy({
             autoComplete="off"
             autoFocus
             role="searchbox"
-            aria-label="Rechercher un aliment Open Food Facts"
+            aria-label="Rechercher un aliment"
           />
         </label>
 
@@ -177,7 +177,7 @@ export function AddFoodScreenLegacy({
             className="ios-press flex min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border border-[#30D158]/40 bg-[#30D158]/15 px-3 py-3.5 text-[13px] font-semibold text-[#30D158]"
           >
             <ScanBarcode className="h-4 w-4 shrink-0" aria-hidden />
-            Scan Code-Barre
+            Code-barres
           </button>
           <MealPhotoAnalyzer
             variant="button"

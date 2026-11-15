@@ -41,7 +41,7 @@ export function formatRepeatSummary(days: SleepAlarmWeekday[]): string {
   const sorted = [...days].sort((a, b) => a - b)
   const isWeekdays =
     sorted.length === 5 && sorted.every((d, i) => d === ([1, 2, 3, 4, 5] as const)[i])
-  if (isWeekdays) return 'En semaine'
+  if (isWeekdays) return 'Lun → ven'
   const isWeekend = sorted.length === 2 && sorted[0] === 6 && sorted[1] === 7
   if (isWeekend) return 'Week-end'
   if (sorted.length === 7) return 'Tous les jours'

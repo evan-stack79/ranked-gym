@@ -6,13 +6,13 @@ import { sleepSpanMinutes } from '../../utils/sleepDialMath'
 import { computeTibHours } from '../../sleep-engine'
 
 describe('SleepView v11 page contracts', () => {
-  it('page exposes dial, cards, Dormir maintenant, diag', () => {
+  it('page exposes dial, cards, Je vais dormir, diag', () => {
     const src = readFileSync(resolve(__dirname, 'SleepView.tsx'), 'utf8')
     expect(src).toMatch(/data-sleep-page/)
     expect(src).toMatch(/data-sleep-route="sommeil"/)
     expect(src).toMatch(/SleepClockDial/)
-    expect(src).toMatch(/Dormir maintenant/)
-    expect(src).toMatch(/Désactiver le réveil/)
+    expect(src).toMatch(/Je vais dormir/)
+    expect(src).toMatch(/Couper mon réveil/)
     expect(src).toMatch(/days:\s*\[\]/)
     expect(src).toMatch(/Batterie faible/)
     expect(src).toMatch(/cancelSleepAlarm/)
@@ -20,7 +20,7 @@ describe('SleepView v11 page contracts', () => {
     expect(src).toMatch(/isSleepAlarmDiagEnabled/)
     expect(src).toMatch(/diagOpen/)
     expect(src).toMatch(/Sonnerie/)
-    expect(src).toMatch(/Répétition/)
+    expect(src).toMatch(/Jours/)
     expect(src).not.toMatch(/Au réveil/)
     expect(src).not.toMatch(/flamme|streak|BPM|kcal/i)
   })

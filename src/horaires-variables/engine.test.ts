@@ -153,7 +153,7 @@ describe('HV mots interdits', () => {
 describe('HV décompression + dette', () => {
   it('coucher conseillé', () => {
     expect(suggestedBedtimeHm('23:00', 60)).toBe('00:00')
-    expect(decompressionCopy('23:00', 60)).toContain('coucher conseillé vers')
+    expect(decompressionCopy('23:00', 60)).toContain('au lit vers')
   })
 
   it('week debt grey math', () => {

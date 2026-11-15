@@ -29,6 +29,7 @@ import {
   isSleepAlarmDiagEnabled,
   setSleepAlarmDiagEnabled,
 } from '../../utils/sleepAlarmDiagGate'
+import { HV_FEATURE_TITLE } from '../../horaires-variables/constants'
 
 const BG = '#000000'
 const CARD = '#1C1C1E'
@@ -51,9 +52,9 @@ export type SleepAlarmSheetPane = 'main' | 'days' | 'sound'
 interface SleepAlarmSheetProps {
   open: boolean
   onClose: () => void
-  /** Open directly on Sonnerie / Répétition (page Sommeil v11). */
+  /** Open directly on Sonnerie / Jours (page Sommeil v11). */
   initialPane?: SleepAlarmSheetPane
-  /** Opens Emploi du temps variable (shared Mes réveils planning). */
+  /** Opens Mon planning (shared HV planning). */
   onOpenHorairesVariables?: () => void
 }
 
@@ -215,7 +216,7 @@ export function SleepAlarmSheet({
   const onCancel = () => onClose()
 
   const sheetTitle =
-    pane === 'main' ? 'Réveil' : pane === 'days' ? 'Répétition' : 'Sonnerie'
+    pane === 'main' ? 'Réveil' : pane === 'days' ? 'Jours' : 'Sonnerie'
 
   return (
     <IosSheet
@@ -273,7 +274,7 @@ export function SleepAlarmSheet({
 
             <p className="flex items-center gap-1.5 px-1 text-[13px]" style={{ color: GRAY }}>
               <span aria-hidden>☼</span>
-              Suit ton heure de lever (cadran Sommeil)
+              Suit ton heure de réveil (cadran Sommeil)
             </p>
 
             <div className="overflow-hidden rounded-2xl" style={{ backgroundColor: CARD }}>
@@ -282,7 +283,7 @@ export function SleepAlarmSheet({
                 onClick={() => setPane('days')}
                 className="ios-press flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left"
               >
-                <span className="text-[16px] text-white">Répétition</span>
+                <span className="text-[16px] text-white">Jours</span>
                 <span className="flex items-center gap-1 text-[15px]" style={{ color: GRAY }}>
                   {formatRepeatSummary(draft.days)}
                   <ChevronRight className="h-4 w-4" />
@@ -290,7 +291,7 @@ export function SleepAlarmSheet({
               </button>
               <div className="mx-4 h-px bg-white/10" />
               <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-                <span className="text-[16px] text-white">Libellé</span>
+                <span className="text-[16px] text-white">Nom</span>
                 {labelEditing ? (
                   <input
                     autoFocus
@@ -328,7 +329,7 @@ export function SleepAlarmSheet({
               <div className="mx-4 h-px bg-white/10" />
               <div className="flex items-center justify-between gap-3 px-4 py-3.5">
                 <div>
-                  <p className="text-[16px] text-white">Répéter</p>
+                  <p className="text-[16px] text-white">Encore 9 min</p>
                   <p className="text-[13px]" style={{ color: GRAY }}>
                     {SLEEP_ALARM_SNOOZE_MINUTES} min
                   </p>
@@ -353,7 +354,7 @@ export function SleepAlarmSheet({
             </div>
 
             <p className="px-1 text-[12px]" style={{ color: GRAY }}>
-              La sonnerie monte doucement.
+              Le son monte doucement.
             </p>
             {onOpenHorairesVariables ? (
               <button
@@ -363,7 +364,7 @@ export function SleepAlarmSheet({
                 style={{ backgroundColor: CARD }}
                 data-hv-link-from-alarm
               >
-                <span className="text-[16px] text-white">Emploi du temps variable</span>
+                <span className="text-[16px] text-white">{HV_FEATURE_TITLE}</span>
                 <ChevronRight className="h-4 w-4" style={{ color: GRAY }} />
               </button>
             ) : null}
@@ -434,7 +435,7 @@ export function SleepAlarmSheet({
               <span>
                 <span className="block text-[16px] text-white">{SLEEP_ALARM_SOUND_LABEL}</span>
                 <span className="mt-0.5 block text-[13px]" style={{ color: GRAY }}>
-                  Monte doucement
+                  Son doux au début
                 </span>
               </span>
               {draft.soundId !== 'none' ? (

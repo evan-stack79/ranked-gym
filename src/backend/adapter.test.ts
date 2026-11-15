@@ -87,6 +87,10 @@ const PHASE_E_TABLES = [
   'subscriptionPurchaseAttempts',
   'subscriptionReceipts',
   'subscriptionReminderOutbox',
+  'account_delete_subscription_archive',
+  'account_delete_rewards_redemption_archive',
+  'account_delete_age_majority_archive',
+  'account_delete_google_takeover_archive',
 ] as const
 
 describe('Convex Phase A feature flag', () => {

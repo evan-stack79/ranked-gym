@@ -14,7 +14,7 @@ interface SleepScheduleSheetProps {
 const RED = '#ff0702'
 
 /**
- * « Tes horaires » — cartes Coucher/Lever EN HAUT, puis cadran.
+ * « Tes heures » — cartes Coucher/Réveil EN HAUT, puis cadran.
  * Aucune alarme / sonnerie ici (hors périmètre réveil).
  */
 export function SleepScheduleSheet({ open, onClose, onSaved }: SleepScheduleSheetProps) {
@@ -34,7 +34,7 @@ export function SleepScheduleSheet({ open, onClose, onSaved }: SleepScheduleShee
     setError(null)
     const saved = saveSleepSchedule({ bedtime, waketime })
     if (!saved) {
-      setError('Impossible d’enregistrer — vérifie tes horaires.')
+      setError('Pas enregistré. Vérifie tes heures.')
       return
     }
     onClose()
@@ -45,7 +45,7 @@ export function SleepScheduleSheet({ open, onClose, onSaved }: SleepScheduleShee
     <IosSheet
       open={open}
       onClose={onClose}
-      title="Tes horaires"
+      title="Tes heures"
       scrollLocked
       footer={
         <button
@@ -73,7 +73,7 @@ export function SleepScheduleSheet({ open, onClose, onSaved }: SleepScheduleShee
           <div className="rounded-2xl bg-[#1C1C1E] px-3.5 py-3">
             <p className="flex items-center gap-1.5 text-[12px] text-[#ACB4BA]">
               <SleepSunIcon size={13} />
-              Lever
+              Réveil
             </p>
             <p className="mt-1 text-[22px] font-bold tabular-nums text-white">
               {formatClockHm(waketime)}

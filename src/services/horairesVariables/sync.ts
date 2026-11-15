@@ -70,7 +70,7 @@ async function armFixedWakes(
     }
     const r = await RankedAlarm.createFixedAlarm({
       fireAtMs: fireAt.getTime(),
-      label: `Réveil ${w.dateKey}`,
+      label: 'Réveil',
       snoozeEnabled: true,
       snoozeMinutes: 9,
       soundName,

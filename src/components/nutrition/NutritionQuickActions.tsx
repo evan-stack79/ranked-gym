@@ -28,8 +28,8 @@ const ACTIONS: Array<{
   Icon?: LucideIcon
   customIcon?: 'scan-ia'
 }> = [
-  { id: 'scanner', label: 'Scanner', Icon: ScanBarcode },
-  { id: 'scan-ia', label: 'Scan IA', customIcon: 'scan-ia' },
+  { id: 'scanner', label: 'Code-barres', Icon: ScanBarcode },
+  { id: 'scan-ia', label: 'Photo du repas', customIcon: 'scan-ia' },
   { id: 'search', label: 'Recherche', Icon: Search },
   { id: 'journal', label: 'Journal', Icon: BookOpen },
 ]

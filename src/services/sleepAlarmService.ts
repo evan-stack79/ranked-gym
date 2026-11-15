@@ -98,12 +98,12 @@ async function ensureNotifActions(
     ? [
         {
           id: SLEEP_ALARM_SNOOZE_ACTION_ID,
-          title: 'Répéter · 9 min',
+          title: 'Encore 9 min',
           foreground: true,
         },
-        { id: SLEEP_ALARM_STOP_ACTION_ID, title: 'Arrêter', foreground: true },
+          { id: SLEEP_ALARM_STOP_ACTION_ID, title: 'Stop', foreground: true },
       ]
-    : [{ id: SLEEP_ALARM_STOP_ACTION_ID, title: 'Arrêter', foreground: true }]
+    : [{ id: SLEEP_ALARM_STOP_ACTION_ID, title: 'Stop', foreground: true }]
   await mod.LocalNotifications.registerActionTypes({
     types: [{ id: SLEEP_ALARM_NOTIF_ACTION_TYPE, actions }],
   })
@@ -122,7 +122,7 @@ async function scheduleLocalFallback(settings: SleepAlarmSettings): Promise<void
     settings.soundId === SLEEP_ALARM_SOUND_ID ? SLEEP_ALARM_SOUND_FILE_LN : undefined
   const base = {
     title: settings.label || 'Réveil',
-    body: 'Ranked Gym',
+    body: "C'est l'heure !",
     sound,
     actionTypeId: SLEEP_ALARM_NOTIF_ACTION_TYPE,
     interruptionLevel: 'timeSensitive' as const,
@@ -373,7 +373,7 @@ export async function handleSleepAlarmNotificationAction(actionId: string): Prom
         {
           id: SLEEP_ALARM_NOTIF_IDS.snooze,
           title: settings.label || 'Réveil',
-          body: 'Répéter · 9 min',
+          body: 'Encore 9 min',
           sound,
           actionTypeId: SLEEP_ALARM_NOTIF_ACTION_TYPE,
           interruptionLevel: 'timeSensitive',
@@ -391,10 +391,10 @@ export async function handleSleepAlarmNotificationAction(actionId: string): Prom
 
 export function sleepAlarmFallbackHint(backend: AlarmBackend | 'plugin-missing'): string | null {
   if (backend === 'local-notification') {
-    return 'Sur cette version d’iOS, le son peut être coupé en mode silencieux.'
+    return 'Mode silencieux : le son peut être coupé.'
   }
   if (backend === 'plugin-missing') {
-    return 'Plugin natif RankedAlarm introuvable — le réveil ne peut pas sonner.'
+    return "Le réveil ne marche pas. Relance l'app."
   }
   return null
 }
@@ -422,7 +422,7 @@ export function formatAlarmScheduledMessage(timeHm: string): string {
   const hhmm = parsed
     ? `${String(parsed.hour).padStart(2, '0')}:${String(parsed.minute).padStart(2, '0')}`
     : timeHm
-  return `Réveil prévu à ${hhmm}`
+  return `Réveil à ${hhmm}`
 }
 
 function pickPrimaryAlarm(alarms: RankedAlarmRow[]): RankedAlarmRow | null {
@@ -443,7 +443,7 @@ export async function readSleepAlarmUiStatus(): Promise<SleepAlarmUiStatus> {
             kind: 'mismatch',
             expected: 0,
             actual: alarms.length,
-            message: `Réveil incohérent (${alarms.length} alarme(s) système). Réarme ou désactive.`,
+            message: 'Souci avec ton réveil. Règle-le à nouveau.',
           }
         }
       } catch {
@@ -457,7 +457,7 @@ export async function readSleepAlarmUiStatus(): Promise<SleepAlarmUiStatus> {
   if (backend === 'plugin-missing') {
     return {
       kind: 'error',
-      message: 'Plugin natif RankedAlarm introuvable.',
+      message: "Le réveil ne marche pas. Relance l'app.",
       openSettings: false,
     }
   }
@@ -465,7 +465,7 @@ export async function readSleepAlarmUiStatus(): Promise<SleepAlarmUiStatus> {
     if (!isRankedAlarmPluginAvailable()) {
       return {
         kind: 'error',
-        message: 'Plugin natif RankedAlarm introuvable.',
+        message: "Le réveil ne marche pas. Relance l'app.",
         openSettings: false,
       }
     }
@@ -480,8 +480,8 @@ export async function readSleepAlarmUiStatus(): Promise<SleepAlarmUiStatus> {
           actual: alarms.length,
           message:
             alarms.length === 0
-              ? 'Le réveil n’est plus enregistré. Réarme-le.'
-              : `Plusieurs alarmes système (${alarms.length}). Réarme pour n’en garder qu’une.`,
+              ? 'Ton réveil a sauté. Règle-le à nouveau.'
+              : 'Trop de réveils. Règle-le à nouveau.',
         }
       }
       const primary = pickPrimaryAlarm(alarms)
@@ -490,7 +490,7 @@ export async function readSleepAlarmUiStatus(): Promise<SleepAlarmUiStatus> {
           kind: 'mismatch',
           expected: 1,
           actual: 0,
-          message: 'Le réveil n’est plus enregistré. Réarme-le.',
+          message: 'Ton réveil a sauté. Règle-le à nouveau.',
         }
       }
       const hour = primary.hour ?? parseAlarmTimeHm(settings.timeHm)?.hour ?? 7
@@ -513,7 +513,7 @@ export async function readSleepAlarmUiStatus(): Promise<SleepAlarmUiStatus> {
       }
     } catch (err) {
       console.error('[sleep-alarm] status read failed', err)
-      return { kind: 'error', message: 'Impossible de vérifier le réveil.', openSettings: true }
+      return { kind: 'error', message: "Je n'arrive pas à voir ton réveil.", openSettings: true }
     }
   }
 
@@ -552,19 +552,19 @@ export async function readBatteryWarning(): Promise<boolean> {
 export function syncFailureMessage(reason: string | undefined): string {
   switch (reason) {
     case 'PERMISSION_DENIED':
-      return 'Autorise les alarmes pour Ranked Gym dans Réglages'
+      return 'Autorise les alarmes'
     case 'ALARM_PLUGIN_MISSING':
     case 'PLUGIN_MISSING':
-      return 'Plugin natif RankedAlarm introuvable — redémarre l’app.'
+      return "Le réveil ne marche pas. Relance l'app."
     case 'NOT_CONFIRMED':
     case 'NO_ALARM_ID':
-      return 'Le réveil n’a pas pu être confirmé. Réessaie.'
+      return 'Réveil pas réglé. Réessaie.'
     case 'INVALID_TIME':
-      return 'Horaires invalides.'
+      return 'Heure pas valable.'
     case 'UNSUPPORTED_PLATFORM':
-      return 'Le réveil est dispo sur l’app iPhone.'
+      return "Le réveil marche dans l'app iPhone."
     default:
-      return 'Impossible d’enregistrer le réveil.'
+      return 'Réveil pas enregistré. Réessaie.'
   }
 }
 
@@ -608,7 +608,7 @@ export async function collectSleepAlarmDiagnostics(): Promise<SleepAlarmDiagView
       alarmKitAvailable: false,
       authorization: 'unavailable',
       alarmCount: 0,
-      lastError: 'isPluginAvailable(RankedAlarm)=false',
+      lastError: "Le réveil ne marche pas. Relance l'app.",
       hasUsageDescription: false,
     }
   }

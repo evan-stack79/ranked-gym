@@ -53,7 +53,7 @@ export function SleepAlarmStatusBanner({
             style={{ color: RED }}
             data-sleep-alarm-rearm
           >
-            Réarmer le réveil
+            Régler à nouveau
           </button>
         ) : null}
       </div>
@@ -71,10 +71,10 @@ export function SleepAlarmStatusBanner({
         data-sleep-alarm-status="permission"
       >
         <p className="text-[15px] font-semibold text-white">
-          Autorise les alarmes pour Ranked Gym
+          Autorise les alarmes
         </p>
         <p className="text-[13px]" style={{ color: GRAY }}>
-          Sans cette autorisation, le réveil ne peut pas sonner.
+          Sinon, ton réveil ne sonnera pas.
         </p>
         <button
           type="button"
@@ -83,7 +83,7 @@ export function SleepAlarmStatusBanner({
           style={{ color: RED }}
           data-sleep-alarm-open-settings
         >
-          Ouvrir Réglages
+          Ouvrir les Réglages
         </button>
       </div>
     )
@@ -107,7 +107,7 @@ export function SleepAlarmStatusBanner({
           style={{ color: RED }}
           data-sleep-alarm-open-settings
         >
-          Ouvrir Réglages
+          Ouvrir les Réglages
         </button>
       ) : null}
     </div>

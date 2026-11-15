@@ -167,7 +167,7 @@ describe('QA M7 — mineurs : repère non réglable, défaut existant', () => {
     expect(card).toMatch(/isMinorOrUnknownAge/)
     expect(card).toMatch(/GOAL_DEFAULT_ML/)
     expect(card).toMatch(/data-hydration-minor/)
-    expect(card).toMatch(/LABEL_REPERE_JOUR/)
+    expect(card).toMatch(/Repère :/)
     expect(card).toMatch(/MSG_MINOR_PERMANENT/)
     expect(card).not.toMatch(/L&apos;objectif n&apos;est pas réglable/)
     const server = readFileSync(resolve('convex/hydration.ts'), 'utf8')

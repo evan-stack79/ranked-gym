@@ -56,7 +56,7 @@ export function LogSleepNightSheet({
       source: 'manual',
     })
     if (!saved) {
-      setError('Impossible d’enregistrer — vérifie tes horaires.')
+      setError('Pas enregistré. Vérifie tes heures.')
       return
     }
     onClose()
@@ -95,7 +95,7 @@ export function LogSleepNightSheet({
           <div className="rounded-2xl bg-[#1C1C1E] px-3.5 py-3">
             <p className="flex items-center gap-1.5 text-[12px] text-[#ACB4BA]">
               <SleepSunIcon size={13} />
-              Lever
+              Réveil
             </p>
             <p className="mt-1 text-[22px] font-bold tabular-nums text-white">
               {formatClockHm(waketime)}

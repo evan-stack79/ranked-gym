@@ -60,7 +60,7 @@ export function HvStartPickerSheet({
             }}
             onClick={() => setTab(t)}
           >
-            {t === 'heure' ? 'Début' : 'Repos'}
+            {t === 'heure' ? 'Je commence à' : 'Repos'}
           </button>
         ))}
       </div>

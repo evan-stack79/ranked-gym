@@ -12,6 +12,7 @@ import {
   type SleepEngineSuccess,
   type SleepQuantityStatus,
 } from '../sleep-engine'
+import { getCalorieProfile } from './nutritionStorage'
 import {
   getLatestSleepNight,
   getRecentSleepNights,
@@ -60,11 +61,11 @@ export function formatBedtimeLabel(hm: string): string {
 export function quantityStatusLabel(status: SleepQuantityStatus): string {
   switch (status) {
     case 'optimal':
-      return 'Récupération optimale'
+      return 'Nuit complète'
     case 'deficit':
-      return 'Sommeil insuffisant'
+      return 'Nuit courte'
     case 'excess':
-      return 'Au-dessus de la plage recommandée'
+      return 'Longue nuit'
   }
 }
 
@@ -192,6 +193,7 @@ export function getSleepHomeSnapshot(): SleepHomeViewModel {
 
   const knownTstNights = recent.filter((n): n is SleepNightEntry & { tstHours: number } => n.tstHours != null)
 
+  const age = getCalorieProfile().age
   const result = runSleepEngine({
     bedtime: latest.bedtime,
     waketime: latest.waketime,
@@ -200,6 +202,7 @@ export function getSleepHomeSnapshot(): SleepHomeViewModel {
     historicalWaketimes: older.map((n) => n.waketime),
     workdayTstHours: knownTstNights.map((n) => n.tstHours),
     currentTibHours: tibHours ?? undefined,
+    age: age > 0 ? age : undefined,
   })
 
   if (!result.ok) {

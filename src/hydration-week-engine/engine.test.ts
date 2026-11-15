@@ -17,7 +17,15 @@ import {
   FIXTURE_PRIORITY_7_MINOR_OVER_6,
   FIXTURE_TOO_FEW_DAYS,
 } from './fixtures.ts'
-import { AIDE_02, AIDE_05, ETAT_TEXTES, ETAT_TITLES } from './texts.ts'
+import {
+  AIDE_02,
+  AIDE_05,
+  AIDE_07_ADULT,
+  AIDE_07_MINOR,
+  AIDE_07_PRIVACY,
+  ETAT_TEXTES,
+  ETAT_TITLES,
+} from './texts.ts'
 
 describe('countsAsWater', () => {
   it('accepte eau, eau gazeuse, infusion, eau citron et proches', () => {
@@ -33,22 +41,40 @@ describe('countsAsWater', () => {
 })
 
 describe('drinkRepereRange', () => {
-  it('EFSA 14+ hommes / femmes', () => {
+  it('EFSA 15–64 hommes / femmes', () => {
     expect(drinkRepereRange(30, 'male')).toEqual({
       lowL: 1.75,
       highL: 2.0,
-      label: 'environ 1,75 à 2,0 L de boissons (repère)',
+      label: 'environ 1,75 à 2,0 L de boissons',
     })
     expect(drinkRepereRange(30, 'female')).toEqual({
       lowL: 1.4,
       highL: 1.6,
-      label: 'environ 1,4 à 1,6 L de boissons (repère)',
+      label: 'environ 1,4 à 1,6 L de boissons',
     })
+    expect(drinkRepereRange(15, 'male').label).toBe('environ 1,75 à 2,0 L de boissons')
   })
 
   it('65+ au moins 2,0 / 1,6', () => {
-    expect(drinkRepereRange(70, 'homme')).toMatchObject({ lowL: 2.0, highL: 2.0 })
-    expect(drinkRepereRange(70, 'femme')).toMatchObject({ lowL: 1.6, highL: 1.6 })
+    expect(drinkRepereRange(70, 'homme')).toEqual({
+      lowL: 2.0,
+      highL: 2.0,
+      label: 'au moins 2,0 L de boissons',
+    })
+    expect(drinkRepereRange(70, 'femme')).toEqual({
+      lowL: 1.6,
+      highL: 1.6,
+      label: 'au moins 1,6 L de boissons',
+    })
+  })
+
+  it('ne propose pas les plages 4–8 ni 9–13', () => {
+    for (const age of [7, 10, 12, 14]) {
+      const label = drinkRepereRange(age, 'male').label
+      expect(label).not.toMatch(/1,1 à 1,3/)
+      expect(label).not.toMatch(/1,5 à 1,7/)
+      expect(label).not.toMatch(/1,3 à 1,5/)
+    }
   })
 })
 
@@ -59,6 +85,13 @@ describe('estimatedTotalWaterRange', () => {
     expect(r.highL).toBe(2.1) // 1.5 * 1.43 → 2.145 → 2.1
     expect(r.label).toContain('1,9')
     expect(r.label).toContain('2,1')
+  })
+})
+
+describe('titres courts choix B', () => {
+  it('Bois plus tôt / Une bouteille = un tap', () => {
+    expect(ETAT_TITLES[6]).toBe('Bois plus tôt')
+    expect(ETAT_TITLES[10]).toBe('Une bouteille = un tap')
   })
 })
 
@@ -84,9 +117,25 @@ describe('textes aide (option A)', () => {
   it('aide 05 exacte', () => {
     const r = detectHydrationEtat(ALL_ETAT_FIXTURES[5]!)
     expect(r.aide).toBe(AIDE_05)
-    expect(r.aide).toBe(
-      'Boire bien plus que sa soif n’aide pas ; si tu te sens mal après avoir beaucoup bu, un pro de santé peut aider.',
+    expect(r.aide).toBe('Boire bien plus que sa soif n’aide pas. Écoute ta soif.')
+  })
+
+  it('privacy eau : compte, pas téléphone', () => {
+    expect(AIDE_07_PRIVACY).toBe(
+      'Personne d’autre ne voit ces données. Ton eau est sauvée sur ton compte.',
     )
+    expect(AIDE_07_PRIVACY).not.toMatch(/téléphone/)
+  })
+
+  it('aide 07 adulte ≠ mineur (pas de café/thé proposés aux mineurs)', () => {
+    expect(AIDE_07_ADULT).toBe(
+      'Café, soda et jus : dans ton eau totale. Thé, eau gazeuse, infusion et eau au citron : aussi dans l’eau bue.',
+    )
+    expect(AIDE_07_MINOR).toBe(
+      'Soda et jus apportent bien de l’eau. Ils comptent dans ton eau totale, et l’eau gazeuse au citron compte dans ton eau bue.',
+    )
+    expect(AIDE_07_MINOR).not.toMatch(/Café/)
+    expect(AIDE_07_MINOR).not.toMatch(/Thé/)
   })
 })
 
@@ -129,6 +178,9 @@ describe('état 7 variants', () => {
     expect(r.variant).toBe('minor')
     expect(r.neverSuggestCaffeinated).toBe(true)
     expect(r.actions.some((a) => /jamais de boisson caféinée/i.test(a))).toBe(true)
+    expect(r.actions).toContain(
+      'Une fois par jour, remplace une boisson par de l’eau pétillante, une infusion ou de l’eau au citron. Jamais de boisson caféinée proposée.',
+    )
   })
 
   it('déclenche aussi sur 5 boissons caféinées (comptage boissons, pas mg)', () => {

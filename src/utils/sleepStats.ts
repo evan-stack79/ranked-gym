@@ -40,10 +40,10 @@ export function wakeRegularityStdMinutes(nights: SleepNightLike[]): number | nul
   return circularStdDevMinutes(samples)
 }
 
-/** Libellé neutre : « Lever ± 25 min » — aucune étiquette irrégulier/bon. */
+/** Libellé neutre : « Réveil : bouge de 25 min » — aucune étiquette irrégulier/bon. */
 export function formatWakeRegularityLabel(nights: SleepNightLike[]): string | null {
   const std = wakeRegularityStdMinutes(nights)
   if (std == null) return null
   const rounded = Math.round(std)
-  return `Lever ± ${rounded} min`
+  return `Réveil : bouge de ${rounded} min`
 }

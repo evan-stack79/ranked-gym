@@ -208,7 +208,7 @@ export function SettingsScreen({
         { id: 'personal', icon: UserRound, label: 'Informations personnelles' },
         { id: 'ranked', icon: Trophy, label: 'Ranked Force / Discipline' },
         { id: 'boutiquePartenaires', icon: Gift, label: 'Boutique partenaires' },
-        { id: 'privacy', icon: Shield, label: 'Sécurité & Confidentialité' },
+        { id: 'privacy', icon: Shield, label: 'Compte et vie privée' },
         { id: 'healthSituations', icon: HeartHandshake, label: 'Situations de santé' },
         { id: 'energyInfo', icon: Info, label: 'Informations' },
         { id: 'pro', icon: CreditCard, label: 'Ranked Pro' },

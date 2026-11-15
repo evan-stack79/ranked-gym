@@ -53,6 +53,6 @@ describe('persistScannedProductSelection', () => {
       onError,
     )
     expect(result).toBe(false)
-    expect(onError).toHaveBeenCalledWith('Impossible d’enregistrer cet aliment.')
+    expect(onError).toHaveBeenCalledWith('Aliment pas enregistré. Réessaie.')
   })
 })

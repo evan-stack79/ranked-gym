@@ -165,7 +165,7 @@ export function SleepNightSummaryCard({
       source: 'manual',
     })
     if (!saved) {
-      setError('Impossible d’enregistrer — vérifie tes horaires.')
+      setError('Pas enregistré. Vérifie tes heures.')
       return
     }
     setEditing(false)
@@ -194,9 +194,9 @@ export function SleepNightSummaryCard({
           onClick={() => {
             if (variant === 'accueil' && onOpenSleepScreen && !editing) onOpenSleepScreen()
           }}
-          aria-label="Comment s'est passée ta nuit"
+          aria-label="Tu as bien dormi ?"
         >
-          <p className="text-[15px] font-semibold text-white">Comment s&apos;est passée ta nuit ?</p>
+          <p className="text-[15px] font-semibold text-white">Tu as bien dormi ?</p>
         </button>
         <div
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
@@ -298,7 +298,7 @@ export function SleepNightSummaryCard({
             className="ios-press inline-flex min-h-11 items-center gap-1.5 text-[14px] font-medium text-[#E5E5EA]"
             data-sleep-add-feeling
           >
-            <span style={{ color: RED }}>+</span> Ajouter mon ressenti
+            <span style={{ color: RED }}>+</span> Mon ressenti
           </button>
         )}
       </div>
@@ -343,7 +343,7 @@ export function SleepNightSummaryCard({
             type="button"
             className="ios-press flex h-10 w-10 items-center justify-center rounded-full bg-[#2C2C2E] text-white"
             onClick={() => saveSleepGoalHours(goalHours - 0.5)}
-            aria-label="Baisser l’objectif"
+            aria-label="Moins d'heures"
           >
             −
           </button>
@@ -354,7 +354,7 @@ export function SleepNightSummaryCard({
             type="button"
             className="ios-press flex h-10 w-10 items-center justify-center rounded-full bg-[#2C2C2E] text-white"
             onClick={() => saveSleepGoalHours(goalHours + 0.5)}
-            aria-label="Augmenter l’objectif"
+            aria-label="Plus d'heures"
           >
             +
           </button>
@@ -377,7 +377,7 @@ export function SleepNightSummaryCard({
             <div className="rounded-2xl bg-[#2C2C2E] px-3 py-2.5">
               <p className="flex items-center gap-1.5 text-[11px] text-[#ACB4BA]">
                 <SleepSunIcon size={12} />
-                Lever
+                Réveil
               </p>
               <p className="mt-0.5 text-[20px] font-bold tabular-nums text-white">
                 {formatClockHm(waketime)}
@@ -421,7 +421,7 @@ export function SleepNightSummaryCard({
           style={{ backgroundColor: RED }}
           data-sleep-primary-action={logged ? 'modifier' : 'noter'}
         >
-          {logged ? 'Modifier' : 'Noter'}
+          {logged ? 'Changer' : 'Noter ma nuit'}
         </button>
       ) : null}
 

@@ -50,7 +50,7 @@ import {
 import { syncHvAlarms } from '../../services/horairesVariables/sync'
 import {
   HV_FEATURE_NAME,
-  HV_FEATURE_SUBTITLE,
+  HV_FEATURE_TITLE,
   HV_RED,
 } from '../../horaires-variables/constants'
 import {
@@ -381,7 +381,7 @@ export function SleepView() {
         kind: 'mismatch',
         expected: 0,
         actual: remaining,
-        message: `Désactivation incomplète (${remaining} alarme(s)). Réessaie.`,
+        message: 'Un réveil sonne encore. Réessaie.',
       })
       setTick((n) => n + 1)
       return
@@ -538,7 +538,7 @@ export function SleepView() {
           className="ios-press flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
           data-sleep-row-repeat
         >
-          <span className="text-[15px] text-white">Répétition</span>
+          <span className="text-[15px] text-white">Jours</span>
           <span className="flex min-w-0 items-center gap-1 text-[14px]" style={{ color: GRAY }}>
             <span className="truncate">{repeatLabel}</span>
             <ChevronRight className="h-4 w-4 shrink-0" />
@@ -552,14 +552,14 @@ export function SleepView() {
             <HvLottie id="15" className="h-14 w-14 shrink-0" />
             <div className="min-w-0 flex-1">
               <small className="text-[11px] font-medium" style={{ color: GRAY }}>
-                {HV_FEATURE_NAME}
+                {HV_FEATURE_TITLE}
               </small>
-              <b className="block text-[15px] text-white">Mode en pause tout seul</b>
+              <b className="block text-[15px] text-white">Mon planning en pause</b>
               <p className="mt-0.5 text-[13px]" style={{ color: GRAY }}>
-                Ton planning est vide : on garde tes repères habituels.
+                Planning vide : on garde tes heures habituelles.
               </p>
               <small className="mt-1 block text-[11px]" style={{ color: GRAY }}>
-                7 jours sans heure de début
+                Rien de noté depuis 7 jours.
               </small>
             </div>
           </div>
@@ -601,7 +601,7 @@ export function SleepView() {
 
       {hvPause.paused && hvPause.reason === 'vacation' && !showAutoPauseCard ? (
         <p className="mt-2 text-center text-[12px]" style={{ color: GRAY }} data-hv-vacation-pause>
-          Mode en pause. Ton planning t&apos;attend.
+          Planning en pause.
         </p>
       ) : null}
 
@@ -623,7 +623,7 @@ export function SleepView() {
             onComplete={() => setSleepNowAnim(false)}
           />
         )}
-        {saving ? 'Enregistrement…' : 'Dormir maintenant'}
+        {saving ? 'Je note…' : 'Je vais dormir'}
       </button>
 
       {showAlarm ? (
@@ -634,7 +634,7 @@ export function SleepView() {
           style={{ color: GRAY }}
           data-sleep-program-alarm
         >
-          Programmer mon réveil
+          Régler mon réveil
         </button>
       ) : null}
 
@@ -650,9 +650,9 @@ export function SleepView() {
       >
         <HvLottie id="01" className="h-11 w-11 shrink-0" />
         <span className="min-w-0 flex-1">
-          <b className="block text-[15px] text-white">{HV_FEATURE_NAME}</b>
+          <b className="block text-[15px] text-white">{HV_FEATURE_TITLE}</b>
           <small className="block text-[12px]" style={{ color: GRAY }}>
-            {HV_FEATURE_SUBTITLE}
+            {HV_FEATURE_NAME}
           </small>
           <small
             className="mt-0.5 inline-flex items-center gap-1.5 text-[11px] font-semibold"
@@ -681,14 +681,14 @@ export function SleepView() {
           style={{ color: GRAY }}
           data-sleep-alarm-disable
         >
-          {disabling ? 'Désactivation…' : 'Désactiver le réveil'}
+          {disabling ? 'Je coupe…' : 'Couper mon réveil'}
         </button>
       ) : null}
 
       <div className="mt-2 shrink-0 space-y-1">
         {batteryWarn ? (
           <p className="text-[13px] font-medium text-[#FF907F]" data-sleep-battery-warn>
-            Batterie faible : branche ton téléphone
+            Batterie faible : branche ton tél.
           </p>
         ) : null}
         {confirmMsg ? (

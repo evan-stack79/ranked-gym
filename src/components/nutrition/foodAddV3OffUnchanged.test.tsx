@@ -75,7 +75,7 @@ describe('V3 OFF — history / legacy list / manual form inchangés', () => {
     const source = readFileSync('src/components/nutrition/NutritionDashboard.tsx', 'utf8')
     // cc068d8 : double-quoted JS string (jamais JSX &apos; à ce spot).
     expect(source).toContain(
-      `"Aucun aliment pour l'instant — utilise Scanner, Scan IA ou Recherche."`,
+      `'Rien de noté. Code-barres, photo ou recherche.'`,
     )
     expect(source).not.toContain(
       'Aucun aliment pour l&apos;instant — utilise Scanner, Scan IA ou Recherche.',
@@ -90,13 +90,13 @@ describe('V3 OFF — history / legacy list / manual form inchangés', () => {
       root.render(
         <p data-testid="food-empty-v3-off">
           {foodAddV3
-            ? 'Aucun aliment pour l’instant — utilise Recherche.'
-            : "Aucun aliment pour l'instant — utilise Scanner, Scan IA ou Recherche."}
+            ? 'Rien mangé de noté. Cherche un aliment.'
+            : 'Rien de noté. Code-barres, photo ou recherche.'}
         </p>,
       )
     })
     expect(host.textContent).toBe(
-      "Aucun aliment pour l'instant — utilise Scanner, Scan IA ou Recherche.",
+      'Rien de noté. Code-barres, photo ou recherche.',
     )
     expect(host.textContent).not.toContain('&apos;')
     expect(host.innerHTML).not.toContain('&apos;')

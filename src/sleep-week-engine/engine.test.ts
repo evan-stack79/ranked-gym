@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { besoin, etat, fmtClock, fmtDur } from './engine.ts'
 import { ETATS, NORMAL, PROVISOIRE } from './fixtures.ts'
 import { nightsFromSleepEntries } from './adapter.ts'
+import { AIDE, LIGNE_PRO, etatTexts } from './texts.ts'
 
 describe('etat fixtures (priorité C)', () => {
   it('NORMAL → état 11', () => {
@@ -89,5 +90,48 @@ describe('nightsFromSleepEntries', () => {
     )
     expect(nights.map((n) => n.day)).toEqual(['lun', 'mar', 'ven', 'sam'])
     expect(nights[0]).toMatchObject({ bed: '23:30', wake: '07:15', R: 3 })
+  })
+})
+
+describe('textes Vérif. (titres courts + corrections)', () => {
+  const sample = etat(NORMAL.nights, NORMAL.age, NORMAL.q)
+
+  it('titres courts choix B', () => {
+    expect(etatTexts(1, sample)?.nom).toBe('Nuits courtes, fatigue')
+    expect(etatTexts(2, sample)?.nom).toBe('Longues nuits, mais fatigue')
+    expect(etatTexts(4, sample)?.nom).toBe('Presque assez')
+    expect(etatTexts(5, sample)?.nom).toBe('Longues nuits, toujours fatigue')
+    expect(etatTexts(6, sample)?.nom).toBe('Semaine ≠ week-end')
+    expect(etatTexts(8, sample)?.nom).toBe('Heures en zigzag')
+    expect(etatTexts(11, sample)?.nom).toBe('Un peu court pour ton âge')
+  })
+
+  it('phrases corrigées mot pour mot', () => {
+    expect(etatTexts(1, sample)?.actions[2]).toBe(
+      'Ni café, ni thé fort, ni cola, ni boisson énergisante 6 h avant le lit.',
+    )
+    expect(etatTexts(3, sample)?.texte).toBe(
+      'En forme, top ! Ton corps a quand même besoin de plus de nuit. On teste 15 min de plus ce soir ?',
+    )
+    expect(etatTexts(9, sample)?.actions[0]).toBe(
+      'Pas sommeil ? Lève-toi, fais un truc calme dans une lumière douce, reviens quand le sommeil arrive.',
+    )
+    expect(etatTexts(10, sample)?.texte).toBe(
+      "Ta sieste t'aide, mais elle vole du sommeil à ta nuit. Garde-la courte et tôt.",
+    )
+    expect(etatTexts(12, sample)?.texte).toBe(
+      'Bravo, rythme régulier et une durée qui colle à ton âge !',
+    )
+    expect(AIDE[3]).toBe(
+      "Moins de 6 h, c'est sous ton repère, même quand tu te sens en forme. On avance de 15 min à la fois.",
+    )
+    expect(AIDE[5]).toBe(
+      "Une longue nuit ne repose pas toujours plus. Même réveil et lumière du matin aident. L'app ne te dira jamais de dormir encore plus.",
+    )
+    expect(AIDE[9]).toBe(
+      'Pas sommeil ? Un moment calme hors du lit aide. Pas de minuteur, pas de règle stricte.',
+    )
+    expect(LIGNE_PRO).toBe('Si la fatigue dure malgré tout, un pro de santé peut aider.')
+    expect(LIGNE_PRO).not.toMatch(/médecin/)
   })
 })

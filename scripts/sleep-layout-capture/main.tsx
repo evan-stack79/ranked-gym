@@ -18,7 +18,7 @@ saveSleepAlarmSettings({
   enabled: false,
   timeHm: '07:00',
   days: [1, 2, 3, 4, 5, 6, 7],
-  label: 'Lever',
+  label: 'Réveil',
   soundId: 'petits_oiseaux',
   snoozeEnabled: true,
   snoozeMinutes: 9,

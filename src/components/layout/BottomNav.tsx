@@ -16,8 +16,8 @@ interface BottomNavProps {
 
 const tabs: { id: TabId; label: string; icon: typeof Home }[] = [
   { id: 'home', label: 'Accueil', icon: Home },
-  { id: 'training', label: 'Train', icon: Dumbbell },
-  { id: 'nutrition', label: 'Nutri', icon: Salad },
+  { id: 'training', label: 'Sport', icon: Dumbbell },
+  { id: 'nutrition', label: 'Repas', icon: Salad },
   { id: 'sleep', label: 'Sommeil', icon: Moon },
   { id: 'profile', label: 'Profil', icon: User },
 ]
@@ -53,13 +53,13 @@ export function BottomNav({
       type="button"
       onClick={onStartTraining}
       className="ios-press flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1.5 text-[#ACB4BA] transition-colors duration-150"
-      aria-label={hasActiveWorkout ? 'Reprendre' : 'Nouvelle séance'}
+      aria-label={hasActiveWorkout ? 'Reprendre' : 'Lancer'}
       data-nav-center={hasActiveWorkout ? 'resume' : 'new'}
     >
       <span className={`flex items-center justify-center rounded-full border-4 border-[#171719] bg-[#FF0702] text-white transition-[height,width] duration-180 motion-reduce:transition-none ${compact ? 'h-12 w-12 -mt-1' : 'h-14 w-14 -mt-5'}`}>
         <Play className="ml-0.5 h-5 w-5 fill-current" strokeWidth={2.25} aria-hidden="true" />
       </span>
-      <span className={labelClass}>{hasActiveWorkout ? 'Reprendre' : 'Nouvelle séance'}</span>
+      <span className={labelClass}>{hasActiveWorkout ? 'Reprendre' : 'Lancer'}</span>
     </button>
   )
 
@@ -159,7 +159,7 @@ function FloatingPillBottomNav({
       type="button"
       onClick={onStartTraining}
       className="ios-press bottom-nav-pill__center relative z-10 flex h-11 min-h-11 min-w-11 flex-1 items-center justify-center rounded-full px-0.5"
-      aria-label={hasActiveWorkout ? 'Reprendre' : 'Nouvelle séance'}
+      aria-label={hasActiveWorkout ? 'Reprendre' : 'Lancer'}
       data-nav-center={hasActiveWorkout ? 'resume' : 'new'}
     >
       <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#FF0702] text-white shadow-[0_6px_18px_rgb(255_7_2_/_0.45)] ring-4 ring-[#000000]/55">
