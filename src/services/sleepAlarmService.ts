@@ -246,6 +246,33 @@ export function __resetSleepAlarmSyncGateForTests(): void {
 async function syncSleepAlarmBody(
   patch: Partial<SleepAlarmSettings> | undefined,
 ): Promise<SyncSleepAlarmResult> {
+  // Shared planning: when Emploi du temps variable is on, HV owns AlarmKit arming.
+  try {
+    const { isHvModeActive } = await import('./horairesVariables/storage')
+    const { syncHvAlarms } = await import('./horairesVariables/sync')
+    if (isHvModeActive()) {
+      if (patch) saveSleepAlarmSettings(patch)
+      const hv = await syncHvAlarms()
+      const backend = await resolveAlarmBackend()
+      if (!hv.ok) {
+        return {
+          ok: false,
+          backend: backend === 'unavailable' ? 'unavailable' : backend,
+          reason: hv.reason,
+        }
+      }
+      const settings = getSleepAlarmSettings()
+      return {
+        ok: true,
+        backend: backend === 'unavailable' ? 'unavailable' : backend,
+        timeHm: settings.timeHm,
+        reason: hv.reason ?? 'HV',
+      }
+    }
+  } catch (err) {
+    console.warn('[sleep-alarm] hv gate', err)
+  }
+
   const settings = patch ? saveSleepAlarmSettings(patch) : getSleepAlarmSettings()
   const backend = await resolveAlarmBackend()
 

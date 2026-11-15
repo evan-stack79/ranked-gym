@@ -16,6 +16,7 @@ public class RankedAlarmPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "cancelAll", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "checkPermissions", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "createAlarm", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "createFixedAlarm", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getAlarms", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getBattery", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getDiagnostics", returnType: CAPPluginReturnPromise),
@@ -242,6 +243,48 @@ public class RankedAlarmPlugin: CAPPlugin, CAPBridgedPlugin {
                     minute: minute,
                     label: label,
                     days: daysRaw,
+                    snoozeMinutes: snoozeMinutes,
+                    snoozeEnabled: snoozeEnabled,
+                    soundName: soundName
+                )
+                call.resolve(["id": id])
+            } catch {
+                call.reject(error.localizedDescription, "SCHEDULE_FAILED", error)
+            }
+        }
+    }
+
+    /// HV A/B — fixed-date alarm; does not cancel siblings (cap enforced in JS ≤ 14).
+    @objc func createFixedAlarm(_ call: CAPPluginCall) {
+        guard #available(iOS 26.0, *), let impl = ensureImpl() as? RankedAlarmKit else {
+            call.reject("AlarmKit unavailable (requires iOS 26+)", "UNAVAILABLE")
+            return
+        }
+        let fireAtMs: Double
+        if let n = call.getDouble("fireAtMs") {
+            fireAtMs = n
+        } else if let i = call.getInt("fireAtMs") {
+            fireAtMs = Double(i)
+        } else {
+            call.reject("Invalid fireAtMs", "INVALID_TIME")
+            return
+        }
+        let fireAt = Date(timeIntervalSince1970: fireAtMs / 1000.0)
+        let label = call.getString("label") ?? "Réveil"
+        let snoozeMinutes = call.getInt("snoozeMinutes") ?? 9
+        let soundName = call.getString("soundName")
+        let snoozeEnabled = call.getBool("snoozeEnabled") ?? true
+
+        Task {
+            do {
+                let auth = try await impl.requestPermissions()
+                guard auth == "granted" else {
+                    call.reject("Permission AlarmKit refusée", "PERMISSION_DENIED")
+                    return
+                }
+                let id = try await impl.createFixedAlarm(
+                    fireAt: fireAt,
+                    label: label,
                     snoozeMinutes: snoozeMinutes,
                     snoozeEnabled: snoozeEnabled,
                     soundName: soundName

@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { localDayKey } from '../../shared/hydration'
+import { hydrationDayKeyForHv } from '../../services/horairesVariables/waterDay'
+import { HV_WATER_DAY_PHRASE } from '../../horaires-variables/constants'
+import { isHvModeActive } from '../../services/horairesVariables/storage'
 import {
   addHydrationEntry,
   fallbackHydrationHistory,
@@ -80,7 +83,8 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
   }, [userId])
 
   const refresh = useCallback(async () => {
-    const data = await fetchHydrationToday(localDayKey())
+    const dayKey = isHvModeActive() ? hydrationDayKeyForHv() : localDayKey()
+    const data = await fetchHydrationToday(dayKey)
     setToday(data)
     try {
       setWeekHistory(fallbackHydrationHistory(data.dayKey, userId))
@@ -215,6 +219,11 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
           <p className="text-[14px] font-semibold text-white">Eau</p>
           <p className="text-[12px] text-[#ACB4BA]">Aujourd’hui</p>
         </div>
+        {isHvModeActive() ? (
+          <p className="mb-2 text-[12px] leading-snug text-[#ACB4BA]" data-hv-water-day>
+            {HV_WATER_DAY_PHRASE}
+          </p>
+        ) : null}
         <div className="flex items-center gap-3">
           <button
             type="button"

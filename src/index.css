@@ -103,6 +103,13 @@ a,
   -webkit-touch-callout: none;
 }
 
+/* HV écran nuit (09) — nav visible but very dim; red center button kept. */
+html[data-hv-night='1'] [data-bottom-nav-host],
+html[data-hv-night='1'] .bottom-nav-pill {
+  opacity: 0.28;
+  filter: brightness(0.55);
+}
+
 /*
  * Accueil vertical scroll precision (iPhone Safari PWA):
  * overflow-y:auto alone computes overflow-x to auto too — the page can pan

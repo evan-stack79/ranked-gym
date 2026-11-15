@@ -53,6 +53,8 @@ interface SleepAlarmSheetProps {
   onClose: () => void
   /** Open directly on Sonnerie / Répétition (page Sommeil v11). */
   initialPane?: SleepAlarmSheetPane
+  /** Opens Emploi du temps variable (shared Mes réveils planning). */
+  onOpenHorairesVariables?: () => void
 }
 
 function TimeWheels({
@@ -98,6 +100,7 @@ export function SleepAlarmSheet({
   open,
   onClose,
   initialPane = 'main',
+  onOpenHorairesVariables,
 }: SleepAlarmSheetProps) {
   const [draft, setDraft] = useState<SleepAlarmSettings>(() => getSleepAlarmSettings())
   const [pane, setPane] = useState<SleepAlarmSheetPane>('main')
@@ -352,6 +355,18 @@ export function SleepAlarmSheet({
             <p className="px-1 text-[12px]" style={{ color: GRAY }}>
               La sonnerie monte doucement.
             </p>
+            {onOpenHorairesVariables ? (
+              <button
+                type="button"
+                onClick={onOpenHorairesVariables}
+                className="ios-press flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-left"
+                style={{ backgroundColor: CARD }}
+                data-hv-link-from-alarm
+              >
+                <span className="text-[16px] text-white">Emploi du temps variable</span>
+                <ChevronRight className="h-4 w-4" style={{ color: GRAY }} />
+              </button>
+            ) : null}
             {hint ? (
               <p className="px-1 text-[12px]" style={{ color: GRAY }} data-sleep-alarm-fallback-hint>
                 {hint}

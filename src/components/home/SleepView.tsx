@@ -40,6 +40,26 @@ import { SleepAlarmStatusBanner } from './SleepAlarmStatusBanner'
 import { SleepClockDial } from './SleepClockDial'
 import { SleepHmWheelSheet } from './SleepHmWheelSheet'
 import { SleepLottie } from './sleepLottie/SleepLottie'
+import { HvFlow, type HvFlowPane } from './horairesVariables/HvFlow'
+import { HvLottie } from './horairesVariables/HvLottie'
+import {
+  HV_CHANGED_EVENT,
+  getHvState,
+  saveHvState,
+} from '../../services/horairesVariables/storage'
+import { syncHvAlarms } from '../../services/horairesVariables/sync'
+import {
+  HV_FEATURE_NAME,
+  HV_FEATURE_SUBTITLE,
+  HV_RED,
+} from '../../horaires-variables/constants'
+import {
+  canUseNightMode,
+  dateKeyOf,
+  hmToMinutes,
+  isHvPaused,
+  shouldAutoPause,
+} from '../../horaires-variables/engine'
 
 const RED = '#ff0702'
 const CARD = '#1C1C1E'
@@ -71,6 +91,9 @@ export function SleepView() {
   const [wakeIconPlay, setWakeIconPlay] = useState(false)
   const [batteryWarn, setBatteryWarn] = useState(false)
   const [disabling, setDisabling] = useState(false)
+  const [hvOpen, setHvOpen] = useState(false)
+  const [hvPane, setHvPane] = useState<HvFlowPane>('activation')
+  const [hvTick, setHvTick] = useState(0)
   const showAlarm = isSleepAlarmPlatformSupported()
   const pageActive = useSleepPageActive()
   const titleTaps = useRef({ count: 0, last: 0 })
@@ -94,15 +117,32 @@ export function SleepView() {
 
   useEffect(() => {
     const sync = () => setTick((n) => n + 1)
+    const hvSync = () => setHvTick((n) => n + 1)
     window.addEventListener(SLEEP_CHANGED_EVENT, sync)
     window.addEventListener(SLEEP_ALARM_CHANGED_EVENT, sync)
+    window.addEventListener(HV_CHANGED_EVENT, hvSync)
     window.addEventListener('ranked-gym:backup-restored', sync)
     return () => {
       window.removeEventListener(SLEEP_CHANGED_EVENT, sync)
       window.removeEventListener(SLEEP_ALARM_CHANGED_EVENT, sync)
+      window.removeEventListener(HV_CHANGED_EVENT, hvSync)
       window.removeEventListener('ranked-gym:backup-restored', sync)
     }
   }, [])
+
+  useEffect(() => {
+    const hv = getHvState()
+    if (!hv.settings.enabled) return
+    const hasAnyStart = hv.days.some((d) => Boolean(d.startHm))
+    if (shouldAutoPause({ settings: hv.settings, hasAnyStart })) {
+      saveHvState({
+        settings: { ...hv.settings, autoPaused: true, autoPauseCardDismissed: false },
+      })
+      void syncHvAlarms()
+    } else {
+      void syncHvAlarms()
+    }
+  }, [hvTick, tick])
 
   useEffect(() => {
     const schedule = getSleepSchedule()
@@ -144,6 +184,15 @@ export function SleepView() {
   }, [showAlarm])
 
   const alarm = useMemo(() => getSleepAlarmSettings(), [tick])
+  const hvState = useMemo(() => {
+    void hvTick
+    return getHvState()
+  }, [hvTick, tick])
+  const hvPause = isHvPaused(hvState.settings, dateKeyOf(new Date()))
+  const showAutoPauseCard =
+    hvState.settings.enabled &&
+    hvState.settings.autoPaused &&
+    !hvState.settings.autoPauseCardDismissed
   const dateLabel = useMemo(() => formatFrenchLongDate(), [tick])
   const soundLabel =
     alarm.soundId === 'none' ? 'Aucune' : SLEEP_ALARM_SOUND_LABEL
@@ -223,6 +272,40 @@ export function SleepView() {
     setConfirmMsg(null)
     setBatteryWarn(false)
     persistWindow(bedtime, waketime)
+
+    // Nuit très courte (écran 08) : réveil dans ≤ 60 min → décalage obligatoire proposé.
+    const now = new Date()
+    const wakeMin = hmToMinutes(waketime)
+    const nowMin = now.getHours() * 60 + now.getMinutes()
+    if (wakeMin != null) {
+      let delta = wakeMin - nowMin
+      if (delta < 0) delta += 24 * 60
+      if (delta > 0 && delta <= 60) {
+        setSaving(false)
+        setSleepNowAnim(false)
+        setHvPane('shortNight')
+        setHvOpen(true)
+        return
+      }
+    }
+
+    // Écran nuit 3 h (état 32) — adultes only, between bedtime and wake.
+    const age = getCalorieProfile().age
+    const bedMin = hmToMinutes(bedtime)
+    if (canUseNightMode(age) && bedMin != null && wakeMin != null) {
+      const inNight =
+        bedMin < wakeMin
+          ? nowMin >= bedMin && nowMin < wakeMin
+          : nowMin >= bedMin || nowMin < wakeMin
+      if (inNight) {
+        setSaving(false)
+        setSleepNowAnim(false)
+        setHvPane('night')
+        setHvOpen(true)
+        return
+      }
+    }
+
     const lowBat = await readBatteryWarning()
     if (lowBat) setBatteryWarn(true)
     // One-shot next wake — never reuse Mon–Fri weekday list for « Dormir maintenant ».
@@ -411,6 +494,65 @@ export function SleepView() {
         </button>
       </div>
 
+      {showAutoPauseCard ? (
+        <div className="mt-3 shrink-0 rounded-2xl p-3" style={{ backgroundColor: CARD }} data-hv-auto-pause>
+          <div className="flex gap-2">
+            <HvLottie id="15" className="h-14 w-14 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <small className="text-[11px] font-medium" style={{ color: GRAY }}>
+                {HV_FEATURE_NAME}
+              </small>
+              <b className="block text-[15px] text-white">Mode en pause tout seul</b>
+              <p className="mt-0.5 text-[13px]" style={{ color: GRAY }}>
+                Ton planning est vide : on garde tes repères habituels.
+              </p>
+              <small className="mt-1 block text-[11px]" style={{ color: GRAY }}>
+                7 jours sans heure de début
+              </small>
+            </div>
+          </div>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              className="ios-press flex-1 rounded-xl py-2.5 text-[13px] font-semibold text-white"
+              style={{ backgroundColor: HV_RED }}
+              onClick={() => {
+                saveHvState({
+                  settings: {
+                    ...hvState.settings,
+                    autoPaused: false,
+                    autoPauseCardDismissed: true,
+                    lastStartEditAt: new Date().toISOString(),
+                  },
+                })
+                setHvPane('planning')
+                setHvOpen(true)
+              }}
+            >
+              Remplir mon planning
+            </button>
+            <button
+              type="button"
+              className="ios-press flex-1 rounded-xl py-2.5 text-[13px] font-semibold text-white"
+              style={{ backgroundColor: '#2C2C2E' }}
+              onClick={() =>
+                saveHvState({
+                  settings: { ...hvState.settings, autoPauseCardDismissed: true },
+                })
+              }
+            >
+              D&apos;accord
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {hvPause.paused && hvPause.reason === 'vacation' && !showAutoPauseCard ? (
+        <p className="mt-2 text-center text-[12px]" style={{ color: GRAY }} data-hv-vacation-pause>
+          Mode en pause. Ton planning t&apos;attend.
+        </p>
+      ) : null}
+
       <button
         type="button"
         onClick={() => void onSleepNow()}
@@ -430,6 +572,38 @@ export function SleepView() {
           />
         )}
         {saving ? 'Enregistrement…' : 'Dormir maintenant'}
+      </button>
+
+      {showAlarm ? (
+        <button
+          type="button"
+          onClick={() => setAlarmPane('main')}
+          className="ios-press mt-2 flex w-full shrink-0 items-center justify-center gap-2 py-2.5 text-[15px] font-semibold"
+          style={{ color: GRAY }}
+          data-sleep-program-alarm
+        >
+          Programmer mon réveil
+        </button>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={() => {
+          setHvPane(hvState.settings.enabled ? 'planning' : 'activation')
+          setHvOpen(true)
+        }}
+        className="ios-press mt-1 flex w-full shrink-0 items-center gap-3 rounded-2xl px-3 py-3 text-left"
+        style={{ backgroundColor: CARD }}
+        data-hv-entry
+      >
+        <HvLottie id="01" className="h-11 w-11 shrink-0" />
+        <span className="min-w-0 flex-1">
+          <b className="block text-[15px] text-white">{HV_FEATURE_NAME}</b>
+          <small className="text-[12px]" style={{ color: GRAY }}>
+            {HV_FEATURE_SUBTITLE}
+          </small>
+        </span>
+        <ChevronRight className="h-4 w-4 shrink-0" style={{ color: GRAY }} />
       </button>
 
       {showAlarm && alarmArmed ? (
@@ -491,6 +665,21 @@ export function SleepView() {
           setTick((n) => n + 1)
         }}
         initialPane={alarmPane ?? 'main'}
+        onOpenHorairesVariables={() => {
+          setAlarmPane(null)
+          setHvPane(hvState.settings.enabled ? 'planning' : 'activation')
+          setHvOpen(true)
+        }}
+      />
+
+      <HvFlow
+        open={hvOpen}
+        onClose={() => {
+          setHvOpen(false)
+          setTick((n) => n + 1)
+          setHvTick((n) => n + 1)
+        }}
+        initialPane={hvPane}
       />
     </div>
   )

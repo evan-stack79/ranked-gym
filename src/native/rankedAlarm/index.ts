@@ -50,6 +50,17 @@ export type RankedAlarmNative = {
     snoozeEnabled?: boolean
     soundName?: string
   }) => Promise<{ id: string | null }>
+  /**
+   * HV only — AlarmKit `.fixed` without cancelAll.
+   * Classic createAlarm path stays make-before-break (e1a8801).
+   */
+  createFixedAlarm?: (opts: {
+    fireAtMs: number
+    label?: string
+    snoozeMinutes?: number
+    snoozeEnabled?: boolean
+    soundName?: string
+  }) => Promise<{ id: string | null }>
   cancelAlarm: (opts: { id: string }) => Promise<void>
   cancelAll: (opts?: { keepId?: string }) => Promise<{ remaining: number }>
   getAlarms: () => Promise<{ alarms: RankedAlarmRow[] }>
@@ -81,6 +92,9 @@ const RankedAlarmWeb: RankedAlarmNative = {
     return { alarms: 'denied' }
   },
   async createAlarm() {
+    throw new Error('RankedAlarm web stub — native plugin missing')
+  },
+  async createFixedAlarm() {
     throw new Error('RankedAlarm web stub — native plugin missing')
   },
   async cancelAlarm() {},

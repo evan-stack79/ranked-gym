@@ -138,6 +138,71 @@ final class RankedAlarmKit {
     }
 
     /**
+     * HV (Emploi du temps variable) — schedule one `.fixed` alarm without wiping others.
+     * Classic `createAlarm` path is unchanged (relative never / weekly + make-before-break).
+     * Cap is enforced by the JS layer (≤ 14). Throws on AlarmKit maximumLimitReached.
+     */
+    func createFixedAlarm(
+        fireAt: Date,
+        label: String,
+        snoozeMinutes: Int,
+        snoozeEnabled: Bool,
+        soundName: String?
+    ) async throws -> String {
+        do {
+            try await authorizeIfNeeded()
+        } catch {
+            lastError = error.localizedDescription
+            throw error
+        }
+
+        guard fireAt.timeIntervalSinceNow >= Self.minLeadSeconds else {
+            lastError = "fixed fireAt too soon"
+            throw RankedAlarmError.invalidDay
+        }
+
+        let attributes = makeAttributes(
+            label: label,
+            snoozeEnabled: snoozeEnabled
+        )
+        let sound = makeAlertSound(named: soundName)
+
+        let countdownDuration: Alarm.CountdownDuration?
+        if snoozeEnabled {
+            let seconds = max(60, snoozeMinutes * 60)
+            countdownDuration = Alarm.CountdownDuration(preAlert: nil, postAlert: TimeInterval(seconds))
+        } else {
+            countdownDuration = nil
+        }
+
+        let id = UUID()
+        let configuration = AlarmManager.AlarmConfiguration<RankedGymAlarmMetadata>(
+            countdownDuration: countdownDuration,
+            schedule: .fixed(fireAt),
+            attributes: attributes,
+            stopIntent: RankedAlarmStopIntent(alarmID: id.uuidString),
+            secondaryIntent: nil,
+            sound: sound
+        )
+
+        do {
+            _ = try await manager.schedule(id: id, configuration: configuration)
+            setLabel(label, for: id)
+            let confirmed = try manager.alarms.contains { $0.id == id }
+            guard confirmed else {
+                lastError = "fixed alarm not listed after schedule"
+                throw RankedAlarmError.notListedAfterSchedule
+            }
+            // Intentionally NO cancelAll — HV arms up to 14 fixed alarms.
+            lastError = nil
+            return id.uuidString
+        } catch {
+            lastError = error.localizedDescription
+            throw error
+        }
+    }
+
+    /**
      * Create + verify, then cancel every other alarm (make-before-break).
      * Empty / nil days → one-shot `.relative(.never)` (never `.fixed`).
      */
