@@ -50,6 +50,9 @@ vi.mock('../../services/hydration/hydrationService', () => ({
     effectiveVisualMode: 'catalog',
     myBottleHasShape: false,
   }),
+  fallbackHydrationHistory: () => [
+    { dayKey: '2026-11-10', drunkMl: 900 },
+  ],
   flushHydrationPendingQueue: async () => undefined,
   onHydrationAccountChanged: () => undefined,
   addHydrationEntry: async () => ({

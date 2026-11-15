@@ -1,10 +1,13 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight, Pencil } from 'lucide-react'
 import {
+  getRecentSleepNights,
   getSleepSchedule,
   saveSleepSchedule,
   SLEEP_CHANGED_EVENT,
 } from '../../services/sleepStorage'
+import { getCalorieProfile } from '../../services/nutritionStorage'
+import { SleepWeekBlock } from './sleepWeek/SleepWeekBlock'
 import {
   SLEEP_ALARM_CHANGED_EVENT,
   SLEEP_ALARM_SOUND_LABEL,
@@ -448,6 +451,12 @@ export function SleepView() {
       <div className="mt-1 shrink-0">
         <SleepAlarmDiagBlock open expanded={diagExpanded} />
       </div>
+
+      <SleepWeekBlock
+        key={`sleep-week-${tick}`}
+        nights={getRecentSleepNights(14)}
+        age={getCalorieProfile().age}
+      />
 
       <SleepHmWheelSheet
         open={wheelTarget != null}
