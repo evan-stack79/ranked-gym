@@ -1,0 +1,65 @@
+export {
+  ADULT_MIN_AGE,
+  APP_DAY_START_HOUR,
+  DEFAULT_BEDTIME_HOUR,
+  EVENING_START_HOUR,
+  FOOD_WATER_FACTOR_HIGH,
+  FOOD_WATER_FACTOR_LOW,
+  MIN_ENTRIES_FOR_SAISI,
+  MIN_SAISI_DAYS_FOR_WEEK,
+  SENIOR_MIN_AGE,
+  countsAsWater,
+  detectHydrationEtat,
+  drinkRepereRange,
+  estimatedTotalWaterRange,
+  isCaffeinated,
+  isSugaryOrCaffeinated,
+} from './engine.ts'
+
+export type {
+  DrinkRepereRange,
+  HydrationDay,
+  HydrationEntry,
+  HydrationEtatInput,
+  HydrationEtatQ,
+  HydrationEtatResult,
+  HydrationEtatVariant,
+  HydrationSex,
+  SportSession,
+  TotalWaterRange,
+} from './engine.ts'
+
+export {
+  AIDE_02,
+  AIDE_05,
+  ETAT_TEXTES,
+  ETAT_TITLES,
+  getEtatActions,
+  getEtatAide,
+  getEtatTexte,
+  getEtatTitle,
+} from './texts.ts'
+
+export type { EtatTextVariant } from './texts.ts'
+
+export {
+  ALL_ETAT_FIXTURES,
+  FIXTURE_ETAT_1,
+  FIXTURE_ETAT_2,
+  FIXTURE_ETAT_3,
+  FIXTURE_ETAT_3_HIDDEN,
+  FIXTURE_ETAT_4,
+  FIXTURE_ETAT_4_COUNTING,
+  FIXTURE_ETAT_5,
+  FIXTURE_ETAT_6,
+  FIXTURE_ETAT_7_ADULT,
+  FIXTURE_ETAT_7_FIVE_COFFEES,
+  FIXTURE_ETAT_7_MINOR,
+  FIXTURE_ETAT_8,
+  FIXTURE_ETAT_9,
+  FIXTURE_ETAT_10,
+  FIXTURE_ETAT_10_TO_3,
+  FIXTURE_PRIORITY_5_BLOCKS_DRINK_MORE,
+  FIXTURE_PRIORITY_7_MINOR_OVER_6,
+  FIXTURE_TOO_FEW_DAYS,
+} from './fixtures.ts'
