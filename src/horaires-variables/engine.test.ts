@@ -118,9 +118,9 @@ describe('HV journée d’eau lever→lever', () => {
 })
 
 describe('HV mineurs', () => {
-  it('13–17 = minor, no night mode', () => {
+  it('13–17 = minor ; écran nuit autorisé (verifier 5, 5 conditions UI)', () => {
     expect(isMinorAge(16)).toBe(true)
-    expect(canUseNightMode(16)).toBe(false)
+    expect(canUseNightMode(16)).toBe(true)
     expect(canUseNightMode(18)).toBe(true)
   })
 
@@ -261,6 +261,11 @@ describe('HV activation pickers (Evan 21h03)', () => {
     const settings = {
       ...defaultHvSettings(new Date('2026-11-09T12:00:00')),
       weeksAb: true,
+      cycleLength: 2 as const,
+      cycleWeeks: [
+        { letter: 'A' as const, name: 'A', slots: defaultWeekSlots('08:00') },
+        { letter: 'B' as const, name: 'B', slots: defaultWeekSlots('14:00') },
+      ],
       trajetMin: 30,
       prepMin: 30,
       weekARefMondayKey: '2026-11-09',
