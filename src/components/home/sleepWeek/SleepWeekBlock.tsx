@@ -1,91 +1,50 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { usePrefersReducedMotion } from '../../../hooks/usePrefersReducedMotion'
-import {
-  AIDE,
-  LIGNE_PRO,
-  etat,
-  etatTexts,
-  fmtDur,
-} from '../../../sleep-week-engine'
+import { AIDE, LIGNE_PRO, etat, etatTexts } from '../../../sleep-week-engine'
 import type { SleepNightEntry } from '../../../services/sleepStorage'
 import { SLEEP_PANTHER_SRC } from '../sleepFeeling'
 import type { SleepFeelingLevel } from '../../../services/sleepStorage'
 import { ConseilLottie } from '../../conseil/ConseilLottie'
 import { buildSleepWeekModel, fmtDurParts } from './sleepWeekModel'
+import {
+  SLEEP_WEEK_BAR_RECORDED,
+  SLEEP_WEEK_BAR_SELECTED,
+  SLEEP_WEEK_CHART_H_PX,
+  barHeightPx,
+  chartSlotKind,
+  formatBarDurationLabel,
+  nightsSurSeptLabel,
+  repereBottomPx,
+} from './sleepWeekChart'
 
 const RED = '#ff0702'
 const CARD = '#1C1C1E'
-const GRAY = '#ACB4BA'
-
-function monotonePath(points: Array<[number, number]>): string {
-  if (points.length === 0) return ''
-  if (points.length === 1) return `M${points[0]![0]} ${points[0]![1]}`
-  const n = points.length
-  const dx = (points[n - 1]![0] - points[0]![0]) / Math.max(1, n - 1)
-  const sl = points.slice(1).map((p, i) => (p[1] - points[i]![1]) / dx)
-  const m = points.map((_, i) =>
-    i === 0
-      ? sl[0]!
-      : i === n - 1
-        ? sl[n - 2]!
-        : sl[i - 1]! * sl[i]! <= 0
-          ? 0
-          : (sl[i - 1]! + sl[i]!) / 2,
-  )
-  for (let i = 0; i < n - 1; i++) {
-    if (sl[i] === 0) {
-      m[i] = 0
-      m[i + 1] = 0
-      continue
-    }
-    const a = m[i]! / sl[i]!
-    const b = m[i + 1]! / sl[i]!
-    const h = a * a + b * b
-    if (h > 9) {
-      const t = 3 / Math.sqrt(h)
-      m[i] = t * a * sl[i]!
-      m[i + 1] = t * b * sl[i]!
-    }
-  }
-  let d = `M${points[0]![0]} ${points[0]![1]}`
-  for (let i = 0; i < n - 1; i++) {
-    d += ` C${[
-      points[i]![0] + dx / 3,
-      points[i]![1] + m[i]! * (dx / 3),
-      points[i + 1]![0] - dx / 3,
-      points[i + 1]![1] + m[i + 1]! * (dx / 3),
-      points[i + 1]![0],
-      points[i + 1]![1],
-    ]
-      .map((v) => v.toFixed(1))
-      .join(' ')}`
-  }
-  return d
-}
+const GRAY = '#8E8E93'
+const DAY_FILL = '#2C2C2E'
+const DAY_OUTLINE = '#3A3A3C'
 
 function PantherHeads({ half }: { half: number }) {
   const level = Math.min(5, Math.max(1, Math.round(half) || 3)) as SleepFeelingLevel
   const src = SLEEP_PANTHER_SRC[level]
-  const full = Math.floor(half)
-  const frac = half - full
+  const full = Math.min(5, Math.max(0, Math.floor(half)))
   return (
     <span className="inline-flex items-center gap-0.5" data-sleep-week-heads>
       {([1, 2, 3, 4, 5] as const).map((lvl) => {
         const on = lvl <= full
-        const halfOn = lvl === full + 1 && frac >= 0.5
         return (
-          <span key={lvl} className="relative inline-block h-5 w-5 overflow-hidden">
-            <img src={src} alt="" className="absolute inset-0 h-5 w-5 opacity-25" />
-            {(on || halfOn) && (
-              <img
-                src={src}
-                alt=""
-                className="absolute inset-0 h-5 w-5"
-                style={halfOn ? { clipPath: 'inset(0 50% 0 0)' } : undefined}
-              />
-            )}
-          </span>
+          <img
+            key={lvl}
+            src={src}
+            alt=""
+            className="h-6 w-6 object-contain"
+            style={
+              on
+                ? undefined
+                : { opacity: 0.45, filter: 'grayscale(1) brightness(1.5)' }
+            }
+            data-sleep-week-head={on ? 'on' : 'off'}
+          />
         )
       })}
     </span>
@@ -130,81 +89,67 @@ export function SleepWeekBlock({ nights, age }: SleepWeekBlockProps) {
 
   if (!model || model.validCount === 0) return null
 
-  const W = 327
-  const H = 126
-  const bot = 104
-  const lo = 4.5 * 60
-  const hi = 8.5 * 60
-  const X = (i: number) => 22 + (i * (W - 44)) / 6
-  const Y = (m: number) => bot - ((m - lo) / (hi - lo)) * (bot - 8)
-
-  const points: Array<[number, number]> = model.days.map((d, i) => [
-    X(i),
-    Y(d.durationMin ?? model.avgMin ?? 7 * 60),
-  ])
-  const path = monotonePath(points)
-  const yR = Y(model.Bb)
-  const focus = selected != null ? model.days[selected] : null
-  const showDay = Boolean(focus?.night && focus.durationMin != null)
-  const displayMin = showDay ? focus!.durationMin! : model.avgMin!
-  const parts = fmtDurParts(displayMin)
-  const title = showDay ? `Nuit du ${focus!.label}` : 'Moyenne de la semaine'
-  const subtitle = showDay ? focus!.hoursLabel : 'par nuit'
-  const filledIdx = model.days
-    .map((d, i) => (d.durationMin != null ? i : -1))
-    .filter((i) => i >= 0)
-  const dotI = showDay ? selected! : (filledIdx.at(-1) ?? 0)
-  const dot = points[dotI] ?? points[0]!
+  const parts = fmtDurParts(model.avgMin ?? 0)
+  const sub = nightsSurSeptLabel(model.validCount)
+  const refBottom = repereBottomPx(model.Bb)
 
   return (
-    <section className="mt-4 shrink-0 pb-2" data-sleep-week-block>
-      <div className="mb-2 flex items-baseline justify-between px-0.5">
-        <h2 className="text-[17px] font-semibold text-white">Ta semaine</h2>
-        <span className="text-[13px]" style={{ color: GRAY }}>
+    <section className="mt-4 shrink-0 pb-2" data-sleep-week-block data-sleep-week-variant="bars-v2">
+      <div className="mb-2.5 flex items-baseline justify-between px-1">
+        <h2 className="text-[22px] font-extrabold tracking-tight text-white">Ta semaine</h2>
+        <span className="text-[13px] font-semibold" style={{ color: GRAY }} data-sleep-week-range>
           {model.weekLabel}
-          {model.provisional ? ' · provisoire' : ''}
         </span>
       </div>
 
       <div
-        className="overflow-hidden rounded-2xl px-3 pb-3 pt-3"
+        className="overflow-hidden rounded-[20px] px-3.5 pt-4"
         style={{ backgroundColor: CARD }}
         data-sleep-week-card
       >
-        <div className="flex justify-between gap-1">
+        <div className="grid grid-cols-7 text-center">
           {model.days.map((d) => {
-            const on =
-              selected === d.index ||
-              (selected == null && d.index === (filledIdx.at(-1) ?? -1))
+            const hasNight = d.durationMin != null && d.durationMin > 0
+            const on = selected === d.index
             return (
               <button
                 key={d.nightDateKey}
                 type="button"
-                className="ios-press flex flex-1 flex-col items-center gap-1"
+                className="ios-press flex flex-col items-center"
                 onClick={() => {
-                  if (!d.night) return
+                  if (!hasNight) return
                   setSelected((cur) => (cur === d.index ? null : d.index))
                 }}
                 data-sleep-week-day={d.index}
+                data-sleep-week-day-state={on ? 'sel' : hasNight ? 'has' : 'no'}
                 style={{
                   opacity: appeared ? 1 : 0,
-                  transform: appeared ? 'none' : 'translateY(8px)',
+                  transform: appeared ? 'none' : 'translateY(6px)',
                   transition: reduced
                     ? undefined
-                    : `opacity 380ms ${d.index * 70}ms, transform 380ms ${d.index * 70}ms`,
+                    : `opacity 360ms ${d.index * 60}ms, transform 360ms ${d.index * 60}ms`,
                 }}
               >
                 <span
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-semibold"
-                  style={{
-                    backgroundColor: on ? RED : 'transparent',
-                    color: on ? '#fff' : GRAY,
-                    boxShadow: on ? `0 0 0 1.5px ${RED}` : undefined,
-                  }}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-bold"
+                  style={
+                    on
+                      ? { backgroundColor: RED, color: '#fff' }
+                      : hasNight
+                        ? { backgroundColor: DAY_FILL, color: '#D1D1D6' }
+                        : {
+                            backgroundColor: 'transparent',
+                            color: GRAY,
+                            border: `1.5px solid ${DAY_OUTLINE}`,
+                          }
+                  }
                 >
                   {d.letter}
                 </span>
-                <span className="text-[11px] tabular-nums" style={{ color: GRAY }}>
+                <span
+                  className="mt-1 text-[11px] font-semibold tabular-nums"
+                  style={{ color: on ? '#fff' : GRAY }}
+                >
                   {d.dateNum}
                 </span>
               </button>
@@ -212,157 +157,156 @@ export function SleepWeekBlock({ nights, age }: SleepWeekBlockProps) {
           })}
         </div>
 
-        <div className="relative mt-3 flex min-h-[88px] flex-col items-center justify-center">
-          <p className="text-[12px]" style={{ color: GRAY }} data-sleep-week-title>
-            {title}
+        <div className="mt-[18px] text-center">
+          <p className="text-[13px] font-semibold" style={{ color: '#AEAEB2' }} data-sleep-week-title>
+            Moyenne de la semaine
           </p>
-          <div className="relative">
-            <p
-              className="mt-0.5 text-[44px] font-bold leading-none tabular-nums text-white"
-              style={{
-                opacity: appeared ? 1 : 0,
-                transform: appeared ? 'none' : 'translateY(6px)',
-                transition: reduced
-                  ? undefined
-                  : 'opacity 700ms 900ms, transform 700ms 900ms',
-              }}
-              data-sleep-week-avg
-            >
-              <span>{parts.h}</span>
-              <span className="mx-0.5 text-[28px] font-semibold" style={{ color: GRAY }}>
-                h
-              </span>
-              <span>{parts.m}</span>
-            </p>
-            {!reduced ? (
-              <>
-                <span
-                  className="pointer-events-none absolute -left-3 top-1 text-[10px]"
-                  style={{ color: RED, opacity: 0.55 }}
-                  aria-hidden
-                >
-                  ✦
-                </span>
-                <span
-                  className="pointer-events-none absolute -right-4 bottom-1 text-[9px]"
-                  style={{ color: GRAY, opacity: 0.7 }}
-                  aria-hidden
-                >
-                  +
-                </span>
-                <span
-                  className="pointer-events-none absolute -right-1 -top-1 text-[8px]"
-                  style={{ color: RED, opacity: 0.4 }}
-                  aria-hidden
-                >
-                  ✦
-                </span>
-              </>
-            ) : null}
-          </div>
-          <p className="mt-1 text-[13px]" style={{ color: GRAY }} data-sleep-week-sub>
-            {subtitle}
+          <p
+            className="mt-1 flex items-baseline justify-center gap-1 tabular-nums leading-none text-white"
+            style={{
+              opacity: appeared ? 1 : 0,
+              transition: reduced ? undefined : 'opacity 600ms 500ms',
+            }}
+            data-sleep-week-avg
+          >
+            <span className="text-[56px] font-extrabold tracking-tight">{parts.h}</span>
+            <span className="mr-1.5 text-[26px] font-bold" style={{ color: GRAY }}>
+              h
+            </span>
+            <span className="text-[56px] font-extrabold tracking-tight">{parts.m}</span>
+          </p>
+          <p className="mt-1.5 text-[13px] font-semibold" style={{ color: GRAY }} data-sleep-week-sub>
+            {sub}
           </p>
         </div>
 
-        <div className="relative mt-1">
-          <svg
-            width="100%"
-            viewBox={`0 0 ${W} ${H}`}
-            className="block"
-            aria-hidden
-            data-sleep-week-curve
-          >
-            <defs>
-              <linearGradient id="sleepWeekFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor={RED} stopOpacity="0.28" />
-                <stop offset="1" stopColor={RED} stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <line
-              x1={0}
-              x2={W}
-              y1={yR}
-              y2={yR}
-              stroke={GRAY}
-              strokeOpacity={0.55}
-              strokeWidth={1.2}
-              strokeDasharray="3 5"
-              strokeLinecap="round"
+        <div
+          className="relative mt-[22px]"
+          style={{ height: SLEEP_WEEK_CHART_H_PX }}
+          data-sleep-week-chart
+        >
+          <div className="absolute inset-0 grid grid-cols-7">
+            {model.days.map((d) => {
+              const kind = chartSlotKind(d.durationMin)
+              const on = selected === d.index
+              const hPx = kind === 'bar' ? barHeightPx(d.durationMin!) : 0
+              return (
+                <div key={d.nightDateKey} className="relative" data-sleep-week-col={d.index}>
+                  {kind === 'stub' ? (
+                    <div
+                      className="absolute bottom-0 left-1/2 -ml-[11px] w-[22px] rounded-[5px]"
+                      style={{
+                        height: 10,
+                        border: '1.5px dashed #48484A',
+                        background: 'transparent',
+                      }}
+                      data-sleep-week-stub={d.index}
+                    />
+                  ) : (
+                    <div
+                      className="absolute bottom-0 left-1/2 -ml-[11px] w-[22px] rounded-[7px]"
+                      style={{
+                        height: hPx,
+                        backgroundColor: on ? SLEEP_WEEK_BAR_SELECTED : SLEEP_WEEK_BAR_RECORDED,
+                        opacity: appeared ? 1 : 0,
+                        transition: reduced
+                          ? undefined
+                          : `height 700ms ${200 + d.index * 50}ms ease-out, opacity 400ms ${200 + d.index * 50}ms`,
+                      }}
+                      data-sleep-week-bar={d.index}
+                      data-sleep-week-bar-sel={on ? '1' : '0'}
+                    />
+                  )}
+                  {on && kind === 'bar' ? (
+                    <div
+                      className="absolute left-1/2 z-[2] -translate-x-1/2 whitespace-nowrap px-0.5 text-[12px] font-bold tabular-nums"
+                      style={{
+                        bottom: hPx + 6,
+                        backgroundColor: CARD,
+                      }}
+                      data-sleep-week-bar-val
+                    >
+                      {formatBarDurationLabel(d.durationMin!)}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            })}
+          </div>
+          <div
+            className="pointer-events-none absolute left-0 right-0 z-[1]"
+            style={{
+              bottom: refBottom,
+              borderTop: '1.5px dashed #636366',
+            }}
+            data-sleep-week-repere-line
+          />
+        </div>
+
+        <div
+          className="mt-3 flex flex-wrap items-center justify-center gap-x-3.5 gap-y-1 text-[11px] font-semibold"
+          style={{ color: GRAY }}
+          data-sleep-week-legend
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <i
+              className="inline-block rounded-[3px]"
+              style={{ height: 10, width: 10, backgroundColor: SLEEP_WEEK_BAR_RECORDED }}
+              aria-hidden
             />
-            {path ? (
-              <>
-                <path
-                  d={`${path} L${points[points.length - 1]![0]} ${bot + 2} L${points[0]![0]} ${bot + 2} Z`}
-                  fill="url(#sleepWeekFill)"
-                  style={{
-                    opacity: appeared ? 1 : 0,
-                    transition: reduced ? undefined : 'opacity 500ms 1.3s',
-                  }}
-                />
-                <path
-                  d={path}
-                  fill="none"
-                  stroke={RED}
-                  strokeWidth={3}
-                  strokeLinecap="round"
-                  pathLength={1}
-                  style={{
-                    strokeDasharray: 1,
-                    strokeDashoffset: appeared ? 0 : 1,
-                    transition: reduced ? undefined : 'stroke-dashoffset 1100ms 450ms ease-out',
-                  }}
-                />
-              </>
-            ) : null}
-            <circle
-              cx={dot[0]}
-              cy={dot[1]}
-              r={5.5}
-              fill={RED}
-              stroke="#fff"
-              strokeWidth={2}
+            Nuit notée
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <i
+              className="inline-block rounded-[3px]"
+              style={{ height: 10, width: 10, border: '1.5px dashed #48484A' }}
+              aria-hidden
+            />
+            Pas de nuit
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <i
+              className="inline-block"
               style={{
-                filter: `drop-shadow(0 0 6px ${RED})`,
-                opacity: appeared ? 1 : 0,
-                transition: reduced ? undefined : 'opacity 400ms 1.4s',
+                width: 14,
+                height: 0,
+                borderTop: '1.5px dashed #8E8E93',
               }}
+              aria-hidden
             />
-          </svg>
-          <span
-            className="pointer-events-none absolute rounded bg-[#2A2A2E] px-1.5 py-0.5 text-[10px] font-medium text-[#ECEEEF]"
-            style={{ top: Math.max(4, yR + 8), right: 12 }}
-            data-sleep-week-repere
-          >
             Ton repère {model.repereHours}&nbsp;h
           </span>
         </div>
 
-        <div className="mt-2 grid grid-cols-3 gap-2 border-t border-white/10 pt-3">
-          <div>
-            <div className="text-[11px]" style={{ color: GRAY }}>
+        <div
+          className="mt-3.5 grid grid-cols-3 border-t"
+          style={{ borderColor: '#2C2C2E', marginLeft: -14, marginRight: -14 }}
+          data-sleep-week-fig
+        >
+          <div className="px-1 py-3.5 text-center">
+            <div className="text-[12px] font-semibold" style={{ color: GRAY }}>
               Nuit (au lit)
             </div>
-            <div className="mt-0.5 text-[14px] font-semibold text-white">
-              {showDay ? fmtDur(focus!.durationMin!) : model.avgLabel}
+            <div className="mt-1.5 flex h-6 items-center justify-center text-[17px] font-bold tabular-nums text-white">
+              {model.avgLabel}
             </div>
           </div>
-          <div>
-            <div className="text-[11px]" style={{ color: GRAY }}>
+          <div className="border-l px-1 py-3.5 text-center" style={{ borderColor: '#2C2C2E' }}>
+            <div className="text-[12px] font-semibold" style={{ color: GRAY }}>
               Coucher
             </div>
-            <div className="mt-0.5 text-[14px] font-semibold text-white">
-              <span className="text-[11px] font-normal" style={{ color: GRAY }}>
-                vers{' '}
+            <div className="mt-1.5 flex h-6 items-center justify-center gap-1 text-[17px] font-bold tabular-nums text-white">
+              <span className="text-[13px] font-semibold" style={{ color: GRAY }}>
+                vers
               </span>
               {model.coucherLabel}
             </div>
           </div>
-          <div>
-            <div className="text-[11px]" style={{ color: GRAY }}>
+          <div className="border-l px-1 py-3.5 text-center" style={{ borderColor: '#2C2C2E' }}>
+            <div className="text-[12px] font-semibold" style={{ color: GRAY }}>
               Ressenti
             </div>
-            <div className="mt-0.5">
+            <div className="mt-1.5 flex h-6 items-center justify-center">
               <PantherHeads half={model.ressentiHalf} />
             </div>
           </div>
