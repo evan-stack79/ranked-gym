@@ -25,7 +25,9 @@ vi.mock('@capacitor/core', () => ({
       throw new Error('stub')
     },
     cancelAlarm: async () => {},
+    cancelAll: async () => ({ remaining: 0 }),
     getAlarms: async () => ({ alarms: [] }),
+    getBattery: async () => ({ level: null, charging: false, unknown: true }),
     verifyAlarm: async () => ({ present: false }),
     openAppSettings: async () => {},
     getDiagnostics: async () => ({
@@ -54,6 +56,8 @@ describe('sleep alarm status copy', () => {
       'Autorise les alarmes pour Ranked Gym dans Réglages',
     )
     expect(syncFailureMessage('ALARM_PLUGIN_MISSING')).toMatch(/RankedAlarm/)
+    const { makeBeforeBreakSteps } = await import('./sleepAlarmService')
+    expect(makeBeforeBreakSteps()).toEqual(['create', 'verify', 'cancelOthers'])
   })
 
   it('exposes build sha helper', async () => {

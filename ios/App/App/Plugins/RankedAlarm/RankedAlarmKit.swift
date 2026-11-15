@@ -8,20 +8,17 @@ import SwiftUI
 /**
  * AlarmKit scheduler — fork lineage: @capawesome/capacitor-alarm (MIT).
  *
- * Evan IPA 870b206 (iPhone) — alarm rings, but:
- *  1) Arrêter must open app → morning « Tu as bien dormi ? » (stopIntent LiveActivityIntent)
- *  2) Répéter requires snooze presentation + postAlert countdown (test was snooze-off)
- *  3) Custom sound needs exact bundle filename with extension for AlertSound.named
+ * Reliability (Evan GO 15/11):
+ *  - One-shot = `.relative(time, repeats: .never)` (timezone-aware; never `.fixed`)
+ *  - Make-before-break: schedule + verify, then cancelAll(except: newId)
+ *  - cancelAll iterates AlarmManager.alarms so no orphan/duplicate
  *
- * Sound looping: AlarmKit has no loop API (WWDC25-230). Apple forum 797172 said
- * keep custom alert sounds under ~30 s; early betas often played once. Device
- * evidence on iOS 26.6.1 shows a ~44 s bundled CAF plays fully and loops until
- * Arrêter/Répéter (donminzzi report). We ship a seamless ~44 s PCM CAF so the
- * alert stays audible even when the OS does not loop a short clip.
+ * Sound: seamless ~44 s PCM CAF; AlarmKit has no loop API (WWDC25-230).
  */
 @available(iOS 26.0, *)
 final class RankedAlarmKit {
     static let defaultSoundFileName = "PetitsOiseaux.caf"
+    static let minLeadSeconds: TimeInterval = 5
 
     struct Diagnostics {
         let authorization: String
@@ -36,9 +33,15 @@ final class RankedAlarmKit {
     private let labelsKey = "ranked_gym_alarm_labels"
     private weak var plugin: CAPPlugin?
     private(set) var lastError: String?
+    private var updatesTask: Task<Void, Never>?
 
     init(plugin: CAPPlugin) {
         self.plugin = plugin
+        startAlarmUpdatesBridge()
+    }
+
+    deinit {
+        updatesTask?.cancel()
     }
 
     func permissionState() -> String {
@@ -95,35 +98,23 @@ final class RankedAlarmKit {
         }
     }
 
-    /// Beta: one-shot fixed alarm — always includes Répéter (9 min) + stopIntent.
+    /// Beta: one-shot relative(.never) — always includes Répéter (9 min) + stopIntent.
     func scheduleFixedTest(secondsFromNow: Int) async throws -> String {
         try await authorizeIfNeeded()
+        // Test uses a near-term relative time derived from now + N seconds.
         let fire = Date().addingTimeInterval(TimeInterval(max(15, secondsFromNow)))
-        let id = UUID()
-        let attributes = makeAttributes(label: "Test Ranked Gym", snoozeEnabled: true)
-        let sound = makeAlertSound(named: Self.defaultSoundFileName)
-        let snoozeSeconds = TimeInterval(9 * 60)
-        let configuration = AlarmManager.AlarmConfiguration<RankedGymAlarmMetadata>(
-            countdownDuration: Alarm.CountdownDuration(preAlert: nil, postAlert: snoozeSeconds),
-            schedule: .fixed(fire),
-            attributes: attributes,
-            stopIntent: RankedAlarmStopIntent(alarmID: id.uuidString),
-            secondaryIntent: nil,
-            sound: sound
+        let cal = Calendar.current
+        let hour = cal.component(.hour, from: fire)
+        let minute = cal.component(.minute, from: fire)
+        return try await createAlarm(
+            hour: hour,
+            minute: minute,
+            label: "Test Ranked Gym",
+            days: nil,
+            snoozeMinutes: 9,
+            snoozeEnabled: true,
+            soundName: Self.defaultSoundFileName
         )
-        do {
-            _ = try await manager.schedule(id: id, configuration: configuration)
-            setLabel("Test Ranked Gym", for: id)
-            guard try manager.alarms.contains(where: { $0.id == id }) else {
-                lastError = "test alarm not listed after schedule"
-                throw RankedAlarmError.notListedAfterSchedule
-            }
-            lastError = nil
-            return id.uuidString
-        } catch {
-            lastError = error.localizedDescription
-            throw error
-        }
     }
 
     func cancelAlarm(id: UUID, completion: @escaping (Error?) -> Void) {
@@ -136,6 +127,20 @@ final class RankedAlarmKit {
         }
     }
 
+    /// Cancel every AlarmKit alarm except an optional keep id.
+    func cancelAll(except keep: UUID? = nil) throws {
+        let alarms = try manager.alarms
+        for alarm in alarms {
+            if let keep, alarm.id == keep { continue }
+            try manager.cancel(id: alarm.id)
+            removeLabel(for: alarm.id)
+        }
+    }
+
+    /**
+     * Create + verify, then cancel every other alarm (make-before-break).
+     * Empty / nil days → one-shot `.relative(.never)` (never `.fixed`).
+     */
     func createAlarm(
         hour: Int,
         minute: Int,
@@ -153,7 +158,7 @@ final class RankedAlarmKit {
         }
 
         let weekdays = try parseDays(days)
-        let schedule = try makeSchedule(hour: hour, minute: minute, weekdays: weekdays)
+        let schedule = try await makeSchedule(hour: hour, minute: minute, weekdays: weekdays)
         let attributes = makeAttributes(
             label: label,
             snoozeEnabled: snoozeEnabled
@@ -186,6 +191,8 @@ final class RankedAlarmKit {
                 lastError = "alarm not listed after schedule"
                 throw RankedAlarmError.notListedAfterSchedule
             }
+            // Make-before-break: only cancel orphans AFTER the new alarm is verified.
+            try cancelAll(except: id)
             lastError = nil
             return id.uuidString
         } catch {
@@ -196,13 +203,23 @@ final class RankedAlarmKit {
 
     func getAlarms() throws -> [[String: Any]] {
         let labels = getLabels()
+        let now = Date()
         return try manager.alarms.map { alarm in
             var row: [String: Any] = [
                 "id": alarm.id.uuidString,
                 "enabled": true,
+                "state": mapState(alarm.state),
             ]
             if let label = labels[alarm.id.uuidString] {
                 row["label"] = label
+            }
+            let decoded = decodeSchedule(alarm.schedule, now: now)
+            row["hour"] = decoded.hour as Any
+            row["minute"] = decoded.minute as Any
+            row["repeats"] = decoded.repeats
+            if let next = decoded.nextFire {
+                row["nextFireAt"] = ISO8601DateFormatter().string(from: next)
+                row["nextFireAtMs"] = next.timeIntervalSince1970 * 1000
             }
             return row
         }
@@ -211,6 +228,10 @@ final class RankedAlarmKit {
     /// True when `id` is currently present in AlarmManager.alarms.
     func hasAlarm(id: UUID) throws -> Bool {
         try manager.alarms.contains { $0.id == id }
+    }
+
+    func alarmCount() throws -> Int {
+        try manager.alarms.count
     }
 
     // MARK: - Sound
@@ -230,7 +251,6 @@ final class RankedAlarmKit {
             candidates.append(trimmed)
             if !trimmed.contains(".") {
                 candidates.append("\(trimmed).caf")
-                candidates.append("\(trimmed).wav")
             }
         }
         candidates.append(contentsOf: [
@@ -263,16 +283,22 @@ final class RankedAlarmKit {
 
     // MARK: - Schedule builders
 
-    private func makeSchedule(hour: Int, minute: Int, weekdays: [Locale.Weekday]) throws -> Alarm.Schedule {
-        if weekdays.isEmpty {
-            let next = try nextFixedDate(hour: hour, minute: minute)
-            return .fixed(next)
-        }
+    private func makeSchedule(hour: Int, minute: Int, weekdays: [Locale.Weekday]) async throws -> Alarm.Schedule {
         let time = Alarm.Schedule.Relative.Time(hour: hour, minute: minute)
+        if weekdays.isEmpty {
+            // One-shot: `.relative(.never)` follows timezone (WWDC25-230). Never `.fixed`.
+            // If today's occurrence is < 5 s away, wait past it so .never lands tomorrow.
+            let until = secondsUntilToday(hour: hour, minute: minute)
+            if until >= 0 && until < Self.minLeadSeconds {
+                let ns = UInt64((until + 0.15) * 1_000_000_000)
+                try await Task.sleep(nanoseconds: ns)
+            }
+            return .relative(Alarm.Schedule.Relative(time: time, repeats: .never))
+        }
         return .relative(Alarm.Schedule.Relative(time: time, repeats: .weekly(weekdays)))
     }
 
-    private func nextFixedDate(hour: Int, minute: Int, now: Date = Date()) throws -> Date {
+    private func secondsUntilToday(hour: Int, minute: Int, now: Date = Date()) -> TimeInterval {
         var calendar = Calendar.current
         calendar.timeZone = .current
         var comps = calendar.dateComponents([.year, .month, .day], from: now)
@@ -280,16 +306,113 @@ final class RankedAlarmKit {
         comps.minute = minute
         comps.second = 0
         comps.nanosecond = 0
-        guard var date = calendar.date(from: comps) else {
-            throw RankedAlarmError.invalidSchedule
-        }
-        if date.timeIntervalSince(now) < 5 {
-            guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: date) else {
-                throw RankedAlarmError.invalidSchedule
-            }
-            date = tomorrow
+        guard let date = calendar.date(from: comps) else { return -1 }
+        return date.timeIntervalSince(now)
+    }
+
+    private func nextRelativeOccurrence(hour: Int, minute: Int, now: Date) -> Date {
+        var calendar = Calendar.current
+        calendar.timeZone = .current
+        var comps = calendar.dateComponents([.year, .month, .day], from: now)
+        comps.hour = hour
+        comps.minute = minute
+        comps.second = 0
+        comps.nanosecond = 0
+        guard var date = calendar.date(from: comps) else { return now }
+        if date.timeIntervalSince(now) < Self.minLeadSeconds {
+            date = calendar.date(byAdding: .day, value: 1, to: date) ?? date
         }
         return date
+    }
+
+    private func nextWeeklyOccurrence(hour: Int, minute: Int, weekdays: [Locale.Weekday], now: Date) -> Date {
+        var calendar = Calendar.current
+        calendar.timeZone = .current
+        let wanted = Set(weekdays.map { weekdayNumber($0) })
+        for offset in 0..<8 {
+            guard let day = calendar.date(byAdding: .day, value: offset, to: now) else { continue }
+            var comps = calendar.dateComponents([.year, .month, .day], from: day)
+            comps.hour = hour
+            comps.minute = minute
+            comps.second = 0
+            comps.nanosecond = 0
+            guard let candidate = calendar.date(from: comps) else { continue }
+            let wd = calendar.component(.weekday, from: candidate) // 1=Sun … 7=Sat
+            guard wanted.contains(wd) else { continue }
+            if candidate.timeIntervalSince(now) >= Self.minLeadSeconds {
+                return candidate
+            }
+        }
+        return nextRelativeOccurrence(hour: hour, minute: minute, now: now)
+    }
+
+    private func weekdayNumber(_ day: Locale.Weekday) -> Int {
+        switch day {
+        case .sunday: return 1
+        case .monday: return 2
+        case .tuesday: return 3
+        case .wednesday: return 4
+        case .thursday: return 5
+        case .friday: return 6
+        case .saturday: return 7
+        @unknown default: return 2
+        }
+    }
+
+    private struct DecodedSchedule {
+        let hour: Int?
+        let minute: Int?
+        let repeats: String
+        let nextFire: Date?
+    }
+
+    private func decodeSchedule(_ schedule: Alarm.Schedule?, now: Date) -> DecodedSchedule {
+        guard let schedule else {
+            return DecodedSchedule(hour: nil, minute: nil, repeats: "none", nextFire: nil)
+        }
+        switch schedule {
+        case .fixed(let date):
+            let cal = Calendar.current
+            return DecodedSchedule(
+                hour: cal.component(.hour, from: date),
+                minute: cal.component(.minute, from: date),
+                repeats: "fixed",
+                nextFire: date
+            )
+        case .relative(let relative):
+            let hour = relative.time.hour
+            let minute = relative.time.minute
+            switch relative.repeats {
+            case .never:
+                return DecodedSchedule(
+                    hour: hour,
+                    minute: minute,
+                    repeats: "never",
+                    nextFire: nextRelativeOccurrence(hour: hour, minute: minute, now: now)
+                )
+            case .weekly(let days):
+                return DecodedSchedule(
+                    hour: hour,
+                    minute: minute,
+                    repeats: "weekly",
+                    nextFire: nextWeeklyOccurrence(hour: hour, minute: minute, weekdays: days, now: now)
+                )
+            @unknown default:
+                return DecodedSchedule(hour: hour, minute: minute, repeats: "unknown", nextFire: nil)
+            }
+        @unknown default:
+            return DecodedSchedule(hour: nil, minute: nil, repeats: "unknown", nextFire: nil)
+        }
+    }
+
+    private func mapState(_ state: Alarm.State) -> String {
+        switch state {
+        case .scheduled: return "scheduled"
+        case .countdown: return "countdown"
+        case .alerting: return "alerting"
+        case .paused: return "paused"
+        @unknown default: return "unknown"
+        }
     }
 
     private func makeAttributes(label: String, snoozeEnabled: Bool) -> AlarmAttributes<RankedGymAlarmMetadata> {
@@ -343,6 +466,22 @@ final class RankedAlarmKit {
             metadata: RankedGymAlarmMetadata(),
             tintColor: tint
         )
+    }
+
+    // MARK: - Updates bridge
+
+    private func startAlarmUpdatesBridge() {
+        updatesTask?.cancel()
+        updatesTask = Task { [weak self] in
+            guard let self else { return }
+            for await alarms in self.manager.alarmUpdates {
+                let payload: [String: Any] = [
+                    "count": alarms.count,
+                    "ids": alarms.map { $0.id.uuidString },
+                ]
+                self.plugin?.notifyListeners("alarmUpdates", data: payload)
+            }
+        }
     }
 
     // MARK: - Auth / labels

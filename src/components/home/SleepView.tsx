@@ -12,13 +12,15 @@ import {
   saveSleepAlarmSettings,
 } from '../../services/sleepAlarmStorage'
 import {
-  formatAlarmScheduledMessage,
+  cancelSleepAlarm,
   isSleepAlarmPlatformSupported,
+  readBatteryWarning,
   syncFailureMessage,
   syncSleepAlarm,
   type SleepAlarmUiStatus,
   readSleepAlarmUiStatus,
 } from '../../services/sleepAlarmService'
+import { RankedAlarm, isRankedAlarmPluginAvailable } from '../../native/rankedAlarm'
 import { formatRepeatSummary } from '../../utils/sleepAlarmSchedule'
 import {
   formatClockHm,
@@ -55,6 +57,8 @@ export function SleepView() {
   const [sleepNowAnim, setSleepNowAnim] = useState(false)
   const [bedIconPlay, setBedIconPlay] = useState(false)
   const [wakeIconPlay, setWakeIconPlay] = useState(false)
+  const [batteryWarn, setBatteryWarn] = useState(false)
+  const [disabling, setDisabling] = useState(false)
   const showAlarm = isSleepAlarmPlatformSupported()
   const pageActive = useSleepPageActive()
   const titleTaps = useRef({ count: 0, last: 0 })
@@ -106,11 +110,33 @@ export function SleepView() {
     }
   }, [showAlarm, tick, confirmMsg])
 
+  useEffect(() => {
+    if (!showAlarm) return
+    const refresh = () => setTick((n) => n + 1)
+    const onVis = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('focus', refresh)
+    let handle: { remove: () => void } | undefined
+    if (isRankedAlarmPluginAvailable() && typeof RankedAlarm.addListener === 'function') {
+      void RankedAlarm.addListener('alarmUpdates', refresh).then((h) => {
+        handle = h
+      })
+    }
+    return () => {
+      document.removeEventListener('visibilitychange', onVis)
+      window.removeEventListener('focus', refresh)
+      handle?.remove()
+    }
+  }, [showAlarm])
+
   const alarm = useMemo(() => getSleepAlarmSettings(), [tick])
   const dateLabel = useMemo(() => formatFrenchLongDate(), [tick])
   const soundLabel =
     alarm.soundId === 'none' ? 'Aucune' : SLEEP_ALARM_SOUND_LABEL
   const repeatLabel = formatRepeatSummary(alarm.days)
+  const alarmArmed = alarm.enabled || status.kind === 'scheduled' || status.kind === 'mismatch'
 
   const persistWindow = (nextBed: string, nextWake: string) => {
     setBedtime(nextBed)
@@ -122,29 +148,40 @@ export function SleepView() {
     }
   }
 
+  const applySyncResult = (
+    result: Awaited<ReturnType<typeof syncSleepAlarm>>,
+    fallbackHm: string,
+  ) => {
+    if (result.superseded) return
+    if (!result.ok) {
+      const msg = syncFailureMessage(result.reason)
+      setError(msg)
+      if (result.reason === 'PERMISSION_DENIED') {
+        setStatus({ kind: 'permission' })
+      } else {
+        setStatus({ kind: 'error', message: msg, openSettings: true })
+      }
+      return
+    }
+    const timeHm = result.timeHm ?? fallbackHm
+    setConfirmMsg(result.readback ?? null)
+    setStatus({
+      kind: 'scheduled',
+      timeHm,
+      summary: formatRepeatSummary(getSleepAlarmSettings().days),
+      readback: result.readback ?? timeHm,
+      fireAtIso: result.fireAtIso,
+    })
+    setTick((n) => n + 1)
+  }
+
   /** Reschedule AlarmKit when the réveil window changes and an alarm is armed. */
   const rescheduleAlarmIfNeeded = (nextWake: string) => {
     if (!showAlarm) return
     const cur = getSleepAlarmSettings()
     if (!cur.enabled) return
     void syncSleepAlarm({ ...cur, timeHm: nextWake, enabled: true }).then((result) => {
-      if (!result.ok) {
-        const msg = syncFailureMessage(result.reason)
-        setError(msg)
-        if (result.reason === 'PERMISSION_DENIED') {
-          setStatus({ kind: 'permission' })
-        } else {
-          setStatus({ kind: 'error', message: msg })
-        }
-        return
-      }
-      const timeHm = result.timeHm ?? nextWake
-      setStatus({
-        kind: 'scheduled',
-        timeHm,
-        summary: formatRepeatSummary(getSleepAlarmSettings().days),
-      })
-      setTick((n) => n + 1)
+      applySyncResult(result, nextWake)
     })
   }
 
@@ -172,31 +209,42 @@ export function SleepView() {
     setSaving(true)
     setError(null)
     setConfirmMsg(null)
+    setBatteryWarn(false)
     persistWindow(bedtime, waketime)
+    const lowBat = await readBatteryWarning()
+    if (lowBat) setBatteryWarn(true)
+    // One-shot next wake — never reuse Mon–Fri weekday list for « Dormir maintenant ».
     const result = await syncSleepAlarm({
-      ...getSleepAlarmSettings(),
       timeHm: waketime,
+      days: [],
       enabled: true,
     })
     setSaving(false)
-    if (!result.ok) {
-      const msg = syncFailureMessage(result.reason)
-      setError(msg)
-      if (result.reason === 'PERMISSION_DENIED') {
-        setStatus({ kind: 'permission' })
-      } else {
-        setStatus({ kind: 'error', message: msg })
-      }
+    applySyncResult(result, waketime)
+  }
+
+  const onDisableAlarm = async () => {
+    setDisabling(true)
+    setError(null)
+    setConfirmMsg(null)
+    const { remaining } = await cancelSleepAlarm()
+    setDisabling(false)
+    if (remaining !== 0) {
+      setStatus({
+        kind: 'mismatch',
+        expected: 0,
+        actual: remaining,
+        message: `Désactivation incomplète (${remaining} alarme(s)). Réessaie.`,
+      })
+      setTick((n) => n + 1)
       return
     }
-    const timeHm = result.timeHm ?? waketime
-    setConfirmMsg(formatAlarmScheduledMessage(timeHm))
-    setStatus({
-      kind: 'scheduled',
-      timeHm,
-      summary: formatRepeatSummary(getSleepAlarmSettings().days),
-    })
+    setStatus({ kind: 'off' })
     setTick((n) => n + 1)
+  }
+
+  const onRearm = () => {
+    void onSleepNow()
   }
 
   return (
@@ -347,7 +395,7 @@ export function SleepView() {
       <button
         type="button"
         onClick={() => void onSleepNow()}
-        disabled={saving}
+        disabled={saving || disabling}
         className="ios-press mt-3 flex w-full shrink-0 items-center justify-center gap-2 rounded-2xl py-3.5 text-[16px] font-semibold text-white disabled:opacity-50"
         style={{ backgroundColor: RED }}
         data-sleep-now
@@ -365,16 +413,34 @@ export function SleepView() {
         {saving ? 'Enregistrement…' : 'Dormir maintenant'}
       </button>
 
+      {showAlarm && alarmArmed ? (
+        <button
+          type="button"
+          onClick={() => void onDisableAlarm()}
+          disabled={disabling || saving}
+          className="ios-press mt-2 w-full shrink-0 py-2 text-center text-[14px] font-medium disabled:opacity-50"
+          style={{ color: GRAY }}
+          data-sleep-alarm-disable
+        >
+          {disabling ? 'Désactivation…' : 'Désactiver le réveil'}
+        </button>
+      ) : null}
+
       <div className="mt-2 shrink-0 space-y-1">
+        {batteryWarn ? (
+          <p className="text-[13px] font-medium text-[#FF907F]" data-sleep-battery-warn>
+            Batterie faible : branche ton téléphone
+          </p>
+        ) : null}
         {confirmMsg ? (
           <div className="flex items-center gap-2" data-sleep-alarm-confirm>
             <SleepLottie name="alarm" playing loop={false} className="h-8 w-8 shrink-0" aria-hidden />
             <p className="text-[13px] font-medium text-white">{confirmMsg}</p>
           </div>
         ) : (
-          <SleepAlarmStatusBanner status={status} />
+          <SleepAlarmStatusBanner status={status} onRearm={onRearm} />
         )}
-        {error && status.kind !== 'permission' ? (
+        {error && status.kind !== 'permission' && status.kind !== 'error' ? (
           <p className="text-[12px] text-[#FF907F]">{error}</p>
         ) : null}
       </div>

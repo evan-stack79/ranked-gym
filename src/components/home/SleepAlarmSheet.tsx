@@ -169,23 +169,26 @@ export function SleepAlarmSheet({
     // Auth is requested inside syncSleepAlarm → scheduleAlarmKit (before schedule).
     const result = await syncSleepAlarm({ ...draft, enabled: true })
     setSaving(false)
+    if (result.superseded) return
     if (!result.ok) {
       const msg = syncFailureMessage(result.reason)
       setError(msg)
       if (result.reason === 'PERMISSION_DENIED') {
         setStatus({ kind: 'permission' })
       } else {
-        setStatus({ kind: 'error', message: msg })
+        setStatus({ kind: 'error', message: msg, openSettings: true })
       }
       return
     }
     const timeHm = result.timeHm ?? draft.timeHm
-    const msg = formatAlarmScheduledMessage(timeHm)
+    const msg = result.readback ?? formatAlarmScheduledMessage(timeHm)
     setConfirmMsg(msg)
     setStatus({
       kind: 'scheduled',
       timeHm,
       summary: formatRepeatSummary(draft.days),
+      readback: result.readback ?? msg,
+      fireAtIso: result.fireAtIso,
     })
     // Keep sheet open briefly so Evan sees the confirmation, then close.
     window.setTimeout(() => onClose(), 700)

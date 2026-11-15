@@ -14,6 +14,8 @@ export const SLEEP_ALARM_SOUND_ID = 'petits_oiseaux' as const
 export const SLEEP_ALARM_SOUND_LABEL = 'Petits oiseaux'
 /** Exact bundle resource name (with extension) for AlarmKit AlertSound.named */
 export const SLEEP_ALARM_SOUND_FILE = 'PetitsOiseaux.caf'
+/** ≤ 29.9 s CAF for LocalNotifications (pre-iOS 26) — iOS caps custom notif sounds at 30 s. */
+export const SLEEP_ALARM_SOUND_FILE_LN = 'PetitsOiseaux_29.caf'
 export const SLEEP_ALARM_SNOOZE_MINUTES = 9
 
 /** ISO weekday: 1=lundi … 7=dimanche (aligné UX FR). */

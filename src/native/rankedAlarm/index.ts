@@ -19,6 +19,24 @@ export type RankedAlarmDiagnostics = {
   soundResolvedName?: string
 }
 
+export type RankedAlarmRow = {
+  id: string
+  enabled?: boolean
+  label?: string
+  hour?: number | null
+  minute?: number | null
+  repeats?: string
+  state?: string
+  nextFireAt?: string
+  nextFireAtMs?: number
+}
+
+export type RankedAlarmBattery = {
+  level: number | null
+  charging: boolean
+  unknown: boolean
+}
+
 export type RankedAlarmNative = {
   isAvailable: () => Promise<{ available: boolean; native?: boolean }>
   checkPermissions: () => Promise<{ alarms: string }>
@@ -33,7 +51,9 @@ export type RankedAlarmNative = {
     soundName?: string
   }) => Promise<{ id: string | null }>
   cancelAlarm: (opts: { id: string }) => Promise<void>
-  getAlarms: () => Promise<{ alarms: Array<{ id: string }> }>
+  cancelAll: (opts?: { keepId?: string }) => Promise<{ remaining: number }>
+  getAlarms: () => Promise<{ alarms: RankedAlarmRow[] }>
+  getBattery: () => Promise<RankedAlarmBattery>
   verifyAlarm: (opts: { id: string }) => Promise<{ present: boolean }>
   openAppSettings: () => Promise<void>
   getDiagnostics: () => Promise<RankedAlarmDiagnostics>
@@ -44,6 +64,10 @@ export type RankedAlarmNative = {
     alarmID?: string
     at?: number
   }>
+  addListener?: (
+    eventName: 'alarmUpdates',
+    listener: (data: { count: number; ids: string[] }) => void,
+  ) => Promise<{ remove: () => void }>
 }
 
 const RankedAlarmWeb: RankedAlarmNative = {
@@ -60,8 +84,14 @@ const RankedAlarmWeb: RankedAlarmNative = {
     throw new Error('RankedAlarm web stub — native plugin missing')
   },
   async cancelAlarm() {},
+  async cancelAll() {
+    return { remaining: 0 }
+  },
   async getAlarms() {
     return { alarms: [] }
+  },
+  async getBattery() {
+    return { level: null, charging: false, unknown: true }
   },
   async verifyAlarm() {
     return { present: false }

@@ -786,6 +786,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     hydrateGenRef.current += 1
     resetCloudBackupHydration()
     void clearCachedSessionUser()
+    // Wipe AlarmKit + scoped sleep-alarm storage on account change.
+    void import('../services/sleepAlarmService')
+      .then((m) => m.cancelAllSleepAlarmsOnLogout())
+      .catch(() => {})
     setSession(null)
     setUser(null)
     setProfile(null)

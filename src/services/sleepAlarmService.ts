@@ -1,10 +1,11 @@
 /**
  * Orchestre le réveil Sommeil via RankedAlarm (App-local Capacitor plugin).
  *
- * Preuve IPA cbf74d0 : si le pont JS tombe sur le stub web, l’ancien code
- * basculait en notification locale → aucune invite AlarmKit. Ici :
- * - isPluginAvailable('RankedAlarm') obligatoire sur iOS
- * - aucun « OK » via stub web / notif locale quand AlarmKit est attendu
+ * Reliability:
+ * - « Dormir maintenant » = one-shot (days: []) → AlarmKit `.relative(.never)`
+ * - Make-before-break lives in native createAlarm (verify, then cancelAll except new)
+ * - syncSleepAlarm is serialized; last request wins
+ * - cancelAll on disable / logout
  */
 
 import {
@@ -13,11 +14,14 @@ import {
   isNativeIosShell,
   isRankedAlarmPluginAvailable,
   type RankedAlarmDiagnostics,
+  type RankedAlarmRow,
 } from '../native/rankedAlarm'
 import {
   SLEEP_ALARM_SOUND_FILE,
+  SLEEP_ALARM_SOUND_FILE_LN,
   SLEEP_ALARM_SOUND_ID,
   SLEEP_ALARM_SNOOZE_MINUTES,
+  clearSleepAlarmSettings,
   getSleepAlarmSettings,
   parseAlarmTimeHm,
   saveSleepAlarmSettings,
@@ -29,8 +33,10 @@ import {
   SLEEP_ALARM_SNOOZE_ACTION_ID,
   SLEEP_ALARM_STOP_ACTION_ID,
   chooseAlarmBackend,
+  formatAlarmReadback,
   formatRepeatSummary,
   nextAlarmDate,
+  nextOneShotAlarmDate,
   snoozeFrom,
   toAlarmKitWeekday,
   toIosWeekday,
@@ -84,25 +90,20 @@ async function cancelLocalAlarmNotifications(): Promise<void> {
   })
 }
 
-async function cancelAlarmKit(id: string | null): Promise<void> {
-  if (!id || !isRankedAlarmPluginAvailable()) return
-  try {
-    await RankedAlarm.cancelAlarm({ id })
-  } catch (err) {
-    console.warn('[sleep-alarm] cancelAlarm', err)
-  }
-}
-
 async function ensureNotifActions(
   mod: typeof import('@capacitor/local-notifications'),
   snoozeEnabled: boolean,
 ): Promise<void> {
   const actions = snoozeEnabled
     ? [
-        { id: SLEEP_ALARM_SNOOZE_ACTION_ID, title: 'Répéter · 9 min' },
-        { id: SLEEP_ALARM_STOP_ACTION_ID, title: 'Arrêter' },
+        {
+          id: SLEEP_ALARM_SNOOZE_ACTION_ID,
+          title: 'Répéter · 9 min',
+          foreground: true,
+        },
+        { id: SLEEP_ALARM_STOP_ACTION_ID, title: 'Arrêter', foreground: true },
       ]
-    : [{ id: SLEEP_ALARM_STOP_ACTION_ID, title: 'Arrêter' }]
+    : [{ id: SLEEP_ALARM_STOP_ACTION_ID, title: 'Arrêter', foreground: true }]
   await mod.LocalNotifications.registerActionTypes({
     types: [{ id: SLEEP_ALARM_NOTIF_ACTION_TYPE, actions }],
   })
@@ -118,18 +119,26 @@ async function scheduleLocalFallback(settings: SleepAlarmSettings): Promise<void
   if (perm.display !== 'granted') throw new Error('PERMISSION_DENIED')
   await ensureNotifActions(mod, settings.snoozeEnabled)
   const sound =
-    settings.soundId === SLEEP_ALARM_SOUND_ID ? SLEEP_ALARM_SOUND_FILE : undefined
+    settings.soundId === SLEEP_ALARM_SOUND_ID ? SLEEP_ALARM_SOUND_FILE_LN : undefined
   const base = {
     title: settings.label || 'Réveil',
     body: 'Ranked Gym',
     sound,
     actionTypeId: SLEEP_ALARM_NOTIF_ACTION_TYPE,
+    interruptionLevel: 'timeSensitive' as const,
     extra: { kind: 'sleep-alarm' as const },
   }
+  // One-shot from Sommeil (empty days) or weekly when days set in sheet.
   if (settings.days.length === 0) {
-    const at = nextAlarmDate(parsed.hour, parsed.minute, [])
+    const at = nextOneShotAlarmDate(parsed.hour, parsed.minute)
     await mod.LocalNotifications.schedule({
-      notifications: [{ ...base, id: SLEEP_ALARM_NOTIF_IDS.once, schedule: { at, allowWhileIdle: true } }],
+      notifications: [
+        {
+          ...base,
+          id: SLEEP_ALARM_NOTIF_IDS.once,
+          schedule: { at, allowWhileIdle: true },
+        },
+      ],
     })
     return
   }
@@ -147,6 +156,15 @@ async function scheduleLocalFallback(settings: SleepAlarmSettings): Promise<void
   await mod.LocalNotifications.schedule({ notifications })
 }
 
+/** Pure ordering helper — exposed for unit tests (create → verify → cancel others). */
+export function makeBeforeBreakSteps(): readonly [
+  'create',
+  'verify',
+  'cancelOthers',
+] {
+  return ['create', 'verify', 'cancelOthers'] as const
+}
+
 async function scheduleAlarmKit(settings: SleepAlarmSettings): Promise<string> {
   if (!isRankedAlarmPluginAvailable()) throw new Error('ALARM_PLUGIN_MISSING')
   const parsed = parseAlarmTimeHm(settings.timeHm)
@@ -155,6 +173,7 @@ async function scheduleAlarmKit(settings: SleepAlarmSettings): Promise<string> {
   const perm = await RankedAlarm.requestPermissions()
   if (perm.alarms !== 'granted') throw new Error('PERMISSION_DENIED')
 
+  // Empty days → native `.relative(.never)`. Native createAlarm verifies then cancelAll(except: id).
   const days =
     settings.days.length > 0 ? settings.days.map(toAlarmKitWeekday) : undefined
 
@@ -177,13 +196,32 @@ async function scheduleAlarmKit(settings: SleepAlarmSettings): Promise<string> {
   return result.id
 }
 
-export async function cancelSleepAlarm(): Promise<void> {
-  const settings = getSleepAlarmSettings()
-  await cancelAlarmKit(settings.alarmKitId)
-  await cancelLocalAlarmNotifications()
-  if (settings.alarmKitId || settings.enabled) {
-    saveSleepAlarmSettings({ alarmKitId: null, enabled: false })
+export async function cancelSleepAlarm(): Promise<{ remaining: number }> {
+  let remaining = 0
+  if (isRankedAlarmPluginAvailable()) {
+    try {
+      const r = await RankedAlarm.cancelAll()
+      remaining = r.remaining
+    } catch (err) {
+      console.warn('[sleep-alarm] cancelAll', err)
+    }
   }
+  await cancelLocalAlarmNotifications()
+  saveSleepAlarmSettings({ alarmKitId: null, enabled: false })
+  return { remaining }
+}
+
+/** Call on logout / account change — wipe AlarmKit + local storage. */
+export async function cancelAllSleepAlarmsOnLogout(): Promise<void> {
+  try {
+    if (isRankedAlarmPluginAvailable()) {
+      await RankedAlarm.cancelAll()
+    }
+  } catch (err) {
+    console.warn('[sleep-alarm] logout cancelAll', err)
+  }
+  await cancelLocalAlarmNotifications()
+  clearSleepAlarmSettings()
 }
 
 export type SyncSleepAlarmResult = {
@@ -191,10 +229,22 @@ export type SyncSleepAlarmResult = {
   backend: AlarmBackend | 'plugin-missing'
   reason?: string
   timeHm?: string
+  readback?: string
+  fireAtIso?: string
+  superseded?: boolean
 }
 
-export async function syncSleepAlarm(
-  patch?: Partial<SleepAlarmSettings>,
+let syncToken = 0
+let syncGate: Promise<void> = Promise.resolve()
+
+/** @internal — reset between unit tests. */
+export function __resetSleepAlarmSyncGateForTests(): void {
+  syncToken = 0
+  syncGate = Promise.resolve()
+}
+
+async function syncSleepAlarmBody(
+  patch: Partial<SleepAlarmSettings> | undefined,
 ): Promise<SyncSleepAlarmResult> {
   const settings = patch ? saveSleepAlarmSettings(patch) : getSleepAlarmSettings()
   const backend = await resolveAlarmBackend()
@@ -203,33 +253,81 @@ export async function syncSleepAlarm(
     return { ok: false, backend, reason: 'UNSUPPORTED_PLATFORM' }
   }
   if (backend === 'plugin-missing') {
-    saveSleepAlarmSettings({ enabled: false, alarmKitId: null })
+    // Keep previous alarmKitId — do not disable silently after a plugin race.
     return { ok: false, backend, reason: 'ALARM_PLUGIN_MISSING' }
   }
 
-  await cancelAlarmKit(settings.alarmKitId)
-  await cancelLocalAlarmNotifications()
-
   if (!settings.enabled) {
-    saveSleepAlarmSettings({ alarmKitId: null, enabled: false })
+    await cancelSleepAlarm()
     return { ok: true, backend, reason: 'OFF' }
   }
 
   try {
     if (backend === 'alarmkit') {
+      // Make-before-break: do NOT cancel the old alarm first.
+      // Native createAlarm schedules, verifies, then cancelAll(except: newId).
       const id = await scheduleAlarmKit(settings)
       saveSleepAlarmSettings({ alarmKitId: id, enabled: true })
-      return { ok: true, backend, timeHm: settings.timeHm }
+      const parsed = parseAlarmTimeHm(settings.timeHm)
+      const fireAt = parsed
+        ? settings.days.length === 0
+          ? nextOneShotAlarmDate(parsed.hour, parsed.minute)
+          : nextAlarmDate(parsed.hour, parsed.minute, settings.days)
+        : null
+      return {
+        ok: true,
+        backend,
+        timeHm: settings.timeHm,
+        readback: fireAt ? formatAlarmReadback(fireAt) : undefined,
+        fireAtIso: fireAt?.toISOString(),
+      }
     }
-    // Pre-iOS 26 only
     await scheduleLocalFallback(settings)
     saveSleepAlarmSettings({ alarmKitId: null, enabled: true })
-    return { ok: true, backend, timeHm: settings.timeHm }
+    const parsed = parseAlarmTimeHm(settings.timeHm)
+    const fireAt = parsed
+      ? nextAlarmDate(parsed.hour, parsed.minute, settings.days)
+      : null
+    return {
+      ok: true,
+      backend,
+      timeHm: settings.timeHm,
+      readback: fireAt ? formatAlarmReadback(fireAt) : undefined,
+      fireAtIso: fireAt?.toISOString(),
+    }
   } catch (err) {
     const reason = err instanceof Error ? err.message : 'SCHEDULE_FAILED'
     console.error('[sleep-alarm] sync failed', reason, err)
-    saveSleepAlarmSettings({ enabled: false, alarmKitId: null })
+    // Keep previous enabled/alarmKitId — old alarm still rings if create failed.
     return { ok: false, backend, reason }
+  }
+}
+
+/**
+ * Serialize schedules; last request wins (superseded mid-flight callers skip work).
+ */
+export async function syncSleepAlarm(
+  patch?: Partial<SleepAlarmSettings>,
+): Promise<SyncSleepAlarmResult> {
+  const token = ++syncToken
+  const prev = syncGate
+  let release!: () => void
+  syncGate = new Promise<void>((r) => {
+    release = r
+  })
+  await prev
+  try {
+    if (token !== syncToken) {
+      return {
+        ok: true,
+        backend: 'alarmkit',
+        reason: 'SUPERSEDED',
+        superseded: true,
+      }
+    }
+    return await syncSleepAlarmBody(patch)
+  } finally {
+    release()
   }
 }
 
@@ -239,9 +337,10 @@ export async function handleSleepAlarmNotificationAction(actionId: string): Prom
     if (!settings.snoozeEnabled) return
     const mod = await loadLocalNotifications()
     if (!mod) return
+    await ensureNotifActions(mod, true)
     const at = snoozeFrom(new Date(), settings.snoozeMinutes || SLEEP_ALARM_SNOOZE_MINUTES)
     const sound =
-      settings.soundId === SLEEP_ALARM_SOUND_ID ? SLEEP_ALARM_SOUND_FILE : undefined
+      settings.soundId === SLEEP_ALARM_SOUND_ID ? SLEEP_ALARM_SOUND_FILE_LN : undefined
     await mod.LocalNotifications.schedule({
       notifications: [
         {
@@ -250,6 +349,7 @@ export async function handleSleepAlarmNotificationAction(actionId: string): Prom
           body: 'Répéter · 9 min',
           sound,
           actionTypeId: SLEEP_ALARM_NOTIF_ACTION_TYPE,
+          interruptionLevel: 'timeSensitive',
           schedule: { at, allowWhileIdle: true },
           extra: { kind: 'sleep-alarm-snooze' },
         },
@@ -274,9 +374,21 @@ export function sleepAlarmFallbackHint(backend: AlarmBackend | 'plugin-missing')
 
 export type SleepAlarmUiStatus =
   | { kind: 'off' }
-  | { kind: 'scheduled'; timeHm: string; summary: string }
+  | {
+      kind: 'scheduled'
+      timeHm: string
+      summary: string
+      readback: string
+      fireAtIso?: string
+    }
+  | {
+      kind: 'mismatch'
+      expected: number
+      actual: number
+      message: string
+    }
   | { kind: 'permission' }
-  | { kind: 'error'; message: string }
+  | { kind: 'error'; message: string; openSettings?: boolean }
 
 export function formatAlarmScheduledMessage(timeHm: string): string {
   const parsed = parseAlarmTimeHm(timeHm)
@@ -286,39 +398,108 @@ export function formatAlarmScheduledMessage(timeHm: string): string {
   return `Réveil prévu à ${hhmm}`
 }
 
+function pickPrimaryAlarm(alarms: RankedAlarmRow[]): RankedAlarmRow | null {
+  if (alarms.length === 0) return null
+  const withFire = [...alarms].sort((a, b) => (a.nextFireAtMs ?? 0) - (b.nextFireAtMs ?? 0))
+  return withFire[0] ?? alarms[0] ?? null
+}
+
 export async function readSleepAlarmUiStatus(): Promise<SleepAlarmUiStatus> {
   if (!isSleepAlarmPlatformSupported()) return { kind: 'off' }
   const settings = getSleepAlarmSettings()
-  if (!settings.enabled) return { kind: 'off' }
+  if (!settings.enabled) {
+    if (isRankedAlarmPluginAvailable()) {
+      try {
+        const { alarms } = await RankedAlarm.getAlarms()
+        if (alarms.length !== 0) {
+          return {
+            kind: 'mismatch',
+            expected: 0,
+            actual: alarms.length,
+            message: `Réveil incohérent (${alarms.length} alarme(s) système). Réarme ou désactive.`,
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    return { kind: 'off' }
+  }
 
   const backend = await resolveAlarmBackend()
   if (backend === 'plugin-missing') {
-    return { kind: 'error', message: 'Plugin natif RankedAlarm introuvable.' }
+    return {
+      kind: 'error',
+      message: 'Plugin natif RankedAlarm introuvable.',
+      openSettings: false,
+    }
   }
   if (backend === 'alarmkit') {
     if (!isRankedAlarmPluginAvailable()) {
-      return { kind: 'error', message: 'Plugin natif RankedAlarm introuvable.' }
+      return {
+        kind: 'error',
+        message: 'Plugin natif RankedAlarm introuvable.',
+        openSettings: false,
+      }
     }
     try {
       const perm = await RankedAlarm.checkPermissions()
       if (perm.alarms !== 'granted') return { kind: 'permission' }
-      if (!settings.alarmKitId) {
-        return { kind: 'error', message: 'Le réveil n’est pas confirmé. Enregistre-le à nouveau.' }
+      const { alarms } = await RankedAlarm.getAlarms()
+      if (alarms.length !== 1) {
+        return {
+          kind: 'mismatch',
+          expected: 1,
+          actual: alarms.length,
+          message:
+            alarms.length === 0
+              ? 'Le réveil n’est plus enregistré. Réarme-le.'
+              : `Plusieurs alarmes système (${alarms.length}). Réarme pour n’en garder qu’une.`,
+        }
       }
-      const present = (await RankedAlarm.verifyAlarm({ id: settings.alarmKitId })).present
-      if (!present) {
-        return { kind: 'error', message: 'Le réveil n’est plus enregistré. Enregistre-le à nouveau.' }
+      const primary = pickPrimaryAlarm(alarms)
+      if (!primary) {
+        return {
+          kind: 'mismatch',
+          expected: 1,
+          actual: 0,
+          message: 'Le réveil n’est plus enregistré. Réarme-le.',
+        }
+      }
+      const hour = primary.hour ?? parseAlarmTimeHm(settings.timeHm)?.hour ?? 7
+      const minute = primary.minute ?? parseAlarmTimeHm(settings.timeHm)?.minute ?? 0
+      const timeHm = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+      const fireAt =
+        typeof primary.nextFireAtMs === 'number'
+          ? new Date(primary.nextFireAtMs)
+          : primary.nextFireAt
+            ? new Date(primary.nextFireAt)
+            : nextOneShotAlarmDate(hour, minute)
+      return {
+        kind: 'scheduled',
+        timeHm,
+        summary: formatRepeatSummary(
+          primary.repeats === 'weekly' ? settings.days : [],
+        ),
+        readback: formatAlarmReadback(fireAt),
+        fireAtIso: fireAt.toISOString(),
       }
     } catch (err) {
       console.error('[sleep-alarm] status read failed', err)
-      return { kind: 'error', message: 'Impossible de vérifier le réveil.' }
+      return { kind: 'error', message: 'Impossible de vérifier le réveil.', openSettings: true }
     }
   }
 
+  const parsed = parseAlarmTimeHm(settings.timeHm)
+  const fireAt = parsed
+    ? nextAlarmDate(parsed.hour, parsed.minute, settings.days)
+    : null
   return {
     kind: 'scheduled',
     timeHm: settings.timeHm,
     summary: formatRepeatSummary(settings.days),
+    readback: fireAt ? formatAlarmReadback(fireAt) : formatAlarmScheduledMessage(settings.timeHm),
+    fireAtIso: fireAt?.toISOString(),
   }
 }
 
@@ -328,6 +509,17 @@ export async function openSleepAlarmSettings(): Promise<void> {
     return
   }
   if (typeof window !== 'undefined') window.location.href = 'app-settings:'
+}
+
+export async function readBatteryWarning(): Promise<boolean> {
+  if (!isRankedAlarmPluginAvailable()) return false
+  try {
+    const bat = await RankedAlarm.getBattery()
+    if (bat.unknown || bat.level == null) return false
+    return bat.level < 0.2 && !bat.charging
+  } catch {
+    return false
+  }
 }
 
 export function syncFailureMessage(reason: string | undefined): string {

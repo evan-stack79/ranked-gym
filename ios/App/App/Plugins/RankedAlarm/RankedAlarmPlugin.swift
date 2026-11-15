@@ -13,9 +13,11 @@ public class RankedAlarmPlugin: CAPPlugin, CAPBridgedPlugin {
     public let jsName = "RankedAlarm"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "cancelAlarm", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "cancelAll", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "checkPermissions", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "createAlarm", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getAlarms", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getBattery", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getDiagnostics", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "isAvailable", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "openAppSettings", returnType: CAPPluginReturnPromise),
@@ -57,6 +59,21 @@ public class RankedAlarmPlugin: CAPPlugin, CAPBridgedPlugin {
             UIApplication.shared.open(url, options: [:]) { ok in
                 if ok { call.resolve() } else { call.reject("Settings open failed", "SETTINGS") }
             }
+        }
+    }
+
+    @objc func getBattery(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            UIDevice.current.isBatteryMonitoringEnabled = true
+            let level = UIDevice.current.batteryLevel
+            let state = UIDevice.current.batteryState
+            let charging = state == .charging || state == .full
+            let unknown = level < 0
+            call.resolve([
+                "level": unknown ? NSNull() : Double(level),
+                "charging": charging,
+                "unknown": unknown,
+            ])
         }
     }
 
@@ -152,6 +169,22 @@ public class RankedAlarmPlugin: CAPPlugin, CAPBridgedPlugin {
             } else {
                 call.resolve()
             }
+        }
+    }
+
+    @objc func cancelAll(_ call: CAPPluginCall) {
+        guard #available(iOS 26.0, *), let impl = ensureImpl() as? RankedAlarmKit else {
+            call.reject("AlarmKit unavailable (requires iOS 26+)", "UNAVAILABLE")
+            return
+        }
+        do {
+            let keepRaw = call.getString("keepId")
+            let keep = keepRaw.flatMap { UUID(uuidString: $0) }
+            try impl.cancelAll(except: keep)
+            let remaining = try impl.alarmCount()
+            call.resolve(["remaining": remaining])
+        } catch {
+            call.reject(error.localizedDescription, "CANCEL_FAILED", error)
         }
     }
 
