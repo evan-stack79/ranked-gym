@@ -150,7 +150,7 @@ describe('sleepEngineAdapter', () => {
     )
     const snap = getSleepHomeSnapshot()
     expect(snap.statusKey).toBe('deficit')
-    expect(snap.statusLabel).toBe('Sommeil insuffisant')
+    expect(snap.statusLabel).toBe('Nuit courte')
   })
 
   it('historique insuffisant signalé sans inventer une mauvaise régularité', async () => {

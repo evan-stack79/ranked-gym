@@ -156,7 +156,7 @@ export function YourDataMealsErasePanel({
                 className="mt-0.5 block text-[12px] text-[#ACB4BA]"
                 data-testid="erase-old-meals-pending"
               >
-                + {pendingCount} repas pas encore envoyés
+                + {pendingCount} repas pas encore sauvés
               </span>
             ) : null}
           </span>
@@ -188,7 +188,7 @@ export function YourDataMealsErasePanel({
         }}
         dismissible={!reconnectBusy && !emailCodeBusy}
         title={emailCodeStep ? 'Confirmer l’e-mail' : 'Ancien compte'}
-        subtitle={emailCodeStep ? 'Code à 6 chiffres' : 'Lier pour effacer'}
+        subtitle={emailCodeStep ? 'Code à 6 chiffres' : 'Relier mon ancien compte'}
         leading={<Trash2 className="mt-0.5 h-5 w-5 text-[#FF453A]" />}
       >
         <div className="space-y-3 pb-2">
@@ -287,7 +287,7 @@ export function YourDataMealsErasePanel({
                 {reconnectBusy ? (
                   <>
                     <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-                    Liaison…
+                    Un instant…
                   </>
                 ) : (
                   'Lier mon ancien compte'
@@ -305,15 +305,15 @@ export function YourDataMealsErasePanel({
         }}
         dismissible={!busy}
         title="Effacer mes anciens repas"
-        subtitle="Action définitive"
+        subtitle="Pas de retour possible"
         leading={<Trash2 className="mt-0.5 h-5 w-5 text-[#FF453A]" />}
       >
         <div className="space-y-3 pb-2">
           <p className="text-[13px] leading-relaxed text-[#ACB4BA]">
             Tu vas supprimer définitivement {serverCount} repas enregistré
             {serverCount > 1 ? 's' : ''}
-            {pendingCount > 0 ? ` (+ ${pendingCount} pas encore envoyés)` : ''}. Aucun détail n’est
-            affiché ici. Cette action vide aussi le cache de ton téléphone.
+            {pendingCount > 0 ? ` (+ ${pendingCount} pas encore sauvés)` : ''}. Aucun détail n’est
+            affiché ici. Ça efface aussi ce qui est sur ton téléphone.
           </p>
           {error ? (
             <p className="rounded-xl border border-[#FF453A]/30 bg-[#FF453A]/10 px-3 py-2 text-[13px] text-[#FF907F]">

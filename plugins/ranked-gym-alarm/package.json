@@ -1,0 +1,47 @@
+{
+  "name": "@ranked-gym/capacitor-alarm",
+  "version": "0.1.2-ranked.1",
+  "description": "Fork of @capawesome/capacitor-alarm (MIT) \u2014 Ranked Gym AlarmKit + snooze 9 min + custom sound.",
+  "main": "dist/plugin.cjs.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
+  "unpkg": "dist/plugin.js",
+  "files": [
+    "dist/",
+    "ios/Plugin/",
+    "Package.swift",
+    "LICENSE",
+    "ATTRIBUTION.md",
+    "RankedGymCapacitorAlarm.podspec"
+  ],
+  "author": "Ranked Gym (fork of Capawesome / Robin Genz)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/evan-stack79/ranked-gym.git"
+  },
+  "bugs": {
+    "url": "https://github.com/capawesome-team/capacitor-plugins/issues"
+  },
+  "homepage": "https://github.com/evan-stack79/ranked-gym",
+  "keywords": [
+    "capacitor",
+    "plugin",
+    "native",
+    "alarm",
+    "alarmkit",
+    "timer",
+    "clock",
+    "capacitor-plugin",
+    "alarm clock",
+    "system alarm",
+    "countdown timer",
+    "wake up alarm",
+    "schedule alarm"
+  ],
+  "peerDependencies": {
+    "@capacitor/core": ">=8.0.0"
+  },
+  "capacitor": {},
+  "private": true
+}

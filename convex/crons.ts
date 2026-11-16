@@ -68,4 +68,23 @@ crons.interval(
   {},
 )
 
+const purgeAccountDeleteArchivesRef = makeFunctionReference<
+  'mutation',
+  { now?: number; limit?: number },
+  {
+    deleted: number
+    scanned: number
+    hasMore: boolean
+    byTable: Record<string, number>
+  }
+>('accountDeleteArchives:purgeExpiredAccountDeleteArchives')
+
+/** Archives Juriste — purge retainUntil échues (lots idempotents). */
+crons.daily(
+  'account delete archive retainUntil purge',
+  { hourUTC: 4, minuteUTC: 40 },
+  purgeAccountDeleteArchivesRef,
+  {},
+)
+
 export default crons

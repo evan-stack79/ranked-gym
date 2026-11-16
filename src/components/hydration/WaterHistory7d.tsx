@@ -104,7 +104,7 @@ export function WaterHistory7d({ goalMl, active = true, className = '' }: WaterH
       <section className="space-y-2" data-hydration-today-entries>
         <p className="text-[20px] font-bold text-white">Aujourd’hui</p>
         {entries.length === 0 ? (
-          <p className="text-[13px] text-[#8E8E93]">Aucun ajout pour l’instant.</p>
+          <p className="text-[13px] text-[#8E8E93]">Rien noté aujourd'hui.</p>
         ) : (
           <ul className="overflow-hidden rounded-2xl border border-white/10 bg-black/25">
             {entries.map((entry) => (
@@ -119,7 +119,7 @@ export function WaterHistory7d({ goalMl, active = true, className = '' }: WaterH
                   </p>
                   <p className="text-[12px] text-[#8E8E93]">
                     {timeLabel(entry.createdAt)}
-                    {entry.pending ? ' · en attente' : ''}
+                    {entry.pending ? ' · pas encore sauvé' : ''}
                   </p>
                 </div>
                 {confirmId === entry.clientId ? (
@@ -130,7 +130,7 @@ export function WaterHistory7d({ goalMl, active = true, className = '' }: WaterH
                       onClick={() => setConfirmId(null)}
                       disabled={busyId === entry.clientId}
                     >
-                      Annuler
+                      Retirer
                     </button>
                     <button
                       type="button"

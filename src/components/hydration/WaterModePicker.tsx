@@ -21,7 +21,7 @@ export function WaterModePicker({
 
   return (
     <div className="space-y-2" data-hydration-mode-picker>
-      <p className="text-[15px] font-semibold text-white">Mode d’affichage</p>
+      <p className="text-[15px] font-semibold text-white">Comment tu comptes</p>
       <div className="space-y-2">
         {options.map((opt) => {
           const selected = mode === opt.id

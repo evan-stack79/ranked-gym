@@ -96,9 +96,9 @@ export function NutritionDayMealsCard({
   }
 
   return (
-    <section aria-label="Repas du jour">
+    <section aria-label="Mes repas">
       <h2 className="mb-3 text-[20px] font-bold tracking-tight text-white">
-        <BlurInText as="span">Repas du jour</BlurInText>
+        <BlurInText as="span">Mes repas</BlurInText>
       </h2>
       <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#141416]">
         <ul>

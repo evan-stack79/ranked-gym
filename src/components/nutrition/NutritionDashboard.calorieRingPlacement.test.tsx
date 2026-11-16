@@ -50,6 +50,9 @@ vi.mock('../../services/hydration/hydrationService', () => ({
     effectiveVisualMode: 'catalog',
     myBottleHasShape: false,
   }),
+  fallbackHydrationHistory: () => [
+    { dayKey: '2026-11-10', drunkMl: 900 },
+  ],
   flushHydrationPendingQueue: async () => undefined,
   onHydrationAccountChanged: () => undefined,
   addHydrationEntry: async () => ({
@@ -166,8 +169,8 @@ describe('NutritionDashboard — anneau kcal / Eau / TCA', () => {
     expect(ring.getAttribute('data-calorie-lock')).toBe('tca')
     expect(ring.textContent).not.toMatch(/kcal restantes/)
     expect(host.querySelector('[data-testid="define-calorie-goal"]')).toBeNull()
-    expect(host.querySelector('[aria-label="Progression calorique"]')).toBeNull()
-    expect(ring.textContent).toMatch(/Situations de santé/)
+    expect(host.querySelector('[aria-label="Calories du jour"]')).toBeNull()
+    expect(ring.textContent).toMatch(/Calories cachées pour toi/)
     root.unmount()
     host.remove()
   })

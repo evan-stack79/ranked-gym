@@ -10,6 +10,14 @@ import { YourDataMealsEraseCard } from './YourDataMealsEraseCard'
 import { changePassword, deleteOwnAccount, signInWithEmail } from '../../services/authService'
 import { useAuth } from '../../context/AuthContext'
 import { toUserFacingError } from '../../utils/userFacingError'
+import { getPurchasesAdapter } from '../../native/purchases'
+
+/** Juriste Sec:276 — vrai seulement après erase serveur + wipe local. */
+export const ACCOUNT_DELETE_JURISTE_WARNING =
+  'Ton compte et toutes tes données (séances, repas, eau, sommeil, classement, sauvegardes) seront effacés pour toujours. On garde seulement la trace de tes achats, sans ton profil. Tes achats restent chez Apple/Google : ton abonnement continue tant que tu ne le résilies pas là-bas.'
+
+export const ACCOUNT_DELETE_MANAGE_SUBSCRIPTION_LABEL = 'Gérer mon abonnement'
+export const ACCOUNT_DELETE_CONFIRM_LABEL = 'Supprimer pour toujours'
 
 interface SecurityScreenProps {
   onBack: () => void
@@ -55,15 +63,15 @@ export function SecurityScreen({
     setPasswordOk(null)
 
     if (!user?.email) {
-      setPasswordError('Session invalide. Reconnecte-toi.')
+      setPasswordError('Reconnecte-toi.')
       return
     }
     if (newPassword.length < 6) {
-      setPasswordError('Le nouveau mot de passe doit contenir au moins 6 caractères.')
+      setPasswordError('6 caractères minimum.')
       return
     }
     if (newPassword !== confirmPassword) {
-      setPasswordError('Les nouveaux mots de passe ne correspondent pas.')
+      setPasswordError('Les 2 mots de passe sont différents.')
       return
     }
 
@@ -77,11 +85,11 @@ export function SecurityScreen({
         setPasswordOk(null)
       }, 1200)
     } catch (err) {
-      const raw = toUserFacingError(err, 'Impossible de changer le mot de passe.')
+      const raw = toUserFacingError(err, 'Mot de passe pas changé. Réessaie.')
       setPasswordError(
         raw.toLowerCase().includes('invalid login')
           ? 'Ancien mot de passe incorrect.'
-          : raw || 'Impossible de changer le mot de passe.',
+          : raw || 'Mot de passe pas changé. Réessaie.',
       )
     } finally {
       setPasswordBusy(false)
@@ -92,7 +100,7 @@ export function SecurityScreen({
     event.preventDefault()
     setDeleteError(null)
     if (!user?.email) {
-      setDeleteError('Session invalide. Reconnecte-toi.')
+      setDeleteError('Reconnecte-toi.')
       return
     }
     if (!deletePassword) {
@@ -107,13 +115,13 @@ export function SecurityScreen({
       await signOut()
       onSignOut()
     } catch (err) {
-      const raw = toUserFacingError(err, 'Suppression impossible.')
+      const raw = toUserFacingError(err, 'Compte pas supprimé. Réessaie.')
       setDeleteError(
         raw.toLowerCase().includes('invalid login')
           ? 'Mot de passe incorrect.'
           : raw.includes('delete_own_account') || raw.toLowerCase().includes('function')
-            ? 'Suppression indisponible pour le moment. Contacte le support Ranked Gym.'
-            : raw || 'Suppression impossible.',
+            ? "Pas possible pour l'instant. Écris au support."
+            : raw || 'Compte pas supprimé. Réessaie.',
       )
     } finally {
       setDeleteBusy(false)
@@ -123,8 +131,8 @@ export function SecurityScreen({
   return (
     <div className="flex flex-col gap-6 ios-fade-up pb-4">
       <ProfileSubScreenHeader
-        title="Sécurité & Confidentialité"
-        subtitle="Compte, Mode Furtif & données"
+        title="Compte et vie privée"
+        subtitle="Mot de passe, Mode Furtif, données"
         onBack={onBack}
       />
 
@@ -135,8 +143,7 @@ export function SecurityScreen({
           disabled={ghostSaving}
         />
         <p className="px-1 text-[13px] leading-relaxed text-[#ACB4BA]">
-          Le Mode Furtif masque ta localisation et ton identité dans le feed. Tes données
-          d&apos;entraînement restent privées.
+          Mode Furtif : personne ne voit où tu es ni qui tu es dans le fil.
         </p>
       </div>
 
@@ -184,7 +191,6 @@ export function SecurityScreen({
         }}
         dismissible={!passwordBusy}
         title="Changer mon mot de passe"
-        subtitle="Sécurise ton compte"
         leading={<KeyRound className="mt-0.5 h-5 w-5 text-[#ACB4BA]" />}
       >
         <form onSubmit={(e) => void handleChangePassword(e)} className="space-y-3 pb-2">
@@ -268,13 +274,12 @@ export function SecurityScreen({
         }}
         dismissible={!deleteBusy}
         title="Supprimer mon compte"
-        subtitle="Action définitive"
+        subtitle="Pas de retour possible"
         leading={<Trash2 className="mt-0.5 h-5 w-5 text-[#FF453A]" />}
       >
         <form onSubmit={(e) => void handleDeleteAccount(e)} className="space-y-3 pb-2">
           <p className="text-[13px] leading-relaxed text-[#ACB4BA]">
-            Ton profil, tes séances et tes sauvegardes cloud seront définitivement effacés. Cette
-            action est irréversible.
+            {ACCOUNT_DELETE_JURISTE_WARNING}
           </p>
           <label className="block">
             <span className="mb-1.5 block text-[12px] font-semibold text-[#ACB4BA]">
@@ -296,7 +301,19 @@ export function SecurityScreen({
             </p>
           ) : null}
           <button
+            type="button"
+            data-testid="account-delete-manage-subscription"
+            disabled={deleteBusy}
+            onClick={() => {
+              void getPurchasesAdapter().manageSubscriptions()
+            }}
+            className="ios-press flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] py-3.5 text-[15px] font-semibold text-white disabled:opacity-50"
+          >
+            {ACCOUNT_DELETE_MANAGE_SUBSCRIPTION_LABEL}
+          </button>
+          <button
             type="submit"
+            data-testid="account-delete-confirm"
             disabled={deleteBusy}
             className="ios-press flex w-full items-center justify-center gap-2 rounded-2xl border border-[#FF453A]/40 bg-[#FF453A]/15 py-3.5 text-[15px] font-semibold text-[#FF907F] disabled:opacity-50"
           >
@@ -306,7 +323,7 @@ export function SecurityScreen({
                 Suppression…
               </>
             ) : (
-              'Supprimer définitivement'
+              ACCOUNT_DELETE_CONFIRM_LABEL
             )}
           </button>
         </form>

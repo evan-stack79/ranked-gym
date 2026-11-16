@@ -13,6 +13,7 @@ import { usePwaLifecycle } from './hooks/usePwaUpdate'
 import { GlobalOnboardingScreen } from './components/onboarding/GlobalOnboardingScreen'
 import { SportsOnboardingScreen } from './components/onboarding/SportsOnboardingScreen'
 import { HomeView } from './components/home/HomeView'
+import { SleepView } from './components/home/SleepView'
 import { TrainingView } from './components/training/TrainingView'
 import { NutritionView } from './components/nutrition/NutritionView'
 import { ProfileView } from './components/profile/ProfileView'
@@ -71,6 +72,8 @@ function renderActiveView(
       )
     case 'nutrition':
       return <NutritionView />
+    case 'sleep':
+      return <SleepView />
     case 'profile':
       return <ProfileView />
   }

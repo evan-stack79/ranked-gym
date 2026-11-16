@@ -72,7 +72,7 @@ describe('YourDataMealsErasePanel — B6/B7', () => {
       /12 repas gardés/,
     )
     expect(host.querySelector('[data-testid="erase-old-meals-pending"]')?.textContent).toBe(
-      '+ 3 repas pas encore envoyés',
+      '+ 3 repas pas encore sauvés',
     )
     expect(host.textContent).not.toContain('Skyr')
 

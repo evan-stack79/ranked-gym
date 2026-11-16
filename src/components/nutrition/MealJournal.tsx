@@ -196,7 +196,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
           if (controller.signal.aborted) return
           if (err instanceof DOMException && err.name === 'AbortError') return
           setSearchHits([])
-          setSearchError(err instanceof Error ? err.message : 'Recherche impossible.')
+          setSearchError('Recherche ratée. Réessaie.')
         })
         .finally(() => {
           if (!controller.signal.aborted) setSearchLoading(false)
@@ -263,7 +263,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
 
   const handleValidateFoodSelection = (items: FoodAddV3Selection[]) => {
     if (!foodAddAllowed) {
-      showToast('Ajout d’aliment indisponible pour ce compte.', 'error')
+      showToast('Connecte-toi pour ajouter un repas.', 'error')
       return
     }
     const type = pendingMealType ?? mealType
@@ -337,7 +337,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
             else {
               const access = mapAccessError(error)
               if (access) showToast(access.message, 'error')
-              else showToast("L'ajout n'a pas fonctionné. Réessaie.", 'error')
+              else showToast('Pas ajouté. Réessaie.', 'error')
             }
             continue
           }
@@ -357,7 +357,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
       setPendingMealType(null)
       resetForm()
       if (added > 0) {
-        showToast(added === 1 ? 'Aliment ajouté.' : `${added} aliments ajoutés.`)
+        showToast(added === 1 ? 'Ajouté !' : `${added} ajoutés !`)
       }
     })()
   }
@@ -506,7 +506,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
                 Journal
               </p>
               <h2 className="whitespace-nowrap text-[20px] font-bold leading-tight tracking-tight text-white">
-                Repas du jour
+                Mes repas
               </h2>
             </div>
           </div>
@@ -519,7 +519,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
                   className="inline-flex items-center gap-1.5 rounded-full border border-[#30D158]/35 bg-[#30D158]/15 px-3.5 py-2 text-[13px] font-semibold text-[#30D158]"
                 >
                   <ScanBarcode className="h-4 w-4" />
-                  Scanner
+                  Code-barres
                 </button>
               ) : null}
               <button
@@ -638,7 +638,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
               className="ios-press inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#00B4FF]/40 bg-[#00B4FF]/20 py-2.5 text-[13px] font-semibold text-[#64D2FF]"
             >
               <ScanLine className="h-4 w-4" />
-              Scanner l’accompagnement
+              Ajouter l&apos;accompagnement
             </button>
             <button
               type="button"
@@ -704,7 +704,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
               void setPersonalFoodFavorite(hit.foodKey!, next)
                 .then((applied) => {
                   if (!applied) {
-                    showToast('Impossible de mettre à jour le favori.', 'error')
+                    showToast('Favori pas changé. Réessaie.', 'error')
                     return
                   }
                   setSearchHits((prev) =>
@@ -715,7 +715,7 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
                   showToast(next ? 'Ajouté aux favoris.' : 'Retiré des favoris.')
                 })
                 .catch(() => {
-                  showToast('Impossible de mettre à jour le favori.', 'error')
+                  showToast('Favori pas changé. Réessaie.', 'error')
                 })
             })
           }}
@@ -766,11 +766,9 @@ export function MealJournal({ targetCalories, morphology }: MealJournalProps) {
           >
             <UtensilsCrossed className="h-7 w-7 text-[#30D158]" strokeWidth={1.75} />
           </div>
-          <p className="text-[16px] font-semibold text-white">Aucun repas pour l&apos;instant</p>
+          <p className="text-[16px] font-semibold text-white">Pas encore de repas</p>
           <p className="max-w-xs text-[13px] text-[#ACB4BA]">
-            {foodAddV3
-              ? 'Ajoute un aliment pour suivre ta journée.'
-              : 'Scanne un produit ou ajoute un repas pour suivre ta journée.'}
+            Ajoute ce que tu manges.
           </p>
         </div>
       ) : (

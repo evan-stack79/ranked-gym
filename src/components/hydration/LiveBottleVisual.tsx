@@ -233,7 +233,19 @@ export function LiveBottleVisual({
       data-fill-ratio={fillRatio.toFixed(3)}
       data-hydration-remaining={mlFromFillRatio(fillRatio, capacityMl)}
       data-hydration-dragging={dragging ? '1' : '0'}
-      style={interactive ? { touchAction: 'none', userSelect: 'none' } : undefined}
+      style={
+        interactive
+          ? {
+              touchAction: 'none',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              WebkitTouchCallout: 'none',
+            }
+          : { WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }
+      }
+      onContextMenu={(e) => {
+        e.preventDefault()
+      }}
       onPointerDown={interactive ? onPointerDown : undefined}
       onPointerMove={interactive ? onPointerMove : undefined}
       onPointerUp={interactive ? endDrag : undefined}
@@ -253,6 +265,8 @@ export function LiveBottleVisual({
           draggable={false}
           data-hydration-shell
           className="relative z-0 h-full w-auto select-none object-contain"
+          style={{ WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
+          onContextMenu={(e) => e.preventDefault()}
         />
 
         <div
@@ -370,7 +384,14 @@ export function LiveBottleVisual({
           draggable={false}
           aria-hidden
           className="pointer-events-none absolute inset-0 z-[2] h-full w-full object-contain"
-          style={{ mixBlendMode: 'screen', opacity: 0.28 }}
+          style={{
+            mixBlendMode: 'screen',
+            opacity: 0.28,
+            WebkitTouchCallout: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+          }}
+          onContextMenu={(e) => e.preventDefault()}
         />
 
         {showHandle ? (

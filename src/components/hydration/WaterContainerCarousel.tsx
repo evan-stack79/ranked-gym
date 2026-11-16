@@ -71,6 +71,8 @@ export function WaterContainerCarousel({
                   alt=""
                   draggable={false}
                   className="relative z-0 h-full w-full object-contain"
+                  style={{ WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
+                  onContextMenu={(e) => e.preventDefault()}
                 />
                 {id !== 'my_bottle' ? (
                   <div

@@ -54,25 +54,19 @@ export function resolveDisplayFirstName(input: ResolveDisplayFirstNameInput): st
   return capitalizeWord(cleaned)
 }
 
-/** Message d'accueil dynamique selon l'heure et le prénom. */
-export function getHomeGreeting(firstName: string, now = new Date()): string {
-  const hour = now.getHours()
+/** Message d'accueil fixe : « Salut ${prénom} ». */
+export function getHomeGreeting(firstName: string, _now = new Date()): string {
   const name = firstName || 'Champion'
-
-  if (hour >= 5 && hour < 12) return `Prêt à rank up, ${name} ?`
-  if (hour >= 12 && hour < 17) return `Séance de l'après-midi, ${name} ?`
-  if (hour >= 17 && hour < 22) return `Séance du soir, ${name} ?`
-  return `Recovery mode, ${name} ?`
+  return `Salut ${name}`
 }
 
 /**
- * Sous-titre Accueil (Soft Blur In) — le mot cyclé « Prêt / Motivé / Focus »
- * vit dans TextFlip ; ici seulement le contexte horaire.
+ * Sous-titre Accueil (Soft Blur In) — contexte horaire sous « Salut ${prénom} ».
  */
 export function getHomeGreetingSubtitle(now = new Date()): string {
   const hour = now.getHours()
-  if (hour >= 5 && hour < 12) return 'À rank up aujourd’hui'
-  if (hour >= 12 && hour < 17) return 'Séance de l’après-midi'
-  if (hour >= 17 && hour < 22) return 'Séance du soir'
-  return 'Recovery mode'
+  if (hour >= 5 && hour < 12) return "On s'y met ?"
+  if (hour >= 12 && hour < 17) return 'Une séance cet aprèm ?'
+  if (hour >= 17 && hour < 22) return 'Une séance ce soir ?'
+  return 'Il est tard : repos.'
 }

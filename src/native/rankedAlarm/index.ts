@@ -1,0 +1,146 @@
+import { Capacitor, registerPlugin } from '@capacitor/core'
+
+/**
+ * Pont JS → RankedAlarmPlugin (jsName "RankedAlarm").
+ * Même pattern que RestTimerLiveActivity : stub web qui ne throw PAS
+ * et ne prétend jamais qu’une alarme est programmée.
+ */
+
+export type RankedAlarmDiagnostics = {
+  native: boolean
+  iosVersion: string
+  alarmKitAvailable: boolean
+  /** authorized | denied | notDetermined | unavailable | unknown */
+  authorization: string
+  alarmCount: number
+  lastError: string | null
+  hasUsageDescription: boolean
+  soundInBundle?: boolean
+  soundResolvedName?: string
+}
+
+export type RankedAlarmRow = {
+  id: string
+  enabled?: boolean
+  label?: string
+  hour?: number | null
+  minute?: number | null
+  repeats?: string
+  state?: string
+  nextFireAt?: string
+  nextFireAtMs?: number
+}
+
+export type RankedAlarmBattery = {
+  level: number | null
+  charging: boolean
+  unknown: boolean
+}
+
+export type RankedAlarmNative = {
+  isAvailable: () => Promise<{ available: boolean; native?: boolean }>
+  checkPermissions: () => Promise<{ alarms: string }>
+  requestPermissions: () => Promise<{ alarms: string }>
+  createAlarm: (opts: {
+    hour: number
+    minute: number
+    label?: string
+    days?: string[]
+    snoozeMinutes?: number
+    snoozeEnabled?: boolean
+    soundName?: string
+  }) => Promise<{ id: string | null }>
+  /**
+   * HV only — AlarmKit `.fixed` without cancelAll.
+   * Classic createAlarm path stays make-before-break (e1a8801).
+   */
+  createFixedAlarm?: (opts: {
+    fireAtMs: number
+    label?: string
+    snoozeMinutes?: number
+    snoozeEnabled?: boolean
+    soundName?: string
+  }) => Promise<{ id: string | null }>
+  cancelAlarm: (opts: { id: string }) => Promise<void>
+  cancelAll: (opts?: { keepId?: string }) => Promise<{ remaining: number }>
+  getAlarms: () => Promise<{ alarms: RankedAlarmRow[] }>
+  getBattery: () => Promise<RankedAlarmBattery>
+  verifyAlarm: (opts: { id: string }) => Promise<{ present: boolean }>
+  openAppSettings: () => Promise<void>
+  getDiagnostics: () => Promise<RankedAlarmDiagnostics>
+  scheduleTestInOneMinute: () => Promise<{ id: string; secondsFromNow: number }>
+  /** After AlarmKit Arrêter (stopIntent) — one-shot pending morning modal. */
+  consumePendingMorningPrompt: () => Promise<{
+    pending: boolean
+    alarmID?: string
+    at?: number
+  }>
+  addListener?: (
+    eventName: 'alarmUpdates',
+    listener: (data: { count: number; ids: string[] }) => void,
+  ) => Promise<{ remove: () => void }>
+}
+
+const RankedAlarmWeb: RankedAlarmNative = {
+  async isAvailable() {
+    return { available: false, native: false }
+  },
+  async checkPermissions() {
+    return { alarms: 'denied' }
+  },
+  async requestPermissions() {
+    return { alarms: 'denied' }
+  },
+  async createAlarm() {
+    throw new Error('RankedAlarm web stub — native plugin missing')
+  },
+  async createFixedAlarm() {
+    throw new Error('RankedAlarm web stub — native plugin missing')
+  },
+  async cancelAlarm() {},
+  async cancelAll() {
+    return { remaining: 0 }
+  },
+  async getAlarms() {
+    return { alarms: [] }
+  },
+  async getBattery() {
+    return { level: null, charging: false, unknown: true }
+  },
+  async verifyAlarm() {
+    return { present: false }
+  },
+  async openAppSettings() {},
+  async getDiagnostics() {
+    return {
+      native: false,
+      iosVersion: 'web',
+      alarmKitAvailable: false,
+      authorization: 'unavailable',
+      alarmCount: 0,
+      lastError: 'web stub',
+      hasUsageDescription: false,
+    }
+  },
+  async scheduleTestInOneMinute() {
+    throw new Error('RankedAlarm web stub — native plugin missing')
+  },
+  async consumePendingMorningPrompt() {
+    return { pending: false }
+  },
+}
+
+/** Must match RankedAlarmPlugin.jsName */
+export const RANKED_ALARM_JS_NAME = 'RankedAlarm'
+
+export const RankedAlarm = registerPlugin<RankedAlarmNative>(RANKED_ALARM_JS_NAME, {
+  web: () => RankedAlarmWeb,
+})
+
+export function isRankedAlarmPluginAvailable(): boolean {
+  return Capacitor.isPluginAvailable(RANKED_ALARM_JS_NAME)
+}
+
+export function isNativeIosShell(): boolean {
+  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
+}

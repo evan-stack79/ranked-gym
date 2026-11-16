@@ -319,7 +319,7 @@ export function BottleFlowV3({
   const label =
     title ??
     (kind === 'plastic_15'
-      ? 'Cristaline 1,5 L'
+      ? 'Bouteille 1,5 L'
       : kind === 'small_50'
         ? 'Petite bouteille 50 cl'
         : kind === 'glass_25'
@@ -492,7 +492,7 @@ export function BottleFlowV3({
               <>
                 <p className="text-[15px] font-medium text-[#ACB4BA]" data-hydration-release-hint>
                   {dragging
-                    ? 'Règle le niveau…'
+                    ? 'Glisse le niveau'
                     : drunkMl > 0
                       ? 'Confirme pour ajouter'
                       : 'Glisse vers le bas'}
@@ -514,7 +514,7 @@ export function BottleFlowV3({
               className="ios-press text-[13px] font-medium text-[#8E8E93] underline-offset-2 hover:underline"
               data-hydration-reset-level
             >
-              Bouteille remplie · Régler le niveau
+              Bouteille pleine
             </button>
             <button
               type="button"
@@ -538,7 +538,7 @@ export function BottleFlowV3({
           <button
             type="button"
             className="min-h-0 flex-1 cursor-default"
-            aria-label="Fermer l’historique"
+            aria-label="Fermer"
             onClick={() => setHistoryOpen(false)}
           />
           <div className="max-h-[58%] overflow-y-auto rounded-t-[28px] border-t border-white/10 bg-[#1D1F20] px-5 pb-6 pt-3">

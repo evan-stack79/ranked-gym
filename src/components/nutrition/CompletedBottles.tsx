@@ -12,7 +12,7 @@ interface CompletedBottlesProps {
 function completedAriaLabel(count: number): string {
   if (count <= 0) return ''
   if (count === 1) return '1 bouteille de 1,5 litre terminée'
-  return `${count} bouteilles de 1,5 litre terminées`
+  return `${count} bouteilles de 1,5 L finies`
 }
 
 /**

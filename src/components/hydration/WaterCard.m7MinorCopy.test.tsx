@@ -10,7 +10,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRoot, type Root } from 'react-dom/client'
 import { act } from 'react'
 import {
-  LABEL_REPERE_JOUR,
   MSG_HIGH_INFO,
   MSG_MINOR_PERMANENT,
   MSG_NEUTRAL_OK,
@@ -120,7 +119,7 @@ describe('M7 complément — WaterCard mineur / âge inconnu / adulte', () => {
     const text = host.textContent ?? ''
     expect(host.querySelector('[data-hydration-minor="1"]')).toBeTruthy()
     expect(host.querySelector('[data-hydration-repere]')).toBeTruthy()
-    expect(text).toContain(LABEL_REPERE_JOUR)
+    expect(text).toContain('Repère :')
     expect(text).toContain(MSG_MINOR_PERMANENT)
     expect(text).toContain(MSG_REPERE_LOCKED)
     expect(host.querySelector('[data-hydration-minor-permanent]')?.textContent).toBe(
@@ -136,7 +135,7 @@ describe('M7 complément — WaterCard mineur / âge inconnu / adulte', () => {
     await renderCard(root, host)
     const text = host.textContent ?? ''
     expect(host.querySelector('[data-hydration-minor="1"]')).toBeTruthy()
-    expect(text).toContain(LABEL_REPERE_JOUR)
+    expect(text).toContain('Repère :')
     expect(text).toContain(MSG_MINOR_PERMANENT)
     expect(host.querySelector('[data-hydration-high-info]')).toBeNull()
     assertNoObjectifWording(text)
@@ -151,7 +150,7 @@ describe('M7 complément — WaterCard mineur / âge inconnu / adulte', () => {
     expect(text).toContain(MSG_PERMANENT)
     expect(host.querySelector('[data-hydration-high-info]')?.textContent).toBe(MSG_HIGH_INFO)
     expect(text).not.toContain(MSG_MINOR_PERMANENT)
-    expect(text).not.toContain(LABEL_REPERE_JOUR)
+    expect(text).not.toContain('Repère :')
     expect(host.querySelector('[data-hydration-settings]')).toBeTruthy()
   })
 })

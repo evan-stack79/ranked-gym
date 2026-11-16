@@ -275,7 +275,7 @@ export function SeriesJourTile({
             </span>
           </div>
           <p className="mt-1 text-[11px] text-[#ACB4BA]">
-            {model.showRing ? 'Aujourd’hui' : 'Sans séance planifiée'}
+            {model.showRing ? 'Aujourd’hui' : 'Rien de prévu'}
           </p>
         </div>
         {model.showRing ? (
@@ -334,7 +334,7 @@ export function ProchaineSeanceTile({
             data-accueil-next-start
             data-accueil-next-cta={model.inProgress ? 'reprendre' : 'demarrer'}
           >
-            {model.inProgress ? 'Reprendre' : 'Démarrer'}
+            {model.inProgress ? 'Reprendre' : 'Lancer'}
           </button>
         ) : (
           <button
@@ -347,7 +347,7 @@ export function ProchaineSeanceTile({
             className="accueil-metric-tile__cta accueil-metric-tile__cta--ghost ios-press disabled:opacity-60"
             data-accueil-next-open
           >
-            Ouvrir Train
+            Voir mes séances
           </button>
         )}
       </div>

@@ -109,7 +109,7 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
       setShapeBlob(png)
       setStep('result')
     } catch {
-      setMessage('Recadrage impossible. Passe en mode 2 L.')
+      setMessage('Découpe ratée. Prends la bouteille 2 L.')
       setStep('fallback')
     } finally {
       setBusy(false)
@@ -129,7 +129,7 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
     }
     const vol = Math.round(volumeMl)
     if (vol < CONTAINER_MIN_ML || vol > CONTAINER_MAX_ML) {
-      setMessage(`Volume entre ${CONTAINER_MIN_ML} et ${CONTAINER_MAX_ML} ml.`)
+      setMessage(`Entre ${CONTAINER_MIN_ML} et ${CONTAINER_MAX_ML} ml.`)
       return
     }
     setBusy(true)
@@ -149,7 +149,7 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
         setMessage('Ma bouteille nécessite Pass Pro.')
         setStep('fallback')
       } else {
-        setMessage('Enregistrement impossible. Réessaie ou mode 2 L.')
+        setMessage('Pas enregistré. Réessaie.')
       }
     } finally {
       setBusy(false)
@@ -170,7 +170,7 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
           <div className="relative mx-auto aspect-[3/4] w-full max-w-[260px] rounded-2xl border border-dashed border-white/30 bg-black/40">
             <div className="absolute inset-6 rounded-xl border border-dashed border-[#5AC8FA]/50" />
             <p className="absolute inset-x-4 bottom-4 text-center text-[13px] text-[#C7C7CC]">
-              Fond uni · bouteille droite, entière · sans visage
+              Bouteille entière, debout, sans visage
             </p>
           </div>
           <p className="text-[12px] leading-snug text-[#8E8E93]">{CUTOUT_WIFI_HINT}</p>
@@ -192,7 +192,7 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
             className="ios-press min-h-11 w-full rounded-2xl bg-[#FF0702] text-[15px] font-semibold text-white disabled:opacity-50"
             data-hydration-capture-shutter
           >
-            {busy ? 'Traitement…' : 'Prendre la photo'}
+            {busy ? 'Un instant…' : 'Prendre la photo'}
           </button>
           <button
             type="button"
@@ -206,9 +206,16 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
 
       {step === 'crop' && previewUrl && faceCleared ? (
         <div className="space-y-3">
-          <p className="text-[14px] text-[#C7C7CC]">Recadre ta bouteille à la main</p>
+          <p className="text-[14px] text-[#C7C7CC]">Découpe ta bouteille avec ton doigt</p>
           {message ? <p className="text-[12px] text-[#C7C7CC]">{message}</p> : null}
-          <img src={previewUrl} alt="" className="mx-auto max-h-64 rounded-xl object-contain" />
+          <img
+            src={previewUrl}
+            alt=""
+            draggable={false}
+            className="hydration-no-callout mx-auto max-h-64 rounded-xl object-contain select-none"
+            style={{ WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
+            onContextMenu={(e) => e.preventDefault()}
+          />
           <div className="grid grid-cols-2 gap-2 text-[12px] text-[#ACB4BA]">
             {(['x', 'y', 'width', 'height'] as const).map((key) => (
               <label key={key} className="flex flex-col gap-1">
@@ -228,7 +235,7 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
             onClick={() => void applyManualCrop()}
             className="ios-press min-h-11 w-full rounded-2xl bg-[#FF0702] text-[15px] font-semibold text-white"
           >
-            Appliquer le recadrage
+            OK, c'est découpé
           </button>
           <button
             type="button"
@@ -242,11 +249,14 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
 
       {step === 'result' && shapeBlob && faceCleared ? (
         <div className="space-y-3">
-          <p className="text-[14px] text-[#C7C7CC]">Aperçu découpé</p>
+          <p className="text-[14px] text-[#C7C7CC]">Ta bouteille</p>
           <img
             src={URL.createObjectURL(shapeBlob)}
             alt=""
-            className="mx-auto max-h-64 object-contain"
+            draggable={false}
+            className="hydration-no-callout mx-auto max-h-64 object-contain select-none"
+            style={{ WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
+            onContextMenu={(e) => e.preventDefault()}
           />
           <div className="flex gap-2">
             <button
@@ -272,7 +282,7 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
               onClick={() => setStep('crop')}
               className="ios-press min-h-11 flex-1 rounded-2xl border border-white/15 text-[14px] text-white"
             >
-              Recadrer
+              Découper
             </button>
           </div>
         </div>
@@ -280,7 +290,7 @@ export function BottleCaptureFlow({ onDone, onFallback2L, onCancel }: BottleCapt
 
       {step === 'volume' && faceCleared ? (
         <div className="space-y-3">
-          <p className="text-[14px] font-semibold text-white">Volume de ta bouteille</p>
+          <p className="text-[14px] font-semibold text-white">Combien elle contient ?</p>
           <div className="flex flex-wrap gap-2">
             {MY_BOTTLE_PRESET_ML.map((ml) => (
               <button

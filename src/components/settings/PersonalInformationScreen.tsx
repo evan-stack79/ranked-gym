@@ -96,7 +96,7 @@ export function PersonalInformationScreen({
       void refreshProfile()
     } catch (err) {
       setAvatarPreview(null)
-      setAvatarError(err instanceof Error ? err.message : 'Upload impossible.')
+      setAvatarError(err instanceof Error ? err.message : 'Photo pas envoyée. Réessaie.')
     } finally {
       setAvatarUploading(false)
       URL.revokeObjectURL(localPreview)
@@ -130,7 +130,7 @@ export function PersonalInformationScreen({
     setWeightKg(null)
     setHeightCm(null)
     setBodyNoted(false)
-    setMessage('Mensurations effacées.')
+    setMessage('Taille et poids effacés.')
     window.setTimeout(() => setMessage(null), 2000)
   }
 
@@ -148,7 +148,7 @@ export function PersonalInformationScreen({
 
     const trimmed = pseudo.trim()
     if (trimmed.length < 2) {
-      setError('Le pseudo doit contenir au moins 2 caractères.')
+      setError('Ton pseudo : 2 lettres minimum.')
       return
     }
 
@@ -170,11 +170,11 @@ export function PersonalInformationScreen({
         setTrainingSports(sportIds)
       }
 
-      setMessage('Modifications enregistrées.')
+      setMessage('C\'est enregistré.')
       void refreshProfile()
       window.setTimeout(() => setMessage(null), 2500)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sauvegarde impossible.')
+      setError(err instanceof Error ? err.message : 'Pas enregistré. Réessaie.')
     } finally {
       setSaving(false)
     }
@@ -183,8 +183,8 @@ export function PersonalInformationScreen({
   return (
     <div className="flex flex-col gap-6 ios-fade-up pb-4">
       <ProfileSubScreenHeader
-        title="Informations personnelles"
-        subtitle="Compte, photo & biométrie"
+        title="Mon profil"
+        subtitle="Compte, photo, taille et poids"
         onBack={onBack}
       />
 
@@ -247,7 +247,7 @@ export function PersonalInformationScreen({
           <p className="text-[12px] font-semibold text-[#ACB4BA]">Adresse email</p>
           <p className="mt-1 break-all text-[15px] text-[#EBEBF5]">{email || '—'}</p>
           <p className="mt-1 text-[11px] text-[#717C83]">
-            L’email est lié à ton compte. Contacte le support pour le modifier.
+            Pour changer d'e-mail, écris au support.
           </p>
         </div>
 
@@ -275,7 +275,7 @@ export function PersonalInformationScreen({
         >
           <p className="text-[12px] font-semibold text-[#ACB4BA]">Sports</p>
           <p className="mt-1 text-[12px] text-[#717C83]">
-            Modifiable à tout moment — alimente les recommandations Training.
+            Tu peux changer. Ça règle tes séances proposées.
           </p>
           <div className="mt-3 max-h-72">
             <SportsMultiSelect selectedIds={sportIds} onChange={setSportIds} idPrefix="profile-sport" />
@@ -306,7 +306,7 @@ export function PersonalInformationScreen({
             Enregistrement…
           </>
         ) : (
-          'Sauvegarder les modifications'
+          'Enregistrer'
         )}
       </button>
 

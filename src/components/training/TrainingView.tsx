@@ -99,8 +99,9 @@ import {
 } from '../../utils/sessionBackNav'
 import { deriveSessionDisplayTitle } from '../../utils/sessionDisplayTitle'
 import { BlurInText, Reveal } from '../motion'
+import { CreneauFlow } from './creneau/CreneauFlow'
 
-type TrainPanel = 'hub' | 'notebook' | 'endurance' | 'agenda' | 'history' | 'steps'
+type TrainPanel = 'hub' | 'notebook' | 'endurance' | 'agenda' | 'history' | 'steps' | 'creneau'
 
 export function TrainingView({
   launchRoutineId = null,
@@ -692,7 +693,7 @@ export function TrainingView({
     setNotebookLaunchId(null)
   }
 
-  const panelTitle: Record<Exclude<TrainPanel, 'hub'>, string> = {
+  const panelTitle: Record<Exclude<TrainPanel, 'hub' | 'creneau'>, string> = {
     notebook: 'Carnet',
     endurance: 'Course / Endurance',
     agenda: 'Programmes',
@@ -725,7 +726,7 @@ export function TrainingView({
             </button>
           </div>
         </header>
-      ) : immersiveLiveSession ? null : (
+      ) : immersiveLiveSession || panel === 'creneau' ? null : (
         <header className="flex items-center gap-2 ios-fade-up">
           <button
             type="button"
@@ -747,8 +748,23 @@ export function TrainingView({
         </div>
       ) : null}
 
+      {panel === 'creneau' ? <CreneauFlow onBack={goHub} /> : null}
+
       {panel === 'hub' ? (
         <div className="flex flex-col gap-4" data-training-hub>
+          <button
+            type="button"
+            onClick={() => setPanel('creneau')}
+            className="ios-press flex items-center justify-between rounded-3xl border border-[#FF0702]/35 bg-[#FF0702]/10 px-4 py-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/35"
+            data-creneau-entry
+          >
+            <span>
+              <span className="block text-[17px] font-bold text-white">Mon créneau</span>
+              <span className="text-[13px] text-[#ACB4BA]">Salle ou marche — peu de monde, en sécurité</span>
+            </span>
+            <span className="text-[13px] font-semibold text-[#FF0702]">Ouvrir</span>
+          </button>
+
           <TrainWeekStrip days={weekStrip} />
 
           {heroRec ? (

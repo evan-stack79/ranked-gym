@@ -19,6 +19,8 @@ interface IosSheetProps {
   scrollLocked?: boolean
   /** Leading icon or node in header */
   leading?: ReactNode
+  /** Optional tap handler on the title (e.g. 5-tap diagnostics). */
+  onTitleClick?: () => void
   /**
    * When true (default if footer is set), panel height follows visualViewport
    * so the sticky footer stays above the iOS keyboard.
@@ -40,6 +42,7 @@ export function IosSheet({
   dismissible = true,
   scrollLocked = false,
   leading,
+  onTitleClick,
   adaptToKeyboard,
 }: IosSheetProps) {
   const titleId = useId()
@@ -141,9 +144,20 @@ export function IosSheet({
           <div className="min-w-0 flex items-start gap-2.5">
             {leading}
             <div className="min-w-0">
-              <h2 id={titleId} className="text-[17px] font-semibold tracking-tight text-white">
-                {title}
-              </h2>
+              {onTitleClick ? (
+                <button
+                  type="button"
+                  id={titleId}
+                  onClick={onTitleClick}
+                  className="text-left text-[17px] font-semibold tracking-tight text-white"
+                >
+                  {title}
+                </button>
+              ) : (
+                <h2 id={titleId} className="text-[17px] font-semibold tracking-tight text-white">
+                  {title}
+                </h2>
+              )}
               {subtitle && <p className="mt-0.5 text-[13px] text-[#ACB4BA]">{subtitle}</p>}
             </div>
           </div>

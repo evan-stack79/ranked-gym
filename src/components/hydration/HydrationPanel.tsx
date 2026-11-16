@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { localDayKey } from '../../shared/hydration'
+import { hydrationDayKeyForHv } from '../../services/horairesVariables/waterDay'
+import { HV_WATER_DAY_PHRASE } from '../../horaires-variables/constants'
+import { isHvModeActive } from '../../services/horairesVariables/storage'
 import {
   addHydrationEntry,
+  fallbackHydrationHistory,
   fetchHydrationToday,
   flushHydrationPendingQueue,
   HYDRATION_CHANGED_EVENT,
@@ -25,6 +29,11 @@ import {
   capacityForMode,
   kindForMode,
 } from '../../utils/hydrationModeDisplay'
+import {
+  HydrationConseilCard,
+  HydrationRepereStrip,
+} from './HydrationConseilCard'
+import type { HydrationDay, HydrationSex } from '../../hydration-week-engine'
 
 interface HydrationPanelProps {
   onOpenSettings?: () => void
@@ -61,6 +70,7 @@ function ChangeBottleIcon() {
 export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPanelProps) {
   const { user } = useAuth()
   const [today, setToday] = useState<HydrationToday | null>(null)
+  const [weekHistory, setWeekHistory] = useState<Array<{ dayKey: string; drunkMl: number }>>([])
   const [shapeUrl, setShapeUrl] = useState<string | null>(null)
   const [flowOpen, setFlowOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -73,14 +83,20 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
   }, [userId])
 
   const refresh = useCallback(async () => {
-    const data = await fetchHydrationToday(localDayKey())
+    const dayKey = isHvModeActive() ? hydrationDayKeyForHv() : localDayKey()
+    const data = await fetchHydrationToday(dayKey)
     setToday(data)
+    try {
+      setWeekHistory(fallbackHydrationHistory(data.dayKey, userId))
+    } catch {
+      setWeekHistory([])
+    }
     if (data.effectiveVisualMode === 'my_bottle' && data.myBottleHasShape) {
       setShapeUrl(await loadBottleShapeUrl())
     } else {
       setShapeUrl(null)
     }
-  }, [])
+  }, [userId])
 
   useEffect(() => {
     void refresh()
@@ -165,9 +181,29 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
   }
 
   const goalMl = today.goalMl
-  const drunkL = (today.drunkMl / 1000).toFixed(2).replace('.', ',')
-  const goalL = (goalMl / 1000).toFixed(goalMl % 1000 === 0 ? 0 : 2).replace('.', ',')
+  const drunkL = (today.drunkMl / 1000).toFixed(1).replace('.', ',')
   const progress = goalMl > 0 ? Math.min(1, today.drunkMl / goalMl) : 0
+  const profile = getCalorieProfile()
+  const age = profile.age
+  const sex: HydrationSex = profile.sex === 'female' ? 'female' : 'male'
+  // Build 7-day window from local history. Two synthetic entries per day with volume
+  // so the tip engine treats the day as « saisi » (≥2 entries) without inventing timestamps.
+  const historyRows =
+    weekHistory.length > 0
+      ? weekHistory
+      : [{ dayKey: today.dayKey, drunkMl: today.drunkMl }]
+  const conseilDays: HydrationDay[] = historyRows.map((row, i) => {
+    const vol = Math.max(0, row.drunkMl) / 1000
+    const entries =
+      vol > 0
+        ? [
+            { hour: 10, volumeL: vol / 2, kind: 'eau' },
+            { hour: 16, volumeL: vol / 2, kind: 'eau' },
+          ]
+        : []
+    return { dayIndex: i, entries }
+  })
+  const goalReached = today.drunkMl >= goalMl && goalMl > 0
 
   return (
     <>
@@ -179,6 +215,15 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
         data-testid="nutrition-eau-card"
         aria-label="Eau"
       >
+        <div className="mb-1 flex items-center justify-between">
+          <p className="text-[14px] font-semibold text-white">Eau</p>
+          <p className="text-[12px] text-[#ACB4BA]">Aujourd’hui</p>
+        </div>
+        {isHvModeActive() ? (
+          <p className="mb-2 text-[12px] leading-snug text-[#ACB4BA]" data-hv-water-day>
+            {HV_WATER_DAY_PHRASE}
+          </p>
+        ) : null}
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -186,7 +231,7 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
             className="ios-press flex min-w-0 flex-1 items-center gap-3 text-left"
             data-hydration-eau-card
           >
-            <div className="flex h-[72px] w-12 shrink-0 items-end justify-center">
+            <div className="flex h-[88px] w-14 shrink-0 items-end justify-center">
               <LiveBottleVisual
                 kind={kind}
                 remainingMl={memorized.remaining}
@@ -196,15 +241,11 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
               />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[14px] font-semibold text-white">
-                {myBottleMode ? 'Ma bouteille' : 'Eau'}
+              <p className="text-[12px] text-[#ACB4BA]">Eau bue</p>
+              <p className="mt-0.5 text-[28px] font-bold tabular-nums leading-none text-white" data-hydration-drunk>
+                {drunkL}&nbsp;L
               </p>
-              <p className="mt-0.5 text-[15px] font-semibold tabular-nums text-white" data-hydration-drunk>
-                {drunkL}&nbsp;/&nbsp;{goalL}&nbsp;L
-              </p>
-              <p className="mt-0.5 truncate text-[13px] text-[#ACB4BA]" data-hydration-bottle-label>
-                {bottleLabel}
-              </p>
+              <HydrationRepereStrip age={age} sex={sex} drunkMl={today.drunkMl} />
             </div>
           </button>
 
@@ -221,6 +262,23 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
           ) : null}
         </div>
 
+        {!goalReached ? (
+          <button
+            type="button"
+            onClick={() => setFlowOpen(true)}
+            disabled={busy}
+            className="ios-press mt-3 w-full rounded-2xl py-3 text-center text-[16px] font-semibold text-white disabled:opacity-50"
+            style={{ backgroundColor: '#ff0702' }}
+            data-hydration-ajouter
+          >
+            Ajouter
+          </button>
+        ) : (
+          <p className="mt-3 text-center text-[14px] font-medium text-white" data-hydration-objectif>
+            Objectif atteint !
+          </p>
+        )}
+        <p className="mt-2 text-center text-[12px] text-[#ACB4BA]">Un repère, pas un défi.</p>
         <div className="mt-2.5 h-[3px] overflow-hidden rounded-full bg-[#2A2A2E]">
           <div
             className="h-full rounded-full bg-[#FF0702]"
@@ -228,6 +286,8 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
           />
         </div>
       </section>
+
+      <HydrationConseilCard age={age} sex={sex} days={conseilDays} />
 
       <BottleFlowV3
         open={flowOpen}

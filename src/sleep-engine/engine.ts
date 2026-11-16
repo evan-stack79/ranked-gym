@@ -37,7 +37,8 @@ export function runSleepEngine(input: SleepInput): SleepEngineResult {
     derivedTibHours,
   }
 
-  const { recommendations, warnings } = buildSleepRecommendations(metrics)
+  const age = Number.isFinite(input.age) ? input.age : undefined
+  const { recommendations, warnings } = buildSleepRecommendations(metrics, age)
 
   return {
     ok: true,

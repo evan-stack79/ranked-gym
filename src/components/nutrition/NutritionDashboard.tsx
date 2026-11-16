@@ -268,7 +268,7 @@ export function NutritionDashboard({
           if (controller.signal.aborted) return
           if (err instanceof DOMException && err.name === 'AbortError') return
           setSearchHits([])
-          setSearchError(err instanceof Error ? err.message : 'Recherche impossible.')
+          setSearchError('Recherche ratée. Réessaie.')
         })
         .finally(() => {
           if (!controller.signal.aborted) setSearchLoading(false)
@@ -366,7 +366,7 @@ export function NutritionDashboard({
         .then((access) => {
           if (!access.ok) {
             setServerFoodAddDenied(true)
-            showToast('Ajout d’aliment indisponible pour ce compte.', 'error')
+            showToast('Connecte-toi pour ajouter un repas.', 'error')
             return
           }
           setServerFoodAddDenied(false)
@@ -385,7 +385,7 @@ export function NutritionDashboard({
     items: FoodAddV3Selection[] | OpenFoodFactsSearchHit[],
   ) => {
     if (!foodAddAllowed) {
-      showToast('Ajout d’aliment indisponible pour ce compte.', 'error')
+      showToast('Connecte-toi pour ajouter un repas.', 'error')
       return
     }
     const type = pendingMealType ?? mealType
@@ -475,7 +475,7 @@ export function NutritionDashboard({
             else {
               const access = mapAccessError(error)
               if (access) showToast(access.message, 'error')
-              else showToast("L'ajout n'a pas fonctionné. Réessaie.", 'error')
+              else showToast('Pas ajouté. Réessaie.', 'error')
             }
             continue
           }
@@ -497,7 +497,7 @@ export function NutritionDashboard({
       resetForm()
       setJournalDetailOpen(true)
       if (added > 0) {
-        showToast(added === 1 ? 'Aliment ajouté.' : `${added} aliments ajoutés.`)
+        showToast(added === 1 ? 'Ajouté !' : `${added} ajoutés !`)
       }
     })()
   }
@@ -561,7 +561,7 @@ export function NutritionDashboard({
     pieces?: number
   }) => {
     if (!foodAddAllowed) {
-      showToast('Ajout d’aliment indisponible pour ce compte.', 'error')
+      showToast('Connecte-toi pour ajouter un repas.', 'error')
       return
     }
     try {
@@ -592,14 +592,14 @@ export function NutritionDashboard({
         },
       )
     } catch {
-      showToast("L'ajout n'a pas fonctionné. Réessaie.", 'error')
+      showToast('Pas ajouté. Réessaie.', 'error')
     }
   }
 
   const handleAdd = (event: FormEvent) => {
     event.preventDefault()
     if (!foodAddAllowed) {
-      showToast('Ajout d’aliment indisponible pour ce compte.', 'error')
+      showToast('Connecte-toi pour ajouter un repas.', 'error')
       return
     }
     const trimmed = name.trim()
@@ -650,7 +650,7 @@ export function NutritionDashboard({
 
   const handleEditSave = (mealId: string, patch: Partial<MealEntry>) => {
     if (!foodAddAllowed) {
-      showToast('Modification indisponible pour ce compte.', 'error')
+      showToast('Connecte-toi pour changer ça.', 'error')
       return
     }
     // Strict V3 seulement si la ligne est déjà marquée (jamais ?? 'v3').
@@ -712,8 +712,8 @@ export function NutritionDashboard({
   if (!hydrated) {
     return (
       <div className="flex flex-col gap-4 pt-2">
-        <SectionSkeleton tall label="Nutrition" />
-        <SectionSkeleton label="Hydratation" />
+        <SectionSkeleton tall label="Repas" />
+        <SectionSkeleton label="Eau" />
         <SectionSkeleton label="Repas" />
       </div>
     )
@@ -728,13 +728,13 @@ export function NutritionDashboard({
       <div className="flex flex-col gap-4 px-5 pt-1">
         <header className="flex items-center justify-between gap-3">
           <h1 className="text-[32px] font-bold tracking-tight text-white">
-            <BlurInText as="span">Nutrition</BlurInText>
+            <BlurInText as="span">Repas</BlurInText>
           </h1>
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
             className="ios-press flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] text-white"
-            aria-label="Menu nutrition"
+            aria-label="Menu repas"
           >
             <Ellipsis className="h-5 w-5" strokeWidth={2.25} />
           </button>
@@ -851,10 +851,10 @@ export function NutritionDashboard({
 
         <div ref={journalRef} className="scroll-mt-4">
           {showMealJournal && journalDetailOpen ? (
-            <section className="space-y-3" aria-label="Détail du journal">
+            <section className="space-y-3" aria-label="Détail">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-[17px] font-semibold text-white">
-                  <BlurInText as="span">Aliments du jour</BlurInText>
+                  <BlurInText as="span">Mes repas</BlurInText>
                 </h2>
                 <button
                   type="button"
@@ -867,8 +867,8 @@ export function NutritionDashboard({
               {meals.length === 0 ? (
                 <p className="rounded-2xl border border-white/[0.08] bg-[#141416]/80 px-4 py-6 text-center text-[13px] text-[#ACB4BA]">
                   {foodAddV3
-                    ? 'Aucun aliment pour l’instant — utilise Recherche.'
-                    : "Aucun aliment pour l'instant — utilise Scanner, Scan IA ou Recherche."}
+                    ? 'Rien mangé de noté. Cherche un aliment.'
+                    : 'Rien de noté. Code-barres, photo ou recherche.'}
                 </p>
               ) : (
                 <ul className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#141416]/92">
@@ -1020,7 +1020,7 @@ export function NutritionDashboard({
               void setPersonalFoodFavorite(hit.foodKey!, next)
                 .then((applied) => {
                   if (!applied) {
-                    showToast('Impossible de mettre à jour le favori.', 'error')
+                    showToast('Favori pas changé. Réessaie.', 'error')
                     return
                   }
                   setSearchHits((prev) =>
@@ -1031,7 +1031,7 @@ export function NutritionDashboard({
                   showToast(next ? 'Ajouté aux favoris.' : 'Retiré des favoris.')
                 })
                 .catch(() => {
-                  showToast('Impossible de mettre à jour le favori.', 'error')
+                  showToast('Favori pas changé. Réessaie.', 'error')
                 })
             })
           }}
@@ -1126,8 +1126,8 @@ export function NutritionDashboard({
       <IosSheet
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
-        title="Nutrition"
-        subtitle="Réglages et outils"
+        title="Repas"
+        subtitle="Réglages"
       >
         <div className="space-y-2 pb-4">
           <button
@@ -1139,7 +1139,7 @@ export function NutritionDashboard({
             className="ios-press flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3.5 text-left"
           >
             <RotateCcw className="h-4 w-4 text-[#ACB4BA]" />
-            <span className="text-[15px] font-medium text-white">Refaire le setup</span>
+            <span className="text-[15px] font-medium text-white">Tout régler à nouveau</span>
           </button>
           <button
             type="button"
@@ -1151,7 +1151,7 @@ export function NutritionDashboard({
           >
             <Ellipsis className="h-4 w-4 text-[#ACB4BA]" />
             <span className="text-[15px] font-medium text-white">
-              {advancedOpen ? 'Masquer plan & jauge' : 'Plan, rythme & jauge eau'}
+              {advancedOpen ? 'Cacher les calories' : 'Plan, rythme & jauge eau'}
             </span>
           </button>
           <button
@@ -1165,7 +1165,7 @@ export function NutritionDashboard({
             }}
             className="ios-press flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3.5 text-left"
           >
-            <span className="text-[15px] font-medium text-white">Ouvrir le journal détaillé</span>
+            <span className="text-[15px] font-medium text-white">Voir le détail</span>
           </button>
           <button
             type="button"

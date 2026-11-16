@@ -1,32 +1,37 @@
 import type { SleepMetrics } from './types.ts'
 
+type SleepAgeBand = 'teen' | 'adult' | 'senior'
+
 /**
  * Textes affichés à l’utilisateur — n’altèrent jamais les métriques calculées.
  * Langage courant uniquement (pas de jargon TST/TIB/σ dans l’UI).
  * Aucun diagnostic médical (apnée, insomnie, trouble circadien, etc.).
  */
-export function buildSleepRecommendations(metrics: SleepMetrics): {
+export function buildSleepRecommendations(
+  metrics: SleepMetrics,
+  age?: number,
+): {
   recommendations: string[]
   warnings: string[]
 } {
   const recommendations: string[] = []
   const warnings: string[] = []
+  const band = sleepAgeBand(age)
 
   switch (metrics.quantity.scientific_status) {
     case 'optimal':
-      recommendations.push(
-        'Tu as dormi entre 7 et 9 heures, la plage habituelle pour un adulte.',
-      )
+      recommendations.push(optimalNightLine(band))
       break
     case 'deficit':
       recommendations.push(
-        'Tu as dormi moins de 7 heures. Essaie de te coucher un peu plus tôt, en gardant des horaires stables.',
+        'Moins de 7 h au lit. Ce soir, au lit un peu plus tôt, à heure régulière.',
       )
       break
     case 'excess':
-      recommendations.push(
-        'Tu as dormi plus de 9 heures. Un sommeil très long tous les jours n’est pas idéal ; garde des horaires réguliers.',
-      )
+      // « Plus de 9 h » reste dans le repère ado (8–10 h) : ne pas l’afficher aux 13–18 ans.
+      if (band !== 'teen') {
+        recommendations.push('Plus de 9 h au lit. Garde la même heure de réveil.')
+      }
       break
   }
 
@@ -49,11 +54,9 @@ export function buildSleepRecommendations(metrics: SleepMetrics): {
     )
   }
 
-  // Signaux répétés de déficit marqué → orientation vers un professionnel (pas un diagnostic).
+  // Signaux répétés de déficit marqué — phrase courte à l’écran (fiche d’aide ailleurs).
   if (metrics.quantity.scientific_status === 'deficit' && metrics.quantity.tstHours < 5) {
-    warnings.push(
-      'Tu as dormi très peu. Si la fatigue, les ronflements, les pauses respiratoires ou une somnolence importante dans la journée persistent, parle-en à un professionnel de santé. Cette app ne pose aucun diagnostic.',
-    )
+    warnings.push('Nuit très courte.')
   }
 
   if (
@@ -61,10 +64,20 @@ export function buildSleepRecommendations(metrics: SleepMetrics): {
     metrics.catchUp.workdayAverageTstHours != null &&
     metrics.catchUp.workdayAverageTstHours < 5
   ) {
-    warnings.push(
-      'En moyenne, tu dors très peu les jours travaillés. Un avis médical peut être utile. Aucun diagnostic n’est établi ici.',
-    )
+    warnings.push('Tu dors très peu les jours de cours ou de travail.')
   }
 
   return { recommendations, warnings }
+}
+
+function sleepAgeBand(age?: number): SleepAgeBand {
+  if (age != null && Number.isFinite(age) && age >= 13 && age <= 18) return 'teen'
+  if (age != null && Number.isFinite(age) && age >= 65) return 'senior'
+  return 'adult'
+}
+
+function optimalNightLine(band: SleepAgeBand): string {
+  if (band === 'teen') return 'Nuit (au lit) dans le repère de ton âge : 8 à 10 h.'
+  if (band === 'senior') return 'Nuit (au lit) dans le repère de ton âge : 7 à 8 h.'
+  return 'Nuit (au lit) dans le repère de ton âge : 7 à 9 h.'
 }

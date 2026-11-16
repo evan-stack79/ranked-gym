@@ -1,0 +1,743 @@
+{
+  "api": {
+    "name": "AlarmPlugin",
+    "slug": "alarmplugin",
+    "docs": "",
+    "tags": [],
+    "methods": [
+      {
+        "name": "cancelAlarm",
+        "signature": "(options: CancelAlarmOptions) => Promise<void>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "",
+            "type": "CancelAlarmOptions"
+          }
+        ],
+        "returns": "Promise<void>",
+        "tags": [
+          {
+            "name": "since",
+            "text": "0.1.0"
+          }
+        ],
+        "docs": "Cancel an alarm that was created by the app.\n\nOnly available on iOS.",
+        "complexTypes": [
+          "CancelAlarmOptions"
+        ],
+        "slug": "cancelalarm"
+      },
+      {
+        "name": "checkPermissions",
+        "signature": "() => Promise<PermissionStatus>",
+        "parameters": [],
+        "returns": "Promise<PermissionStatus>",
+        "tags": [
+          {
+            "name": "since",
+            "text": "0.1.0"
+          }
+        ],
+        "docs": "Check permission to schedule alarms.\n\nOn Android, this method always returns `granted` since\nalarms are created via the system clock app.\n\nOnly available on Android and iOS.",
+        "complexTypes": [
+          "PermissionStatus"
+        ],
+        "slug": "checkpermissions"
+      },
+      {
+        "name": "createAlarm",
+        "signature": "(options: CreateAlarmOptions) => Promise<CreateAlarmResult>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "",
+            "type": "CreateAlarmOptions"
+          }
+        ],
+        "returns": "Promise<CreateAlarmResult>",
+        "tags": [
+          {
+            "name": "since",
+            "text": "0.1.0"
+          }
+        ],
+        "docs": "Create a new alarm.\n\nOn Android, the alarm is created in the system clock app.\nThe app has no access to the created alarm afterwards.\n\nOn iOS, the alarm is owned by the app and can be listed\nand canceled using the `getAlarms(...)` and `cancelAlarm(...)`\nmethods.\n\nOnly available on Android and iOS.",
+        "complexTypes": [
+          "CreateAlarmResult",
+          "CreateAlarmOptions"
+        ],
+        "slug": "createalarm"
+      },
+      {
+        "name": "createTimer",
+        "signature": "(options: CreateTimerOptions) => Promise<void>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "",
+            "type": "CreateTimerOptions"
+          }
+        ],
+        "returns": "Promise<void>",
+        "tags": [
+          {
+            "name": "since",
+            "text": "0.1.0"
+          }
+        ],
+        "docs": "Create a new countdown timer in the system clock app.\n\nOnly available on Android.",
+        "complexTypes": [
+          "CreateTimerOptions"
+        ],
+        "slug": "createtimer"
+      },
+      {
+        "name": "getAlarms",
+        "signature": "() => Promise<GetAlarmsResult>",
+        "parameters": [],
+        "returns": "Promise<GetAlarmsResult>",
+        "tags": [
+          {
+            "name": "since",
+            "text": "0.1.0"
+          }
+        ],
+        "docs": "Get all alarms that were created by the app.\n\nOnly available on iOS.",
+        "complexTypes": [
+          "GetAlarmsResult"
+        ],
+        "slug": "getalarms"
+      },
+      {
+        "name": "isAvailable",
+        "signature": "() => Promise<IsAvailableResult>",
+        "parameters": [],
+        "returns": "Promise<IsAvailableResult>",
+        "tags": [
+          {
+            "name": "since",
+            "text": "0.1.0"
+          }
+        ],
+        "docs": "Check if alarms are available on this device.\n\nOn Android, this checks whether an app that can handle\nalarms is installed. On iOS, this returns `true` if the\ndevice runs iOS 26 or later.\n\nOnly available on Android and iOS.",
+        "complexTypes": [
+          "IsAvailableResult"
+        ],
+        "slug": "isavailable"
+      },
+      {
+        "name": "openAlarms",
+        "signature": "() => Promise<void>",
+        "parameters": [],
+        "returns": "Promise<void>",
+        "tags": [
+          {
+            "name": "since",
+            "text": "0.1.0"
+          }
+        ],
+        "docs": "Open the list of alarms in the system clock app.\n\nOnly available on Android.",
+        "complexTypes": [],
+        "slug": "openalarms"
+      },
+      {
+        "name": "requestPermissions",
+        "signature": "() => Promise<PermissionStatus>",
+        "parameters": [],
+        "returns": "Promise<PermissionStatus>",
+        "tags": [
+          {
+            "name": "since",
+            "text": "0.1.0"
+          }
+        ],
+        "docs": "Request permission to schedule alarms.\n\nOn Android, this method always returns `granted` since\nalarms are created via the system clock app.\n\nOnly available on Android and iOS.",
+        "complexTypes": [
+          "PermissionStatus"
+        ],
+        "slug": "requestpermissions"
+      }
+    ],
+    "properties": []
+  },
+  "interfaces": [
+    {
+      "name": "CancelAlarmOptions",
+      "slug": "cancelalarmoptions",
+      "docs": "",
+      "tags": [
+        {
+          "text": "0.1.0",
+          "name": "since"
+        }
+      ],
+      "methods": [],
+      "properties": [
+        {
+          "name": "id",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "'2B1A3C4D-5E6F-7A8B-9C0D-1E2F3A4B5C6D'",
+              "name": "example"
+            }
+          ],
+          "docs": "The unique identifier of the alarm to cancel.",
+          "complexTypes": [],
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "PermissionStatus",
+      "slug": "permissionstatus",
+      "docs": "",
+      "tags": [
+        {
+          "text": "0.1.0",
+          "name": "since"
+        }
+      ],
+      "methods": [],
+      "properties": [
+        {
+          "name": "alarms",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": "Permission state of scheduling alarms.",
+          "complexTypes": [
+            "PermissionState"
+          ],
+          "type": "PermissionState"
+        }
+      ]
+    },
+    {
+      "name": "CreateAlarmResult",
+      "slug": "createalarmresult",
+      "docs": "",
+      "tags": [
+        {
+          "text": "0.1.0",
+          "name": "since"
+        }
+      ],
+      "methods": [],
+      "properties": [
+        {
+          "name": "id",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "'2B1A3C4D-5E6F-7A8B-9C0D-1E2F3A4B5C6D'",
+              "name": "example"
+            }
+          ],
+          "docs": "The unique identifier of the created alarm.\n\nOn Android, this is always `null` since the alarm is\ncreated in the system clock app.",
+          "complexTypes": [],
+          "type": "string | null"
+        }
+      ]
+    },
+    {
+      "name": "CreateAlarmOptions",
+      "slug": "createalarmoptions",
+      "docs": "",
+      "tags": [
+        {
+          "text": "0.1.0",
+          "name": "since"
+        }
+      ],
+      "methods": [],
+      "properties": [
+        {
+          "name": "android",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": "Android-specific options.\n\nOnly available on Android.",
+          "complexTypes": [
+            "CreateAlarmAndroidOptions"
+          ],
+          "type": "CreateAlarmAndroidOptions"
+        },
+        {
+          "name": "days",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "[Weekday.Monday, Weekday.Friday]",
+              "name": "example"
+            }
+          ],
+          "docs": "The days of the week on which the alarm repeats.\n\nIf not provided, the alarm fires once at the next\noccurrence of the given time.",
+          "complexTypes": [
+            "Weekday"
+          ],
+          "type": "Weekday[] | undefined"
+        },
+        {
+          "name": "hour",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "6",
+              "name": "example"
+            }
+          ],
+          "docs": "The hour of the alarm (0-23).",
+          "complexTypes": [],
+          "type": "number"
+        },
+        {
+          "name": "label",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "'Wake up'",
+              "name": "example"
+            }
+          ],
+          "docs": "The label of the alarm.",
+          "complexTypes": [],
+          "type": "string | undefined"
+        },
+        {
+          "name": "minute",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "30",
+              "name": "example"
+            }
+          ],
+          "docs": "The minute of the alarm (0-59).",
+          "complexTypes": [],
+          "type": "number"
+        }
+      ]
+    },
+    {
+      "name": "CreateAlarmAndroidOptions",
+      "slug": "createalarmandroidoptions",
+      "docs": "",
+      "tags": [
+        {
+          "text": "0.1.0",
+          "name": "since"
+        }
+      ],
+      "methods": [],
+      "properties": [
+        {
+          "name": "skipUi",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "false",
+              "name": "default"
+            }
+          ],
+          "docs": "Whether or not to create the alarm without showing\nthe user interface of the system clock app.\n\nOnly available on Android.",
+          "complexTypes": [],
+          "type": "boolean | undefined"
+        },
+        {
+          "name": "vibrate",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": "Whether or not the alarm should vibrate.\n\nIf not provided, the default behavior of the system\nclock app is used.\n\nOnly available on Android.",
+          "complexTypes": [],
+          "type": "boolean | undefined"
+        }
+      ]
+    },
+    {
+      "name": "CreateTimerOptions",
+      "slug": "createtimeroptions",
+      "docs": "",
+      "tags": [
+        {
+          "text": "0.1.0",
+          "name": "since"
+        }
+      ],
+      "methods": [],
+      "properties": [
+        {
+          "name": "android",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": "Android-specific options.\n\nOnly available on Android.",
+          "complexTypes": [
+            "CreateTimerAndroidOptions"
+          ],
+          "type": "CreateTimerAndroidOptions"
+        },
+        {
+          "name": "duration",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "300",
+              "name": "example"
+            }
+          ],
+          "docs": "The length of the timer in seconds (1-86400).",
+          "complexTypes": [],
+          "type": "number"
+        },
+        {
+          "name": "label",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "'Tea'",
+              "name": "example"
+            }
+          ],
+          "docs": "The label of the timer.",
+          "complexTypes": [],
+          "type": "string | undefined"
+        }
+      ]
+    },
+    {
+      "name": "CreateTimerAndroidOptions",
+      "slug": "createtimerandroidoptions",
+      "docs": "",
+      "tags": [
+        {
+          "text": "0.1.0",
+          "name": "since"
+        }
+      ],
+      "methods": [],
+      "properties": [
+        {
+          "name": "skipUi",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "false",
+              "name": "default"
+            }
+          ],
+          "docs": "Whether or not to create the timer without showing\nthe user interface of the system clock app.\n\nOnly available on Android.",
+          "complexTypes": [],
+          "type": "boolean | undefined"
+        }
+      ]
+    },
+    {
+      "name": "GetAlarmsResult",
+      "slug": "getalarmsresult",
+      "docs": "",
+      "tags": [
+        {
+          "text": "0.1.0",
+          "name": "since"
+        }
+      ],
+      "methods": [],
+      "properties": [
+        {
+          "name": "alarms",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": "The alarms that were created by the app.",
+          "complexTypes": [
+            "AlarmInfo"
+          ],
+          "type": "AlarmInfo[]"
+        }
+      ]
+    },
+    {
+      "name": "AlarmInfo",
+      "slug": "alarminfo",
+      "docs": "",
+      "tags": [
+        {
+          "text": "0.1.0",
+          "name": "since"
+        }
+      ],
+      "methods": [],
+      "properties": [
+        {
+          "name": "enabled",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "true",
+              "name": "example"
+            }
+          ],
+          "docs": "Whether or not the alarm is active.",
+          "complexTypes": [],
+          "type": "boolean | null"
+        },
+        {
+          "name": "hour",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "6",
+              "name": "example"
+            }
+          ],
+          "docs": "The hour of the alarm (0-23).",
+          "complexTypes": [],
+          "type": "number | null"
+        },
+        {
+          "name": "id",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "'2B1A3C4D-5E6F-7A8B-9C0D-1E2F3A4B5C6D'",
+              "name": "example"
+            }
+          ],
+          "docs": "The unique identifier of the alarm.",
+          "complexTypes": [],
+          "type": "string"
+        },
+        {
+          "name": "label",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "'Wake up'",
+              "name": "example"
+            }
+          ],
+          "docs": "The label of the alarm.",
+          "complexTypes": [],
+          "type": "string | null"
+        },
+        {
+          "name": "minute",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "30",
+              "name": "example"
+            }
+          ],
+          "docs": "The minute of the alarm (0-59).",
+          "complexTypes": [],
+          "type": "number | null"
+        }
+      ]
+    },
+    {
+      "name": "IsAvailableResult",
+      "slug": "isavailableresult",
+      "docs": "",
+      "tags": [
+        {
+          "text": "0.1.0",
+          "name": "since"
+        }
+      ],
+      "methods": [],
+      "properties": [
+        {
+          "name": "available",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "true",
+              "name": "example"
+            }
+          ],
+          "docs": "Whether or not alarms are available on this device.",
+          "complexTypes": [],
+          "type": "boolean"
+        }
+      ]
+    }
+  ],
+  "enums": [
+    {
+      "name": "Weekday",
+      "slug": "weekday",
+      "members": [
+        {
+          "name": "Friday",
+          "value": "'FRIDAY'",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": ""
+        },
+        {
+          "name": "Monday",
+          "value": "'MONDAY'",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": ""
+        },
+        {
+          "name": "Saturday",
+          "value": "'SATURDAY'",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": ""
+        },
+        {
+          "name": "Sunday",
+          "value": "'SUNDAY'",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": ""
+        },
+        {
+          "name": "Thursday",
+          "value": "'THURSDAY'",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": ""
+        },
+        {
+          "name": "Tuesday",
+          "value": "'TUESDAY'",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": ""
+        },
+        {
+          "name": "Wednesday",
+          "value": "'WEDNESDAY'",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": ""
+        }
+      ]
+    }
+  ],
+  "typeAliases": [
+    {
+      "name": "PermissionState",
+      "slug": "permissionstate",
+      "docs": "",
+      "types": [
+        {
+          "text": "'prompt'",
+          "complexTypes": []
+        },
+        {
+          "text": "'prompt-with-rationale'",
+          "complexTypes": []
+        },
+        {
+          "text": "'granted'",
+          "complexTypes": []
+        },
+        {
+          "text": "'denied'",
+          "complexTypes": []
+        }
+      ]
+    }
+  ],
+  "pluginConfigs": []
+}

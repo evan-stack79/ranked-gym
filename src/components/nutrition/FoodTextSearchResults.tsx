@@ -41,7 +41,7 @@ export function FoodTextSearchResults({
           <p className="text-[14px] font-medium text-[#ACB4BA]">
             Tape un aliment ou une marque
           </p>
-          <p className="text-[12px] text-[#717C83]">Résultats Open Food Facts (France)</p>
+          <p className="text-[12px] text-[#717C83]">Résultats</p>
         </div>
       ) : null}
 
@@ -52,7 +52,7 @@ export function FoodTextSearchResults({
           }`}
         >
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          Recherche Open Food Facts…
+          Je cherche…
         </div>
       ) : null}
 
@@ -67,8 +67,8 @@ export function FoodTextSearchResults({
           role="status"
         >
           {!online
-            ? 'Pas de connexion. Réessaie quand tu as du réseau.'
-            : 'Aucun produit trouvé.'}
+            ? 'Pas de réseau. Réessaie plus tard.'
+            : 'Rien trouvé. Essaie un autre mot.'}
         </p>
       ) : null}
 
@@ -78,7 +78,7 @@ export function FoodTextSearchResults({
             fill ? 'flex-1' : 'max-h-72'
           }`}
           role="listbox"
-          aria-label="Résultats Open Food Facts"
+          aria-label="Résultats"
         >
           {hits.map((hit) => (
             <li key={`${hit.barcode}-${hit.nom}`}>

@@ -11,7 +11,7 @@ import { MSG_GOAL_RANGE, MSG_MEDICAL_LIMIT, MSG_PERMANENT, MSG_PREGNANCY } from 
 
 describe('hydrationModeDisplay B v2', () => {
   it('libellés 1,5 L / 2 L cohérents (pas Cristaline sur 2 L)', () => {
-    expect(bottleScreenLabelForMode('classic_15')).toBe('Cristaline 1,5 L')
+    expect(bottleScreenLabelForMode('classic_15')).toBe('Bouteille 1,5 L')
     expect(bottleScreenLabelForMode('classic_2l')).toBe('Bouteille 2 L')
     expect(bottleScreenLabelForMode('classic_2l')).not.toMatch(/Cristaline/)
     expect(carouselTitleForMode('classic_15')).toBe('1,5 L')

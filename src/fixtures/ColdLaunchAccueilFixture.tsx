@@ -6,7 +6,6 @@ import {
   Reveal,
   SoftBlurIn,
   StaticKcalNumber,
-  TextFlip,
 } from '../components/motion'
 
 export function ColdLaunchAccueilFixture() {
@@ -62,7 +61,9 @@ export function ColdLaunchAccueilFixture() {
           <div className="flex flex-col gap-8">
             <header className="home-cold-enter__group home-cold-enter__group--0">
               <h1 className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white">
-                <TextFlip /><BlurInText as="span" instant={coldEntering} label=", Alex ?">{`, Alex ?`}</BlurInText>
+                <BlurInText as="span" instant={coldEntering} label="Salut Alex">
+                  Salut Alex
+                </BlurInText>
               </h1>
               <p className="mt-1.5 text-[15px] font-medium text-[#ACB4BA]">
                 <SoftBlurIn instant={coldEntering}>Séance de l’après-midi</SoftBlurIn>

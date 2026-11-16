@@ -90,7 +90,7 @@ export const MSG_NEUTRAL_OK = 'Bien joué'
  * M7 (EFSA 2010 / Vérificateur) — mineurs & âge inconnu.
  * 1500 mL reste le défaut non modifiable ; libellé « repère », jamais « objectif ».
  */
-export const LABEL_REPERE_JOUR = 'Repère du jour'
+export const LABEL_REPERE_JOUR = 'Repère'
 
 export const MSG_MINOR_PERMANENT =
   'Les aliments et autres boissons apportent aussi de l’eau.'
@@ -99,11 +99,11 @@ export const MSG_REPERE_LOCKED = 'Le repère n’est pas réglable ici.'
 
 /** Pause rappels mineurs — neutre, sans réussite / célébration. */
 export const MSG_REMINDER_PAUSE_NEUTRAL =
-  'Les rappels du jour sont en pause jusqu’à demain.'
+  "Plus de rappels aujourd'hui. À demain."
 
 /** Pause rappels adultes (libellé objectif inchangé). */
 export const MSG_REMINDER_PAUSE_GOAL =
-  'Objectif du jour atteint — les rappels restants sont en pause jusqu’à demain.'
+  "Objectif atteint. Plus de rappels aujourd'hui."
 
 /** Texte Pro upsell — sans rang / points (HY-13). */
 export const MSG_PRO_BOTTLE =

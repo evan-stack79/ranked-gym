@@ -17,6 +17,22 @@ const PRIVACY_PARAGRAPHS = [
   'Cette politique s’applique à la bêta privée Ranked Gym. Elle pourra être précisée avant une ouverture plus large.',
 ]
 
+/** Rubrique Juriste — mots du cadrage « Durées de conservation ». */
+export const PRIVACY_RETENTION_TITLE = 'Durées de conservation'
+
+export const PRIVACY_RETENTION_INTRO =
+  'Quand quelqu’un supprime son compte, on efface tout. On ne garde une donnée que s’il y a une vraie raison, et seulement le temps qu’il faut, avec le minimum d’informations. Archive à part, accès limité, sans profil ni données de santé.'
+
+export const PRIVACY_RETENTION_BULLETS = [
+  'Achats (identifiant de transaction du store, produit, dates, montant, store) : 5 ans après la fin de l’abonnement, puis effacer. Pour prouver une vente, répondre à une réclamation ou à un litige, et faire la compta. Remplacer l’identifiant utilisateur par un identifiant sans lien avec le compte. Supprimer tout le reste.',
+  'Codes partenaires déjà donnés : 1 an après l’utilisation du code, ou la durée du contrat partenaire si elle est plus courte. Garder le code, la date, le partenaire et le nombre de points. Pas d’identité.',
+  'Preuve que l’âge a été vérifié : 1 an, à valider avec un DPO ou un avocat. Garder seulement la date et le résultat (« 15 ans et plus : oui »). Aucune donnée de santé.',
+  'Preuve de sécurité en cas de piratage de compte (prise de compte Google) : 6 mois. Pas de mot de passe ni de jeton.',
+] as const
+
+export const PRIVACY_RETENTION_FOOTER =
+  'Le reste (eau, classement, récompenses non données, abonnement côté app, compte, santé et suivi, planning et photo de gourde sur le téléphone) est effacé à la suppression. « Anonymiser » veut dire qu’on ne peut plus jamais retrouver la personne.'
+
 export function LegalDocumentScreen({ kind }: { kind: LegalDocumentKind }) {
   const isTerms = kind === 'terms'
   const title = isTerms ? 'Conditions d’utilisation' : 'Politique de confidentialité'
@@ -49,6 +65,20 @@ export function LegalDocumentScreen({ kind }: { kind: LegalDocumentKind }) {
             <p key={text}>{text}</p>
           ))}
         </div>
+        {!isTerms ? (
+          <section className="mt-8 space-y-3" data-legal-retention>
+            <h2 className="text-[20px] font-semibold tracking-tight text-white">
+              {PRIVACY_RETENTION_TITLE}
+            </h2>
+            <p className="text-[15px] leading-relaxed text-[#EBEBF5]">{PRIVACY_RETENTION_INTRO}</p>
+            <ul className="list-disc space-y-3 pl-5 text-[15px] leading-relaxed text-[#EBEBF5]">
+              {PRIVACY_RETENTION_BULLETS.map((bullet) => (
+                <li key={bullet}>{bullet}</li>
+              ))}
+            </ul>
+            <p className="text-[15px] leading-relaxed text-[#EBEBF5]">{PRIVACY_RETENTION_FOOTER}</p>
+          </section>
+        ) : null}
         <p className="mt-8 text-[13px] text-[#ACB4BA]">
           Voir aussi{' '}
           <a className="text-[#EBEBF5] underline underline-offset-2" href={otherHref}>

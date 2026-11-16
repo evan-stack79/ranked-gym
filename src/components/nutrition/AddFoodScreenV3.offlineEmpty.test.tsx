@@ -54,7 +54,7 @@ describe('AddFoodScreenV3 — vide hors ligne', () => {
     })
 
     const empty = document.querySelector('[data-food-empty-state]')
-    expect(empty?.textContent).toMatch(/Pas de connexion/i)
+    expect(empty?.textContent).toMatch(/Pas de réseau/i)
     expect(empty?.textContent).not.toMatch(/Aucun produit trouvé/i)
 
     await act(async () => {

@@ -37,7 +37,7 @@ describe('sleepHomeCompact', () => {
     const view = getSleepHomeCompactView(snap)
     expect(view.action).toBe('log')
     expect(view.actionLabel).toBe('Enregistrer')
-    expect(view.secondaryLine).toBe('Comment était ta nuit ?')
+    expect(view.secondaryLine).toBe('Tu as bien dormi ?')
   })
 
   it('TST connu → dormies dans le résumé', () => {
@@ -62,7 +62,7 @@ describe('sleepHomeCompact', () => {
     const snap = getSleepHomeSnapshot()
     const view = getSleepHomeCompactView(snap)
     expect(view.secondaryLine).toContain('au lit')
-    expect(view.secondaryLine).toContain('Sommeil non estimé')
+    expect(view.secondaryLine).toContain('temps dormi inconnu')
     expect(view.secondaryLine).not.toMatch(/dormies/i)
   })
 

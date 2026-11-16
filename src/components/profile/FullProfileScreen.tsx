@@ -186,7 +186,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
       void refreshProfile()
     } catch (err) {
       setAvatarPreview(null)
-      setAvatarError(err instanceof Error ? err.message : 'Upload impossible.')
+      setAvatarError(err instanceof Error ? err.message : 'Photo pas envoyée. Réessaie.')
     } finally {
       setAvatarUploading(false)
       URL.revokeObjectURL(localPreview)
@@ -223,7 +223,7 @@ export function FullProfileScreen({ onBack }: FullProfileScreenProps) {
     setHeightCm(null)
     setGoalWeightKg(null)
     setBodyNoted(false)
-    setSaveMessage('Mensurations effacées.')
+    setSaveMessage('Taille et poids effacés.')
     window.setTimeout(() => setSaveMessage(null), 2000)
   }
 

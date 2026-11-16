@@ -29,6 +29,7 @@ export function BottleVisual({
         className={`relative mx-auto h-28 w-16 ${className}`}
         aria-hidden
         data-hydration-visual="glass"
+        onContextMenu={(e) => e.preventDefault()}
       >
         <div className="absolute inset-0 rounded-b-xl rounded-t-md border-2 border-[#8E8E93]/70 bg-[#1C1C1E]">
           <div className="absolute inset-x-0 bottom-0 overflow-hidden rounded-b-[10px]" style={{ height: waterHeight, transition }}>
@@ -45,6 +46,7 @@ export function BottleVisual({
         className={`relative mx-auto h-36 w-24 ${className}`}
         aria-hidden
         data-hydration-visual="my_bottle"
+        onContextMenu={(e) => e.preventDefault()}
       >
         <div
           className="absolute inset-0"
@@ -70,6 +72,8 @@ export function BottleVisual({
           alt=""
           className="pointer-events-none absolute inset-0 h-full w-full object-contain opacity-90"
           draggable={false}
+          style={{ WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
+          onContextMenu={(e) => e.preventDefault()}
         />
       </div>
     )
@@ -81,6 +85,7 @@ export function BottleVisual({
       className={`relative mx-auto h-36 w-20 ${className}`}
       aria-hidden
       data-hydration-visual="classic_2l"
+      onContextMenu={(e) => e.preventDefault()}
     >
       <svg viewBox="0 0 80 140" className="absolute inset-0 h-full w-full">
         <defs>

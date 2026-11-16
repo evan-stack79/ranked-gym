@@ -54,7 +54,11 @@ import {
   fetchHydrationToday,
   HYDRATION_CHANGED_EVENT,
 } from '../../services/hydration/hydrationService'
-import { getHomeGreetingSubtitle, resolveDisplayFirstName } from '../../utils/homeGreeting'
+import {
+  getHomeGreeting,
+  getHomeGreetingSubtitle,
+  resolveDisplayFirstName,
+} from '../../utils/homeGreeting'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { findActiveStrengthSession } from '../../utils/trainHub'
 import { BlurInText, CountUpNumber, Reveal, SoftBlurIn, TiltCard } from '../motion'
@@ -405,12 +409,13 @@ export function HomeGalleryView({
       ms: ACCUEIL_FLIP_MS,
     })
   }, [visibleOrderKey, editMode, prefersReducedMotion, draggingId])
-  const subtitle = getHomeGreetingSubtitle()
   const firstName = resolveDisplayFirstName({
     firstName: user?.firstName,
     displayName: user?.displayName,
     pseudo: profile?.pseudo,
   })
+  const greeting = getHomeGreeting(firstName)
+  const subtitle = getHomeGreetingSubtitle()
 
   const handleHero = (card: GalleryHeroCard) => {
     if (editMode) return
@@ -946,15 +951,14 @@ export function HomeGalleryView({
                 <BlurInText
                   as="span"
                   instant={coldEntering || prefersReducedMotion}
-                  label="Accueil"
+                  label={greeting}
                 >
-                  Accueil
+                  {greeting}
                 </BlurInText>
               </h1>
               <p className="mt-2 text-[15px] font-medium text-[#ACB4BA]">
                 <SoftBlurIn instant={coldEntering || prefersReducedMotion}>
                   {subtitle}
-                  {firstName ? ` · ${firstName}` : ''}
                 </SoftBlurIn>
               </p>
             </div>
@@ -972,7 +976,7 @@ export function HomeGalleryView({
                 type="button"
                 onClick={onOpenTraining}
                 className="ios-press flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/8 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/45"
-                aria-label="Ouvrir Train"
+                aria-label="Voir mes séances"
               >
                 <NotebookPen className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
               </button>

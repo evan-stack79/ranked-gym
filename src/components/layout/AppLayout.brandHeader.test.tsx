@@ -70,6 +70,7 @@ describe('shouldShowBrandHeader', () => {
     expect(shouldShowBrandHeader('nutrition')).toBe(true)
     expect(shouldShowBrandHeader('training')).toBe(true)
     expect(shouldShowBrandHeader('home')).toBe(false)
+    expect(shouldShowBrandHeader('sleep')).toBe(false)
     expect(shouldShowBrandHeader('profile')).toBe(false)
   })
 

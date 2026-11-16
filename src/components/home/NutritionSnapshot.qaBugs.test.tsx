@@ -44,7 +44,7 @@ describe('QA BUG-16 — Accueil sans « Objectif indisponible » (drapeau OFF)',
     else vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', prev)
   })
 
-  it('drapeau OFF : carte neutre « Suivi du jour », pas Objectif indisponible', async () => {
+  it("drapeau OFF : carte neutre « Aujourd'hui », pas Objectif indisponible", async () => {
     vi.stubEnv('VITE_ENABLE_CALORIE_GOAL', '')
     profileState.current = { ...profileState.current, age: 30 }
     const host = document.createElement('div')
@@ -54,7 +54,7 @@ describe('QA BUG-16 — Accueil sans « Objectif indisponible » (drapeau OFF)',
       root.render(<NutritionSnapshot />)
     })
     expect(host.textContent).not.toContain('Objectif indisponible')
-    expect(host.textContent).toContain('Suivi du jour')
+    expect(host.textContent).toContain("Aujourd'hui")
     root.unmount()
     host.remove()
   })

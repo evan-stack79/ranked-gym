@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 
-export const GREETING_FLIP_WORDS = ['Prêt', 'Motivé', 'Focus'] as const
+export const GREETING_FLIP_WORDS = ['Salut'] as const
 export const TEXT_FLIP_INTERVAL_MS = 2500
 export const TEXT_FLIP_DUR_MS = 420
 
@@ -12,7 +12,7 @@ export interface TextFlipProps {
   intervalMs?: number
   /**
    * Static word announced to screen readers (and shown under reduced motion).
-   * Defaults to the first word (« Prêt »).
+   * Defaults to the first word (« Salut »).
    */
   staticWord?: string
 }
@@ -20,7 +20,7 @@ export interface TextFlipProps {
 /**
  * Text Flip — one word cycles with a vertical flip (rotateX).
  * Stable width (measured max). Accessible: sr-only static word, cycling aria-hidden,
- * no aria-live. Pauses when the tab is hidden. Reduced motion → static « Prêt » only.
+ * no aria-live. Pauses when the tab is hidden. Reduced motion → static first word only.
  */
 export function TextFlip({
   words = GREETING_FLIP_WORDS,
@@ -30,7 +30,7 @@ export function TextFlip({
 }: TextFlipProps) {
   const reduced = usePrefersReducedMotion()
   const list = words.length > 0 ? words : GREETING_FLIP_WORDS
-  const announced = staticWord ?? list[0] ?? 'Prêt'
+  const announced = staticWord ?? list[0] ?? 'Salut'
   const [index, setIndex] = useState(0)
   const [phase, setPhase] = useState<'idle' | 'out' | 'in'>('idle')
   const [minWidth, setMinWidth] = useState<number | undefined>(undefined)
