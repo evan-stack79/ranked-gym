@@ -64,3 +64,11 @@ Fichiers : `src/assets/lottie/hydration/conseil/etat_XX_*_rouge.json`
 | 17 | water resources | Paula Oliveira | https://lottiefiles.com/free-animation/water-resources-w8dwRSObEE | Lottie Simple License | couleurs modifiées |
 
 Fichiers : `src/assets/lottie/sleep/horaires-variables/NN_*_rouge.json`
+
+## Mon créneau salle / marche
+
+| Écran | Nom | Auteur | Lien | Licence | Note |
+|---|---|---|---|---|---|
+| créneau | Exercise for diet or health | Haikal | https://lottiefiles.com/free-animation/exercise-for-diet-or-health-FAwPTRab09 | Lottie Simple License | couleurs modifiées (rouge `#ff0702`) ; le titre d’origine (« diet ») n’apparaît jamais dans l’app |
+
+Fichier : `src/assets/lottie/creneau/exercise-for-diet-or-health_rouge.json`
