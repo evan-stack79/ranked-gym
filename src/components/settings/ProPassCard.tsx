@@ -33,7 +33,7 @@ export function ProPassCard({ onTryFree, onDismiss }: ProPassCardProps) {
       </h2>
       <p className="mt-2 max-w-[280px] text-[14px] leading-snug text-[#C7C7CC]">
         14 jours d&apos;essai gratuit, puis 9,99&nbsp;€ / mois — ou {PRO_YEARLY_PRICE_LINE}.
-        Aucun avantage de rang, Force, Discipline ou points.
+        Aucun bonus de rang ni de points.
       </p>
       <button
         type="button"

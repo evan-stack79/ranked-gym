@@ -206,14 +206,14 @@ export function HydrationRepereStrip({
   return (
     <div className="mt-2 space-y-1" data-hydration-repere>
       <p className="text-[13px] text-white">
-        <span style={{ color: GRAY }}>Ton repère du jour </span>
+        <span style={{ color: GRAY }}>Ton repère </span>
         <span className="font-semibold">{rangeLabel}</span>
       </p>
       <p className="text-[12px]" style={{ color: GRAY }}>
         Eau totale estimée : environ {fmt(total.lowL)} à {fmt(total.highL)}&nbsp;L
       </p>
       <p className="text-[11px]" style={{ color: GRAY }}>
-        C’est une estimation : tes autres boissons et tes repas apportent aussi de l’eau.
+        Tes repas et autres boissons comptent aussi.
       </p>
     </div>
   )

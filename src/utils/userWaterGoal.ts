@@ -15,7 +15,7 @@ export const WATER_GOAL_MAX_ML = 6000
 
 /** Scientific-reviewer approved copy — no numbers. */
 export const WATER_GOAL_CHOICE_ADVICE =
-  'Choisis ton objectif. Ce dont tu as besoin change selon toi, la chaleur et l\'effort. En cas de doute, demande à un médecin.'
+  'Ton besoin change avec la chaleur et le sport. Un doute ? Demande à un médecin.'
 
 export const WATER_GOAL_CHANGED_EVENT = 'ranked-gym:water-goal-changed'
 

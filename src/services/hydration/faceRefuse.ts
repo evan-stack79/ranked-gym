@@ -76,7 +76,7 @@ export async function refuseIfFaceDetected(
 }
 
 export const FACE_REFUSED_MESSAGE =
-  'Un visage est visible sur la photo. Reprends la photo de ta bouteille seule, ou utilise le mode 2 L.'
+  'On voit un visage. Reprends la bouteille seule.'
 
 export const FACE_UNAVAILABLE_MESSAGE =
-  'La photo Ma bouteille n’est pas disponible sur cet appareil (vérification visage requise). Utilise le mode 2 L ou les verres.'
+  'Pas de photo sur ce téléphone. Prends la bouteille 2 L.'

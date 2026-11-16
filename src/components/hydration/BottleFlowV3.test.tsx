@@ -95,7 +95,7 @@ describe('BottleFlowV3 — logique variante B', () => {
     expect(onUndo).toHaveBeenCalledTimes(1)
   })
 
-  it('ouverture mémorisée → drink, Cristaline une seule fois, lien régler', () => {
+  it('ouverture mémorisée → drink, Bouteille 1,5 L une seule fois, lien régler', () => {
     host = document.createElement('div')
     document.body.appendChild(host)
     root = createRoot(host)
@@ -117,8 +117,8 @@ describe('BottleFlowV3 — logique variante B', () => {
       '[data-hydration-bottle-flow="v3b"]',
     ) as HTMLElement
     expect(overlay.getAttribute('data-hydration-phase')).toBe('drink')
-    expect((overlay.textContent || '').match(/Cristaline 1,5 L/g)?.length).toBe(1)
-    expect(overlay.textContent).toContain('Bouteille remplie')
+    expect((overlay.textContent || '').match(/Bouteille 1,5 L/g)?.length).toBe(1)
+    expect(overlay.textContent).toContain('Bouteille pleine')
     expect(overlay.textContent).not.toContain('Commencer')
   })
 

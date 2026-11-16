@@ -77,11 +77,11 @@ export function WaterReminderBell({
     })
     if (!result.ok) {
       if (result.reason === 'PERMISSION_DENIED') {
-        setError('Les notifications sont refusées. Tu peux les réactiver dans les réglages du téléphone.')
+        setError('Notifications coupées. Active-les dans les Réglages du téléphone.')
       } else if (result.reason === 'WEB_NO_REMINDERS_V0') {
-        setError('Les rappels sont disponibles dans l’app iOS / Android.')
+        setError("Rappels dispo seulement dans l'app.")
       } else if (result.reason === 'PLUGIN_MISSING') {
-        setError('Les rappels locaux ne sont pas encore branchés sur cet appareil.')
+        setError('Pas encore de rappels sur ce téléphone.')
       }
       onChange({ enabled: false, times: displayTimes })
       return

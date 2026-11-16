@@ -38,7 +38,7 @@ export function CameraHeartRateScreen({ onBack }: CameraHeartRateScreenProps) {
       if (!availability.available) {
         setAvailabilityMessage(
           availability.reason ??
-            'Mesure BPM indisponible sur cet appareil (caméra / flash).',
+            'La mesure ne démarre pas. Réessaie.',
         )
       }
     })()
@@ -107,8 +107,8 @@ export function CameraHeartRateScreen({ onBack }: CameraHeartRateScreenProps) {
   return (
     <div className="flex flex-col gap-4 pb-8">
       <ProfileSubScreenHeader
-        title="Mesure BPM"
-        subtitle="Prototype caméra · non médical"
+        title="Mon pouls"
+        subtitle="Test · pas médical"
         onBack={onBack}
       />
 
@@ -128,7 +128,7 @@ export function CameraHeartRateScreen({ onBack }: CameraHeartRateScreenProps) {
         <p className="text-[15px] font-semibold text-white">Comment faire</p>
         <ol className="mt-2 list-decimal space-y-1.5 pl-4 text-[13px] leading-relaxed text-[#ACB4BA]">
           <li>Pose le doigt sur la caméra arrière et le flash.</li>
-          <li>Reste immobile 12–20 secondes.</li>
+          <li>Ne bouge pas pendant 20 s.</li>
           <li>Si le doigt bouge ou laisse passer la lumière : pas de résultat.</li>
         </ol>
       </div>
@@ -146,7 +146,7 @@ export function CameraHeartRateScreen({ onBack }: CameraHeartRateScreenProps) {
         <p className="text-[48px] font-bold tabular-nums tracking-tight text-white">
           {liveBpm ?? '—'}
         </p>
-        <p className="text-[13px] text-[#ACB4BA]">BPM estimé</p>
+        <p className="text-[13px] text-[#ACB4BA]">Pouls (environ)</p>
         {progress ? (
           <div className="w-full space-y-1 text-[12px] text-[#ACB4BA]">
             <p>
@@ -172,7 +172,7 @@ export function CameraHeartRateScreen({ onBack }: CameraHeartRateScreenProps) {
               ? `Estimation : ${result.bpm} BPM (confiance ${Math.round(
                   (result.confidence ?? 0) * 100,
                 )}%). Non enregistrée.`
-              : (result.message ?? 'Mesure non concluante.')}
+              : (result.message ?? 'Pas de résultat. Réessaie sans bouger.')}
           </p>
         ) : null}
       </div>

@@ -275,7 +275,7 @@ export function HydrationPanel({ onOpenSettings, className = '' }: HydrationPane
           </button>
         ) : (
           <p className="mt-3 text-center text-[14px] font-medium text-white" data-hydration-objectif>
-            Objectif atteint
+            Objectif atteint !
           </p>
         )}
         <p className="mt-2 text-center text-[12px] text-[#ACB4BA]">Un repère, pas un défi.</p>

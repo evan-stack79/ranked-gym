@@ -160,7 +160,7 @@ export function SettingsScreen({
       onAvatarUpdated?.(publicUrl)
     } catch (err) {
       setAvatarPreview(null)
-      setAvatarError(err instanceof Error ? err.message : 'Upload impossible.')
+      setAvatarError(err instanceof Error ? err.message : 'Photo pas envoyée. Réessaie.')
     } finally {
       setAvatarUploading(false)
       URL.revokeObjectURL(localPreview)
@@ -205,22 +205,22 @@ export function SettingsScreen({
   }> = [
     {
       items: [
-        { id: 'personal', icon: UserRound, label: 'Informations personnelles' },
+        { id: 'personal', icon: UserRound, label: 'Mon profil' },
         { id: 'ranked', icon: Trophy, label: 'Ranked Force / Discipline' },
         { id: 'boutiquePartenaires', icon: Gift, label: 'Boutique partenaires' },
         { id: 'privacy', icon: Shield, label: 'Compte et vie privée' },
         { id: 'healthSituations', icon: HeartHandshake, label: 'Situations de santé' },
-        { id: 'energyInfo', icon: Info, label: 'Informations' },
+        { id: 'energyInfo', icon: Info, label: 'À propos' },
         { id: 'pro', icon: CreditCard, label: 'Ranked Pro' },
         {
           id: 'proEngagement',
           icon: HandHeart,
           label: 'Notre engagement 6 %',
         },
-        { id: 'payment', icon: CreditCard, label: 'Méthodes de paiement' },
+        { id: 'payment', icon: CreditCard, label: 'Paiement' },
         { id: 'preferences', icon: Settings2, label: 'Préférences' },
         ...(isCameraHeartRateEnabled()
-          ? [{ id: 'cameraHeartRate' as const, icon: HeartPulse, label: 'Tester la mesure BPM' }]
+          ? [{ id: 'cameraHeartRate' as const, icon: HeartPulse, label: 'Mesurer mon pouls' }]
           : []),
       ],
     },
@@ -399,14 +399,14 @@ export function SettingsScreen({
       <IosSheet
         open={sheet === 'payment'}
         onClose={() => setSheet(null)}
-        title="Méthodes de paiement"
+        title="Paiement"
         subtitle="Pass Pro"
         leading={<CreditCard className="mt-0.5 h-5 w-5 text-[#ACB4BA]" />}
       >
         <div className="space-y-4 pb-2">
           <ProPassCard onTryFree={handleTryPro} onDismiss={() => setSheet(null)} />
           <p className="text-center text-[12px] text-[#717C83]">
-            Paiement sécurisé · Annulation à tout moment
+            Paiement sûr · tu arrêtes quand tu veux
           </p>
         </div>
       </IosSheet>
@@ -438,7 +438,7 @@ export function SettingsScreen({
           </div>
           <div className="glass-card rounded-2xl p-4">
             <p className="text-[15px] font-semibold text-white">Unités</p>
-            <p className="mt-1 text-[13px] text-[#ACB4BA]">Kilogrammes (kg) · Calories (kcal)</p>
+            <p className="mt-1 text-[13px] text-[#ACB4BA]">kg · kcal</p>
           </div>
         </div>
       </IosSheet>

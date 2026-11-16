@@ -4,7 +4,7 @@ import { formatWaterMl } from '../../utils/waterGoal'
 interface HydrationProgressBarProps {
   consumedMl: number
   goalMl: number
-  /** Affiche le libellé « Hydratation » et l’icône. */
+  /** Affiche le libellé « Eau » et l’icône. */
   showHeader?: boolean
   /** Barre plus fine (Accueil). */
   compact?: boolean
@@ -45,7 +45,7 @@ export function HydrationProgressBar({
                   compact ? 'text-[10px]' : 'text-[11px]'
                 }`}
               >
-                Hydratation
+                Eau
               </p>
               {!compact ? (
                 <p className="truncate text-[13px] font-medium text-white">

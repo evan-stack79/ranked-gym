@@ -106,7 +106,7 @@ export async function runFloodCutout(source: Blob): Promise<CutoutResult> {
       return {
         ok: false,
         error: 'INFERENCE_FAILED',
-        message: 'Détourage impossible sur cet appareil. Recadre à la main.',
+        message: 'Découpe-la avec ton doigt.',
       }
     }
     ctx.drawImage(bitmap, 0, 0)
@@ -158,7 +158,7 @@ export async function runFloodCutout(source: Blob): Promise<CutoutResult> {
         ok: false,
         error: 'EMPTY_MASK',
         message:
-          'Détourage auto peu fiable sur cette photo. Recadre à la main ou passe en mode 2 L.',
+          'Découpe-la avec ton doigt.',
       }
     }
 
@@ -174,7 +174,7 @@ export async function runFloodCutout(source: Blob): Promise<CutoutResult> {
     return {
       ok: false,
       error: 'INFERENCE_FAILED',
-      message: 'Détourage impossible. Recadre à la main ou passe en mode 2 L.',
+      message: 'Découpe-la avec ton doigt.',
     }
   }
 }
@@ -193,7 +193,7 @@ export async function runBottleCutout(source: Blob): Promise<CutoutResult> {
       ok: false,
       error: 'MODEL_MISSING',
       message:
-        'Modèle de détourage introuvable sur l’appareil. Recadre à la main ou passe en mode 2 L.',
+        'Découpe-la avec ton doigt.',
     }
   }
 
@@ -201,4 +201,4 @@ export async function runBottleCutout(source: Blob): Promise<CutoutResult> {
 }
 
 export const CUTOUT_WIFI_HINT =
-  'Le détourage se fait sur l’appareil. Aucune photo n’est envoyée. Sur fond uni, le résultat est meilleur.'
+  'La photo reste sur ton téléphone. Fond uni = mieux.'
