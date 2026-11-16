@@ -10,6 +10,7 @@ import { CONTAINER_LEVEL_STORAGE_KEY } from './hydration/containerLevelStorage'
 import { cancelHydrationReminders } from './hydration/hydrationReminders'
 import { clearHydrationLocalState } from './hydration/hydrationService'
 import { HV_STORAGE_BASE, clearHvState } from './horairesVariables/storage'
+import { CRENEAU_STORAGE_BASE, clearCreneauSettings } from './creneau/storage'
 
 /** Exact localStorage keys removed on account delete (hydration + bottle). */
 export const ACCOUNT_DELETE_LOCAL_WIPE_KEYS = [
@@ -26,6 +27,7 @@ export const ACCOUNT_DELETE_LOCAL_WIPE_KEYS = [
 /**
  * Expected wipe list for account deletion (client).
  * - clearHvState() + `ranked-gym:horaires-variables*`
+ * - clearCreneauSettings() + `ranked-gym:creneau*`
  * - hydration keys in ACCOUNT_DELETE_LOCAL_WIPE_KEYS
  * - accueil-widget-prefs: strip hydration-related `waterGoalMl` only
  * - clearBottleShapeLocal()
@@ -33,6 +35,7 @@ export const ACCOUNT_DELETE_LOCAL_WIPE_KEYS = [
  */
 export const ACCOUNT_DELETE_LOCAL_WIPE_LIST = [
   'clearHvState',
+  'clearCreneauSettings',
   ...ACCOUNT_DELETE_LOCAL_WIPE_KEYS,
   'ranked-gym:accueil-widget-prefs#waterGoalMl',
   'clearBottleShapeLocal',
@@ -75,6 +78,9 @@ function stripAccueilHydrationPrefs(): void {
 export async function wipeDeletedAccountLocalData(): Promise<void> {
   clearHvState()
   removeLocalKeysByPrefix(HV_STORAGE_BASE)
+
+  clearCreneauSettings()
+  removeLocalKeysByPrefix(CRENEAU_STORAGE_BASE)
 
   clearHydrationLocalState()
   clearUserWaterGoal()

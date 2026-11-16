@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ACCUEIL_WIDGET_PREFS_KEY } from '../utils/accueilWidgetPrefs'
 import { USER_WATER_GOAL_KEY } from '../utils/userWaterGoal'
 import { HV_STORAGE_BASE } from './horairesVariables/storage'
+import { CRENEAU_STORAGE_BASE } from './creneau/storage'
 import { CONTAINER_LEVEL_STORAGE_KEY } from './hydration/containerLevelStorage'
 
 const cancelHydrationReminders = vi.fn(async () => undefined)
@@ -53,6 +54,10 @@ describe('wipeDeletedAccountLocalData', () => {
     )
     localStorage.setItem('ranked-gym:my-bottle-shape-dataurl', 'data:image/png;base64,xx')
     localStorage.setItem(`${HV_STORAGE_BASE}:u:other`, '{"keep":false}')
+    const { saveCreneauSettings, getCreneauSettings } = await import('./creneau/storage')
+    saveCreneauSettings({ heatVigilanceToday: true, eveningWalkEnabled: true })
+    expect(getCreneauSettings().heatVigilanceToday).toBe(true)
+    localStorage.setItem(`${CRENEAU_STORAGE_BASE}:u:other`, '{"keep":false}')
   })
 
   it('calls clearHvState, bottle, reminders and clears the documented hydration keys', async () => {
@@ -68,6 +73,7 @@ describe('wipeDeletedAccountLocalData', () => {
     expect(ACCOUNT_DELETE_LOCAL_WIPE_LIST).toEqual(
       expect.arrayContaining([
         'clearHvState',
+        'clearCreneauSettings',
         'ranked-gym:hydration-pending-entries',
         'ranked-gym:hydration-active-user',
         'ranked-gym:hydration-settings-cache',
@@ -89,6 +95,10 @@ describe('wipeDeletedAccountLocalData', () => {
     expect(getHvState().settings.enabled).toBe(false)
     expect(localStorage.getItem(`${HV_STORAGE_BASE}:u:user-wipe`)).toBeNull()
     expect(localStorage.getItem(`${HV_STORAGE_BASE}:u:other`)).toBeNull()
+    const { getCreneauSettings } = await import('./creneau/storage')
+    expect(getCreneauSettings().heatVigilanceToday).toBe(false)
+    expect(localStorage.getItem(`${CRENEAU_STORAGE_BASE}:u:user-wipe`)).toBeNull()
+    expect(localStorage.getItem(`${CRENEAU_STORAGE_BASE}:u:other`)).toBeNull()
 
     const prefs = JSON.parse(localStorage.getItem(ACCUEIL_WIDGET_PREFS_KEY) ?? '{}') as {
       waterGoalMl?: unknown
