@@ -593,6 +593,13 @@ export type SleepAlarmDiagView = RankedAlarmDiagnostics & {
 
 export async function collectSleepAlarmDiagnostics(): Promise<SleepAlarmDiagView> {
   const { Capacitor } = await import('@capacitor/core')
+  let hvLastError: string | null = null
+  try {
+    const { getHvSyncLastError } = await import('./horairesVariables/sync')
+    hvLastError = getHvSyncLastError()
+  } catch {
+    /* ignore */
+  }
   const base = {
     buildSha: getBuildSha(),
     pluginAvailable: isRankedAlarmPluginAvailable(),
@@ -608,13 +615,17 @@ export async function collectSleepAlarmDiagnostics(): Promise<SleepAlarmDiagView
       alarmKitAvailable: false,
       authorization: 'unavailable',
       alarmCount: 0,
-      lastError: "Le réveil ne marche pas. Relance l'app.",
+      lastError: hvLastError ?? "Le réveil ne marche pas. Relance l'app.",
       hasUsageDescription: false,
     }
   }
   try {
     const d = await RankedAlarm.getDiagnostics()
-    return { ...base, ...d }
+    return {
+      ...base,
+      ...d,
+      lastError: hvLastError ?? d.lastError,
+    }
   } catch (err) {
     return {
       ...base,
@@ -623,7 +634,7 @@ export async function collectSleepAlarmDiagnostics(): Promise<SleepAlarmDiagView
       alarmKitAvailable: false,
       authorization: 'unknown',
       alarmCount: 0,
-      lastError: err instanceof Error ? err.message : String(err),
+      lastError: hvLastError ?? (err instanceof Error ? err.message : String(err)),
       hasUsageDescription: false,
     }
   }

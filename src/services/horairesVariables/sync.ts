@@ -1,7 +1,7 @@
 /**
  * Sync HV planning → AlarmKit fixed alarms (≤ HV_MAX_ARMED_ALARMS).
- * Does not alter classic createAlarm make-before-break path when HV is off.
- * Pause (Evan choice A): restore simple réveil + pre-arm planning from resume day.
+ * Make-before-break: create + verify new fixed alarms first, then cancel known old ids.
+ * Does not alter classic createAlarm make-before-break path when HV is off / pause simple.
  */
 
 import {
@@ -31,64 +31,135 @@ export type HvSyncResult = {
   ids: string[]
   reason?: string
   autoPaused?: boolean
+  /** Expected wake keys (dateKeyTwakeHm) missing after relecture */
+  missing?: string[]
+  lastError?: string | null
+  superseded?: boolean
 }
 
-function fireDateFor(dateKey: string, wakeHm: string): Date | null {
+export type HvWakeTarget = { dateKey: string; wakeHm: string }
+
+/** Signature of desired wake list — used to skip no-op re-syncs (stops SleepView loop). */
+export function wakesSignature(wakes: HvWakeTarget[]): string {
+  return wakes.map((w) => `${w.dateKey}T${w.wakeHm}`).join('|')
+}
+
+let hvSyncLastError: string | null = null
+let lastOkSignature: string | null = null
+let lastOkIds: string[] = []
+
+let syncGate: Promise<void> = Promise.resolve()
+let pendingMerge = false
+let lastHvSyncResult: HvSyncResult = { ok: true, armed: 0, ids: [] }
+
+/** @internal — reset between unit tests. */
+export function __resetHvSyncGateForTests(): void {
+  syncGate = Promise.resolve()
+  pendingMerge = false
+  lastHvSyncResult = { ok: true, armed: 0, ids: [] }
+  lastOkSignature = null
+  lastOkIds = []
+  hvSyncLastError = null
+}
+
+export function getHvSyncLastError(): string | null {
+  return hvSyncLastError
+}
+
+function setHvSyncLastError(msg: string | null): void {
+  hvSyncLastError = msg
+}
+
+function fireDateFor(dateKey: string, wakeHm: string, nowMs = Date.now()): Date | null {
   const p = parseHm(wakeHm)
   if (!p) return null
   const [y, m, d] = dateKey.split('-').map(Number)
   const dt = new Date(y, m - 1, d, p.hour, p.minute, 0, 0)
   if (Number.isNaN(dt.getTime())) return null
-  if (dt.getTime() <= Date.now() + 5_000) return null
+  if (dt.getTime() <= nowMs + 5_000) return null
   return dt
 }
 
+async function cancelKnownIds(ids: string[]): Promise<void> {
+  for (const id of ids) {
+    if (!id) continue
+    try {
+      await RankedAlarm.cancelAlarm({ id })
+    } catch {
+      /* keep going — best effort */
+    }
+  }
+}
+
+/**
+ * Create fixed wakes one-by-one. On any failure, cancel the new ids already created
+ * and rethrow — callers keep their previous alarms.
+ */
 async function armFixedWakes(
-  wakes: { dateKey: string; wakeHm: string }[],
+  wakes: HvWakeTarget[],
   soundName: string | undefined,
+  nowMs = Date.now(),
 ): Promise<string[]> {
   const ids: string[] = []
-  for (const w of wakes) {
-    const fireAt = fireDateFor(w.dateKey, w.wakeHm)
-    if (!fireAt) continue
-    if (typeof RankedAlarm.createFixedAlarm !== 'function') {
-      const first = wakes[0]
-      if (!first) break
-      const parsed = parseHm(first.wakeHm)
-      if (!parsed) break
-      // Classic createAlarm make-before-break (e1a8801) — single alarm only.
-      const r = await RankedAlarm.createAlarm({
-        hour: parsed.hour,
-        minute: parsed.minute,
+  try {
+    for (const w of wakes) {
+      const fireAt = fireDateFor(w.dateKey, w.wakeHm, nowMs)
+      if (!fireAt) continue
+      if (typeof RankedAlarm.createFixedAlarm !== 'function') {
+        const first = wakes[0]
+        if (!first) break
+        const parsed = parseHm(first.wakeHm)
+        if (!parsed) break
+        // Classic createAlarm make-before-break (e1a8801) — single alarm only.
+        const r = await RankedAlarm.createAlarm({
+          hour: parsed.hour,
+          minute: parsed.minute,
+          label: 'Réveil',
+          snoozeEnabled: true,
+          snoozeMinutes: 9,
+          soundName,
+        })
+        if (!r.id) throw new Error('CREATE_ALARM_FAILED')
+        ids.push(r.id)
+        break
+      }
+      const r = await RankedAlarm.createFixedAlarm({
+        fireAtMs: fireAt.getTime(),
         label: 'Réveil',
         snoozeEnabled: true,
         snoozeMinutes: 9,
         soundName,
       })
-      if (r.id) ids.push(r.id)
-      break
+      if (!r.id) throw new Error('CREATE_FIXED_FAILED')
+      ids.push(r.id)
+      if (ids.length >= HV_MAX_ARMED_ALARMS) break
     }
-    const r = await RankedAlarm.createFixedAlarm({
-      fireAtMs: fireAt.getTime(),
-      label: 'Réveil',
-      snoozeEnabled: true,
-      snoozeMinutes: 9,
-      soundName,
-    })
-    if (r.id) ids.push(r.id)
-    if (ids.length >= HV_MAX_ARMED_ALARMS) break
+    return ids
+  } catch (err) {
+    await cancelKnownIds(ids)
+    throw err
   }
-  return ids
 }
 
-/**
- * When HV is active and not paused: cancelAll then arm up to 14 fixed alarms.
- * Classic single-alarm createAlarm is not used (preserves e1a8801 for non-HV).
- * During pause (choice A): restore simple réveil + pre-arm from resume day.
- */
-export async function syncHvAlarms(now = new Date()): Promise<HvSyncResult> {
+async function verifyArmedIds(ids: string[]): Promise<{ ok: boolean; missing: string[] }> {
+  if (ids.length === 0) return { ok: true, missing: [] }
+  const { alarms } = await RankedAlarm.getAlarms()
+  const present = new Set(alarms.map((a) => a.id))
+  const missing = ids.filter((id) => !present.has(id))
+  return { ok: missing.length === 0, missing }
+}
+
+function knownOldIds(stateIds: string[]): string[] {
+  const simpleId = getSleepAlarmSettings().alarmKitId
+  const all = [...stateIds]
+  if (simpleId) all.push(simpleId)
+  return [...new Set(all.filter(Boolean))]
+}
+
+async function syncHvAlarmsBody(now: Date): Promise<HvSyncResult> {
   const state = getHvState()
   const today = dateKeyOf(now)
+  const nowMs = now.getTime()
 
   if (!state.settings.enabled) {
     return { ok: true, armed: 0, ids: [], reason: 'OFF' }
@@ -99,7 +170,6 @@ export async function syncHvAlarms(now = new Date()): Promise<HvSyncResult> {
     saveHvState({
       settings: { ...state.settings, autoPaused: true, autoPauseCardDismissed: false },
     })
-    // Fall through to pause handling with updated settings
   }
 
   const fresh = getHvState()
@@ -109,7 +179,6 @@ export async function syncHvAlarms(now = new Date()): Promise<HvSyncResult> {
     getSleepAlarmSettings().soundId === 'none' ? undefined : SLEEP_ALARM_SOUND_FILE
 
   if (pause.paused) {
-    // Choice A: simple réveil during pause + pre-arm planning from resume day.
     const simpleHm =
       fresh.settings.pauseSimpleWakeHm ||
       getSleepAlarmSettings().timeHm ||
@@ -118,7 +187,7 @@ export async function syncHvAlarms(now = new Date()): Promise<HvSyncResult> {
       pause.reason === 'vacation' && fresh.settings.vacationPauseUntilKey
         ? vacationResumeKey(fresh.settings.vacationPauseUntilKey)
         : pause.reason === 'auto'
-          ? today // auto: resume when user fills planning; still pre-arm from tomorrow
+          ? today
           : addDaysKey(today, 1)
 
     const fromKey = resumeKey && resumeKey > today ? resumeKey : addDaysKey(today, 1) ?? today
@@ -131,42 +200,40 @@ export async function syncHvAlarms(now = new Date()): Promise<HvSyncResult> {
       now,
     })
 
-    // Simple réveil: next occurrence of simpleHm while paused
     const simpleParsed = parseHm(simpleHm)
-    const simpleWakes: { dateKey: string; wakeHm: string }[] = []
-    if (simpleParsed) {
-      for (let i = 0; i < 7; i++) {
-        const key = addDaysKey(today, i)
-        if (!key) continue
-        if (fromKey && key >= fromKey) break
-        const fire = fireDateFor(key, simpleHm)
-        if (fire) {
-          simpleWakes.push({ dateKey: key, wakeHm: simpleHm })
-          break // one simple alarm is enough; createAlarm path handles daily
-        }
-      }
+    const pauseSig = `pause:${pause.reason}:${simpleHm}|${wakesSignature(planningWakes)}`
+    if (
+      lastOkSignature === pauseSig &&
+      lastOkIds.length > 0 &&
+      (await verifyArmedIds(lastOkIds)).ok
+    ) {
+      return { ok: true, armed: lastOkIds.length, ids: lastOkIds, reason: pause.reason ?? 'PAUSED' }
     }
 
     saveSleepAlarmSettings({
       enabled: true,
       timeHm: simpleHm,
       days: [],
-      alarmKitId: null,
+      alarmKitId: getSleepAlarmSettings().alarmKitId,
     })
 
     if (!isRankedAlarmPluginAvailable()) {
-      saveHvState({ armedAlarmIds: [] })
-      return { ok: false, armed: 0, ids: [], reason: 'ALARM_PLUGIN_MISSING' }
+      const err = 'ALARM_PLUGIN_MISSING'
+      setHvSyncLastError(err)
+      return { ok: false, armed: 0, ids: [], reason: err, lastError: err }
     }
+
+    const oldIds = knownOldIds(fresh.armedAlarmIds)
 
     try {
       const perm = await RankedAlarm.requestPermissions()
       if (perm.alarms !== 'granted') {
-        return { ok: false, armed: 0, ids: [], reason: 'PERMISSION_DENIED' }
+        const err = 'PERMISSION_DENIED'
+        setHvSyncLastError(err)
+        return { ok: false, armed: oldIds.length, ids: oldIds, reason: err, lastError: err }
       }
-      await RankedAlarm.cancelAll()
 
-      // Arm simple via createAlarm (e1a8801 make-before-break) — daily-style single.
+      // Simple réveil via createAlarm (e1a8801 native make-before-break) — do NOT cancelAll first.
       const ids: string[] = []
       if (simpleParsed) {
         const r = await RankedAlarm.createAlarm({
@@ -177,37 +244,62 @@ export async function syncHvAlarms(now = new Date()): Promise<HvSyncResult> {
           snoozeMinutes: 9,
           soundName,
         })
-        if (r.id) ids.push(r.id)
+        if (!r.id) throw new Error('CREATE_ALARM_FAILED')
+        ids.push(r.id)
         saveSleepAlarmSettings({
           enabled: true,
           timeHm: simpleHm,
           days: [],
-          alarmKitId: r.id ?? null,
+          alarmKitId: r.id,
         })
       }
 
-      // Pre-arm planning wakes from resume (fixed) without exceeding 14.
       const remaining = HV_MAX_ARMED_ALARMS - ids.length
       if (remaining > 0 && planningWakes.length > 0) {
-        const more = await armFixedWakes(planningWakes.slice(0, remaining), soundName)
+        const more = await armFixedWakes(planningWakes.slice(0, remaining), soundName, nowMs)
         ids.push(...more)
       }
 
+      const verified = await verifyArmedIds(ids)
+      if (!verified.ok) {
+        await cancelKnownIds(ids.filter((id) => !oldIds.includes(id)))
+        const err = `MISSING_AFTER_SYNC:${verified.missing.join(',')}`
+        setHvSyncLastError(err)
+        return {
+          ok: false,
+          armed: oldIds.length,
+          ids: oldIds,
+          reason: 'MISSING_AFTER_SYNC',
+          missing: verified.missing,
+          lastError: err,
+        }
+      }
+
+      const newSet = new Set(ids)
+      await cancelKnownIds(oldIds.filter((id) => !newSet.has(id)))
+
       saveHvState({ armedAlarmIds: ids })
+      lastOkSignature = pauseSig
+      lastOkIds = ids
+      setHvSyncLastError(null)
       return {
         ok: true,
         armed: ids.length,
         ids,
         reason: pause.reason ?? 'PAUSED',
         autoPaused: pause.reason === 'auto',
+        lastError: null,
       }
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'SYNC_FAILED'
       console.warn('[hv] syncHvAlarms pause', err)
+      setHvSyncLastError(msg)
       return {
         ok: false,
-        armed: 0,
-        ids: [],
-        reason: err instanceof Error ? err.message : 'SYNC_FAILED',
+        armed: oldIds.length,
+        ids: oldIds,
+        reason: msg,
+        lastError: msg,
       }
     }
   }
@@ -220,6 +312,7 @@ export async function syncHvAlarms(now = new Date()): Promise<HvSyncResult> {
     maxArmed: HV_MAX_ARMED_ALARMS,
     now,
   })
+  const sig = wakesSignature(wakes)
 
   if (!isRankedAlarmPluginAvailable()) {
     if (wakes[0]) {
@@ -227,20 +320,79 @@ export async function syncHvAlarms(now = new Date()): Promise<HvSyncResult> {
         enabled: true,
         timeHm: wakes[0].wakeHm,
         days: [],
-        alarmKitId: null,
+        alarmKitId: getSleepAlarmSettings().alarmKitId,
       })
     }
-    return { ok: false, armed: 0, ids: [], reason: 'ALARM_PLUGIN_MISSING' }
+    const err = 'ALARM_PLUGIN_MISSING'
+    setHvSyncLastError(err)
+    return { ok: false, armed: 0, ids: [], reason: err, lastError: err }
   }
+
+  if (
+    lastOkSignature === sig &&
+    lastOkIds.length === wakes.length &&
+    (await verifyArmedIds(lastOkIds)).ok
+  ) {
+    return { ok: true, armed: lastOkIds.length, ids: lastOkIds, lastError: null }
+  }
+
+  const oldIds = knownOldIds(fresh.armedAlarmIds)
 
   try {
     const perm = await RankedAlarm.requestPermissions()
     if (perm.alarms !== 'granted') {
-      return { ok: false, armed: 0, ids: [], reason: 'PERMISSION_DENIED' }
+      const err = 'PERMISSION_DENIED'
+      setHvSyncLastError(err)
+      return { ok: false, armed: oldIds.length, ids: oldIds, reason: err, lastError: err }
     }
 
-    await RankedAlarm.cancelAll()
-    const ids = await armFixedWakes(wakes, soundName)
+    // Make-before-break: create all new first (no cancelAll).
+    const ids = await armFixedWakes(wakes, soundName, nowMs)
+
+    const expectedKeys = wakes
+      .map((w) => {
+        const fire = fireDateFor(w.dateKey, w.wakeHm, nowMs)
+        return fire ? `${w.dateKey}T${w.wakeHm}` : null
+      })
+      .filter((k): k is string => Boolean(k))
+      .slice(0, HV_MAX_ARMED_ALARMS)
+
+    if (ids.length < expectedKeys.length) {
+      await cancelKnownIds(ids)
+      const missing = expectedKeys.slice(ids.length)
+      const err = `CREATE_INCOMPLETE:${missing.join(',')}`
+      setHvSyncLastError(err)
+      return {
+        ok: false,
+        armed: oldIds.length,
+        ids: oldIds,
+        reason: 'CREATE_INCOMPLETE',
+        missing,
+        lastError: err,
+      }
+    }
+
+    const verified = await verifyArmedIds(ids)
+    if (!verified.ok) {
+      await cancelKnownIds(ids)
+      const missingKeys = verified.missing.map(
+        (id) => expectedKeys[ids.indexOf(id)] ?? id,
+      )
+      const err = `MISSING_AFTER_SYNC:${missingKeys.join(',')}`
+      setHvSyncLastError(err)
+      return {
+        ok: false,
+        armed: oldIds.length,
+        ids: oldIds,
+        reason: 'MISSING_AFTER_SYNC',
+        missing: missingKeys,
+        lastError: err,
+      }
+    }
+
+    // Success — cancel only known old ids (never the new ones).
+    const newSet = new Set(ids)
+    await cancelKnownIds(oldIds.filter((id) => !newSet.has(id)))
 
     saveHvState({ armedAlarmIds: ids })
     if (wakes[0]) {
@@ -251,14 +403,49 @@ export async function syncHvAlarms(now = new Date()): Promise<HvSyncResult> {
         alarmKitId: ids[0] ?? null,
       })
     }
-    return { ok: true, armed: ids.length, ids }
+
+    lastOkSignature = sig
+    lastOkIds = ids
+    setHvSyncLastError(null)
+    return { ok: true, armed: ids.length, ids, lastError: null }
   } catch (err) {
+    const msg = err instanceof Error ? err.message : 'SYNC_FAILED'
     console.warn('[hv] syncHvAlarms', err)
+    setHvSyncLastError(msg)
     return {
       ok: false,
-      armed: 0,
-      ids: [],
-      reason: err instanceof Error ? err.message : 'SYNC_FAILED',
+      armed: oldIds.length,
+      ids: oldIds,
+      reason: msg,
+      lastError: msg,
     }
+  }
+}
+
+/**
+ * Serialize HV syncs: one at a time; requests arriving mid-flight coalesce into
+ * a single rerun after the current body finishes.
+ */
+export async function syncHvAlarms(now = new Date()): Promise<HvSyncResult> {
+  pendingMerge = true
+  const prev = syncGate
+  let release!: () => void
+  syncGate = new Promise<void>((r) => {
+    release = r
+  })
+  await prev
+  try {
+    if (!pendingMerge) {
+      return { ...lastHvSyncResult, superseded: true }
+    }
+    let result: HvSyncResult = lastHvSyncResult
+    while (pendingMerge) {
+      pendingMerge = false
+      result = await syncHvAlarmsBody(now)
+    }
+    lastHvSyncResult = result
+    return result
+  } finally {
+    release()
   }
 }

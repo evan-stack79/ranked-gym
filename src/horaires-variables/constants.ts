@@ -57,3 +57,8 @@ export const HV_NIGHT_CONFIRM = "C'est noté. Rendors-toi tranquille."
 /** Water day copy (état 26). */
 export const HV_WATER_DAY_PHRASE =
   "Ta journée d'eau va d'un réveil au suivant."
+
+/** Sync verification banner (DIAGNOSTIC correction 1 / Evan GO). */
+export const HV_ALARM_INACTIVE = "Ton réveil n'est pas actif"
+/** Success toast after verified arming. */
+export const HV_ALARMS_READY = 'Tes réveils sont prêts.'

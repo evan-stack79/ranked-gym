@@ -7,6 +7,8 @@ import { HvIosSwitch } from './HvIosSwitch'
 import { HvDurationPickerSheet } from './HvDurationPickerSheet'
 import { HvStartPickerSheet } from './HvStartPickerSheet'
 import {
+  HV_ALARM_INACTIVE,
+  HV_ALARMS_READY,
   HV_FEATURE_NAME,
   HV_FEATURE_SUBTITLE,
   HV_FEATURE_TITLE,
@@ -34,6 +36,7 @@ import {
   emptyDayPlan,
   formatDurationFr,
   formatHoursMinutesFr,
+  formatNextWakeLabelFr,
   hmToMinutes,
   hvStatus,
   isMinorAge,
@@ -380,6 +383,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
   const [pane, setPane] = useState<HvFlowPane>(initialPane)
   const [tick, setTick] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
+  const [armSyncFailed, setArmSyncFailed] = useState(false)
   const [editKey, setEditKey] = useState<string | null>(null)
   const [draftStart, setDraftStart] = useState('08:00')
   const [draftKind, setDraftKind] = useState<HvDayPlan['kind']>('tot')
@@ -419,6 +423,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
       setDecMin(st.settings.decompressionMin)
       setNightAck(false)
       setToast(null)
+      setArmSyncFailed(false)
     }
   }, [open, initialPane])
 
@@ -471,18 +476,37 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
     })
   }, [state.days, showMonday, today])
 
+  const previewDays = useMemo(
+    () =>
+      materializeDaysFromTemplates({
+        settings,
+        existingDays: state.days,
+        fromDateKey: today,
+        isMinor: minor,
+      }),
+    [settings, state.days, today, minor],
+  )
+
   const armed = useMemo(
     () =>
       buildArmedWakes({
-        days: state.days,
+        days: settings.enabled ? state.days : previewDays,
         trajetMin: settings.trajetMin,
         prepMin: settings.prepMin,
         fromDateKey: today,
         maxArmed: HV_MAX_ARMED_ALARMS,
       }),
-    [state.days, settings.trajetMin, settings.prepMin, today],
+    [
+      settings.enabled,
+      state.days,
+      previewDays,
+      settings.trajetMin,
+      settings.prepMin,
+      today,
+    ],
   )
   const nextWake = nextArmedWake(armed)
+  const nextWakeLabel = nextWake ? formatNextWakeLabelFr(nextWake) : null
 
   const nights = getRecentSleepNights(7)
   const debt = computeWeekDebt({
@@ -559,9 +583,25 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
       },
       days,
     })
-    await syncHvAlarms()
-    setToast('Tes réveils sont prêts.')
-    setPane(minor ? 'minor' : 'planning')
+    const result = await syncHvAlarms()
+    if (result.ok) {
+      setArmSyncFailed(false)
+      setToast(HV_ALARMS_READY)
+      setPane(minor ? 'minor' : 'planning')
+    } else {
+      setArmSyncFailed(true)
+      setToast(null)
+    }
+  }
+
+  const retryArmSync = async () => {
+    const result = await syncHvAlarms()
+    if (result.ok) {
+      setArmSyncFailed(false)
+      setToast(HV_ALARMS_READY)
+    } else {
+      setArmSyncFailed(true)
+    }
   }
 
   const saveTemplate = async () => {
@@ -572,7 +612,14 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
       isMinor: minor,
     })
     saveHvState({ settings, days })
-    await syncHvAlarms()
+    const result = await syncHvAlarms()
+    if (result.ok) {
+      setArmSyncFailed(false)
+      setToast(HV_ALARMS_READY)
+    } else {
+      setArmSyncFailed(true)
+      setToast(null)
+    }
     setPane('planning')
   }
 
@@ -807,7 +854,7 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
     const ref = refMondayForLetter(thisMonday, Math.max(0, idx))
     persistSettings({ ...settings, weekARefMondayKey: ref })
     setToast(
-      `Semaine ${settings.cycleWeeks[idx]?.name ?? letter} cette semaine. Tes réveils sont prêts.`,
+      `Semaine ${settings.cycleWeeks[idx]?.name ?? letter} cette semaine. ${HV_ALARMS_READY}`,
     )
   }
 
@@ -907,6 +954,18 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
   const primaryFooter =
     pane === 'activation' ? (
       <div className="flex flex-col gap-2">
+        {nextWakeLabel ? (
+          <p
+            className="text-center text-[14px] font-semibold text-white"
+            data-hv-next-wake
+          >
+            Prochain réveil : {nextWakeLabel}
+          </p>
+        ) : (
+          <p className="text-center text-[13px]" style={{ color: GRAY }} data-hv-next-wake>
+            Prochain réveil : à régler
+          </p>
+        )}
         <button
           type="button"
           onClick={() => void (settings.enabled ? saveTemplate() : activate())}
@@ -1018,6 +1077,26 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
 
           {!sheetNight ? (
             <StatusPill kind={status.kind} label={status.label} onClick={onStatusClick} />
+          ) : null}
+
+          {armSyncFailed && pane !== 'night' ? (
+            <div
+              className="flex items-center gap-3 rounded-2xl px-4 py-3"
+              style={{ backgroundColor: HV_RED }}
+              data-hv-arm-banner
+            >
+              <p className="min-w-0 flex-1 text-[14px] font-semibold text-white">
+                {HV_ALARM_INACTIVE}
+              </p>
+              <button
+                type="button"
+                onClick={() => void retryArmSync()}
+                className="ios-press shrink-0 rounded-xl bg-white/20 px-3 py-2 text-[13px] font-semibold text-white"
+                data-hv-arm-retry
+              >
+                Réessayer
+              </button>
+            </div>
           ) : null}
 
           {toast && pane !== 'night' ? (
@@ -1216,9 +1295,13 @@ export function HvFlow({ open, onClose, initialPane = 'activation' }: Props) {
                           {HV_WEEKDAY_LABELS_FR[slot.weekday]}
                         </span>
                         <span className="min-w-0 flex-1">
-                          {slot.kind === 'repos' || !slot.startHm ? (
+                          {slot.kind === 'repos' ? (
                             <span className="text-[14px]" style={{ color: GRAY }}>
                               Repos
+                            </span>
+                          ) : !slot.startHm ? (
+                            <span className="text-[14px]" style={{ color: GRAY }}>
+                              À régler
                             </span>
                           ) : (
                             <>

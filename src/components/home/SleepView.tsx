@@ -138,6 +138,9 @@ export function SleepView() {
     }
   }, [])
 
+  // HV sync: only on HV_CHANGED (hvTick). Do NOT depend on SLEEP_ALARM_CHANGED /
+  // sleep tick — sync saves would otherwise re-enter forever. syncHvAlarms also
+  // skips when the wake signature is unchanged.
   useEffect(() => {
     const hv = getHvState()
     if (!hv.settings.enabled) return
@@ -146,11 +149,9 @@ export function SleepView() {
       saveHvState({
         settings: { ...hv.settings, autoPaused: true, autoPauseCardDismissed: false },
       })
-      void syncHvAlarms()
-    } else {
-      void syncHvAlarms()
     }
-  }, [hvTick, tick])
+    void syncHvAlarms()
+  }, [hvTick])
 
   useEffect(() => {
     const schedule = getSleepSchedule()

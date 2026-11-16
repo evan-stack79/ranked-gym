@@ -183,14 +183,23 @@ export function defaultWeekSlots(startHm = '08:00'): HvWeekdaySlot[] {
   })
 }
 
+/** Empty model (B/C/D): work days « À régler », no invented 14:00 start. */
+export function emptyWeekSlots(): HvWeekdaySlot[] {
+  return ([1, 2, 3, 4, 5, 6, 7] as const).map((weekday) => {
+    if (weekday >= 6) {
+      return { weekday, kind: 'repos' as const, startHm: null }
+    }
+    return { weekday, kind: 'work' as const, startHm: null }
+  })
+}
+
 export function defaultCycleWeeks(length: HvCycleLength = 1): HvCycleWeek[] {
-  const starts = ['08:00', '14:00', '22:00', '06:00'] as const
   const names = ['A', 'B', 'C', 'D'] as const
   const letters: HvWeekTemplate[] = ['A', 'B', 'C', 'D']
   return letters.slice(0, length).map((letter, i) => ({
     letter,
     name: names[i]!,
-    slots: defaultWeekSlots(starts[i]!),
+    slots: i === 0 ? defaultWeekSlots('08:00') : emptyWeekSlots(),
   }))
 }
 
@@ -205,7 +214,7 @@ export function defaultHvSettings(now = new Date()): HvSettings {
     cycleLength: 1,
     cycleWeeks,
     weekASlots: cycleWeeks[0]!.slots,
-    weekBSlots: defaultWeekSlots('14:00'),
+    weekBSlots: emptyWeekSlots(),
     weekARefMondayKey: mondayKeyOf(now),
     reminderWeekday: 7,
     sundayReminderHm: HV_SUNDAY_REMINDER_MIN_HM,
@@ -236,7 +245,12 @@ export function syncCycleSlots(settings: HvSettings): HvSettings {
       {
         letter,
         name: letter,
-        slots: i === 1 ? settings.weekBSlots : defaultWeekSlots(i === 2 ? '22:00' : '06:00'),
+        slots:
+          i === 1
+            ? settings.weekBSlots?.some((s) => s.startHm)
+              ? settings.weekBSlots
+              : emptyWeekSlots()
+            : emptyWeekSlots(),
       },
     ]
   }
@@ -324,7 +338,12 @@ export function sanitizeWeekSlots(
     const kind = r.kind === 'repos' ? 'repos' : 'work'
     let startHm: string | null = null
     if (kind === 'work') {
-      startHm = typeof r.startHm === 'string' ? snapHmToStep(r.startHm) ?? '08:00' : '08:00'
+      // null / missing = « À régler » (not invented 08:00 / 14:00)
+      if (typeof r.startHm === 'string' && r.startHm.trim()) {
+        startHm = snapHmToStep(r.startHm) ?? null
+      } else {
+        startHm = null
+      }
     }
     const lastStartHm =
       typeof r.lastStartHm === 'string'
@@ -343,7 +362,7 @@ export function sanitizeWeekSlots(
     (weekday) => byWd.get(weekday) ?? fallback.find((s) => s.weekday === weekday) ?? {
       weekday,
       kind: weekday >= 6 ? 'repos' : 'work',
-      startHm: weekday >= 6 ? null : '08:00',
+      startHm: null,
     },
   )
 }
@@ -443,9 +462,27 @@ export function materializeDaysFromTemplates(args: {
       continue
     }
     const startHm = slot.startHm
-    const kind = startHm
-      ? classifyDayKindFromStart(startHm, { isMinor: args.isMinor })
-      : 'tot'
+    if (!startHm) {
+      // Empty model day (« À régler ») — no invented wake.
+      out.push({
+        ...(prev ?? emptyDayPlan(key)),
+        dateKey: key,
+        kind: 'unset',
+        startHm: null,
+        finishHm: null,
+        lastStartHm: prev?.lastStartHm ?? slot.lastStartHm ?? null,
+        noAlarm: true,
+        softWake: false,
+        softWakeHm: prev?.softWakeHm ?? HV_REST_SOFT_WAKE_HM,
+        wakeOverrideHm: null,
+        oneShotOffsetMin: 0,
+        exception: false,
+        trajetMin: prev?.trajetMin ?? null,
+        prepMin: prev?.prepMin ?? null,
+      })
+      continue
+    }
+    const kind = classifyDayKindFromStart(startHm, { isMinor: args.isMinor })
     out.push({
       ...(prev ?? emptyDayPlan(key)),
       dateKey: key,
@@ -850,6 +887,18 @@ export function nextArmedWake(
     if (at.getTime() > nowMs) return { ...w, wakeAt: at }
   }
   return null
+}
+
+/** « Lundi 06:15 » — next wake label before Activer. */
+export function formatNextWakeLabelFr(wake: {
+  dateKey: string
+  wakeHm: string
+}): string {
+  const wd = isoWeekdayFromKey(wake.dateKey)
+  const day = wd ? HV_WEEKDAY_LABELS_FR[wd] : wake.dateKey
+  const hm = parseHm(wake.wakeHm)
+  const time = hm ? formatHm(hm.hour, hm.minute) : wake.wakeHm
+  return `${day} ${time}`
 }
 
 /**

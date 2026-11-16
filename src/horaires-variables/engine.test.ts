@@ -257,7 +257,7 @@ describe('HV activation pickers (Evan 21h03)', () => {
     expect(snapHmToStep('08:08')).toBe('08:15')
   })
 
-  it('A/B materialize : semaine A vs B + repos week-end', () => {
+  it('A/B materialize : semaine A vs B remplie + repos week-end', () => {
     const settings = {
       ...defaultHvSettings(new Date('2026-11-09T12:00:00')),
       weeksAb: true,
@@ -288,5 +288,12 @@ describe('HV activation pickers (Evan 21h03)', () => {
     expect(monB?.startHm).toBe('14:00')
     // 14:00 − 1 h 15 − 30 min = 12:15
     expect(effectiveWakeForDay(monB!, 75, 30)).toBe('12:15')
+  })
+
+  it('semaine B par défaut vide (pas 14:00 inventé)', async () => {
+    const { emptyWeekSlots, defaultCycleWeeks, defaultHvSettings } = await import('./engine')
+    expect(emptyWeekSlots().find((s) => s.weekday === 1)?.startHm).toBeNull()
+    expect(defaultCycleWeeks(2)[1]!.slots.find((s) => s.weekday === 1)?.startHm).toBeNull()
+    expect(defaultHvSettings().weekBSlots.find((s) => s.weekday === 1)?.startHm).toBeNull()
   })
 })
