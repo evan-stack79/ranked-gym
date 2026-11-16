@@ -473,7 +473,46 @@ export async function readSleepAlarmUiStatus(): Promise<SleepAlarmUiStatus> {
       const perm = await RankedAlarm.checkPermissions()
       if (perm.alarms !== 'granted') return { kind: 'permission' }
       const { alarms } = await RankedAlarm.getAlarms()
-      if (alarms.length !== 1) {
+
+      // HV « Mon planning » arms up to HV_MAX_ARMED_ALARMS fixed wakes — not 1.
+      // Alert only when some expected wakes are missing (never "Trop de réveils" for N≈10).
+      let hvExpected: number | null = null
+      try {
+        const { isHvModeActive, getHvState } = await import('./horairesVariables/storage')
+        if (isHvModeActive()) {
+          const { buildArmedWakes, dateKeyOf } = await import('../horaires-variables/engine')
+          const { HV_MAX_ARMED_ALARMS } = await import('../horaires-variables/constants')
+          const hv = getHvState()
+          const now = new Date()
+          const wakes = buildArmedWakes({
+            days: hv.days,
+            trajetMin: hv.settings.trajetMin,
+            prepMin: hv.settings.prepMin,
+            fromDateKey: dateKeyOf(now),
+            maxArmed: HV_MAX_ARMED_ALARMS,
+            now,
+          })
+          hvExpected = wakes.length
+        }
+      } catch {
+        hvExpected = null
+      }
+
+      if (hvExpected != null) {
+        if (alarms.length < hvExpected) {
+          return {
+            kind: 'mismatch',
+            expected: hvExpected,
+            actual: alarms.length,
+            message:
+              alarms.length === 0
+                ? 'Ton réveil a sauté. Règle-le à nouveau.'
+                : "Ton réveil n'est pas actif",
+          }
+        }
+        // Enough (or more) alarms present — show next wake, no false "Trop de réveils".
+      } else if (alarms.length !== 1) {
+        // Classic single réveil (e1a8801) — unchanged.
         return {
           kind: 'mismatch',
           expected: 1,
@@ -488,7 +527,7 @@ export async function readSleepAlarmUiStatus(): Promise<SleepAlarmUiStatus> {
       if (!primary) {
         return {
           kind: 'mismatch',
-          expected: 1,
+          expected: hvExpected ?? 1,
           actual: 0,
           message: 'Ton réveil a sauté. Règle-le à nouveau.',
         }
