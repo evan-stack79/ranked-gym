@@ -274,6 +274,46 @@ describe('HV sync make-before-break + verify', () => {
     expect(getHvSyncLastError()).toMatch(/MISSING_AFTER_SYNC/)
     expect(r.ids).toContain('old-x')
   })
+
+  it('planning OFF: cancel HV armed ids, restore simple createAlarm, clear armedAlarmIds', async () => {
+    await seedEnabledPlanning({ oldIds: ['hv-1', 'hv-2'] })
+    liveAlarms.set('hv-1', { id: 'hv-1' })
+    liveAlarms.set('hv-2', { id: 'hv-2' })
+    const { saveHvState, getHvState } = await import('./storage')
+    saveHvState({ settings: { ...getHvState().settings, enabled: false } })
+    const { saveSleepAlarmSettings } = await import('../sleepAlarmStorage')
+    saveSleepAlarmSettings({ enabled: true, timeHm: '07:00', days: [] })
+
+    const order: string[] = []
+    cancelAlarm.mockImplementation(async ({ id }: { id: string }) => {
+      order.push(`cancel:${id}`)
+      liveAlarms.delete(id)
+    })
+    createAlarm.mockImplementation(async () => {
+      order.push('createAlarm')
+      liveAlarms.clear()
+      liveAlarms.set('simple-new', { id: 'simple-new' })
+      return { id: 'simple-new' }
+    })
+    cancelAll.mockImplementation(async () => {
+      order.push('cancelAll')
+      return { remaining: 0 }
+    })
+
+    const { syncHvAlarms, __resetHvSyncGateForTests } = await import('./sync')
+    __resetHvSyncGateForTests()
+    const r = await syncHvAlarms(new Date(2026, 10, 16, 12, 0, 0))
+    expect(r.ok).toBe(true)
+    expect(r.reason).toBe('OFF')
+    expect(r.armed).toBe(1)
+    expect(getHvState().armedAlarmIds).toEqual([])
+    expect(order[0]).toMatch(/^cancel:/)
+    expect(order).toContain('createAlarm')
+    expect(order.includes('cancelAll')).toBe(false)
+    expect(liveAlarms.size).toBe(1)
+    expect(liveAlarms.has('simple-new')).toBe(true)
+    expect(createFixedAlarm).not.toHaveBeenCalled()
+  })
 })
 
 describe('HV next wake + empty week B + phrases', () => {

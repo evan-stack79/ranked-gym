@@ -15,11 +15,18 @@ export function repereBottomPx(repereMin: number): number {
   return barHeightPx(repereMin)
 }
 
-/** Empty night → dashed stub, never a 0-height bar. */
+/**
+ * Empty night → dashed stub (past), never a 0-height bar.
+ * Future nights / no figure → empty (no stub, no bar).
+ */
 export function chartSlotKind(
   durationMin: number | null | undefined,
-): 'bar' | 'stub' {
-  return durationMin != null && durationMin > 0 ? 'bar' : 'stub'
+  opts?: { future?: boolean; emptyUnrecorded?: boolean },
+): 'bar' | 'stub' | 'empty' {
+  if (opts?.future) return 'empty'
+  if (durationMin != null && durationMin > 0) return 'bar'
+  if (opts?.emptyUnrecorded) return 'empty'
+  return 'stub'
 }
 
 export function formatBarDurationLabel(durationMin: number): string {

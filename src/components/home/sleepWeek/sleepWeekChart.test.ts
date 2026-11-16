@@ -9,11 +9,14 @@ import {
 } from './sleepWeekChart'
 
 describe('sleepWeekChart', () => {
-  it('empty / null night → stub, never a 0 bar', () => {
+  it('empty / null night → stub, never a 0 bar; future → empty', () => {
     expect(chartSlotKind(null)).toBe('stub')
     expect(chartSlotKind(undefined)).toBe('stub')
     expect(chartSlotKind(0)).toBe('stub')
     expect(chartSlotKind(470)).toBe('bar')
+    expect(chartSlotKind(null, { future: true })).toBe('empty')
+    expect(chartSlotKind(470, { future: true })).toBe('empty')
+    expect(chartSlotKind(null, { emptyUnrecorded: true })).toBe('empty')
   })
 
   it('bar height scales to 10 h max; stub path never uses height 0 as a bar', () => {

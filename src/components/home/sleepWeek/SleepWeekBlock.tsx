@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { usePrefersReducedMotion } from '../../../hooks/usePrefersReducedMotion'
 import { AIDE, LIGNE_PRO, etat, etatTexts } from '../../../sleep-week-engine'
 import type { SleepNightEntry } from '../../../services/sleepStorage'
@@ -51,6 +51,53 @@ function PantherHeads({ half }: { half: number }) {
   )
 }
 
+/** Local calendar « today » — refreshed on foreground + midnight, never frozen at mount. */
+function useLocalTodayMs(): number {
+  const [todayMs, setTodayMs] = useState(() => Date.now())
+
+  useEffect(() => {
+    const bump = () => setTodayMs(Date.now())
+
+    const onVis = () => {
+      if (document.visibilityState !== 'hidden') bump()
+    }
+    document.addEventListener('visibilitychange', onVis)
+
+    let removeApp: (() => void) | undefined
+    void (async () => {
+      try {
+        const { App } = await import('@capacitor/app')
+        const handle = await App.addListener('appStateChange', ({ isActive }) => {
+          if (isActive) bump()
+        })
+        removeApp = () => {
+          void handle.remove()
+        }
+      } catch {
+        /* web */
+      }
+    })()
+
+    const scheduleMidnight = () => {
+      const now = new Date()
+      const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1, 0)
+      return window.setTimeout(() => {
+        bump()
+        midnightTimer = scheduleMidnight()
+      }, Math.max(1_000, next.getTime() - now.getTime()))
+    }
+    let midnightTimer = scheduleMidnight()
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVis)
+      removeApp?.()
+      window.clearTimeout(midnightTimer)
+    }
+  }, [])
+
+  return todayMs
+}
+
 interface SleepWeekBlockProps {
   nights: SleepNightEntry[]
   age: number
@@ -58,10 +105,20 @@ interface SleepWeekBlockProps {
 
 export function SleepWeekBlock({ nights, age }: SleepWeekBlockProps) {
   const reduced = usePrefersReducedMotion()
-  const model = useMemo(() => buildSleepWeekModel(nights, age), [nights, age])
+  const todayMs = useLocalTodayMs()
+  const [weekOffset, setWeekOffset] = useState<0 | -1>(0)
+  const model = useMemo(
+    () =>
+      buildSleepWeekModel(nights, age, {}, { now: new Date(todayMs), weekOffset }),
+    [nights, age, todayMs, weekOffset],
+  )
   const [selected, setSelected] = useState<number | null>(null)
   const [appeared, setAppeared] = useState(reduced)
   const [aideOpen, setAideOpen] = useState(false)
+
+  useEffect(() => {
+    setSelected(null)
+  }, [model.weekStart])
 
   const tip = useMemo(() => {
     // SCIENCE_12 : aucun conseil / profil d'état avant 5 nuits valides (y compris état 3).
@@ -85,21 +142,49 @@ export function SleepWeekBlock({ nights, age }: SleepWeekBlockProps) {
     setAppeared(false)
     const t = window.setTimeout(() => setAppeared(true), 40)
     return () => window.clearTimeout(t)
-  }, [model?.weekStart, reduced])
+  }, [model.weekStart, reduced])
 
-  if (!model || model.validCount === 0) return null
+  const hasAnyEntry = nights.length > 0
+  if (!hasAnyEntry) return null
 
-  const parts = fmtDurParts(model.avgMin ?? 0)
+  const showAvgFigures = model.validCount > 0
+  const parts = showAvgFigures ? fmtDurParts(model.avgMin ?? 0) : null
   const sub = nightsSurSeptLabel(model.validCount)
   const refBottom = repereBottomPx(model.Bb)
 
   return (
     <section className="mt-4 shrink-0 pb-2" data-sleep-week-block data-sleep-week-variant="bars-v2">
-      <div className="mb-2.5 flex items-baseline justify-between px-1">
+      <div className="mb-2.5 flex items-baseline justify-between gap-2 px-1">
         <h2 className="text-[22px] font-extrabold tracking-tight text-white">Ta semaine</h2>
         <span className="text-[13px] font-semibold" style={{ color: GRAY }} data-sleep-week-range>
           {model.weekLabel}
         </span>
+      </div>
+
+      <div className="mb-2 flex items-center justify-end px-1">
+        {weekOffset === 0 ? (
+          <button
+            type="button"
+            className="ios-press inline-flex items-center gap-0.5 text-[13px] font-semibold"
+            style={{ color: RED }}
+            onClick={() => setWeekOffset(-1)}
+            data-sleep-week-prev
+          >
+            Semaine dernière
+            <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="ios-press inline-flex items-center gap-0.5 text-[13px] font-semibold"
+            style={{ color: RED }}
+            onClick={() => setWeekOffset(0)}
+            data-sleep-week-current
+          >
+            <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+            Cette semaine
+          </button>
+        )}
       </div>
 
       <div
@@ -122,6 +207,7 @@ export function SleepWeekBlock({ nights, age }: SleepWeekBlockProps) {
                 }}
                 data-sleep-week-day={d.index}
                 data-sleep-week-day-state={on ? 'sel' : hasNight ? 'has' : 'no'}
+                data-sleep-week-day-future={d.future ? '1' : '0'}
                 style={{
                   opacity: appeared ? 1 : 0,
                   transform: appeared ? 'none' : 'translateY(6px)',
@@ -169,11 +255,19 @@ export function SleepWeekBlock({ nights, age }: SleepWeekBlockProps) {
             }}
             data-sleep-week-avg
           >
-            <span className="text-[56px] font-extrabold tracking-tight">{parts.h}</span>
-            <span className="mr-1.5 text-[26px] font-bold" style={{ color: GRAY }}>
-              h
-            </span>
-            <span className="text-[56px] font-extrabold tracking-tight">{parts.m}</span>
+            {parts ? (
+              <>
+                <span className="text-[56px] font-extrabold tracking-tight">{parts.h}</span>
+                <span className="mr-1.5 text-[26px] font-bold" style={{ color: GRAY }}>
+                  h
+                </span>
+                <span className="text-[56px] font-extrabold tracking-tight">{parts.m}</span>
+              </>
+            ) : (
+              <span className="text-[56px] font-extrabold tracking-tight" style={{ color: GRAY }}>
+                —
+              </span>
+            )}
           </p>
           <p className="mt-1.5 text-[13px] font-semibold" style={{ color: GRAY }} data-sleep-week-sub>
             {sub}
@@ -187,12 +281,13 @@ export function SleepWeekBlock({ nights, age }: SleepWeekBlockProps) {
         >
           <div className="absolute inset-0 grid grid-cols-7">
             {model.days.map((d) => {
-              const kind = chartSlotKind(d.durationMin)
+              // Future nights: empty (no bar / stub / fake figure). Past empty: dashed stub.
+              const kind = chartSlotKind(d.durationMin, { future: d.future })
               const on = selected === d.index
               const hPx = kind === 'bar' ? barHeightPx(d.durationMin!) : 0
               return (
                 <div key={d.nightDateKey} className="relative" data-sleep-week-col={d.index}>
-                  {kind === 'stub' ? (
+                  {kind === 'empty' ? null : kind === 'stub' ? (
                     <div
                       className="absolute bottom-0 left-1/2 -ml-[11px] w-[22px] rounded-[5px]"
                       style={{
@@ -307,7 +402,9 @@ export function SleepWeekBlock({ nights, age }: SleepWeekBlockProps) {
               Ressenti
             </div>
             <div className="mt-1.5 flex h-6 items-center justify-center">
-              <PantherHeads half={model.ressentiHalf} />
+              {showAvgFigures ? <PantherHeads half={model.ressentiHalf} /> : (
+                <span style={{ color: GRAY }}>—</span>
+              )}
             </div>
           </div>
         </div>

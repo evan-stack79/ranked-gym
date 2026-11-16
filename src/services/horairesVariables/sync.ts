@@ -156,13 +156,77 @@ function knownOldIds(stateIds: string[]): string[] {
   return [...new Set(all.filter(Boolean))]
 }
 
+/**
+ * Planning OFF: cancel known HV armed ids, re-arm classic single réveil
+ * via createAlarm (native make-before-break e1a8801), clear armedAlarmIds.
+ */
+export async function teardownHvAlarmsRestoreSimple(): Promise<HvSyncResult> {
+  const state = getHvState()
+  const hvIds = [...state.armedAlarmIds]
+  // Cancel HV fixed wakes first (do not touch classic make-before-break ordering).
+  await cancelKnownIds(hvIds)
+
+  const settings = getSleepAlarmSettings()
+  const soundName = settings.soundId === 'none' ? undefined : SLEEP_ALARM_SOUND_FILE
+  let simpleId: string | null = null
+
+  if (isRankedAlarmPluginAvailable() && settings.enabled) {
+    const parsed = parseHm(settings.timeHm)
+    if (parsed) {
+      try {
+        const perm = await RankedAlarm.requestPermissions()
+        if (perm.alarms === 'granted') {
+          // Classic createAlarm — native verify then cancelAll(except new). Unchanged path.
+          const r = await RankedAlarm.createAlarm({
+            hour: parsed.hour,
+            minute: parsed.minute,
+            label: 'Réveil',
+            snoozeEnabled: true,
+            snoozeMinutes: 9,
+            soundName,
+          })
+          if (r.id) {
+            simpleId = r.id
+            saveSleepAlarmSettings({
+              enabled: true,
+              timeHm: settings.timeHm,
+              days: [],
+              alarmKitId: r.id,
+            })
+          }
+        }
+      } catch (err) {
+        console.warn('[hv] restore simple after OFF', err)
+      }
+    }
+  }
+
+  // Drop any leftover HV ids that createAlarm did not sweep (best effort).
+  if (hvIds.length > 0) {
+    await cancelKnownIds(hvIds.filter((id) => id && id !== simpleId))
+  }
+
+  saveHvState({ armedAlarmIds: [] })
+  lastOkSignature = 'OFF'
+  lastOkIds = simpleId ? [simpleId] : []
+  setHvSyncLastError(null)
+  return {
+    ok: true,
+    armed: simpleId ? 1 : 0,
+    ids: simpleId ? [simpleId] : [],
+    reason: 'OFF',
+    lastError: null,
+  }
+}
+
 async function syncHvAlarmsBody(now: Date): Promise<HvSyncResult> {
   const state = getHvState()
   const today = dateKeyOf(now)
   const nowMs = now.getTime()
 
   if (!state.settings.enabled) {
-    return { ok: true, armed: 0, ids: [], reason: 'OFF' }
+    // Always tear down leftover HV fixed alarms when planning is off.
+    return teardownHvAlarmsRestoreSimple()
   }
 
   const hasAnyStart = state.days.some((d) => Boolean(d.startHm))

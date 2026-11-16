@@ -472,14 +472,16 @@ export async function readSleepAlarmUiStatus(): Promise<SleepAlarmUiStatus> {
     try {
       const perm = await RankedAlarm.checkPermissions()
       if (perm.alarms !== 'granted') return { kind: 'permission' }
-      const { alarms } = await RankedAlarm.getAlarms()
+      let { alarms } = await RankedAlarm.getAlarms()
 
       // HV « Mon planning » arms up to HV_MAX_ARMED_ALARMS fixed wakes — not 1.
       // Alert only when some expected wakes are missing (never "Trop de réveils" for N≈10).
       let hvExpected: number | null = null
+      let hvActive = false
       try {
         const { isHvModeActive, getHvState } = await import('./horairesVariables/storage')
-        if (isHvModeActive()) {
+        hvActive = isHvModeActive()
+        if (hvActive) {
           const { buildArmedWakes, dateKeyOf } = await import('../horaires-variables/engine')
           const { HV_MAX_ARMED_ALARMS } = await import('../horaires-variables/constants')
           const hv = getHvState()
@@ -496,6 +498,7 @@ export async function readSleepAlarmUiStatus(): Promise<SleepAlarmUiStatus> {
         }
       } catch {
         hvExpected = null
+        hvActive = false
       }
 
       if (hvExpected != null) {
@@ -512,15 +515,30 @@ export async function readSleepAlarmUiStatus(): Promise<SleepAlarmUiStatus> {
         }
         // Enough (or more) alarms present — show next wake, no false "Trop de réveils".
       } else if (alarms.length !== 1) {
-        // Classic single réveil (e1a8801) — unchanged.
-        return {
-          kind: 'mismatch',
-          expected: 1,
-          actual: alarms.length,
-          message:
-            alarms.length === 0
-              ? 'Ton réveil a sauté. Règle-le à nouveau.'
-              : 'Trop de réveils. Règle-le à nouveau.',
+        // Planning off + leftover HV fixed alarms → cancel known ids / restore simple, then re-check.
+        if (!hvActive && alarms.length > 1) {
+          try {
+            const { teardownHvAlarmsRestoreSimple } = await import(
+              './horairesVariables/sync'
+            )
+            await teardownHvAlarmsRestoreSimple()
+            const again = await RankedAlarm.getAlarms()
+            alarms = again.alarms
+          } catch (err) {
+            console.warn('[sleep-alarm] HV-off leftover cleanup', err)
+          }
+        }
+        if (alarms.length !== 1) {
+          // Classic single réveil — alert only if still incoherent after cleanup.
+          return {
+            kind: 'mismatch',
+            expected: 1,
+            actual: alarms.length,
+            message:
+              alarms.length === 0
+                ? 'Ton réveil a sauté. Règle-le à nouveau.'
+                : 'Trop de réveils. Règle-le à nouveau.',
+          }
         }
       }
       const primary = pickPrimaryAlarm(alarms)

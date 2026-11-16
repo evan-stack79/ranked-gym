@@ -39,15 +39,16 @@ function shift(dateKey: string, days: number): string | null {
   return formatDateKey(dt)
 }
 
-function mondayOfLatestNight(entries: SleepNightEntry[]): string | null {
-  if (entries.length === 0) return null
-  const latestWake = [...entries].map((e) => e.dateKey).sort().at(-1)!
-  const nightKey = shift(latestWake, -1)
-  if (!nightKey) return null
-  const dt = parseDateKey(nightKey)
-  if (!dt) return null
-  const idx = (dt.getDay() + 6) % 7
-  return shift(nightKey, -idx)
+/** Lundi local de la date civile `now` (0=lun … 6=dim). */
+export function mondayOfLocalDate(now: Date): string {
+  const key = formatDateKey(now)
+  const idx = (now.getDay() + 6) % 7
+  return shift(key, -idx)!
+}
+
+/** @deprecated kept for call-site greps — prefer mondayOfLocalDate. */
+export function mondayOfLatestNight(_entries: SleepNightEntry[]): string | null {
+  return mondayOfLocalDate(new Date())
 }
 
 function hm(s: string): number {
@@ -70,6 +71,8 @@ export type SleepWeekDaySlot = {
   nightDateKey: string
   night: SleepEngineNight | null
   durationMin: number | null
+  /** Calendar night after today — no bar / no stub / no fake figure. */
+  future: boolean
   label: string
   hoursLabel: string
 }
@@ -77,6 +80,9 @@ export type SleepWeekDaySlot = {
 export type SleepWeekModel = {
   weekStart: string
   weekLabel: string
+  /** 0 = cette semaine (lundi d’aujourd’hui), -1 = semaine dernière. */
+  weekOffset: 0 | -1
+  todayKey: string
   days: SleepWeekDaySlot[]
   nights: SleepEngineNight[]
   validCount: number
@@ -91,13 +97,26 @@ export type SleepWeekModel = {
   etatId: number
 }
 
+export type BuildSleepWeekModelOpts = {
+  now?: Date
+  /** 0 = current week from today’s Monday; -1 = previous week. */
+  weekOffset?: 0 | -1
+}
+
 export function buildSleepWeekModel(
   entries: SleepNightEntry[],
   age: number,
   q: SleepEtatQ = {},
-): SleepWeekModel | null {
-  const weekStart = mondayOfLatestNight(entries)
-  if (!weekStart) return null
+  opts: BuildSleepWeekModelOpts = {},
+): SleepWeekModel {
+  const now = opts.now ?? new Date()
+  const weekOffset: 0 | -1 = opts.weekOffset === -1 ? -1 : 0
+  const todayKey = formatDateKey(now)
+  let weekStart = mondayOfLocalDate(now)
+  if (weekOffset === -1) {
+    weekStart = shift(weekStart, -7)!
+  }
+
   const nights = nightsFromSleepEntries(entries, weekStart)
   const ageSafe = age > 0 ? age : 24
   const [Bb, Bh] = besoin(ageSafe)
@@ -107,8 +126,10 @@ export function buildSleepWeekModel(
   const days: SleepWeekDaySlot[] = DAY_KEYS.map((key, i) => {
     const nightDateKey = shift(weekStart, i)!
     const dt = parseDateKey(nightDateKey)!
-    const night = nights.find((n) => n.day === key) ?? null
-    const durationMin = night ? nightDurationMin(night.bed, night.wake) : null
+    const future = nightDateKey > todayKey
+    const night = future ? null : (nights.find((n) => n.day === key) ?? null)
+    const durationMin =
+      !future && night ? nightDurationMin(night.bed, night.wake) : null
     return {
       index: i,
       letter: DAY_LETTERS[i]!,
@@ -116,6 +137,7 @@ export function buildSleepWeekModel(
       nightDateKey,
       night,
       durationMin,
+      future,
       label: DAY_NAMES[i]!,
       hoursLabel:
         night && durationMin != null
@@ -145,6 +167,8 @@ export function buildSleepWeekModel(
   return {
     weekStart,
     weekLabel,
+    weekOffset,
+    todayKey,
     days,
     nights,
     validCount: s.n,
