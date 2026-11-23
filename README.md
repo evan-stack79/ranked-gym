@@ -52,6 +52,11 @@ VITE_GOOGLE_MAPS_API_KEY=ta_cle_ici
 
 Active **Places API** et **Geocoding API** sur Google Cloud. Tant que la clé est vide, l’app affiche 3 salles mock autour de ta position.
 
+## Spec-Driven Development
+
+Baseline Spec Kit (Cursor / `cursor-agent`) : voir [`docs/SPEC_KIT.md`](docs/SPEC_KIT.md).
+Constitution : `.specify/memory/constitution.md`. Merge/deploy seulement avec GO Evan.
+
 ## Scripts
 
 | Commande | Description |
