@@ -6,6 +6,7 @@ import { getActiveCloudUserId } from '../cloudSession'
 import { readLocal, removeLocal, writeLocal } from '../secureLocalStore'
 import type { CreneauCrowdLevel } from '../../creneau/constants'
 import type { CrowdReport } from '../../creneau/engine'
+import { TERGNIER_COORDS } from '../../creneau/sunset'
 
 export const CRENEAU_STORAGE_BASE = 'ranked-gym:creneau'
 export const CRENEAU_CHANGED_EVENT = 'ranked-gym:creneau-changed'
@@ -18,23 +19,21 @@ export type CreneauGymPrefs = {
   staffFromHm: string | null
   staffUntilHm: string | null
   closesHm: string | null
+  /** Ville / coords pour B2 sunset (salle). */
+  city?: string
+  latitude?: number
+  longitude?: number
 }
 
 export type CreneauSettings = {
   favorite: CreneauGymPrefs | null
   backup: CreneauGymPrefs | null
-  /** À pied | vélo | transports | voiture — display only for v1. */
   trajetMode: 'pied' | 'velo' | 'transports' | 'voiture'
   lockerMin: number
-  /** Adults: « Je marche aussi le soir » (default off). */
   eveningWalkEnabled: boolean
-  /** Adults: « Salle sans personnel » (default off). */
   stafflessGymEnabled: boolean
   preferQuiet: boolean
-  /** Local heat flag (user / operator). No external weather API required. */
   heatVigilanceToday: boolean
-  /** After sunset for today — set by UI from clock or user; no paid API. */
-  afterSunset: boolean
   crowdReports: CrowdReport[]
 }
 
@@ -47,7 +46,6 @@ const DEFAULTS: CreneauSettings = {
   stafflessGymEnabled: false,
   preferQuiet: true,
   heatVigilanceToday: false,
-  afterSunset: false,
   crowdReports: [],
 }
 
@@ -82,6 +80,28 @@ function sanitizeGym(raw: unknown): CreneauGymPrefs | null {
     staffFromHm: typeof g.staffFromHm === 'string' ? g.staffFromHm : null,
     staffUntilHm: typeof g.staffUntilHm === 'string' ? g.staffUntilHm : '22:00',
     closesHm: typeof g.closesHm === 'string' ? g.closesHm : null,
+    city: typeof g.city === 'string' ? g.city.slice(0, 60) : undefined,
+    latitude:
+      typeof g.latitude === 'number' && Number.isFinite(g.latitude)
+        ? g.latitude
+        : undefined,
+    longitude:
+      typeof g.longitude === 'number' && Number.isFinite(g.longitude)
+        ? g.longitude
+        : undefined,
+  }
+}
+
+function sanitizeReport(r: unknown): CrowdReport | null {
+  if (!r || typeof r !== 'object') return null
+  const x = r as CrowdReport
+  if (typeof x.gymId !== 'string' || typeof x.atMs !== 'number') return null
+  if (!['calme', 'moyen', 'charge'].includes(x.level)) return null
+  return {
+    gymId: x.gymId,
+    level: x.level,
+    atMs: x.atMs,
+    personId: typeof x.personId === 'string' ? x.personId.slice(0, 120) : undefined,
   }
 }
 
@@ -91,16 +111,7 @@ export function getCreneauSettings(): CreneauSettings {
     if (!raw) return { ...DEFAULTS, crowdReports: [] }
     const parsed = JSON.parse(raw) as Partial<CreneauSettings>
     const reports = Array.isArray(parsed.crowdReports)
-      ? parsed.crowdReports
-          .filter(
-            (r): r is CrowdReport =>
-              !!r &&
-              typeof r === 'object' &&
-              typeof (r as CrowdReport).gymId === 'string' &&
-              typeof (r as CrowdReport).atMs === 'number' &&
-              ['calme', 'moyen', 'charge'].includes((r as CrowdReport).level),
-          )
-          .slice(-200)
+      ? parsed.crowdReports.map(sanitizeReport).filter((r): r is CrowdReport => !!r).slice(-200)
       : []
     return {
       favorite: sanitizeGym(parsed.favorite),
@@ -119,7 +130,6 @@ export function getCreneauSettings(): CreneauSettings {
       stafflessGymEnabled: Boolean(parsed.stafflessGymEnabled),
       preferQuiet: parsed.preferQuiet !== false,
       heatVigilanceToday: Boolean(parsed.heatVigilanceToday),
-      afterSunset: Boolean(parsed.afterSunset),
       crowdReports: reports,
     }
   } catch {
@@ -141,13 +151,33 @@ export function saveCreneauSettings(patch: Partial<CreneauSettings>): CreneauSet
   return next
 }
 
+function localPersonId(): string {
+  const uid = getActiveCloudUserId()
+  if (uid) return `u:${uid}`
+  try {
+    const key = 'ranked-gym:creneau-person'
+    let id = localStorage.getItem(key)
+    if (!id) {
+      id = `local:${Math.random().toString(36).slice(2, 10)}`
+      localStorage.setItem(key, id)
+    }
+    return id
+  } catch {
+    return 'local:anon'
+  }
+}
+
 export function recordCrowdTap(
   gymId: string,
   level: CreneauCrowdLevel,
   atMs = Date.now(),
+  personId?: string,
 ): CreneauSettings {
   const cur = getCreneauSettings()
-  const crowdReports = [...cur.crowdReports, { gymId, level, atMs }].slice(-200)
+  const crowdReports = [
+    ...cur.crowdReports,
+    { gymId, level, atMs, personId: personId ?? localPersonId() },
+  ].slice(-200)
   return saveCreneauSettings({ crowdReports })
 }
 
@@ -156,10 +186,26 @@ export function clearCreneauSettings(): void {
   notify()
 }
 
-/** Seed demo salles once (favorite + backup) when empty — editable in UI. */
+/** Seed demo salles once — Salle de la gare @ Tergnier (B2 / Vérificateur). */
 export function ensureDefaultGyms(): CreneauSettings {
   const cur = getCreneauSettings()
-  if (cur.favorite && cur.backup) return cur
+  if (cur.favorite && cur.backup) {
+    // Backfill coords if missing on favorite
+    if (
+      cur.favorite &&
+      (cur.favorite.latitude == null || cur.favorite.longitude == null)
+    ) {
+      return saveCreneauSettings({
+        favorite: {
+          ...cur.favorite,
+          city: cur.favorite.city ?? TERGNIER_COORDS.name,
+          latitude: TERGNIER_COORDS.latitude,
+          longitude: TERGNIER_COORDS.longitude,
+        },
+      })
+    }
+    return cur
+  }
   return saveCreneauSettings({
     favorite: cur.favorite ?? {
       id: 'fav-gare',
@@ -169,6 +215,9 @@ export function ensureDefaultGyms(): CreneauSettings {
       staffFromHm: '07:00',
       staffUntilHm: '22:00',
       closesHm: '23:00',
+      city: TERGNIER_COORDS.name,
+      latitude: TERGNIER_COORDS.latitude,
+      longitude: TERGNIER_COORDS.longitude,
     },
     backup: cur.backup ?? {
       id: 'bk-republique',
@@ -178,6 +227,9 @@ export function ensureDefaultGyms(): CreneauSettings {
       staffFromHm: '08:00',
       staffUntilHm: '21:00',
       closesHm: '22:00',
+      city: TERGNIER_COORDS.name,
+      latitude: TERGNIER_COORDS.latitude,
+      longitude: TERGNIER_COORDS.longitude,
     },
   })
 }

@@ -190,8 +190,12 @@ describe('HV A/B arm cap', () => {
       trajetMin: 75,
       prepMin: 30,
       fromDateKey: planned[0].dateKey,
+      horizonDays: 20,
+      // Freeze « now » so the cap test is not flaky after the fixture start date.
+      now: new Date(2026, 10, 16, 0, 0, 0),
     })
     expect(armed.length).toBe(HV_MAX_ARMED_ALARMS)
+    expect(HV_MAX_ARMED_ALARMS).toBe(14)
     expect(armed[0].wakeHm).toBe('06:15')
     void days
   })

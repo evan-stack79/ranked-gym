@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, MapPin } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   CRENEAU_PHRASES,
   CRENEAU_RED,
@@ -9,10 +9,14 @@ import {
   activationPhrase,
   addMinutes,
   formatDelayMessage,
+  formatDeparturePassedWithNew,
   isCreneauMinor,
+  parseHm,
   proposeCreneau,
   summarizeCrowd,
+  type ProposedSlot,
 } from '../../../creneau/engine'
+import { useAuth } from '../../../context/AuthContext'
 import { getCalorieProfile } from '../../../services/nutritionStorage'
 import {
   CRENEAU_CHANGED_EVENT,
@@ -22,53 +26,71 @@ import {
   saveCreneauSettings,
   type CreneauSettings,
 } from '../../../services/creneau/storage'
+import { resolveDisplayFirstName } from '../../../utils/homeGreeting'
 import { CreneauLottie } from './CreneauLottie'
+import heroPhoto from '../../../assets/photos/creneau/shadow-boxing-pavel-danilyuk.jpg'
 
 type Pane =
   | 'home'
+  | 'confirmed'
   | 'gyms'
   | 'evening'
+  | 'other'
   | 'delay'
   | 'energy'
   | 'checkin'
   | 'delayResult'
   | 'energyResult'
+  | 'details'
 
 function nowHm(): string {
   const d = new Date()
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-function formatLongDate(d = new Date()): string {
-  return d.toLocaleDateString('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  })
-}
-
-function firstName(): string {
-  try {
-    const raw = localStorage.getItem('ranked-gym:profile')
-    if (!raw) return 'toi'
-    const p = JSON.parse(raw) as { firstName?: string; prenom?: string; name?: string }
-    return (p.firstName || p.prenom || p.name || 'toi').split(' ')[0] || 'toi'
-  } catch {
-    return 'toi'
+function gymArgs(g: NonNullable<CreneauSettings['favorite']>) {
+  return {
+    id: g.id,
+    name: g.name,
+    staffFromHm: g.staffFromHm,
+    staffUntilHm: g.staffUntilHm,
+    closesHm: g.closesHm,
+    travelMin: g.travelFromWorkMin,
+    latitude: g.latitude,
+    longitude: g.longitude,
+    cityKnown: g.latitude != null && g.longitude != null,
   }
 }
 
+function salleLine(slot: ProposedSlot): string {
+  return `${slot.gymName} · ${slot.trajetLabel}`
+}
+
 export function CreneauFlow({ onBack }: { onBack: () => void }) {
+  const { user } = useAuth()
   const [pane, setPane] = useState<Pane>('home')
   const [settings, setSettings] = useState<CreneauSettings>(() => ensureDefaultGyms())
+  const [clockHm, setClockHm] = useState(nowHm)
   const [delayMin, setDelayMin] = useState(0)
   const [soft, setSoft] = useState(false)
   const [delayResult, setDelayResult] = useState('')
   const [energyResult, setEnergyResult] = useState('')
   const [toast, setToast] = useState<string | null>(null)
+  const [committed, setCommitted] = useState(false)
+  const [activeSlot, setActiveSlot] = useState<ProposedSlot | null>(null)
+  const [showCrowdPick, setShowCrowdPick] = useState(false)
 
   const age = getCalorieProfile().age ?? null
   const minor = isCreneauMinor(age)
+
+  const displayName = resolveDisplayFirstName({
+    firstName: user?.firstName,
+    displayName: user?.displayName,
+    pseudo: user?.displayName,
+  })
+  // CA-C6: vrai prénom ou rien — jamais « toi » / « Champion » sur cet écran
+  const greetName =
+    displayName && displayName !== 'Champion' ? displayName : null
 
   useEffect(() => {
     const sync = () => setSettings(getCreneauSettings())
@@ -76,44 +98,47 @@ export function CreneauFlow({ onBack }: { onBack: () => void }) {
     return () => window.removeEventListener(CRENEAU_CHANGED_EVENT, sync)
   }, [])
 
+  // CA-C2: refresh clock so a stale departure never stays on screen
+  useEffect(() => {
+    const id = window.setInterval(() => setClockHm(nowHm()), 15_000)
+    return () => window.clearInterval(id)
+  }, [])
+
   const proposal = useMemo(() => {
     const fav = settings.favorite
     const bak = settings.backup
     return proposeCreneau({
       age,
-      nowHm: nowHm(),
-      afterSunset: settings.afterSunset,
+      nowHm: clockHm,
       heatVigilance: settings.heatVigilanceToday,
       eveningWalkEnabled: settings.eveningWalkEnabled,
       stafflessGymEnabled: settings.stafflessGymEnabled,
       preferQuiet: settings.preferQuiet,
       softSession: soft,
       delayMin,
-      favorite: fav
-        ? {
-            id: fav.id,
-            name: fav.name,
-            staffUntilHm: fav.staffUntilHm,
-            travelMin: fav.travelFromWorkMin,
-          }
-        : null,
-      backup: bak
-        ? {
-            id: bak.id,
-            name: bak.name,
-            staffUntilHm: bak.staffUntilHm,
-            travelMin: bak.travelFromWorkMin,
-          }
-        : null,
+      trajetMode: settings.trajetMode,
+      favorite: fav ? gymArgs(fav) : null,
+      backup: bak ? gymArgs(bak) : null,
       lockerMin: settings.lockerMin,
+      nowDate: new Date(),
     })
-  }, [age, settings, delayMin, soft])
+  }, [age, settings, delayMin, soft, clockHm])
+
+  const primary = activeSlot ?? proposal.primary
+  const planB = proposal.planB
+  const soleilPhrase = proposal.soleilPhrase
 
   const crowd = useMemo(() => {
-    const id = proposal.primary?.gymId
+    const id = primary?.gymId
     if (!id) return null
     return summarizeCrowd(settings.crowdReports, id, Date.now())
-  }, [proposal.primary?.gymId, settings.crowdReports])
+  }, [primary?.gymId, settings.crowdReports])
+
+  const planBCrowd = useMemo(() => {
+    const id = planB?.gymId
+    if (!id) return null
+    return summarizeCrowd(settings.crowdReports, id, Date.now())
+  }, [planB?.gymId, settings.crowdReports])
 
   const patch = useCallback((p: Partial<CreneauSettings>) => {
     setSettings(saveCreneauSettings(p))
@@ -124,49 +149,244 @@ export function CreneauFlow({ onBack }: { onBack: () => void }) {
     window.setTimeout(() => setToast(null), 3200)
   }
 
-  const primary = proposal.primary
-  const planB = proposal.planB
+  const departurePassed = useMemo(() => {
+    if (!primary || committed) return false
+    const dep = parseHm(primary.departureHm)
+    const now = parseHm(clockHm)
+    if (dep == null || now == null) return false
+    return now > dep
+  }, [primary, clockHm, committed])
 
-  return (
-    <div className="flex flex-col gap-4" data-creneau-flow data-pane={pane}>
-      <header className="flex items-center gap-2">
+  const heroTitle = useMemo(() => {
+    if (!primary) return '—'
+    if (pane === 'confirmed' || committed) {
+      return `${CRENEAU_PHRASES.notedPrefix} ${primary.departureHm}`
+    }
+    if (pane === 'checkin') {
+      return `Séance ${primary.sessionStartHm}`
+    }
+    if (pane === 'energyResult') {
+      return energyResult.includes('demain') || energyResult.includes('Demain')
+        ? 'DEMAIN'
+        : 'OK, ON VOIT ÇA'
+    }
+    if (departurePassed) {
+      // Propose +15 as new departure display
+      const next = addMinutes(primary.departureHm, 15) ?? primary.departureHm
+      return next
+    }
+    return `Pars à ${primary.departureHm}`
+  }, [primary, pane, committed, departurePassed, energyResult])
+
+  const heroPassedLine = departurePassed && primary && !committed
+    ? formatDeparturePassedWithNew(primary.departureHm)
+    : null
+
+  const line1 = primary ? salleLine(primary) : null
+  const line2 = minor
+    ? CRENEAU_PHRASES.minorHeroLine
+    : soleilPhrase
+
+  const bigButtonLabel = (() => {
+    if (pane === 'confirmed' || (committed && pane === 'home')) {
+      return CRENEAU_PHRASES.warnSomeone
+    }
+    if (pane === 'checkin') return CRENEAU_PHRASES.imHereButton
+    if (pane === 'energyResult') return CRENEAU_PHRASES.backToPlan
+    return CRENEAU_PHRASES.goButton
+  })()
+
+  const onBigButton = () => {
+    if (!primary) return
+    if (pane === 'energyResult') {
+      setPane('home')
+      setSoft(false)
+      setEnergyResult('')
+      return
+    }
+    if (pane === 'checkin') {
+      setShowCrowdPick(true)
+      return
+    }
+    if (pane === 'confirmed' || committed) {
+      void shareArrival(primary)
+      return
+    }
+    setCommitted(true)
+    setActiveSlot(primary)
+    setPane('confirmed')
+  }
+
+  const shareArrival = async (slot: ProposedSlot) => {
+    const text = `J’arrive vers ${slot.returnHm} · ${slot.gymName}`
+    try {
+      if (navigator.share) {
+        await navigator.share({ text })
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text)
+        showToast('Message prêt — colle-le pour envoyer.')
+      }
+    } catch {
+      /* user cancelled share — nothing sent */
+    }
+  }
+
+  const swapToPlanB = () => {
+    if (!planB) {
+      showToast('Pas d’autre créneau pour l’instant.')
+      return
+    }
+    setActiveSlot(planB)
+    setCommitted(false)
+    setPane('home')
+    setDelayMin(0)
+  }
+
+  const renderHero = (opts: {
+    title: string
+    passedPrefix?: string | null
+    button: string
+    onButton: () => void
+    lineA?: string | null
+    lineB?: string | null
+    showOtherTime?: boolean
+    showCancel?: boolean
+  }) => (
+    <div
+      className="relative flex min-h-[calc(100dvh-6.5rem)] flex-col overflow-hidden rounded-[28px] bg-black"
+      data-creneau-hero
+    >
+      {/* Photo + red trail ~55% */}
+      <div className="relative h-[55%] min-h-[240px] w-full shrink-0 overflow-hidden">
+        <img
+          src={heroPhoto}
+          alt=""
+          className="h-full w-full object-cover object-[center_20%]"
+          draggable={false}
+        />
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: `linear-gradient(180deg, transparent 20%, ${CRENEAU_RED}55 55%, #000 100%)`,
+          }}
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -left-8 top-[30%] h-[70%] w-[70%] rounded-full opacity-80 blur-3xl"
+          style={{ background: CRENEAU_RED }}
+          aria-hidden
+        />
         <button
           type="button"
           onClick={() => {
-            if (pane === 'home') onBack()
-            else if (pane === 'delayResult' || pane === 'energyResult' || pane === 'checkin')
-              setPane('home')
-            else if (pane === 'evening') setPane('gyms')
+            if (pane === 'home' || pane === 'confirmed') onBack()
             else setPane('home')
           }}
-          className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white"
+          className="ios-press absolute left-3 top-3 z-10 flex min-h-11 min-w-11 items-center justify-center rounded-full bg-black/40 text-white"
           aria-label="Retour"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <div className="min-w-0 flex-1">
-          <p className="text-[13px] text-[#ACB4BA]">
-            {pane === 'gyms' || pane === 'evening' ? 'Mon créneau' : 'Sport'}
+      </div>
+
+      <div className="relative z-10 -mt-8 flex flex-1 flex-col px-5 pb-[calc(var(--app-bottom-nav,64px)+env(safe-area-inset-bottom,0px)+20px)] pt-2">
+        {greetName && pane === 'home' && !committed ? (
+          <p className="mb-1 text-[13px] text-[#ACB4BA]" data-creneau-salut>
+            Salut {greetName}
           </p>
-          <h1 className="truncate text-[22px] font-bold tracking-tight text-white">
-            {pane === 'gyms'
-              ? 'Mes salles'
-              : pane === 'evening'
-                ? 'Le soir'
-                : 'Mon créneau'}
-          </h1>
+        ) : null}
+
+        {opts.passedPrefix ? (
+          <p
+            className="text-[15px] font-semibold uppercase tracking-wide text-white/90"
+            data-creneau-passed
+          >
+            {opts.passedPrefix}
+          </p>
+        ) : null}
+
+        <h1
+          className="mt-1 text-[clamp(2.6rem,12vw,4.25rem)] font-black uppercase leading-[0.92] tracking-[-0.04em] text-white"
+          style={{ fontStretch: 'condensed' }}
+          data-creneau-giant-time
+        >
+          {opts.title}
+        </h1>
+
+        <div className="mt-3 space-y-1">
+          {opts.lineA ? (
+            <p className="text-[14px] text-[#ACB4BA]" data-creneau-line1>
+              {opts.lineA}
+            </p>
+          ) : null}
+          {opts.lineB ? (
+            <p className="text-[14px] text-[#ACB4BA]" data-creneau-line2>
+              {opts.lineB}
+            </p>
+          ) : null}
         </div>
-        {pane === 'home' ? (
+
+        <div className="mt-auto flex flex-col items-stretch gap-3 pt-8">
           <button
             type="button"
-            onClick={() => setPane('gyms')}
-            className="text-[13px] font-semibold text-[#ACB4BA]"
+            onClick={opts.onButton}
+            className="ios-press w-full rounded-2xl py-[18px] text-center text-[18px] font-bold text-white"
+            style={{ background: CRENEAU_RED }}
+            data-creneau-primary-cta
           >
-            Salles
+            {opts.button}
           </button>
-        ) : null}
-      </header>
+          {opts.showOtherTime ? (
+            <button
+              type="button"
+              onClick={() => setPane('other')}
+              className="text-center text-[13px] font-medium text-[#ACB4BA] underline-offset-2 hover:underline"
+              data-creneau-autre-heure
+            >
+              {CRENEAU_PHRASES.otherTime}
+            </button>
+          ) : null}
+          {opts.showCancel ? (
+            <button
+              type="button"
+              onClick={() => {
+                setCommitted(false)
+                setActiveSlot(null)
+                setPane('home')
+              }}
+              className="text-center text-[13px] font-medium text-[#ACB4BA]"
+              data-creneau-annuler
+            >
+              Annuler
+            </button>
+          ) : null}
+          {pane === 'home' && !committed ? (
+            <div className="flex justify-center gap-6 pt-1">
+              <button
+                type="button"
+                className="text-[12px] text-[#ACB4BA]"
+                onClick={() => setPane('delay')}
+                data-creneau-delay
+              >
+                Je suis en retard
+              </button>
+              <button
+                type="button"
+                className="text-[12px] text-[#ACB4BA]"
+                onClick={() => setPane('energy')}
+                data-creneau-energy
+              >
+                {CRENEAU_PHRASES.noSessionToday}
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  )
 
+  return (
+    <div className="flex flex-col gap-3" data-creneau-flow data-pane={pane}>
       {toast ? (
         <div
           className="rounded-2xl px-4 py-3 text-[14px] font-medium text-white"
@@ -177,168 +397,190 @@ export function CreneauFlow({ onBack }: { onBack: () => void }) {
         </div>
       ) : null}
 
-      {pane === 'home' ? (
-        <div className="flex flex-col gap-4">
-          <p className="text-[13px] capitalize text-[#ACB4BA]">{formatLongDate()}</p>
-          <div className="flex items-center gap-3">
-            <CreneauLottie className="h-14 w-14 shrink-0" />
-            <div>
-              <p className="text-[17px] font-semibold text-white">
-                Salut {firstName()}&nbsp;!
-              </p>
-              <p className="text-[13px] text-[#ACB4BA]">
-                {primary
-                  ? 'Ton créneau de ce soir est prêt.'
-                  : 'Aucun créneau sûr pour l’instant.'}
-              </p>
-            </div>
-          </div>
+      {(pane === 'home' || pane === 'confirmed') && primary ? (
+        renderHero({
+          title: heroTitle,
+          passedPrefix: pane === 'home' ? heroPassedLine : null,
+          button: bigButtonLabel,
+          onButton: onBigButton,
+          lineA: line1,
+          lineB: line2,
+          // Minor: no « Autre heure » (README v5 / Vérificateur option B)
+          showOtherTime: !minor && pane === 'home',
+          showCancel: pane === 'confirmed',
+        })
+      ) : null}
 
-          {settings.heatVigilanceToday ? (
-            <div
-              className="rounded-2xl px-4 py-3 text-[14px] text-white"
-              style={{ border: `1px solid ${CRENEAU_RED}55`, background: `${CRENEAU_RED}18` }}
-              data-creneau-heat
-            >
-              <p className="font-semibold">{CRENEAU_PHRASES.heatVigilance}</p>
-              <p className="mt-1 text-[#ACB4BA]">{CRENEAU_PHRASES.takeBottle}</p>
-            </div>
-          ) : null}
+      {pane === 'home' && !primary ? (
+        <div className="rounded-3xl border border-white/10 bg-black p-5">
+          <button
+            type="button"
+            onClick={onBack}
+            className="ios-press mb-4 flex min-h-11 min-w-11 items-center justify-center rounded-2xl border border-white/10 text-white"
+            aria-label="Retour"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <p className="text-[18px] font-bold text-white">Aucun créneau pour l’instant.</p>
+          <p className="mt-2 text-[14px] text-[#ACB4BA]">
+            Règle tes salles{minor ? '' : ' ou « Le soir »'}.
+          </p>
+          <button
+            type="button"
+            onClick={() => setPane('gyms')}
+            className="ios-press mt-4 w-full rounded-2xl py-3 font-bold text-white"
+            style={{ background: CRENEAU_RED }}
+          >
+            Changer de salle
+          </button>
+        </div>
+      ) : null}
 
-          {minor ? (
-            <p className="text-[12px] leading-snug text-[#ACB4BA]" data-creneau-minor-help>
-              {CRENEAU_PHRASES.minorEveningHelp}
-            </p>
-          ) : null}
-
-          {primary ? (
-            <div
-              className="rounded-3xl border border-white/10 bg-white/[0.04] p-4"
-              data-creneau-slot
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#ACB4BA]">
-                    Ce soir
-                  </p>
-                  <p className="text-[28px] font-bold tabular-nums text-white">
-                    {primary.sessionStartHm}
-                    <span className="text-[16px] font-semibold text-[#ACB4BA]">
-                      {' '}
-                      – {primary.sessionEndHm}
-                    </span>
-                  </p>
-                </div>
-                {minor ? (
-                  <span
-                    className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-white"
-                    style={{ background: CRENEAU_RED }}
-                    data-creneau-minor-badge
-                  >
-                    {CRENEAU_PHRASES.minorHomeBadge}
-                  </span>
-                ) : null}
-              </div>
-              <div className="mt-3 flex items-center gap-2 text-[14px] text-white">
-                <MapPin className="h-4 w-4 text-[#ACB4BA]" aria-hidden />
-                <span>
-                  {primary.gymName}
-                  {primary.favorite ? (
-                    <span className="text-[#ACB4BA]"> · favorite</span>
-                  ) : null}
-                </span>
-              </div>
-              {crowd?.level ? (
-                <p className="mt-2 text-[13px] text-[#ACB4BA]">
-                  {crowd.label} pour ta salle
-                  <span className="text-white/70"> · {crowd.confidenceLabel}</span>
-                </p>
-              ) : (
-                <p className="mt-2 text-[13px] text-[#ACB4BA]">on apprend ta salle</p>
-              )}
-              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                {[
-                  [primary.departureHm, 'Départ'],
-                  [primary.sessionStartHm, 'Séance'],
-                  [primary.returnHm, 'Retour'],
-                ].map(([t, l]) => (
-                  <div key={l} className="rounded-2xl bg-black/30 px-2 py-2">
-                    <p className="text-[15px] font-bold tabular-nums text-white">{t}</p>
-                    <p className="text-[11px] text-[#ACB4BA]">{l}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 flex gap-2">
+      {pane === 'checkin' && primary ? (
+        <div className="flex flex-col gap-4" data-creneau-checkin>
+          {renderHero({
+            title: `Séance ${primary.sessionStartHm}`,
+            button: showCrowdPick ? CRENEAU_PHRASES.onSiteAsk : CRENEAU_PHRASES.imHereButton,
+            onButton: () => setShowCrowdPick(true),
+            lineA: CRENEAU_PHRASES.onSiteThanks,
+            lineB: null,
+            showOtherTime: false,
+          })}
+          {showCrowdPick ? (
+            <div className="grid grid-cols-3 gap-2 px-1" data-creneau-crowd-pick>
+              {(
+                [
+                  ['calme', 'Calme'],
+                  ['moyen', 'Moyen'],
+                  ['charge', 'Chargé'],
+                ] as [CreneauCrowdLevel, string][]
+              ).map(([id, label]) => (
                 <button
+                  key={id}
                   type="button"
-                  className="ios-press flex-1 rounded-2xl py-3 text-[15px] font-bold text-white"
-                  style={{ background: CRENEAU_RED }}
-                  onClick={() => setPane('checkin')}
-                >
-                  OK
-                </button>
-                <button
-                  type="button"
-                  className="ios-press flex-1 rounded-2xl border border-white/15 bg-white/5 py-3 text-[15px] font-semibold text-white"
+                  className="ios-press rounded-2xl border border-white/10 bg-white/[0.04] py-4 text-[14px] font-bold text-white"
                   onClick={() => {
-                    if (planB) {
-                      showToast(`Autre créneau : ${planB.sessionStartHm} · ${planB.gymName}`)
-                    } else {
-                      showToast('Pas d’autre créneau sûr pour l’instant.')
-                    }
+                    setSettings(recordCrowdTap(primary.gymId!, id))
+                    showToast(CRENEAU_PHRASES.onSiteThanks)
+                    setShowCrowdPick(false)
+                    setPane('home')
                   }}
                 >
-                  Autre créneau
+                  {label}
                 </button>
-              </div>
+              ))}
             </div>
           ) : (
-            <p className="text-[14px] text-[#ACB4BA]">
-              Règle tes salles ou assouplis « Le soir » si tu es adulte.
-            </p>
+            <button
+              type="button"
+              className="text-center text-[12px] text-[#ACB4BA]"
+              onClick={() => setShowCrowdPick(true)}
+            >
+              Il y a du monde ?
+            </button>
           )}
+        </div>
+      ) : null}
 
+      {pane === 'other' ? (
+        <div className="flex flex-col gap-3" data-creneau-other>
+          <header className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPane('home')}
+              className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-2xl border border-white/10 text-white"
+              aria-label="Retour"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <h2 className="text-[18px] font-bold text-white">Autre heure</h2>
+          </header>
           {planB ? (
             <button
               type="button"
-              onClick={() => showToast(`Plan B : ${planB.sessionStartHm} · ${planB.gymName}`)}
+              onClick={swapToPlanB}
               className="ios-press flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left"
               data-creneau-planb
             >
-              <span className="text-[11px] font-bold uppercase text-[#ACB4BA]">Plan B</span>
+              <span className="text-[11px] font-bold uppercase text-[#ACB4BA]">Sinon</span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] font-semibold text-white">
                   {planB.sessionStartHm} · {planB.gymName}
                 </span>
-                <span className="text-[12px] text-[#ACB4BA]">Moyen · à confirmer</span>
+                <span className="text-[12px] text-[#ACB4BA]" data-creneau-planb-crowd>
+                  {!planB.staffed
+                    ? CRENEAU_PHRASES.stafflessAtHour
+                    : planBCrowd?.level
+                      ? `${planBCrowd.label} · ${planBCrowd.confidence === 'sur' ? planBCrowd.confidenceLabel : planBCrowd.confidenceLabel}`
+                      : CRENEAU_PHRASES.noCrowdYet}
+                </span>
               </span>
               <ChevronRight className="h-4 w-4 text-[#ACB4BA]" />
             </button>
-          ) : null}
+          ) : (
+            <p className="text-[14px] text-[#ACB4BA]">Pas d’autre créneau pour l’instant.</p>
+          )}
+          <button
+            type="button"
+            onClick={() => setPane('gyms')}
+            className="ios-press rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3.5 text-left font-semibold text-white"
+          >
+            Changer de salle
+          </button>
+          <button
+            type="button"
+            onClick={() => setPane('details')}
+            className="text-[13px] text-[#ACB4BA]"
+          >
+            Détails du créneau
+          </button>
+        </div>
+      ) : null}
 
-          <button
-            type="button"
-            onClick={() => setPane('delay')}
-            className="ios-press flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3.5 text-left"
-            data-creneau-delay
-          >
-            <span className="font-semibold text-white">Je suis en retard</span>
-            <ChevronRight className="h-4 w-4 text-[#ACB4BA]" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setPane('energy')}
-            className="ios-press flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3.5 text-left"
-            data-creneau-energy
-          >
-            <span className="font-semibold text-white">Pas d&apos;énergie aujourd&apos;hui</span>
-            <ChevronRight className="h-4 w-4 text-[#ACB4BA]" />
-          </button>
+      {pane === 'details' && primary ? (
+        <div className="flex flex-col gap-3" data-creneau-details>
+          <header className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPane('other')}
+              className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-2xl border border-white/10 text-white"
+              aria-label="Retour"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <h2 className="text-[18px] font-bold text-white">Détails</h2>
+          </header>
+          <ul className="space-y-2 text-[14px] text-[#ACB4BA]">
+            <li>Départ {primary.departureHm}</li>
+            <li>Séance {primary.sessionStartHm} – {primary.sessionEndHm}</li>
+            <li>Chez toi vers {primary.returnHm}</li>
+            {!primary.staffed ? <li>{CRENEAU_PHRASES.stafflessAtHour}</li> : null}
+            {crowd?.level ? (
+              <li>
+                {crowd.label}
+                {crowd.confidence !== 'sur' ? ` · ${crowd.confidenceLabel}` : ''}
+              </li>
+            ) : (
+              <li>{CRENEAU_PHRASES.noCrowdYet}</li>
+            )}
+            {soleilPhrase && !minor ? <li>{soleilPhrase}</li> : null}
+          </ul>
         </div>
       ) : null}
 
       {pane === 'gyms' ? (
         <div className="flex flex-col gap-4">
+          <header className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPane('home')}
+              className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-2xl border border-white/10 text-white"
+              aria-label="Retour"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <h2 className="text-[18px] font-bold text-white">Changer de salle</h2>
+          </header>
           <p className="text-[13px] text-[#ACB4BA]">1 salle favorite + 1 salle de secours</p>
           {(['favorite', 'backup'] as const).map((key) => {
             const g = settings[key]
@@ -362,41 +604,31 @@ export function CreneauFlow({ onBack }: { onBack: () => void }) {
                         ? `${g.staffFromHm}–${g.staffUntilHm}`
                         : '—'}
                     </li>
+                    {g.city ? <li>{g.city}</li> : null}
                     {g.closesHm ? <li>Ferme à {g.closesHm}</li> : null}
                   </ul>
                 ) : null}
               </div>
             )
           })}
-          <p className="text-[12px] text-[#ACB4BA]">Réglé une seule fois</p>
-          <button
-            type="button"
-            onClick={() => setPane('evening')}
-            className="ios-press flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3.5"
-          >
-            <span>
-              <span className="block font-semibold text-white">Le soir</span>
-              <span className="text-[12px] text-[#ACB4BA]">
-                {settings.eveningWalkEnabled || settings.stafflessGymEnabled
-                  ? 'Personnalisé'
-                  : 'Protecteur'}
+          {!minor ? (
+            <button
+              type="button"
+              onClick={() => setPane('evening')}
+              className="ios-press flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3.5"
+            >
+              <span>
+                <span className="block font-semibold text-white">Le soir</span>
+                <span className="text-[12px] text-[#ACB4BA]">
+                  {settings.eveningWalkEnabled || settings.stafflessGymEnabled
+                    ? 'Personnalisé'
+                    : 'Protecteur'}
+                </span>
               </span>
-            </span>
-            <ChevronRight className="h-4 w-4 text-[#ACB4BA]" />
-          </button>
-          <label className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3.5">
-            <span>
-              <span className="block font-semibold text-white">Créneau tranquille</span>
-              <span className="text-[12px] text-[#ACB4BA]">Moins de monde</span>
-            </span>
-            <input
-              type="checkbox"
-              checked={settings.preferQuiet}
-              onChange={(e) => patch({ preferQuiet: e.target.checked })}
-              className="h-5 w-5 accent-[#ff0702]"
-            />
-          </label>
-          <p className="flex gap-2 text-[12px] leading-snug text-[#ACB4BA]">
+              <ChevronRight className="h-4 w-4 text-[#ACB4BA]" />
+            </button>
+          ) : null}
+          <p className="text-[12px] leading-snug text-[#ACB4BA]">
             {CRENEAU_PHRASES.sameProtectiveSetting}
           </p>
         </div>
@@ -404,6 +636,17 @@ export function CreneauFlow({ onBack }: { onBack: () => void }) {
 
       {pane === 'evening' ? (
         <div className="flex flex-col gap-4" data-creneau-evening>
+          <header className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPane('gyms')}
+              className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-2xl border border-white/10 text-white"
+              aria-label="Retour"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <h2 className="text-[18px] font-bold text-white">Le soir</h2>
+          </header>
           {minor ? (
             <p className="text-[13px] text-[#ACB4BA]">
               Ces options ne s’appliquent pas aux comptes mineurs.
@@ -452,15 +695,7 @@ export function CreneauFlow({ onBack }: { onBack: () => void }) {
               </label>
             </>
           )}
-          <label className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3.5">
-            <span className="font-semibold text-white">Après le coucher du soleil</span>
-            <input
-              type="checkbox"
-              checked={settings.afterSunset}
-              onChange={(e) => patch({ afterSunset: e.target.checked })}
-              className="h-5 w-5 accent-[#ff0702]"
-            />
-          </label>
+          {/* B2 / CA-C28: sunset is computed — no manual checkbox */}
           <label className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3.5">
             <span className="font-semibold text-white">Vigilance chaleur (aujourd&apos;hui)</span>
             <input
@@ -470,12 +705,27 @@ export function CreneauFlow({ onBack }: { onBack: () => void }) {
               className="h-5 w-5 accent-[#ff0702]"
             />
           </label>
+          {soleilPhrase ? (
+            <p className="text-[13px] text-[#ACB4BA]" data-creneau-soleil>
+              {soleilPhrase}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
       {pane === 'delay' ? (
         <div className="flex flex-col gap-3" data-creneau-delay-pane>
-          <p className="text-[14px] text-[#ACB4BA]">Combien de retard&nbsp;?</p>
+          <header className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPane('home')}
+              className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-2xl border border-white/10 text-white"
+              aria-label="Retour"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <p className="text-[14px] text-[#ACB4BA]">Combien de retard&nbsp;?</p>
+          </header>
           {[15, 30, 45].map((m) => (
             <button
               key={m}
@@ -483,8 +733,8 @@ export function CreneauFlow({ onBack }: { onBack: () => void }) {
               className="ios-press rounded-2xl border border-white/10 bg-white/[0.04] py-4 text-[17px] font-bold text-white"
               onClick={() => {
                 setDelayMin(m)
-                const start = addMinutes(primary?.sessionStartHm ?? nowHm(), m)
-                const ret = addMinutes(primary?.returnHm ?? nowHm(), m)
+                const start = addMinutes(primary?.sessionStartHm ?? clockHm, m)
+                const ret = addMinutes(primary?.returnHm ?? clockHm, m)
                 setDelayResult(formatDelayMessage(start ?? '—', ret ?? '—'))
                 setPane('delayResult')
               }}
@@ -511,7 +761,17 @@ export function CreneauFlow({ onBack }: { onBack: () => void }) {
 
       {pane === 'energy' ? (
         <div className="flex flex-col gap-3" data-creneau-energy-pane>
-          <p className="text-[16px] font-semibold text-white">{CRENEAU_PHRASES.softSessionAsk}</p>
+          <header className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPane('home')}
+              className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-2xl border border-white/10 text-white"
+              aria-label="Retour"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <p className="text-[16px] font-semibold text-white">{CRENEAU_PHRASES.softSessionAsk}</p>
+          </header>
           <button
             type="button"
             className="ios-press rounded-2xl border border-white/10 bg-white/[0.04] py-4 text-[15px] font-semibold text-white"
@@ -531,56 +791,50 @@ export function CreneauFlow({ onBack }: { onBack: () => void }) {
               setPane('energyResult')
             }}
           >
-            Décaler à demain
+            Demain
           </button>
         </div>
       ) : null}
 
       {pane === 'energyResult' ? (
-        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-          <p className="text-[16px] text-white">{energyResult}</p>
-          <button
-            type="button"
-            className="ios-press mt-4 w-full rounded-2xl py-3 font-bold text-white"
-            style={{ background: CRENEAU_RED }}
-            onClick={() => setPane('home')}
-          >
-            OK
-          </button>
-        </div>
+        renderHero({
+          title:
+            energyResult === CRENEAU_PHRASES.softTomorrow ? 'DEMAIN' : 'OK, ON VOIT ÇA',
+          button: CRENEAU_PHRASES.backToPlan,
+          onButton: () => {
+            setPane('home')
+            setEnergyResult('')
+          },
+          lineA: CRENEAU_PHRASES.softRest,
+          lineB: null,
+        })
       ) : null}
 
-      {pane === 'checkin' && primary?.gymId ? (
-        <div className="flex flex-col gap-4" data-creneau-checkin>
-          <CreneauLottie className="mx-auto h-20 w-20" />
-          <p className="text-center text-[18px] font-bold text-white">{primary.gymName}</p>
-          <p className="text-center text-[16px] text-white">{CRENEAU_PHRASES.onSiteAsk}</p>
-          <p className="text-center text-[12px] text-[#ACB4BA]">1 tap, c&apos;est anonyme.</p>
-          <div className="grid grid-cols-3 gap-2">
-            {(
-              [
-                ['calme', 'Calme'],
-                ['moyen', 'Moyen'],
-                ['charge', 'Chargé'],
-              ] as [CreneauCrowdLevel, string][]
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                className="ios-press rounded-2xl border border-white/10 bg-white/[0.04] py-4 text-[14px] font-bold text-white"
-                onClick={() => {
-                  setSettings(recordCrowdTap(primary.gymId!, id))
-                  showToast('Merci — c’est noté.')
-                  setPane('home')
-                }}
-              >
-                {label}
-              </button>
-            ))}
+      {/* Hidden entry to check-in near session — CA-C18 */}
+      {pane === 'home' && committed && primary?.gymId ? (
+        <button
+          type="button"
+          className="sr-only"
+          data-creneau-open-checkin
+          onClick={() => setPane('checkin')}
+        >
+          Je suis là
+        </button>
+      ) : null}
+
+      {pane === 'home' && committed && primary ? (
+        <div className="px-1">
+          <button
+            type="button"
+            onClick={() => setPane('checkin')}
+            className="ios-press w-full rounded-2xl border border-white/10 bg-white/[0.03] py-3 text-[14px] font-semibold text-white"
+            data-creneau-im-here
+          >
+            {CRENEAU_PHRASES.imHereButton}
+          </button>
+          <div className="mt-3 flex justify-center">
+            <CreneauLottie className="h-[120px] w-[120px]" />
           </div>
-          <p className="text-center text-[12px] leading-snug text-[#ACB4BA]">
-            {CRENEAU_PHRASES.crowdFromCheckins}
-          </p>
         </div>
       ) : null}
     </div>

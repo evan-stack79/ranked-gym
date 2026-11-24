@@ -11,6 +11,9 @@ export const CRENEAU_RED = '#ff0702'
 /** Mineurs : rentrés avant 20:00 (début « Nuit » S32). */
 export const CRENEAU_MINOR_HOME_BEFORE_HM = '20:00'
 
+/** Mineurs : pas de départ avant 06:00 (Q5 / VETO 1). */
+export const CRENEAU_MINOR_EARLIEST_HM = '06:00'
+
 /** Adultes : pas de marche dehors après 22:00 (même avec marche du soir). */
 export const CRENEAU_ADULT_WALK_CURFEW_HM = '22:00'
 
@@ -37,6 +40,8 @@ export const CRENEAU_PHRASES = {
   takeBottle: 'Prends ta bouteille.',
   minorEveningHelp:
     'Le soir, on te propose la salle plutôt que dehors. Une question ? Un adulte de confiance peut t\'aider.',
+  /** Ligne hero mineur (v5 écran 05) — mot pour mot. */
+  minorHeroLine: 'Retour avant 20 h. Un adulte de confiance peut t\'aider.',
   minorHomeBadge: 'Retour avant 20 h',
   sameProtectiveSetting: 'Le même réglage protecteur pour tout le monde.',
   crowdFromCheckins:
@@ -46,7 +51,18 @@ export const CRENEAU_PHRASES = {
   softSessionAsk: "Pas d'énergie aujourd'hui ?",
   softSessionResult: 'Séance douce notée. On garde le créneau sans forcer.',
   softTomorrow: 'Créneau décalé à demain. Repose-toi.',
+  softRest: 'Repose-toi.',
   onSiteAsk: 'Tu y es ? Il y a du monde ?',
+  onSiteThanks: 'Merci, c\'est noté.',
+  notedPrefix: "C'est noté",
+  goButton: "J'y vais",
+  imHereButton: 'Je suis là',
+  warnSomeone: 'Prévenir quelqu\'un',
+  otherTime: 'Autre heure',
+  noSessionToday: 'Pas aujourd\'hui',
+  backToPlan: 'Retour à mon plan',
+  stafflessAtHour: 'Sans personnel à cette heure',
+  noCrowdYet: "Pas encore d'avis",
 } as const
 
 export type CreneauCrowdLevel = 'calme' | 'moyen' | 'charge'

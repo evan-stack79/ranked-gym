@@ -760,7 +760,7 @@ export function TrainingView({
           >
             <span>
               <span className="block text-[17px] font-bold text-white">Mon créneau</span>
-              <span className="text-[13px] text-[#ACB4BA]">Salle ou marche — peu de monde, en sécurité</span>
+              <span className="text-[13px] text-[#ACB4BA]">Salle ou marche — ton créneau du jour</span>
             </span>
             <span className="text-[13px] font-semibold text-[#FF0702]">Ouvrir</span>
           </button>

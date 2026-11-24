@@ -70,5 +70,7 @@ Fichiers : `src/assets/lottie/sleep/horaires-variables/NN_*_rouge.json`
 | Écran | Nom | Auteur | Lien | Licence | Note |
 |---|---|---|---|---|---|
 | créneau | Exercise for diet or health | Haikal | https://lottiefiles.com/free-animation/exercise-for-diet-or-health-FAwPTRab09 | Lottie Simple License | couleurs modifiées (rouge `#ff0702`) ; le titre d’origine (« diet ») n’apparaît jamais dans l’app |
+| hero photo | A Man Doing Shadow Boxing | Pavel Danilyuk | https://www.pexels.com/photo/a-man-doing-shadow-boxing-6295816/ | Pexels License | photo hero Sport › Mon créneau v5 |
 
-Fichier : `src/assets/lottie/creneau/exercise-for-diet-or-health_rouge.json`
+Fichier Lottie : `src/assets/lottie/creneau/exercise-for-diet-or-health_rouge.json`  
+Fichier photo : `src/assets/photos/creneau/shadow-boxing-pavel-danilyuk.jpg` (voir aussi `src/assets/photos/creneau/LICENCE.txt`)
