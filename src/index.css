@@ -3247,7 +3247,7 @@ select,
 }
 
 /* dissolve:theme:start */
-/* Ranked Gym DA: rouge #ff0702, noir, blanc uniquement (pas de vert / bleu / jaune / violet). */
+/* Ranked : idle/loader rouge #ff0702 ; succès MorphButton « Payé » vert #16a34a (Evan). */
 :root {
   --dissolve-background: rgb(255 255 255);
   --dissolve-surface: rgb(0 0 0);
@@ -3256,7 +3256,7 @@ select,
   --dissolve-muted: rgb(172 180 186);
   --dissolve-primary: #ff0702;
   --dissolve-primary-foreground: rgb(255 255 255);
-  --dissolve-success: #ff0702;
+  --dissolve-success: #16a34a;
   --dissolve-danger: #ff0702;
   --dissolve-danger-foreground: rgb(255 255 255);
   --dissolve-accent: #ff0702;
@@ -3275,7 +3275,7 @@ select,
     --dissolve-muted: rgb(172 180 186);
     --dissolve-primary: #ff0702;
     --dissolve-primary-foreground: rgb(255 255 255);
-    --dissolve-success: #ff0702;
+    --dissolve-success: #16a34a;
     --dissolve-danger: #ff0702;
     --dissolve-danger-foreground: rgb(255 255 255);
     --dissolve-accent: #ff0702;

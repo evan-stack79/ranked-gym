@@ -56,7 +56,7 @@ const SPRING = { stiffness: 260, damping: 31, mass: 1, eps: 0.05 }
 const CHECK =
   '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg>'
 const PRIMARY = 'var(--dissolve-primary, #ff0702)'
-const SUCCESS = 'var(--dissolve-success, #ff0702)'
+const SUCCESS = 'var(--dissolve-success, #16a34a)'
 
 const CSS = `
 :where([data-dissolve="morph-button"]) { position: relative; cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }

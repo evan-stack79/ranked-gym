@@ -3,9 +3,9 @@ import { MorphButton } from '../dissolve/morph-button'
 import { PAYMENT_MORPH_DONE_LABEL, paymentMorphLabel, type PayOfferKey } from './paymentMorphLabel'
 
 const BRAND_STYLE: CSSProperties = {
-  // Ranked DA — rouge / blanc uniquement (pas de vert dissolve).
+  // Idle / loader : rouge Ranked. État « Payé » : vert sobre (demande Evan).
   ['--dissolve-primary' as string]: '#ff0702',
-  ['--dissolve-success' as string]: '#ff0702',
+  ['--dissolve-success' as string]: '#16a34a',
   ['--dissolve-primary-foreground' as string]: '#ffffff',
 }
 

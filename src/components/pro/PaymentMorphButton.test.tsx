@@ -61,6 +61,21 @@ describe('PaymentMorphButton', () => {
     })
     expect(morph.dataset.phase).toBe('done')
     expect(host.textContent).toContain('Payé')
+    // Tokens : idle/loader rouge, succès Payé vert (Evan) + texte blanc.
+    expect(morph.style.getPropertyValue('--dissolve-success').trim()).toBe('#16a34a')
+    expect(morph.style.getPropertyValue('--dissolve-primary').trim()).toBe('#ff0702')
+    expect(morph.style.getPropertyValue('--dissolve-primary-foreground').trim()).toBe('#ffffff')
+    const pill = morph.querySelector('.dissolve-morph-pill') as HTMLElement
+    const deadline = Date.now() + 1500
+    let bg = ''
+    while (Date.now() < deadline) {
+      bg = pill.style.background.replace(/\s/g, '').toLowerCase()
+      if (/#16a34a|rgb\(22,?163,?74\)|var\(--dissolve-success/.test(bg)) break
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 40))
+      })
+    }
+    expect(bg).toMatch(/#16a34a|rgb\(22,?163,?74\)|var\(--dissolve-success/)
   })
 
   it('échec : retour idle + onPay a rejeté', async () => {

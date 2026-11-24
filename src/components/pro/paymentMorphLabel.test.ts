@@ -30,4 +30,12 @@ describe('paymentMorphLabel', () => {
     expect(ui).toMatch(/disabled=\{!consent/)
     expect(ui).not.toMatch(/Commencer l’essai/)
   })
+
+  it('PaymentMorphButton : idle rouge, succès Payé vert #16a34a', () => {
+    const src = readFileSync(resolve(__dirname, './PaymentMorphButton.tsx'), 'utf8')
+    expect(src).toContain("'#ff0702'")
+    expect(src).toContain("'#16a34a'")
+    expect(src).toMatch(/--dissolve-primary/)
+    expect(src).toMatch(/--dissolve-success/)
+  })
 })

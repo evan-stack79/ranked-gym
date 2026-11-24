@@ -78,7 +78,24 @@ describe('createMorphButton — états', () => {
     btn.destroy()
   })
 
-  it('payé : phase done + libellé Payé', async () => {
+  it('payé : phase done + libellé Payé + fond vert succès', async () => {
+    // Snap immédiat pour lire le fond succès sans attendre le fade tone.
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((query: string) => ({
+        matches: String(query).includes('prefers-reduced-motion'),
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+        onchange: null,
+      })),
+    )
+    host.style.setProperty('--dissolve-primary', '#ff0702')
+    host.style.setProperty('--dissolve-success', '#16a34a')
+    host.style.setProperty('--dissolve-primary-foreground', '#ffffff')
     const btn = createMorphButton(host, {
       label: 'Payer 89,99 €',
       doneLabel: 'Payé',
@@ -86,10 +103,13 @@ describe('createMorphButton — états', () => {
       resetAfter: 0,
     })
     host.click()
-    await flushFrames(6)
+    await flushFrames(4)
     expect(btn.getPhase()).toBe('done')
     expect(host.dataset.phase).toBe('done')
     expect(host.textContent).toContain('Payé')
+    const pill = host.querySelector('.dissolve-morph-pill') as HTMLElement
+    const bg = pill.style.background.replace(/\s/g, '').toLowerCase()
+    expect(bg).toMatch(/#16a34a|rgb\(22,?163,?74\)|var\(--dissolve-success/)
     btn.destroy()
   })
 
