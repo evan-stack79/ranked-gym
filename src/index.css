@@ -3245,3 +3245,64 @@ select,
     margin-top: 1rem;
   }
 }
+
+/* dissolve:theme:start */
+/* Ranked : idle/loader rouge #ff0702 ; succès MorphButton « Payé » vert #16a34a (Evan). */
+:root {
+  --dissolve-background: rgb(255 255 255);
+  --dissolve-surface: rgb(0 0 0);
+  --dissolve-surface-2: rgb(28 28 30);
+  --dissolve-foreground: rgb(255 255 255);
+  --dissolve-muted: rgb(172 180 186);
+  --dissolve-primary: #ff0702;
+  --dissolve-primary-foreground: rgb(255 255 255);
+  --dissolve-success: #16a34a;
+  --dissolve-danger: #ff0702;
+  --dissolve-danger-foreground: rgb(255 255 255);
+  --dissolve-accent: #ff0702;
+  --dissolve-border: rgb(255 255 255 / 0.12);
+  --dissolve-chart-1: #ff0702;
+  --dissolve-chart-2: rgb(255 255 255);
+  --dissolve-chart-3: rgb(0 0 0);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --dissolve-background: rgb(0 0 0);
+    --dissolve-surface: rgb(28 28 30);
+    --dissolve-surface-2: rgb(44 44 46);
+    --dissolve-foreground: rgb(255 255 255);
+    --dissolve-muted: rgb(172 180 186);
+    --dissolve-primary: #ff0702;
+    --dissolve-primary-foreground: rgb(255 255 255);
+    --dissolve-success: #16a34a;
+    --dissolve-danger: #ff0702;
+    --dissolve-danger-foreground: rgb(255 255 255);
+    --dissolve-accent: #ff0702;
+    --dissolve-border: rgb(255 255 255 / 0.12);
+    --dissolve-chart-1: #ff0702;
+    --dissolve-chart-2: rgb(255 255 255);
+    --dissolve-chart-3: rgb(0 0 0);
+  }
+}
+
+@layer theme {
+  @theme inline {
+    --color-dissolve-background: var(--dissolve-background);
+    --color-dissolve-surface: var(--dissolve-surface);
+    --color-dissolve-surface-2: var(--dissolve-surface-2);
+    --color-dissolve-foreground: var(--dissolve-foreground);
+    --color-dissolve-muted: var(--dissolve-muted);
+    --color-dissolve-primary: var(--dissolve-primary);
+    --color-dissolve-primary-foreground: var(--dissolve-primary-foreground);
+    --color-dissolve-success: var(--dissolve-success);
+    --color-dissolve-danger: var(--dissolve-danger);
+    --color-dissolve-danger-foreground: var(--dissolve-danger-foreground);
+    --color-dissolve-accent: var(--dissolve-accent);
+    --color-dissolve-border: var(--dissolve-border);
+    --color-dissolve-chart-1: var(--dissolve-chart-1);
+    --color-dissolve-chart-2: var(--dissolve-chart-2);
+    --color-dissolve-chart-3: var(--dissolve-chart-3);
+  }
+}
+/* dissolve:theme:end */

@@ -15,6 +15,7 @@ import {
 import { PRO_LEGAL_TEXT_VERSION_L05 } from '../../../shared/subscriptions/constants'
 import { LEGAL_PRIVACY_PATH, LEGAL_TERMS_PATH } from '../legal/legalRoutes'
 import { Capacitor } from '@capacitor/core'
+import { PaymentMorphButton } from './PaymentMorphButton'
 
 type OfferKey = 'solo_monthly' | 'solo_yearly'
 
@@ -170,20 +171,17 @@ export function ProScreen({
 
           <p className="text-[12px] leading-snug text-[#ACB4BA]">{l05b}</p>
 
-          <button
-            type="button"
+          <PaymentMorphButton
+            offerKey={offerKey}
             disabled={!consent || busy || !canBuy}
-            onClick={() =>
-              void onPrepareAndPurchase({
+            onPay={() =>
+              onPrepareAndPurchase({
                 offerKey,
                 withdrawalConsent: consent,
                 legalVersion: PRO_LEGAL_TEXT_VERSION_L05,
               })
             }
-            className="ios-press min-h-12 w-full rounded-2xl bg-white text-[15px] font-semibold text-black disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {busy ? 'Patiente…' : 'Commencer l’essai'}
-          </button>
+          />
         </>
       )}
 

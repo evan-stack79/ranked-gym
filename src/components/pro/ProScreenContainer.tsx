@@ -18,6 +18,7 @@ import {
 } from '../../services/proReceiptOffline'
 import { Capacitor } from '@capacitor/core'
 import { useAuth } from '../../context/AuthContext'
+import { purchaseErrorMessage } from './paymentMorphLabel'
 
 interface ProScreenContainerProps {
   onBack: () => void
@@ -97,8 +98,9 @@ export function ProScreenContainer({ onBack }: ProScreenContainerProps) {
     }) => {
       setError(null)
       if (!backendReady) {
-        setError('Achat disponible uniquement dans l’app mobile avec Convex configuré.')
-        return
+        const msg = 'Achat disponible uniquement dans l’app mobile avec Convex configuré.'
+        setError(msg)
+        throw new Error(msg)
       }
       setBusy(true)
       try {
@@ -158,10 +160,14 @@ export function ProScreenContainer({ onBack }: ProScreenContainerProps) {
           await adapter.finish(purchased.purchaseToken)
           await scheduleTrialEndReminder(verified.status?.trialEndsAt ?? null)
         } else {
-          setError('Achat web indisponible en v0.')
+          const msg = 'Achat disponible dans l’application mobile Ranked Gym (App Store / Google Play). Aucun paiement web en v0.'
+          setError(msg)
+          throw new Error(msg)
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Achat impossible')
+        const msg = purchaseErrorMessage(err)
+        setError(msg)
+        throw new Error(msg)
       } finally {
         setBusy(false)
       }
