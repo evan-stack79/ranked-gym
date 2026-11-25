@@ -56,3 +56,23 @@ fichiers hero-01…07.jpg).
 - Auteur : Pavel Danilyuk
 - Source : https://www.pexels.com/photo/a-man-doing-shadow-boxing-6295816/
 - Licence : Pexels License
+
+### Train v2 (`photos/train/`)
+
+1. photo-hero-a.jpg — Aujourd’hui / Upper
+  Titre  : Man in Black Tank Top and Shorts Standing on Boxing Ring
+  Auteur : Ron Lach
+  Page   : https://www.pexels.com/photo/man-in-black-tank-top-and-shorts-standing-on-boxing-ring-8745171/
+  Licence: Pexels License · Fujifilm X-T20, 14/06/2021
+
+2. photo-creneau-thumb.jpg — Carte Mon créneau
+  Titre  : Man Entering Sports Hall
+  Auteur : Pavel Danilyuk
+  Page   : https://www.pexels.com/photo/man-entering-sports-hall-6339318/
+  Licence: Pexels License · Nikon D610, 03/12/2020
+
+3. photo-bench-thumb.jpg — Dernière séance
+  Titre  : Strong sportsman doing bench press during workout in modern gym
+  Auteur : Andrea Piacquadio
+  Page   : https://www.pexels.com/photo/strong-sportsman-doing-bench-press-during-workout-in-modern-gym-3837743/
+  Licence: Pexels License · Canon EOS 5DS, 01/03/2020
