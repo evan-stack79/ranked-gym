@@ -70,7 +70,13 @@ Fichiers : `src/assets/lottie/sleep/horaires-variables/NN_*_rouge.json`
 | Écran | Nom | Auteur | Lien | Licence | Note |
 |---|---|---|---|---|---|
 | créneau | Exercise for diet or health | Haikal | https://lottiefiles.com/free-animation/exercise-for-diet-or-health-FAwPTRab09 | Lottie Simple License | couleurs modifiées (rouge `#ff0702`) ; le titre d’origine (« diet ») n’apparaît jamais dans l’app |
-| hero photo | A Man Doing Shadow Boxing | Pavel Danilyuk | https://www.pexels.com/photo/a-man-doing-shadow-boxing-6295816/ | Pexels License | photo hero Sport › Mon créneau v5 |
+| hero v9-01 | A Woman Timing Her Run in the Tracks | Mikhail Nilov | https://www.pexels.com/photo/a-woman-timing-her-run-in-the-tracks-8456012/ | Pexels License | Autre heure |
+| hero v9-02 | Photo of a Train Station at Daytime | Abdul Kayum | https://www.pexels.com/photo/photo-of-a-train-station-at-daytime-9749564/ | Pexels License | Changer de salle |
+| hero v9-03 | A Woman Working Out Using a Treadmill | Gustavo Fring | https://www.pexels.com/photo/a-woman-working-out-using-a-treadmill-6285187/ | Pexels License | Le soir |
+| hero v9-04 | A Woman Sleeping in the Bed | Marcus Aurelius | https://www.pexels.com/photo/a-woman-sleeping-in-the-bed-9788264/ | Pexels License | Pas d'énergie |
+| hero v9-05 | Athlete on Running Track | KoolShooters | https://www.pexels.com/photo/athlete-on-running-track-8533446/ | Pexels License | Départ dépassé |
+| hero v9-06 | Man Entering Sports Hall | Pavel Danilyuk | https://www.pexels.com/photo/man-entering-sports-hall-6339318/ | Pexels License | Pars à |
+| hero v9-07 | Woman In Black Tank Top Opening Locker | Anna Shvets | https://www.pexels.com/photo/woman-in-black-tank-top-opening-locker-3902728/ | Pexels License | Mineur (adulte) |
 
 Fichier Lottie : `src/assets/lottie/creneau/exercise-for-diet-or-health_rouge.json`  
-Fichier photo : `src/assets/photos/creneau/shadow-boxing-pavel-danilyuk.jpg` (voir aussi `src/assets/photos/creneau/LICENCE.txt`)
+Heroes v9 : `src/assets/photos/creneau/v9/hero-01.jpg` … `hero-07.jpg` (voir `src/assets/photos/LICENCE.txt`)

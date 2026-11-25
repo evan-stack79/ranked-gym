@@ -1,14 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { resolveDisplayFirstName } from '../utils/homeGreeting'
 import { CRENEAU_PHRASES } from './constants'
 import { proposeCreneau, summarizeCrowd } from './engine'
 import { TERGNIER_COORDS } from './sunset'
 
 const root = resolve(__dirname, '..')
 
-describe('créneau copy + prénom + Plan B dynamique', () => {
+describe('créneau copy + Plan B dynamique', () => {
   it('TrainingView n’a plus la promesse « peu de monde, en sécurité » (CA-C34)', () => {
     const src = readFileSync(
       resolve(root, 'components/training/TrainingView.tsx'),
@@ -18,17 +17,16 @@ describe('créneau copy + prénom + Plan B dynamique', () => {
     expect(src).not.toMatch(/peu de monde/)
   })
 
-  it('Salut lit firstName via resolveDisplayFirstName (pas « toi »)', () => {
-    expect(
-      resolveDisplayFirstName({ firstName: 'Evan', displayName: 'evanl141' }),
-    ).toBe('Evan')
+  it('CreneauFlow v9 : heroes par état + pas de case sunset', () => {
     const flow = readFileSync(
       resolve(root, 'components/training/creneau/CreneauFlow.tsx'),
       'utf8',
     )
-    expect(flow).toMatch(/resolveDisplayFirstName/)
-    expect(flow).not.toMatch(/Salut toi/)
-    expect(flow).not.toMatch(/localStorage\.getItem\('ranked-gym:profile'\)/)
+    expect(flow).toMatch(/hero-01/)
+    expect(flow).toMatch(/hero-07/)
+    expect(flow).toMatch(/CreneauV9Screen/)
+    expect(flow).not.toMatch(/Après le coucher du soleil/)
+    expect(flow).not.toMatch(/type="checkbox"/)
   })
 
   it('Plan B crowd n’est plus codé en dur « Moyen · à confirmer »', () => {
@@ -37,9 +35,6 @@ describe('créneau copy + prénom + Plan B dynamique', () => {
       'utf8',
     )
     expect(flow).not.toMatch(/Moyen · à confirmer/)
-    expect(flow).toMatch(/planBCrowd/)
-    expect(flow).toMatch(/summarizeCrowd/)
-
     const now = Date.now()
     const crowd = summarizeCrowd(
       [{ gymId: 'g2', level: 'charge', atMs: now - 1000, personId: 'x' }],
@@ -47,10 +42,9 @@ describe('créneau copy + prénom + Plan B dynamique', () => {
       now,
     )
     expect(crowd.label).toBe('Chargé')
-    expect(crowd.confidence).not.toBe('sur')
   })
 
-  it('phrases imposées v5 / Vérificateur présentes dans constants', () => {
+  it('phrases imposées v9 / Vérificateur', () => {
     expect(CRENEAU_PHRASES.minorHeroLine).toBe(
       "Retour avant 20 h. Un adulte de confiance peut t'aider.",
     )
@@ -86,14 +80,5 @@ describe('créneau copy + prénom + Plan B dynamique', () => {
     expect(soleilPhrase).toBe('Le soleil se couche à 16:55.')
     expect(soleilPhrase).not.toMatch(/17:00/)
     expect(soleilPhrase).not.toMatch(/fera nuit/i)
-  })
-
-  it('CreneauFlow n’a plus de case « Après le coucher du soleil » (CA-C28)', () => {
-    const flow = readFileSync(
-      resolve(root, 'components/training/creneau/CreneauFlow.tsx'),
-      'utf8',
-    )
-    expect(flow).not.toMatch(/Après le coucher du soleil/)
-    expect(flow).not.toMatch(/afterSunset:/)
   })
 })

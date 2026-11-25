@@ -742,7 +742,7 @@ export function TrainingView({
         </header>
       )}
 
-      {dueBanner && !immersiveLiveSession && panel !== 'hub' ? (
+      {dueBanner && !immersiveLiveSession && panel !== 'hub' && panel !== 'creneau' ? (
         <div className="rounded-2xl border border-[#FF0702]/40 bg-[#FF0702]/15 px-4 py-3 text-[14px] font-semibold text-white">
           {dueBanner}
         </div>
