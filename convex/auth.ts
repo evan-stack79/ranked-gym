@@ -151,8 +151,10 @@ async function deleteRows(
   deletedDocIds: Set<string>,
 ): Promise<void> {
   for (const row of rows) {
+    const id = String(row._id)
+    if (deletedDocIds.has(id)) continue
     await ctx.db.delete(row._id as never)
-    deletedDocIds.add(String(row._id))
+    deletedDocIds.add(id)
   }
 }
 
@@ -169,6 +171,32 @@ export const NUTRITION_USER_CHILD_TABLES = [
   { table: 'nutrition_day_state' as const, index: 'by_userId_updatedAt' as const },
   { table: 'nutrition_food_catalog' as const, index: 'by_userId_lastSelectedAt' as const },
 ]
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Durées de conservation visées pour les archives minimales (suppression de compte). */
+export const ACCOUNT_DELETE_RETENTION_MS = {
+  subscription: 5 * 365 * DAY_MS,
+  rewardsRedemption: 365 * DAY_MS,
+  ageMajority: 365 * DAY_MS,
+  googleTakeover: 182 * DAY_MS,
+} as const
+
+export const ACCOUNT_DELETE_AGE_MAJORITY_RESULT = '15+ oui' as const
+
+/** Tables ranked* scopées utilisateur — à effacer (amitié / verify à part). */
+export const ACCOUNT_DELETE_RANKED_USER_TABLES = [
+  { table: 'rankedOptIn' as const, index: 'by_userId' as const },
+  { table: 'rankedLiftLog' as const, index: 'by_userId' as const },
+  { table: 'rankedVerifiedPr' as const, index: 'by_userId' as const },
+  { table: 'rankedForceScore' as const, index: 'by_userId' as const },
+  { table: 'rankedDisciplineScore' as const, index: 'by_userId' as const },
+  { table: 'rankedSessionCompletion' as const, index: 'by_userId' as const },
+] as const
+
+function newAccountDeleteArchiveId(): string {
+  return `arch_${createOpaqueToken()}`
+}
 
 const continuePurgeNutritionUserDataRef = makeFunctionReference<
   'mutation',
@@ -441,6 +469,358 @@ export async function registerUserWithEmail(
   }
 }
 
+async function archiveMinimalSubscriptionTrail(
+  ctx: MutationCtx,
+  userId: string,
+  archiveId: string,
+  now: number,
+  deletedDocIds: Set<string>,
+): Promise<void> {
+  const retainUntil = now + ACCOUNT_DELETE_RETENTION_MS.subscription
+  const subscriptions = await ctx.db
+    .query('subscriptions')
+    .withIndex('by_user', (q) => q.eq('userId', userId))
+    .collect()
+  const receipts = await ctx.db
+    .query('subscriptionReceipts')
+    .withIndex('by_user', (q) => q.eq('userId', userId))
+    .collect()
+  const subById = new Map(subscriptions.map((row) => [String(row._id), row] as const))
+
+  for (const receipt of receipts) {
+    const sub = receipt.subscriptionId ? subById.get(String(receipt.subscriptionId)) : undefined
+    await ctx.db.insert('account_delete_subscription_archive', {
+      archiveId,
+      storeTransactionId: sub?.latestTransactionId ?? sub?.storeChainKey,
+      productId: receipt.productId,
+      occurredAt: receipt.firstChargeAt ?? receipt.createdAt,
+      periodEndsAt: sub?.periodEndsAt,
+      amount: receipt.firstChargeAmountDisplay || receipt.priceDisplay,
+      store: sub?.source,
+      archivedAt: now,
+      retainUntil,
+    })
+  }
+
+  for (const sub of subscriptions) {
+    await ctx.db.insert('account_delete_subscription_archive', {
+      archiveId,
+      storeTransactionId: sub.latestTransactionId ?? sub.storeChainKey,
+      productId: sub.productId,
+      occurredAt: sub.verifiedAt,
+      periodEndsAt: sub.periodEndsAt,
+      store: sub.source,
+      archivedAt: now,
+      retainUntil,
+    })
+  }
+
+  const eventsByUser = await ctx.db
+    .query('subscriptionEvents')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .collect()
+  const eventIds = new Set(eventsByUser.map((row) => String(row._id)))
+  const events = [...eventsByUser]
+  for (const sub of subscriptions) {
+    const extra = await ctx.db
+      .query('subscriptionEvents')
+      .withIndex('by_subscriptionId', (q) => q.eq('subscriptionId', sub._id))
+      .collect()
+    for (const event of extra) {
+      const id = String(event._id)
+      if (eventIds.has(id)) continue
+      eventIds.add(id)
+      events.push(event)
+    }
+  }
+
+  for (const event of events) {
+    await ctx.db.insert('account_delete_subscription_archive', {
+      archiveId,
+      storeTransactionId: event.eventKey,
+      occurredAt: event.sourceOccurredAt ?? event.receivedAt,
+      store: event.source,
+      archivedAt: now,
+      retainUntil,
+    })
+  }
+
+  await deleteRows(ctx, receipts, deletedDocIds)
+  await deleteRows(ctx, subscriptions, deletedDocIds)
+  await deleteRows(ctx, events, deletedDocIds)
+}
+
+async function archiveGivenRewardsRedemptions(
+  ctx: MutationCtx,
+  userId: string,
+  archiveId: string,
+  now: number,
+  deletedDocIds: Set<string>,
+): Promise<void> {
+  const retainUntil = now + ACCOUNT_DELETE_RETENTION_MS.rewardsRedemption
+  const codes = await ctx.db
+    .query('rewardsRedemptionCode')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .collect()
+  const ledger = await ctx.db
+    .query('rewardsLedger')
+    .withIndex('by_user_time', (q) => q.eq('userId', userId))
+    .collect()
+
+  const givenCodeIds = new Set(codes.map((row) => String(row._id)))
+  const archivedCodeKeys = new Set<string>()
+
+  for (const code of codes) {
+    let partner = 'inconnu'
+    const item = await ctx.db.get(code.itemId)
+    if (item) {
+      const partnerRow = await ctx.db.get(item.partnerId)
+      if (partnerRow?.name) partner = partnerRow.name
+      else if (partnerRow?.slug) partner = partnerRow.slug
+    }
+    await ctx.db.insert('account_delete_rewards_redemption_archive', {
+      archiveId,
+      code: code.code,
+      redeemedAt: code.consumedAt ?? code.shownAt ?? code.createdAt,
+      partner,
+      points: code.costPoints,
+      archivedAt: now,
+      retainUntil,
+    })
+    archivedCodeKeys.add(String(code._id))
+  }
+
+  for (const row of ledger) {
+    if (row.reason !== 'redeem') continue
+    if (row.refId && givenCodeIds.has(row.refId) && archivedCodeKeys.has(row.refId)) continue
+    await ctx.db.insert('account_delete_rewards_redemption_archive', {
+      archiveId,
+      code: row.refId ?? '',
+      redeemedAt: row.createdAt,
+      partner: 'inconnu',
+      points: Math.abs(row.delta),
+      archivedAt: now,
+      retainUntil,
+    })
+  }
+
+  await deleteRows(ctx, codes, deletedDocIds)
+  await deleteRows(ctx, ledger, deletedDocIds)
+}
+
+async function archiveAgeMajorityAndGoogleTakeover(
+  ctx: MutationCtx,
+  userId: string,
+  archiveId: string,
+  now: number,
+  deletedDocIds: Set<string>,
+): Promise<void> {
+  const ageRows = await ctx.db
+    .query('nutrition_age_majority_audit')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .collect()
+  for (const row of ageRows) {
+    await ctx.db.insert('account_delete_age_majority_archive', {
+      archiveId,
+      at: row.at,
+      result: ACCOUNT_DELETE_AGE_MAJORITY_RESULT,
+      archivedAt: now,
+      retainUntil: now + ACCOUNT_DELETE_RETENTION_MS.ageMajority,
+    })
+  }
+  await deleteRows(ctx, ageRows, deletedDocIds)
+
+  const takeoverRows = await ctx.db
+    .query('auth_google_takeover_audit')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .collect()
+  for (const row of takeoverRows) {
+    await ctx.db.insert('account_delete_google_takeover_archive', {
+      archiveId,
+      at: row.at,
+      archivedAt: now,
+      retainUntil: now + ACCOUNT_DELETE_RETENTION_MS.googleTakeover,
+    })
+  }
+  await deleteRows(ctx, takeoverRows, deletedDocIds)
+}
+
+async function eraseRemainingAccountUserData(
+  ctx: MutationCtx,
+  userId: string,
+  deletedDocIds: Set<string>,
+): Promise<void> {
+  await deleteRows(
+    ctx,
+    await ctx.db.query('hydrationSettings').withIndex('by_user', (q) => q.eq('userId', userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('hydrationEntries').withIndex('by_user_day', (q) => q.eq('userId', userId)).collect(),
+    deletedDocIds,
+  )
+
+  await deleteRows(
+    ctx,
+    await ctx.db.query('rankedOptIn').withIndex('by_userId', (q) => q.eq('userId', userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('rankedLiftLog').withIndex('by_userId', (q) => q.eq('userId', userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('rankedVerifiedPr').withIndex('by_userId', (q) => q.eq('userId', userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('rankedForceScore').withIndex('by_userId', (q) => q.eq('userId', userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('rankedDisciplineScore').withIndex('by_userId', (q) => q.eq('userId', userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('rankedSessionCompletion')
+      .withIndex('by_userId', (q) => q.eq('userId', userId))
+      .collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('rankedFriendship')
+      .withIndex('by_userA_status', (q) => q.eq('userA', userId))
+      .collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('rankedFriendship')
+      .withIndex('by_userB_status', (q) => q.eq('userB', userId))
+      .collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('rankedVerifyRequest').withIndex('by_ownerId', (q) => q.eq('ownerId', userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('rankedVerifyRequest')
+      .withIndex('by_friendId_status', (q) => q.eq('friendId', userId))
+      .collect(),
+    deletedDocIds,
+  )
+
+  await deleteRows(
+    ctx,
+    await ctx.db.query('rewardsWallet').withIndex('by_userId', (q) => q.eq('userId', userId)).collect(),
+    deletedDocIds,
+  )
+
+  await deleteRows(
+    ctx,
+    await ctx.db.query('proEntitlements').withIndex('by_user', (q) => q.eq('userId', userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('subscriptionUserProfiles')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('subscriptionAccounts').withIndex('by_user', (q) => q.eq('userId', userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db.query('subscriptionAccess').withIndex('by_user', (q) => q.eq('userId', userId)).collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('subscriptionPurchaseAttempts')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('subscriptionReminderOutbox')
+      .withIndex('by_user_kind_period', (q) => q.eq('userId', userId))
+      .collect(),
+    deletedDocIds,
+  )
+
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('auth_account_links')
+      .withIndex('by_ownerUserId', (q) => q.eq('ownerUserId', userId))
+      .collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('auth_email_verification_codes')
+      .withIndex('by_userId', (q) => q.eq('userId', userId))
+      .collect(),
+    deletedDocIds,
+  )
+
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('nutrition_safety_clear_audit')
+      .withIndex('by_userId', (q) => q.eq('userId', userId))
+      .collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('nutrition_safety_admin_audit')
+      .withIndex('by_userId', (q) => q.eq('userId', userId))
+      .collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('food_search_usage')
+      .withIndex('by_userId_dateKey', (q) => q.eq('userId', userId))
+      .collect(),
+    deletedDocIds,
+  )
+  await deleteRows(
+    ctx,
+    await ctx.db
+      .query('surveillance_fitness_events')
+      .withIndex('by_userId_type', (q) => q.eq('userId', userId))
+      .collect(),
+    deletedDocIds,
+  )
+}
+
 export async function deleteAccountAndUserData(
   ctx: MutationCtx,
   args: { sessionToken: string; password: string },
@@ -620,6 +1000,12 @@ export async function deleteAccountAndUserData(
     await ctx.db.query('avis_beta').withIndex('by_userId', (q) => q.eq('userId', user.userId)).collect(),
     deletedDocIds,
   )
+
+  const archiveId = newAccountDeleteArchiveId()
+  await archiveMinimalSubscriptionTrail(ctx, user.userId, archiveId, now, deletedDocIds)
+  await archiveGivenRewardsRedemptions(ctx, user.userId, archiveId, now, deletedDocIds)
+  await archiveAgeMajorityAndGoogleTakeover(ctx, user.userId, archiveId, now, deletedDocIds)
+  await eraseRemainingAccountUserData(ctx, user.userId, deletedDocIds)
 
   const userFiles = await ctx.db
     .query('user_files')

@@ -1,0 +1,48 @@
+<!doctype html><html lang=fr><meta charset=utf-8><link rel=stylesheet href=base.css><style>
+.big{text-align:center;margin-top:18px}
+.big .lb{font-size:13px;font-weight:600;color:#aeaeb2}
+.big .n{display:flex;align-items:baseline;justify-content:center;gap:4px;margin-top:4px;font-variant-numeric:tabular-nums}
+.big .n b{font-size:56px;font-weight:800;letter-spacing:-.04em;line-height:1}
+.big .n i{font-style:normal;font-size:26px;font-weight:700;color:#8e8e93;margin-right:6px}
+.big .sb{font-size:13px;font-weight:600;color:#8e8e93;margin-top:6px}
+.chart{position:relative;height:132px;margin-top:22px}
+.bars{position:absolute;left:0;right:0;bottom:0;top:0;display:grid;grid-template-columns:repeat(7,1fr)}
+.col{position:relative}
+.bar{position:absolute;bottom:0;left:50%;width:22px;margin-left:-11px;border-radius:7px;background:#6e1a18}
+.bar.sel{background:#ff0702}
+.stub{position:absolute;bottom:0;left:50%;width:22px;height:10px;margin-left:-11px;border-radius:5px;border:1.5px dashed #48484a}
+.val{position:absolute;left:50%;transform:translateX(-50%);font-size:12px;font-weight:700;white-space:nowrap;background:#1c1c1e;padding:0 3px;z-index:2;font-variant-numeric:tabular-nums}
+.ref{position:absolute;left:0;right:0;border-top:1.5px dashed #636366;z-index:1}
+.reflb{position:absolute;right:0;width:40px;text-align:right;font-size:10.5px;font-weight:600;color:#8e8e93;line-height:1.15;transform:translateY(-50%)}
+.reflb b{display:block;font-size:12px;color:#d1d1d6}
+.leg{display:flex;gap:14px;justify-content:center;margin-top:12px;font-size:11px;font-weight:600;color:#8e8e93}
+.leg span{display:flex;align-items:center;gap:5px}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:3px}
+.heads{display:flex;gap:2px}
+.heads img{width:24px;height:24px}
+.heads img.off{opacity:.45;filter:grayscale(1) brightness(1.5)}
+</style><body>
+<div class=hdr><h2>Ta semaine</h2><span>9 – 15 nov.</span></div>
+<div class=card>
+ <div class=days id=days></div>
+ <div class=big><div class=lb>Moyenne de la semaine</div>
+  <div class=n><b>7</b><i>h</i><b>40</b></div>
+  <div class=sb>par nuit · 3 nuits sur 7</div></div>
+ <div class=chart id=chart></div>
+ <div class=leg><span><i style="background:#6e1a18"></i>Nuit notée</span><span><i style="border:1.5px dashed #48484a"></i>Pas de nuit</span><span><i style="width:14px;height:0;border-radius:0;border-top:1.5px dashed #8e8e93"></i>Ton repère 8 h</span></div>
+ <div class=fig>
+  <div><div class=k>Nuit (au lit)</div><div class=v>7<small>h</small>40</div></div>
+  <div><div class=k>Coucher</div><div class=v><small>vers</small>&nbsp;23<small>h</small>00</div></div>
+  <div><div class=k>Ressenti</div><div class=v><span class=heads>
+   <img src=tete_4.png><img src=tete_4.png><img src=tete_4.png><img class=off src=tete_4.png><img class=off src=tete_4.png></span></div></div>
+ </div>
+</div>
+<script>
+const D=[['L',9],['M',10],['M',11],['J',12],['V',13],['S',14],['D',15]]
+const H=[null,null,null,440,470,470,null] // minutes
+const SEL=5,H_PX=132,MAX=10*60,y=m=>m/MAX*H_PX
+days.innerHTML=D.map(([l,d],i)=>`<div class="${i==SEL?'sel':H[i]==null?'no':''}"><div class=l>${l}</div><div class=d>${d}</div></div>`).join('')
+let h='<div class=bars>'+H.map((m,i)=>`<div class=col>${m==null?'<div class=stub></div>':`<div class="bar ${i==SEL?'sel':''}" style="height:${y(m)}px"></div>`}${i==SEL?`<div class=val style="bottom:${y(m)+6}px">${Math.floor(m/60)} h ${String(m%60).padStart(2,'0')}</div>`:''}</div>`).join('')+'</div>'
+h+=`<div class=ref style="bottom:${y(480)}px"></div>`
+chart.innerHTML=h
+</script>

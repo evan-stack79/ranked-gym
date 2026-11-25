@@ -49,6 +49,7 @@ function parseBody(raw: unknown): SleepInput | null {
       b.currentTibHours != null || b.current_tib_hours != null
         ? Number(b.currentTibHours ?? b.current_tib_hours)
         : undefined,
+    age: b.age != null && Number.isFinite(Number(b.age)) ? Number(b.age) : undefined,
   }
 }
 

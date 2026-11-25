@@ -40,8 +40,7 @@ export function CloudBackupCard() {
           <div className="min-w-0 flex-1">
             <p className="text-[16px] font-semibold text-white">Sauvegarde auto</p>
             <p className="mt-1 text-[13px] leading-snug text-[#ACB4BA]">
-              Connecte-toi pour sauvegarder nutrition, entraînements et profil.
-              Même si le lien de l’app change, ta progression revient au login.
+              Connecte-toi : tes repas et séances seront sauvés.
             </p>
             <button
               type="button"
@@ -74,15 +73,15 @@ export function CloudBackupCard() {
           <p className="mt-1 text-[13px] leading-snug text-[#ACB4BA]">
             {saving
               ? 'Sauvegarde en cours…'
-              : `Sauvegarde active. Dernière mise à jour : ${formatWhen(meta.lastPushAt)}.`}
+              : `Sauvé ${formatWhen(meta.lastPushAt)}.`}
           </p>
           {meta.lastError ? (
             <p className="mt-2 text-[12px] leading-snug text-[#FF453A]">
-              Sauvegarde momentanément indisponible. Tes données locales sont conservées.
+              Sauvegarde en pause. Rien n&apos;est perdu.
             </p>
           ) : (
             <p className="mt-2 text-[12px] font-medium text-[#30D158]">
-              Sauvegarde automatique activée.
+              Sauvegarde activée.
             </p>
           )}
         </div>

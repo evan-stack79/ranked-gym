@@ -32,7 +32,7 @@ export function WaterGoalChooser({
     event.preventDefault()
     const ml = parseWaterGoalInput(raw)
     if (ml == null || !setUserWaterGoalMl(ml)) {
-      setError('Objectif invalide. Entre une quantité en ml ou en L.')
+      setError('Écris un nombre, en ml ou en L.')
       return
     }
     setError(null)

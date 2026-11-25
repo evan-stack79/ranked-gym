@@ -74,6 +74,8 @@
 	<string>Ranked Gym utilise la caméra pour le Pump Check et le prototype expérimental de mesure BPM (doigt sur le flash). Aucune image n’est envoyée ni enregistrée pour le BPM.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>NSAlarmKitUsageDescription</key>
+	<string>Ranked Gym utilise AlarmKit pour ton réveil Sommeil (Arrêter et Répéter 9 min). Aucune autre alerte la nuit.</string>
 	<!-- MASVS storage: iOS has no allowBackup flag. Secrets use Keychain
 	     kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly (not restored via iCloud/iTunes).
 	     UIFileSharingEnabled remains unset (default false). See docs/MASVS_STORAGE.md. -->

@@ -59,9 +59,9 @@ export function NutritionCalorieRing({
             kcal
           </>
         ) : allowGoalSetup ? (
-          'Objectif à définir'
+          "Pas d'objectif"
         ) : (
-          'Suivi sans objectif'
+          'Sans objectif'
         )}
       </p>
     </div>
@@ -70,12 +70,12 @@ export function NutritionCalorieRing({
   if (!hasTarget) {
     const lockedCopy =
       lockReason === 'tca'
-        ? 'Les chiffres caloriques sont masqués pour ton profil. Tu peux revoir ça dans Réglages → Situations de santé.'
+        ? 'Calories cachées pour toi. À changer dans Réglages.'
         : lockReason === 'health'
-          ? 'Objectif indisponible pour ta situation de santé. Réglages → Situations de santé.'
+          ? "Pas d'objectif pour toi. Voir Réglages."
           : lockReason === 'flag_off'
-            ? 'Suivi sans objectif chiffré'
-            : 'Suivi sans objectif chiffré'
+            ? 'Sans objectif'
+            : 'Sans objectif'
 
     return (
       <div
@@ -96,11 +96,11 @@ export function NutritionCalorieRing({
           />
         </div>
         <p className="mt-4 text-[16px] font-semibold text-white">
-          {allowGoalSetup ? 'Fixe ton objectif calorique' : lockedCopy}
+          {allowGoalSetup ? 'Choisis ton objectif' : lockedCopy}
         </p>
         {allowGoalSetup ? (
           <p className="mt-1 max-w-[18rem] text-[13px] leading-5 text-[#ACB4BA]">
-            Calcul auto depuis ton profil, avec les bornes de sécurité.
+            Calculé pour toi, sans excès.
           </p>
         ) : lockReason === 'tca' || lockReason === 'health' ? (
           <p className="mt-2 max-w-[20rem] text-[13px] leading-5 text-[#ACB4BA]">
@@ -137,7 +137,7 @@ export function NutritionCalorieRing({
           viewBox="0 0 240 240"
           className="h-full w-full overflow-visible"
           role="img"
-          aria-label="Progression calorique"
+          aria-label="Calories du jour"
         >
           <circle
             cx="120"

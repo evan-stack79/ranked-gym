@@ -3,16 +3,16 @@ import { isAccueilGalleryEnabled } from '../../backend/accueilGalleryFeatureFlag
 import { useAuth } from '../../context/AuthContext'
 import { getTrainingState } from '../../services/trainingStorage'
 import {
+  getHomeGreeting,
   getHomeGreetingSubtitle,
   resolveDisplayFirstName,
 } from '../../utils/homeGreeting'
 import { getTodayWorkout } from '../../utils/todayWorkout'
-import { BlurInText, Reveal, SoftBlurIn, TextFlip } from '../motion'
+import { BlurInText, Reveal, SoftBlurIn } from '../motion'
 import { DailyStreak } from './DailyStreak'
 import { HomeGalleryView } from './HomeGalleryView'
 import { TodayWorkoutCard } from './TodayWorkoutCard'
 import { NutritionSnapshot } from './NutritionSnapshot'
-import { SleepSnapshot } from './SleepSnapshot'
 import { WaterCard } from '../hydration/WaterCard'
 import { WaterSettingsSheet } from '../hydration/WaterSettingsSheet'
 
@@ -54,7 +54,7 @@ export function HomeView({
 
 /**
  * Accueil = dashboard quotidien (default).
- * Ordre : Nutrition (calories + eau) → Séance → Sommeil → Série → Alertes (si besoin).
+ * Ordre : Sommeil (haut) → Nutrition (calories + eau) → Séance → Série → Alertes (si besoin).
  * Ghost mode / Lobby / feed social : hors nav principale (infra conservée).
  */
 function HomeDashboardView({
@@ -112,6 +112,7 @@ function HomeDashboardView({
     displayName: user?.displayName,
     pseudo: profile?.pseudo,
   })
+  const greeting = getHomeGreeting(firstName)
   const subtitle = getHomeGreetingSubtitle()
 
   const todayWorkout = useMemo(
@@ -123,19 +124,21 @@ function HomeDashboardView({
     <div className={`flex flex-col gap-8 ${coldEntering ? 'home-cold-enter home-cold-enter--active' : ''}`}>
       <header className="home-cold-enter__group home-cold-enter__group--0">
         <h1 className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight text-white">
-          <TextFlip /><BlurInText as="span" instant={coldEntering} label={`, ${firstName} ?`}>{`, ${firstName} ?`}</BlurInText>
+          <BlurInText as="span" instant={coldEntering} label={greeting}>
+            {greeting}
+          </BlurInText>
         </h1>
         <p className="mt-1.5 text-[15px] font-medium text-[#ACB4BA]">
           <SoftBlurIn instant={coldEntering}>{subtitle}</SoftBlurIn>
         </p>
       </header>
 
-      <div className="home-cold-enter__group home-cold-enter__group--1">
-        <Reveal instant={coldEntering}>
+      <div className="home-cold-enter__group home-cold-enter__group--2">
+        <Reveal delayMs={40} instant={coldEntering}>
           <NutritionSnapshot onOpenNutrition={onOpenNutrition} />
         </Reveal>
         <div className="mt-3">
-          <Reveal delayMs={40} instant={coldEntering}>
+          <Reveal delayMs={60} instant={coldEntering}>
             <WaterCard onOpenSettings={() => setWaterSettingsOpen(true)} />
           </Reveal>
         </div>
@@ -145,8 +148,8 @@ function HomeDashboardView({
         />
       </div>
 
-      <div className="home-cold-enter__group home-cold-enter__group--2">
-        <Reveal delayMs={60} instant={coldEntering}>
+      <div className="home-cold-enter__group home-cold-enter__group--3">
+        <Reveal delayMs={80} instant={coldEntering}>
           <TodayWorkoutCard
             workout={todayWorkout}
             onStart={() => {
@@ -155,10 +158,6 @@ function HomeDashboardView({
             onOpenNotebook={onOpenTraining}
           />
         </Reveal>
-      </div>
-
-      <div className="home-cold-enter__group home-cold-enter__group--3">
-        <SleepSnapshot />
       </div>
 
       <div className="home-cold-enter__group home-cold-enter__group--4">

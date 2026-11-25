@@ -67,7 +67,7 @@ export function DailyStreak() {
           <Flame className="h-7 w-7 shrink-0 text-[#717C83]" strokeWidth={2.25} />
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#ACB4BA]">
-              Série quotidienne
+              Ta flamme
             </p>
             <p className="mt-0.5 text-[15px] font-semibold text-[#ACB4BA]">
               Connecte-toi pour allumer ta flamme
@@ -79,7 +79,7 @@ export function DailyStreak() {
   }
 
   if (!profile) {
-    return <SectionSkeleton label="Série quotidienne" />
+    return <SectionSkeleton label="Ta flamme" />
   }
 
   const lit = isTodayDone && currentStreak > 0
@@ -124,7 +124,7 @@ export function DailyStreak() {
             {calmStreak ? (
               <>
                 <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#ACB4BA]">
-                  Série
+                  Flamme
                 </p>
                 <p className="mt-0.5 text-[16px] font-semibold leading-snug text-[#ACB4BA]">
                   {currentStreak > 0 ? `${displayStreak} jour${displayStreak > 1 ? 's' : ''}` : '—'}
@@ -133,7 +133,7 @@ export function DailyStreak() {
             ) : lit ? (
               <>
                 <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#FF9F0A]">
-                  Série en cours
+                  Jours d&apos;affilée
                 </p>
                 <p
                   className={`mt-0.5 text-[22px] font-black tracking-tight text-white ${
@@ -149,12 +149,12 @@ export function DailyStreak() {
             ) : (
               <>
                 <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#ACB4BA]">
-                  Série · {currentStreak} j
+                  Flamme · {currentStreak} j
                 </p>
                 <p className="mt-0.5 text-[16px] font-semibold leading-snug text-[#ACB4BA]">
                   {currentStreak > 0
-                    ? 'Maintiens ta série — reviens demain !'
-                    : 'Ouvre l’app demain pour enchaîner'}
+                    ? 'Reviens demain pour la garder.'
+                    : "Reviens demain pour l'allumer."}
                 </p>
               </>
             )}
@@ -187,7 +187,7 @@ export function DailyStreak() {
                 Semaine parfaite ! +{bonusFlash.bonusXp || STREAK_WEEK_BONUS_XP} XP bonus
               </p>
               <p className="mt-0.5 text-[12px] text-[#ACB4BA]">
-                {bonusFlash.streak} jours de feu — continue comme ça.
+                {bonusFlash.streak} jours de feu !
               </p>
             </div>
           </div>

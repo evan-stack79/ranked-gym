@@ -13,7 +13,7 @@ function secondaryLine(workout: TodayWorkoutPlan | null): string {
     const countLabel = `${workout.exerciseCount} exercice${workout.exerciseCount > 1 ? 's' : ''}`
     return `${workout.title} · ${countLabel}`
   }
-  return `${workout.title} · Séance planifiée`
+  return `${workout.title} · prévue`
 }
 
 const secondaryButtonClass =
@@ -29,11 +29,11 @@ export function TodayWorkoutCard({ workout, onStart, onOpenNotebook }: TodayWork
   const summary = secondaryLine(workout)
 
   return (
-    <section className="glass-card rounded-2xl p-4" aria-label="Entraînement">
+    <section className="glass-card rounded-2xl p-4" aria-label="Ta séance">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-medium text-[#ACB4BA]">
-            <SoftBlurIn>Entraînement</SoftBlurIn>
+            <SoftBlurIn>Ta séance</SoftBlurIn>
           </p>
           <p className="mt-1 text-[15px] font-semibold leading-snug text-white">
             <SoftBlurIn delayMs={40}>{summary}</SoftBlurIn>
@@ -44,19 +44,19 @@ export function TodayWorkoutCard({ workout, onStart, onOpenNotebook }: TodayWork
           <button
             type="button"
             onClick={onStart}
-            aria-label="Démarrer la séance"
+            aria-label="Lancer la séance"
             className={primaryButtonClass}
           >
-            Démarrer
+            Lancer
           </button>
         ) : (
           <button
             type="button"
             onClick={onOpenNotebook}
-            aria-label={workout ? 'Ouvrir Train' : 'Ouvrir mon carnet'}
+            aria-label="Voir mes séances"
             className={secondaryButtonClass}
           >
-            {workout ? 'Ouvrir Train' : 'Ouvrir mon carnet'}
+            Voir mes séances
           </button>
         )}
       </div>

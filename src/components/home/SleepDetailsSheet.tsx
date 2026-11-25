@@ -118,7 +118,7 @@ export function SleepDetailsSheet({
                       : '—'}
                   </li>
                   <li>
-                    Lever qui varie d&apos;environ{' '}
+                    Réveil qui varie d&apos;environ{' '}
                     {engine.metrics.regularity.waketimeVariabilityMinutes != null
                       ? `${Math.round(engine.metrics.regularity.waketimeVariabilityMinutes)} min`
                       : '—'}

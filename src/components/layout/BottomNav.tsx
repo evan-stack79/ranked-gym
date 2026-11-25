@@ -1,4 +1,4 @@
-import { Dumbbell, Home, Play, Salad, User } from 'lucide-react'
+import { Dumbbell, Home, Moon, Play, Salad, User } from 'lucide-react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { isAccueilGalleryEnabled } from '../../backend/accueilGalleryFeatureFlag'
 import type { TabId } from '../../types'
@@ -16,8 +16,9 @@ interface BottomNavProps {
 
 const tabs: { id: TabId; label: string; icon: typeof Home }[] = [
   { id: 'home', label: 'Accueil', icon: Home },
-  { id: 'training', label: 'Train', icon: Dumbbell },
-  { id: 'nutrition', label: 'Nutri', icon: Salad },
+  { id: 'training', label: 'Sport', icon: Dumbbell },
+  { id: 'nutrition', label: 'Repas', icon: Salad },
+  { id: 'sleep', label: 'Sommeil', icon: Moon },
   { id: 'profile', label: 'Profil', icon: User },
 ]
 
@@ -46,25 +47,25 @@ export function BottomNav({
     )
   }
 
-  const labelClass = `text-[11px] leading-tight transition-opacity duration-180 motion-reduce:transition-none ${compact ? 'invisible absolute opacity-0' : 'opacity-100'}`
+  const labelClass = `text-[10px] leading-tight transition-opacity duration-180 motion-reduce:transition-none ${compact ? 'invisible absolute opacity-0' : 'opacity-100'}`
   const centralAction = (
     <button
       type="button"
       onClick={onStartTraining}
-      className="ios-press flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[#ACB4BA] transition-colors duration-150"
-      aria-label={hasActiveWorkout ? 'Reprendre' : 'Nouvelle séance'}
+      className="ios-press flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1.5 text-[#ACB4BA] transition-colors duration-150"
+      aria-label={hasActiveWorkout ? 'Reprendre' : 'Lancer'}
       data-nav-center={hasActiveWorkout ? 'resume' : 'new'}
     >
       <span className={`flex items-center justify-center rounded-full border-4 border-[#171719] bg-[#FF0702] text-white transition-[height,width] duration-180 motion-reduce:transition-none ${compact ? 'h-12 w-12 -mt-1' : 'h-14 w-14 -mt-5'}`}>
         <Play className="ml-0.5 h-5 w-5 fill-current" strokeWidth={2.25} aria-hidden="true" />
       </span>
-      <span className={labelClass}>{hasActiveWorkout ? 'Reprendre' : 'Nouvelle séance'}</span>
+      <span className={labelClass}>{hasActiveWorkout ? 'Reprendre' : 'Lancer'}</span>
     </button>
   )
 
   return (
     <nav
-      className={`fixed inset-x-0 bottom-0 z-50 border-t border-[#38383D] bg-[#171719] px-1.5 pt-1.5 transition-[padding] duration-180 ease-out motion-reduce:transition-none ${compact ? '' : ''}`}
+      className={`fixed inset-x-0 bottom-0 z-50 border-t border-[#38383D] bg-[#171719] px-1 pt-1.5 transition-[padding] duration-180 ease-out motion-reduce:transition-none ${compact ? '' : ''}`}
       aria-label="Navigation principale"
       data-bottom-nav-mode={compact ? 'compact' : 'expanded'}
       data-bottom-nav-variant="dock"
@@ -79,7 +80,7 @@ export function BottomNav({
       }}
       onFocusCapture={onExpand}
     >
-      <div className="flex items-end justify-between gap-0.5">
+      <div className="flex items-end justify-between gap-0">
         {tabs.map(({ id, label, icon: Icon }) => {
           const isActive = activeTab === id
           const item = (
@@ -87,11 +88,12 @@ export function BottomNav({
               key={id}
               type="button"
               onClick={() => onTabChange(id)}
-              className={`ios-press flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 transition-colors duration-150 ${isActive ? 'text-[#FF0702]' : 'text-[#ACB4BA]'}`}
+              className={`ios-press flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1.5 transition-colors duration-150 ${isActive ? 'text-[#FF0702]' : 'text-[#ACB4BA]'}`}
               aria-current={isActive ? 'page' : undefined}
               aria-label={label}
+              data-nav-tab={id}
             >
-              <Icon className="h-[22px] w-[22px]" strokeWidth={isActive ? 2.25 : 1.75} aria-hidden="true" />
+              <Icon className="h-[20px] w-[20px]" strokeWidth={isActive ? 2.25 : 1.75} aria-hidden="true" />
               <span className={labelClass}>{label}</span>
             </button>
           )
@@ -156,8 +158,8 @@ function FloatingPillBottomNav({
     <button
       type="button"
       onClick={onStartTraining}
-      className="ios-press bottom-nav-pill__center relative z-10 flex h-11 min-h-11 min-w-11 flex-1 items-center justify-center rounded-full px-1"
-      aria-label={hasActiveWorkout ? 'Reprendre' : 'Nouvelle séance'}
+      className="ios-press bottom-nav-pill__center relative z-10 flex h-11 min-h-11 min-w-11 flex-1 items-center justify-center rounded-full px-0.5"
+      aria-label={hasActiveWorkout ? 'Reprendre' : 'Lancer'}
       data-nav-center={hasActiveWorkout ? 'resume' : 'new'}
     >
       <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#FF0702] text-white shadow-[0_6px_18px_rgb(255_7_2_/_0.45)] ring-4 ring-[#000000]/55">
@@ -168,7 +170,7 @@ function FloatingPillBottomNav({
 
   return (
     <nav
-      className="bottom-nav-pill fixed inset-x-0 bottom-0 z-50 rounded-none rounded-t-[28px] px-2 pt-1.5"
+      className="bottom-nav-pill fixed inset-x-0 bottom-0 z-50 rounded-none rounded-t-[28px] px-1.5 pt-1.5"
       aria-label="Navigation principale"
       data-bottom-nav-mode="pill"
       data-bottom-nav-variant="floating-pill"
@@ -183,7 +185,7 @@ function FloatingPillBottomNav({
           'var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px))',
       }}
     >
-      <div ref={trackRef} className="bottom-nav-pill__track relative flex items-center justify-between gap-0.5">
+      <div ref={trackRef} className="bottom-nav-pill__track relative flex items-center justify-between gap-0">
         <span
           className="bottom-nav-pill__bubble"
           aria-hidden="true"
@@ -204,7 +206,7 @@ function FloatingPillBottomNav({
                 tabRefs.current[id] = el
               }}
               onClick={() => onTabChange(id)}
-              className={`ios-press bottom-nav-pill__tab relative z-[1] flex h-11 min-h-11 min-w-11 flex-1 items-center justify-center rounded-full px-1 transition-colors duration-150 motion-reduce:transition-none ${
+              className={`ios-press bottom-nav-pill__tab relative z-[1] flex h-11 min-h-11 min-w-0 flex-1 items-center justify-center rounded-full px-0.5 transition-colors duration-150 motion-reduce:transition-none ${
                 isActive ? 'text-[#FF0702]' : 'text-[#EBEBF5]'
               }`}
               aria-current={isActive ? 'page' : undefined}

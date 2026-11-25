@@ -103,7 +103,7 @@ export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAn
       return
     }
     if (remaining === 0) {
-      const msg = 'Limite atteinte : 5 analyses photo / jour.'
+      const msg = "5 photos aujourd'hui, c'est le max. À demain !"
       setErrorMessage(msg)
       onToast?.(msg, 'error')
       return
@@ -127,22 +127,17 @@ export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAn
 
       onAnalyzed({
         ...macros,
-        name: 'Repas (IA)',
+        name: 'Repas en photo',
         mealType,
       })
 
       onToast?.(
-        `+${macros.calories} kcal ajoutées · ${macros.scansRemaining}/${macros.dailyLimit} scans restants`,
+        `+${macros.calories} kcal · encore ${macros.scansRemaining} photos`,
         'success',
       )
     } catch (e) {
       safeError('[MealPhotoAnalyzer]', e)
-      const msg =
-        e instanceof MealPhotoAiError
-          ? e.message
-          : e instanceof Error
-            ? e.message
-            : 'Analyse impossible — réessaie.'
+      const msg = 'Photo pas lue. Réessaie.'
 
       if (e instanceof MealPhotoAiError && e.scansRemaining != null) {
         setRemaining(e.scansRemaining)
@@ -195,7 +190,7 @@ export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAn
             ) : (
               (iconSlot ?? <Camera className="h-4 w-4" aria-hidden />)
             )}
-            {busy ? 'Analyse…' : 'Photo IA'}
+            {busy ? 'Je regarde…' : 'Photo du repas'}
           </button>
           {visibleErrorMessage ? (
             <p className="mt-2 text-[11px] leading-snug text-[#FF907F]" role="alert">
@@ -213,18 +208,15 @@ export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAn
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[15px] font-semibold text-white">Photo → macros (Gemini)</p>
-            <p className="mt-0.5 text-[12px] leading-snug text-[#ACB4BA]">
-              Compression locale puis analyse sécurisée.
-            </p>
+            <p className="text-[15px] font-semibold text-white">Prends ton repas en photo</p>
             <p
               className={`mt-1 text-[12px] font-semibold tabular-nums ${
                 remaining === 0 ? 'text-[#FF453A]' : 'text-[#30D158]'
               }`}
             >
               {remaining == null
-                ? 'Scans IA : —/5 restants aujourd’hui'
-                : `Scans IA : ${remaining}/5 restants aujourd’hui`}
+                ? 'Encore — photos aujourd’hui'
+                : `Encore ${remaining} photos aujourd'hui`}
             </p>
 
             <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -252,7 +244,7 @@ export const MealPhotoAnalyzer = forwardRef<MealPhotoAnalyzerHandle, MealPhotoAn
               className="ios-press mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-[#BF5AF2]/40 bg-[#BF5AF2]/15 px-3.5 py-2 text-[13px] font-semibold text-[#E9D5FF] disabled:opacity-50"
             >
               <Camera className="h-4 w-4" />
-              {busy ? 'Analyse en cours…' : 'Photo repas'}
+              {busy ? 'Je regarde…' : 'Photo du repas'}
             </button>
           </div>
           {previewUrl ? (

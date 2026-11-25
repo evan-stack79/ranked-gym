@@ -1,0 +1,78 @@
+Photos — Ranked Gym
+
+Toutes les photos Mon créneau v9 sont de vraies photos, sous licence Pexels
+(https://www.pexels.com/license/) : usage libre, y compris commercial.
+Mention de l'auteur appréciée, non obligatoire. Ne pas vendre la photo telle quelle.
+Aucune image IA. La traînée rouge est un effet graphique ajouté (incluse dans les
+fichiers hero-01…07.jpg).
+
+### Mon créneau v9 — heroes (`creneau/v9/hero-0N.jpg`)
+
+01 — Autre heure
+  Titre  : A Woman Timing Her Run in the Tracks
+  Auteur : Mikhail Nilov
+  Page   : https://www.pexels.com/photo/a-woman-timing-her-run-in-the-tracks-8456012/
+  Licence: Pexels License · Nikon D750, 24/04/2021
+
+02 — Changer de salle / La gare
+  Titre  : Photo of a Train Station at Daytime
+  Auteur : Abdul Kayum
+  Page   : https://www.pexels.com/photo/photo-of-a-train-station-at-daytime-9749564/
+  Licence: Pexels License · Nikon D5300, 25/09/2021
+
+03 — Le soir / Salle
+  Titre  : A Woman Working Out Using a Treadmill
+  Auteur : Gustavo Fring
+  Page   : https://www.pexels.com/photo/a-woman-working-out-using-a-treadmill-6285187/
+  Licence: Pexels License · Canon EOS 5D Mark III, 15/12/2020
+
+04 — Pas d'énergie / Demain
+  Titre  : A Woman Sleeping in the Bed
+  Auteur : Marcus Aurelius
+  Page   : https://www.pexels.com/photo/a-woman-sleeping-in-the-bed-9788264/
+  Licence: Pexels License · Canon EOS 5D Mark IV, 12/08/2021
+
+05 — Départ dépassé
+  Titre  : Athlete on Running Track
+  Auteur : KoolShooters
+  Page   : https://www.pexels.com/photo/athlete-on-running-track-8533446/
+  Licence: Pexels License · Canon EOS 5D Mark IV, 21/06/2021
+
+06 — Pars à
+  Titre  : Man Entering Sports Hall
+  Auteur : Pavel Danilyuk
+  Page   : https://www.pexels.com/photo/man-entering-sports-hall-6339318/
+  Licence: Pexels License · Nikon D610, 03/12/2020
+
+07 — Mineur
+  Titre  : Woman In Black Tank Top Opening Locker
+  Auteur : Anna Shvets
+  Page   : https://www.pexels.com/photo/woman-in-black-tank-top-opening-locker-3902728/
+  Licence: Pexels License · publiée le 10/03/2020. Femme adulte, aucun visage d'enfant.
+
+### Ancien hero v5 (conservé)
+- Fichier : creneau/shadow-boxing-pavel-danilyuk.jpg
+- Titre : A Man Doing Shadow Boxing
+- Auteur : Pavel Danilyuk
+- Source : https://www.pexels.com/photo/a-man-doing-shadow-boxing-6295816/
+- Licence : Pexels License
+
+### Train v2 (`photos/train/`)
+
+1. photo-hero-a.jpg — Aujourd’hui / Upper
+  Titre  : Man in Black Tank Top and Shorts Standing on Boxing Ring
+  Auteur : Ron Lach
+  Page   : https://www.pexels.com/photo/man-in-black-tank-top-and-shorts-standing-on-boxing-ring-8745171/
+  Licence: Pexels License · Fujifilm X-T20, 14/06/2021
+
+2. photo-creneau-thumb.jpg — Carte Mon créneau
+  Titre  : Man Entering Sports Hall
+  Auteur : Pavel Danilyuk
+  Page   : https://www.pexels.com/photo/man-entering-sports-hall-6339318/
+  Licence: Pexels License · Nikon D610, 03/12/2020
+
+3. photo-bench-thumb.jpg — Dernière séance
+  Titre  : Strong sportsman doing bench press during workout in modern gym
+  Auteur : Andrea Piacquadio
+  Page   : https://www.pexels.com/photo/strong-sportsman-doing-bench-press-during-workout-in-modern-gym-3837743/
+  Licence: Pexels License · Canon EOS 5DS, 01/03/2020

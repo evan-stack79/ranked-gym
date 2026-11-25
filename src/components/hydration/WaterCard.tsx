@@ -5,7 +5,6 @@ import {
   formatLitersFr,
   formatRemainingLabel,
   GOAL_DEFAULT_ML,
-  LABEL_REPERE_JOUR,
   MSG_HIGH_INFO,
   MSG_MINOR_PERMANENT,
   MSG_PERMANENT,
@@ -116,7 +115,7 @@ export function WaterCard({ compact = false, onOpenSettings, className = '' }: W
 
   const goalMl = minorLocked ? GOAL_DEFAULT_ML : today.goalMl
   const ratio = fillRatio(goalMl, today.drunkMl)
-  const repereLabel = `${LABEL_REPERE_JOUR} · ${formatLitersFr(goalMl)}`
+  const repereLabel = `Repère : ${formatLitersFr(goalMl)}`
 
   return (
     <div
@@ -195,7 +194,7 @@ export function WaterCard({ compact = false, onOpenSettings, className = '' }: W
           className="ios-press min-h-11 rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
           data-hydration-add="half"
         >
-          +½
+          +½ bouteille
         </button>
         <button
           type="button"
@@ -204,7 +203,7 @@ export function WaterCard({ compact = false, onOpenSettings, className = '' }: W
           className="ios-press min-h-11 rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
           data-hydration-add="full"
         >
-          +bouteille
+          +1 bouteille
         </button>
         <button
           type="button"
@@ -213,7 +212,7 @@ export function WaterCard({ compact = false, onOpenSettings, className = '' }: W
           className="ios-press min-h-11 rounded-xl border border-white/10 px-3 py-2.5 text-[13px] font-medium text-[#ACB4BA] disabled:opacity-40"
           data-hydration-undo
         >
-          Annuler
+          Retirer
         </button>
         {onOpenSettings && !minorLocked ? (
           <button

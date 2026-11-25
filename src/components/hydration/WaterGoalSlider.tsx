@@ -33,7 +33,7 @@ export function WaterGoalSlider({ valueMl, onChange, disabled }: WaterGoalSlider
         disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full accent-[#FF0702]"
-        aria-label="Objectif d’eau quotidienne"
+        aria-label="Ton objectif d'eau"
         aria-valuemin={GOAL_MIN_ML}
         aria-valuemax={GOAL_MAX_ML}
         aria-valuenow={safe}

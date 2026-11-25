@@ -50,6 +50,6 @@ describe('updateHydrationSettings optimiste', () => {
     const today = fallbackToday('2026-11-10', 'u-opt')
     expect(today.mode).toBe('classic_15')
     expect(today.effectiveVisualMode).toBe('classic_15')
-    expect(bottleScreenLabelForMode(today.effectiveVisualMode)).toBe('Cristaline 1,5 L')
+    expect(bottleScreenLabelForMode(today.effectiveVisualMode)).toBe('Bouteille 1,5 L')
   })
 })

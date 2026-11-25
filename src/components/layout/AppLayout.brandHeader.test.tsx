@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppLayout } from './AppLayout'
 import { shouldShowBrandHeader } from './shouldShowBrandHeader'
 import { AuthStateProvider, type AuthContextValue } from '../../context/AuthContext'
-import { RestTimerProvider } from '../../context/RestTimerContext'
+import { RestTimerProvider, useRestTimerContext } from '../../context/RestTimerContext'
 import type { TabId } from '../../types'
 
 vi.mock('../../assets/brand/panther-roaring.png', () => ({ default: 'panther.png' }))
@@ -70,12 +70,19 @@ describe('shouldShowBrandHeader', () => {
     expect(shouldShowBrandHeader('nutrition')).toBe(true)
     expect(shouldShowBrandHeader('training')).toBe(true)
     expect(shouldShowBrandHeader('home')).toBe(false)
+    expect(shouldShowBrandHeader('sleep')).toBe(false)
     expect(shouldShowBrandHeader('profile')).toBe(false)
   })
 
   it('reste masquée si chrome immersif (chromeHidden)', () => {
     expect(shouldShowBrandHeader('nutrition', true)).toBe(false)
     expect(shouldShowBrandHeader('training', true)).toBe(false)
+  })
+
+  it('reste masquée en plein écran contenu (contentFullBleed) — Mon créneau', () => {
+    expect(shouldShowBrandHeader('training', false, true)).toBe(false)
+    expect(shouldShowBrandHeader('nutrition', false, true)).toBe(false)
+    expect(shouldShowBrandHeader('training', false, false)).toBe(true)
   })
 })
 
@@ -165,5 +172,49 @@ describe('AppLayout — barre marque sticky Nutrition / Train', () => {
     ;({ root, host } = renderLayout('profile'))
     expect(host.querySelector('[data-app-brand-header]')).toBeNull()
     expect(host.querySelector('nav[aria-label="Navigation principale"]')).not.toBeNull()
+  })
+
+  it('contentFullBleed : pas de barre marque, Tab Bar conservée, pad full-bleed', async () => {
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    let setBleed: ((v: boolean) => void) | null = null
+
+    function Probe() {
+      const { setContentFullBleed, contentFullBleed } = useRestTimerContext()
+      setBleed = setContentFullBleed
+      return (
+        <AppLayout activeTab="training" onTabChange={vi.fn()}>
+          <div data-testid="page-body" data-bleed={contentFullBleed ? '1' : '0'}>
+            créneau
+          </div>
+        </AppLayout>
+      )
+    }
+
+    await act(async () => {
+      root.render(
+        <AuthStateProvider value={buildAuthValue()}>
+          <RestTimerProvider>
+            <Probe />
+          </RestTimerProvider>
+        </AuthStateProvider>,
+      )
+    })
+    expect(host.querySelector('[data-app-brand-header="1"]')).not.toBeNull()
+    expect(host.querySelector('nav[aria-label="Navigation principale"]')).not.toBeNull()
+
+    await act(async () => {
+      setBleed?.(true)
+    })
+    expect(host.querySelector('[data-app-brand-header]')).toBeNull()
+    expect(host.querySelector('nav[aria-label="Navigation principale"]')).not.toBeNull()
+    expect(host.querySelector('[data-app-content-pad="full-bleed"]')).not.toBeNull()
+    expect(host.querySelector('[data-app-full-bleed="1"]')).not.toBeNull()
+
+    await act(async () => {
+      root.unmount()
+    })
+    host.remove()
   })
 })

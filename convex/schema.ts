@@ -1095,7 +1095,9 @@ export const convexTables = {
     appliedAt: v.optional(v.number()),
   })
     .index('by_source_env_event', ['source', 'environment', 'eventKey'])
-    .index('by_processing_state', ['processingState', 'receivedAt']),
+    .index('by_processing_state', ['processingState', 'receivedAt'])
+    .index('by_userId', ['userId'])
+    .index('by_subscriptionId', ['subscriptionId']),
 
   subscriptionPurchaseAttempts: defineTable({
     userId: v.string(),
@@ -1166,6 +1168,69 @@ export const convexTables = {
   })
     .index('by_user_kind_period', ['userId', 'kind', 'periodKey'])
     .index('by_status_fireAt', ['status', 'fireAt']),
+
+  /**
+   * Archive minimale après suppression de compte (RGPD).
+   * `archiveId` est un identifiant sans lien avec le compte — jamais de userId,
+   * profil, e-mail, jeton, payload chiffré ni donnée de santé.
+   * Conservation visée : 5 ans (prescription civile), puis purge.
+   */
+  account_delete_subscription_archive: defineTable({
+    archiveId: v.string(),
+    storeTransactionId: v.optional(v.string()),
+    productId: v.optional(v.string()),
+    occurredAt: v.optional(v.number()),
+    periodEndsAt: v.optional(v.number()),
+    amount: v.optional(v.string()),
+    store: v.optional(v.string()),
+    archivedAt: v.number(),
+    retainUntil: v.number(),
+  })
+    .index('by_archiveId', ['archiveId'])
+    .index('by_retainUntil', ['retainUntil']),
+
+  /**
+   * Codes partenaires déjà donnés + ligne ledger redeem associée.
+   * Conservation visée : 1 an. Code, date, partenaire, points — pas d’identité.
+   */
+  account_delete_rewards_redemption_archive: defineTable({
+    archiveId: v.string(),
+    code: v.string(),
+    redeemedAt: v.number(),
+    partner: v.string(),
+    points: v.number(),
+    archivedAt: v.number(),
+    retainUntil: v.number(),
+  })
+    .index('by_archiveId', ['archiveId'])
+    .index('by_retainUntil', ['retainUntil']),
+
+  /**
+   * Preuve d’âge vérifié à la suppression. Date + résultat seulement.
+   * Conservation visée : 1 an.
+   */
+  account_delete_age_majority_archive: defineTable({
+    archiveId: v.string(),
+    at: v.number(),
+    result: v.literal('15+ oui'),
+    archivedAt: v.number(),
+    retainUntil: v.number(),
+  })
+    .index('by_archiveId', ['archiveId'])
+    .index('by_retainUntil', ['retainUntil']),
+
+  /**
+   * Preuve takeover Google (sécurité). Horodatage seulement — jamais mot de passe / jeton.
+   * Conservation visée : 6 mois.
+   */
+  account_delete_google_takeover_archive: defineTable({
+    archiveId: v.string(),
+    at: v.number(),
+    archivedAt: v.number(),
+    retainUntil: v.number(),
+  })
+    .index('by_archiveId', ['archiveId'])
+    .index('by_retainUntil', ['retainUntil']),
 }
 
 export default defineSchema(convexTables)

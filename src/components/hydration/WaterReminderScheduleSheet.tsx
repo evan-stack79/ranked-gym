@@ -54,7 +54,7 @@ export function WaterReminderScheduleSheet({
     const candidates = ['09:00', '11:00', '13:00', '15:00', '17:00', '19:00']
     const next = candidates.find((t) => !draft.includes(t) && isReminderTimeAllowed(t))
     if (!next) {
-      setError('Aucun créneau libre entre 8 h et 21 h.')
+      setError("Plus d'heure libre entre 8 h et 21 h.")
       return
     }
     setDraft(sortTimes([...draft, next]))
@@ -63,22 +63,22 @@ export function WaterReminderScheduleSheet({
 
   const commitEdit = (index: number, value: string) => {
     if (!/^\d{2}:\d{2}$/.test(value)) {
-      setError('Format HH:MM requis.')
+      setError("Écris l'heure comme 14:30.")
       return
     }
     if (!isReminderTimeAllowed(value)) {
-      setError('Jamais la nuit (21 h–8 h).')
+      setError('Pas entre 21 h et 8 h.')
       return
     }
     if (draft.some((t, i) => i !== index && t === value)) {
-      setError('Créneau déjà utilisé.')
+      setError('Tu as déjà cette heure.')
       return
     }
     const next = [...draft]
     next[index] = value
     const sanitized = sanitizeReminderTimes(next)
     if (sanitized.length < next.length) {
-      setError('Créneau refusé (nuit ou doublon).')
+      setError('Heure pas possible.')
       return
     }
     setDraft(sortTimes(sanitized))
@@ -89,11 +89,11 @@ export function WaterReminderScheduleSheet({
   const confirm = () => {
     const sanitized = sanitizeReminderTimes(draft)
     if (sanitized.length === 0) {
-      setError('Ajoute au moins un créneau entre 8 h et 21 h.')
+      setError('Ajoute une heure entre 8 h et 21 h.')
       return
     }
     if (sanitized.length > REMINDERS_MAX_PER_DAY) {
-      setError(`Maximum ${REMINDERS_MAX_PER_DAY} créneaux.`)
+      setError(`${REMINDERS_MAX_PER_DAY} rappels max.`)
       return
     }
     onSave(sanitized)
@@ -101,7 +101,7 @@ export function WaterReminderScheduleSheet({
   }
 
   return (
-    <IosSheet open={open} onClose={onClose} title="Horaires" dismissible>
+    <IosSheet open={open} onClose={onClose} title="Heures" dismissible>
       <div className="space-y-3 pb-6" data-hydration-reminders-schedule>
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
           {draft.map((t, index) => (
@@ -170,7 +170,7 @@ export function WaterReminderScheduleSheet({
         </button>
 
         <p className="text-center text-[13px] text-[#ACB4BA]">
-          Jamais la nuit (21 h–8 h) · {REMINDERS_MAX_PER_DAY} max
+          {REMINDERS_MAX_PER_DAY} max · jamais de 21 h à 8 h
         </p>
         {error ? (
           <p className="text-center text-[12px] text-[#FF907F]" data-hydration-reminder-schedule-error>
@@ -184,7 +184,7 @@ export function WaterReminderScheduleSheet({
           className="btn-brand ios-press mt-2 flex h-[50px] w-full items-center justify-center rounded-2xl text-[16px] font-bold text-white"
           data-hydration-reminder-schedule-ok
         >
-          OK
+          C'est bon
         </button>
       </div>
     </IosSheet>

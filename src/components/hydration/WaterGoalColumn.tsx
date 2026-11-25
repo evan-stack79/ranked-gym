@@ -111,7 +111,7 @@ export function WaterGoalColumn({
         <div
           ref={trackRef}
           role="slider"
-          aria-label="Objectif d’eau quotidienne"
+          aria-label="Ton objectif d'eau"
           aria-valuemin={GOAL_MIN_ML}
           aria-valuemax={GOAL_MAX_ML}
           aria-valuenow={safe}
@@ -160,7 +160,7 @@ export function WaterGoalColumn({
           <span className="text-[14px] font-semibold text-white">Objectif</span>
           <button
             type="button"
-            aria-label="Informations santé hydratation"
+            aria-label="Bon à savoir"
             aria-expanded={infoOpen}
             onClick={() => setInfoOpen((v) => !v)}
             className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
@@ -181,7 +181,7 @@ export function WaterGoalColumn({
             className="absolute left-1/2 top-7 z-20 w-[min(280px,78vw)] -translate-x-1/2 rounded-2xl border border-white/10 bg-[#2C3032] p-3.5 text-left shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
             data-hydration-goal-info-bubble
             role="dialog"
-            aria-label="Mentions santé"
+            aria-label="Bon à savoir"
           >
             <p className="text-[12px] leading-snug text-[#C7C7CC]">{MSG_PERMANENT}</p>
             <p className="mt-2 text-[12px] leading-snug text-[#C7C7CC]">{MSG_GOAL_RANGE}</p>

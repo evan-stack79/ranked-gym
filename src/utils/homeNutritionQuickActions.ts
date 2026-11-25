@@ -41,7 +41,7 @@ export function tryAddHomeQuickWater(): HomeQuickWaterResult {
       addedMl: result.waterMl - before,
     }
   } catch {
-    return { ok: false, message: "Impossible d'ajouter l'eau" }
+    return { ok: false, message: 'Eau pas ajoutée. Réessaie.' }
   }
 }
 

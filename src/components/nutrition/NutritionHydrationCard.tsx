@@ -39,7 +39,7 @@ export function NutritionHydrationCard({
           <GlassWater className="h-6 w-6 shrink-0 text-white" strokeWidth={1.75} aria-hidden />
           <div className="min-w-0 flex-1">
             <p className="text-[14px] font-semibold text-white">
-              <SoftBlurIn>Hydratation</SoftBlurIn>
+              <SoftBlurIn>Eau</SoftBlurIn>
             </p>
             <p className="mt-0.5 text-[13px] font-medium tabular-nums text-[#ACB4BA]">
               <CountUpNumber
@@ -77,7 +77,7 @@ export function NutritionHydrationCard({
       <GlassWater className="h-6 w-6 shrink-0 text-white" strokeWidth={1.75} aria-hidden />
       <div className="min-w-0 flex-1">
         <p className="text-[14px] font-semibold text-white">
-          <SoftBlurIn>Hydratation</SoftBlurIn>
+          <SoftBlurIn>Eau</SoftBlurIn>
         </p>
         <p className="mt-0.5 text-[13px] font-medium tabular-nums text-[#ACB4BA]">
           <CountUpNumber
@@ -93,7 +93,7 @@ export function NutritionHydrationCard({
           aria-valuenow={Math.round(progress * 100)}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label="Progression hydratation"
+          aria-label="Eau bue aujourd'hui"
         >
           <div
             className="motion-progress-fill h-full rounded-full bg-[#FF0702]"

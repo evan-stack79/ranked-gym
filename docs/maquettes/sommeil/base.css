@@ -1,0 +1,19 @@
+@font-face{font-family:Inter;src:url(Inter-Variable.ttf)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#000;color:#fff;font-family:-apple-system,"SF Pro Text",Inter,sans-serif;width:390px;padding:18px 16px 22px;-webkit-font-smoothing:antialiased}
+.hdr{display:flex;justify-content:space-between;align-items:baseline;margin:0 4px 10px}
+.hdr h2{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.hdr span{font-size:13px;font-weight:600;color:#8e8e93}
+.card{background:#1c1c1e;border-radius:20px;padding:16px 14px 0;overflow:hidden}
+.days{display:grid;grid-template-columns:repeat(7,1fr);text-align:center}
+.days .l{font-size:13px;font-weight:700;color:#d1d1d6;width:32px;height:32px;line-height:32px;border-radius:50%;margin:0 auto;background:#2c2c2e}
+.days .d{font-size:11px;font-weight:600;color:#8e8e93;margin-top:5px;font-variant-numeric:tabular-nums}
+.days .sel .l{background:#ff0702;color:#fff}
+.days .sel .d{color:#fff}
+.days .no .l{background:transparent;border:1.5px solid #3a3a3c;color:#8e8e93;line-height:29px}
+.fig{display:grid;grid-template-columns:1fr 1fr 1fr;margin:14px -14px 0;border-top:1px solid #2c2c2e}
+.fig>div{padding:13px 4px 15px;text-align:center}
+.fig>div+div{border-left:1px solid #2c2c2e}
+.fig .k{font-size:12px;font-weight:600;color:#8e8e93}
+.fig .v{margin-top:7px;font-size:17px;font-weight:700;letter-spacing:-.01em;height:24px;display:flex;align-items:center;justify-content:center;gap:3px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.fig .v small{font-size:13px;font-weight:600;color:#8e8e93}

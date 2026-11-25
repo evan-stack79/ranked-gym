@@ -17,7 +17,7 @@ export function WaterGoalSheet({ open, onClose }: WaterGoalSheetProps) {
       open={open}
       onClose={onClose}
       title="Objectif d'eau"
-      subtitle="Choisis un objectif journalier — uniquement si tu en veux un."
+      subtitle="Un objectif par jour, si tu veux."
       footer={
         <button
           type="button"

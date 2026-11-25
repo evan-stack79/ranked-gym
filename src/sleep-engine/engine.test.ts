@@ -222,6 +222,72 @@ describe('Efficiency threshold documentation', () => {
   })
 })
 
+describe('Recommandations — libellés âge (Vérif. 1–5)', () => {
+  it('nuit optimale : 13–18 / 19–64 / 65+', () => {
+    const teen = runSleepEngine({ ...BASE, tstHours: 8, age: 16 })
+    const adult = runSleepEngine({ ...BASE, tstHours: 8, age: 30 })
+    const senior = runSleepEngine({ ...BASE, tstHours: 8, age: 70 })
+    expect(teen.ok && adult.ok && senior.ok).toBe(true)
+    if (!teen.ok || !adult.ok || !senior.ok) return
+    expect(teen.recommendations).toContain(
+      'Nuit (au lit) dans le repère de ton âge : 8 à 10 h.',
+    )
+    expect(adult.recommendations).toContain(
+      'Nuit (au lit) dans le repère de ton âge : 7 à 9 h.',
+    )
+    expect(senior.recommendations).toContain(
+      'Nuit (au lit) dans le repère de ton âge : 7 à 8 h.',
+    )
+  })
+
+  it('déficit : moins de 7 h au lit, heure régulière', () => {
+    const r = runSleepEngine({ ...BASE, bedtime: '00:00', waketime: '07:00', tstHours: 6 })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.recommendations).toContain(
+      'Moins de 7 h au lit. Ce soir, au lit un peu plus tôt, à heure régulière.',
+    )
+  })
+
+  it('excès : pas affiché aux 13–18 ans ; adulte = même réveil', () => {
+    const teen = runSleepEngine({
+      ...BASE,
+      bedtime: '21:00',
+      waketime: '08:00',
+      tstHours: 10,
+      age: 16,
+    })
+    const adult = runSleepEngine({
+      ...BASE,
+      bedtime: '21:00',
+      waketime: '08:00',
+      tstHours: 10,
+      age: 30,
+    })
+    expect(teen.ok && adult.ok).toBe(true)
+    if (!teen.ok || !adult.ok) return
+    expect(teen.recommendations.join(' ')).not.toMatch(/Plus de 9 h/)
+    expect(adult.recommendations).toContain(
+      'Plus de 9 h au lit. Garde la même heure de réveil.',
+    )
+  })
+
+  it('avertissements courts, sans médecin', () => {
+    const r = runSleepEngine({
+      ...BASE,
+      bedtime: '02:00',
+      waketime: '06:00',
+      tstHours: 4,
+      workdayTstHours: [4, 4, 4],
+    })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.warnings).toContain('Nuit très courte.')
+    expect(r.warnings).toContain('Tu dors très peu les jours de cours ou de travail.')
+    expect([...r.recommendations, ...r.warnings].join(' ')).not.toMatch(/médecin/i)
+  })
+})
+
 describe('Sleep restriction therapy — excluded', () => {
   it('module expérimental désactivé et non branché', () => {
     expect(SLEEP_RESTRICTION_EXPERIMENTAL_ENABLED).toBe(false)

@@ -463,7 +463,7 @@ export function SmartWaterGauge() {
       <div className="mb-5 flex items-end justify-between gap-3">
         <div>
           <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#ACB4BA]">
-            Hydratation
+            Eau
           </p>
           <h2 className="mt-1 text-[22px] font-semibold tracking-tight text-white">
             <SoftBlurIn as="span">Eau</SoftBlurIn>
@@ -677,11 +677,11 @@ export function SmartWaterGauge() {
             type="button"
             onClick={enterCalibration}
             className="ios-press min-h-11 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2.5 text-[13px] font-medium text-[#ACB4BA] hover:border-white/20 hover:text-white"
-            aria-label="Régler le niveau de ma bouteille"
+            aria-label="Régler ma bouteille"
           >
             Régler ma bouteille
             {isCalibrated ? (
-              <span className="ml-1.5 text-[11px] font-semibold text-[#7DD3FC]">· calibré</span>
+              <span className="ml-1.5 text-[11px] font-semibold text-[#7DD3FC]">· réglée</span>
             ) : null}
           </button>
         ) : null}
@@ -689,10 +689,10 @@ export function SmartWaterGauge() {
         {calibrating ? (
           <div className="flex w-full max-w-[340px] flex-col items-center gap-3">
             <p className="rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7DD3FC]">
-              Mode calibrage
+              Réglage
             </p>
             <p className="max-w-[280px] text-center text-[13px] font-medium leading-relaxed text-[#ACB4BA]">
-              Place le niveau de l’eau comme sur ta vraie bouteille
+              Mets le niveau comme sur ta bouteille
             </p>
             <div className="flex w-full items-center gap-2">
               <button
@@ -715,7 +715,7 @@ export function SmartWaterGauge() {
               onClick={resetToAutomatic}
               className="ios-press px-2 py-1.5 text-[12px] font-medium text-[#ACB4BA] underline-offset-2 hover:underline"
             >
-              Revenir au suivi automatique
+              Remettre comme avant
             </button>
           </div>
         ) : null}
@@ -741,7 +741,7 @@ export function SmartWaterGauge() {
 
         <div className="w-full max-w-[340px]">
           <p className="mb-2 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-[#ACB4BA]">
-            Raccourcis
+            Ajout rapide
           </p>
           <div className="grid grid-cols-3 gap-2">
             {WATER_SMART_PRESETS.map((preset) => (
@@ -795,7 +795,7 @@ export function SmartWaterGauge() {
 
           {entries.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-white/10 px-3 py-4 text-center text-[12px] leading-relaxed text-[#717C83]">
-              Aucune prise pour l’instant — valide un volume ou un raccourci.
+              Rien bu pour l'instant. Ajoute un verre.
             </p>
           ) : (
             <ul
@@ -890,8 +890,8 @@ export function SmartWaterGauge() {
         ) : calibrating ? null : (
           <p className="max-w-[280px] text-center text-[13px] leading-relaxed text-[#ACB4BA]">
             {showActiveBottle
-              ? 'Glisse la bouteille ou utilise un raccourci — corrige via la liste.'
-              : 'Suivi visuel de ce que tu as enregistré — pas une obligation de boire.'}
+              ? 'Glisse la bouteille. Erreur ? Corrige dans la liste.'
+              : 'Juste ce que tu as noté. Bois selon ta soif.'}
           </p>
         )}
       </div>

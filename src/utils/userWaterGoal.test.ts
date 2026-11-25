@@ -107,7 +107,7 @@ describe('userWaterGoal', () => {
 
   it('phrase scientifique exacte', () => {
     expect(WATER_GOAL_CHOICE_ADVICE).toBe(
-      "Choisis ton objectif. Ce dont tu as besoin change selon toi, la chaleur et l'effort. En cas de doute, demande à un médecin.",
+      "Ton besoin change avec la chaleur et le sport. Un doute ? Demande à un médecin.",
     )
   })
 

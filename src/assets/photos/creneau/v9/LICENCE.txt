@@ -1,0 +1,73 @@
+Toutes les photos sont de vraies photos, sous licence Pexels
+(https://www.pexels.com/license/) : usage libre, y compris commercial.
+Mention de l'auteur appréciée, non obligatoire. Ne pas vendre la photo telle quelle.
+Aucune image IA. La traînée rouge est un effet graphique ajouté.
+
+01 — Autre heure
+  Titre  : A Woman Timing Her Run in the Tracks
+  Auteur : Mikhail Nilov
+  Page   : https://www.pexels.com/photo/a-woman-timing-her-run-in-the-tracks-8456012/
+  Licence: Pexels License
+  Appareil: Nikon D750, 24/04/2021
+  Fichier: 01_mikhail-nilov-woman-timing-run.jpg
+  Note   : conservée de la v7/v8 (déjà lumineuse).
+
+02 — Changer de salle / La gare
+  Titre  : Photo of a Train Station at Daytime
+  Auteur : Abdul Kayum
+  Page   : https://www.pexels.com/photo/photo-of-a-train-station-at-daytime-9749564/
+  Licence: Pexels License
+  Appareil: Nikon D5300, 25/09/2021
+  Fichier: 02_abdul-kayum-train-station-daytime.jpg
+  Note   : remplace Ahmed Mulla, Train Station Platform at Night (4977883),
+           trop sombre par nature (quai de nuit).
+
+03 — Le soir / Salle
+  Titre  : A Woman Working Out Using a Treadmill
+  Auteur : Gustavo Fring
+  Page   : https://www.pexels.com/photo/a-woman-working-out-using-a-treadmill-6285187/
+  Licence: Pexels License
+  Appareil: Canon EOS 5D Mark III, 15/12/2020
+  Fichier: 03_gustavo-fring-woman-treadmill-gym.jpg
+  Note   : remplace cottonbro studio, Brown Wooden Bar Stools and Table
+           (4754000), salle de boxe trop sombre par nature.
+
+04 — Pas d'énergie / Demain
+  Titre  : A Woman Sleeping in the Bed
+  Auteur : Marcus Aurelius
+  Page   : https://www.pexels.com/photo/a-woman-sleeping-in-the-bed-9788264/
+  Licence: Pexels License
+  Appareil: Canon EOS 5D Mark IV, 12/08/2021
+  Fichier: 04_marcus-aurelius-woman-sleeping-in-bed.jpg
+  Note   : remplace cottonbro studio, A Person Sleeping on the Bed (6753354),
+           lit au rendu sombre et inquiet. Femme adulte, lumière claire.
+
+05 — Départ dépassé
+  Titre  : Athlete on Running Track
+  Auteur : KoolShooters
+  Page   : https://www.pexels.com/photo/athlete-on-running-track-8533446/
+  Licence: Pexels License
+  Appareil: Canon EOS 5D Mark IV, 21/06/2021
+  Fichier: 05_koolshooters-athlete-tying-shoes.jpg
+  Note   : conservée de la v7/v8 (déjà lumineuse). Personne et séance
+           différentes de l'écran 01.
+
+06 — Pars à
+  Titre  : Man Entering Sports Hall
+  Auteur : Pavel Danilyuk
+  Page   : https://www.pexels.com/photo/man-entering-sports-hall-6339318/
+  Licence: Pexels License
+  Appareil: Nikon D610, 03/12/2020
+  Fichier: 06_pavel-danilyuk-entering-sports-hall.jpg
+  Note   : conservée de la v7/v8 (déjà assez claire, couleurs naturelles).
+
+07 — Mineur
+  Titre  : Woman In Black Tank Top Opening Locker
+  Auteur : Anna Shvets
+  Page   : https://www.pexels.com/photo/woman-in-black-tank-top-opening-locker-3902728/
+  Licence: Pexels License
+  Appareil: (non indiqué sur la page Pexels ; photo publiée le 10/03/2020)
+  Fichier: 07_anna-shvets-woman-opening-locker.jpg
+  Note   : remplace Nurefşan KOŞAR, Lockers in Empty Locker Room (14169925),
+           vestiaire vide à l'ambiance abandonnée. Femme adulte dans un
+           vestiaire lumineux. Aucun visage d'enfant.

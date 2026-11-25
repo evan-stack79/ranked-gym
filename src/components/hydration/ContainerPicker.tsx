@@ -28,7 +28,7 @@ export function ContainerPicker({
 }) {
   return (
     <div className="space-y-2" data-hydration-container-picker>
-      <p className="text-[15px] font-semibold text-white">Contenant</p>
+      <p className="text-[15px] font-semibold text-white">Ta bouteille</p>
       <div className="grid grid-cols-3 gap-2">
         {OPTIONS.map((opt) => {
           const isSelected = selected === opt.id

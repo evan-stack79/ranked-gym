@@ -15,11 +15,26 @@ function resolveAppBuildId(): string {
     process.env.WORKERS_CI_COMMIT_SHA ||
     process.env.CF_PAGES_COMMIT_SHA ||
     process.env.VITE_APP_BUILD_ID ||
+    process.env.VITE_GIT_SHA ||
     process.env.GITHUB_SHA ||
     ''
   const short = fromEnv.trim().slice(0, 7)
   if (short) return short
   return 'local'
+}
+
+/** Full-ish SHA for sleep-alarm beta diagnostics (12 chars). */
+function resolveGitSha(): string {
+  const fromEnv =
+    process.env.VITE_GIT_SHA ||
+    process.env.WORKERS_CI_COMMIT_SHA ||
+    process.env.CF_PAGES_COMMIT_SHA ||
+    process.env.GITHUB_SHA ||
+    process.env.VITE_APP_BUILD_ID ||
+    ''
+  const trimmed = fromEnv.trim()
+  if (trimmed) return trimmed.slice(0, 12)
+  return 'dev'
 }
 
 function resolveAppBuildTimeIso(): string {
@@ -30,6 +45,7 @@ export default defineConfig({
   define: {
     __APP_BUILD_ID__: JSON.stringify(resolveAppBuildId()),
     __APP_BUILD_TIME__: JSON.stringify(resolveAppBuildTimeIso()),
+    'import.meta.env.VITE_GIT_SHA': JSON.stringify(resolveGitSha()),
   },
   server: {
     host: true,

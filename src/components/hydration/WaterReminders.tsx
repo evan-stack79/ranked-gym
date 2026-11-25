@@ -43,17 +43,17 @@ export function WaterReminders({
       goalReachedToday,
     })
     if (!result.ok && result.reason === 'PERMISSION_DENIED') {
-      setError('Les notifications sont refusées. Tu peux les réactiver dans les réglages du téléphone.')
+      setError('Notifications coupées. Active-les dans les Réglages du téléphone.')
       onChange({ enabled: false, times: displayTimes })
       return
     }
     if (!result.ok && result.reason === 'WEB_NO_REMINDERS_V0') {
-      setError('Les rappels sont disponibles dans l’app iOS / Android.')
+      setError("Rappels dispo seulement dans l'app.")
       onChange({ enabled: false, times: displayTimes })
       return
     }
     if (!result.ok && result.reason === 'PLUGIN_MISSING') {
-      setError('Les rappels locaux ne sont pas encore branchés sur cet appareil.')
+      setError('Pas encore de rappels sur ce téléphone.')
       onChange({ enabled: false, times: displayTimes })
       return
     }
@@ -66,7 +66,7 @@ export function WaterReminders({
         <div>
           <p className="text-[15px] font-semibold text-white">Rappels d’eau</p>
           <p className="text-[12px] text-[#8E8E93]">
-            Désactivés par défaut · max {REMINDERS_MAX_PER_DAY} / jour · jamais la nuit (21 h–8 h)
+            {REMINDERS_MAX_PER_DAY} max par jour. Jamais de 21 h à 8 h.
           </p>
         </div>
         <button
@@ -87,7 +87,7 @@ export function WaterReminders({
         </button>
       </div>
       <p className="text-[12px] text-[#8E8E93]">
-        Créneaux : {(displayTimes.length ? displayTimes : DEFAULT_REMINDER_TIMES).join(' · ')}
+        Heures : {(displayTimes.length ? displayTimes : DEFAULT_REMINDER_TIMES).join(' · ')}
       </p>
       {goalReachedToday && enabled ? (
         <p

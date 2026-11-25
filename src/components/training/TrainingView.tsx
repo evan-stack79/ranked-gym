@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './trainView.css'
-import { ChevronLeft, Settings2 } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
 import type { TrainingState, WorkoutNote } from '../../types/training'
 import { getSportById } from '../../data/sports'
-import { getCatalogExercise } from '../../data/exerciseCatalog'
 import {
   getTrainingState,
   removeSchedule,
@@ -23,9 +22,6 @@ import {
   upsertSchedule,
   markVoluntaryLeaveToTrainHub,
   clearLastVoluntaryRoute,
-  dismissRecommendedExercise,
-  appendExerciseToActiveRoutine,
-  persistActiveExerciseIndex,
 } from '../../services/trainingStorage'
 import { saveAndSyncWorkoutSession } from '../../services/trainingSyncService'
 import { notifyRankedSessionCompleted } from '../../services/rankedService'
@@ -68,24 +64,16 @@ import {
 import type { TeamSessionType } from '../../types/training'
 import {
   deriveRecentSessions,
+  deriveTodayHubCard,
   deriveWeekStrip,
   deriveWeeklySummary,
+  launchableRoutineId,
   trainSessionKindForSport,
   resolveSessionKind,
   type SportSummaryFilter,
 } from '../../utils/trainHub'
-import { TrainWeekStrip } from './TrainWeekStrip'
-import { TrainWeeklySummary } from './TrainWeeklySummary'
-import { TrainRecentSessions } from './TrainRecentSessions'
 import { TrainActivitySheet, type QuickActivityId } from './TrainActivitySheet'
-import { TrainingRecommendationCard } from './TrainingRecommendationCard'
-import { isTrainingRecommendationsEnabled } from '../../backend/trainingFeatureFlags'
-import {
-  recommendExercises,
-  recommendationProfileFromState,
-  lastLoggedSetCount,
-  type TrainingRecommendation,
-} from '../../training-engine'
+import { TrainV2Hub } from './TrainV2Hub'
 import {
   formatSessionClock,
   liveElapsedMs,
@@ -98,9 +86,9 @@ import {
   shouldAutoReopenSession,
 } from '../../utils/sessionBackNav'
 import { deriveSessionDisplayTitle } from '../../utils/sessionDisplayTitle'
-import { BlurInText, Reveal } from '../motion'
+import { CreneauFlow } from './creneau/CreneauFlow'
 
-type TrainPanel = 'hub' | 'notebook' | 'endurance' | 'agenda' | 'history' | 'steps'
+type TrainPanel = 'hub' | 'notebook' | 'endurance' | 'agenda' | 'history' | 'steps' | 'creneau'
 
 export function TrainingView({
   launchRoutineId = null,
@@ -139,8 +127,14 @@ export function TrainingView({
     nonce: number
   } | null>(null)
 
-  const { start: startRestTimer, dismiss: dismissRestTimer, setReadyBarEnabled, isBarVisible, setChromeHidden } =
-    useRestTimerContext()
+  const {
+    start: startRestTimer,
+    dismiss: dismissRestTimer,
+    setReadyBarEnabled,
+    isBarVisible,
+    setChromeHidden,
+    setContentFullBleed,
+  } = useRestTimerContext()
 
   const [disciplineTick, setDisciplineTick] = useState(0)
   const [pumpCheckSession, setPumpCheckSession] = useState<VictorySessionStats | null>(null)
@@ -150,7 +144,7 @@ export function TrainingView({
   const [notebookEditNote, setNotebookEditNote] = useState<WorkoutNote | null>(null)
   /** Séance libre : carnet vide → sélecteur premier exo. */
   const [notebookStartEmpty, setNotebookStartEmpty] = useState(false)
-  const [summaryFilter, setSummaryFilter] = useState<SportSummaryFilter>('all')
+  const summaryFilter: SportSummaryFilter = 'all'
   const [focusNoteId, setFocusNoteId] = useState<string | null>(null)
   const [nowTick, setNowTick] = useState(() => Date.now())
   const [clockTick, setClockTick] = useState(() => Date.now())
@@ -227,20 +221,8 @@ export function TrainingView({
     () => deriveRecentSessions(state.workoutNotes, now, 1),
     [state.workoutNotes, now],
   )
-  const recsEnabled = isTrainingRecommendationsEnabled()
-  const recommendations = useMemo(() => {
-    if (!recsEnabled) return []
-    return recommendExercises(
-      recommendationProfileFromState(state, {
-        goal: profile.goal,
-        nowMs: nowTick,
-      }),
-    ).items
-  }, [recsEnabled, state, profile.goal, nowTick])
-  const heroRec = recommendations[0] ?? null
-  const heroSetCount = heroRec
-    ? lastLoggedSetCount(state.workoutNotes, heroRec.canonicalExerciseId)
-    : null
+  const todayCard = useMemo(() => deriveTodayHubCard(state, now), [state, now])
+  const lastSession = recentSessions[0] ?? null
 
   const resetCardioSheet = useCallback(() => {
     setDurationMin(40)
@@ -283,6 +265,12 @@ export function TrainingView({
     setChromeHidden(hide)
     return () => setChromeHidden(false)
   }, [immersiveLiveSession, pumpCheckSession, setChromeHidden])
+
+  /** Hub Train v2 + Mon créneau : plein écran (hero bord à bord), Tab Bar conservée. */
+  useEffect(() => {
+    setContentFullBleed(panel === 'hub' || panel === 'creneau')
+    return () => setContentFullBleed(false)
+  }, [panel, setContentFullBleed])
 
   const openNotebook = useCallback((
     routineId?: string | null,
@@ -426,46 +414,6 @@ export function TrainingView({
     setState(next)
   }
 
-  const applyRecommendation = useCallback(
-    (rec: TrainingRecommendation) => {
-      const catalog = getCatalogExercise(rec.canonicalExerciseId)
-      if (!catalog) return
-      const hadDraft = Boolean(getTrainingState().activeWorkoutDraft)
-      if (!hadDraft) {
-        setState(startFreeWorkoutSession('musculation'))
-      }
-      const entry = {
-        id: `ex-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        name: catalog.name,
-        canonicalExerciseId: catalog.id,
-        sets: [{ reps: 0, weightKg: 0 }],
-      }
-      const before = getTrainingState()
-      const draftRoutine = before.routines.find((r) => r.id === before.activeWorkoutDraft?.routineId)
-      const already = Boolean(
-        catalog.id &&
-          draftRoutine?.exercises?.some((ex) => ex.canonicalExerciseId === catalog.id),
-      )
-      const next = appendExerciseToActiveRoutine(entry)
-      const live = next.routines.find((r) => r.id === next.activeWorkoutDraft?.routineId)
-      const focus = live?.exercises?.findIndex((ex) => ex.canonicalExerciseId === catalog.id) ?? 0
-      const focused = persistActiveExerciseIndex(focus >= 0 ? focus : 0)
-      setState(focused)
-      const draft = focused.activeWorkoutDraft
-      if (hadDraft && already) {
-        showToast('Déjà dans ta séance')
-      } else if (hadDraft) {
-        showToast('Ajouté à ta séance')
-      }
-      if (draft) openNotebook(draft.routineId, null, true)
-    },
-    [openNotebook, showToast],
-  )
-
-  const refuseRecommendation = useCallback((rec: TrainingRecommendation) => {
-    setState(dismissRecommendedExercise(rec.canonicalExerciseId))
-  }, [])
-
   useEffect(() => {
     const stop = startReminderWatcher(
       () => getTrainingState().schedule,
@@ -598,6 +546,28 @@ export function TrainingView({
     setDisciplineTick((t) => t + 1)
   }
 
+  const handleTodayPrimary = useCallback(() => {
+    const card = todayCard
+    if (card.cta === 'resume' || card.cta === 'start') {
+      if (card.sportId === 'musculation' || card.openTarget === 'notebook') {
+        applyDiscipline('musculation')
+        const rid = launchableRoutineId(card)
+        openNotebook(rid, null, card.cta === 'resume')
+        return
+      }
+      if (card.openTarget === 'endurance') {
+        applyDiscipline('course')
+        setPanel('endurance')
+        return
+      }
+      if (card.openTarget === 'session') {
+        setCardioOpen(true)
+        return
+      }
+    }
+    setActivityOpen(true)
+  }, [todayCard, openNotebook])
+
   const applySport = (sportId: string) => {
     const selectedSport = getSportById(sportId)
     const nextDiscipline = selectedSport
@@ -692,7 +662,7 @@ export function TrainingView({
     setNotebookLaunchId(null)
   }
 
-  const panelTitle: Record<Exclude<TrainPanel, 'hub'>, string> = {
+  const panelTitle: Record<Exclude<TrainPanel, 'hub' | 'creneau'>, string> = {
     notebook: 'Carnet',
     endurance: 'Course / Endurance',
     agenda: 'Programmes',
@@ -703,29 +673,18 @@ export function TrainingView({
   return (
     <div
       className={`train-view flex flex-col ${
-        immersiveLiveSession ? 'gap-0' : panel === 'history' ? 'gap-2' : panel === 'hub' ? 'gap-4' : 'gap-6'
+        immersiveLiveSession || panel === 'creneau' || panel === 'hub'
+          ? 'gap-0'
+          : panel === 'history'
+            ? 'gap-2'
+            : 'gap-6'
       }${panel === 'history' ? ' train-view--history' : ''}`}
       style={{
-        paddingBottom: immersiveLiveSession ? 0 : 8,
+        paddingBottom: immersiveLiveSession || panel === 'creneau' || panel === 'hub' ? 0 : 8,
       }}
+      data-train-panel={panel}
     >
-      {panel === 'hub' ? (
-        <header className="relative ios-fade-up">
-          <div className="flex items-start justify-between gap-3">
-            <h1 className="text-[34px] font-bold tracking-tight text-white">
-              <BlurInText as="span">Train</BlurInText>
-            </h1>
-            <button
-              type="button"
-              onClick={() => setPanel('agenda')}
-              className="ios-press flex min-h-11 min-w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-[#ACB4BA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF0702]/35"
-              aria-label="Réglages"
-            >
-              <Settings2 className="h-5 w-5" aria-hidden="true" />
-            </button>
-          </div>
-        </header>
-      ) : immersiveLiveSession ? null : (
+      {immersiveLiveSession || panel === 'creneau' || panel === 'hub' ? null : (
         <header className="flex items-center gap-2 ios-fade-up">
           <button
             type="button"
@@ -741,51 +700,28 @@ export function TrainingView({
         </header>
       )}
 
-      {dueBanner && !immersiveLiveSession && panel !== 'hub' ? (
+      {dueBanner && !immersiveLiveSession && panel !== 'hub' && panel !== 'creneau' ? (
         <div className="rounded-2xl border border-[#FF0702]/40 bg-[#FF0702]/15 px-4 py-3 text-[14px] font-semibold text-white">
           {dueBanner}
         </div>
       ) : null}
 
+      {panel === 'creneau' ? <CreneauFlow onBack={goHub} /> : null}
+
       {panel === 'hub' ? (
-        <div className="flex flex-col gap-4" data-training-hub>
-          <TrainWeekStrip days={weekStrip} />
-
-          {heroRec ? (
-            <TrainingRecommendationCard
-              recommendation={heroRec}
-              primaryLabel={state.activeWorkoutDraft ? 'add' : 'start'}
-              setCount={heroSetCount}
-              onPrimary={() => applyRecommendation(heroRec)}
-              onDismiss={() => refuseRecommendation(heroRec)}
-            />
-          ) : recsEnabled ? (
-            <p className="text-[14px] text-[#ACB4BA]" data-training-reco-empty>
-              Aucune suggestion pour l’instant. Lance une séance depuis le bouton central.
-            </p>
-          ) : null}
-
-          <Reveal>
-            <TrainWeeklySummary
-              summary={weeklySummary}
-              filter={summaryFilter}
-              onFilterChange={setSummaryFilter}
-              compact
-            />
-          </Reveal>
-
-          <Reveal delayMs={60}>
-            <TrainRecentSessions
-              items={recentSessions}
-              single
-              onOpen={(id) => {
-                setFocusNoteId(id)
-                setPanel('history')
-              }}
-              onSeeAll={() => setPanel('history')}
-            />
-          </Reveal>
-        </div>
+        <TrainV2Hub
+          today={todayCard}
+          weekStrip={weekStrip}
+          weeklySummary={weeklySummary}
+          lastSession={lastSession}
+          onSettings={() => setPanel('agenda')}
+          onStart={handleTodayPrimary}
+          onOpenCreneau={() => setPanel('creneau')}
+          onOpenLastSession={(id) => {
+            setFocusNoteId(id)
+            setPanel('history')
+          }}
+        />
       ) : null}
 
       {panel === 'notebook' ? (

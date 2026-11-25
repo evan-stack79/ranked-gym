@@ -17,6 +17,9 @@ import HydrationV3Fixture from './fixtures/HydrationV3Fixture.tsx'
 import { HeightWeightFixture } from './fixtures/HeightWeightFixture.tsx'
 import { InscriptionFixture } from './fixtures/InscriptionFixture.tsx'
 import { AddFoodScreenFixture } from './fixtures/AddFoodScreenFixture.tsx'
+import { CreneauV9Fixture } from './fixtures/CreneauV9Fixture.tsx'
+import { CreneauLayoutFixture } from './fixtures/CreneauLayoutFixture.tsx'
+import { TrainV2Fixture } from './fixtures/TrainV2Fixture.tsx'
 import { YourDataMealsEraseFixture } from './fixtures/YourDataMealsEraseFixture.tsx'
 import { LegalDocumentScreen } from './components/legal/LegalDocumentScreen.tsx'
 import { legalKindFromPath } from './components/legal/legalRoutes.ts'
@@ -78,6 +81,9 @@ function resolveBootTree() {
   if (QA_FIXTURES_ENABLED && path === '/auth-welcome-logged-in-fixture')
     return <AuthWelcomeLoggedInFixture />
   if (QA_FIXTURES_ENABLED && path === '/auth-welcome-sheet-fixture') return <AuthWelcomeSheetFixture />
+  if (QA_FIXTURES_ENABLED && path === '/creneau-v9-fixture') return <CreneauV9Fixture />
+  if (QA_FIXTURES_ENABLED && path === '/creneau-layout-fixture') return <CreneauLayoutFixture />
+  if (QA_FIXTURES_ENABLED && path === '/train-v2-fixture') return <TrainV2Fixture />
   return <App />
 }
 
@@ -100,6 +106,9 @@ function isColdLaunchPath() {
   if (QA_FIXTURES_ENABLED && path === '/height-weight-fixture') return false
   if (QA_FIXTURES_ENABLED && path === '/inscription-fixture') return false
   if (QA_FIXTURES_ENABLED && path === '/train-fixture') return false
+  if (QA_FIXTURES_ENABLED && path === '/creneau-v9-fixture') return false
+  if (QA_FIXTURES_ENABLED && path === '/creneau-layout-fixture') return false
+  if (QA_FIXTURES_ENABLED && path === '/train-v2-fixture') return false
   return true
 }
 

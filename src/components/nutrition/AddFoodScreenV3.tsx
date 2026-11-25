@@ -386,7 +386,7 @@ export function AddFoodScreenV3({
             autoComplete="off"
             autoFocus
             role="searchbox"
-            aria-label="Rechercher un aliment Open Food Facts"
+            aria-label="Rechercher un aliment"
           />
         </label>
 
@@ -412,7 +412,7 @@ export function AddFoodScreenV3({
           data-food-results
         >
           {searchLoading && filteredHits.length === 0 ? (
-            <p className="py-10 text-center text-[13px] text-[#ACB4BA]">Recherche Open Food Facts…</p>
+            <p className="py-10 text-center text-[13px] text-[#ACB4BA]">Je cherche…</p>
           ) : null}
 
           {searchError && !searchLoading ? (
@@ -428,8 +428,8 @@ export function AddFoodScreenV3({
               role="status"
             >
               {!online || forceOfflineImages
-                ? 'Pas de connexion. Réessaie quand tu as du réseau.'
-                : 'Aucun produit trouvé.'}
+                ? 'Pas de réseau. Réessaie plus tard.'
+                : 'Rien trouvé. Essaie un autre mot.'}
             </p>
           ) : null}
 
@@ -445,7 +445,7 @@ export function AddFoodScreenV3({
             <ul
               className="grid grid-cols-2 gap-x-3 gap-y-3 pt-2"
               role="listbox"
-              aria-label="Résultats Open Food Facts"
+              aria-label="Résultats"
               aria-multiselectable="true"
             >
               {filteredHits.map((hit) => {

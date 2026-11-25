@@ -208,7 +208,7 @@ export function WaterSettingsSheet({ open, onClose }: WaterSettingsSheetProps) {
               {today?.mode === 'my_bottle' && today.proActive ? (
                 <div className="space-y-2 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
                   <p className="text-[13px] leading-snug text-[#ACB4BA]">
-                    Look cosmétique Pass Pro. Aucun avantage de jeu.
+                    Juste un look Pro. Aucun bonus de jeu.
                   </p>
                   <button
                     type="button"

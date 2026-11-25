@@ -217,7 +217,7 @@ export function deriveNextSessionTile(
       title: today.title,
       subtitle: today.canStart
         ? `${today.exerciseCount} exercice${today.exerciseCount > 1 ? 's' : ''} · ${today.time}`
-        : `Planifiée · ${today.time}`,
+        : `Prévue à ${today.time}`,
       routineId: today.routineId,
       canStart: today.canStart,
       inProgress: false,
@@ -250,7 +250,7 @@ export function deriveNextSessionTile(
 
   return {
     title: 'Aucune séance prévue',
-    subtitle: 'Planifie dans Train',
+    subtitle: 'Ajoute-la dans Train',
     routineId: null,
     canStart: false,
     inProgress: false,

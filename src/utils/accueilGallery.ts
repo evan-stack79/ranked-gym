@@ -159,7 +159,7 @@ export function deriveGalleryHeroCards(
   const withExos = programRoutines.filter((r) => (r.exercises?.length ?? 0) > 0).length
   const programSecondary =
     programRoutines.length === 0
-      ? 'Configure ton carnet'
+      ? 'Remplis ton carnet'
       : `${withExos}/${programRoutines.length} routines prêtes`
 
   const sessionRoutine = routineId

@@ -39,8 +39,8 @@ describe('TextFlip', () => {
     vi.unstubAllGlobals()
   })
 
-  it('defaults to Prêt / Motivé / Focus and exposes static sr-only Prêt', () => {
-    expect([...GREETING_FLIP_WORDS]).toEqual(['Prêt', 'Motivé', 'Focus'])
+  it('defaults to Salut and exposes static sr-only Salut', () => {
+    expect([...GREETING_FLIP_WORDS]).toEqual(['Salut'])
     expect(TEXT_FLIP_INTERVAL_MS).toBe(2500)
 
     act(() => {
@@ -48,25 +48,25 @@ describe('TextFlip', () => {
     })
 
     const el = host.querySelector('[data-rg-text-flip]') as HTMLElement
-    expect(el.querySelector('.sr-only')?.textContent).toBe('Prêt')
-    expect(el.querySelector('[aria-hidden="true"] .rg-text-flip__word')?.textContent).toBe('Prêt')
+    expect(el.querySelector('.sr-only')?.textContent).toBe('Salut')
+    expect(el.querySelector('[aria-hidden="true"] .rg-text-flip__word')?.textContent).toBe('Salut')
     expect(el.querySelector('[aria-live]')).toBeNull()
   })
 
-  it('prefers-reduced-motion shows only Prêt (no cycle)', () => {
+  it('prefers-reduced-motion shows only Salut (no cycle)', () => {
     mockMatchMedia(true)
     act(() => {
       root.render(<TextFlip />)
     })
     const el = host.querySelector('[data-rg-text-flip="static"]') as HTMLElement
     expect(el).not.toBeNull()
-    expect(el.textContent).toBe('Prêt')
+    expect(el.textContent).toBe('Salut')
     expect(el.getAttribute('data-rg-motion')).toBe('reduced')
   })
 
   it('cycles to the next word after interval and pauses when tab hidden', () => {
     act(() => {
-      root.render(<TextFlip />)
+      root.render(<TextFlip words={['Salut', 'Motivé', 'Focus']} />)
     })
 
     act(() => {

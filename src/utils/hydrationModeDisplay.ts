@@ -60,7 +60,7 @@ export function carouselTitleForMode(mode: HydrationMode): string {
     case 'classic_2l':
       return '2 L'
     case 'my_bottle':
-      return 'Ma bout.'
+      return 'Bouteille'
     default:
       return '2 L'
   }
@@ -91,7 +91,7 @@ export function bottleScreenLabelForMode(mode: HydrationMode): string {
     case 'glasses_250':
       return 'Verre 250 ml'
     case 'classic_15':
-      return 'Cristaline 1,5 L'
+      return 'Bouteille 1,5 L'
     case 'classic_2l':
       return 'Bouteille 2 L'
     case 'my_bottle':
