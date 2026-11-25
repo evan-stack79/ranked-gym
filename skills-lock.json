@@ -97,6 +97,30 @@
       "computedHash": "21ac62910306392f1ba935a1fd1d80dfd87e4ba0d83fefcfc3206043fd8d2c2e",
       "installMode": "copy"
     },
+    "hyperframes": {
+      "source": "heygen-com/hyperframes",
+      "commit": "9f1b1b437c650b79e65ea2583b77c2b933baa6e4",
+      "sourceType": "github",
+      "skillPath": "skills/hyperframes/SKILL.md",
+      "computedHash": "f1014735ac384648120552c612743d190b485e53a9837adf311754dfa3d5b515",
+      "installMode": "copy"
+    },
+    "hyperframes-cli": {
+      "source": "heygen-com/hyperframes",
+      "commit": "9f1b1b437c650b79e65ea2583b77c2b933baa6e4",
+      "sourceType": "github",
+      "skillPath": "skills/hyperframes-cli/SKILL.md",
+      "computedHash": "0ea9db9323924084f7e2b24e9eb2755891ba7a74c0b706c2d3ea0e54b7b23eea",
+      "installMode": "copy"
+    },
+    "hyperframes-registry": {
+      "source": "heygen-com/hyperframes",
+      "commit": "9f1b1b437c650b79e65ea2583b77c2b933baa6e4",
+      "sourceType": "github",
+      "skillPath": "skills/hyperframes-registry/SKILL.md",
+      "computedHash": "6867a66011b2cda40600cc9bff07e89197b756e6aa77861d884285ba7a869361",
+      "installMode": "copy"
+    },
     "interface-review": {
       "source": "jakubkrehel/skills",
       "commit": "672ae44ace6aaed65b86cbb1e2fd6fbea0e79578",
@@ -105,12 +129,36 @@
       "computedHash": "77008a18d758ea6f18f72f650b3dde6f71522bedfa349d25d548ed5f0b9c3e5a",
       "installMode": "copy"
     },
+    "media-use": {
+      "source": "heygen-com/hyperframes",
+      "commit": "9f1b1b437c650b79e65ea2583b77c2b933baa6e4",
+      "sourceType": "github",
+      "skillPath": "skills/media-use/SKILL.md",
+      "computedHash": "62e4e046849d17cd7d31a9f9ba3930b61cc39ef9cd1291ef5c5d708866104211",
+      "installMode": "copy"
+    },
+    "reverse-any-video": {
+      "source": "heygen-com/hyperframes",
+      "commit": "9f1b1b437c650b79e65ea2583b77c2b933baa6e4",
+      "sourceType": "github",
+      "skillPath": "skills/reverse-any-video/SKILL.md",
+      "computedHash": "221f106c2b350432e566d8469f91c914978a868becd7fffe72f312ae105d1297",
+      "installMode": "copy"
+    },
     "state-machine": {
       "source": "jakubkrehel/skills",
       "commit": "672ae44ace6aaed65b86cbb1e2fd6fbea0e79578",
       "sourceType": "github",
       "skillPath": "skills/state-machine/SKILL.md",
       "computedHash": "36cc762e0b394918deb6785ece94a416996194f1c51df785ccea978fd6321625",
+      "installMode": "copy"
+    },
+    "style-sampling": {
+      "source": "heygen-com/hyperframes",
+      "commit": "9f1b1b437c650b79e65ea2583b77c2b933baa6e4",
+      "sourceType": "github",
+      "skillPath": "skills/style-sampling/SKILL.md",
+      "computedHash": "433d429c44c3e43028f804b4f6a933994d1a7f2c891faef26ec04d42b26cefa2",
       "installMode": "copy"
     },
     "upskill": {
