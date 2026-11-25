@@ -37,6 +37,7 @@ export function AppLayout({
     isBarVisible,
     readyBarEnabled,
     chromeHidden,
+    contentFullBleed,
     start,
     pause,
     resume,
@@ -45,13 +46,14 @@ export function AppLayout({
   } = useRestTimerContext()
 
   const streakCelebrationActive = Boolean(streakCelebration)
-  const showHeader = shouldShowBrandHeader(activeTab, chromeHidden)
+  const showHeader = shouldShowBrandHeader(activeTab, chromeHidden, contentFullBleed)
   const { mode: bottomNavMode, keyboardOpen, expand } = useAdaptiveBottomNav({ mainRef, resetKey: activeTab })
   const showBottomNav = !chromeHidden && !hideBottomNav && !keyboardOpen
   const bottomNavObscured = streakCelebrationActive
   const showReadyBar = !chromeHidden && activeTab === 'training' && readyBarEnabled
   const floatingPillNav = isAccueilGalleryEnabled()
   const sleepTab = activeTab === 'sleep'
+  const edgeToEdge = chromeHidden || contentFullBleed
 
   useEffect(() => {
     if (floatingPillNav) {
@@ -119,10 +121,10 @@ export function AppLayout({
       <main
         ref={mainRef}
         className={`relative z-10 min-h-0 w-full flex-1 overflow-x-clip overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch] ${
-          chromeHidden ? 'max-w-none' : ''
+          edgeToEdge ? 'max-w-none' : ''
         }`}
         style={
-          chromeHidden
+          edgeToEdge
             ? { paddingBottom: 0 }
             : {
                 paddingBottom:
@@ -135,17 +137,18 @@ export function AppLayout({
         }
         aria-hidden={streakCelebrationActive ? true : undefined}
         data-app-scroll-main="1"
+        data-app-full-bleed={contentFullBleed ? '1' : undefined}
       >
         <div
           className={
-            chromeHidden
-              ? undefined
+            edgeToEdge
+              ? 'relative h-full min-h-full w-full max-w-none px-0 py-0'
               : sleepTab
                 ? 'mx-auto w-full max-w-lg px-5'
                 : 'mx-auto w-full max-w-lg px-5 py-8'
           }
           style={
-            chromeHidden || showHeader
+            edgeToEdge || showHeader
               ? undefined
               : sleepTab
                 ? {
@@ -158,7 +161,15 @@ export function AppLayout({
                     paddingTop: 'max(2rem, calc(env(safe-area-inset-top, 0px) + 1rem))',
                   }
           }
-          data-app-content-pad={sleepTab ? 'sleep' : showHeader ? 'brand' : 'default'}
+          data-app-content-pad={
+            contentFullBleed
+              ? 'full-bleed'
+              : sleepTab
+                ? 'sleep'
+                : showHeader
+                  ? 'brand'
+                  : 'default'
+          }
         >
           {children}
         </div>

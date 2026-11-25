@@ -72,6 +72,16 @@ const STATES: StateDef[] = [
     secondaryLabel: 'Séance douce',
   },
   {
+    id: 'empty',
+    heroSrc: hero06,
+    eyebrow: 'Ce soir',
+    giant: '—',
+    line1: 'Aucun créneau pour l’instant.',
+    line2: CRENEAU_PHRASES.minorEveningHelp,
+    primaryLabel: 'Changer de salle',
+    secondaryLabel: null,
+  },
+  {
     id: 'depart_depasse',
     heroSrc: hero05,
     eyebrow: formatDepartedHeadline('17:15'),

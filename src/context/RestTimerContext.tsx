@@ -75,6 +75,12 @@ type RestTimerContextValue = {
    */
   chromeHidden: boolean
   setChromeHidden: (hidden: boolean) => void
+  /**
+   * Plein écran contenu (ex. Mon créneau) : masque la barre marque, retire max-w / padding
+   * latéral, garde la Tab Bar + bouton rouge central.
+   */
+  contentFullBleed: boolean
+  setContentFullBleed: (fullBleed: boolean) => void
   start: (seconds: number, target: RestTimerTarget) => void
   pause: () => void
   resume: () => void
@@ -106,6 +112,7 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<RestTimerState>(IDLE)
   const [readyBarEnabled, setReadyBarEnabled] = useState(false)
   const [chromeHidden, setChromeHiddenState] = useState(false)
+  const [contentFullBleed, setContentFullBleedState] = useState(false)
   /** Force un cycle d’hydratation après restore / changement d’utilisateur. */
   const [hydrateEpoch, setHydrateEpoch] = useState(0)
 
@@ -511,6 +518,10 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
     setChromeHiddenState(hidden)
   }, [])
 
+  const setContentFullBleed = useCallback((fullBleed: boolean) => {
+    setContentFullBleedState(fullBleed)
+  }, [])
+
   const value = useMemo<RestTimerContextValue>(
     () => ({
       state,
@@ -520,6 +531,8 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       isBarVisible,
       chromeHidden,
       setChromeHidden,
+      contentFullBleed,
+      setContentFullBleed,
       start,
       pause,
       resume,
@@ -535,6 +548,8 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
       isBarVisible,
       chromeHidden,
       setChromeHidden,
+      contentFullBleed,
+      setContentFullBleed,
       start,
       pause,
       resume,

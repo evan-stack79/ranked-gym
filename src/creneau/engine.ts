@@ -517,6 +517,12 @@ export function proposeCreneau(args: ProposeArgs): {
     if (b) planB = b.slot
   }
 
+  // Soirée / fin de vacation : séance 60 min hors fenêtre staffée → retenter en séance douce
+  // (30 min) avant d’afficher l’état vide. Ne change pas les vetos mineurs.
+  if (!primary && !args.softSession) {
+    return proposeCreneau({ ...args, softSession: true })
+  }
+
   return {
     primary,
     planB,

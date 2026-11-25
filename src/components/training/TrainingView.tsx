@@ -140,8 +140,14 @@ export function TrainingView({
     nonce: number
   } | null>(null)
 
-  const { start: startRestTimer, dismiss: dismissRestTimer, setReadyBarEnabled, isBarVisible, setChromeHidden } =
-    useRestTimerContext()
+  const {
+    start: startRestTimer,
+    dismiss: dismissRestTimer,
+    setReadyBarEnabled,
+    isBarVisible,
+    setChromeHidden,
+    setContentFullBleed,
+  } = useRestTimerContext()
 
   const [disciplineTick, setDisciplineTick] = useState(0)
   const [pumpCheckSession, setPumpCheckSession] = useState<VictorySessionStats | null>(null)
@@ -284,6 +290,12 @@ export function TrainingView({
     setChromeHidden(hide)
     return () => setChromeHidden(false)
   }, [immersiveLiveSession, pumpCheckSession, setChromeHidden])
+
+  /** Mon créneau : plein écran (hero bord à bord), Tab Bar conservée. */
+  useEffect(() => {
+    setContentFullBleed(panel === 'creneau')
+    return () => setContentFullBleed(false)
+  }, [panel, setContentFullBleed])
 
   const openNotebook = useCallback((
     routineId?: string | null,
@@ -704,11 +716,18 @@ export function TrainingView({
   return (
     <div
       className={`train-view flex flex-col ${
-        immersiveLiveSession ? 'gap-0' : panel === 'history' ? 'gap-2' : panel === 'hub' ? 'gap-4' : 'gap-6'
+        immersiveLiveSession || panel === 'creneau'
+          ? 'gap-0'
+          : panel === 'history'
+            ? 'gap-2'
+            : panel === 'hub'
+              ? 'gap-4'
+              : 'gap-6'
       }${panel === 'history' ? ' train-view--history' : ''}`}
       style={{
-        paddingBottom: immersiveLiveSession ? 0 : 8,
+        paddingBottom: immersiveLiveSession || panel === 'creneau' ? 0 : 8,
       }}
+      data-train-panel={panel}
     >
       {panel === 'hub' ? (
         <header className="relative ios-fade-up">

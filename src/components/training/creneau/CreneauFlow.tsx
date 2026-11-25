@@ -77,7 +77,9 @@ export function CreneauFlow({ onBack }: { onBack: () => void }) {
   const [showCrowdPick, setShowCrowdPick] = useState(false)
   const [usingPlanB, setUsingPlanB] = useState(false)
 
-  const age = getCalorieProfile().age ?? null
+  // age 0 = profil non renseigné (nutrition default) → inconnu / protecteur mineur
+  const rawAge = getCalorieProfile().age
+  const age = rawAge > 0 ? rawAge : null
   const minor = isCreneauMinor(age)
 
   useEffect(() => {
@@ -150,15 +152,20 @@ export function CreneauFlow({ onBack }: { onBack: () => void }) {
   }
 
   // ——— Empty ———
+  // Titre « Mon créneau » uniquement dans le header CreneauV9Screen (pas en eyebrow).
   if (!primary || !depDisplay) {
     return (
       <CreneauV9Screen
         stateId="empty"
         heroSrc={hero06}
-        eyebrow="Mon créneau"
+        eyebrow="Ce soir"
         giant="—"
         line1="Aucun créneau pour l’instant."
-        line2={null}
+        line2={
+          minor
+            ? CRENEAU_PHRASES.minorEveningHelp
+            : 'La salle n’est plus proposée à cette heure.'
+        }
         primaryLabel="Changer de salle"
         onPrimary={() => setPane('gyms')}
         secondaryLabel={null}

@@ -39,7 +39,7 @@ export function CreneauV9Screen({
 }: CreneauV9ScreenProps) {
   return (
     <div
-      className="relative -mx-4 flex min-h-[calc(100dvh-0.5rem)] flex-col overflow-hidden"
+      className="relative flex min-h-[100dvh] w-full flex-col overflow-hidden rounded-none"
       style={{ background: CRENEAU_V9_BG }}
       data-creneau-v9
       data-creneau-v9-state={stateId}

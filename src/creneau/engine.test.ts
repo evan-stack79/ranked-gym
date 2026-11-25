@@ -286,6 +286,66 @@ describe('creneau safety engine', () => {
     expect(primary!.returnHm < '20:00').toBe(true)
   })
 
+  it('soirée : auto softSession si séance 60 min hors vacation staffée', () => {
+    const gym = {
+      id: 'g1',
+      name: 'Salle de la gare',
+      staffFromHm: '07:00',
+      staffUntilHm: '22:00',
+      closesHm: '23:00',
+      travelMin: 15,
+      latitude: TERGNIER_COORDS.latitude,
+      longitude: TERGNIER_COORDS.longitude,
+      cityKnown: true,
+    }
+    const strict = proposeCreneau({
+      age: 28,
+      nowHm: '20:54',
+      heatVigilance: false,
+      eveningWalkEnabled: false,
+      stafflessGymEnabled: false,
+      preferQuiet: true,
+      softSession: true,
+      delayMin: 0,
+      favorite: gym,
+      backup: null,
+      nowDate: new Date(2026, 10, 25),
+    })
+    expect(strict.primary).not.toBeNull()
+    expect(strict.primary!.soft).toBe(true)
+
+    const auto = proposeCreneau({
+      age: 28,
+      nowHm: '20:54',
+      heatVigilance: false,
+      eveningWalkEnabled: false,
+      stafflessGymEnabled: false,
+      preferQuiet: true,
+      softSession: false,
+      delayMin: 0,
+      favorite: gym,
+      backup: null,
+      nowDate: new Date(2026, 10, 25),
+    })
+    expect(auto.primary).not.toBeNull()
+    expect(auto.primary!.soft).toBe(true)
+
+    const minorLate = proposeCreneau({
+      age: null,
+      nowHm: '20:54',
+      heatVigilance: false,
+      eveningWalkEnabled: false,
+      stafflessGymEnabled: false,
+      preferQuiet: true,
+      softSession: false,
+      delayMin: 0,
+      favorite: gym,
+      backup: null,
+      nowDate: new Date(2026, 10, 25),
+    })
+    expect(minorLate.primary).toBeNull()
+  })
+
   it('crowd: 3 taps same person ≠ sûr (CA-C22 dedupe)', () => {
     const now = 1_000_000
     const samePerson = [
