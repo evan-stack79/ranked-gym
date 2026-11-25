@@ -1,28 +1,12 @@
 {
   "version": 2,
   "skills": {
-    "accessibility-inclusive-design": {
-      "source": "hueyexe/frontend-agent-skills",
-      "commit": "2841c079dd8a9c634882227194dc42e25227710d",
-      "sourceType": "github",
-      "skillPath": "accessibility-inclusive-design/SKILL.md",
-      "computedHash": "83b4897fc99ce6cfa95831f4f44c810afa631beeffdbdd1877b9b7b565e1eb38",
-      "installMode": "copy"
-    },
     "afk": {
       "source": "jakubkrehel/skills",
       "commit": "672ae44ace6aaed65b86cbb1e2fd6fbea0e79578",
       "sourceType": "github",
       "skillPath": "skills/afk/SKILL.md",
       "computedHash": "36877a032a45a6659b596031d530706c71bd062f294b8c106ad7b8b4570f542d",
-      "installMode": "copy"
-    },
-    "banner-design": {
-      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
-      "commit": "8db36338810d0942567b97ce439affd1619fcf31",
-      "sourceType": "github",
-      "skillPath": ".claude/skills/banner-design/SKILL.md",
-      "computedHash": "4b22f6f48afc6fcd72e6f3ae106a4dca11b33b88221efded1f5c62d8f9afb50d",
       "installMode": "copy"
     },
     "better-accessibility": {
@@ -89,14 +73,6 @@
       "computedHash": "2a1272ec964d55720f0aa7b95bf198aa488099950f52f4dbd975906438b955af",
       "installMode": "copy"
     },
-    "brand": {
-      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
-      "commit": "8db36338810d0942567b97ce439affd1619fcf31",
-      "sourceType": "github",
-      "skillPath": ".claude/skills/brand/SKILL.md",
-      "computedHash": "d5619310b76bd204efd2f8b3832f72b5a2899712be0ab94d1b4b671271419c54",
-      "installMode": "copy"
-    },
     "break": {
       "source": "jakubkrehel/skills",
       "commit": "672ae44ace6aaed65b86cbb1e2fd6fbea0e79578",
@@ -113,30 +89,6 @@
       "computedHash": "78b640694e568d796dd9044256889d8b28853d98f3349dd08305ae9aeea4aaac",
       "installMode": "copy"
     },
-    "design": {
-      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
-      "commit": "8db36338810d0942567b97ce439affd1619fcf31",
-      "sourceType": "github",
-      "skillPath": ".claude/skills/design/SKILL.md",
-      "computedHash": "da1c68168b9619307d517ab836215d8a6ef249b0da096078769629eeaebb3f7a",
-      "installMode": "copy"
-    },
-    "design-system": {
-      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
-      "commit": "8db36338810d0942567b97ce439affd1619fcf31",
-      "sourceType": "github",
-      "skillPath": ".claude/skills/design-system/SKILL.md",
-      "computedHash": "9efdc106c73d8d298b5a90d55c56995840a37f754fb9d498d14e6562bdaadc23",
-      "installMode": "copy"
-    },
-    "design-systems-frontend-architecture": {
-      "source": "hueyexe/frontend-agent-skills",
-      "commit": "2841c079dd8a9c634882227194dc42e25227710d",
-      "sourceType": "github",
-      "skillPath": "design-systems-frontend-architecture/SKILL.md",
-      "computedHash": "89346110db25c85067e3ff5b542da1d251c853c20d1f3d288a89e53412e03709",
-      "installMode": "copy"
-    },
     "design-taste-frontend": {
       "source": "Leonxlnx/taste-skill",
       "commit": "d1a2bb41d927083ac7118f60cfc9cdf711810ea0",
@@ -151,14 +103,6 @@
       "sourceType": "github",
       "skillPath": "skills/explain-interface/SKILL.md",
       "computedHash": "21ac62910306392f1ba935a1fd1d80dfd87e4ba0d83fefcfc3206043fd8d2c2e",
-      "installMode": "copy"
-    },
-    "forms-inputs-checkout": {
-      "source": "hueyexe/frontend-agent-skills",
-      "commit": "2841c079dd8a9c634882227194dc42e25227710d",
-      "sourceType": "github",
-      "skillPath": "forms-inputs-checkout/SKILL.md",
-      "computedHash": "f65afe1c5c379a12caf6836d96d87baa99fb0cf517cb667de606b9381e9cf145",
       "installMode": "copy"
     },
     "hyperframes": {
@@ -193,22 +137,6 @@
       "computedHash": "b89bce2429b2b581d38620af9b555e2b4762b12f6f4f61fb07fba7757a284b3e",
       "installMode": "copy"
     },
-    "information-architecture-navigation": {
-      "source": "hueyexe/frontend-agent-skills",
-      "commit": "2841c079dd8a9c634882227194dc42e25227710d",
-      "sourceType": "github",
-      "skillPath": "information-architecture-navigation/SKILL.md",
-      "computedHash": "2964fe328bb41acd57258e4eb1083e7d2ccf6f44e3209e46738f12d10acf3f8c",
-      "installMode": "copy"
-    },
-    "interaction-patterns-components": {
-      "source": "hueyexe/frontend-agent-skills",
-      "commit": "2841c079dd8a9c634882227194dc42e25227710d",
-      "sourceType": "github",
-      "skillPath": "interaction-patterns-components/SKILL.md",
-      "computedHash": "ae358ed6cecccf4c41fa66d5a3391175353eb62905f8f7d934ca5d85836eed50",
-      "installMode": "copy"
-    },
     "interface-review": {
       "source": "jakubkrehel/skills",
       "commit": "672ae44ace6aaed65b86cbb1e2fd6fbea0e79578",
@@ -233,14 +161,6 @@
       "computedHash": "221f106c2b350432e566d8469f91c914978a868becd7fffe72f312ae105d1297",
       "installMode": "copy"
     },
-    "slides": {
-      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
-      "commit": "8db36338810d0942567b97ce439affd1619fcf31",
-      "sourceType": "github",
-      "skillPath": ".claude/skills/slides/SKILL.md",
-      "computedHash": "059825b15a508a5f1533ab646f968ffcbcdbb8eadd76c2d122151bfbcf19d287",
-      "installMode": "copy"
-    },
     "state-machine": {
       "source": "jakubkrehel/skills",
       "commit": "672ae44ace6aaed65b86cbb1e2fd6fbea0e79578",
@@ -257,60 +177,12 @@
       "computedHash": "433d429c44c3e43028f804b4f6a933994d1a7f2c891faef26ec04d42b26cefa2",
       "installMode": "copy"
     },
-    "ui-styling": {
-      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
-      "commit": "8db36338810d0942567b97ce439affd1619fcf31",
-      "sourceType": "github",
-      "skillPath": ".claude/skills/ui-styling/SKILL.md",
-      "computedHash": "a598d8ad69832a394d4040e4c94e4b9c7b8daf2b1fdca050929058f7b70bc816",
-      "installMode": "copy"
-    },
-    "ui-ux-pro-max": {
-      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
-      "commit": "8db36338810d0942567b97ce439affd1619fcf31",
-      "sourceType": "github",
-      "skillPath": ".claude/skills/ui-ux-pro-max/SKILL.md",
-      "computedHash": "f583fab0f9bfd86aad1baede1c4f6719d70d0b007398b5cbbd2a75936ffcecd1",
-      "installMode": "copy"
-    },
-    "ui-visual-composition": {
-      "source": "hueyexe/frontend-agent-skills",
-      "commit": "2841c079dd8a9c634882227194dc42e25227710d",
-      "sourceType": "github",
-      "skillPath": "ui-visual-composition/SKILL.md",
-      "computedHash": "27259da5eaebd2782e07d25c187cebd7d5dd9ef07232727e27a3b59a489e6f49",
-      "installMode": "copy"
-    },
     "upskill": {
       "source": "jakubkrehel/skills",
       "commit": "672ae44ace6aaed65b86cbb1e2fd6fbea0e79578",
       "sourceType": "github",
       "skillPath": "skills/upskill/SKILL.md",
       "computedHash": "4fbebf3823e52e1515645f560cad8ed16e3ad63fd8c741d771f1c5851f497cf7",
-      "installMode": "copy"
-    },
-    "ux-research-discovery-testing": {
-      "source": "hueyexe/frontend-agent-skills",
-      "commit": "2841c079dd8a9c634882227194dc42e25227710d",
-      "sourceType": "github",
-      "skillPath": "ux-research-discovery-testing/SKILL.md",
-      "computedHash": "410409f5b737b0616b5b01e78248e02d0f4dee28824b61447b82664ea81ef49e",
-      "installMode": "copy"
-    },
-    "ux-usability-foundations": {
-      "source": "hueyexe/frontend-agent-skills",
-      "commit": "2841c079dd8a9c634882227194dc42e25227710d",
-      "sourceType": "github",
-      "skillPath": "ux-usability-foundations/SKILL.md",
-      "computedHash": "909629b75e9f3e95c4c99c8bf7c4783be797cae64afbd4db1d095c05e67bd8b8",
-      "installMode": "copy"
-    },
-    "ux-writing-content-design": {
-      "source": "hueyexe/frontend-agent-skills",
-      "commit": "2841c079dd8a9c634882227194dc42e25227710d",
-      "sourceType": "github",
-      "skillPath": "ux-writing-content-design/SKILL.md",
-      "computedHash": "bbd3e3f5497559be89749da50f130be350900d5346d8c4ead2acf7c5166797c8",
       "installMode": "copy"
     },
     "variant": {
